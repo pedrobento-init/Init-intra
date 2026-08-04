@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerar Icones PWA</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #f0f4f8; color: #1e293b; }
+    .card { background: #fff; border: 1px solid #d6dfe8; border-radius: 10px; padding: 24px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p { font-size: 14px; color: #64748b; }
+    canvas { border: 1px dashed #d6dfe8; border-radius: 4px; margin: 8px 0; }
+    .preview { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+    .preview div { text-align: center; }
+    .preview canvas { display: block; }
+    .preview span { font-size: 11px; color: #94a3b8; }
+    button { background: #1a56db; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500; }
+    button:hover { background: #1444b8; }
+  </style>
+</head>
+<body>
+  <h1>Gerar Icones PWA</h1>
+  <p>Abra esta pagina no navegador. Os PNGs 192x192 e 512x512 serao baixados automaticamente.</p>
+
+  <div class="card">
+    <p><strong>Preview:</strong></p>
+    <div class="preview">
+      <div><canvas id="c192"></canvas><span>192×192</span></div>
+      <div><canvas id="c512"></canvas><span>512×512</span></div>
+    </div>
+    <br/>
+    <button onclick="downloadIcons()">Baixar PNGs</button>
+  </div>
+
+  <script>
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="96" fill="#1a56db"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="Inter, system-ui, sans-serif" font-size="320" font-weight="800">I</text></svg>`;
+
+    function renderToCanvas(size) {
+      var canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var img = new Image();
+      var blob = new Blob([svg], { type: 'image/svg+xml' });
+      var url = URL.createObjectURL(blob);
+      return new Promise(function(resolve) {
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.src = url;
+      });
+    }
+
+    function downloadCanvas(canvas, filename) {
+      canvas.toBlob(function(blob) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    }
+
+    async function downloadIcons() {
+      var c192 = await renderToCanvas(192);
+      var c512 = await renderToCanvas(512);
+      downloadCanvas(c192, 'icon-192.png');
+      setTimeout(function() { downloadCanvas(c512, 'icon-512.png'); }, 300);
+    }
+
+    async function showPreview() {
+      var c192 = await renderToCanvas(192);
+      var c512 = await renderToCanvas(512);
+      var target192 = document.getElementById('c192');
+      var target512 = document.getElementById('c512');
+      target192.getContext('2d').drawImage(c192, 0, 0);
+      target512.getContext('2d').drawImage(c512, 0, 0);
+    }
+
+    showPreview();
+  </script>
+</body>
+</html>

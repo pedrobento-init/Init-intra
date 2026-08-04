@@ -1,0 +1,6 @@
+# Pastas/arquivos locais — não vão pro deploy
+supabase/
+tests/
+tools/
+README.md
+.gitignore

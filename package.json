@@ -1,0 +1,11 @@
+{
+  "name": "init-intra",
+  "version": "1.0.0",
+  "description": "Init Intra — Sistema interno de gestão (clientes, pendências, visitas)",
+  "private": true,
+  "scripts": {
+    "deploy": "vercel --prod",
+    "dev": "vercel dev",
+    "preview": "vercel"
+  }
+}
