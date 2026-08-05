@@ -70,6 +70,10 @@ function getSession() {
     const s = cache?.value || null;
     if (!s) return null;
     if (Date.now() - s.ts > SESSION_TTL) { clearSession(); return null; }
+    // Sessão local só vale com auth remoto ativo
+    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && !window._supabaseAuthActive) {
+      return null;
+    }
     return s;
   } catch { return null; }
 }
@@ -308,7 +312,9 @@ async function syncSupabaseToLocal() {
     }
 
     // 3. OPERATORS — remoto manda em privilégios; dedupe por e-mail
-    const { data: remoteOps, error: opErr } = await supabaseClient.from('operators').select('*');
+    const { data: remoteOps, error: opErr } = await supabaseClient
+      .from('operators')
+      .select('id,name,initials,color,role,phone,email,is_admin,active,team,auth_user_id,created_at,updated_at');
     if (opErr) console.warn('Supabase operators error:', opErr);
     if (remoteOps) {
       const localOps = dbGet(DB.OPERATORS) || [];
@@ -330,8 +336,9 @@ async function syncSupabaseToLocal() {
           o.active = rem.active !== false;
           o.team = rem.team || 'init';
           o.auth_user_id = rem.auth_user_id || loc?.auth_user_id || null;
-          o.pinHash = rem.pin_hash || loc?.pinHash || null;
-          o.pinSalt = rem.pin_salt || loc?.pinSalt || null;
+          // Hashes de senha não trafegam no sync (auth via Supabase)
+          o.pinHash = loc?.pinHash || null;
+          o.pinSalt = loc?.pinSalt || null;
         } else {
           o.pinHash = loc?.pinHash || null;
           o.pinSalt = loc?.pinSalt || null;
@@ -364,11 +371,12 @@ async function syncSupabaseToLocal() {
 
       for (const o of finalOps) {
         const r = remoteOps.find(x => x.id === o.id);
-        if (_needsPush(o, r)) {
+        if (_needsPush(o, r) && typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
           await supabaseClient.from('operators').upsert({
             id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role,
-            phone: o.phone, email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null,
+            phone: o.phone, email: o.email,
             is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init',
+            auth_user_id: o.auth_user_id || null,
             created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
           });
         }
@@ -1142,9 +1150,9 @@ async function saveOperator(data) {
   
   addLog(isEdit ? 'Editou' : 'Criou', 'Operador', savedOp.id, savedOp.name);
 
-  // Sync to Supabase using the MERGED operator data (savedOp), not the partial form data
+  // Sync to Supabase (sem pin_hash/pin_salt — senha só no Auth)
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('operators').upsert({
+    const payload = {
       id: savedOp.id,
       name: savedOp.name,
       initials: savedOp.initials,
@@ -1152,22 +1160,18 @@ async function saveOperator(data) {
       role: savedOp.role,
       phone: savedOp.phone,
       email: savedOp.email,
-      pin_hash: savedOp.pinHash || null,
-      pin_salt: savedOp.pinSalt || null,
       is_admin: savedOp.isAdmin === true,
       active: savedOp.active !== false,
       team: savedOp.team || 'init',
+      auth_user_id: savedOp.auth_user_id || null,
       created_at: savedOp.createdAt || now,
       updated_at: now
-    }).then(res => {
+    };
+    supabaseClient.from('operators').upsert(payload).then(res => {
       if (res.error) {
-        if (res.error.code === 'PGRST204' || (res.error.message && res.error.message.includes('column'))) {
-          console.warn('⚠️ Supabase operadores: schema incompleto (coluna ausente?). Use o script de migração.');
-        } else {
-          console.warn('⚠️ Supabase operadores:', res.error.message);
-        }
+        console.warn('⚠️ Sync operador:', res.error.message);
       }
-    }).catch(err => console.warn('⚠️ Erro de rede ao salvar operador:', err.message));
+    }).catch(() => {});
   }
 
   return savedOp;
@@ -1250,11 +1254,8 @@ function resetOperatorPassword(opId) {
 
 // ── SEED ──
 function seedDemoData() {
-  // Nunca seedar se Supabase estiver configurado (evita poluir produção)
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
-    console.log('ℹ️ Supabase configurado — seed de demonstração pulado.');
-    return;
-  }
+  // Nunca seedar em produção / com backend configurado
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) return;
   if (localStorage.getItem('intra_allow_demo_seed') !== '1') return;
   if (getClients().length > 0) return;
 

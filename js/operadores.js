@@ -418,14 +418,14 @@ function openOperadorForm(id = null) {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Nova senha</label>
-            <input class="form-input" type="password" name="newPwd" id="opNewPwd" placeholder="${id ? 'Deixe vazio para não alterar' : 'Digite a senha'}" ${!id ? 'required' : ''} />
+            <input class="form-input" type="password" name="newPwd" id="opNewPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Deixe vazio para não alterar' : 'Mín. 8 caracteres'}" ${!id ? 'required' : ''} />
           </div>
           <div class="form-group">
             <label class="form-label">Confirmar senha</label>
-            <input class="form-input" type="password" name="confirmPwd" id="opConfirmPwd" placeholder="${id ? 'Repita a nova senha' : 'Repita a senha'}" ${!id ? 'required' : ''} />
+            <input class="form-input" type="password" name="confirmPwd" id="opConfirmPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Repita a nova senha' : 'Repita a senha'}" ${!id ? 'required' : ''} />
           </div>
         </div>
-        ${op?.pinHash ? '<p style="font-size:11px;color:var(--green);margin-top:-8px">✓ Senha configurada &mdash; preencha os campos acima para alterar.</p>' : '<p style="font-size:11px;color:var(--yellow);margin-top:-8px">⚠️ Sem senha &mdash; defina uma para exigir autenticação no login.</p>'}
+        <p style="font-size:11px;color:var(--text-muted);margin-top:-8px">Senha gerenciada pelo sistema de autenticação. Mínimo 8 caracteres.</p>
       </div>
 
       <div class="form-actions">
@@ -553,11 +553,10 @@ async function submitOperadorForm(e, id) {
       try {
         const { error } = await supabaseClient.auth.updateUser({ password: newPwd });
         if (error) {
-          console.warn('⚠️ Erro ao atualizar senha no Supabase Auth:', error.message);
-          authMsg = `Senha local salva, mas falha no Supabase Auth: ${error.message}`;
+          authMsg = 'Perfil salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
         }
-      } catch (e) {
-        authMsg = `Senha local salva, mas erro de rede ao atualizar Auth: ${e.message}`;
+      } catch (_) {
+        authMsg = 'Perfil salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
       }
     }
 
@@ -575,14 +574,14 @@ async function submitOperadorForm(e, id) {
             dbSet(DB.OPERATORS, list);
           }
           if (result.needsEmailConfirm) {
-            authMsg = `📧 E-mail de confirmação enviado para ${opData.email}.\nO operador só conseguirá entrar depois de confirmar pelo e-mail.`;
+            authMsg = `E-mail de confirmação enviado. O operador só entrará após confirmar.`;
           } else {
-            authMsg = `✅ Operador criado e logado no Supabase Auth.`;
+            authMsg = `Operador e acesso de login criados com sucesso.`;
           }
         } else if (result.reason === 'duplicate') {
-          authMsg = `⚠️ Já existe um usuário no Supabase Auth com o e-mail ${opData.email}.\nO operador foi salvo localmente. Quando ele fizer login, o vínculo será automático.`;
+          authMsg = `Já existe login com esse e-mail. O operador foi salvo; o vínculo ocorre no primeiro acesso.`;
         } else {
-          authMsg = `⚠️ Operador salvo, mas falha ao criar no Supabase Auth: ${result.message}`;
+          authMsg = `Operador salvo, mas o login não pôde ser criado. Contate o suporte.`;
         }
       }
     }

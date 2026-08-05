@@ -1,11 +1,11 @@
-// supabase-config.js - Conexão e Configuração do Supabase Cloud
+// supabase-config.js - Conexão e Configuração do cliente remoto
 // ============================================================
 
-// Credenciais padrão (anon key é pública — segura para distribuição).
-// localStorage tem prioridade para override manual (⚙ na tela de login).
-const SUPABASE_URL = localStorage.getItem('intra_supabase_url')
+// A anon key é pública por design (protegida por RLS no backend).
+// Não altere via UI em produção — use o valor embutido ou variáveis no build.
+const SUPABASE_URL = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_url'))
   || 'https://esticiaufganuxhcwxzq.supabase.co';
-const SUPABASE_ANON_KEY = localStorage.getItem('intra_supabase_key')
+const SUPABASE_ANON_KEY = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_key'))
   || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzdGljaWF1ZmdhbnV4aGN3eHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTk3ODgsImV4cCI6MjEwMDI5NTc4OH0.ZjEBGAyH_W1uFgSBHrxdGZgidIISTqasvofP4WioqzI';
 
 let supabaseClient = null;
@@ -13,21 +13,21 @@ let supabaseClient = null;
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
     try {
         if (typeof supabase !== 'undefined') {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log('✅ Supabase conectado em:', SUPABASE_URL);
-        } else {
-            console.warn('⚠️ SDK Supabase não carregado. Usando modo offline.');
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true,
+                    storage: window.localStorage,
+                }
+            });
         }
-    } catch (err) {
-        console.warn('⚠️ Erro ao inicializar cliente Supabase:', err);
-    }
-} else {
-    console.log('ℹ️ Supabase não configurado. Rodando em modo offline (IndexedDB local).');
+    } catch (_) {}
 }
 
 function isSupabaseConnected() { return !!supabaseClient; }
 
-// Função para atualizar as credenciais do Supabase via UI/Console
+/** Uso interno/admin via console — não exposto na UI de login */
 function setSupabaseConfig(url, key) {
     if (url) localStorage.setItem('intra_supabase_url', url.trim());
     if (key) localStorage.setItem('intra_supabase_key', key.trim());
@@ -35,33 +35,12 @@ function setSupabaseConfig(url, key) {
 }
 
 function openSupabaseConfig() {
-    if (typeof openModal !== 'function') return;
-    var currentUrl = localStorage.getItem('intra_supabase_url') || '';
-    var currentKey = localStorage.getItem('intra_supabase_key') || '';
-    document.getElementById('modalOverlay').style.zIndex = '600';
-    openModal('Configurar Supabase',
-        '<div style="display:flex;flex-direction:column;gap:14px">' +
-        '<p style="font-size:13px;color:var(--text-secondary)">Insira a URL e a chave anon do seu projeto Supabase.</p>' +
-        '<div class="form-group"><label class="form-label">URL do Supabase</label>' +
-        '<input class="form-input" id="cfgSupabaseUrl" value="' + escapeHtml(currentUrl) + '" placeholder="https://xxxxx.supabase.co" /></div>' +
-        '<div class="form-group"><label class="form-label">Anon Key</label>' +
-        '<input class="form-input" id="cfgSupabaseKey" value="' + escapeHtml(currentKey) + '" placeholder="eyJhbGciOiJIUzI1NiIs..." /></div>' +
-        '<p style="font-size:11px;color:var(--text-muted)">Encontre essas informações em: Supabase Dashboard → Project Settings → API</p>' +
-        '<div class="form-actions">' +
-        '<button class="btn btn-secondary" onclick="closeModal();document.getElementById(\'modalOverlay\').style.zIndex=\'200\'">Cancelar</button>' +
-        '<button class="btn btn-primary" onclick="saveSupabaseConfigFromModal()">Salvar e Recarregar</button>' +
-        '</div></div>',
-        'sm');
+    // Configuração removida da interface pública por segurança.
+    return;
 }
 
 function saveSupabaseConfigFromModal() {
-    var url = document.getElementById('cfgSupabaseUrl').value.trim();
-    var key = document.getElementById('cfgSupabaseKey').value.trim();
-    if (!url || !key) {
-        if (typeof showToast === 'function') showToast('Preencha URL e Anon Key.', 'error');
-        return;
-    }
-    setSupabaseConfig(url, key);
+    return;
 }
 
 // Inicializador de escutadores em Tempo Real (Realtime WebSockets)
@@ -102,7 +81,7 @@ const _RT_TABLE_META = {
         map: r => ({
             id: r.id, name: r.name, initials: r.initials, color: r.color, role: r.role, phone: r.phone,
             email: r.email, isAdmin: r.is_admin === true, active: r.active !== false, team: r.team || 'init',
-            auth_user_id: r.auth_user_id, pinHash: r.pin_hash, pinSalt: r.pin_salt,
+            auth_user_id: r.auth_user_id,
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
         onChange: () => {
@@ -167,10 +146,16 @@ function _applyRealtimePayload(table, payload) {
             const row = meta.map(payload.new);
             const idx = list.findIndex(x => x.id === row.id);
             if (idx !== -1) {
-                // Não sobrescreve se local for mais novo
                 const localT = new Date(list[idx].updatedAt || list[idx].timestamp || 0).getTime();
                 const remoteT = new Date(row.updatedAt || row.timestamp || 0).getTime();
-                if (remoteT >= localT) list[idx] = { ...list[idx], ...row };
+                if (remoteT >= localT) {
+                    // Preserva pin local se realtime não envia hashes
+                    const prevPin = list[idx].pinHash;
+                    const prevSalt = list[idx].pinSalt;
+                    list[idx] = { ...list[idx], ...row };
+                    if (prevPin && !row.pinHash) list[idx].pinHash = prevPin;
+                    if (prevSalt && !row.pinSalt) list[idx].pinSalt = prevSalt;
+                }
             } else {
                 list.unshift(row);
             }
@@ -181,13 +166,11 @@ function _applyRealtimePayload(table, payload) {
             dbSet(meta.dbKey, list);
         }
         if (typeof meta.onChange === 'function') meta.onChange();
-    } catch (e) {
-        console.warn('Realtime apply', table, e.message);
-    }
+    } catch (_) {}
 }
 
 function initSupabaseRealtime() {
-    if (!supabaseClient) return;
+    if (!supabaseClient || !window._supabaseAuthActive) return;
 
     if (_realtimeChannel) {
         try { supabaseClient.removeChannel(_realtimeChannel); } catch (e) {}
@@ -197,15 +180,13 @@ function initSupabaseRealtime() {
     let channel = supabaseClient.channel('public-changes');
     Object.keys(_RT_TABLE_META).forEach(table => {
         channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
-            console.log('⚡', table, payload.eventType || payload.event);
             _applyRealtimePayload(table, payload);
         });
     });
     _realtimeChannel = channel.subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('⚠️ Realtime:', status, '— tentando reconectar em 3s');
             setTimeout(() => {
-                if (supabaseClient && document.visibilityState === 'visible') {
+                if (supabaseClient && document.visibilityState === 'visible' && window._supabaseAuthActive) {
                     initSupabaseRealtime();
                 }
             }, 3000);
@@ -213,20 +194,15 @@ function initSupabaseRealtime() {
     });
 }
 
-// Reconecta o realtime quando a aba volta de bfcache / fica visível
 if (typeof window !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && supabaseClient && !_realtimeChannel) {
+        if (document.visibilityState === 'visible' && supabaseClient && window._supabaseAuthActive && !_realtimeChannel) {
             initSupabaseRealtime();
         }
     });
     window.addEventListener('pageshow', (e) => {
-        if (e.persisted && supabaseClient) {
-            console.log('🔄 Página restaurada do bfcache — reconectando realtime');
+        if (e.persisted && supabaseClient && window._supabaseAuthActive) {
             initSupabaseRealtime();
         }
-    });
-    window.addEventListener('DOMContentLoaded', () => {
-        initSupabaseRealtime();
     });
 }

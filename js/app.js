@@ -128,13 +128,17 @@ function exportData() {
     showToast('Apenas administradores podem exportar backup completo.', 'error');
     return;
   }
+  const safeOps = (getOperators() || []).map(o => {
+    const { pinHash, pinSalt, pin, ...rest } = o;
+    return rest;
+  });
   const data = {
     exportedAt: new Date().toISOString(),
     clients:    getClients(),
     pendencias: getPendencias(),
     procedures: dbGet('intra_procedures'),
     procedureTemplates: dbGet('intra_procedure_templates'),
-    operators:  getOperators(),
+    operators:  safeOps,
     visits:     getVisits(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -164,7 +168,7 @@ function importData() {
         const data = JSON.parse(ev.target.result);
         if (!data.clients || !data.pendencias) throw new Error();
         confirmAction(
-          'Isso irá <strong>substituir todos os dados atuais</strong> pelo backup e enviar ao Supabase. Continuar?',
+          'Isso irá <strong>substituir todos os dados atuais</strong> pelo backup e sincronizar na nuvem. Continuar?',
           () => { _runImportBackup(data); }
         );
       } catch { showToast('Arquivo de backup inválido.', 'error'); }
@@ -207,16 +211,15 @@ async function _runImportBackup(data) {
 
     const cloudOk = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
     if (cloudOk) {
-      showToast('Enviando backup para o Supabase...', 'info');
+      showToast('Enviando backup para a nuvem...', 'info');
       const errors = await _pushImportToSupabase(data);
       if (errors.length) {
-        console.warn('Import push errors:', errors);
-        showToast(`Backup local OK, mas ${errors.length} erro(s) no envio à nuvem. Veja o console.`, 'warning', 6000);
+        showToast(`Backup local OK, mas ${errors.length} erro(s) no envio à nuvem.`, 'warning', 6000);
       } else {
-        showToast('Backup importado e sincronizado com a nuvem!', 'success');
+        showToast('Backup importado e sincronizado!', 'success');
       }
     } else {
-      showToast('Backup importado localmente (sem sessão Supabase).', 'success');
+      showToast('Backup importado localmente.', 'success');
     }
 
     addLog('Importou Backup', 'Backup', 'Geral', 'Restaurou backup do sistema');
@@ -264,7 +267,7 @@ async function _pushImportToSupabase(data) {
   try {
     await chunk('operators', (data.operators || []).map(o => ({
       id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone,
-      email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null,
+      email: o.email,
       is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init',
       auth_user_id: o.auth_user_id || null, created_at: o.createdAt || now, updated_at: o.updatedAt || now
     })));
@@ -754,7 +757,6 @@ function topbarAction() {
 let _appStarted = false;
 
 function _startApp() {
-  // Load saved team preference
   if (typeof getCacheKV === 'function') {
     _selectedTeam = getCacheKV('intra_selected_team', '');
   }
@@ -762,12 +764,20 @@ function _startApp() {
   updateUserUI();
   updateBadges();
 
-  if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+  if (typeof initSupabaseRealtime === 'function') {
+    try { initSupabaseRealtime(); } catch (_) {}
+  }
+
+  var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
+  if (!isAdmin) {
     var dashNav = document.getElementById('nav-dashboard');
     if (dashNav) dashNav.style.display = 'none';
     var histNav = document.getElementById('nav-historico');
     if (histNav) histNav.style.display = 'none';
   }
+  document.querySelectorAll('.btn-export').forEach(function (btn) {
+    btn.style.display = isAdmin ? '' : 'none';
+  });
 
   const hash  = window.location.hash.replace('#','');
   const pages = ['dashboard','clientes','pendencias','calendario','operadores','historico','templates','visitas'];
@@ -788,15 +798,15 @@ function forgotPassword() {
     return;
   }
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    alert('Sem conexão com o servidor. Conecte-se ao Supabase para redefinir a senha.');
+    alert('Serviço temporariamente indisponível. Tente novamente mais tarde.');
     return;
   }
   authResetPassword(email)
     .then(() => {
-      alert(`📧 E-mail de redefinição de senha enviado para ${email}.\nVerifique sua caixa de entrada e spam.`);
+      alert('Se o e-mail estiver cadastrado, você receberá um link de redefinição.\nVerifique a caixa de entrada e o spam.');
     })
-    .catch(err => {
-      alert(`Erro ao enviar redefinição: ${err.message}\n\nSe o problema persistir, contate um administrador.`);
+    .catch(() => {
+      alert('Não foi possível enviar o e-mail agora. Tente novamente ou contate um administrador.');
     });
 }
 
@@ -805,10 +815,7 @@ function showLoginScreen() {
   const content = document.getElementById('loginContent');
   overlay.style.display = 'block';
 
-  const supabaseConnected = typeof isSupabaseConnected === 'function' && isSupabaseConnected();
-  const supabaseStatus = supabaseConnected
-    ? '<div style="font-size:10px;display:flex;align-items:center;gap:6px;justify-content:center"><span style="color:#22c55e">● Conectado ao Supabase</span><button class="login-forgot" onclick="openSupabaseConfig()" style="font-size:10px;margin-left:8px">⚙</button></div>'
-    : '<div style="font-size:10px;display:flex;align-items:center;gap:12px;justify-content:center"><span style="color:#dc2626">● Sem conexão com o servidor</span><button class="login-forgot" onclick="openSupabaseConfig()" style="font-size:10px">⚙ Configurar</button></div>';
+  const serverOk = typeof isSupabaseConnected === 'function' && isSupabaseConnected();
 
   content.innerHTML = `
     <div class="login-header">
@@ -819,33 +826,32 @@ function showLoginScreen() {
       </div>
       <div class="login-title">Init Intra</div>
       <div class="login-subtitle">Acesso restrito — identifique-se</div>
-      <div class="login-status">${supabaseStatus}</div>
     </div>
 
     <div class="login-form-wrap">
       <div class="login-card">
-        ${!supabaseConnected ? `<div class="login-error" style="margin-bottom:12px;text-align:center">Configure o Supabase para entrar.<br><span style="font-size:11px;opacity:0.8">Clique em "⚙ Configurar" acima.</span></div>` : ''}
+        ${!serverOk ? `<div class="login-error" style="margin-bottom:12px;text-align:center">Serviço de autenticação indisponível.<br><span style="font-size:11px;opacity:0.8">Verifique sua conexão ou contate o suporte.</span></div>` : ''}
 
         <div class="login-field">
           <label class="login-label">E-mail</label>
           <input type="email" id="loginEmail" class="login-input" autocomplete="email"
-            placeholder="seu.email@initnet.com.br" ${!supabaseConnected ? 'disabled' : ''}
+            placeholder="seu.email@empresa.com" ${!serverOk ? 'disabled' : ''}
             onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('loginPassword').focus()}" />
         </div>
 
         <div class="login-field">
           <div class="login-label-row">
             <label class="login-label">Senha</label>
-            <button type="button" class="login-forgot" onclick="forgotPassword()" ${!supabaseConnected ? 'disabled' : ''}>Esqueci minha senha</button>
+            <button type="button" class="login-forgot" onclick="forgotPassword()" ${!serverOk ? 'disabled' : ''}>Esqueci minha senha</button>
           </div>
           <input type="password" id="loginPassword" class="login-input" autocomplete="current-password"
-            placeholder="Digite sua senha..." ${!supabaseConnected ? 'disabled' : ''}
+            placeholder="Digite sua senha..." ${!serverOk ? 'disabled' : ''}
             onkeydown="if(event.key==='Enter')doLogin()" />
         </div>
 
         <div id="loginError" class="login-error"></div>
 
-        <button id="loginBtn" class="login-btn" onclick="doLogin()" ${!supabaseConnected ? 'disabled' : ''}>
+        <button id="loginBtn" class="login-btn" onclick="doLogin()" ${!serverOk ? 'disabled' : ''}>
           Entrar →
         </button>
       </div>
@@ -855,7 +861,6 @@ function showLoginScreen() {
     </div>
   `;
 
-  // Autofocus no campo de email
   setTimeout(() => document.getElementById('loginEmail')?.focus(), 100);
 }
 
@@ -866,7 +871,7 @@ async function doLogin() {
   const btn      = document.getElementById('loginBtn');
 
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    if (errEl) errEl.textContent = 'Sem conexão com o servidor. Configure o Supabase para entrar.';
+    if (errEl) errEl.textContent = 'Serviço de autenticação indisponível.';
     return;
   }
   if (!email) {
@@ -888,26 +893,32 @@ async function doLogin() {
     const result = await authSignIn(email, password);
     const op = result.operator;
 
-    addLog('Login', 'Sessão', op.id, `${op.name} (${result.method})`);
+    addLog('Login', 'Sessão', op.id, op.name);
     document.getElementById('loginOverlay').style.display = 'none';
     _startApp();
-    showToast(`Bem-vindo, ${op.name}! 👋`, 'success');
+    showToast(`Bem-vindo, ${op.name}!`, 'success');
 
     if ('Notification' in window && Notification.permission === 'default') {
       setTimeout(() => Notification.requestPermission(), 3000);
     }
   } catch (err) {
-    var msg = err.message || 'Erro ao autenticar. Tente novamente.';
-    if (msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) {
-      msg = 'E-mail não confirmado. Desative "Enable email confirmations" no Supabase Auth Settings ou confirme pelo e-mail enviado.';
-    } else if (msg.includes('Invalid login credentials')) {
+    var raw = err.message || '';
+    var msg = 'Não foi possível entrar. Verifique seus dados e tente novamente.';
+    if (raw.includes('Muitas tentativas')) {
+      msg = raw;
+    } else if (raw.includes('não cadastrado') || raw.includes('desativado') || raw.includes('Contate')) {
+      msg = raw;
+    } else if (raw.includes('Email not confirmed') || raw.includes('email_not_confirmed')) {
+      msg = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
+    } else if (raw.includes('Invalid login credentials') || raw.includes('invalid_credentials')) {
       msg = 'E-mail ou senha incorretos.';
-    } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+    } else if (raw.includes('fetch') || raw.includes('network') || raw.includes('Failed to fetch')) {
       msg = 'Sem conexão com o servidor. Verifique sua internet.';
+    } else if (raw.includes('Informe')) {
+      msg = raw;
     }
     if (errEl) errEl.textContent = msg;
     if (errEl) errEl.style.color = '#f87171';
-    console.error('❌ Erro no login:', err);
     const input = document.getElementById('loginPassword');
     if (input) { input.value = ''; input.focus(); }
   } finally {
@@ -970,21 +981,22 @@ async function doLogout() {
         const authUser = supaSession.user;
         let op = getOperatorByAuthId(authUser.id) || getOperatorByEmail(authUser.email);
         if (!op) {
-          op = await _createOperatorFromAuth(authUser);
+          op = await _resolveOperatorForAuth(authUser);
         } else {
           op = await _refreshOperatorFromSupabase(op, authUser);
-          if (!op.auth_user_id) {
+          if (op && !op.auth_user_id) {
             await _linkOperator(op.id, authUser.id, authUser.email);
             op.auth_user_id = authUser.id;
           }
         }
         if (op && op.active !== false) {
-          try { await syncSupabaseToLocal(); } catch(e) { console.warn('Sync pós-boot:', e.message); }
+          try { await syncSupabaseToLocal(); } catch (_) {}
           setSession(op.id);
           window._supabaseAuthActive = true;
           _startApp();
           return;
         }
+        await authSignOut();
       }
     } catch (e) {
       console.warn('⚠️ Erro ao restaurar sessão Supabase:', e.message);

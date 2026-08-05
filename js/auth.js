@@ -1,11 +1,34 @@
 // auth.js – Autenticação exclusiva via Supabase Auth
 // =====================================================================
 
+const OP_SAFE_COLS = 'id,name,initials,color,role,phone,email,is_admin,active,team,auth_user_id,created_at,updated_at';
+
+const _loginGuard = { fails: 0, lockUntil: 0 };
+
+function _assertLoginAllowed() {
+  const now = Date.now();
+  if (now < _loginGuard.lockUntil) {
+    const mins = Math.ceil((_loginGuard.lockUntil - now) / 60000);
+    throw new Error(`Muitas tentativas. Aguarde ${mins} min e tente novamente.`);
+  }
+}
+
+function _recordLoginFailure() {
+  _loginGuard.fails += 1;
+  if (_loginGuard.fails >= 5) {
+    _loginGuard.lockUntil = Date.now() + 15 * 60 * 1000;
+    _loginGuard.fails = 0;
+  }
+}
+
+function _recordLoginSuccess() {
+  _loginGuard.fails = 0;
+  _loginGuard.lockUntil = 0;
+}
+
 /**
  * Realiza login com email e senha via Supabase Auth.
- * Supabase é a única fonte de autenticação. Os dados do operador
- * (incluindo `team` e `isAdmin`) são sempre sincronizados a partir
- * do servidor após o login, antes de iniciar a aplicação.
+ * O operador deve existir previamente (cadastro por administrador).
  *
  * @param {string} email
  * @param {string} password
@@ -16,117 +39,101 @@ async function authSignIn(email, password) {
   if (!trimmedEmail) throw new Error('Informe seu e-mail.');
   if (!password) throw new Error('Informe sua senha.');
 
+  _assertLoginAllowed();
+
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    throw new Error('Sem conexão com o servidor. Verifique sua internet e configure o Supabase para entrar.');
+    throw new Error('Serviço de autenticação indisponível.');
   }
 
-  console.log('🔑 Login via Supabase Auth:', trimmedEmail);
-
-  // 1) Autentica no Supabase Auth
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: trimmedEmail,
     password: password
   });
-  if (error) throw error;
+  if (error) {
+    _recordLoginFailure();
+    throw error;
+  }
   const authUser = data.user;
-  if (!authUser) throw new Error('Falha na autenticação. Tente novamente.');
+  if (!authUser) {
+    _recordLoginFailure();
+    throw new Error('Falha na autenticação. Tente novamente.');
+  }
   window._supabaseAuthActive = true;
 
-  // 2) Garante que existe um operador local correspondente
   let op = getOperatorByAuthId(authUser.id) || getOperatorByEmail(trimmedEmail);
   if (!op) {
-    console.log('🆕 Operador ainda não existe localmente — criando...');
-    op = await _createOperatorFromAuth(authUser);
+    op = await _resolveOperatorForAuth(authUser);
   }
   if (!op || !op.id) {
     await supabaseClient.auth.signOut();
-    throw new Error('Não foi possível criar/vincular seu operador. Contate um administrador.');
+    window._supabaseAuthActive = false;
+    _recordLoginFailure();
+    throw new Error('Usuário não cadastrado. Contate um administrador.');
   }
 
   if (op.active === false) {
     await supabaseClient.auth.signOut();
+    window._supabaseAuthActive = false;
     throw new Error('Operador desativado. Contate um administrador.');
   }
 
-  // 3) Refresca o registro do operador a partir do Supabase para garantir
-  //    dados atualizados (team, isAdmin, name, etc.).
   op = await _refreshOperatorFromSupabase(op, authUser);
+  if (!op || op.active === false) {
+    await supabaseClient.auth.signOut();
+    window._supabaseAuthActive = false;
+    throw new Error('Operador desativado. Contate um administrador.');
+  }
 
-  // 4) Vincula auth_user_id caso ainda não esteja (operador criado via email)
   if (!op.auth_user_id) {
     await _linkOperator(op.id, authUser.id, trimmedEmail);
     op.auth_user_id = authUser.id;
   }
 
-  // 5) Sincroniza todos os dados (clientes, pendências, etc.) ANTES de iniciar o app
   try {
     await syncSupabaseToLocal();
-  } catch (e) {
-    console.warn('⚠️ Sincronização pós-login falhou (continuando com cache local):', e.message);
-  }
+  } catch (_) {}
 
-  // 6) Cria/atualiza a sessão local com os dados frescos
+  _recordLoginSuccess();
   setSession(op.id);
   return { user: authUser, operator: op, method: 'supabase' };
 }
 
 /**
- * Cria um operador local (e no Supabase) a partir de um auth user novo.
+ * Busca operador remoto existente. Não cria operador automaticamente.
  */
-async function _createOperatorFromAuth(authUser) {
+async function _resolveOperatorForAuth(authUser) {
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return null;
   const email = (authUser.email || '').toLowerCase();
-  const nameFromEmail = email.split('@')[0];
-  const name = nameFromEmail.charAt(0).toUpperCase() +
-               nameFromEmail.slice(1).replace(/[._-]/g, ' ');
-  const initials = name.split(' ').map(s => s[0]).join('').substring(0, 2).toUpperCase() || 'OP';
+  try {
+    const { data: remote, error } = await supabaseClient
+      .from('operators')
+      .select(OP_SAFE_COLS)
+      .eq('auth_user_id', authUser.id)
+      .maybeSingle();
+    if (!error && remote) return _upsertOperatorFromRemote(remote);
 
-  const newOp = {
-    name: name || email,
-    initials,
-    color: '#1a56db',
-    role: 'Técnico',
-    active: true,
-    isAdmin: false,
-    team: 'init',
-    email,
-    auth_user_id: authUser.id
-  };
-
-  // Tenta puxar o registro do Supabase (caso o admin já tenha criado o operador lá)
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
-    try {
-      const { data: remote, error } = await supabaseClient
-        .from('operators')
-        .select('*')
-        .eq('auth_user_id', authUser.id)
-        .maybeSingle();
-      if (!error && remote) {
-        return _upsertOperatorFromRemote(remote);
-      }
-      // também tenta por e-mail
+    if (email) {
       const { data: byEmail, error: e2 } = await supabaseClient
         .from('operators')
-        .select('*')
+        .select(OP_SAFE_COLS)
         .eq('email', email)
         .maybeSingle();
       if (!e2 && byEmail) {
         byEmail.auth_user_id = authUser.id;
         return _upsertOperatorFromRemote(byEmail);
       }
-    } catch (e) {
-      console.warn('⚠️ Não foi possível consultar operators no Supabase:', e.message);
     }
-  }
+  } catch (_) {}
+  return null;
+}
 
-  // Cria local e replica no Supabase
-  const saved = await saveOperator(newOp);
-  return saved;
+/** @deprecated use _resolveOperatorForAuth — mantido para compatibilidade de chamadas legadas */
+async function _createOperatorFromAuth(authUser) {
+  return _resolveOperatorForAuth(authUser);
 }
 
 /**
- * Refresca o registro local do operador a partir do Supabase,
- * mantendo os campos sensíveis (pinHash/pinSalt) caso o servidor
- * não os devolva.
+ * Refresca o registro local do operador a partir do Supabase.
  */
 async function _refreshOperatorFromSupabase(localOp, authUser) {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return localOp;
@@ -134,7 +141,7 @@ async function _refreshOperatorFromSupabase(localOp, authUser) {
     let remote = null;
     const { data: byAuth } = await supabaseClient
       .from('operators')
-      .select('*')
+      .select(OP_SAFE_COLS)
       .eq('auth_user_id', authUser.id)
       .maybeSingle();
     if (byAuth) {
@@ -142,29 +149,26 @@ async function _refreshOperatorFromSupabase(localOp, authUser) {
     } else if (authUser.email) {
       const { data: byEmail } = await supabaseClient
         .from('operators')
-        .select('*')
+        .select(OP_SAFE_COLS)
         .eq('email', authUser.email.toLowerCase())
         .maybeSingle();
       remote = byEmail;
     }
     if (!remote) return localOp;
     return _upsertOperatorFromRemote(remote, localOp);
-  } catch (e) {
-    console.warn('⚠️ Falha ao refrescar operador:', e.message);
+  } catch (_) {
     return localOp;
   }
 }
 
 /**
- * Faz upsert de um operador vindo do Supabase no cache local,
- * preservando pinHash/pinSalt locais caso o servidor não os envie.
+ * Upsert de operador remoto no cache local (sem hashes de senha).
  */
 function _upsertOperatorFromRemote(remote, localFallback) {
   const list = getOperators();
   const localById = localFallback || list.find(o => o.id === remote.id) ||
                     list.find(o => o.auth_user_id === remote.auth_user_id) ||
                     list.find(o => (o.email || '').toLowerCase() === (remote.email || '').toLowerCase());
-  // Privilégios vêm só do servidor (nunca do cache local)
   const merged = {
     id:           remote.id,
     name:         remote.name,
@@ -179,8 +183,8 @@ function _upsertOperatorFromRemote(remote, localFallback) {
     auth_user_id: remote.auth_user_id,
     createdAt:    remote.created_at,
     updatedAt:    remote.updated_at,
-    pinHash:      remote.pin_hash || localById?.pinHash || null,
-    pinSalt:      remote.pin_salt || localById?.pinSalt || null,
+    pinHash:      localById?.pinHash || null,
+    pinSalt:      localById?.pinSalt || null,
   };
   const idx = list.findIndex(o => o.id === merged.id);
   if (idx !== -1) list[idx] = { ...list[idx], ...merged };
@@ -205,9 +209,7 @@ async function _linkOperator(operatorId, authUserId, email) {
       auth_user_id: authUserId,
       email,
       updated_at: new Date().toISOString()
-    }).eq('id', operatorId).then(res => {
-      if (res.error) console.warn('⚠️ Vincular auth_user_id (verifique schema operators):', res.error.message);
-    }).catch(err => console.warn('⚠️ Rede ao vincular auth_user_id:', err.message));
+    }).eq('id', operatorId).then(() => {}).catch(() => {});
   }
 }
 
@@ -215,12 +217,9 @@ async function _linkOperator(operatorId, authUserId, email) {
  * Realiza logout (Supabase + local).
  */
 async function authSignOut() {
-  // 1) Limpa sessão local e flags ANTES de chamar signOut
-  //    para garantir que, mesmo se signOut falhar, não há sessão residual.
   clearSession();
   window._supabaseAuthActive = false;
 
-  // 2) Limpa tokens do Supabase Auth do localStorage (safety net)
   try {
     const keys = Object.keys(localStorage);
     for (const key of keys) {
@@ -228,23 +227,17 @@ async function authSignOut() {
         localStorage.removeItem(key);
       }
     }
-  } catch (e) {
-    console.warn('⚠️ Erro ao limpar tokens do localStorage:', e.message);
-  }
+  } catch (_) {}
 
-  // 3) Solicita signOut global ao Supabase (invalida refresh tokens no servidor)
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     try {
       await supabaseClient.auth.signOut({ scope: 'global' });
-    } catch (err) {
-      console.warn('⚠️ Erro ao sair do Supabase Auth:', err.message);
-    }
+    } catch (_) {}
   }
 }
 
 /**
- * Retorna o usuário autenticado atual, restaurando a sessão via Supabase
- * se houver token válido em cookies/storage.
+ * Retorna o usuário autenticado atual (apenas sessão Supabase válida).
  */
 async function authGetCurrentUser() {
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
@@ -255,14 +248,7 @@ async function authGetCurrentUser() {
         const op = getOperatorByAuthId(data.user.id) || getOperatorByEmail(data.user.email);
         return { authUser: data.user, operator: op };
       }
-    } catch (err) {
-      console.warn('⚠️ Erro ao buscar usuário Supabase:', err.message);
-    }
-  }
-  const session = getSession();
-  if (session) {
-    const op = getOperatorById(session.opId);
-    return { authUser: null, operator: op };
+    } catch (_) {}
   }
   return null;
 }
@@ -273,7 +259,6 @@ async function authGetCurrentUser() {
 function authOnStateChange(callback) {
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     return supabaseClient.auth.onAuthStateChange((event, session) => {
-      console.log('🔑 Auth state change:', event);
       callback(event, session);
     });
   }
@@ -285,41 +270,33 @@ function authOnStateChange(callback) {
  */
 async function authResetPassword(email) {
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
-    try {
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: window.location.origin + window.location.pathname
-      });
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      throw err;
-    }
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) throw error;
+    return true;
   }
-  throw new Error('Serviço de redefinição indisponível offline. Contate um administrador.');
+  throw new Error('Serviço de redefinição indisponível.');
 }
 
 /**
- * Cria um usuário no Supabase Auth para o operador recém-cadastrado.
- *
- * Tenta `supabaseClient.auth.signUp` (que dispara o e-mail de confirmação).
- * O operador só conseguirá logar depois de confirmar o e-mail — e o nosso
- * fluxo de login faz o vínculo automaticamente na primeira entrada.
- *
- * Casos retornados:
- *  - { ok: true,  needsEmailConfirm: true }  — usuário criado, aguardando confirmação
- *  - { ok: true,  needsEmailConfirm: false } — usuário criado e logado (raro via signUp)
- *  - { ok: false, reason: 'duplicate' }      — já existe um Auth user com esse e-mail
- *  - { ok: false, reason: 'error', message } — outro erro
+ * Cria um usuário no Supabase Auth para o operador recém-cadastrado (admin).
  */
 async function authCreateUser(email, password) {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    return { ok: false, reason: 'offline', message: 'Sem conexão com o Supabase.' };
+    return { ok: false, reason: 'offline', message: 'Sem conexão com o servidor.' };
+  }
+  if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    return { ok: false, reason: 'forbidden', message: 'Apenas administradores podem criar usuários.' };
   }
   const trimmed = (email || '').trim().toLowerCase();
   if (!trimmed || !password) {
     return { ok: false, reason: 'invalid', message: 'E-mail e senha são obrigatórios.' };
   }
-  // Preserva sessão do admin — signUp pode trocar o JWT pelo do novo usuário
+  if (password.length < 8) {
+    return { ok: false, reason: 'invalid', message: 'A senha deve ter no mínimo 8 caracteres.' };
+  }
+
   let adminAccess = null;
   let adminRefresh = null;
   try {
@@ -341,16 +318,15 @@ async function authCreateUser(email, password) {
     if (error) {
       const msg = (error.message || '').toLowerCase();
       if (msg.includes('already') || msg.includes('registered') || msg.includes('duplicate')) {
-        return { ok: false, reason: 'duplicate', message: 'Já existe um usuário Auth com esse e-mail.' };
+        return { ok: false, reason: 'duplicate', message: 'Já existe um usuário com esse e-mail.' };
       }
       return { ok: false, reason: 'error', message: error.message };
     }
     const newUser = data?.user;
     if (!newUser) {
-      return { ok: false, reason: 'error', message: 'Resposta vazia do Supabase Auth.' };
+      return { ok: false, reason: 'error', message: 'Resposta vazia do servidor de autenticação.' };
     }
 
-    // Restaura sessão do admin se o signUp autenticou o novo usuário
     if (data.session && adminAccess && adminRefresh) {
       try {
         await supabaseClient.auth.setSession({
@@ -358,9 +334,7 @@ async function authCreateUser(email, password) {
           refresh_token: adminRefresh
         });
         window._supabaseAuthActive = true;
-      } catch (restoreErr) {
-        console.warn('⚠️ Falha ao restaurar sessão admin após criar usuário:', restoreErr.message);
-      }
+      } catch (_) {}
     }
 
     return {
@@ -382,12 +356,14 @@ async function authCreateUser(email, password) {
 }
 
 /**
- * Reenvia o e-mail de confirmação para um usuário do Supabase Auth.
- * Usa resetPasswordForEmail como fallback caso signUp não tenha confirmado.
+ * Reenvia o e-mail de convite/redefinição.
  */
 async function authResendInvite(email) {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    return { ok: false, message: 'Sem conexão com o Supabase.' };
+    return { ok: false, message: 'Sem conexão com o servidor.' };
+  }
+  if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    return { ok: false, message: 'Apenas administradores podem reenviar convites.' };
   }
   const trimmed = (email || '').trim().toLowerCase();
   try {
