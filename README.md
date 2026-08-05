@@ -57,21 +57,6 @@ Init-intra/
     └── test-validators.js
 ```
 
-## Instalacao
-
-1. Clone o repositorio
-2. Sirva os arquivos estaticos com qualquer servidor HTTP (ex: `npx serve .`)
-3. Acesse `http://localhost:3000`
-4. Opcional: configure Supabase em Configuracoes → Conexao Cloud para sincronizacao
-
-## Modo Offline
-
-O sistema funciona totalmente offline usando IndexedDB local. Ao configurar o Supabase, os dados sincronizam automaticamente entre dispositivos via WebSockets.
-
-## Icones PWA
-
-Abra `tools/generate-icons.html` no navegador para baixar os PNGs (192x192 e 512x512). Coloque os arquivos `icon-192.png` e `icon-512.png` na raiz do projeto e atualize o `manifest.json`.
-
 ## Licenca
 
 MIT
