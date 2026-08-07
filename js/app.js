@@ -458,7 +458,7 @@ function renderDashboard() {
 
     <div class="card" style="margin-bottom:18px">
       <div class="section-header"><span class="section-title">Evolução de Clientes — ${periodLabel}</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;padding:12px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px,100%),1fr));gap:12px;padding:12px">
         <div style="text-align:center;padding:12px;border-radius:8px;background:var(--bg-secondary)">
           <div style="font-size:24px;font-weight:700;color:#3b82f6">${allClients.length}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Total Cadastrados</div>
@@ -478,7 +478,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    <div class="dashboard-charts-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; margin-bottom: 24px;">
+    <div class="dashboard-charts-grid">
       <div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Distribuição por Prioridade</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartPriority"></canvas></div>

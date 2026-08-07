@@ -36,21 +36,21 @@ function renderCalendar() {
   const opNames = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar" style="flex-wrap:wrap">
-      <select class="form-select" id="calType" style="width:140px" onchange="refreshCalendar()" title="Tipo de evento">
+    <div class="search-bar">
+      <select class="form-select filter-select-md" id="calType" onchange="refreshCalendar()" title="Tipo de evento">
         <option value="all">Pendências + Visitas</option>
         <option value="pendencias">Apenas Pendências</option>
         <option value="visitas">Apenas Visitas</option>
       </select>
-      <select class="form-select" id="calClient" style="width:180px" onchange="refreshCalendar()">
+      <select class="form-select filter-select-md" id="calClient" onchange="refreshCalendar()">
         <option value="">Todos os clientes</option>
         ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select" id="calResponsible" style="width:160px" onchange="refreshCalendar()">
+      <select class="form-select filter-select-md" id="calResponsible" onchange="refreshCalendar()">
         <option value="">Todos os responsáveis</option>
         ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
       </select>
-      <select class="form-select" id="calStatus" style="width:160px" onchange="refreshCalendar()">
+      <select class="form-select filter-select" id="calStatus" onchange="refreshCalendar()">
         <option value="">Todos os status</option>
         <option value="aberto">Aberto</option>
         <option value="em_andamento">Em Andamento</option>
@@ -59,7 +59,7 @@ function renderCalendar() {
         <option value="concluido">Concluído</option>
         <option value="cancelado">Cancelado</option>
       </select>
-      <select class="form-select" id="calPriority" style="width:140px" onchange="refreshCalendar()">
+      <select class="form-select filter-select-sm" id="calPriority" onchange="refreshCalendar()">
         <option value="">Prioridade</option>
         <option value="baixa">Baixa</option>
         <option value="media">Média</option>

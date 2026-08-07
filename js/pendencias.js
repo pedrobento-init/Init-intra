@@ -27,20 +27,20 @@ function renderPendencias() {
   const opNames  = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar" style="flex-wrap:wrap">
-      <div class="search-input-wrap" style="flex:1;min-width:180px">
+    <div class="search-bar">
+      <div class="search-input-wrap filter-grow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="penSearch" placeholder="Buscar..." oninput="savePenFilters();debouncedRenderPenView()" />
       </div>
-      <select class="form-select" id="penClient" style="width:180px" onchange="savePenFilters();renderPenView()">
+      <select class="form-select filter-select-md" id="penClient" onchange="savePenFilters();renderPenView()">
         <option value="">Todos os clientes</option>
         ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select" id="penResponsible" style="width:160px" onchange="savePenFilters();renderPenView()">
+      <select class="form-select filter-select-md" id="penResponsible" onchange="savePenFilters();renderPenView()">
         <option value="">Todos os responsáveis</option>
         ${opNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
       </select>
-      <select class="form-select" id="penStatus" style="width:160px" onchange="savePenFilters();renderPenView()">
+      <select class="form-select filter-select" id="penStatus" onchange="savePenFilters();renderPenView()">
         <option value="">Todos os status</option>
         <option value="aberto">Aberto</option>
         <option value="em_andamento">Em Andamento</option>
@@ -49,7 +49,7 @@ function renderPendencias() {
         <option value="concluido">Concluído</option>
         <option value="cancelado">Cancelado</option>
       </select>
-      <select class="form-select" id="penPriority" style="width:140px" onchange="savePenFilters();renderPenView()">
+      <select class="form-select filter-select-sm" id="penPriority" onchange="savePenFilters();renderPenView()">
         <option value="">Prioridade</option>
         <option value="baixa">Baixa</option>
         <option value="media">Média</option>
@@ -57,7 +57,7 @@ function renderPendencias() {
         <option value="critica">Crítica</option>
       </select>
     </div>
-    <div class="page-action-row" style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <div class="page-action-row">
       <div class="view-toggles" style="display:flex;gap:6px">
         <button class="btn btn-icon${penView==='kanban'?' active-view':''}" id="btnKanbanPen" onclick="setPenView('kanban')" title="Kanban"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg></button>
         <button class="btn btn-icon${penView==='table'?' active-view':''}" id="btnTablePen" onclick="setPenView('table')" title="Tabela"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
@@ -224,7 +224,12 @@ function renderPenTable(area) {
   const startIdx = (_penPage - 1) * PEN_PAGE_SIZE;
   const pagePens = pens.slice(startIdx, startIdx + PEN_PAGE_SIZE);
 
-  wrap.innerHTML = `<table class="pen-table">
+  wrap.innerHTML = `
+  <div class="pen-mobile-toolbar">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAllPenCards(false)">Recolher todas</button>
+    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAllPenCards(true)">Expandir todas</button>
+  </div>
+  <table class="pen-table">
     <thead><tr>
       <th class="col-client">Cliente</th><th class="col-tipo">Tipo</th><th class="col-desc">Descrição</th>
       <th class="col-resp">Responsável</th><th class="col-status">Status</th><th class="col-prio">Prioridade</th>
@@ -242,25 +247,49 @@ function renderPenTable(area) {
       const checklistDone = checklist.filter(function(i) { return i.done; }).length;
       const checklistPct = checklist.length ? Math.round(checklistDone / checklist.length * 100) : 0;
       const tags = (p.tags||[]);
-      return `<tr class="${isOverdue?'row-overdue':''}">
-        <td data-label="Cliente" class="col-client">
+      const desc = escapeHtml(p.descricao) || '—';
+      return `<tr class="pen-card is-collapsed${isOverdue?' row-overdue':''}" data-pen-id="${escapeHtml(p.id)}">
+        <td class="pen-card-summary">
+          <button type="button" class="pen-card-toggle" onclick="togglePenCard(this, event)" aria-expanded="false" aria-label="Expandir pendência">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="pen-card-summary-body" onclick="togglePenCard(this, event)">
+            <div class="pen-card-summary-top">
+              <div class="pen-card-summary-client">
+                ${c ? clientAvatar(c, 24) : ''}
+                <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName)||'—'}</span>
+              </div>
+              <div class="pen-card-summary-tags">
+                ${statusTag(p.status)}
+                ${priorityTag(p.priority)}
+              </div>
+            </div>
+            <div class="pen-card-summary-desc">${desc}</div>
+            <div class="pen-card-summary-footer">
+              ${p.deadline ? `<span class="pen-card-summary-deadline${isOverdue?' is-overdue':''}">📅 ${formatDate(parseDeadline(p.deadline))}</span>` : '<span class="pen-card-summary-deadline">Sem prazo</span>'}
+              ${isOverdue ? '<span class="pen-card-overdue-flag">Vencida</span>' : ''}
+              ${sla ? `<span class="pen-card-summary-sla" style="color:${sla.color}">⏱ ${sla.label}</span>` : ''}
+            </div>
+          </div>
+        </td>
+        <td data-label="Cliente" class="col-client pen-card-detail">
           <div style="display:flex;align-items:center;gap:8px">
             ${c ? clientAvatar(c, 28) : ''}
             <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName)||'—'}</span>
           </div>
         </td>
-        <td data-label="Tipo" class="col-tipo"><span class="tipo-badge">${escapeHtml(p.tipo)||'—'}</span></td>
-        <td data-label="Descrição" class="col-desc"><div class="col-desc-value"><span style="font-size:13px">${escapeHtml(p.descricao)||'—'}</span>${tags.length?'<div style="display:flex;gap:3px;flex-wrap:wrap">'+tags.map(function(t){return '<span class="tag tag-purple" style="font-size:10px">'+escapeHtml(t)+'</span>';}).join('')+'</div>':''}${checklist.length?'<div style="font-size:11px;color:var(--text-muted)">☑ '+checklistPct+'% ('+checklistDone+'/'+checklist.length+')</div>':''}${sla?'<span class="col-desc-sla" style="color:'+sla.color+';font-weight:600;font-size:11px">⏱ '+sla.label+'</span>':''}</div></td>
-        <td data-label="Responsável" class="col-resp"><span class="resp-badge">${escapeHtml(p.responsible)||'—'}</span></td>
-        <td data-label="Status" class="col-status">${statusTag(p.status)}</td>
-        <td data-label="Prioridade" class="col-prio">${priorityTag(p.priority)}</td>
-        <td data-label="Prazo" class="col-deadline" style="${isOverdue?'color:var(--red);font-weight:600':''}"><span>${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}</span></td>
-        <td data-label="Data" class="col-date"><span style="font-size:12px;color:var(--text-muted)">${formatDate(p.createdAt)}</span></td>
-        <td data-label="Tempo" class="col-time">${timerWidget(p, 'pendencia')}</td>
-        <td data-label="Notas" class="col-notes">${hasNotes?`<span class="tag tag-blue" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">${hasNotes} nota${hasNotes>1?'s':''}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td data-label="Anexos" class="col-att">${attsCount?`<span class="tag tag-purple" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">📎 ${attsCount}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td data-label="Link" class="col-link">${safeLink !== '#'?`<a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding:3px 8px">🔗</a>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td class="col-actions">
+        <td data-label="Tipo" class="col-tipo pen-card-detail"><span class="tipo-badge">${escapeHtml(p.tipo)||'—'}</span></td>
+        <td data-label="Descrição" class="col-desc pen-card-detail"><div class="col-desc-value"><span style="font-size:13px">${desc}</span>${tags.length?'<div style="display:flex;gap:3px;flex-wrap:wrap">'+tags.map(function(t){return '<span class="tag tag-purple" style="font-size:10px">'+escapeHtml(t)+'</span>';}).join('')+'</div>':''}${checklist.length?'<div style="font-size:11px;color:var(--text-muted)">☑ '+checklistPct+'% ('+checklistDone+'/'+checklist.length+')</div>':''}${sla?'<span class="col-desc-sla" style="color:'+sla.color+';font-weight:600;font-size:11px">⏱ '+sla.label+'</span>':''}</div></td>
+        <td data-label="Responsável" class="col-resp pen-card-detail"><span class="resp-badge">${escapeHtml(p.responsible)||'—'}</span></td>
+        <td data-label="Status" class="col-status pen-card-detail">${statusTag(p.status)}</td>
+        <td data-label="Prioridade" class="col-prio pen-card-detail">${priorityTag(p.priority)}</td>
+        <td data-label="Prazo" class="col-deadline pen-card-detail" style="${isOverdue?'color:var(--red);font-weight:600':''}"><span>${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}</span></td>
+        <td data-label="Data" class="col-date pen-card-detail"><span style="font-size:12px;color:var(--text-muted)">${formatDate(p.createdAt)}</span></td>
+        <td data-label="Tempo" class="col-time pen-card-detail">${timerWidget(p, 'pendencia')}</td>
+        <td data-label="Notas" class="col-notes pen-card-detail">${hasNotes?`<span class="tag tag-blue" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">${hasNotes} nota${hasNotes>1?'s':''}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
+        <td data-label="Anexos" class="col-att pen-card-detail">${attsCount?`<span class="tag tag-purple" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">📎 ${attsCount}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
+        <td data-label="Link" class="col-link pen-card-detail">${safeLink !== '#'?`<a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding:3px 8px">🔗</a>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
+        <td class="col-actions pen-card-detail">
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm btn-secondary" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">Abrir</button>
             <button class="btn btn-sm btn-danger" onclick="deletePendenciaConfirm('${escapeHtml(p.id)}')">&#10005;</button>
@@ -281,13 +310,41 @@ function renderPenTable(area) {
   ` : ''}`;
 }
 
+function togglePenCard(el, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const row = el && el.closest ? el.closest('tr.pen-card') : null;
+  if (!row) return;
+  const expanded = row.classList.toggle('is-collapsed') === false;
+  row.classList.toggle('is-expanded', expanded);
+  const btn = row.querySelector('.pen-card-toggle');
+  if (btn) {
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.setAttribute('aria-label', expanded ? 'Recolher pendência' : 'Expandir pendência');
+  }
+}
+
+function toggleAllPenCards(expand) {
+  document.querySelectorAll('tr.pen-card').forEach(function(row) {
+    row.classList.toggle('is-collapsed', !expand);
+    row.classList.toggle('is-expanded', !!expand);
+    const btn = row.querySelector('.pen-card-toggle');
+    if (btn) {
+      btn.setAttribute('aria-expanded', expand ? 'true' : 'false');
+      btn.setAttribute('aria-label', expand ? 'Recolher pendência' : 'Expandir pendência');
+    }
+  });
+} 
+
 function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
   const c = getClientById(p.clientId);
   openModal(`${escapeHtml(p.id)} – ${escapeHtml(p.descricao)||'Pendência'}`, `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-      <select class="form-select" id="chgStatus" style="width:170px">
+      <select class="form-select filter-select" id="chgStatus">
         ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
       </select>
       <button class="btn btn-primary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
@@ -338,9 +395,11 @@ function openPendenciaDetail(id) {
       <button class="btn btn-sm btn-primary" onclick="addCheckItem('${escapeHtml(id)}')">+</button>
     </div>
     <hr class="divider"/>
-    <div class="form-group"><label class="form-label">Nova Nota</label>
+    <div class="form-group pen-note-compose"><label class="form-label">Nova Nota</label>
       <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas?"></textarea></div>
-    <div class="form-actions"><button class="btn btn-primary" onclick="submitPenNote('${escapeHtml(id)}')">&#x1F4DD; Registrar Nota</button></div>
+    <div class="pen-note-actions">
+      <button type="button" class="btn btn-primary" onclick="submitPenNote('${escapeHtml(id)}')">&#x1F4DD; Registrar Nota</button>
+    </div>
   `);
   setTimeout(() => {
     renderAttachmentList('pendencias', id, 'penAttachmentsList');

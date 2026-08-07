@@ -161,28 +161,28 @@ function renderVisitas() {
   const opNames  = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar" style="flex-wrap:wrap;gap:10px">
-      <div class="search-input-wrap" style="flex:1;min-width:180px">
+    <div class="search-bar">
+      <div class="search-input-wrap filter-grow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="visitSearch" placeholder="Buscar por cliente, motivo..." oninput="saveVisitFilters();debouncedRenderVisitView()" />
       </div>
-      <select class="form-select" id="visitClient" style="width:180px" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select filter-select-md" id="visitClient" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os clientes</option>
         ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select" id="visitOperator" style="width:200px" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select filter-select-lg" id="visitOperator" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os operadores</option>
         ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
       </select>
-      <select class="form-select" id="visitStatus" style="width:160px" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select filter-select" id="visitStatus" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os status</option>
         <option value="agendada">Agendada</option>
         <option value="em_andamento">Em andamento</option>
         <option value="concluida">Concluída</option>
         <option value="cancelada">Cancelada</option>
       </select>
-      <input type="date" class="form-input" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
-      <input type="date" class="form-input" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
+      <input type="date" class="form-input filter-date" id="visitFrom" onchange="saveVisitFilters();renderVisitView()" title="De" />
+      <input type="date" class="form-input filter-date" id="visitTo" onchange="saveVisitFilters();renderVisitView()" title="Até" />
     </div>
     <div id="visitStats" style="margin-bottom:14px"></div>
     <div id="visitViewArea"></div>`;
@@ -264,7 +264,7 @@ function renderVisitStats() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }).length;
   wrap.innerHTML = `
-    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+    <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Total de visitas</div><div class="stat-value">${total}</div></div>
       <div class="stat-card"><div class="stat-label">Hoje</div><div class="stat-value" style="color:#0ea5e9">${todayN}</div></div>
       <div class="stat-card"><div class="stat-label">Agendadas (futuras)</div><div class="stat-value" style="color:#f59e0b">${upcoming}</div></div>
@@ -514,14 +514,14 @@ function openVisitDetail(id) {
       </div>
       <div id="visitChecklistBox">${renderVisitChecklistHtml(v)}</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <input class="form-input" id="visitManualCheck" placeholder="Item manual extra..." style="flex:1;min-width:160px" />
+        <input class="form-input filter-grow" id="visitManualCheck" placeholder="Item manual extra..." />
         <button type="button" class="btn btn-secondary btn-sm" onclick="addVisitManualCheck('${escapeHtml(id)}')">+ Item</button>
       </div>
     </div>
 
     <div class="form-group"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="chgVisitStatus" style="width:200px">
+        <select class="form-select filter-select-md" id="chgVisitStatus">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
         </select>
         <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar</button>

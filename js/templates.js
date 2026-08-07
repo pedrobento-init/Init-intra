@@ -11,19 +11,19 @@ function renderTemplates() {
   const categories = Array.from(new Set(templates.map(t => t.category).filter(Boolean)));
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar" style="display:flex;gap:12px;flex-wrap:wrap">
-      <div class="search-input-wrap" style="flex:1;min-width:240px">
+    <div class="search-bar">
+      <div class="search-input-wrap filter-grow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." oninput="debouncedFilterTemplatesGrid()" />
       </div>
-      <div style="min-width:180px">
+      <div class="filter-field">
         <select class="form-select" id="templateCategorySelect" onchange="filterTemplatesGrid()">
           <option value="">Todas as categorias</option>
           ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
         </select>
       </div>
     </div>
-    <div id="templatesGridWrap" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(320px, 100%), 1fr));gap:16px;margin-top:16px"></div>
+    <div id="templatesGridWrap"></div>
   `;
 
   const savedFilters = loadFilterState('templates', {});

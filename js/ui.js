@@ -321,12 +321,14 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
   const openMobileMenu = () => {
     sidebar.classList.add('mobile-open');
     sidebarOverlay.style.display = 'block';
+    document.body.style.overflow = 'hidden';
     setTimeout(() => sidebarOverlay.classList.add('active'), 10);
   };
 
   const closeMobileMenu = () => {
     sidebar.classList.remove('mobile-open');
     sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
     setTimeout(() => {
       if (!sidebar.classList.contains('mobile-open')) {
         sidebarOverlay.style.display = 'none';
@@ -334,14 +336,30 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
     }, 300);
   };
 
-  mobileMenuBtn.addEventListener('click', openMobileMenu);
+  window.closeMobileMenu = closeMobileMenu;
+
+  mobileMenuBtn.addEventListener('click', () => {
+    if (sidebar.classList.contains('mobile-open')) closeMobileMenu();
+    else openMobileMenu();
+  });
   sidebarOverlay.addEventListener('click', closeMobileMenu);
 
-  // Auto-close on sidebar navigation clicks on mobile
   sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user, .btn-export').forEach(item => {
     item.addEventListener('click', () => {
-      closeMobileMenu();
+      if (window.innerWidth <= 768) closeMobileMenu();
     });
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768 && sidebar.classList.contains('mobile-open')) {
+      closeMobileMenu();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
+      closeMobileMenu();
+    }
   });
 }
 
@@ -413,9 +431,9 @@ function renderLogs() {
   const ops = typeof getOperators === 'function' ? getOperators() : [];
   
   const toolbarHtml = `
-    <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center">
-      <input type="text" id="logSearch" placeholder="Buscar no histórico..." class="form-input" style="flex:1;min-width:180px">
-      <select id="logTypeFilter" class="form-select" style="width:140px">
+    <div class="log-toolbar search-bar">
+      <input type="text" id="logSearch" placeholder="Buscar no histórico..." class="form-input filter-grow">
+      <select id="logTypeFilter" class="form-select filter-select-sm">
         <option value="">Todos os tipos</option>
         <option value="Cliente">Cliente</option>
         <option value="Pendência">Pendência</option>
@@ -424,17 +442,17 @@ function renderLogs() {
         <option value="Sessão">Sessão</option>
         <option value="Backup">Backup</option>
       </select>
-      <select id="logOpFilter" class="form-select" style="width:200px">
+      <select id="logOpFilter" class="form-select filter-select-lg">
         <option value="">Todos os operadores</option>
         ${ops.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('')}
       </select>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:12px;color:var(--text-muted)">De:</span>
-        <input type="date" id="logDateFrom" class="form-input" style="width:140px" />
+      <div class="filter-date-wrap">
+        <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
+        <input type="date" id="logDateFrom" class="form-input filter-date" />
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:12px;color:var(--text-muted)">Até:</span>
-        <input type="date" id="logDateTo" class="form-input" style="width:140px" />
+      <div class="filter-date-wrap">
+        <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">Até:</span>
+        <input type="date" id="logDateTo" class="form-input filter-date" />
       </div>
       <button class="btn btn-secondary btn-sm" onclick="exportLogsCSV()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
