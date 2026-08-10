@@ -585,6 +585,12 @@ tr:hover td { background: var(--bg-hover); }
   max-width: 320px;
 }
 
+/* Resumo/toolbar de cards recolhíveis — só no mobile */
+.pen-mobile-toolbar,
+.pen-card-summary {
+  display: none;
+}
+
 /* ── TOAST ── */
 .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; animation: slideUp .2s ease; min-width: 240px; color: var(--text-primary); }
@@ -1598,6 +1604,18 @@ tr:hover td { background: var(--bg-hover); }
     display: block;
     width: 100% !important;
   }
+
+  .pen-table tr.pen-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+
   .pen-table tr {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -1607,19 +1625,169 @@ tr:hover td { background: var(--bg-hover); }
     box-shadow: var(--shadow-sm);
     position: relative;
   }
+
+  /* Resumo compacto (sempre visível no mobile) */
+  .pen-card-summary {
+    display: flex !important;
+    align-items: stretch;
+    gap: 0;
+    padding: 0 !important;
+    border-bottom: none !important;
+    min-height: 0;
+  }
+
+  .pen-card-summary::before {
+    display: none !important;
+  }
+
+  .pen-card-toggle {
+    flex-shrink: 0;
+    width: 40px;
+    min-height: 100%;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pen-card-toggle:hover,
+  .pen-card-toggle:active {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .pen-card-toggle svg {
+    transition: transform 0.2s ease;
+  }
+
+  .pen-card.is-expanded .pen-card-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  .pen-card-summary-body {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pen-card-summary-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .pen-card-summary-client {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .pen-card-summary-client .client-badge {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+    font-size: 11px;
+  }
+
+  .pen-card-summary-tags {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pen-card-summary-tags .tag {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .pen-card-summary-desc {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  .pen-card.is-expanded .pen-card-summary-desc {
+    -webkit-line-clamp: unset;
+    display: block;
+  }
+
+  .pen-card-summary-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .pen-card-summary-deadline.is-overdue {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .pen-card-overdue-flag {
+    background: var(--red-dim);
+    color: var(--red);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .pen-card-summary-sla {
+    font-weight: 600;
+  }
+
+  /* Detalhes: ocultos quando recolhido */
+  .pen-card.is-collapsed .pen-card-detail {
+    display: none !important;
+  }
+
+  .pen-card.is-expanded .pen-card-detail {
+    display: flex;
+  }
+
+  .pen-card.is-expanded .pen-card-summary {
+    border-bottom: 1px solid var(--border) !important;
+  }
+
   .pen-table td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 4px 0;
+    padding: 4px 12px;
     border-bottom: 1px solid var(--border-light);
     font-size: 13px;
     min-height: 0;
     gap: 8px;
   }
+
   .pen-table td:last-child {
     border-bottom: none;
   }
+
   .pen-table td::before {
     content: attr(data-label);
     font-size: 10px;
@@ -1631,17 +1799,21 @@ tr:hover td { background: var(--bg-hover); }
     flex-shrink: 0;
     padding-top: 2px;
   }
+
   .pen-table td.col-actions {
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 8px;
+    padding-bottom: 10px;
     border-top: 1px solid var(--border);
     border-bottom: none;
     justify-content: flex-end;
     gap: 6px;
   }
+
   .pen-table td.col-actions::before {
     display: none;
   }
+
   .pen-table td.col-desc .col-desc-value {
     display: flex;
     flex-wrap: wrap;
@@ -1650,42 +1822,78 @@ tr:hover td { background: var(--bg-hover); }
     flex: 1 1 auto;
     min-width: 0;
   }
-  .pen-table td.col-desc .col-desc-value > span:first-child {
+
+  .pen-table td.col-desc .col-desc-value>span:first-child {
     overflow-wrap: anywhere;
     word-break: break-word;
     min-width: 0;
   }
-  .pen-table td.col-desc .col-desc-value > div {
+
+  .pen-table td.col-desc .col-desc-value>div {
     flex: 0 0 auto;
   }
-  .pen-table td.col-desc .col-desc-value > .col-desc-sla {
+
+  .pen-table td.col-desc .col-desc-value>.col-desc-sla {
     margin-left: auto;
   }
-  /* Hide less important columns on mobile */
+
+  /* Hide less important columns on mobile (ainda no expandido, data/notas etc. ficam ocultos) */
   .pen-table .col-date,
   .pen-table .col-time,
   .pen-table .col-notes,
   .pen-table .col-att,
   .pen-table .col-link {
-    display: none;
-  }
-  .visit-table .col-date,
-  .visit-table .col-notes,
-  .visit-table .col-att,
-  .visit-table .col-link {
-    display: block;
+    display: none !important;
   }
 
-  /* ── Overdue row mobile ── */
+  /* No expandido, esconder campos já mostrados no resumo para evitar duplicata */
+  .pen-card.is-expanded .col-client,
+  .pen-card.is-expanded .col-status,
+  .pen-card.is-expanded .col-prio,
+  .pen-card.is-expanded .col-desc {
+    display: none !important;
+  }
+
+  .visit-table .col-date,
+  .visit-table .col-client,
+  .visit-table .col-desc,
+  .visit-table .col-resp,
+  .visit-table .col-status,
+  .visit-table .col-notes,
+  .visit-table .col-att,
+  .visit-table .col-link,
+  .visit-table .col-actions {
+    display: flex !important;
+  }
+
+  .visit-table tr {
+    padding: 12px;
+  }
+
+  /* ── PENDÊNCIAS TABLE → MOBILE CARDS (recolhíveis) ── */
+  .pen-mobile-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .pen-mobile-toolbar .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+    /* ── Overdue row mobile ── */
   .row-overdue td {
     background: transparent !important;
   }
+
   .row-overdue {
     border-color: var(--red) !important;
-    border-left-width: 4px !important;
+    border-left: 4px solid var(--red) !important;
   }
 
-  /* ── Tabs (Client Modal) ── */
+    /* ── Tabs (Client Modal) ── */
   .tabs {
     gap: 0;
     flex-wrap: wrap;
