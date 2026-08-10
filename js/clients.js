@@ -235,10 +235,87 @@ function loadTemplateIntoProcedureForm() {
 function submitProcedureForm(e, clientId, procId) {
   e.preventDefault();
   const fd = new FormData(e.target);
-  saveProcedure({ id: procId || null, clientId, title: fd.get('title'), category: fd.get('category'), content: fd.get('content') });
+  const title = (fd.get('title') || '').toString().trim();
+  const category = (fd.get('category') || '').toString().trim();
+  const content = (fd.get('content') || '').toString();
+  const isNew = !procId;
+  saveProcedure({ id: procId || null, clientId, title, category, content });
   showToast('Procedimento salvo!', 'success');
   viewClient(clientId);
   switchClientTab('procedimentos', clientId);
+  if (isNew && typeof saveProcedureTemplate === 'function') {
+    setTimeout(() => offerSaveProcedureAsTemplate({ title, category, content }), 50);
+  }
+}
+
+function offerSaveProcedureAsTemplate(proc) {
+  if (!proc || !proc.title) return;
+  confirmAction('Deseja salvar este procedimento também como <strong>modelo</strong>?', function() {
+    const titleNorm = (proc.title || '').trim().toLowerCase();
+    const existing = (typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [])
+      .find(t => (t.title || '').trim().toLowerCase() === titleNorm);
+    if (existing) {
+      setTimeout(() => {
+        confirmAction(
+          'Já existe um modelo com o título <strong>' + escapeHtml(proc.title) + '</strong>. Deseja <strong>atualizar</strong> o modelo existente?',
+          function() {
+            saveProcedureTemplate({
+              id: existing.id,
+              title: proc.title,
+              category: proc.category || '',
+              content: proc.content || '',
+            });
+            showToast('Modelo atualizado!', 'success');
+            if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
+              renderTemplates();
+            }
+          }
+        );
+        const btn = document.getElementById('confirmBtn');
+        if (btn) {
+          btn.textContent = 'Atualizar modelo';
+          btn.classList.remove('btn-danger');
+          btn.classList.add('btn-primary');
+        }
+        const cancel = document.getElementById('confirmCancelBtn');
+        if (cancel) {
+          cancel.textContent = 'Criar novo';
+          cancel.onclick = function() {
+            closeModal();
+            saveProcedureTemplate({
+              id: null,
+              title: proc.title,
+              category: proc.category || '',
+              content: proc.content || '',
+            });
+            showToast('Novo modelo criado!', 'success');
+            if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
+              renderTemplates();
+            }
+          };
+        }
+      }, 50);
+      return;
+    }
+    saveProcedureTemplate({
+      id: null,
+      title: proc.title,
+      category: proc.category || '',
+      content: proc.content || '',
+    });
+    showToast('Modelo criado a partir do procedimento!', 'success');
+    if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
+      renderTemplates();
+    }
+  });
+  const btn = document.getElementById('confirmBtn');
+  if (btn) {
+    btn.textContent = 'Salvar como modelo';
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-primary');
+  }
+  const cancel = document.getElementById('confirmCancelBtn');
+  if (cancel) cancel.textContent = 'Não';
 }
 
 function deleteProcedureConfirm(procId, clientId) {
