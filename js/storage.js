@@ -6,6 +6,7 @@ const DB = {
   PROCEDURES: 'intra_procedures',
   PROCEDURE_TEMPLATES: 'intra_procedure_templates',
   OPERATORS: 'intra_operators',
+  TICKETS: 'intra_tickets',
   VISITS: 'intra_visits',
   USER: 'intra_user',
   COUNTER: 'intra_counter',
@@ -70,10 +71,6 @@ function getSession() {
     const s = cache?.value || null;
     if (!s) return null;
     if (Date.now() - s.ts > SESSION_TTL) { clearSession(); return null; }
-    // Sessão local só vale com auth remoto ativo
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && !window._supabaseAuthActive) {
-      return null;
-    }
     return s;
   } catch { return null; }
 }
@@ -96,16 +93,7 @@ function setSession(opId) {
 }
 
 function clearSession() {
-  // Limpa via API normal
   if (typeof setCacheTable === 'function') setCacheTable('sessions', { key: DB.SESSION, value: null });
-  // Limpa cache em memória diretamente (safety net contra race conditions)
-  if (typeof _dbCache !== 'undefined') {
-    _dbCache.sessions = { key: DB.SESSION, value: null };
-  }
-  // Limpa tabela IndexedDB sessions diretamente
-  if (typeof idb !== 'undefined' && idb.sessions) {
-    idb.sessions.clear().catch(() => {});
-  }
 }
 
 // ── TEAM HELPERS ──
@@ -115,8 +103,10 @@ function getCurrentTeam() {
 }
 
 function isTeamAdmin() {
-  // Cross-team só para admin real (não basta ser time init)
-  return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false;
+  const session = getSession();
+  if (!session) return false;
+  const op = getOperatorById(session.opId);
+  return op ? (op.isAdmin === true || op.team === 'init') : false;
 }
 
 function canViewTeam(targetTeam) {
@@ -252,42 +242,8 @@ function _needsPush(local, remote) {
   return new Date(local.updatedAt || 0).getTime() > new Date(remote.updated_at || 0).getTime();
 }
 
-/** Janela para manter criações offline locais ainda não vistas no servidor */
-const _OFFLINE_PUSH_MS = 10 * 60 * 1000;
-
-/**
- * Merge remoto + local sem ressuscitar deletes do servidor.
- * Mantém local-only só se for criação recente (offline).
- */
-async function _syncEntity(dbKey, tableName, remote, fMap, label) {
-  const local = dbGet(dbKey) || [];
-  const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote, fMap);
-  const remoteIds = new Set(remote.map(r => r.id));
-  const now = Date.now();
-  const cleaned = merged.filter(item => {
-    if (remoteIds.has(item.id)) return true;
-    const t = new Date(item.updatedAt || item.createdAt || 0).getTime();
-    return t > now - _OFFLINE_PUSH_MS;
-  });
-  dbSet(dbKey, cleaned);
-  for (const item of cleaned) {
-    const r = remote.find(x => x.id === item.id);
-    if (_needsPush(item, r)) {
-      await supabaseClient.from(tableName).upsert(_mapToRemote(item, fMap));
-    }
-  }
-  return {
-    conflicts,
-    conflictDetails: conflictDetails.map(d => ({ ...d, table: label }))
-  };
-}
-
-let _syncInFlight = null;
-
 async function syncSupabaseToLocal() {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return;
-  if (_syncInFlight) return _syncInFlight;
-  _syncInFlight = (async () => {
   let totalConflicts = 0;
   let allConflictDetails = [];
   try {
@@ -295,90 +251,80 @@ async function syncSupabaseToLocal() {
     const { data: remoteClients, error: cliErr } = await supabaseClient.from('clients').select('*');
     if (cliErr) console.warn('Supabase clients error:', cliErr);
     if (remoteClients) {
+      const local = dbGet(DB.CLIENTS);
       const fMap = { id:'id', name:'name', cnpj:'cnpj', segment:'segment', color:'color', initials:'initials', logo:'logo', logo_shape:'logoShape', owner:'owner', owner_phone:'ownerPhone', responsible:'responsible', responsible_phone:'responsiblePhone', technician:'technician', server:'server', hosting:'hosting', backup:'backup', licenses:'licenses', emails:'emails', google_sheet_url:'googleSheetUrl', team:'team', notes:'notes', attachments:'attachments', created_at:'createdAt', updated_at:'updatedAt' };
-      const r = await _syncEntity(DB.CLIENTS, 'clients', remoteClients, fMap, 'Clientes');
-      totalConflicts += r.conflicts;
-      allConflictDetails.push(...r.conflictDetails);
+      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteClients, fMap);
+      totalConflicts += conflicts;
+      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Clientes' })));
+      dbSet(DB.CLIENTS, merged);
+      for (const c of merged) {
+        const r = remoteClients.find(x => x.id === c.id);
+        if (_needsPush(c, r)) await supabaseClient.from('clients').upsert(_mapToRemote(c, fMap));
+      }
     }
 
     // 2. PENDÊNCIAS
     const { data: remotePens, error: penErr } = await supabaseClient.from('pendencias').select('*');
     if (penErr) console.warn('Supabase pendencias error:', penErr);
     if (remotePens) {
+      const local = dbGet(DB.PENDENCIAS);
       const fMap = { id:'id', client_id:'clientId', client_name:'clientName', tipo:'tipo', descricao:'descricao', responsible:'responsible', status:'status', priority:'priority', deadline:'deadline', notes:'notes', link_util:'linkUtil', team:'team', attachments:'attachments', checklist:'checklist', tags:'tags', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
-      const r = await _syncEntity(DB.PENDENCIAS, 'pendencias', remotePens, fMap, 'Pendências');
-      totalConflicts += r.conflicts;
-      allConflictDetails.push(...r.conflictDetails);
+      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remotePens, fMap);
+      totalConflicts += conflicts;
+      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Pendências' })));
+      dbSet(DB.PENDENCIAS, merged);
+      for (const p of merged) {
+        const r = remotePens.find(x => x.id === p.id);
+        if (_needsPush(p, r)) await supabaseClient.from('pendencias').upsert(_mapToRemote(p, fMap));
+      }
     }
 
-    // 3. OPERATORS — remoto manda em privilégios; dedupe por e-mail
-    const { data: remoteOps, error: opErr } = await supabaseClient
-      .from('operators')
-      .select('id,name,initials,color,role,phone,email,is_admin,active,team,auth_user_id,created_at,updated_at');
+    // 3. TICKETS
+    const { data: remoteTix, error: tckErr } = await supabaseClient.from('tickets').select('*');
+    if (tckErr) console.warn('Supabase tickets error:', tckErr);
+    if (remoteTix) {
+      const local = dbGet(DB.TICKETS);
+      const fMap = { id:'id', client_id:'clientId', client_name:'clientName', title:'title', description:'description', status:'status', priority:'priority', technician:'technician', updates:'updates', team:'team', attachments:'attachments', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
+      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteTix, fMap);
+      totalConflicts += conflicts;
+      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Chamados' })));
+      dbSet(DB.TICKETS, merged);
+      for (const t of merged) {
+        const r = remoteTix.find(x => x.id === t.id);
+        if (_needsPush(t, r)) await supabaseClient.from('tickets').upsert(_mapToRemote(t, fMap));
+      }
+    }
+
+    // 4. OPERATORS — use timestamp-based merge, preserve pinHash/pinSalt
+    const { data: remoteOps, error: opErr } = await supabaseClient.from('operators').select('*');
     if (opErr) console.warn('Supabase operators error:', opErr);
     if (remoteOps) {
-      const localOps = dbGet(DB.OPERATORS) || [];
+      const localOps = dbGet(DB.OPERATORS);
       const opFieldMap = { id:'id', name:'name', initials:'initials', color:'color', role:'role', phone:'phone', email:'email', is_admin:'isAdmin', active:'active', team:'team', created_at:'createdAt', updated_at:'updatedAt' };
       const { merged, conflicts, conflictDetails } = _mergeRecords(localOps, remoteOps, opFieldMap);
       totalConflicts += conflicts;
       allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Operadores' })));
+      // Preserve pinHash/pinSalt: use local if local is newer, remote if remote is newer
       const localMap = new Map(localOps.map(o => [o.id, o]));
       const remoteMap = new Map(remoteOps.map(r => [r.id, r]));
-      const remoteIds = new Set(remoteOps.map(r => r.id));
-      const remoteEmails = new Set(remoteOps.map(r => (r.email || '').toLowerCase()).filter(Boolean));
-      const now = Date.now();
-
       for (const o of merged) {
         const loc = localMap.get(o.id);
         const rem = remoteMap.get(o.id);
-        if (rem) {
-          o.isAdmin = rem.is_admin === true;
-          o.active = rem.active !== false;
-          o.team = rem.team || 'init';
-          o.auth_user_id = rem.auth_user_id || loc?.auth_user_id || null;
-          // Hashes de senha não trafegam no sync (auth via Supabase)
+        const localTime = new Date(loc?.updatedAt || 0).getTime();
+        const remoteTime = new Date(rem?.updated_at || 0).getTime();
+        if (localTime >= remoteTime) {
           o.pinHash = loc?.pinHash || null;
           o.pinSalt = loc?.pinSalt || null;
         } else {
-          o.pinHash = loc?.pinHash || null;
-          o.pinSalt = loc?.pinSalt || null;
-          o.auth_user_id = loc?.auth_user_id || null;
+          o.pinHash = rem?.pin_hash || loc?.pinHash || null;
+          o.pinSalt = rem?.pin_salt || loc?.pinSalt || null;
         }
       }
-
-      const deduped = merged.filter(o => {
-        if (remoteIds.has(o.id)) return true;
-        const em = (o.email || '').toLowerCase();
-        if (em && remoteEmails.has(em)) return false;
-        const t = new Date(o.updatedAt || o.createdAt || 0).getTime();
-        return t > now - _OFFLINE_PUSH_MS;
-      });
-
-      const byEmail = new Map();
-      const noEmail = [];
-      for (const o of deduped) {
-        const em = (o.email || '').toLowerCase();
-        if (!em) { noEmail.push(o); continue; }
-        const prev = byEmail.get(em);
-        if (!prev) { byEmail.set(em, o); continue; }
-        const prefer = remoteIds.has(o.id) && !remoteIds.has(prev.id) ? o
-          : remoteIds.has(prev.id) && !remoteIds.has(o.id) ? prev
-          : (new Date(o.updatedAt || 0) >= new Date(prev.updatedAt || 0) ? o : prev);
-        byEmail.set(em, prefer);
-      }
-      const finalOps = [...byEmail.values(), ...noEmail];
-      dbSet(DB.OPERATORS, finalOps);
-
-      for (const o of finalOps) {
+      dbSet(DB.OPERATORS, merged);
+      for (const o of merged) {
         const r = remoteOps.find(x => x.id === o.id);
-        if (_needsPush(o, r) && typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
-          await supabaseClient.from('operators').upsert({
-            id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role,
-            phone: o.phone, email: o.email,
-            is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init',
-            auth_user_id: o.auth_user_id || null,
-            created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
-          });
+        if (_needsPush(o, r)) {
+          await supabaseClient.from('operators').upsert({ id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone, email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null, is_admin: o.isAdmin === true, active: o.active !== false, created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString() });
         }
       }
     }
@@ -387,43 +333,61 @@ async function syncSupabaseToLocal() {
     const { data: remoteProcs, error: procErr } = await supabaseClient.from('procedures').select('*');
     if (procErr) console.warn('Supabase procedures error:', procErr);
     if (remoteProcs) {
+      const local = dbGet(DB.PROCEDURES);
       const fMap = { id:'id', client_id:'clientId', title:'title', category:'category', content:'content', created_at:'createdAt', updated_at:'updatedAt' };
-      const r = await _syncEntity(DB.PROCEDURES, 'procedures', remoteProcs, fMap, 'Procedimentos');
-      totalConflicts += r.conflicts;
-      allConflictDetails.push(...r.conflictDetails);
+      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteProcs, fMap);
+      totalConflicts += conflicts;
+      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Procedimentos' })));
+      dbSet(DB.PROCEDURES, merged);
+      for (const p of merged) {
+        const r = remoteProcs.find(x => x.id === p.id);
+        if (_needsPush(p, r)) await supabaseClient.from('procedures').upsert(_mapToRemote(p, fMap));
+      }
     }
 
-    // 6. VISITS
+    // 4.5 VISITS
     try {
       const { data: remoteVisits, error: visErr } = await supabaseClient.from('visits').select('*');
       if (visErr) {
         console.warn('Supabase visits (sync pulado):', visErr.message);
       } else if (remoteVisits) {
-        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', motivo:'motivo', observacoes:'observacoes', status:'status', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
-        const r = await _syncEntity(DB.VISITS, 'visits', remoteVisits, fMap, 'Visitas');
-        totalConflicts += r.conflicts;
-        allConflictDetails.push(...r.conflictDetails);
+        const local = dbGet(DB.VISITS);
+        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', status:'status', team:'team', created_at:'createdAt', updated_at:'updatedAt' };
+        const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteVisits, fMap);
+        totalConflicts += conflicts;
+        allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Visitas' })));
+        dbSet(DB.VISITS, merged);
+        for (const v of merged) {
+          const r = remoteVisits.find(x => x.id === v.id);
+          if (_needsPush(v, r)) await supabaseClient.from('visits').upsert(_mapToRemote(v, fMap));
+        }
       }
     } catch (e) {
       console.warn('Supabase visits (sync pulado — tabela ausente?):', e.message);
     }
 
-    // 7. PROCEDURE TEMPLATES
+    // 5.1 PROCEDURE TEMPLATES
     const { data: remoteTpls, error: tplErr } = await supabaseClient.from('procedure_templates').select('*');
     if (tplErr) console.warn('Supabase procedure_templates error:', tplErr);
     if (remoteTpls) {
+      const local = dbGet(DB.PROCEDURE_TEMPLATES);
       const fMap = { id:'id', title:'title', category:'category', content:'content', created_by:'createdBy', created_at:'createdAt', updated_at:'updatedAt' };
-      const r = await _syncEntity(DB.PROCEDURE_TEMPLATES, 'procedure_templates', remoteTpls, fMap, 'Modelos');
-      totalConflicts += r.conflicts;
-      allConflictDetails.push(...r.conflictDetails);
+      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteTpls, fMap);
+      totalConflicts += conflicts;
+      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Modelos' })));
+      dbSet(DB.PROCEDURE_TEMPLATES, merged);
+      for (const t of merged) {
+        const r = remoteTpls.find(x => x.id === t.id);
+        if (_needsPush(t, r)) await supabaseClient.from('procedure_templates').upsert(_mapToRemote(t, fMap));
+      }
     }
 
-    // 8. LOGS — só admins leem; merge com raw local
+    // 6. LOGS — merge remote with local (don't wipe local logs)
     const { data: remoteLogs, error: logErr } = await supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500);
     if (logErr) console.warn('Supabase logs error:', logErr);
     if (remoteLogs && remoteLogs.length > 0) {
       const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
-      const localLogs = _getLogsRaw();
+      const localLogs = getLogs();
       const allIds = new Map(localLogs.map(l => [l.id || (l.timestamp + l.action), l]));
       for (const l of mapped) { allIds.set(l.id || (l.timestamp + l.action), l); }
       const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
@@ -445,35 +409,22 @@ async function syncSupabaseToLocal() {
     }
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);
-  } finally {
-    _syncInFlight = null;
   }
-  })();
-  return _syncInFlight;
 }
 
-// Sync no load só se já houver sessão autenticada
+// Iniciar sincronização ao carregar a página
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      if (window._supabaseAuthActive) syncSupabaseToLocal();
-    }, 500);
-  });
+  window.addEventListener('load', () => setTimeout(syncSupabaseToLocal, 500));
 }
 
 // ── HISTÓRICO DE ATIVIDADES ──
-function _getLogsRaw() {
+function getLogs() {
   if (typeof getCacheTable === 'function') {
     const data = getCacheTable('audit_logs');
     return Array.isArray(data) ? data : [];
   }
   const v = dbGet(DB.LOGS);
   return Array.isArray(v) ? v : [];
-}
-
-function getLogs() {
-  if (typeof isCurrentAdmin === 'function' && getSession() && !isCurrentAdmin()) return [];
-  return _getLogsRaw();
 }
 
 function addLog(action, type, targetId, details) {
@@ -490,13 +441,13 @@ function addLog(action, type, targetId, details) {
   };
 
   if (typeof getCacheTable === 'function' && typeof setCacheTable === 'function') {
-    const logs = _getLogsRaw();
+    const logs = getLogs();
     logs.unshift(log);
     if (logs.length > 2000) logs.pop();
     setCacheTable('audit_logs', logs);
   } else {
     log.id = nextId('LOG');
-    const logs = _getLogsRaw();
+    const logs = getLogs();
     logs.unshift(log);
     if (logs.length > 2000) logs.pop();
     dbSet(DB.LOGS, logs);
@@ -523,8 +474,8 @@ const ATTACHMENT_MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ATTACHMENT_MAX_COUNT = 5;
 
 function getAttachments(type, itemId) {
-  // type = 'clients' | 'pendencias'
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
+  // type = 'clients' | 'pendencias' | 'tickets'
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
   const list = dbGet(keyMap[type] || type);
   const item = list.find(i => i.id === itemId);
   return (item && item.attachments) ? item.attachments : [];
@@ -535,7 +486,7 @@ function addAttachment(type, itemId, fileObj) {
   if (fileObj.size > ATTACHMENT_MAX_SIZE) {
     return { error: 'Arquivo excede o limite de 2MB.' };
   }
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
   const key = keyMap[type];
   if (!key) return { error: 'Tipo inválido.' };
   const list = dbGet(key);
@@ -557,13 +508,12 @@ function addAttachment(type, itemId, fileObj) {
   list[idx].attachments.push(att);
   list[idx].updatedAt = new Date().toISOString();
   dbSet(key, list);
-  addLog('Anexou arquivo', type === 'clients' ? 'Cliente' : 'Pendência', itemId, fileObj.name);
-  _pushAttachmentsToRemote(type, list[idx]);
+  addLog('Anexou arquivo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, fileObj.name);
   return { success: true, attachment: att };
 }
 
 function removeAttachment(type, itemId, attachmentId) {
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
   const key = keyMap[type];
   if (!key) return false;
   const list = dbGet(key);
@@ -576,24 +526,8 @@ function removeAttachment(type, itemId, attachmentId) {
   list[idx].attachments.splice(attIdx, 1);
   list[idx].updatedAt = new Date().toISOString();
   dbSet(key, list);
-  addLog('Removeu anexo', type === 'clients' ? 'Cliente' : 'Pendência', itemId, attName);
-  _pushAttachmentsToRemote(type, list[idx]);
+  addLog('Removeu anexo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, attName);
   return true;
-}
-
-function _pushAttachmentsToRemote(type, item) {
-  if (!item?.id) return;
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || !window._supabaseAuthActive) return;
-  const tableMap = { clients: 'clients', pendencias: 'pendencias' };
-  const table = tableMap[type];
-  if (!table) return;
-  const now = item.updatedAt || new Date().toISOString();
-  supabaseClient.from(table).update({
-    attachments: item.attachments || [],
-    updated_at: now
-  }).eq('id', item.id).then(res => {
-    if (res.error) console.warn('⚠️ Supabase anexos:', res.error.message);
-  }).catch(err => console.warn('⚠️ Rede anexos:', err.message));
 }
 
 function handleFileUpload(type, itemId, inputElement, callback) {
@@ -691,33 +625,31 @@ function saveClient(data) {
   dbSet(DB.CLIENTS, clients);
   addLog(isEdit ? 'Editou' : 'Criou', 'Cliente', data.id, data.name);
 
-  // Sync Supabase (inclui anexos)
+  // Sync Supabase
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    const saved = getClientById(data.id) || data;
     supabaseClient.from('clients').upsert({
-      id: saved.id,
-      name: saved.name,
-      cnpj: saved.cnpj,
-      segment: saved.segment,
-      color: saved.color,
-      initials: saved.initials,
-      logo: saved.logo,
-      logo_shape: saved.logoShape || 'circle',
-      owner: saved.owner,
-      owner_phone: saved.ownerPhone,
-      responsible: saved.responsible,
-      responsible_phone: saved.responsiblePhone,
-      technician: saved.technician,
-      server: saved.server,
-      hosting: saved.hosting,
-      backup: saved.backup,
-      licenses: saved.licenses,
-      emails: saved.emails,
-      google_sheet_url: saved.googleSheetUrl || null,
-      notes: saved.notes,
-      team: saved.team || 'init',
-      attachments: saved.attachments || [],
-      created_at: saved.createdAt || now,
+      id: data.id,
+      name: data.name,
+      cnpj: data.cnpj,
+      segment: data.segment,
+      color: data.color,
+      initials: data.initials,
+      logo: data.logo,
+      logo_shape: data.logoShape || 'circle',
+      owner: data.owner,
+      owner_phone: data.ownerPhone,
+      responsible: data.responsible,
+      responsible_phone: data.responsiblePhone,
+      technician: data.technician,
+      server: data.server,
+      hosting: data.hosting,
+      backup: data.backup,
+      licenses: data.licenses,
+      emails: data.emails,
+      google_sheet_url: data.googleSheetUrl || null,
+      notes: data.notes,
+      team: data.team || 'init',
+      created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
       if (res.error) console.error('❌ Supabase cliente:', res.error);
@@ -875,6 +807,123 @@ function addPendenciaNote(id, text, author) {
   }
 }
 
+// ── TICKETS ──
+function getTickets() { return dbGet(DB.TICKETS); }
+function getTicketsByTeam(team) {
+  const all = getTickets();
+  if (!team) return all;
+  return all.filter(t => (t.team || 'init') === team);
+}
+function getMyTickets() {
+  return filterByTeam(getTickets());
+}
+function getTicketById(id) { return getTickets().find(t => t.id === id) || null; }
+function saveTicket(data) {
+  const list = getTickets();
+  const isEdit = !!data.id;
+  // Herda team do cliente se não informado
+  if (!data.team && data.clientId) {
+    const client = getClientById(data.clientId);
+    if (client) data.team = client.team || 'init';
+  }
+  if (!data.team) data.team = getCurrentTeam();
+  let oldStatus = null;
+  var now = new Date().toISOString();
+  if (isEdit) {
+    const i = list.findIndex(t => t.id === data.id);
+    if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now };
+    } else {
+      data.id = nextId('TCK');
+      data.createdAt = now;
+      data.updatedAt = now;
+      data.status = data.status || 'aberto';
+      data.updates = [];
+      list.push(data);
+    }
+  } else {
+    data.id = nextId('TCK');
+    data.createdAt = now;
+    data.updatedAt = now;
+    data.status = data.status || 'aberto';
+    data.updates = [];
+    list.push(data);
+  }
+  if (data.status === 'concluido' && oldStatus !== 'concluido') {
+    data.completedAt = now;
+    const idx = list.findIndex(t => t.id === data.id);
+    if (idx !== -1) list[idx].completedAt = data.completedAt;
+  }
+  dbSet(DB.TICKETS, list);
+  addLog(isEdit ? 'Editou' : 'Criou', 'Chamado', data.id, data.title);
+
+  // Notificação por e-mail (não bloqueia a operação)
+  setTimeout(() => {
+    try {
+      if (isEdit && typeof notifyTicketUpdated === 'function') {
+        notifyTicketUpdated(data, oldStatus);
+      } else if (!isEdit && typeof notifyTicketCreated === 'function') {
+        notifyTicketCreated(data);
+      }
+    } catch (e) { console.warn('📧 Erro na notificação de chamado:', e); }
+  }, 100);
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.from('tickets').upsert({
+      id: data.id,
+      client_id: data.clientId,
+      client_name: data.clientName,
+      title: data.title,
+      description: data.description,
+      status: data.status,
+      priority: data.priority,
+      technician: data.technician,
+      updates: data.updates || [],
+      team: data.team || 'init',
+      attachments: data.attachments || [],
+      timer_running: data.timerRunning === true,
+      timer_started_at: data.timerStartedAt || null,
+      timer_total_seconds: data.timerTotalSeconds || 0,
+      timer_operator: data.timerOperator || null,
+      completed_at: data.completedAt || null,
+      created_at: data.createdAt || now,
+      updated_at: now
+    }).then(res => { if(res.error) console.error('❌ Supabase chamado:', res.error); });
+  }
+
+  return data;
+}
+function deleteTicket(id) {
+  if (!canDelete()) {
+    if (typeof showToast === 'function') showToast('Permissão negada para excluir chamados.', 'error');
+    return false;
+  }
+  const tck = getTicketById(id);
+  const title = tck ? tck.title : 'Desconhecido';
+  dbSet(DB.TICKETS, getTickets().filter(t => t.id !== id));
+  addLog('Excluiu', 'Chamado', id, title);
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.from('tickets').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir chamado:', res.error); });
+  }
+}
+function addTicketUpdate(id, text, author) {
+  const list = getTickets();
+  const i = list.findIndex(t => t.id === id);
+  if (i === -1) return;
+  if (!list[i].updates) list[i].updates = [];
+  list[i].updates.push({ text, author, createdAt: new Date().toISOString() });
+  var now = new Date().toISOString();
+  list[i].updatedAt = now;
+  dbSet(DB.TICKETS, list);
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.from('tickets').update({
+      updates: list[i].updates,
+      updated_at: now
+    }).eq('id', id).then(res => { if(res.error) console.error('❌ Supabase atualizar chamado:', res.error); });
+  }
+}
+
 // ── VISITS (Visitas Técnicas) ──
 const VISIT_STATUS_MAP = {
   agendada:     { label: 'Agendada',     color: '#0ea5e9' },
@@ -883,6 +932,17 @@ const VISIT_STATUS_MAP = {
   cancelada:    { label: 'Cancelada',    color: '#94a3b8' },
 };
 
+
+function formatVisitTimeRange(v) {
+  if (!v) return '—';
+  if (v.allDay) return 'Dia inteiro';
+  const start = (v.time || '').toString().slice(0, 5);
+  const end = (v.timeEnd || '').toString().slice(0, 5);
+  if (start && end) return start + ' – ' + end;
+  if (start) return start;
+  if (end) return 'até ' + end;
+  return '—';
+}
 function getVisits() { return dbGet(DB.VISITS); }
 function getVisitsByTeam(team) {
   const all = getVisits();
@@ -907,6 +967,14 @@ function saveVisit(data) {
     if (client) data.team = client.team || 'init';
   }
   if (!data.team) data.team = getCurrentTeam();
+  data.allDay = data.allDay === true;
+  if (data.allDay) {
+    data.time = '';
+    data.timeEnd = '';
+  } else {
+    data.time = data.time || '';
+    data.timeEnd = data.timeEnd || '';
+  }
   const now = new Date().toISOString();
   if (isEdit) {
     const i = list.findIndex(v => v.id === data.id);
@@ -922,21 +990,20 @@ function saveVisit(data) {
   addLog(isEdit ? 'Editou' : 'Criou', 'Visita', data.id, data.clientName + ' – ' + (data.motivo || ''));
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    const saved = getVisitById(data.id) || data;
     supabaseClient.from('visits').upsert({
-      id: saved.id,
-      client_id: saved.clientId,
-      client_name: saved.clientName,
-      operator: saved.operator,
-      date: saved.date,
-      time: saved.time || null,
-      motivo: saved.motivo,
-      observacoes: saved.observacoes || '',
-      status: saved.status,
-      team: saved.team || 'init',
-      categories: saved.categories || [],
-      checklist: saved.checklist || [],
-      created_at: saved.createdAt || now,
+      id: data.id,
+      client_id: data.clientId,
+      client_name: data.clientName,
+      operator: data.operator,
+      date: data.date,
+      time: data.allDay ? null : (data.time || null),
+      time_end: data.allDay ? null : (data.timeEnd || null),
+      all_day: data.allDay === true,
+      motivo: data.motivo,
+      observacoes: data.observacoes || '',
+      status: data.status,
+      team: data.team || 'init',
+      created_at: data.createdAt,
       updated_at: now
     }).then(res => { if (res.error) console.error('❌ Supabase visita:', res.error); });
   }
@@ -1099,7 +1166,6 @@ function getOperatorByAuthId(authUserId) {
 }
 async function saveOperator(data) {
   const list = getOperators();
-  if (data.id === null || data.id === undefined || data.id === '') delete data.id;
   const isEdit = !!data.id;
   const existing = isEdit ? list.find(o => o.id === data.id) : null;
   
@@ -1150,9 +1216,9 @@ async function saveOperator(data) {
   
   addLog(isEdit ? 'Editou' : 'Criou', 'Operador', savedOp.id, savedOp.name);
 
-  // Sync to Supabase (sem pin_hash/pin_salt — senha só no Auth)
+  // Sync to Supabase using the MERGED operator data (savedOp), not the partial form data
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    const payload = {
+    supabaseClient.from('operators').upsert({
       id: savedOp.id,
       name: savedOp.name,
       initials: savedOp.initials,
@@ -1160,18 +1226,22 @@ async function saveOperator(data) {
       role: savedOp.role,
       phone: savedOp.phone,
       email: savedOp.email,
+      pin_hash: savedOp.pinHash || null,
+      pin_salt: savedOp.pinSalt || null,
       is_admin: savedOp.isAdmin === true,
       active: savedOp.active !== false,
       team: savedOp.team || 'init',
-      auth_user_id: savedOp.auth_user_id || null,
       created_at: savedOp.createdAt || now,
       updated_at: now
-    };
-    supabaseClient.from('operators').upsert(payload).then(res => {
+    }).then(res => {
       if (res.error) {
-        console.warn('⚠️ Sync operador:', res.error.message);
+        if (res.error.code === 'PGRST204' || (res.error.message && res.error.message.includes('column'))) {
+          console.warn('⚠️ Supabase operadores: schema incompleto (coluna ausente?). Use o script de migração.');
+        } else {
+          console.warn('⚠️ Supabase operadores:', res.error.message);
+        }
       }
-    }).catch(() => {});
+    }).catch(err => console.warn('⚠️ Erro de rede ao salvar operador:', err.message));
   }
 
   return savedOp;
@@ -1254,12 +1324,26 @@ function resetOperatorPassword(opId) {
 
 // ── SEED ──
 function seedDemoData() {
-  // Nunca seedar em produção / com backend configurado
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) return;
-  if (localStorage.getItem('intra_allow_demo_seed') !== '1') return;
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    console.log('ℹ️ Supabase conectado — seed de demonstração pulado.');
+    return;
+  }
   if (getClients().length > 0) return;
 
-  // Operadores não são mais seedados — cadastro manual / login Auth
+  // Seed operators
+  if (getOperators().length === 0) {
+    const operators = [
+      { id:'OP-1', name:'Pedro',   initials:'PE', color:'#1a56db', role:'Técnico',   phone:'', email:'pedro@initnet.com.br',   auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-2', name:'Giovane', initials:'GI', color:'#0891b2', role:'Técnico',   phone:'', email:'giovane@initnet.com.br', auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-3', name:'Rafael',  initials:'RA', color:'#0f766e', role:'Técnico',   phone:'', email:'rafael@initnet.com.br',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-4', name:'Joarli',  initials:'JO', color:'#4f46e5', role:'Técnico',   phone:'', email:'joarli@initnet.com.br',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-5', name:'Felipe',  initials:'FE', color:'#6366f1', role:'CEO',       phone:'', email:'felipe@initnet.com.br', auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+    ];
+    dbSet(DB.OPERATORS, operators);
+    const c = dbGetObj(DB.COUNTER, {});
+    c['OP'] = 5;
+    dbSet(DB.COUNTER, c);
+  }
 
   const clients = [
     {
@@ -1306,6 +1390,44 @@ function seedDemoData() {
     }
   ];
 
+  const pendencias = [
+    {
+      id: 'PEN-1', createdAt: '2025-04-28T08:00:00Z', updatedAt: '2025-04-29T14:00:00Z', team: 'init',
+      clientId: 'CLI-1', clientName: 'Padaria Central',
+      tipo: 'Projeto', descricao: 'Cabeamento estruturado no andar 2',
+      responsible: 'Pedro', status: 'em_andamento', priority: 'media',
+      deadline: '2025-05-15', notes: [], linkUtil: ''
+    },
+    {
+      id: 'PEN-2', createdAt: '2025-04-29T10:00:00Z', updatedAt: '2025-04-29T10:00:00Z', team: 'init',
+      clientId: 'CLI-2', clientName: 'Distribuidora Ômega',
+      tipo: 'Projeto', descricao: 'Migração para AWS',
+      responsible: 'Giovane', status: 'em_andamento', priority: 'alta',
+      deadline: '2025-06-01', notes: [], linkUtil: ''
+    },
+    {
+      id: 'PEN-3', createdAt: '2025-04-30T07:00:00Z', updatedAt: '2025-04-30T07:00:00Z', team: 'init',
+      clientId: 'CLI-3', clientName: 'Al Marques',
+      tipo: 'Suporte', descricao: 'Verificação mensal de backup e segurança',
+      responsible: 'Rafael', status: 'aberto', priority: 'baixa',
+      deadline: '', notes: [], linkUtil: ''
+    },
+    {
+      id: 'PEN-4', createdAt: '2025-05-01T09:00:00Z', updatedAt: '2025-05-01T09:00:00Z', team: 'init',
+      clientId: 'CLI-1', clientName: 'Padaria Central',
+      tipo: 'Manutenção', descricao: 'Atualização do antivírus em todos os terminais',
+      responsible: 'Joarli', status: 'aberto', priority: 'media',
+      deadline: '2025-05-20', notes: [], linkUtil: ''
+    },
+    {
+      id: 'PEN-5', createdAt: '2025-05-02T11:00:00Z', updatedAt: '2025-05-02T11:00:00Z', team: 'init',
+      clientId: 'CLI-2', clientName: 'Distribuidora Ômega',
+      tipo: 'Suporte', descricao: 'Configurar VPN para novos colaboradores',
+      responsible: 'Felipe', status: 'em_andamento', priority: 'alta',
+      deadline: '2025-05-10', notes: [], linkUtil: ''
+    }
+  ];
+
   const procedures = [
     {
       id: 'PROC-1', clientId: 'CLI-1', createdAt: '2025-01-15T10:00:00Z', updatedAt: '2025-01-15T10:00:00Z',
@@ -1346,12 +1468,13 @@ function seedDemoData() {
   ];
 
   dbSet(DB.CLIENTS, clients);
+  dbSet(DB.PENDENCIAS, pendencias);
   dbSet(DB.PROCEDURES, procedures);
   if (getProcedureTemplates().length === 0) {
     dbSet(DB.PROCEDURE_TEMPLATES, procedureTemplates);
   }
-  const currentCounters = dbGetObj(DB.COUNTER, { CLI: 3, PEN: 0, PROC: 3, OP: 0 });
-  dbSet(DB.COUNTER, { ...currentCounters, CLI: 3, PEN: 0, PROC: 3, TPL: 3, OP: 0 });
+  const currentCounters = dbGetObj(DB.COUNTER, { CLI: 3, PEN: 5, PROC: 3, OP: 5 });
+  dbSet(DB.COUNTER, { ...currentCounters, CLI: 3, PEN: 5, PROC: 3, TPL: 3, OP: 5 });
 }
 
 // ── VALIDAÇÃO ──
@@ -1422,21 +1545,21 @@ function validatePendencia(data) {
   return errors;
 }
 
+function validateTicket(data) {
+  const errors = [];
+  if (!Validators.required(data.title)) errors.push('Título é obrigatório.');
+  if (data.technician && !Validators.email(data.technician) && data.technician.includes('@')) errors.push('E-mail do técnico inválido.');
+  return errors;
+}
+
 function validateOperator(data) {
   const errors = [];
   if (!Validators.required(data.name)) errors.push('Nome é obrigatório.');
   if (data.email && !Validators.email(data.email)) errors.push('E-mail inválido.');
   if (data.phone && !Validators.phone(data.phone)) errors.push('Telefone inválido.');
   if (data.initials && data.initials.length > 3) errors.push('Iniciais devem ter no máximo 3 caracteres.');
-  if (data.email) {
-    const email = data.email.trim().toLowerCase();
-    const dup = getOperators().find(o => o.email?.toLowerCase() === email && o.id !== data.id);
-    if (dup) errors.push(`Já existe um operador com o e-mail ${data.email} (${dup.name}).`);
-  }
   return errors;
 }
-
-
 
 function validateTemplate(data) {
   const errors = [];

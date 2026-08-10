@@ -171,7 +171,7 @@ function renderClientTab(tab, id) {
       </div>
       ${visits.length ? `<div class="table-wrapper"><table><thead><tr><th>Data</th><th>Horário</th><th>Motivo</th><th>Operador</th><th>Status</th><th></th></tr></thead><tbody>${visits.map(v => `<tr>
         <td><strong>${formatDate(v.date)}</strong></td>
-        <td>${v.time ? escapeHtml(v.time) : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td>${escapeHtml(typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : (v.time || '—'))}</td>
         <td>${escapeHtml(v.motivo || '—')}${v.observacoes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(v.observacoes)}</div>` : ''}</td>
         <td>${escapeHtml(v.operator || '—')}</td>
         <td>${typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : escapeHtml(v.status)}</td>

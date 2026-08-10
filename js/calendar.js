@@ -153,12 +153,25 @@ function mapPendenciasToEvents(pendencias) {
 function mapVisitsToEvents(visits) {
   return visits.map(v => {
     const c = VISIT_COLORS[v.status] || VISIT_COLORS.agendada;
-    const timeLabel = v.time ? ' ⏰' + v.time : '';
+    const rangeLabel = typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : (v.time || '');
+    const timeLabel = rangeLabel && rangeLabel !== '—' ? ' ⏰' + rangeLabel : '';
+    const allDay = v.allDay === true || !v.time;
+    let start = v.date;
+    let end = undefined;
+    if (!allDay && v.date && v.time) {
+      const tStart = (v.time || '').toString().slice(0, 5);
+      start = v.date + 'T' + tStart + ':00';
+      if (v.timeEnd) {
+        const tEnd = (v.timeEnd || '').toString().slice(0, 5);
+        end = v.date + 'T' + tEnd + ':00';
+      }
+    }
     return {
       id: 'VIS-' + v.id,
-      title: '🚗 ' + (v.clientName || '—') + (v.motivo ? ' · ' + v.motivo : '') + timeLabel,
-      start: v.date,
-      allDay: true,
+      title: '🚗 ' + (v.clientName || '—'),
+      start,
+      end,
+      allDay,
       backgroundColor: c.bg,
       textColor: '#fff',
       borderColor: c.border,
@@ -173,6 +186,8 @@ function mapVisitsToEvents(visits) {
         status: v.status,
         motivo: v.motivo,
         time: v.time,
+        timeEnd: v.timeEnd,
+        allDay: v.allDay === true,
         observacoes: v.observacoes,
       },
     };
@@ -229,6 +244,14 @@ async function initFullCalendar() {
     dayMaxEvents: isMobile ? 2 : 4,
     nowIndicator: true,
     height: 'auto',
+    eventContent: function(arg) {
+      const props = arg.event.extendedProps;
+      if (props.kind !== 'visit') return true; // pendências: default
+      const client = typeof getClientById === 'function' ? getClientById(props.clientId) : null;
+      const avatar = client ? (typeof clientAvatar === 'function' ? clientAvatar(client, 20) : props.clientName) : props.clientName;
+      const name = props.clientName || '—';
+      return { html: '<div class="fc-visit-content"><span class="fc-visit-icon">🚗</span>' + avatar + '<span class="fc-visit-name">' + name + '</span></div>' };
+    },
     eventClick: function(info) {
       info.jsEvent.preventDefault();
       const props = info.event.extendedProps;
@@ -249,7 +272,8 @@ async function initFullCalendar() {
       let title = info.event.title;
       if (props.kind === 'visit') {
         const statusLabel = (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[props.status]?.label) || props.status;
-        title = `🚗 Visita: ${props.motivo || '—'}\nCliente: ${props.clientName || '—'}\nOperador: ${props.operator || '—'}\nStatus: ${statusLabel}${props.time ? '\nHorário: ' + props.time : ''}`;
+        const range = typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(props) : (props.time || '');
+        title = `🚗 Visita: ${props.motivo || '—'}\nCliente: ${props.clientName || '—'}\nOperador: ${props.operator || '—'}\nStatus: ${statusLabel}${range && range !== '—' ? '\nHorário: ' + range : ''}`;
       } else {
         const statusLabel = STATUS_PEN_MAP[props.status]?.label || props.status;
         const priorityLabel = PRIORITY_MAP[props.priority]?.label || props.priority;

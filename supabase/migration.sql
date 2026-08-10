@@ -172,6 +172,8 @@ alter table public.visits add column if not exists client_name text;
 alter table public.visits add column if not exists operator text;
 alter table public.visits add column if not exists date date;
 alter table public.visits add column if not exists "time" time;
+alter table public.visits add column if not exists time_end time;
+alter table public.visits add column if not exists all_day boolean default false;
 alter table public.visits add column if not exists motivo text;
 alter table public.visits add column if not exists observacoes text;
 alter table public.visits add column if not exists status text default 'agendada';

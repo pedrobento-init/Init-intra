@@ -536,7 +536,7 @@ function renderDashboard() {
                   <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${escapeHtml(v.clientName)||'—'} · ${escapeHtml(v.operator)||'—'}</div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
-                  <span style="font-size:11px;font-weight:600;${isToday?'color:#0ea5e9':''}">${formatDate(v.date)}${v.time?' '+escapeHtml(v.time):''}</span>
+                  <span style="font-size:11px;font-weight:600;${isToday?'color:#0ea5e9':''}">${formatDate(v.date)}${(v.allDay || v.time || v.timeEnd) ? ' ' + escapeHtml(formatVisitTimeRange(v)) : ''}</span>
                   <span style="font-size:10px;background:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'}20;color:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'};padding:2px 6px;border-radius:4px;font-weight:600">${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].label:escapeHtml(v.status||'—')}</span>
                 </div>
               </div>`;

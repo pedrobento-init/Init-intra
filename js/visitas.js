@@ -4,153 +4,6 @@ const VISIT_PAGE_SIZE = 30;
 let _visitPage = 1;
 let _filteredVisits = [];
 
-/**
- * Categorias de serviço na visita + pontos de verificação.
- * Ao marcar uma categoria, o checklist correspondente é aplicado.
- */
-const VISIT_CHECK_CATEGORIES = {
-  nobreak: {
-    label: 'Nobreak / Energia',
-    color: '#f59e0b',
-    items: [
-      'Nobreak ligado e em modo online (não bypass)',
-      'Carga da bateria / autonomia verificada',
-      'Equipamentos críticos plugados no nobreak (não na parede)',
-      'Modem/roteador/ONT alimentados e ligados após a troca',
-      'Switch/AP e servidor ligados após a troca',
-      'Teste de queda de energia (se seguro) ou simulação'
-    ]
-  },
-  rede: {
-    label: 'Rede / Link / Modem',
-    color: '#0ea5e9',
-    items: [
-      'Modem/ONT da operadora ligado e com LEDs normais',
-      'Link de internet OK (ping / página externa)',
-      'Roteador/firewall ligado e acessível',
-      'Wi-Fi principal no ar (SSID correto)',
-      'Switches com link nos portos críticos',
-      'IP fixo / DHCP do cliente validado se aplicável'
-    ]
-  },
-  servidor: {
-    label: 'Servidor',
-    color: '#8b5cf6',
-    items: [
-      'Servidor ligado e acessível (local ou remoto)',
-      'Serviços críticos rodando (AD, ERP, arquivos…)',
-      'Espaço em disco e alertas verificados',
-      'Backup recente confere (data/hora)',
-      'Acesso remoto (AnyDesk/RDP/VPN) testado'
-    ]
-  },
-  backup: {
-    label: 'Backup',
-    color: '#16a34a',
-    items: [
-      'Job de backup ativo e sem falha recente',
-      'Destino do backup com espaço',
-      'Restauração de teste (amostra) se combinado',
-      'Agendamento e notificação de falha OK'
-    ]
-  },
-  estacoes: {
-    label: 'Estações / Usuários',
-    color: '#6366f1',
-    items: [
-      'Pelo menos 1 estação de trabalho testada',
-      'Login de usuário e pasta de rede OK',
-      'Impressão de teste (se houver impressora)',
-      'Antivírus/atualizações sem bloqueio crítico'
-    ]
-  },
-  impressao: {
-    label: 'Impressão',
-    color: '#ec4899',
-    items: [
-      'Impressora ligada e na rede',
-      'Fila de impressão sem erro',
-      'Página de teste impressa',
-      'Toner/suprimento verificado'
-    ]
-  },
-  telefonia: {
-    label: 'Telefonia / PABX',
-    color: '#14b8a6',
-    items: [
-      'PABX/ATA ligado',
-      'Linha/tronco com tom',
-      'Ramal de teste atende e realiza chamada',
-      'Gravação/URA (se houver) operacional'
-    ]
-  },
-  camera: {
-    label: 'CFTV / Câmeras',
-    color: '#64748b',
-    items: [
-      'DVR/NVR ligado e gravando',
-      'Câmeras online no software',
-      'Horário do gravador correto',
-      'Espaço de gravação suficiente'
-    ]
-  },
-  geral: {
-    label: 'Checklist geral do site',
-    color: '#1a56db',
-    items: [
-      'Ambiente organizado / cabos sem risco',
-      'Cliente informado do que foi feito',
-      'Pendências restantes registradas no sistema',
-      'Fotos ou anotações anexadas se necessário'
-    ]
-  }
-};
-
-function buildVisitChecklistFromCategories(categoryIds, existing) {
-  const cats = Array.isArray(categoryIds) ? categoryIds : [];
-  const prev = Array.isArray(existing) ? existing : [];
-  const prevMap = new Map(prev.map(i => [i.key || (i.category + '|' + i.text), i]));
-  const out = [];
-  cats.forEach(catId => {
-    const cat = VISIT_CHECK_CATEGORIES[catId];
-    if (!cat) return;
-    cat.items.forEach((text, idx) => {
-      const key = catId + '|' + idx;
-      const old = prevMap.get(key) || prev.find(p => p.category === catId && p.text === text);
-      out.push({
-        key,
-        category: catId,
-        text,
-        done: old ? !!old.done : false,
-        doneAt: old?.doneAt || null,
-        doneBy: old?.doneBy || null
-      });
-    });
-  });
-  // Mantém itens manuais (sem category de catálogo)
-  prev.forEach(p => {
-    if (p.manual && p.text) {
-      out.push({
-        key: p.key || ('manual|' + p.text),
-        category: 'manual',
-        text: p.text,
-        done: !!p.done,
-        doneAt: p.doneAt || null,
-        doneBy: p.doneBy || null,
-        manual: true
-      });
-    }
-  });
-  return out;
-}
-
-function visitChecklistProgress(v) {
-  const list = v?.checklist || [];
-  if (!list.length) return null;
-  const done = list.filter(i => i.done).length;
-  return { done, total: list.length, pct: Math.round((done / list.length) * 100) };
-}
-
 function renderVisitas() {
   document.getElementById('pageTitle').textContent = 'Visitas Técnicas';
   setTopbarAction('+ Nova Visita', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>');
@@ -164,28 +17,28 @@ function renderVisitas() {
   window._visitReportDefaultMonth = `${_nowRpt.getFullYear()}-${String(_nowRpt.getMonth() + 1).padStart(2, '0')}`;
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar">
-      <div class="search-input-wrap filter-grow">
+    <div class="search-bar" style="flex-wrap:wrap;gap:10px">
+      <div class="search-input-wrap" style="flex:1;min-width:180px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="visitSearch" placeholder="Buscar por cliente, motivo..." oninput="saveVisitFilters();debouncedRenderVisitView()" />
       </div>
-      <select class="form-select filter-select-md" id="visitClient" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select" id="visitClient" style="width:180px" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os clientes</option>
         ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select filter-select-lg" id="visitOperator" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select" id="visitOperator" style="width:200px" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os operadores</option>
         ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
       </select>
-      <select class="form-select filter-select" id="visitStatus" onchange="saveVisitFilters();renderVisitView()">
+      <select class="form-select" id="visitStatus" style="width:160px" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os status</option>
         <option value="agendada">Agendada</option>
         <option value="em_andamento">Em andamento</option>
         <option value="concluida">Concluída</option>
         <option value="cancelada">Cancelada</option>
       </select>
-      <input type="date" class="form-input filter-date" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
-      <input type="date" class="form-input filter-date" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
+      <input type="date" class="form-input" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
+      <input type="date" class="form-input" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
       <button type="button" class="btn btn-secondary btn-sm" onclick="openVisitMonthReportModal()" title="Relatório mensal para Google Sheets">
         Relatório do mês
       </button>
@@ -270,7 +123,7 @@ function renderVisitStats() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }).length;
   wrap.innerHTML = `
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
       <div class="stat-card"><div class="stat-label">Total de visitas</div><div class="stat-value">${total}</div></div>
       <div class="stat-card"><div class="stat-label">Hoje</div><div class="stat-value" style="color:#0ea5e9">${todayN}</div></div>
       <div class="stat-card"><div class="stat-label">Agendadas (futuras)</div><div class="stat-value" style="color:#f59e0b">${upcoming}</div></div>
@@ -310,14 +163,24 @@ function renderVisitTable(area) {
       const c = getClientById(v.clientId);
       const color = c?.color || '#2563eb';
       return `<tr>
-        <td data-label="Data" class="col-date" style="white-space:nowrap"><strong>${v.date ? formatDate(v.date) : '—'}</strong>${v.time ? `<div style="font-size:11px;color:var(--text-muted)">⏰ ${escapeHtml(v.time)}</div>` : ''}</td>
+        <td data-label="Data" class="col-date">
+          <div class="visit-date-cell">
+            <span class="visit-date-main">${v.date ? formatDate(v.date) : '—'}</span>
+            ${(v.allDay || v.time || v.timeEnd) ? `<span class="visit-date-time">${escapeHtml(formatVisitTimeRange(v))}</span>` : ''}
+          </div>
+        </td>
         <td data-label="Cliente" class="col-client">
           <div style="display:flex;align-items:center;gap:8px">
             ${c ? clientAvatar(c, 24) : ''}
             <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(v.clientName)||'—'}</span>
           </div>
         </td>
-        <td data-label="Motivo" class="col-desc"><div class="col-desc-value"><span style="font-size:13px">${escapeHtml(v.motivo)||'—'}</span>${(v.categories||[]).length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${(v.categories||[]).map(cid => { const c=VISIT_CHECK_CATEGORIES[cid]; return c?`<span class="tag" style="font-size:10px;background:${c.color}18;color:${c.color};border:1px solid ${c.color}40">${escapeHtml(c.label)}</span>`:''; }).join('')}</div>` : ''}${(() => { const pr=visitChecklistProgress(v); return pr?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">☑ ${pr.pct}% (${pr.done}/${pr.total})</div>`:''; })()}${v.observacoes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(v.observacoes)}</div>` : ''}</div></td>
+        <td data-label="Motivo" class="col-desc col-motivo">
+          <div class="col-desc-value col-motivo-value">
+            <span class="visit-motivo-text">${escapeHtml(v.motivo)||'—'}</span>
+            ${v.observacoes ? `<span class="visit-motivo-obs">${escapeHtml(v.observacoes)}</span>` : ''}
+          </div>
+        </td>
         <td data-label="Operador" class="col-resp"><span class="resp-badge">${escapeHtml(v.operator)||'—'}</span></td>
         <td data-label="Status" class="col-status">${visitStatusTag(v.status)}</td>
         <td class="col-actions">
@@ -346,7 +209,9 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
   const team    = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
   const opNames = getOperatorNames(team);
   const currentOp = v.operator || getUser().name;
-  const selectedCats = Array.isArray(v.categories) ? v.categories : [];
+  const allDay = v.allDay === true;
+  const timeStart = (v.time || '').toString().slice(0, 5);
+  const timeEnd = (v.timeEnd || '').toString().slice(0, 5);
 
   openModal(id ? 'Editar Visita' : 'Nova Visita', `
     <form onsubmit="submitVisitForm(event,'${escapeHtml(id||'')}')">
@@ -367,26 +232,21 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
       <div class="form-row">
         <div class="form-group"><label class="form-label">Data *</label>
           <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || new Date().toISOString().slice(0,10))}" required /></div>
-        <div class="form-group"><label class="form-label">Horário</label>
-          <input type="time" class="form-input" name="time" value="${escapeHtml(v.time || '')}" /></div>
+        <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--bg-base)">
+            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} onchange="toggleVisitAllDayFields()" style="width:16px;height:16px;accent-color:var(--accent)" />
+            Dia inteiro
+          </label>
+        </div>
+      </div>
+      <div class="form-row" id="visitTimeFields" style="${allDay ? 'opacity:.45;pointer-events:none' : ''}">
+        <div class="form-group"><label class="form-label">Horário de início</label>
+          <input type="time" class="form-input" id="visitTimeStart" name="time" value="${escapeHtml(timeStart)}" ${allDay ? 'disabled' : ''} /></div>
+        <div class="form-group"><label class="form-label">Horário de fim</label>
+          <input type="time" class="form-input" id="visitTimeEnd" name="timeEnd" value="${escapeHtml(timeEnd)}" ${allDay ? 'disabled' : ''} /></div>
       </div>
       <div class="form-group"><label class="form-label">Motivo da visita *</label>
-        <input class="form-input" name="motivo" value="${escapeHtml(v.motivo || '')}" placeholder="Ex: Troca de nobreak, manutenção de rede..." required /></div>
-
-      <div class="form-group">
-        <label class="form-label">Categorias do serviço <span style="font-weight:400;color:var(--text-muted)">(gera checklist de verificação)</span></label>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          ${Object.entries(VISIT_CHECK_CATEGORIES).map(([cid, cat]) => `
-            <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid ${selectedCats.includes(cid) ? cat.color : 'var(--border)'};background:${selectedCats.includes(cid) ? cat.color + '14' : 'var(--bg-secondary)'};cursor:pointer;font-size:12px;font-weight:500">
-              <input type="checkbox" name="categories" value="${escapeHtml(cid)}" ${selectedCats.includes(cid) ? 'checked' : ''}
-                onchange="refreshVisitFormChecklistPreview()" style="accent-color:${cat.color}" />
-              <span style="color:${cat.color}">${escapeHtml(cat.label)}</span>
-            </label>
-          `).join('')}
-        </div>
-        <div id="visitChecklistPreview" style="margin-top:12px"></div>
-      </div>
-
+        <input class="form-input" name="motivo" value="${escapeHtml(v.motivo || '')}" placeholder="Ex: Manutenção preventiva, instalação de equipamento..." required /></div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-textarea" name="observacoes" rows="3" placeholder="Detalhes, o que foi feito, pendências...">${escapeHtml(v.observacoes || '')}</textarea></div>
       <div class="form-row">
@@ -400,34 +260,19 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`);
-  window._visitFormExistingChecklist = Array.isArray(v.checklist) ? v.checklist : [];
-  refreshVisitFormChecklistPreview();
 }
 
-function refreshVisitFormChecklistPreview() {
-  const el = document.getElementById('visitChecklistPreview');
-  if (!el) return;
-  const boxes = document.querySelectorAll('input[name="categories"]:checked');
-  const cats = Array.from(boxes).map(b => b.value);
-  if (!cats.length) {
-    el.innerHTML = '<p class="text-muted" style="font-size:12px;margin:0">Selecione categorias (ex.: Nobreak + Rede) para gerar os pontos de verificação no local.</p>';
-    return;
+function toggleVisitAllDayFields() {
+  const allDay = document.getElementById('visitAllDay')?.checked;
+  const wrap = document.getElementById('visitTimeFields');
+  const start = document.getElementById('visitTimeStart');
+  const end = document.getElementById('visitTimeEnd');
+  if (wrap) {
+    wrap.style.opacity = allDay ? '.45' : '';
+    wrap.style.pointerEvents = allDay ? 'none' : '';
   }
-  const items = buildVisitChecklistFromCategories(cats, window._visitFormExistingChecklist || []);
-  const byCat = {};
-  items.forEach(i => {
-    if (!byCat[i.category]) byCat[i.category] = [];
-    byCat[i.category].push(i);
-  });
-  el.innerHTML = Object.keys(byCat).map(cid => {
-    const cat = VISIT_CHECK_CATEGORIES[cid] || { label: cid, color: '#64748b' };
-    return `<div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px solid ${cat.color}33;background:${cat.color}0a">
-      <div style="font-size:12px;font-weight:700;color:${cat.color};margin-bottom:6px">${escapeHtml(cat.label)}</div>
-      <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.55">
-        ${byCat[cid].map(i => `<li>${escapeHtml(i.text)}</li>`).join('')}
-      </ul>
-    </div>`;
-  }).join('') + `<p style="font-size:11px;color:var(--text-muted);margin:4px 0 0">Na visita, marque cada item no detalhe. Concluir com itens abertos gera alerta.</p>`;
+  if (start) start.disabled = !!allDay;
+  if (end) end.disabled = !!allDay;
 }
 
 function submitVisitForm(e, id) {
@@ -447,35 +292,28 @@ function submitVisitForm(e, id) {
     }
     const motivo = g('motivo').trim();
     if (!motivo) { showToast('Informe o motivo da visita.', 'error'); return; }
-
-    const categories = fd.getAll('categories').map(String);
-    const existing = id ? (getVisitById(id)?.checklist || []) : (window._visitFormExistingChecklist || []);
-    const checklist = buildVisitChecklistFromCategories(categories, existing);
-    const status = g('status') || 'agendada';
-
-    if (status === 'concluida' && checklist.length) {
-      const open = checklist.filter(i => !i.done);
-      if (open.length) {
-        const names = open.slice(0, 4).map(i => '• ' + i.text).join('\n');
-        const more = open.length > 4 ? `\n…e mais ${open.length - 4}` : '';
-        if (!confirm(`Ainda há ${open.length} ponto(s) de verificação em aberto:\n\n${names}${more}\n\nConcluir mesmo assim?`)) {
-          return;
-        }
-      }
+    const allDay = document.getElementById('visitAllDay')?.checked === true;
+    let time = g('time').slice(0, 5);
+    let timeEnd = g('timeEnd').slice(0, 5);
+    if (allDay) {
+      time = '';
+      timeEnd = '';
+    } else if (time && timeEnd && timeEnd < time) {
+      showToast('Horário de fim deve ser igual ou depois do início.', 'error');
+      return;
     }
-
     const data = {
       id: id || null,
       clientId,
       clientName: client?.name || '',
       operator: g('operator'),
       date: g('date'),
-      time: g('time'),
+      time,
+      timeEnd,
+      allDay,
       motivo,
       observacoes: g('observacoes').trim(),
-      status,
-      categories,
-      checklist
+      status: g('status') || 'agendada',
     };
     saveVisit(data);
     closeModal();
@@ -492,162 +330,35 @@ function openVisitDetail(id) {
   const v = getVisitById(id);
   if (!v) return;
   const c = getClientById(v.clientId);
-  const pr = visitChecklistProgress(v);
+  const m = VISIT_STATUS_MAP[v.status] || { label: v.status, color: '#94a3b8' };
   openModal(`Visita ${escapeHtml(v.id)}`, `
     <div class="ticket-info-grid">
       <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Operador</div><div class="ticket-info-value">${escapeHtml(v.operator)||'—'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Data</div><div class="ticket-info-value">${v.date ? formatDate(v.date) : '—'}${v.time ? ` <span style="color:var(--text-muted)">⏰ ${escapeHtml(v.time)}</span>` : ''}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Data</div><div class="ticket-info-value">${v.date ? formatDate(v.date) : '—'}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Horário</div><div class="ticket-info-value">${escapeHtml(formatVisitTimeRange(v))}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${visitStatusTag(v.status)}</div></div>
     </div>
     <hr class="divider"/>
     <div class="form-group"><label class="form-label">Motivo</label>
       <div class="timeline-text">${escapeHtml(v.motivo)||'—'}</div></div>
-    ${(v.categories||[]).length ? `<div class="form-group"><label class="form-label">Categorias</label>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${(v.categories||[]).map(cid => {
-        const cat = VISIT_CHECK_CATEGORIES[cid];
-        return cat ? `<span class="tag" style="background:${cat.color}18;color:${cat.color};border:1px solid ${cat.color}40">${escapeHtml(cat.label)}</span>` : '';
-      }).join('')}</div></div>` : ''}
     ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
-
-    <div class="form-group">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-        <label class="form-label" style="margin:0">Checklist de verificação no local</label>
-        <span id="visitCheckProgressLabel" style="font-size:12px;font-weight:600;color:${pr ? (pr.pct===100?'#16a34a':'#f59e0b') : 'var(--text-muted)'}">${pr ? `${pr.done}/${pr.total} · ${pr.pct}%` : ''}</span>
-      </div>
-      <div id="visitCheckProgressBar" style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:10px;${pr ? '' : 'display:none'}">
-        <div id="visitCheckProgressFill" style="height:100%;width:${pr ? pr.pct : 0}%;background:${pr && pr.pct===100?'#16a34a':'#0ea5e9'};transition:width .2s"></div>
-      </div>
-      <div id="visitChecklistBox">${renderVisitChecklistHtml(v)}</div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <input class="form-input filter-grow" id="visitManualCheck" placeholder="Item manual extra..." />
-        <button type="button" class="btn btn-secondary btn-sm" onclick="addVisitManualCheck('${escapeHtml(id)}')">+ Item</button>
-      </div>
-    </div>
-
     <div class="form-group"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select class="form-select filter-select-md" id="chgVisitStatus">
+        <select class="form-select" id="chgVisitStatus" style="width:200px">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
         </select>
         <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar</button>
         <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar</button>
       </div>
     </div>
-  `, 'lg');
-}
-
-function renderVisitChecklistHtml(v) {
-  const list = v.checklist || [];
-  if (!list.length) {
-    return `<p class="text-muted" style="font-size:12px;margin:0">Nenhum checklist. Edite a visita e marque categorias (ex.: <strong>Nobreak</strong> + <strong>Rede</strong>) para não esquecer o modem da operadora após a troca.</p>`;
-  }
-  const byCat = {};
-  list.forEach((item, index) => {
-    const cid = item.category || 'geral';
-    if (!byCat[cid]) byCat[cid] = [];
-    byCat[cid].push({ item, index });
-  });
-  return Object.keys(byCat).map(cid => {
-    const cat = VISIT_CHECK_CATEGORIES[cid] || { label: cid === 'manual' ? 'Itens manuais' : cid, color: '#64748b' };
-    const rows = byCat[cid];
-    const doneN = rows.filter(r => r.item.done).length;
-    return `<div style="margin-bottom:12px;border:1px solid ${cat.color}30;border-radius:10px;overflow:hidden">
-      <div style="padding:8px 12px;background:${cat.color}12;display:flex;justify-content:space-between;align-items:center">
-        <strong style="font-size:12px;color:${cat.color}">${escapeHtml(cat.label)}</strong>
-        <span style="font-size:11px;color:var(--text-muted)">${doneN}/${rows.length}</span>
-      </div>
-      <div style="padding:4px 10px 8px">
-        ${rows.map(({ item, index }) => `
-          <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px">
-            <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleVisitCheckItem('${escapeHtml(v.id)}',${index})"
-              style="margin-top:2px;accent-color:${cat.color};width:16px;height:16px;flex-shrink:0" />
-            <span style="flex:1;${item.done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(item.text)}</span>
-            ${item.manual ? `<button type="button" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px" onclick="event.preventDefault();removeVisitCheckItem('${escapeHtml(v.id)}',${index})">✕</button>` : ''}
-          </label>
-        `).join('')}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function toggleVisitCheckItem(id, index) {
-  const v = getVisitById(id);
-  if (!v || !v.checklist || !v.checklist[index]) return;
-  const item = v.checklist[index];
-  item.done = !item.done;
-  if (item.done) {
-    item.doneAt = new Date().toISOString();
-    item.doneBy = (typeof getUser === 'function' ? getUser()?.name : null) || null;
-  } else {
-    item.doneAt = null;
-    item.doneBy = null;
-  }
-  saveVisit(v);
-  const fresh = getVisitById(id);
-  const box = document.getElementById('visitChecklistBox');
-  if (box) box.innerHTML = renderVisitChecklistHtml(fresh);
-  const pr = visitChecklistProgress(fresh);
-  const lab = document.getElementById('visitCheckProgressLabel');
-  const bar = document.getElementById('visitCheckProgressBar');
-  const fill = document.getElementById('visitCheckProgressFill');
-  if (pr && lab) {
-    lab.textContent = `${pr.done}/${pr.total} · ${pr.pct}%`;
-    lab.style.color = pr.pct === 100 ? '#16a34a' : '#f59e0b';
-  }
-  if (pr && bar && fill) {
-    bar.style.display = '';
-    fill.style.width = pr.pct + '%';
-    fill.style.background = pr.pct === 100 ? '#16a34a' : '#0ea5e9';
-  }
-  if (document.getElementById('visitViewArea')) renderVisitView(false);
-}
-
-function addVisitManualCheck(id) {
-  const input = document.getElementById('visitManualCheck');
-  const text = (input?.value || '').trim();
-  if (!text) return;
-  const v = getVisitById(id);
-  if (!v) return;
-  if (!v.checklist) v.checklist = [];
-  v.checklist.push({
-    key: 'manual|' + Date.now(),
-    category: 'manual',
-    text,
-    done: false,
-    manual: true
-  });
-  saveVisit(v);
-  if (input) input.value = '';
-  openVisitDetail(id);
-  if (document.getElementById('visitViewArea')) renderVisitView(false);
-  showToast('Item adicionado.', 'success');
-}
-
-function removeVisitCheckItem(id, index) {
-  const v = getVisitById(id);
-  if (!v || !v.checklist) return;
-  v.checklist.splice(index, 1);
-  saveVisit(v);
-  openVisitDetail(id);
-  if (document.getElementById('visitViewArea')) renderVisitView(false);
+  `);
 }
 
 function changeVisitStatus(id) {
   const v = getVisitById(id);
   if (!v) return;
-  const next = document.getElementById('chgVisitStatus').value;
-  if (next === 'concluida' && (v.checklist || []).length) {
-    const open = v.checklist.filter(i => !i.done);
-    if (open.length) {
-      const names = open.slice(0, 5).map(i => '• ' + i.text).join('\n');
-      const more = open.length > 5 ? `\n…e mais ${open.length - 5}` : '';
-      if (!confirm(`Checklist incompleto (${open.length} em aberto):\n\n${names}${more}\n\nEx.: após trocar nobreak, confira se o modem da operadora voltou.\n\nConcluir mesmo assim?`)) {
-        return;
-      }
-    }
-  }
-  v.status = next;
+  v.status = document.getElementById('chgVisitStatus').value;
   saveVisit(v);
   showToast('Status atualizado!', 'success');
   openVisitDetail(id);
@@ -679,18 +390,27 @@ function openVisitMonthReportModal() {
   const now = new Date();
   const def = window._visitReportDefaultMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   openModal('Relatório mensal de visitas', `
-    <form onsubmit="exportVisitMonthReport(event)">
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">
-        Gera um CSV com <strong>resumo por cliente</strong> e <strong>detalhe de cada visita</strong> (todas do mês).
-        Abra no Google Sheets: Arquivo → Importar → Enviar → separador ponto e vírgula.
+    <form onsubmit="return false;">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
+        Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong> e <strong>detalhe das visitas</strong>.
+        O Excel sai formatado (pronto para enviar). O CSV serve para importar no Google Sheets.
       </p>
       <div class="form-group">
         <label class="form-label">Mês de referência</label>
         <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
       </div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Exportar CSV (Google Sheets)</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+        <button type="button" class="btn btn-primary" onclick="exportVisitMonthReport('excel')" style="justify-content:center">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
+          Excel (.xls)
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="exportVisitMonthReport('csv')" style="justify-content:center">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          CSV (Sheets)
+        </button>
+      </div>
+      <div class="form-actions" style="margin-top:14px">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Fechar</button>
       </div>
     </form>`);
 }
@@ -700,16 +420,23 @@ function _visitReportCsvCell(val) {
   return `"${s}"`;
 }
 
-function exportVisitMonthReport(e) {
-  e.preventDefault();
-  const monthInput = (document.getElementById('visitReportMonth')?.value || '').trim();
-  if (!/^\d{4}-\d{2}$/.test(monthInput)) {
-    showToast('Selecione um mês válido.', 'error');
-    return;
-  }
+function _visitReportEscHtml(val) {
+  return String(val == null ? '' : val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function _visitReportMonthLabel(yStr, mStr) {
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const m = Number(mStr) - 1;
+  return (months[m] || mStr) + ' de ' + yStr;
+}
+
+function _visitReportCollect(monthInput) {
   const [yStr, mStr] = monthInput.split('-');
   const prefix = monthInput;
-
   const base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
     ? getVisitsByTeam(_selectedTeam)
     : getMyVisits();
@@ -718,12 +445,8 @@ function exportVisitMonthReport(e) {
     .filter(v => (v.date || '').startsWith(prefix))
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || (a.clientName || '').localeCompare(b.clientName || ''));
 
-  if (!visits.length) {
-    showToast('Nenhuma visita neste mês.', 'error');
-    return;
-  }
-
   const byClient = {};
+  const byStatus = {};
   visits.forEach(v => {
     const key = v.clientId || v.clientName || '_sem_cliente';
     if (!byClient[key]) {
@@ -732,46 +455,229 @@ function exportVisitMonthReport(e) {
     byClient[key].count += 1;
     if (v.motivo) byClient[key].motivos.push(v.motivo);
     if (v.operator) byClient[key].operators.add(v.operator);
+    const st = v.status || '—';
+    byStatus[st] = (byStatus[st] || 0) + 1;
   });
 
-  const statusLabel = st => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
+  const summary = Object.values(byClient)
+    .sort((a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName));
 
+  const statusLabel = st => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
+  const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+    ? _selectedTeam
+    : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : '');
+  const user = typeof getUser === 'function' ? getUser() : null;
+
+  return { yStr, mStr, visits, summary, byStatus, statusLabel, team, user };
+}
+
+function _visitReportDownload(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportVisitMonthReport(format) {
+  const monthInput = (document.getElementById('visitReportMonth')?.value || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(monthInput)) {
+    showToast('Selecione um mês válido.', 'error');
+    return;
+  }
+
+  const data = _visitReportCollect(monthInput);
+  if (!data.visits.length) {
+    showToast('Nenhuma visita neste mês.', 'error');
+    return;
+  }
+
+  if (format === 'excel') {
+    _exportVisitMonthExcel(data);
+  } else {
+    _exportVisitMonthCsv(data);
+  }
+  closeModal();
+}
+
+function _exportVisitMonthCsv(data) {
+  const { yStr, mStr, visits, summary, statusLabel } = data;
   const lines = [];
   lines.push(['SEÇÃO', 'Cliente', 'Qtd visitas', 'Motivos', 'Operadores'].map(_visitReportCsvCell).join(';'));
-  Object.values(byClient)
-    .sort((a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName))
-    .forEach(row => {
-      lines.push([
-        'RESUMO',
-        row.clientName,
-        String(row.count),
-        row.motivos.join(' | '),
-        [...row.operators].join(', '),
-      ].map(_visitReportCsvCell).join(';'));
-    });
-
+  summary.forEach(row => {
+    lines.push([
+      'RESUMO',
+      row.clientName,
+      String(row.count),
+      row.motivos.join(' | '),
+      [...row.operators].join(', '),
+    ].map(_visitReportCsvCell).join(';'));
+  });
   lines.push('');
-  lines.push(['SEÇÃO', 'Data', 'Horário', 'Cliente', 'Motivo', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
+  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Cliente', 'Motivo', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
   visits.forEach(v => {
     lines.push([
       'DETALHE',
       v.date || '',
-      v.time || '',
+      v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5)),
+      v.allDay ? '' : ((v.timeEnd || '').toString().slice(0, 5)),
+      formatVisitTimeRange(v),
       v.clientName || '',
       v.motivo || '',
       v.operator || '',
       statusLabel(v.status),
     ].map(_visitReportCsvCell).join(';'));
   });
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  _visitReportDownload(`relatorio_visitas_${yStr}_${mStr}.csv`, blob);
+  showToast(`CSV de ${mStr}/${yStr} exportado (${visits.length} visitas).`, 'success');
+}
 
-  const csvContent = '\uFEFF' + lines.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `relatorio_visitas_${yStr}_${mStr}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  closeModal();
-  showToast(`Relatório de ${mStr}/${yStr} exportado (${visits.length} visitas). Abra no Google Sheets.`, 'success');
+function _exportVisitMonthExcel(data) {
+  const { yStr, mStr, visits, summary, byStatus, statusLabel, team, user } = data;
+  const monthLabel = _visitReportMonthLabel(yStr, mStr);
+  const genAt = new Date();
+  const genStr = genAt.toLocaleString('pt-BR');
+  const operatorName = (user && user.name) || '—';
+  const teamLabel = team || 'Todas';
+  const concluida = byStatus['concluida'] || 0;
+  const agendada = byStatus['agendada'] || 0;
+  const andamento = byStatus['em_andamento'] || 0;
+  const cancelada = byStatus['cancelada'] || 0;
+  const clientsN = summary.length;
+
+  const th = 'background:#1a56db;color:#ffffff;font-weight:700;font-size:11pt;padding:10px 12px;border:1px solid #1341a8;text-align:left;';
+  const td = 'padding:8px 12px;border:1px solid #d0d7de;font-size:10.5pt;vertical-align:top;';
+  const tdAlt = td + 'background:#f3f6fb;';
+  const kpiBox = 'border:1px solid #d0d7de;background:#f8fafc;padding:12px 14px;text-align:center;';
+  const kpiVal = 'font-size:18pt;font-weight:800;color:#1a56db;';
+  const kpiLab = 'font-size:9pt;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.03em;';
+
+  let summaryRows = '';
+  summary.forEach((row, i) => {
+    const s = i % 2 ? tdAlt : td;
+    summaryRows += `<tr>
+      <td style="${s}">${_visitReportEscHtml(row.clientName)}</td>
+      <td style="${s}text-align:center;font-weight:700;color:#1a56db;">${row.count}</td>
+      <td style="${s}">${_visitReportEscHtml(row.motivos.join(' · ') || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml([...row.operators].join(', ') || '—')}</td>
+    </tr>`;
+  });
+
+  let detailRows = '';
+  visits.forEach((v, i) => {
+    const s = i % 2 ? tdAlt : td;
+    const d = v.date ? (typeof formatDate === 'function' ? formatDate(v.date) : v.date) : '—';
+    detailRows += `<tr>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(d)}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5) || '—'))}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? '—' : ((v.timeEnd || '').toString().slice(0, 5) || '—'))}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(formatVisitTimeRange(v))}</td>
+      <td style="${s}">${_visitReportEscHtml(v.clientName || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(v.motivo || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(v.operator || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(statusLabel(v.status))}</td>
+    </tr>`;
+  });
+
+  const html = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8" />
+<!--[if gte mso 9]><xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>Relatório Visitas</x:Name>
+    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml><![endif]-->
+<style>
+  body { font-family: Calibri, Arial, sans-serif; color: #0f172a; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+    <tr>
+      <td colspan="4" style="background:#1a56db;color:#fff;padding:22px 24px;border:none;">
+        <div style="font-size:11pt;font-weight:600;letter-spacing:.08em;opacity:.9;text-transform:uppercase;">Init Intra</div>
+        <div style="font-size:22pt;font-weight:800;margin-top:4px;">Relatório de Visitas Técnicas</div>
+        <div style="font-size:13pt;margin-top:6px;opacity:.95;">${_visitReportEscHtml(monthLabel)}</div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="4" style="background:#e8eefc;padding:10px 24px;border:none;font-size:10pt;color:#334155;">
+        Gerado em <strong>${_visitReportEscHtml(genStr)}</strong>
+        &nbsp;·&nbsp; Por <strong>${_visitReportEscHtml(operatorName)}</strong>
+        &nbsp;·&nbsp; Equipe <strong>${_visitReportEscHtml(teamLabel)}</strong>
+      </td>
+    </tr>
+  </table>
+
+  <table style="width:100%;border-collapse:separate;border-spacing:10px;margin-bottom:8px;">
+    <tr>
+      <td style="${kpiBox}"><div style="${kpiVal}">${visits.length}</div><div style="${kpiLab}">Total visitas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal}">${clientsN}</div><div style="${kpiLab}">Clientes</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:#16a34a">${concluida}</div><div style="${kpiLab}">Concluídas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:#f59e0b">${agendada}</div><div style="${kpiLab}">Agendadas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:#0ea5e9">${andamento}</div><div style="${kpiLab}">Em andamento</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:#94a3b8">${cancelada}</div><div style="${kpiLab}">Canceladas</div></td>
+    </tr>
+  </table>
+
+  <table style="width:100%;margin:18px 0 8px;">
+    <tr><td style="font-size:14pt;font-weight:800;color:#1a56db;border-bottom:3px solid #1a56db;padding:0 0 8px;">1. Resumo por cliente</td></tr>
+  </table>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="${th}">Cliente</th>
+        <th style="${th}text-align:center;width:90px;">Qtd</th>
+        <th style="${th}">Motivos</th>
+        <th style="${th}">Operadores</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${summaryRows}
+    </tbody>
+  </table>
+
+  <table style="width:100%;margin:28px 0 8px;">
+    <tr><td style="font-size:14pt;font-weight:800;color:#1a56db;border-bottom:3px solid #1a56db;padding:0 0 8px;">2. Detalhamento das visitas</td></tr>
+  </table>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="${th}">Data</th>
+        <th style="${th}">Início</th>
+        <th style="${th}">Fim</th>
+        <th style="${th}">Duração</th>
+        <th style="${th}">Cliente</th>
+        <th style="${th}">Motivo</th>
+        <th style="${th}">Operador</th>
+        <th style="${th}">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${detailRows}
+    </tbody>
+  </table>
+
+  <table style="width:100%;margin-top:28px;">
+    <tr>
+      <td style="font-size:9pt;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px;">
+        Documento gerado automaticamente pelo Init Intra · Relatório de visitas · ${_visitReportEscHtml(monthLabel)}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  _visitReportDownload(`Relatorio_Visitas_${yStr}_${mStr}.xls`, blob);
+  showToast(`Excel de ${monthLabel} exportado (${visits.length} visitas).`, 'success');
 }
