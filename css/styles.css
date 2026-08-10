@@ -528,17 +528,16 @@ tr:hover td { background: var(--bg-hover); }
   width: 1%;
   white-space: nowrap;
   vertical-align: middle;
+  text-align: left;
 }
 .visit-date-cell {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  min-width: 118px;
   padding: 2px 0;
 }
 .visit-date-main {
-  display: block;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
