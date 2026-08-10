@@ -160,6 +160,9 @@ function renderVisitas() {
   const team     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
   const opNames  = getOperatorNames(team);
 
+  const _nowRpt = new Date();
+  window._visitReportDefaultMonth = `${_nowRpt.getFullYear()}-${String(_nowRpt.getMonth() + 1).padStart(2, '0')}`;
+
   document.getElementById('contentArea').innerHTML = `
     <div class="search-bar">
       <div class="search-input-wrap filter-grow">
@@ -181,8 +184,11 @@ function renderVisitas() {
         <option value="concluida">Concluída</option>
         <option value="cancelada">Cancelada</option>
       </select>
-      <input type="date" class="form-input filter-date" id="visitFrom" onchange="saveVisitFilters();renderVisitView()" title="De" />
-      <input type="date" class="form-input filter-date" id="visitTo" onchange="saveVisitFilters();renderVisitView()" title="Até" />
+      <input type="date" class="form-input filter-date" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
+      <input type="date" class="form-input filter-date" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
+      <button type="button" class="btn btn-secondary btn-sm" onclick="openVisitMonthReportModal()" title="Relatório mensal para Google Sheets">
+        Relatório do mês
+      </button>
     </div>
     <div id="visitStats" style="margin-bottom:14px"></div>
     <div id="visitViewArea"></div>`;
@@ -667,4 +673,105 @@ function deleteVisitConfirm(id) {
       showToast('Visita restaurada.', 'success');
     });
   });
+}
+
+function openVisitMonthReportModal() {
+  const now = new Date();
+  const def = window._visitReportDefaultMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  openModal('Relatório mensal de visitas', `
+    <form onsubmit="exportVisitMonthReport(event)">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">
+        Gera um CSV com <strong>resumo por cliente</strong> e <strong>detalhe de cada visita</strong> (todas do mês).
+        Abra no Google Sheets: Arquivo → Importar → Enviar → separador ponto e vírgula.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Mês de referência</label>
+        <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Exportar CSV (Google Sheets)</button>
+      </div>
+    </form>`);
+}
+
+function _visitReportCsvCell(val) {
+  const s = (val == null ? '' : String(val)).replace(/\r?\n/g, ' ').replace(/"/g, '""');
+  return `"${s}"`;
+}
+
+function exportVisitMonthReport(e) {
+  e.preventDefault();
+  const monthInput = (document.getElementById('visitReportMonth')?.value || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(monthInput)) {
+    showToast('Selecione um mês válido.', 'error');
+    return;
+  }
+  const [yStr, mStr] = monthInput.split('-');
+  const prefix = monthInput;
+
+  const base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+    ? getVisitsByTeam(_selectedTeam)
+    : getMyVisits();
+
+  const visits = base
+    .filter(v => (v.date || '').startsWith(prefix))
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || (a.clientName || '').localeCompare(b.clientName || ''));
+
+  if (!visits.length) {
+    showToast('Nenhuma visita neste mês.', 'error');
+    return;
+  }
+
+  const byClient = {};
+  visits.forEach(v => {
+    const key = v.clientId || v.clientName || '_sem_cliente';
+    if (!byClient[key]) {
+      byClient[key] = { clientName: v.clientName || '—', count: 0, motivos: [], operators: new Set() };
+    }
+    byClient[key].count += 1;
+    if (v.motivo) byClient[key].motivos.push(v.motivo);
+    if (v.operator) byClient[key].operators.add(v.operator);
+  });
+
+  const statusLabel = st => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
+
+  const lines = [];
+  lines.push(['SEÇÃO', 'Cliente', 'Qtd visitas', 'Motivos', 'Operadores'].map(_visitReportCsvCell).join(';'));
+  Object.values(byClient)
+    .sort((a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName))
+    .forEach(row => {
+      lines.push([
+        'RESUMO',
+        row.clientName,
+        String(row.count),
+        row.motivos.join(' | '),
+        [...row.operators].join(', '),
+      ].map(_visitReportCsvCell).join(';'));
+    });
+
+  lines.push('');
+  lines.push(['SEÇÃO', 'Data', 'Horário', 'Cliente', 'Motivo', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
+  visits.forEach(v => {
+    lines.push([
+      'DETALHE',
+      v.date || '',
+      v.time || '',
+      v.clientName || '',
+      v.motivo || '',
+      v.operator || '',
+      statusLabel(v.status),
+    ].map(_visitReportCsvCell).join(';'));
+  });
+
+  const csvContent = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relatorio_visitas_${yStr}_${mStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeModal();
+  showToast(`Relatório de ${mStr}/${yStr} exportado (${visits.length} visitas). Abra no Google Sheets.`, 'success');
 }
