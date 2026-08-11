@@ -353,6 +353,21 @@ tr:hover td { background: var(--bg-hover); }
 .search-input-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
 .search-input-wrap input { padding-left: 34px; }
 
+/* ── PAGE ACTION ROW ── */
+.page-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+/* ── TEMPLATES GRID ── */
+#templatesGridWrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+}
+
 /* ── TAGS ── */
 .tag {
   display: inline-flex; align-items: center; gap: 4px;
