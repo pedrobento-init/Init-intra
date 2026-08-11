@@ -2200,6 +2200,10 @@ tr:hover td { background: var(--bg-hover); }
   .log-toolbar .form-select {
     max-width: 100%;
   }
+  .dashboard-charts-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    gap: 12px;
+  }
 
   /* ── Operator Detail Modal ── */
   .op-detail-header {
@@ -2629,6 +2633,14 @@ body.dark-theme .theme-toggle-btn:hover {
   background: rgba(251,191,36,0.12);
   border-color: rgba(251,191,36,0.3);
   box-shadow: 0 0 20px rgba(251,191,36,0.25);
+}
+
+/* ── DASHBOARD CHARTS GRID ── */
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
 }
 
 /* ==========================================================================
