@@ -137,7 +137,7 @@ function submitTemplateForm(e, id) {
     saveProcedureTemplate(data);
 
     closeModal();
-    renderTemplates();
+    renderTemplatesGrid();
     showToast(id ? 'Modelo atualizado com sucesso!' : 'Novo modelo criado!', 'success');
   } catch (err) { showToast('Erro ao salvar modelo: ' + err.message, 'error'); }
 }
@@ -148,10 +148,10 @@ function deleteTemplateConfirm(id) {
   confirmAction('Deseja realmente excluir o modelo <strong>' + escapeHtml(tpl.title) + '</strong>?', function() {
     var snapshot = JSON.parse(JSON.stringify(tpl));
     if (deleteProcedureTemplate(id)) {
-      renderTemplates();
+      renderTemplatesGrid();
       showUndoToast('Modelo "' + tpl.title + '" removido.', function() {
         saveProcedureTemplate(snapshot);
-        renderTemplates();
+        renderTemplatesGrid();
         showToast('Modelo restaurado.', 'success');
       });
     }

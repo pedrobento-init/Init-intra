@@ -352,11 +352,11 @@ function deleteClientConfirm(id) {
   confirmAction('Excluir cliente <strong>' + escapeHtml(c.name) + '</strong>?', function() {
     var snapshot = JSON.parse(JSON.stringify(c));
     deleteClient(id);
-    renderClients();
+    renderClientGrid();
     updateBadges();
     showUndoToast('Cliente "' + c.name + '" removido.', function() {
       saveClient(snapshot);
-      renderClients();
+      renderClientGrid();
       updateBadges();
       showToast('Cliente restaurado.', 'success');
     });
@@ -700,7 +700,7 @@ function submitClientForm(e, id) {
       if (errors.length) { showToast(errors[0], 'error'); return; }
     }
     saveClient(clientData);
-    closeModal(); renderClients(); updateBadges();
+    closeModal(); renderClientGrid(); updateBadges();
     showToast(id ? 'Cliente atualizado!' : 'Cliente cadastrado!', 'success');
   } catch (err) { showToast('Erro ao salvar cliente: ' + err.message, 'error'); }
 }
@@ -973,7 +973,7 @@ function executeClientImport() {
   }
 
   closeModal();
-  renderClients();
+  renderClientGrid();
   updateBadges();
   showToast(`${created} cliente(s) importado(s)${skipped ? ` · ${skipped} linha(s) ignoradas` : ''}`, 'success');
 }

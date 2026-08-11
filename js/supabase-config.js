@@ -59,7 +59,7 @@ const _RT_TABLE_META = {
         }),
         onChange: () => {
             if (typeof updateBadges === 'function') updateBadges();
-            if ((window.location.hash.replace('#','') || '') === 'pendencias' && typeof renderPendencias === 'function') renderPendencias();
+            if ((window.location.hash.replace('#','') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
         }
     },
     clients: {
@@ -73,7 +73,7 @@ const _RT_TABLE_META = {
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
         onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'clientes' && typeof renderClients === 'function') renderClients();
+            if ((window.location.hash.replace('#','') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
         }
     },
     operators: {
@@ -85,7 +85,7 @@ const _RT_TABLE_META = {
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
         onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'operadores' && typeof renderOperadores === 'function') renderOperadores();
+            if ((window.location.hash.replace('#','') || '') === 'operadores' && document.getElementById('opGridWrap') && typeof filterOperadores === 'function') filterOperadores();
         }
     },
     visits: {
@@ -98,7 +98,7 @@ const _RT_TABLE_META = {
         }),
         onChange: () => {
             const h = window.location.hash.replace('#','') || '';
-            if (h === 'visitas' && typeof renderVisitas === 'function') renderVisitas();
+            if (h === 'visitas' && document.getElementById('visitViewArea') && typeof renderVisitView === 'function') renderVisitView();
             if (h === 'calendario' && typeof refreshCalendar === 'function') refreshCalendar();
         }
     },
@@ -117,7 +117,7 @@ const _RT_TABLE_META = {
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
         onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'templates' && typeof renderTemplates === 'function') renderTemplates();
+            if ((window.location.hash.replace('#','') || '') === 'templates' && document.getElementById('templatesGridWrap') && typeof renderTemplatesGrid === 'function') renderTemplatesGrid();
         }
     },
     audit_logs: {
