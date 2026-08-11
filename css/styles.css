@@ -101,7 +101,7 @@ body {
   padding: 18px 16px;
   border-bottom: 1px solid var(--sidebar-border);
 }
-.logo { display: flex; align-items: center; gap: 10px; }
+.logo { display: flex; align-items: center; gap: 10px; margin: 0 auto; justify-content: center; }
 .logo-svg { flex-shrink: 0; }
 .logo-text-wrap { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-text { font-size: 16px; font-weight: 400; color: var(--sidebar-text); white-space: nowrap; letter-spacing: -0.2px; }
@@ -767,7 +767,7 @@ tr:hover td { background: var(--bg-hover); }
 
 /* ── LOGO IMAGE IN SIDEBAR ── */
 .logo-img {
-  height: 32px;
+  height: 42px;
   width: auto;
   border-radius: 4px;
 }
