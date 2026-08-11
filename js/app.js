@@ -753,6 +753,11 @@ function topbarAction() {
   if (typeof window._topbarAction === 'function') window._topbarAction();
 }
 
+function refreshPage() {
+  const hash = window.location.hash.replace('#', '') || 'dashboard';
+  navigateTo(hash);
+}
+
 // ── Login / Logout ─────────────────────────────────────────────────────────────
 let _appStarted = false;
 
