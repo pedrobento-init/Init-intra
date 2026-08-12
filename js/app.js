@@ -366,6 +366,10 @@ function renderDashboard() {
   const inProg   = pens.filter(p => p.status === 'em_andamento');
   const paused   = pens.filter(p => p.status === 'pausado');
   const critical = pens.filter(p => ['alta','critica'].includes(p.priority) && !['concluido','cancelado'].includes(p.status));
+  const activePens = pens.filter(p => !['concluido','cancelado'].includes(p.status));
+  const overdue = activePens.filter(p => p.deadline && p.deadline < today);
+  const dueToday = activePens.filter(p => p.deadline === today);
+  const unassigned = activePens.filter(p => !p.responsible || !p.responsible.trim());
   const recentPens = [...pens]
     .filter(p => !['concluido','cancelado'].includes(p.status) && p.responsible === currentUser)
     .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt))
@@ -380,11 +384,16 @@ function renderDashboard() {
 
   const opsAtivos = getOperators().filter(o => o.active !== false).length;
 
-  const resolvedPens = pens.filter(p => p.status === 'concluido' && p.createdAt && p.updatedAt);
+  const resolvedPens = pens.filter(p => p.status === 'concluido' && p.createdAt && (p.completedAt || p.updatedAt));
   const getHours = (start, end) => (new Date(end) - new Date(start)) / (1000 * 60 * 60);
   let totalHours = 0; let totalCount = 0;
-  resolvedPens.forEach(p => { totalHours += getHours(p.createdAt, p.updatedAt); totalCount++; });
+  resolvedPens.forEach(p => {
+    const hours = getHours(p.createdAt, p.completedAt || p.updatedAt);
+    if (hours >= 0) { totalHours += hours; totalCount++; }
+  });
   const avgSlaHours = totalCount > 0 ? (totalHours / totalCount).toFixed(1) : 0;
+  const resolvedCount = pens.filter(p => p.status === 'concluido').length;
+  const completionRate = pens.length ? Math.round((resolvedCount / pens.length) * 100) : 0;
 
   const periodLabel = {all:'Todos',week:'Esta Semana',month:'Este Mês',quarter:'Este Trimestre',custom:'Personalizado'}[_dashPeriod] || 'Todos';
 
@@ -402,6 +411,10 @@ function renderDashboard() {
           <span style="color:var(--text-muted);font-size:12px">até</span>
           <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" onchange="setDashCustomDates()" class="date-input" />
         </div>
+      </div>
+      <div class="dash-sync-status" title="Fonte dos dados do dashboard">
+        <span class="dash-sync-dot ${typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive ? 'is-online' : ''}"></span>
+        ${typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive ? 'Dados sincronizados' : 'Dados locais'}
       </div>
       <div class="dash-export-btns">
         <button class="btn btn-secondary btn-sm" onclick="exportClientsCSV()">
@@ -453,6 +466,30 @@ function renderDashboard() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
         </div>
         <div><div class="stat-value" style="color:#0ea5e9">${visits.length}</div><div class="stat-label">Visitas${_dashPeriod!=='all'?' (período)':''}</div></div>
+      </div>
+      <div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
+        <div class="stat-icon" style="background:#fef2f2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <div><div class="stat-value" style="color:#dc2626">${overdue.length}</div><div class="stat-label">Pendências vencidas</div></div>
+      </div>
+      <div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
+        <div class="stat-icon" style="background:#fff7ed">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div><div class="stat-value" style="color:#ea580c">${dueToday.length}</div><div class="stat-label">Vencem hoje</div></div>
+      </div>
+      <div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
+        <div class="stat-icon" style="background:#fefce8">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ca8a04" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
+        </div>
+        <div><div class="stat-value" style="color:#ca8a04">${unassigned.length}</div><div class="stat-label">Sem responsável</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#f5f3ff">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div><div class="stat-value" style="color:#7c3aed">${completionRate}%</div><div class="stat-label">Taxa de conclusão</div></div>
       </div>
     </div>
 
