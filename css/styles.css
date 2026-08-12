@@ -779,7 +779,8 @@ tr:hover td { background: var(--bg-hover); }
 .crop-container {
   position: relative;
   width: 100%;
-  max-height: 380px;
+  height: min(380px, 60vh);
+  min-height: 220px;
   background: #f0f4f8;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -790,7 +791,10 @@ tr:hover td { background: var(--bg-hover); }
   justify-content: center;
 }
 .crop-container img {
+  width: auto;
+  height: auto;
   max-width: 100%;
+  max-height: 100%;
   display: block;
   cursor: crosshair;
   touch-action: none;
