@@ -1163,7 +1163,12 @@ function saveUser(data) {
 }
 
 // ── OPERATORS ──
-function getOperators() { return dbGet(DB.OPERATORS); }
+function getOperators() {
+  const all = dbGet(DB.OPERATORS);
+  const remoteOnly = all.filter(o => !!o.auth_user_id);
+  if (remoteOnly.length !== all.length) dbSet(DB.OPERATORS, remoteOnly);
+  return remoteOnly;
+}
 function getOperatorById(id) { return getOperators().find(o => o.id === id) || null; }
 function getOperatorByEmail(email) {
   if (!email) return null;

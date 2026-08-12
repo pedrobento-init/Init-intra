@@ -32,23 +32,7 @@ function _buildOperadoresPage(savedFilters = {}) {
   _filteredOps = ops;
   _opPage = 1;
 
-  // Banner: operadores sem Supabase Auth (legado, apenas admin)
-  const allOps = getOperators();
-  const localOnly = allOps.filter(o => !o.auth_user_id);
-  const migrationBanner = (isTeamAdmin() && localOnly.length) ? `
-    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" style="flex-shrink:0;margin-top:2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <div style="flex:1">
-        <div style="font-weight:700;color:#92400e;margin-bottom:4px">Migração para Supabase Auth pendente</div>
-        <div style="font-size:12px;color:#78350f;line-height:1.5">${localOnly.length} operador(es) local(is) sem vínculo com Supabase Auth: <strong>${localOnly.map(o => escapeHtml(o.name)).join(', ')}</strong>.<br>Esses operadores não conseguirão entrar após a migração completa. Cada um precisa ser criado no Supabase Auth e entrar uma vez com seu e-mail — o vínculo é automático.</div>
-        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-sm" style="background:#92400e;color:#fff;border-color:#92400e" onclick="deleteLocalOnlyOperators()">🗑 Excluir todos os locais</button>
-        </div>
-      </div>
-    </div>` : '';
-
   document.getElementById('contentArea').innerHTML = `
-    ${migrationBanner}
     <div class="op-stats-row">
       <div class="op-stat">
         <span class="op-stat-value">${ops.length}</span>
@@ -148,8 +132,6 @@ function _renderOpGrid() {
     const color     = op.color || OP_COLORS[0];
     const isActive  = op.active !== false;
     const isSelf = session && session.opId === op.id;
-    const isLocalOnly = !op.auth_user_id;
-
     let actionsHtml = '';
     if (isAdminUser || isSelf) {
       actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openOperadorForm('${escapeHtml(op.id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
@@ -163,7 +145,7 @@ function _renderOpGrid() {
           }
           ${isActive ? 'Desativar' : 'Ativar'}
         </button>
-        ${isLocalOnly && op.email ? `<button class="btn btn-secondary btn-sm" style="background:#92400e;color:#fff;border-color:#92400e" onclick="event.stopPropagation();resendOperatorInvite('${escapeHtml(op.id)}')" title="Reenviar convite por e-mail">📧 Reenviar</button>` : ''}
+        ${op.email ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();resendOperatorInvite('${escapeHtml(op.id)}')" title="Reenviar convite por e-mail">📧 Reenviar</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteOpConfirm('${escapeHtml(op.id)}')">&#10005;</button>
       `;
     }
@@ -176,7 +158,7 @@ function _renderOpGrid() {
             ${isActive ? 'Ativo' : 'Inativo'}
           </div>
         </div>
-        <div class="op-card-name">${escapeHtml(op.name)}${isLocalOnly ? ' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;margin-left:6px;vertical-align:middle;font-weight:700">LOCAL</span>' : ''}</div>
+        <div class="op-card-name">${escapeHtml(op.name)}</div>
         <div class="op-card-role">${escapeHtml(op.role || 'Técnico')}</div>
         ${op.phone ? `<div class="op-card-contact"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.38 2 2 0 0 1 3.58 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l1.97-1.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> ${escapeHtml(op.phone)}</div>` : ''}
         ${op.email ? `<div class="op-card-contact"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> ${escapeHtml(op.email)}</div>` : ''}
@@ -231,46 +213,6 @@ function deleteOpConfirm(id) {
       showToast('Operador restaurado.', 'success');
     });
   });
-}
-
-// ── Migração: excluir todos os operadores sem Supabase Auth ──────────────────
-function deleteLocalOnlyOperators() {
-  const session = getSession();
-  if (!isTeamAdmin()) {
-    showToast('Apenas administradores podem migrar operadores.', 'error');
-    return;
-  }
-  let localOnly = getOperators().filter(o => !o.auth_user_id);
-  // Não deixa o admin excluir a si mesmo (segurança)
-  if (session) localOnly = localOnly.filter(o => o.id !== session.opId);
-  if (!localOnly.length) {
-    showToast('Nenhum operador local para excluir.', 'info');
-    return;
-  }
-  const names = localOnly.map(o => escapeHtml(o.name)).join(', ');
-  confirmAction(
-    `Excluir <strong>${localOnly.length}</strong> operador(es) local(is)?<br><br><span style="font-size:11px;color:var(--text-muted)">${names}</span><br><br><span style="font-size:12px;color:#dc2626">Eles não conseguirão mais entrar. Esta ação não pode ser desfeita.</span>`,
-    function() {
-      const ids = localOnly.map(o => o.id);
-      ids.forEach(id => _forceDeleteOperator(id));
-      _buildOperadoresPage(loadFilterState('operadores', {}));
-      filterOperadores();
-      showToast(`${ids.length} operador(es) local(is) removido(s).`, 'success');
-    }
-  );
-}
-
-// Exclui diretamente sem checagem de permissão (usado pela migração em massa)
-function _forceDeleteOperator(id) {
-  const op = getOperatorById(id);
-  const name = op ? op.name : 'Desconhecido';
-  dbSet(DB.OPERATORS, getOperators().filter(o => o.id !== id));
-  if (typeof addLog === 'function') addLog('Excluiu', 'Operador', id, name + ' (migração)');
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('operators').delete().eq('id', id).then(res => {
-      if (res.error) console.warn('⚠️ Supabase delete (migração):', res.error.message);
-    }).catch(err => console.warn('⚠️ Rede delete (migração):', err.message));
-  }
 }
 
 // ── Reenviar convite de Auth para um operador local ─────────────────────────
@@ -566,12 +508,15 @@ async function submitOperadorForm(e, id) {
         const result = await authCreateUser(opData.email, newPwd);
         if (result.ok) {
           // Vínculo automático com o operador recém-criado
-          const list = getOperators();
+           const list = dbGet(DB.OPERATORS);
           const opIdx = list.findIndex(o => o.email?.toLowerCase() === opData.email.toLowerCase());
           if (opIdx !== -1 && result.authUserId && !list[opIdx].auth_user_id) {
             list[opIdx].auth_user_id = result.authUserId;
             list[opIdx].updatedAt = new Date().toISOString();
             dbSet(DB.OPERATORS, list);
+            if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+              supabaseClient.from('operators').update({ auth_user_id: result.authUserId }).eq('id', list[opIdx].id);
+            }
           }
           if (result.needsEmailConfirm) {
             authMsg = `E-mail de confirmação enviado. O operador só entrará após confirmar.`;
