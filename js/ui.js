@@ -15,10 +15,6 @@ function loadScript(url) {
 
 async function loadCropper() {
   if (typeof Cropper !== 'undefined') return;
-  const css = document.createElement('link');
-  css.rel = 'stylesheet';
-  css.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css';
-  document.head.appendChild(css);
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js');
 }
 

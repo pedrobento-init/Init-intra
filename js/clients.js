@@ -639,6 +639,7 @@ function openCropModal() {
     showToast('Não foi possível carregar a imagem. Verifique a URL ou envie um arquivo.', 'error');
     closeCropModal();
   };
+  if (/^https?:\/\//i.test(src)) img.crossOrigin = 'anonymous';
   img.src = '';
   document.getElementById('cropModalOverlay').style.display = 'flex';
   img.src = src;
@@ -662,24 +663,23 @@ function cropperReset() {
 
 function applyCrop() {
   if (!_cropper) return;
-  const canvas = _cropper.getCroppedCanvas({
-    width: 256,
-    height: 256,
-    imageSmoothingEnabled: true,
-    imageSmoothingQuality: 'high',
-  });
-  if (!canvas) {
-    showToast('Erro ao recortar a imagem.', 'error');
-    return;
+  try {
+    const canvas = _cropper.getCroppedCanvas({
+      width: 256,
+      height: 256,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+    });
+    if (!canvas) throw new Error('canvas indisponível');
+    window._currentLogoData = canvas.toDataURL('image/png');
+    const urlInput = document.getElementById('logoUrlInput');
+    if (urlInput) urlInput.value = '';
+    closeCropModal();
+    updateLogoPreview();
+    showToast('Logo recortada com sucesso!', 'success');
+  } catch (_) {
+    showToast('Não foi possível aplicar o recorte. Para imagens por URL, habilite CORS no servidor ou envie o arquivo.', 'error');
   }
-  const dataUrl = canvas.toDataURL('image/png');
-  window._currentLogoData = dataUrl;
-  // Clear URL input since we now have cropped data
-  const urlInput = document.getElementById('logoUrlInput');
-  if (urlInput) urlInput.value = '';
-  closeCropModal();
-  updateLogoPreview();
-  showToast('Logo recortada com sucesso!', 'success');
 }
 
 function submitClientForm(e, id) {
