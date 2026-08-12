@@ -603,35 +603,46 @@ function openCropModal() {
     return;
   }
   const img = document.getElementById('cropImage');
-  img.src = src;
-  document.getElementById('cropModalOverlay').style.display = 'flex';
-
-  // Destroy previous cropper instance if exists
   if (_cropper) { _cropper.destroy(); _cropper = null; }
 
-  // Wait for image to load, then init Cropper
-  img.onload = async function() {
-    const shape = window._selectedLogoShape || 'circle';
-    await loadCropper();
-    _cropper = new Cropper(img, {
-      aspectRatio: 1,
-      viewMode: 1,
-      dragMode: 'move',
-      autoCropArea: 0.85,
-      responsive: true,
-      background: true,
-      guides: true,
-      center: true,
-      highlight: false,
-      cropBoxMovable: true,
-      cropBoxResizable: true,
-      toggleDragModeOnDblclick: false,
-    });
+  let cropperInitializing = false;
+  const initCropper = async function() {
+    if (cropperInitializing || _cropper) return;
+    cropperInitializing = true;
+    try {
+      await loadCropper();
+      _cropper = new Cropper(img, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.85,
+        responsive: true,
+        background: true,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+    } catch (err) {
+      showToast('Não foi possível carregar o recorte de imagem.', 'error');
+      closeCropModal();
+    } finally {
+      cropperInitializing = false;
+    }
   };
+
+  // Register handlers before src: data URLs may already be cached/complete.
+  img.onload = initCropper;
   img.onerror = function() {
     showToast('Não foi possível carregar a imagem. Verifique a URL ou envie um arquivo.', 'error');
     closeCropModal();
   };
+  img.src = '';
+  document.getElementById('cropModalOverlay').style.display = 'flex';
+  img.src = src;
+  if (img.complete && img.naturalWidth) initCropper();
 }
 
 function closeCropModal() {
