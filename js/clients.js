@@ -595,6 +595,8 @@ function removeClientLogo() {
 
 // ── Recorte básico local ──
 let _cropImage = null;
+let _cropSelectionRect = null;
+let _cropDragStart = null;
 
 function openCropModal() {
   const src = window._currentLogoData || document.getElementById('logoUrlInput')?.value || '';
@@ -604,7 +606,13 @@ function openCropModal() {
   }
   const img = document.getElementById('cropImage');
   _cropImage = null;
-  img.onload = function() { _cropImage = img; };
+  _cropSelectionRect = null;
+  const selection = document.getElementById('cropSelection');
+  if (selection) selection.hidden = true;
+  img.onload = function() {
+    _cropImage = img;
+    bindManualCropSelection();
+  };
   img.onerror = function() {
     showToast('Não foi possível carregar a imagem. Verifique a URL ou envie um arquivo.', 'error');
     closeCropModal();
@@ -614,7 +622,56 @@ function openCropModal() {
   img.src = '';
   document.getElementById('cropModalOverlay').style.display = 'flex';
   img.src = src;
-  if (img.complete && img.naturalWidth) _cropImage = img;
+  if (img.complete && img.naturalWidth) {
+    _cropImage = img;
+    bindManualCropSelection();
+  }
+}
+
+function bindManualCropSelection() {
+  const img = document.getElementById('cropImage');
+  if (!img || img.dataset.cropBound) return;
+  img.dataset.cropBound = '1';
+  img.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    const r = img.getBoundingClientRect();
+    _cropDragStart = { x: e.clientX - r.left, y: e.clientY - r.top };
+    _cropSelectionRect = { x: _cropDragStart.x, y: _cropDragStart.y, w: 0, h: 0 };
+    img.setPointerCapture(e.pointerId);
+    updateManualCropSelection(r);
+  });
+  img.addEventListener('pointermove', function(e) {
+    if (!_cropDragStart) return;
+    updateManualCropSelection(img.getBoundingClientRect(), e);
+  });
+  img.addEventListener('pointerup', function(e) {
+    if (_cropDragStart) updateManualCropSelection(img.getBoundingClientRect(), e);
+    _cropDragStart = null;
+  });
+}
+
+function updateManualCropSelection(bounds, event) {
+  if (!_cropDragStart) return;
+  const x = Math.max(0, Math.min(bounds.width, (event?.clientX ?? bounds.left + _cropDragStart.x) - bounds.left));
+  const y = Math.max(0, Math.min(bounds.height, (event?.clientY ?? bounds.top + _cropDragStart.y) - bounds.top));
+  const dx = x - _cropDragStart.x;
+  const dy = y - _cropDragStart.y;
+  const size = Math.min(Math.abs(dx), Math.abs(dy));
+  const rect = {
+    x: dx < 0 ? _cropDragStart.x - size : _cropDragStart.x,
+    y: dy < 0 ? _cropDragStart.y - size : _cropDragStart.y,
+    w: size,
+    h: size,
+  };
+  _cropSelectionRect = rect;
+  const selection = document.getElementById('cropSelection');
+  if (selection) {
+    selection.hidden = size < 2;
+    selection.style.left = `${bounds.left - document.getElementById('cropContainer').getBoundingClientRect().left + rect.x}px`;
+    selection.style.top = `${bounds.top - document.getElementById('cropContainer').getBoundingClientRect().top + rect.y}px`;
+    selection.style.width = `${rect.w}px`;
+    selection.style.height = `${rect.h}px`;
+  }
 }
 
 function closeCropModal() {
@@ -630,9 +687,15 @@ function applyCrop() {
   try {
     let canvas;
     const img = _cropImage;
-    const size = Math.min(img.naturalWidth, img.naturalHeight);
-    const sx = (img.naturalWidth - size) / 2;
-    const sy = (img.naturalHeight - size) / 2;
+    const displayed = img.getBoundingClientRect();
+    const selected = _cropSelectionRect && _cropSelectionRect.w > 2
+      ? _cropSelectionRect
+      : { x: 0, y: 0, w: displayed.width, h: displayed.height };
+    const scaleX = img.naturalWidth / displayed.width;
+    const scaleY = img.naturalHeight / displayed.height;
+    const sx = selected.x * scaleX;
+    const sy = selected.y * scaleY;
+    const size = Math.min(selected.w * scaleX, selected.h * scaleY);
     canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
