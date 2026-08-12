@@ -389,8 +389,9 @@ async function _runSupabaseSync() {
     if (remoteLogs && remoteLogs.length > 0) {
       const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
       const localLogs = getLogs();
-      const allIds = new Map(localLogs.map(l => [l.id || (l.timestamp + l.action), l]));
-      for (const l of mapped) { allIds.set(l.id || (l.timestamp + l.action), l); }
+       const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
+       const allIds = new Map(localLogs.map(l => [logKey(l), l]));
+       for (const l of mapped) { allIds.set(logKey(l), l); }
       const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       if (typeof setCacheTable === 'function') setCacheTable('audit_logs', mergedLogs);
       else dbSet(DB.LOGS, mergedLogs);
@@ -434,6 +435,7 @@ function addLog(action, type, targetId, details) {
   const session = getSession();
   const operatorName = session ? session.name : 'Sistema';
   const log = {
+    id: nextId('LOG'),
     timestamp: new Date().toISOString(),
     operatorName,
     action,
@@ -446,10 +448,10 @@ function addLog(action, type, targetId, details) {
   if (typeof getCacheTable === 'function' && typeof setCacheTable === 'function') {
     const logs = getLogs();
     logs.unshift(log);
-    if (logs.length > 2000) logs.pop();
-    setCacheTable('audit_logs', logs);
+    const uniqueLogs = [...new Map(logs.map(item => [item.id || `${item.timestamp}-${item.action}-${item.targetId}`, item])).values()];
+    if (uniqueLogs.length > 2000) uniqueLogs.length = 2000;
+    setCacheTable('audit_logs', uniqueLogs);
   } else {
-    log.id = nextId('LOG');
     const logs = getLogs();
     logs.unshift(log);
     if (logs.length > 2000) logs.pop();
@@ -458,7 +460,7 @@ function addLog(action, type, targetId, details) {
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('audit_logs').insert([{
-      id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2, 10),
+      id: log.id,
       operator_name: log.operatorName,
       action: log.action,
       type: log.type,
