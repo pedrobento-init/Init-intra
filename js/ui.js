@@ -15,7 +15,20 @@ function loadScript(url) {
 
 async function loadCropper() {
   if (typeof Cropper !== 'undefined') return;
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js');
+  const urls = [
+    'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',
+    'https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js',
+  ];
+  let lastError;
+  for (const url of urls) {
+    try {
+      await loadScript(url);
+      if (typeof Cropper !== 'undefined') return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Cropper.js não carregado');
 }
 
 async function loadChartJs() {

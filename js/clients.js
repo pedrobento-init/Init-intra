@@ -626,6 +626,7 @@ function openCropModal() {
         toggleDragModeOnDblclick: false,
       });
     } catch (err) {
+      console.error('Erro ao inicializar Cropper.js:', err);
       showToast('Não foi possível carregar o recorte de imagem.', 'error');
       closeCropModal();
     } finally {
