@@ -523,7 +523,10 @@ function deletePendenciaConfirm(id) {
   if (!p) return;
   confirmAction('Excluir esta pendência?', function() {
     var snapshot = JSON.parse(JSON.stringify(p));
-    deletePendencia(id);
+    if (!deletePendencia(id)) {
+      showToast('Não foi possível excluir esta pendência.', 'error');
+      return;
+    }
     renderPenView(false);
     updateBadges();
     showUndoToast('Pendência removida.', function() {

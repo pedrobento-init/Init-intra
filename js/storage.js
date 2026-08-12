@@ -686,6 +686,13 @@ function getMyPendencias() {
   return filterByTeam(getPendencias());
 }
 function getPendenciaById(id) { return getPendencias().find(p => p.id === id) || null; }
+function uniquePendenciaId(list) {
+  let id;
+  do {
+    id = `PEN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  } while (list.some(p => p.id === id));
+  return id;
+}
 function savePendencia(data) {
   const list = getPendencias();
   const isEdit = !!data.id;
@@ -701,14 +708,14 @@ function savePendencia(data) {
     const i = list.findIndex(p => p.id === data.id);
     if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now };
     } else {
-      data.id = nextId('PEN');
+      data.id = uniquePendenciaId(list);
       data.createdAt = now;
       data.updatedAt = now;
       data.status = data.status || 'em_andamento';
       list.push(data);
     }
   } else {
-    data.id = nextId('PEN');
+    data.id = uniquePendenciaId(list);
     data.createdAt = now;
     data.updatedAt = now;
     data.status = data.status || 'em_andamento';
@@ -773,12 +780,15 @@ function deletePendencia(id) {
   }
   const pen = getPendenciaById(id);
   const desc = pen ? pen.descricao : 'Desconhecido';
-  dbSet(DB.PENDENCIAS, getPendencias().filter(p => p.id !== id));
+  const remaining = getPendencias().filter(p => p.id !== id);
+  if (remaining.length === getPendencias().length) return false;
+  dbSet(DB.PENDENCIAS, remaining);
   addLog('Excluiu', 'Pendência', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir pendência:', res.error); });
   }
+  return true;
 }
 function addPendenciaNote(id, text, author) {
   const list = getPendencias();
