@@ -799,12 +799,6 @@ tr:hover td { background: var(--bg-hover); }
   gap: 10px;
   flex-wrap: wrap;
 }
-.crop-tools {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
 /* Upload drop zone */
 .logo-upload-zone {
   display: flex;

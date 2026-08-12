@@ -12,7 +12,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1a56db" />
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
@@ -210,17 +209,6 @@
           <img id="cropImage" src="" alt="Recortar" />
         </div>
         <div class="crop-actions">
-          <div class="crop-tools">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="cropperRotate(-90)" title="Girar esquerda" aria-label="Girar imagem para esquerda">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="cropperRotate(90)" title="Girar direita" aria-label="Girar imagem para direita">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="cropperZoom(0.1)" title="Zoom +" aria-label="Aumentar zoom">+</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="cropperZoom(-0.1)" title="Zoom −" aria-label="Diminuir zoom">−</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="cropperReset()" title="Resetar" aria-label="Resetar recorte">↺ Reset</button>
-          </div>
           <div style="display:flex;gap:8px">
             <button type="button" class="btn btn-secondary" onclick="closeCropModal()" aria-label="Cancelar recorte">Cancelar</button>
             <button type="button" class="btn btn-primary" onclick="applyCrop()" aria-label="Aplicar recorte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><path d="M6 21V9m0 0h12M18 3v12m0 0H6"/></svg> Aplicar Recorte</button>

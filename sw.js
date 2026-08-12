@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v40';
-const CDN_CACHE_NAME = 'init-intra-cdn-v40';
+const CACHE_NAME = 'init-intra-v41';
+const CDN_CACHE_NAME = 'init-intra-cdn-v41';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [

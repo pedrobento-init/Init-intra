@@ -593,9 +593,8 @@ function removeClientLogo() {
   showToast('Logo removida.', 'info');
 }
 
-// ── Cropper.js integration ──
-let _cropper = null;
-let _nativeCropImage = null;
+// ── Recorte básico local ──
+let _cropImage = null;
 
 function openCropModal() {
   const src = window._currentLogoData || document.getElementById('logoUrlInput')?.value || '';
@@ -604,41 +603,8 @@ function openCropModal() {
     return;
   }
   const img = document.getElementById('cropImage');
-  if (_cropper) { _cropper.destroy(); _cropper = null; }
-  _nativeCropImage = null;
-
-  let cropperInitializing = false;
-  const initCropper = async function() {
-    if (cropperInitializing || _cropper) return;
-    cropperInitializing = true;
-    try {
-      await loadCropper();
-      _cropper = new Cropper(img, {
-        aspectRatio: 1,
-        viewMode: 1,
-        dragMode: 'move',
-        autoCropArea: 0.85,
-        responsive: true,
-        background: true,
-        guides: true,
-        center: true,
-        highlight: false,
-        cropBoxMovable: true,
-        cropBoxResizable: true,
-        toggleDragModeOnDblclick: false,
-      });
-    } catch (err) {
-      console.error('Erro ao inicializar Cropper.js:', err);
-      // Keep the crop action usable even when the optional CDN library fails.
-      _nativeCropImage = img;
-      showToast('Modo de recorte básico ativado.', 'info');
-    } finally {
-      cropperInitializing = false;
-    }
-  };
-
-  // Register handlers before src: data URLs may already be cached/complete.
-  img.onload = initCropper;
+  _cropImage = null;
+  img.onload = function() { _cropImage = img; };
   img.onerror = function() {
     showToast('Não foi possível carregar a imagem. Verifique a URL ou envie um arquivo.', 'error');
     closeCropModal();
@@ -648,52 +614,32 @@ function openCropModal() {
   img.src = '';
   document.getElementById('cropModalOverlay').style.display = 'flex';
   img.src = src;
-  if (img.complete && img.naturalWidth) initCropper();
+  if (img.complete && img.naturalWidth) _cropImage = img;
 }
 
 function closeCropModal() {
   document.getElementById('cropModalOverlay').style.display = 'none';
-  if (_cropper) { _cropper.destroy(); _cropper = null; }
-  _nativeCropImage = null;
-}
-
-function cropperRotate(deg) {
-  if (_cropper) _cropper.rotate(deg);
-}
-function cropperZoom(ratio) {
-  if (_cropper) _cropper.zoom(ratio);
-}
-function cropperReset() {
-  if (_cropper) _cropper.reset();
+  _cropImage = null;
 }
 
 function applyCrop() {
-  if (!_cropper && !_nativeCropImage) {
+  if (!_cropImage) {
     showToast('A imagem ainda está carregando. Tente novamente.', 'error');
     return;
   }
   try {
     let canvas;
-    if (_cropper) {
-      canvas = _cropper.getCroppedCanvas({
-        width: 256,
-        height: 256,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
-      });
-    } else {
-      const img = _nativeCropImage;
-      const size = Math.min(img.naturalWidth, img.naturalHeight);
-      const sx = (img.naturalWidth - size) / 2;
-      const sy = (img.naturalHeight - size) / 2;
-      canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256);
-    }
+    const img = _cropImage;
+    const size = Math.min(img.naturalWidth, img.naturalHeight);
+    const sx = (img.naturalWidth - size) / 2;
+    const sy = (img.naturalHeight - size) / 2;
+    canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256);
     if (!canvas) throw new Error('canvas indisponível');
     window._currentLogoData = canvas.toDataURL('image/png');
     const urlInput = document.getElementById('logoUrlInput');
