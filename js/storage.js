@@ -182,18 +182,10 @@ function dbSet(key, value) {
 }
 
 function nextId(prefix) {
-  let c;
-  if (typeof getCacheTable === 'function') {
-    const entry = getCacheTable('counters');
-    c = entry?.value || {};
-    c[prefix] = (c[prefix] || 0) + 1;
-    setCacheTable('counters', { key: DB.COUNTER, value: c });
-  } else {
-    c = dbGetObj(DB.COUNTER, {});
-    c[prefix] = (c[prefix] || 0) + 1;
-    dbSet(DB.COUNTER, c);
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
   }
-  return `${prefix}-${c[prefix]}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ── SUPABASE CLOUD SYNC HELPERS ──
@@ -204,10 +196,12 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
   const remoteById = new Map(remote.map(r => [r.id, r]));
   for (const loc of local) {
     const rem = remoteById.get(loc.id);
-    if (!rem) { merged.push(loc); continue; }
+    // Supabase is authoritative for records that no longer exist remotely.
+    // Keeping these local orphans makes deleted records reappear on the next push.
+    if (!rem) { continue; }
     const localTime = new Date(loc.updatedAt || 0).getTime();
     const remoteTime = new Date(rem.updated_at || 0).getTime();
-    if (localTime >= remoteTime) { merged.push(loc); }
+    if (localTime > remoteTime) { merged.push(loc); }
     else {
       conflicts++;
       const mapped = {};
@@ -242,8 +236,15 @@ function _needsPush(local, remote) {
   return new Date(local.updatedAt || 0).getTime() > new Date(remote.updated_at || 0).getTime();
 }
 
+let _syncPromise = null;
 async function syncSupabaseToLocal() {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return;
+  if (_syncPromise) return _syncPromise;
+  _syncPromise = _runSupabaseSync();
+  try { return await _syncPromise; } finally { _syncPromise = null; }
+}
+
+async function _runSupabaseSync() {
   let totalConflicts = 0;
   let allConflictDetails = [];
   try {
@@ -300,7 +301,7 @@ async function syncSupabaseToLocal() {
     if (opErr) console.warn('Supabase operators error:', opErr);
     if (remoteOps) {
       const localOps = dbGet(DB.OPERATORS);
-      const opFieldMap = { id:'id', name:'name', initials:'initials', color:'color', role:'role', phone:'phone', email:'email', is_admin:'isAdmin', active:'active', team:'team', created_at:'createdAt', updated_at:'updatedAt' };
+      const opFieldMap = { id:'id', name:'name', initials:'initials', color:'color', role:'role', phone:'phone', email:'email', is_admin:'isAdmin', active:'active', team:'team', auth_user_id:'auth_user_id', created_at:'createdAt', updated_at:'updatedAt' };
       const { merged, conflicts, conflictDetails } = _mergeRecords(localOps, remoteOps, opFieldMap);
       totalConflicts += conflicts;
       allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Operadores' })));
@@ -352,7 +353,7 @@ async function syncSupabaseToLocal() {
         console.warn('Supabase visits (sync pulado):', visErr.message);
       } else if (remoteVisits) {
         const local = dbGet(DB.VISITS);
-        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', status:'status', team:'team', created_at:'createdAt', updated_at:'updatedAt' };
+        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', status:'status', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
         const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteVisits, fMap);
         totalConflicts += conflicts;
         allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Visitas' })));
@@ -414,7 +415,9 @@ async function syncSupabaseToLocal() {
 
 // Iniciar sincronização ao carregar a página
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => setTimeout(syncSupabaseToLocal, 500));
+  window.addEventListener('load', () => setTimeout(() => {
+    if (window._supabaseAuthActive) syncSupabaseToLocal();
+  }, 500));
 }
 
 // ── HISTÓRICO DE ATIVIDADES ──
@@ -1011,9 +1014,11 @@ function saveVisit(data) {
       all_day: data.allDay === true,
       motivo: data.motivo,
       observacoes: data.observacoes || '',
-      status: data.status,
-      team: data.team || 'init',
-      created_at: data.createdAt,
+       status: data.status,
+       team: data.team || 'init',
+       categories: data.categories || [],
+       checklist: data.checklist || [],
+       created_at: data.createdAt,
       updated_at: now
     }).then(res => { if (res.error) console.error('❌ Supabase visita:', res.error); });
   }
@@ -1240,12 +1245,13 @@ async function saveOperator(data) {
       color: savedOp.color,
       role: savedOp.role,
       phone: savedOp.phone,
-      email: savedOp.email,
-      pin_hash: savedOp.pinHash || null,
+       email: savedOp.email,
+       auth_user_id: savedOp.auth_user_id || null,
+       pin_hash: savedOp.pinHash || null,
       pin_salt: savedOp.pinSalt || null,
       is_admin: savedOp.isAdmin === true,
-      active: savedOp.active !== false,
-      team: savedOp.team || 'init',
+       active: savedOp.active !== false,
+       team: savedOp.team || 'init',
       created_at: savedOp.createdAt || now,
       updated_at: now
     }).then(res => {

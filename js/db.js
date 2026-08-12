@@ -39,6 +39,7 @@ const _dbCache = {
 };
 
 let _dbReady = false;
+const _storeWriteQueues = {};
 
 /**
  * Inicialização e migração de dados do localStorage para o IndexedDB
@@ -175,12 +176,11 @@ function setCacheStore(storeName, items) {
   _dbCache[storeName] = data;
 
   if (idb[storeName]) {
-    idb.transaction('rw', idb[storeName], async () => {
+    const previous = _storeWriteQueues[storeName] || Promise.resolve();
+    _storeWriteQueues[storeName] = previous.then(() => idb.transaction('rw', idb[storeName], async () => {
       await idb[storeName].clear();
-      if (data && data.length) {
-        await idb[storeName].bulkPut(data);
-      }
-    }).catch(err => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
+      if (data && data.length) await idb[storeName].bulkPut(data);
+    })).catch(err => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
   }
 }
 
@@ -207,10 +207,11 @@ function getCacheTable(tableName) {
 function setCacheTable(tableName, data) {
   _dbCache[tableName] = data;
   if (Array.isArray(data)) {
-    idb.transaction('rw', idb[tableName], async () => {
+    const previous = _storeWriteQueues[tableName] || Promise.resolve();
+    _storeWriteQueues[tableName] = previous.then(() => idb.transaction('rw', idb[tableName], async () => {
       await idb[tableName].clear();
       if (data.length) await idb[tableName].bulkPut(data);
-    }).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
+    })).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
   } else if (data && typeof data === 'object' && data.key) {
     idb.transaction('rw', idb[tableName], async () => {
       await idb[tableName].put(data);

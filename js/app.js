@@ -960,7 +960,7 @@ async function doLogout() {
     try { await _initDBPromise; } catch(e) { console.error('Erro ao inicializar IndexedDB:', e); }
   }
 
-  seedDemoData();
+  if (!(typeof isSupabaseConnected === 'function' && isSupabaseConnected())) seedDemoData();
 
   // Listener de auth sempre registrado (antes do restore)
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof authOnStateChange === 'function') {

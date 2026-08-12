@@ -219,6 +219,9 @@ function _updateConnectionStatus(isOnline) {
       banner.className = 'offline-banner online visible';
       if (msg) msg.textContent = '✓ Conexão restaurada';
       if (syncBtn) syncBtn.style.display = 'inline-block';
+      if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
+        syncSupabaseToLocal().catch(err => console.warn('Sincronização após reconexão:', err));
+      }
       // Auto-hide after 5s
       clearTimeout(_onlineTimeout);
       _onlineTimeout = setTimeout(() => {
@@ -257,6 +260,11 @@ function syncNow() {
 // Listen to browser online/offline events
 window.addEventListener('online',  () => _updateConnectionStatus(true));
 window.addEventListener('offline', () => _updateConnectionStatus(false));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && navigator.onLine && window._supabaseAuthActive && typeof syncSupabaseToLocal === 'function') {
+    syncSupabaseToLocal().catch(err => console.warn('Sincronização ao retornar à aba:', err));
+  }
+});
 
 // Initial check
 window.addEventListener('DOMContentLoaded', () => {

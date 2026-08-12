@@ -93,6 +93,7 @@ const _RT_TABLE_META = {
         map: r => ({
             id: r.id, clientId: r.client_id, clientName: r.client_name, operator: r.operator, date: r.date,
             time: r.time, motivo: r.motivo, observacoes: r.observacoes, status: r.status, team: r.team,
+            timeEnd: r.time_end, allDay: r.all_day === true,
             categories: r.categories || [], checklist: r.checklist || [],
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
@@ -185,6 +186,9 @@ function initSupabaseRealtime() {
     });
     _realtimeChannel = channel.subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
+                syncSupabaseToLocal().catch(() => {});
+            }
             setTimeout(() => {
                 if (supabaseClient && document.visibilityState === 'visible' && window._supabaseAuthActive) {
                     initSupabaseRealtime();
