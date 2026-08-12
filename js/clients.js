@@ -595,6 +595,7 @@ function removeClientLogo() {
 
 // ── Cropper.js integration ──
 let _cropper = null;
+let _nativeCropImage = null;
 
 function openCropModal() {
   const src = window._currentLogoData || document.getElementById('logoUrlInput')?.value || '';
@@ -604,6 +605,7 @@ function openCropModal() {
   }
   const img = document.getElementById('cropImage');
   if (_cropper) { _cropper.destroy(); _cropper = null; }
+  _nativeCropImage = null;
 
   let cropperInitializing = false;
   const initCropper = async function() {
@@ -627,8 +629,9 @@ function openCropModal() {
       });
     } catch (err) {
       console.error('Erro ao inicializar Cropper.js:', err);
-      showToast('Não foi possível carregar o recorte de imagem.', 'error');
-      closeCropModal();
+      // Keep the crop action usable even when the optional CDN library fails.
+      _nativeCropImage = img;
+      showToast('Modo de recorte básico ativado.', 'info');
     } finally {
       cropperInitializing = false;
     }
@@ -641,6 +644,7 @@ function openCropModal() {
     closeCropModal();
   };
   if (/^https?:\/\//i.test(src)) img.crossOrigin = 'anonymous';
+  else img.removeAttribute('crossorigin');
   img.src = '';
   document.getElementById('cropModalOverlay').style.display = 'flex';
   img.src = src;
@@ -650,6 +654,7 @@ function openCropModal() {
 function closeCropModal() {
   document.getElementById('cropModalOverlay').style.display = 'none';
   if (_cropper) { _cropper.destroy(); _cropper = null; }
+  _nativeCropImage = null;
 }
 
 function cropperRotate(deg) {
@@ -663,14 +668,32 @@ function cropperReset() {
 }
 
 function applyCrop() {
-  if (!_cropper) return;
+  if (!_cropper && !_nativeCropImage) {
+    showToast('A imagem ainda está carregando. Tente novamente.', 'error');
+    return;
+  }
   try {
-    const canvas = _cropper.getCroppedCanvas({
-      width: 256,
-      height: 256,
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: 'high',
-    });
+    let canvas;
+    if (_cropper) {
+      canvas = _cropper.getCroppedCanvas({
+        width: 256,
+        height: 256,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+    } else {
+      const img = _nativeCropImage;
+      const size = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - size) / 2;
+      const sy = (img.naturalHeight - size) / 2;
+      canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256);
+    }
     if (!canvas) throw new Error('canvas indisponível');
     window._currentLogoData = canvas.toDataURL('image/png');
     const urlInput = document.getElementById('logoUrlInput');
