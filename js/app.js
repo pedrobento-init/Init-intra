@@ -73,7 +73,7 @@ function _brasiliaNow() {
 function _parseItemDate(item) {
   const raw = item.date || item.createdAt || item.updatedAt || 0;
   if (!raw) return new Date(0);
-  const d = new Date(raw);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? parseDateOnly(raw) : new Date(raw);
   const bp = _brasiliaDateParts(d);
   return new Date(bp.year, bp.month, bp.day);
 }
@@ -358,7 +358,7 @@ function renderDashboard() {
   const allVisits   = isTeamAdmin() && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
   const session     = getSession();
   const currentUser = session ? session.name : '';
-  const today       = new Date().toISOString().slice(0, 10);
+  const today       = localDateISO();
 
   const clients  = allClients.filter(c => itemInDashPeriod(c));
   const pens     = allPens.filter(p => itemInDashPeriod(p));
@@ -544,7 +544,7 @@ function renderDashboard() {
           ${recentPens.length ? `<div style="display:flex;flex-direction:column;gap:1px">
             ${recentPens.map(p => {
               const c = getClientById(p.clientId);
-              const isOverdue = p.deadline && p.deadline < new Date().toISOString().slice(0, 10);
+               const isOverdue = p.deadline && p.deadline < localDateISO();
               return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
                 ${c ? clientAvatar(c, 30) : ''}
                 <div style="flex:1;min-width:0">
@@ -776,7 +776,7 @@ function updateBadges() {
   if (badge) { badge.textContent = open; badge.classList.toggle('hidden', open === 0); }
 
   var visits = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
-  var today = new Date().toISOString().slice(0, 10);
+  var today = localDateISO();
   var upcoming = visits.filter(function(v) { return v.date >= today && (v.status === 'agendada' || v.status === 'em_andamento'); }).length;
   var vbadge = document.getElementById('badge-visitas');
   if (vbadge) { vbadge.textContent = upcoming; vbadge.classList.toggle('hidden', upcoming === 0); }

@@ -563,7 +563,7 @@ function openOpPendencias(opId) {
     return list.map(p => {
       const c = getClientById(p.clientId);
       const color = c?.color || '#2563eb';
-      const isOverdue = p.deadline && p.deadline < new Date().toISOString().slice(0, 10) && !['concluido','cancelado'].includes(p.status);
+        const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:border-color .15s;background:var(--bg-surface)"
              onmouseover="this.style.borderColor='#1a56db'" onmouseout="this.style.borderColor='var(--border)'"

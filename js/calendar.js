@@ -121,7 +121,7 @@ function getFilteredCalendarVisits() {
 function mapPendenciasToEvents(pendencias) {
   return pendencias.map(p => {
     const color = PRIORITY_COLORS[p.priority] || PRIORITY_COLORS.media;
-    const isOverdue = p.deadline < new Date().toISOString().slice(0, 10) && !['concluido', 'cancelado'].includes(p.status);
+    const isOverdue = p.deadline < localDateISO() && !['concluido', 'cancelado'].includes(p.status);
     const statusColor = STATUS_COLORS[p.status] || '#94a3b8';
     const borderColor = isOverdue ? '#dc2626' : statusColor;
 

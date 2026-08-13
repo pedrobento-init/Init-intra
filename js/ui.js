@@ -219,17 +219,29 @@ function confirmAction(message, onConfirm) {
   }
 }
 
+const APP_TIME_ZONE = 'America/Sao_Paulo';
+function localDateISO(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(date);
+  const values = {};
+  parts.forEach(p => { values[p.type] = p.value; });
+  return `${values.year}-${values.month}-${values.day}`;
+}
+function parseDateOnly(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : new Date(value);
+}
 function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('pt-BR');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(iso)) ? parseDateOnly(iso) : new Date(iso);
+  return date.toLocaleDateString('pt-BR', { timeZone: APP_TIME_ZONE });
 }
 function formatDateTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  return new Date(iso).toLocaleString('pt-BR', { timeZone: APP_TIME_ZONE, day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 function parseDeadline(deadlineStr) {
   if (!deadlineStr) return null;
-  return new Date(deadlineStr + 'T12:00:00-03:00');
+  return parseDateOnly(deadlineStr);
 }
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Copiado!', 'success'));
@@ -712,11 +724,11 @@ function checkOverdueAlerts() {
   if (typeof getPendencias !== 'function') return;
   const pens = typeof getMyPendencias === 'function' ? getMyPendencias() : getPendencias();
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = localDateISO(now);
   
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const tomorrowStr = localDateISO(tomorrow);
 
   const overdue = pens.filter(p => p.deadline && p.deadline <= todayStr && !['concluido', 'cancelado'].includes(p.status));
   const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !['concluido', 'cancelado'].includes(p.status));

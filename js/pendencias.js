@@ -128,7 +128,7 @@ function renderPenKanban(area) {
 
 function penKanbanCard(p) {
   var c = getClientById(p.clientId);
-  var isOverdue = p.deadline && p.deadline < new Date().toISOString().slice(0, 10) && !['concluido','cancelado'].includes(p.status);
+  var isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
   var sla = slaCountdown(p, 48);
   return '<div class="kanban-card"' +
     ' draggable="true"' +
@@ -240,7 +240,7 @@ function renderPenTable(area) {
       const color = c?.color || '#2563eb';
       const hasNotes = (p.notes||[]).length;
       const attsCount = (p.attachments||[]).length;
-      const isOverdue = p.deadline && p.deadline < new Date().toISOString().slice(0, 10) && !['concluido','cancelado'].includes(p.status);
+      const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
       const safeLink = safeUrl(p.linkUtil);
       const sla = slaCountdown(p, 48);
       const checklist = (p.checklist||[]);

@@ -111,15 +111,15 @@ function renderVisitStats() {
   if (!wrap) return;
   const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
   const ops = getOperatorNames(team);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   const base = isTeamAdmin() && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
   const total    = base.length;
   const todayN   = base.filter(v => v.date === today).length;
   const upcoming = base.filter(v => v.date >= today && v.status === 'agendada').length;
   const doneMonth = base.filter(v => {
     if (!v.date || v.status !== 'concluida') return false;
-    const d = new Date(v.date);
-    const now = new Date();
+    const d = parseDateOnly(v.date);
+    const now = _brasiliaNow();
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }).length;
   wrap.innerHTML = `
@@ -231,7 +231,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Data *</label>
-          <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || new Date().toISOString().slice(0,10))}" required /></div>
+          <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || localDateISO())}" required /></div>
         <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--bg-base)">
             <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} onchange="toggleVisitAllDayFields()" style="width:16px;height:16px;accent-color:var(--accent)" />
