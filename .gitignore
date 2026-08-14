@@ -11,5 +11,7 @@ node_modules/
 .env.local
 *.local
 
+# Supabase credentials — never commit this file
+js/config.js
 
 .vercel

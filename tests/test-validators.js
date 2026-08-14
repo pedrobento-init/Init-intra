@@ -127,6 +127,20 @@ function validatePendencia(data) {
 }
 
 function validateOperator(data) {
+  const errors = [];
+  if (!Validators.required(data.name)) errors.push('Nome é obrigatório.');
+  if (data.email && !Validators.email(data.email)) errors.push('E-mail inválido.');
+  if (data.phone && !Validators.phone(data.phone)) errors.push('Telefone inválido.');
+  if (data.initials && data.initials.length > 3) errors.push('Iniciais devem ter no máximo 3 caracteres.');
+  return errors;
+}
+
+function validateTemplate(data) {
+  const errors = [];
+  if (!Validators.required(data.title)) errors.push('Título é obrigatório.');
+  if (!Validators.required(data.content)) errors.push('Conteúdo é obrigatório.');
+  return errors;
+}
 
 // ── validateOperator ──
 console.log('\nvalidateOperator:');

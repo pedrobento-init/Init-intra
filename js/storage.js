@@ -185,7 +185,17 @@ function nextId(prefix) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `${prefix}-${crypto.randomUUID()}`;
   }
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now().toString(36)}-${_secureRandStr(6)}`;
+}
+
+/**
+ * Gera uma string aleatória criptograficamente segura (hex chars).
+ * Substitui Math.random() para geração de IDs.
+ */
+function _secureRandStr(len) {
+  const arr = new Uint8Array(Math.ceil(len / 2));
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('').slice(0, len);
 }
 
 // ── SUPABASE CLOUD SYNC HELPERS ──
@@ -502,7 +512,7 @@ function addAttachment(type, itemId, fileObj) {
     return { error: `Máximo de ${ATTACHMENT_MAX_COUNT} anexos por item.` };
   }
   const att = {
-    id: 'ATT-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    id: 'ATT-' + Date.now() + '-' + _secureRandStr(4),
     name: fileObj.name,
     mimeType: fileObj.type,
     size: fileObj.size,
@@ -657,9 +667,9 @@ function saveClient(data) {
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
-      if (res.error) console.error('❌ Supabase cliente:', res.error);
+      if (res.error) console.error('❌ Supabase cliente:', String(res.error.message || res.error));
     }).catch(err => {
-      console.error('❌ Erro de rede Supabase cliente:', err.message);
+      console.error('❌ Erro de rede Supabase cliente:', String(err.message));
     });
   }
 
@@ -676,7 +686,7 @@ function deleteClient(id) {
   addLog('Excluiu', 'Cliente', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir cliente:', res.error); });
+    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); });
   }
 }
 
@@ -694,7 +704,7 @@ function getPendenciaById(id) { return getPendencias().find(p => p.id === id) ||
 function uniquePendenciaId(list) {
   let id;
   do {
-    id = `PEN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    id = `PEN-${Date.now().toString(36)}-${_secureRandStr(6)}`;
   } while (list.some(p => p.id === id));
   return id;
 }
@@ -1353,14 +1363,14 @@ function seedDemoData() {
   }
   if (getClients().length > 0) return;
 
-  // Seed operators
+  // Seed operators (emails usam .example.local — domínio reservado, sem relação com endereços reais)
   if (getOperators().length === 0) {
     const operators = [
-      { id:'OP-1', name:'Pedro',   initials:'PE', color:'#1a56db', role:'Técnico',   phone:'', email:'pedro@initnet.com.br',   auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-2', name:'Giovane', initials:'GI', color:'#0891b2', role:'Técnico',   phone:'', email:'giovane@initnet.com.br', auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-3', name:'Rafael',  initials:'RA', color:'#0f766e', role:'Técnico',   phone:'', email:'rafael@initnet.com.br',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-4', name:'Joarli',  initials:'JO', color:'#4f46e5', role:'Técnico',   phone:'', email:'joarli@initnet.com.br',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-5', name:'Felipe',  initials:'FE', color:'#6366f1', role:'CEO',       phone:'', email:'felipe@initnet.com.br', auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-1', name:'Pedro',   initials:'PE', color:'#1a56db', role:'Técnico',   phone:'', email:'op1@example.local',   auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-2', name:'Giovane', initials:'GI', color:'#0891b2', role:'Técnico',   phone:'', email:'op2@example.local', auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-3', name:'Rafael',  initials:'RA', color:'#0f766e', role:'Técnico',   phone:'', email:'op3@example.local',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-4', name:'Joarli',  initials:'JO', color:'#4f46e5', role:'Técnico',   phone:'', email:'op4@example.local',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-5', name:'Felipe',  initials:'FE', color:'#6366f1', role:'CEO',       phone:'', email:'op5@example.local', auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
     ];
     dbSet(DB.OPERATORS, operators);
     const c = dbGetObj(DB.COUNTER, {});

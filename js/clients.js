@@ -991,9 +991,11 @@ function executeClientImport() {
   const currentTeam = getCurrentTeam();
 
   for (const row of validRows) {
+    const randBuf = new Uint32Array(1);
+    crypto.getRandomValues(randBuf);
     const clientData = {
       team: currentTeam,
-      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      color: COLORS[randBuf[0] % COLORS.length],
       initials: '',
       server: {}, hosting: {}, backup: {}, emails: {}, licenses: [],
     };

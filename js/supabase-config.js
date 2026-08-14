@@ -1,12 +1,18 @@
 // supabase-config.js - Conexão e Configuração do cliente remoto
 // ============================================================
+//
+// A anon key é protegida por Row Level Security (RLS) no Supabase.
+// Os valores são carregados de js/config.js (gitignored) via window.SUPABASE_CONFIG.
+// Administradores podem substituir temporariamente via localStorage no console:
+//   setSupabaseConfig('https://...', 'eyJ...')
+//
+// Para configurar: copie js/config.example.js → js/config.js e preencha os valores.
 
-// A anon key é pública por design (protegida por RLS no backend).
-// Não altere via UI em produção — use o valor embutido ou variáveis no build.
+const _cfg = (typeof window !== 'undefined' && window.SUPABASE_CONFIG) || {};
 const SUPABASE_URL = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_url'))
-  || 'https://esticiaufganuxhcwxzq.supabase.co';
+  || _cfg.url || '';
 const SUPABASE_ANON_KEY = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_key'))
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzdGljaWF1ZmdhbnV4aGN3eHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTk3ODgsImV4cCI6MjEwMDI5NTc4OH0.ZjEBGAyH_W1uFgSBHrxdGZgidIISTqasvofP4WioqzI';
+  || _cfg.anonKey || '';
 
 let supabaseClient = null;
 
