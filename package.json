@@ -4,6 +4,7 @@
   "description": "Init Intra — Sistema interno de gestão (clientes, pendências, visitas)",
   "private": true,
   "scripts": {
+    "build": "node tools/build-config.js",
     "deploy": "vercel --prod",
     "dev": "vercel dev",
     "preview": "vercel"
