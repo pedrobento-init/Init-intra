@@ -176,6 +176,7 @@ alter table public.visits add column if not exists time_end time;
 alter table public.visits add column if not exists all_day boolean default false;
 alter table public.visits add column if not exists motivo text;
 alter table public.visits add column if not exists observacoes text;
+alter table public.visits add column if not exists relatorio text;
 alter table public.visits add column if not exists status text default 'agendada';
 alter table public.visits add column if not exists team text default 'init';
 alter table public.visits add column if not exists categories jsonb default '[]'::jsonb;

@@ -1026,13 +1026,14 @@ function saveVisit(data) {
       all_day: data.allDay === true,
       motivo: data.motivo,
       observacoes: data.observacoes || '',
-       status: data.status,
-       team: data.team || 'init',
-       categories: data.categories || [],
-       checklist: data.checklist || [],
-       created_at: data.createdAt,
+      relatorio: data.relatorio || '',
+      status: data.status,
+      team: data.team || 'init',
+      categories: data.categories || [],
+      checklist: data.checklist || [],
+      created_at: data.createdAt,
       updated_at: now
-    }).then(res => { if (res.error) console.error('❌ Supabase visita:', res.error); });
+    }).then(res => { if (res.error) console.error('❌ Supabase visita:', String(res.error.message || res.error)); });
   }
   return data;
 }

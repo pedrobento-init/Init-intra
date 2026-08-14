@@ -20,7 +20,7 @@ function renderVisitas() {
     <div class="search-bar" style="flex-wrap:wrap;gap:10px">
       <div class="search-input-wrap" style="flex:1;min-width:180px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="visitSearch" placeholder="Buscar por cliente, motivo..." oninput="saveVisitFilters();debouncedRenderVisitView()" />
+        <input class="form-input" id="visitSearch" placeholder="Buscar por cliente, motivo, relatório..." oninput="saveVisitFilters();debouncedRenderVisitView()" />
       </div>
       <select class="form-select" id="visitClient" style="width:180px" onchange="saveVisitFilters();renderVisitView()">
         <option value="">Todos os clientes</option>
@@ -39,7 +39,7 @@ function renderVisitas() {
       </select>
       <input type="date" class="form-input" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
       <input type="date" class="form-input" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
-      <button type="button" class="btn btn-secondary btn-sm" onclick="openVisitMonthReportModal()" title="Relatório mensal para Google Sheets">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="openVisitMonthReportModal()" title="Relatório mensal exportável">
         Relatório do mês
       </button>
     </div>
@@ -85,6 +85,7 @@ function getFilteredVisits() {
     if (q && !(v.motivo || '').toLowerCase().includes(q)
          && !(v.clientName || '').toLowerCase().includes(q)
          && !(v.observacoes || '').toLowerCase().includes(q)
+         && !(v.relatorio || '').toLowerCase().includes(q)
          && !(v.operator || '').toLowerCase().includes(q)) return false;
     if (cid && v.clientId !== cid) return false;
     if (op  && v.operator !== op) return false;
@@ -154,7 +155,7 @@ function renderVisitTable(area) {
     <thead><tr>
       <th class="col-date">Data</th>
       <th class="col-client">Cliente</th>
-      <th class="col-desc">Motivo</th>
+      <th class="col-desc">Motivo & Relatório</th>
       <th class="col-resp">Operador</th>
       <th class="col-status">Status</th>
       <th class="col-actions"></th>
@@ -162,6 +163,7 @@ function renderVisitTable(area) {
     <tbody>${pageVisits.map(v => {
       const c = getClientById(v.clientId);
       const color = c?.color || '#2563eb';
+      const hasReport = !!(v.relatorio && v.relatorio.trim());
       return `<tr>
         <td data-label="Data" class="col-date">
           <div class="visit-date-cell">
@@ -175,10 +177,19 @@ function renderVisitTable(area) {
             <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(v.clientName)||'—'}</span>
           </div>
         </td>
-        <td data-label="Motivo" class="col-desc col-motivo">
+        <td data-label="Motivo & Relatório" class="col-desc col-motivo">
           <div class="col-desc-value col-motivo-value">
             <span class="visit-motivo-text">${escapeHtml(v.motivo)||'—'}</span>
             ${v.observacoes ? `<span class="visit-motivo-obs">${escapeHtml(v.observacoes)}</span>` : ''}
+            ${hasReport
+              ? `<div style="margin-top:4px;font-size:11px;color:#16a34a;display:inline-flex;align-items:center;gap:4px;font-weight:600;background:#16a34a15;padding:2px 8px;border-radius:4px;border:1px solid #16a34a30" title="Relatório de atendimento preenchido">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Relatório do que foi feito
+                </div>`
+              : v.status === 'concluida'
+                ? `<button type="button" class="btn btn-sm btn-secondary" onclick="openConcludeVisitModal('${escapeHtml(v.id)}')" style="margin-top:4px;font-size:10px;padding:2px 6px;color:#d97706;border-color:#f59e0b40;background:#f59e0b10">
+                    ⚠️ Adicionar relatório
+                  </button>`
+                : ''}
           </div>
         </td>
         <td data-label="Operador" class="col-resp"><span class="resp-badge">${escapeHtml(v.operator)||'—'}</span></td>
@@ -216,7 +227,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
   openModal(id ? 'Editar Visita' : 'Nova Visita', `
     <form onsubmit="submitVisitForm(event,'${escapeHtml(id||'')}')">
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Cliente</label>
+        <div class="form-group"><label class="form-label">Cliente *</label>
           <select class="form-select" name="clientId" required>
             <option value="">Selecione...</option>
             ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${((v.clientId||preClientId)===c.id)?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
@@ -247,9 +258,18 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
       </div>
       <div class="form-group"><label class="form-label">Motivo da visita *</label>
         <input class="form-input" name="motivo" value="${escapeHtml(v.motivo || '')}" placeholder="Ex: Manutenção preventiva, instalação de equipamento..." required /></div>
-      <div class="form-group"><label class="form-label">Observações</label>
-        <textarea class="form-textarea" name="observacoes" rows="3" placeholder="Detalhes, o que foi feito, pendências...">${escapeHtml(v.observacoes || '')}</textarea></div>
-      <div class="form-row">
+      <div class="form-group"><label class="form-label">Observações prévias / Instruções</label>
+        <textarea class="form-textarea" name="observacoes" rows="2" placeholder="Orientações prévias, localização, contato local...">${escapeHtml(v.observacoes || '')}</textarea></div>
+      
+      <div class="form-group" style="margin-top:12px;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);font-weight:700">
+          <span>Relatório de Atendimento (O que foi feito na visita)</span>
+          <span style="font-size:11px;font-weight:400;color:var(--text-muted)">Preenchimento após/durante a visita</span>
+        </label>
+        <textarea class="form-textarea" name="relatorio" rows="4" placeholder="Descreva em detalhes o serviço realizado, equipamentos testados, soluções aplicadas ou observações de conclusão...">${escapeHtml(v.relatorio || '')}</textarea>
+      </div>
+
+      <div class="form-row" style="margin-top:12px">
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" name="status">
             ${Object.entries(VISIT_STATUS_MAP).map(([k,m]) => `<option value="${k}" ${(v.status||'agendada')===k?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
@@ -313,6 +333,7 @@ function submitVisitForm(e, id) {
       allDay,
       motivo,
       observacoes: g('observacoes').trim(),
+      relatorio: g('relatorio').trim(),
       status: g('status') || 'agendada',
     };
     saveVisit(data);
@@ -331,6 +352,8 @@ function openVisitDetail(id) {
   if (!v) return;
   const c = getClientById(v.clientId);
   const m = VISIT_STATUS_MAP[v.status] || { label: v.status, color: '#94a3b8' };
+  const hasReport = !!(v.relatorio && v.relatorio.trim());
+
   openModal(`Visita ${escapeHtml(v.id)}`, `
     <div class="ticket-info-grid">
       <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
@@ -340,16 +363,37 @@ function openVisitDetail(id) {
       <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${visitStatusTag(v.status)}</div></div>
     </div>
     <hr class="divider"/>
+    
     <div class="form-group"><label class="form-label">Motivo</label>
       <div class="timeline-text">${escapeHtml(v.motivo)||'—'}</div></div>
-    ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
-    <div class="form-group"><label class="form-label">Alterar status</label>
+    
+    ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações prévias</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
+
+    <div class="form-group" style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label class="form-label" style="margin:0;font-weight:700;display:flex;align-items:center;gap:6px;font-size:13px;color:#16a34a">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório de Atendimento (O que foi feito)
+        </label>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="openEditVisitReportModal('${escapeHtml(id)}')">
+          ${hasReport ? '✎ Editar Relatório' : '+ Adicionar Relatório'}
+        </button>
+      </div>
+      <div class="timeline-text" style="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
+        ${hasReport
+          ? escapeHtml(v.relatorio).replace(/\n/g, '<br>')
+          : '<em style="color:var(--text-muted)">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'}
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:16px"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="chgVisitStatus" style="width:200px">
+        <select class="form-select" id="chgVisitStatus" style="width:180px">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
         </select>
-        <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar</button>
-        <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar</button>
+        <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar Status</button>
+        ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="openConcludeVisitModal('${escapeHtml(id)}')">✅ Concluir com Relatório</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar Tudo</button>
       </div>
     </div>
   `);
@@ -358,13 +402,98 @@ function openVisitDetail(id) {
 function changeVisitStatus(id) {
   const v = getVisitById(id);
   if (!v) return;
-  v.status = document.getElementById('chgVisitStatus').value;
+  const newStatus = document.getElementById('chgVisitStatus').value;
+  
+  // Se estiver concluindo e não tiver relatório, direciona para o modal de conclusão com relatório
+  if (newStatus === 'concluida' && (!v.relatorio || !v.relatorio.trim())) {
+    openConcludeVisitModal(id);
+    return;
+  }
+
+  v.status = newStatus;
   saveVisit(v);
   showToast('Status atualizado!', 'success');
   openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
+}
+
+function openConcludeVisitModal(id) {
+  const v = getVisitById(id);
+  if (!v) return;
+
+  openModal('Concluir Visita — Relatório de Atendimento', `
+    <form onsubmit="submitConcludeVisit(event, '${escapeHtml(id)}')">
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;font-size:13px;border-left:3px solid #16a34a">
+        <strong>Cliente:</strong> ${escapeHtml(v.clientName||'—')}<br>
+        <strong>Motivo:</strong> ${escapeHtml(v.motivo||'—')}
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:700;color:#16a34a">
+          O que foi feito no atendimento? *
+        </label>
+        <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Voltar</button>
+        <button type="submit" class="btn" style="background:#16a34a;color:#fff;border:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Salvar Relatório e Concluir Visita
+        </button>
+      </div>
+    </form>
+  `);
+  setTimeout(() => document.getElementById('concludeRelatorio')?.focus(), 100);
+}
+
+function submitConcludeVisit(e, id) {
+  e.preventDefault();
+  const v = getVisitById(id);
+  if (!v) return;
+  const rel = (document.getElementById('concludeRelatorio')?.value || '').trim();
+  if (!rel) {
+    showToast('Descreva o que foi feito para concluir a visita.', 'error');
+    return;
+  }
+  v.relatorio = rel;
+  v.status = 'concluida';
+  saveVisit(v);
+  closeModal();
+  showToast('Visita concluída com relatório salvo!', 'success');
+  if (document.getElementById('visitViewArea')) renderVisitView(false);
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
+function openEditVisitReportModal(id) {
+  const v = getVisitById(id);
+  if (!v) return;
+
+  openModal('Relatório de Atendimento', `
+    <form onsubmit="submitEditVisitReport(event, '${escapeHtml(id)}')">
+      <div class="form-group">
+        <label class="form-label" style="font-weight:700">Relatório (O que foi feito na visita)</label>
+        <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar Relatório</button>
+      </div>
+    </form>
+  `);
+  setTimeout(() => document.getElementById('editVisitReportText')?.focus(), 100);
+}
+
+function submitEditVisitReport(e, id) {
+  e.preventDefault();
+  const v = getVisitById(id);
+  if (!v) return;
+  v.relatorio = (document.getElementById('editVisitReportText')?.value || '').trim();
+  saveVisit(v);
+  showToast('Relatório salvo com sucesso!', 'success');
+  openVisitDetail(id);
+  if (document.getElementById('visitViewArea')) renderVisitView(false);
 }
 
 function deleteVisitConfirm(id) {
@@ -392,7 +521,7 @@ function openVisitMonthReportModal() {
   openModal('Relatório mensal de visitas', `
     <form onsubmit="return false;">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
-        Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong> e <strong>detalhe das visitas</strong>.
+        Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong> e <strong>detalhe das visitas</strong> (incluindo o que foi feito em cada atendimento).
         O Excel sai formatado (pronto para enviar). O CSV serve para importar no Google Sheets.
       </p>
       <div class="form-group">
@@ -515,7 +644,7 @@ function _exportVisitMonthCsv(data) {
     ].map(_visitReportCsvCell).join(';'));
   });
   lines.push('');
-  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Cliente', 'Motivo', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
+  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Cliente', 'Motivo', 'O Que Foi Feito (Relatório)', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
   visits.forEach(v => {
     lines.push([
       'DETALHE',
@@ -525,6 +654,7 @@ function _exportVisitMonthCsv(data) {
       formatVisitTimeRange(v),
       v.clientName || '',
       v.motivo || '',
+      v.relatorio || '',
       v.operator || '',
       statusLabel(v.status),
     ].map(_visitReportCsvCell).join(';'));
@@ -576,6 +706,7 @@ function _exportVisitMonthExcel(data) {
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(formatVisitTimeRange(v))}</td>
       <td style="${s}">${_visitReportEscHtml(v.clientName || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(v.motivo || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(v.relatorio || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(v.operator || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(statusLabel(v.status))}</td>
     </tr>`;
@@ -658,6 +789,7 @@ function _exportVisitMonthExcel(data) {
         <th style="${th}">Duração</th>
         <th style="${th}">Cliente</th>
         <th style="${th}">Motivo</th>
+        <th style="${th}">O Que Foi Feito (Relatório)</th>
         <th style="${th}">Operador</th>
         <th style="${th}">Status</th>
       </tr>
