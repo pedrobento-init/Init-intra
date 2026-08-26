@@ -500,6 +500,18 @@ async function submitOperadorForm(e, id) {
       } catch (_) {
         authMsg = 'Perfil salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
       }
+    } else if (id && isAdminUser && newPwd && existing?.auth_user_id) {
+      // Admin alterando senha de outro operador — via Edge Function (service role)
+      try {
+        const { data: resetData, error: resetErr } = await supabaseClient.functions.invoke('update-user-password', {
+          body: { userId: existing.auth_user_id, password: newPwd }
+        });
+        if (resetErr || (resetData && resetData.error)) {
+          authMsg = 'Operador salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
+        }
+      } catch (_) {
+        authMsg = 'Operador salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
+      }
     }
 
     // Criar usuário no Supabase Auth (apenas para novos operadores, se conectado)

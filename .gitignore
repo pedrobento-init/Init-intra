@@ -15,3 +15,6 @@ node_modules/
 js/config.js
 
 .vercel
+
+# Supabase CLI local state
+supabase/.temp/
