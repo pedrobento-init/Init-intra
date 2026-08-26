@@ -11,7 +11,7 @@ const PEN_KANBAN_COLS = [
   { id: 'cancelado',    label: 'Cancelado',     color: '#64748b' },
 ];
 
-let penView = 'table';
+let penView = 'kanban';
 let _filteredPens = [];
 
 function renderPendencias() {
@@ -20,7 +20,6 @@ function renderPendencias() {
   window._topbarAction = () => openPendenciaForm();
 
   const saved = loadFilterState('pendencias', {});
-  if (saved.view === 'kanban' || saved.view === 'table') penView = saved.view;
 
   const clients  = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   const team     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
@@ -58,10 +57,6 @@ function renderPendencias() {
       </select>
     </div>
     <div class="page-action-row">
-      <div class="view-toggles" style="display:flex;gap:6px">
-        <button class="btn btn-icon${penView==='kanban'?' active-view':''}" id="btnKanbanPen" onclick="setPenView('kanban')" title="Kanban"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg></button>
-        <button class="btn btn-icon${penView==='table'?' active-view':''}" id="btnTablePen" onclick="setPenView('table')" title="Tabela"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
-      </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-new-action" onclick="openPendenciaForm()" aria-label="Nova Pendência">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -78,24 +73,12 @@ function renderPendencias() {
   renderPenView();
 }
 
-function setPenView(view, rerender) {
-  if (rerender === undefined) rerender = true;
-  penView = view;
-  var btnK = document.getElementById('btnKanbanPen');
-  var btnT = document.getElementById('btnTablePen');
-  if (btnK) btnK.classList.toggle('active-view', view === 'kanban');
-  if (btnT) btnT.classList.toggle('active-view', view === 'table');
-  if (rerender) { savePenFilters(); renderPenView(); }
-}
-
 function renderPenView(resetPage) {
   var area = document.getElementById('penViewArea');
   if (!area) return;
   setTimeout(function() {
-    if (resetPage !== false) _penPage = 1;
     _filteredPens = getFilteredPendencias();
-    if (penView === 'kanban') renderPenKanban(area);
-    else renderPenTable(area);
+    renderPenKanban(area);
   }, 10);
 }
 
@@ -237,9 +220,6 @@ function getFilteredPendencias() {
   });
 }
 
-let _penPage = 1;
-const PEN_PAGE_SIZE = 30;
-
 function savePenFilters() {
   saveFilterState('pendencias', {
     search: document.getElementById('penSearch')?.value||'',
@@ -263,133 +243,6 @@ window.addEventListener('resize', debounce(function() {
   _penMobileState = nowMobile;
   renderPenView(false);
 }, 200));
-
-function renderPenTable(area) {
-  var wrap = area || document.getElementById('penViewArea');
-  if (!wrap) return;
-  var pens = _filteredPens;
-  if (!pens.length) { wrap.innerHTML = '<div class="card"><div class="empty-state"><p>Nenhuma pendência encontrada.</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div></div>'; return; }
-
-  const totalPages = Math.ceil(pens.length / PEN_PAGE_SIZE);
-  if (_penPage > totalPages) _penPage = totalPages;
-  if (_penPage < 1) _penPage = 1;
-
-  const startIdx = (_penPage - 1) * PEN_PAGE_SIZE;
-  const pagePens = pens.slice(startIdx, startIdx + PEN_PAGE_SIZE);
-
-  wrap.innerHTML = `
-  <div class="pen-mobile-toolbar">
-    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAllPenCards(false)">Recolher todas</button>
-    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAllPenCards(true)">Expandir todas</button>
-  </div>
-  <table class="pen-table">
-    <thead><tr>
-      <th class="col-client">Cliente</th><th class="col-tipo">Tipo</th><th class="col-desc">Descrição</th>
-      <th class="col-resp">Responsável</th><th class="col-status">Status</th><th class="col-prio">Prioridade</th>
-      <th class="col-deadline">Prazo</th><th class="col-date">Data</th><th class="col-time">Tempo</th><th class="col-notes">Notas</th><th class="col-att">Anexos</th><th class="col-link">Link</th><th class="col-actions"></th>
-    </tr></thead>
-    <tbody>${pagePens.map(p => {
-      const c = getClientById(p.clientId);
-      const color = c?.color || '#2563eb';
-      const hasNotes = (p.notes||[]).length;
-      const attsCount = (p.attachments||[]).length;
-      const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
-      const safeLink = safeUrl(p.linkUtil);
-      const sla = slaCountdown(p, 48);
-      const checklist = (p.checklist||[]);
-      const checklistDone = checklist.filter(function(i) { return i.done; }).length;
-      const checklistPct = checklist.length ? Math.round(checklistDone / checklist.length * 100) : 0;
-      const tags = (p.tags||[]);
-      const desc = escapeHtml(p.descricao) || '—';
-      return `<tr class="pen-card is-collapsed${isOverdue?' row-overdue':''}" data-pen-id="${escapeHtml(p.id)}">
-        <td class="pen-card-summary">
-          <button type="button" class="pen-card-toggle" onclick="togglePenCard(this, event)" aria-expanded="false" aria-label="Expandir pendência">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="pen-card-summary-body" onclick="togglePenCard(this, event)">
-            <div class="pen-card-summary-top">
-              <div class="pen-card-summary-client">
-                ${c ? clientAvatar(c, 24) : ''}
-                <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName)||'—'}</span>
-              </div>
-              <div class="pen-card-summary-tags">
-                ${statusTag(p.status)}
-                ${priorityTag(p.priority)}
-              </div>
-            </div>
-            <div class="pen-card-summary-desc">${desc}</div>
-            <div class="pen-card-summary-footer">
-              ${p.deadline ? `<span class="pen-card-summary-deadline${isOverdue?' is-overdue':''}">📅 ${formatDate(parseDeadline(p.deadline))}</span>` : '<span class="pen-card-summary-deadline">Sem prazo</span>'}
-              ${isOverdue ? '<span class="pen-card-overdue-flag">Vencida</span>' : ''}
-              ${sla ? `<span class="pen-card-summary-sla" style="color:${sla.color}">⏱ ${sla.label}</span>` : ''}
-            </div>
-          </div>
-        </td>
-        <td data-label="Cliente" class="col-client pen-card-detail">
-          <div style="display:flex;align-items:center;gap:8px">
-            ${c ? clientAvatar(c, 28) : ''}
-            <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName)||'—'}</span>
-          </div>
-        </td>
-        <td data-label="Tipo" class="col-tipo pen-card-detail"><span class="tipo-badge">${escapeHtml(p.tipo)||'—'}</span></td>
-        <td data-label="Descrição" class="col-desc pen-card-detail"><div class="col-desc-value"><span style="font-size:13px">${desc}</span>${tags.length?'<div style="display:flex;gap:3px;flex-wrap:wrap">'+tags.map(function(t){return '<span class="tag tag-purple" style="font-size:10px">'+escapeHtml(t)+'</span>';}).join('')+'</div>':''}${checklist.length?'<div style="font-size:11px;color:var(--text-muted)">☑ '+checklistPct+'% ('+checklistDone+'/'+checklist.length+')</div>':''}${sla?'<span class="col-desc-sla" style="color:'+sla.color+';font-weight:600;font-size:11px">⏱ '+sla.label+'</span>':''}</div></td>
-        <td data-label="Responsável" class="col-resp pen-card-detail"><span class="resp-badge">${escapeHtml(p.responsible)||'—'}</span></td>
-        <td data-label="Status" class="col-status pen-card-detail">${statusTag(p.status)}</td>
-        <td data-label="Prioridade" class="col-prio pen-card-detail">${priorityTag(p.priority)}</td>
-        <td data-label="Prazo" class="col-deadline pen-card-detail" style="${isOverdue?'color:var(--red);font-weight:600':''}"><span>${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}</span></td>
-        <td data-label="Data" class="col-date pen-card-detail"><span style="font-size:12px;color:var(--text-muted)">${formatDate(p.createdAt)}</span></td>
-        <td data-label="Tempo" class="col-time pen-card-detail">${timerWidget(p, 'pendencia')}</td>
-        <td data-label="Notas" class="col-notes pen-card-detail">${hasNotes?`<span class="tag tag-blue" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">${hasNotes} nota${hasNotes>1?'s':''}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td data-label="Anexos" class="col-att pen-card-detail">${attsCount?`<span class="tag tag-purple" style="cursor:pointer" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">📎 ${attsCount}</span>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td data-label="Link" class="col-link pen-card-detail">${safeLink !== '#'?`<a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding:3px 8px">🔗</a>`:'<span style="color:var(--text-muted);font-size:12px">—</span>'}</td>
-        <td class="col-actions pen-card-detail">
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-sm btn-secondary" onclick="openPendenciaDetail('${escapeHtml(p.id)}')">Abrir</button>
-            <button class="btn btn-sm btn-danger" onclick="deletePendenciaConfirm('${escapeHtml(p.id)}')">&#10005;</button>
-          </div>
-        </td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>
-  ${totalPages > 1 ? `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+PEN_PAGE_SIZE, pens.length)} de ${pens.length} pendências</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" ${_penPage===1?'disabled':''} onclick="_penPage--;renderPenView(false)">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_penPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_penPage===totalPages?'disabled':''} onclick="_penPage++;renderPenView(false)">Próxima →</button>
-      </div>
-    </div>
-  ` : ''}`;
-}
-
-function togglePenCard(el, event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  const row = el && el.closest ? el.closest('tr.pen-card') : null;
-  if (!row) return;
-  const expanded = row.classList.toggle('is-collapsed') === false;
-  row.classList.toggle('is-expanded', expanded);
-  const btn = row.querySelector('.pen-card-toggle');
-  if (btn) {
-    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    btn.setAttribute('aria-label', expanded ? 'Recolher pendência' : 'Expandir pendência');
-  }
-}
-
-function toggleAllPenCards(expand) {
-  document.querySelectorAll('tr.pen-card').forEach(function(row) {
-    row.classList.toggle('is-collapsed', !expand);
-    row.classList.toggle('is-expanded', !!expand);
-    const btn = row.querySelector('.pen-card-toggle');
-    if (btn) {
-      btn.setAttribute('aria-expanded', expand ? 'true' : 'false');
-      btn.setAttribute('aria-label', expand ? 'Recolher pendência' : 'Expandir pendência');
-    }
-  });
-} 
 
 function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
