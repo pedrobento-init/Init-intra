@@ -105,14 +105,17 @@ function safeUrl(url) {
 
 let _prevFocus = null;
 let _modalTrapHandler = null;
+let _modalHideTimer = null;
 
 function openModal(title, bodyHTML, size = '') {
+  if (_modalHideTimer) { clearTimeout(_modalHideTimer); _modalHideTimer = null; }
   _prevFocus = document.activeElement;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = bodyHTML;
   document.getElementById('modal').className = 'modal' + (size ? ' ' + size : '');
-  document.getElementById('modalOverlay').style.display = 'flex';
+  const overlay = document.getElementById('modalOverlay');
   const modal = document.getElementById('modal');
+  overlay.style.display = 'flex';
   const focusable = modal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
   if (focusable.length) focusable[0].focus();
   _modalTrapHandler = function(e) {
@@ -124,11 +127,30 @@ function openModal(title, bodyHTML, size = '') {
     else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
   };
   modal.addEventListener('keydown', _modalTrapHandler);
+
+  if (typeof Motion !== 'undefined') {
+    overlay.style.animation = 'none';
+    modal.style.animation = 'none';
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
+    Motion.animate(modal, isMobile
+      ? { opacity: [0, 1], y: [28, 0] }
+      : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
+      { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] });
+  }
 }
 function closeModal() {
   const modal = document.getElementById('modal');
+  const overlay = document.getElementById('modalOverlay');
   if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
-  document.getElementById('modalOverlay').style.display = 'none';
+  const hide = () => { overlay.style.display = 'none'; };
+  if (typeof Motion !== 'undefined' && overlay.style.display !== 'none') {
+    Motion.animate(modal, { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] }, { duration: 0.14, ease: 'easeIn' });
+    Motion.animate(overlay, { opacity: [1, 0] }, { duration: 0.14, ease: 'easeIn' });
+    _modalHideTimer = setTimeout(() => { hide(); _modalHideTimer = null; }, 150);
+  } else {
+    hide();
+  }
   if (_prevFocus && _prevFocus.focus) { _prevFocus.focus(); _prevFocus = null; }
 }
 
@@ -149,7 +171,19 @@ function showToast(message, type = 'info') {
   t.appendChild(iconSpan);
   t.appendChild(msgSpan);
   c.appendChild(t);
-  setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 300); }, 3500);
+  if (typeof Motion !== 'undefined') {
+    t.style.animation = 'none';
+    Motion.animate(t, { opacity: [0, 1], x: [24, 0] }, { duration: 0.35, ease: 'easeOut' });
+  }
+  setTimeout(() => {
+    if (typeof Motion !== 'undefined') {
+      Motion.animate(t, { opacity: [1, 0], x: [0, -24] }, { duration: 0.22, ease: 'easeIn' });
+      setTimeout(() => t.remove(), 230);
+    } else {
+      t.classList.add('removing');
+      setTimeout(() => t.remove(), 300);
+    }
+  }, 3500);
 }
 
 function showUndoToast(message, onUndo) {

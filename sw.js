@@ -32,6 +32,7 @@ const CDN_ASSETS = [
   'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js',
 ];
 
 self.addEventListener('install', (event) => {

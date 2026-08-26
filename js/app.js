@@ -595,6 +595,24 @@ function renderDashboard() {
     </div>`;
   
   setTimeout(() => renderCharts(pens, visits), 50);
+  animateDashboardCounters();
+}
+
+function animateDashboardCounters() {
+  if (typeof Motion === 'undefined') return;
+  document.querySelectorAll('.stat-value').forEach(el => {
+    const m = (el.textContent || '').match(/^([\d.,]+)(.*)$/);
+    if (!m) return;
+    const target = parseFloat(m[1].replace(',', '.'));
+    const suffix = m[2] || '';
+    if (isNaN(target)) return;
+    const isInt = Number.isInteger(target);
+    Motion.animate(0, target, {
+      duration: 0.8,
+      ease: 'easeOut',
+      onUpdate: v => { el.textContent = (isInt ? Math.round(v) : v.toFixed(1)) + suffix; }
+    });
+  });
 }
 
 function renderCharts(pens, visits) {

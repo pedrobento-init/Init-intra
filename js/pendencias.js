@@ -91,30 +91,47 @@ function renderPenKanban(area) {
   var pens = _filteredPens;
   if (isPenMobile()) {
     area.innerHTML = renderPenMobileGrid(pens);
-    return;
-  }
-  area.innerHTML = '<div class="kanban-board">' + 
-    PEN_KANBAN_COLS.map(function(col) {
-      var cards = pens.filter(function(p) { return p.status === col.id; });
-      return '<div class="kanban-col"' +
-        ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
-        ' ondragleave="this.classList.remove(\'drag-over\')"' +
-        ' ondrop="onPenKanbanDrop(event,\'' + col.id + '\')">' +
-        '<div class="kanban-col-header">' +
-          '<div class="kanban-col-title">' +
-            '<span style="width:10px;height:10px;border-radius:50%;background:' + col.color + ';display:inline-block"></span> ' +
-            escapeHtml(col.label) +
+  } else {
+    area.innerHTML = '<div class="kanban-board">' + 
+      PEN_KANBAN_COLS.map(function(col) {
+        var cards = pens.filter(function(p) { return p.status === col.id; });
+        return '<div class="kanban-col"' +
+          ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+          ' ondragleave="this.classList.remove(\'drag-over\')"' +
+          ' ondrop="onPenKanbanDrop(event,\'' + col.id + '\')">' +
+          '<div class="kanban-col-header">' +
+            '<div class="kanban-col-title">' +
+              '<span style="width:10px;height:10px;border-radius:50%;background:' + col.color + ';display:inline-block"></span> ' +
+              escapeHtml(col.label) +
+            '</div>' +
+            '<span class="kanban-col-count">' + cards.length + '</span>' +
           '</div>' +
-          '<span class="kanban-col-count">' + cards.length + '</span>' +
-        '</div>' +
-        '<div class="kanban-cards">' +
-          (cards.length
-            ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-            : '<div class="empty-state" style="padding:30px 10px"><p>Nenhuma</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
-        '</div>' +
-      '</div>';
-    }).join('') +
-  '</div>';
+          '<div class="kanban-cards">' +
+            (cards.length
+              ? cards.map(function(p) { return penKanbanCard(p); }).join('')
+              : '<div class="empty-state" style="padding:30px 10px"><p>Nenhuma</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+  _applyPenCardMotion(area);
+}
+
+function _applyPenCardMotion(area) {
+  if (typeof Motion === 'undefined') return;
+  area.querySelectorAll('.pen-mobile-card').forEach(function(card) {
+    Motion.press(card,
+      function() { Motion.animate(card, { scale: 0.97 }, { duration: 0.1 }); },
+      function() { Motion.animate(card, { scale: 1 }, { duration: 0.25, ease: 'easeOut' }); }
+    );
+  });
+  area.querySelectorAll('.kanban-card').forEach(function(card) {
+    Motion.hover(card,
+      function() { Motion.animate(card, { y: -3 }, { duration: 0.2, ease: 'easeOut' }); },
+      function() { Motion.animate(card, { y: 0 }, { duration: 0.2, ease: 'easeOut' }); }
+    );
+  });
 }
 
 function penKanbanCard(p) {
