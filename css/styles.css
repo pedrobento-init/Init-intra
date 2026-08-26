@@ -421,7 +421,7 @@ tr:hover td { background: var(--bg-hover); }
   border-radius: 4px;
 }
 .modal-close:hover { color: var(--text-primary); background: var(--bg-hover); }
-.modal-body { padding: 22px; overflow-y: auto; flex: 1; }
+.modal-body { padding: 22px; overflow-y: auto; flex: 1; min-height: 0; }
 
 /* ── KANBAN ── */
 .kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; min-height: 420px; }

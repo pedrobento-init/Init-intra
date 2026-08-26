@@ -515,7 +515,15 @@ async function submitOperadorForm(e, id) {
             list[opIdx].updatedAt = new Date().toISOString();
             dbSet(DB.OPERATORS, list);
             if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-              supabaseClient.from('operators').update({ auth_user_id: result.authUserId }).eq('id', list[opIdx].id);
+              try {
+                const { error: linkErr } = await supabaseClient
+                  .from('operators')
+                  .update({ auth_user_id: result.authUserId, updated_at: new Date().toISOString() })
+                  .eq('id', list[opIdx].id);
+                if (linkErr) console.warn('⚠️ Falha ao vincular auth_user_id no Supabase:', linkErr.message);
+              } catch (linkErr) {
+                console.warn('⚠️ Erro ao vincular auth_user_id no Supabase:', linkErr.message);
+              }
             }
           }
           if (result.needsEmailConfirm) {

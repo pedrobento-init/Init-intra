@@ -119,7 +119,15 @@ async function _resolveOperatorForAuth(authUser) {
         .eq('email', email)
         .maybeSingle();
       if (!e2 && byEmail) {
-        byEmail.auth_user_id = authUser.id;
+        if (!byEmail.auth_user_id) {
+          byEmail.auth_user_id = authUser.id;
+          try {
+            await supabaseClient
+              .from('operators')
+              .update({ auth_user_id: authUser.id, updated_at: new Date().toISOString() })
+              .eq('id', byEmail.id);
+          } catch (_) {}
+        }
         return _upsertOperatorFromRemote(byEmail);
       }
     }

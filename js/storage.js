@@ -407,17 +407,8 @@ async function _runSupabaseSync() {
       else dbSet(DB.LOGS, mergedLogs);
     }
 
-    if (totalConflicts > 0 && typeof showToast === 'function') {
-      showToast(`${totalConflicts} registro(s) atualizado(s) pelo servidor.`, 'info');
-      if (allConflictDetails.length > 0 && typeof openModal === 'function') {
-        const FIELD_LABELS = { name:'Nome', title:'Título', descricao:'Descrição', status:'Status', priority:'Prioridade', responsible:'Responsável', technician:'Técnico', cnpj:'CNPJ', segment:'Segmento', phone:'Telefone', email:'E-mail', notes:'Observações', deadline:'Prazo', content:'Conteúdo' };
-        const rows = allConflictDetails.slice(0, 10).map(d => {
-          const cells = d.fields.slice(0, 3).map(f => `<span style="color:var(--text-muted)">${FIELD_LABELS[f.field]||f.field}:</span> <s style="color:var(--red);opacity:.6">${escapeHtml(String(f.local||'').substring(0,30))}</s> → <span style="color:var(--green)">${escapeHtml(String(f.remote||'').substring(0,30))}</span>`).join('<br>');
-          return `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>${escapeHtml(String(d.name||d.id).substring(0,40))}</strong> <span class="text-muted" style="font-size:11px">(${escapeHtml(d.table)})</span><div style="font-size:12px;margin-top:4px">${cells}</div></div>`;
-        }).join('');
-        const more = allConflictDetails.length > 10 ? `<p style="font-size:12px;color:var(--text-muted);margin-top:8px">...e mais ${allConflictDetails.length - 10} registro(s).</p>` : '';
-        openModal('Conflitos de Sincronização', `<div style="max-height:400px;overflow-y:auto">${rows}${more}</div><p style="font-size:11px;color:var(--text-muted);margin-top:12px">Valores do servidor foram aplicados automaticamente.</p>`, 'lg');
-      }
+    if (allConflictDetails.length > 0) {
+      console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
     }
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);
@@ -1182,10 +1173,7 @@ function saveUser(data) {
 
 // ── OPERATORS ──
 function getOperators() {
-  const all = dbGet(DB.OPERATORS);
-  const remoteOnly = all.filter(o => !!o.auth_user_id);
-  if (remoteOnly.length !== all.length) dbSet(DB.OPERATORS, remoteOnly);
-  return remoteOnly;
+  return dbGet(DB.OPERATORS);
 }
 function getOperatorById(id) { return getOperators().find(o => o.id === id) || null; }
 function getOperatorByEmail(email) {
