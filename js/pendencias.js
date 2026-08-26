@@ -100,8 +100,16 @@ function renderPenView(resetPage) {
 }
 
 // ── Kanban drag-and-drop de pendências ───────────────────────────────────────
+function isPenMobile() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
+}
+
 function renderPenKanban(area) {
   var pens = _filteredPens;
+  if (isPenMobile()) {
+    area.innerHTML = renderPenMobileGrid(pens);
+    return;
+  }
   area.innerHTML = '<div class="kanban-board">' + 
     PEN_KANBAN_COLS.map(function(col) {
       var cards = pens.filter(function(p) { return p.status === col.id; });
@@ -150,6 +158,40 @@ function penKanbanCard(p) {
       timerWidget(p, "pendencia") +
     '</div>' +
     (p.deadline ? '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px">📅 ' + formatDate(parseDeadline(p.deadline)) + '</div>' : '') +
+  '</div>';
+}
+
+function renderPenMobileGrid(pens) {
+  if (!pens.length) {
+    return '<div class="card"><div class="empty-state"><p>Nenhuma pendência encontrada.</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div></div>';
+  }
+  return '<div class="pen-mobile-grid">' + pens.map(penMobileCard).join('') + '</div>';
+}
+
+function penMobileCard(p) {
+  const c = getClientById(p.clientId);
+  const st = STATUS_PEN_MAP[p.status] || { label: p.status || '—', dot: '#94a3b8' };
+  const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
+  const sla = slaCountdown(p, 48);
+  return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
+    '<div class="pen-mobile-card-top">' +
+      '<div class="pen-mobile-card-client">' +
+        (c ? clientAvatar(c, 22) : '') +
+        '<span>' + escapeHtml(p.clientName || '—') + '</span>' +
+      '</div>' +
+      statusTag(p.status) +
+    '</div>' +
+    '<div class="pen-mobile-card-desc">' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="pen-mobile-card-meta">' +
+      priorityTag(p.priority) +
+      '<span>' + escapeHtml(p.responsible || '—') + '</span>' +
+      (isOverdue ? '<span class="pen-mobile-overdue">⚠️ Vencida</span>' : '') +
+      (sla ? '<span style="color:' + sla.color + ';font-weight:600">⏱ ' + sla.label + '</span>' : '') +
+    '</div>' +
+    '<div class="pen-mobile-card-footer">' +
+      (p.deadline ? '<span>📅 ' + formatDate(parseDeadline(p.deadline)) + '</span>' : '<span>Sem prazo</span>') +
+      timerWidget(p, 'pendencia') +
+    '</div>' +
   '</div>';
 }
 
@@ -210,6 +252,17 @@ function savePenFilters() {
 }
 
 window.debouncedRenderPenView = debounce(renderPenView, 300);
+
+let _penMobileState = null;
+window.addEventListener('resize', debounce(function() {
+  const area = document.getElementById('penViewArea');
+  if (!area || penView !== 'kanban') return;
+  const nowMobile = isPenMobile();
+  if (_penMobileState === null) _penMobileState = nowMobile;
+  if (nowMobile === _penMobileState) return;
+  _penMobileState = nowMobile;
+  renderPenView(false);
+}, 200));
 
 function renderPenTable(area) {
   var wrap = area || document.getElementById('penViewArea');
