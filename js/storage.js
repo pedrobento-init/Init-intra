@@ -604,7 +604,12 @@ function formatFileSize(bytes) {
 
 
 // ── CLIENTS ──
-function getClients() { return dbGet(DB.CLIENTS); }
+function getClients() {
+  const all = dbGet(DB.CLIENTS);
+  return all.slice().sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true })
+  );
+}
 function getClientsByTeam(team) {
   const all = getClients();
   if (!team) return all;
