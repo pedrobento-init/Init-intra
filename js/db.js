@@ -68,7 +68,7 @@ async function initIndexedDB() {
     }
 
     if (hasLegacyData) {
-      console.log('📦 Migrando dados do localStorage para o IndexedDB...');
+      console.debug('📦 Migrando dados do localStorage para o IndexedDB...');
 
       const parseLS = (k, def = null) => {
         try {
@@ -108,7 +108,7 @@ async function initIndexedDB() {
       for (const key of Object.values(legacyKeys)) {
         localStorage.removeItem(key);
       }
-      console.log('✅ Migração para IndexedDB concluída com sucesso!');
+      console.debug('✅ Migração para IndexedDB concluída com sucesso!');
     }
 
     // Carregar dados armazenados para o cache em memória
@@ -159,7 +159,7 @@ async function initIndexedDB() {
     _dbCache.audit_logs = await idb.audit_logs.toArray();
 
     _dbReady = true;
-    console.log('⚡ IndexedDB carregado no cache com sucesso.');
+    console.debug('⚡ IndexedDB carregado no cache com sucesso.');
   } catch (err) {
     console.error('❌ Erro durante a inicialização/migração do IndexedDB:', err);
   }

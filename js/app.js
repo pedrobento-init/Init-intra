@@ -140,6 +140,7 @@ function exportData() {
     procedureTemplates: dbGet('intra_procedure_templates'),
     operators:  safeOps,
     visits:     getVisits(),
+    tickets:    getTickets(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -188,6 +189,7 @@ async function _runImportBackup(data) {
     if (data.procedureTemplates) dbSet('intra_procedure_templates', data.procedureTemplates);
     if (data.operators)  dbSet('intra_operators',  data.operators);
     if (data.visits)     dbSet('intra_visits',     data.visits);
+    if (data.tickets)    dbSet('intra_tickets',    data.tickets);
 
     // Contadores a partir dos IDs importados
     if (typeof dbGetObj === 'function' && typeof dbSet === 'function') {
@@ -206,6 +208,7 @@ async function _runImportBackup(data) {
       c.VIS = Math.max(c.VIS || 0, maxN(data.visits, 'VIS'));
       c.PROC = Math.max(c.PROC || 0, maxN(data.procedures, 'PROC'));
       c.TPL = Math.max(c.TPL || 0, maxN(data.procedureTemplates, 'TPL'));
+      c.TCK = Math.max(c.TCK || 0, maxN(data.tickets, 'TCK'));
       dbSet(DB.COUNTER, c);
     }
 
@@ -298,6 +301,17 @@ async function _pushImportToSupabase(data) {
   } catch (e) {
     errors.push('visits: ' + e.message);
   }
+
+  try {
+    await chunk('tickets', (data.tickets || []).map(t => ({
+      id: t.id, client_id: t.clientId, client_name: t.clientName, title: t.title, description: t.description,
+      status: t.status, priority: t.priority, technician: t.technician, updates: t.updates || [],
+      team: t.team || 'init', attachments: t.attachments || [],
+      timer_running: t.timerRunning === true, timer_started_at: t.timerStartedAt || null,
+      timer_total_seconds: t.timerTotalSeconds || 0, timer_operator: t.timerOperator || null,
+      completed_at: t.completedAt || null, created_at: t.createdAt || now, updated_at: t.updatedAt || now
+    })));
+  } catch (e) { errors.push('tickets: ' + e.message); }
 
   return errors;
 }

@@ -335,7 +335,7 @@ async function _runSupabaseSync() {
       for (const o of merged) {
         const r = remoteOps.find(x => x.id === o.id);
         if (_needsPush(o, r)) {
-          await supabaseClient.from('operators').upsert({ id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone, email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null, is_admin: o.isAdmin === true, active: o.active !== false, created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString() });
+          await supabaseClient.from('operators').upsert({ id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone, email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null, is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init', auth_user_id: o.auth_user_id || null, created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString() });
         }
       }
     }
@@ -660,6 +660,7 @@ function saveClient(data) {
       google_sheet_url: data.googleSheetUrl || null,
       notes: data.notes,
       team: data.team || 'init',
+      attachments: data.attachments || [],
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {

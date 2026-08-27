@@ -9,17 +9,7 @@ const PRIORITY_COLORS = {
   critica: { bg: '#991b1b', text: '#fff' },
 };
 
-const STATUS_COLORS = {
-  aberto:        '#3b82f6',
-  em_andamento:  '#6366f1',
-  pausado:       '#f59e0b',
-  aguardando:    '#7c3aed',
-  aguardando_cliente: '#7c3aed',
-  concluido:     '#16a34a',
-  resolvido:     '#16a34a',
-  cancelado:     '#94a3b8',
-  fechado:       '#94a3b8',
-};
+const STATUS_COLORS = Object.fromEntries(Object.entries(STATUS_PEN_MAP).map(([k, v]) => [k, v.dot]));
 
 const VISIT_COLORS = {
   agendada:     { bg: '#0ea5e9', border: '#0284c7' },

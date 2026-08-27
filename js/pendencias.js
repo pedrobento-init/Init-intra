@@ -2,17 +2,7 @@
 
 const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro'];
 
-const PEN_KANBAN_COLS = [
-  { id: 'aberto',            label: 'Aberto',            color: '#3b82f6' },
-  { id: 'em_andamento',      label: 'Em Andamento',      color: '#6366f1' },
-  { id: 'pausado',           label: 'Pausado',           color: '#f59e0b' },
-  { id: 'aguardando',        label: 'Aguardando',        color: '#d97706' },
-  { id: 'aguardando_cliente',label: 'Aguard. Cliente',   color: '#7c3aed' },
-  { id: 'concluido',         label: 'Concluído',         color: '#22c55e' },
-  { id: 'resolvido',         label: 'Resolvido',         color: '#16a34a' },
-  { id: 'cancelado',         label: 'Cancelado',         color: '#64748b' },
-  { id: 'fechado',           label: 'Fechado',           color: '#94a3b8' },
-];
+const PEN_KANBAN_COLS = Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot }));
 
 let penView = 'kanban';
 let _filteredPens = [];

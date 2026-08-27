@@ -90,8 +90,7 @@ function _renderSearchResults(query) {
     html += `<div class="search-group-label">Pendências</div>`;
     html += matchPens.map((p, i) => {
       const idx = clientOffset + i;
-      const statusColors = { aberto: '#1a56db', em_andamento: '#6366f1', pausado: '#f59e0b', concluido: '#16a34a', cancelado: '#9ca3af', aguardando: '#7c3aed', aguardando_cliente: '#7c3aed', resolvido: '#16a34a', fechado: '#9ca3af' };
-      const color = statusColors[p.status] || '#9ca3af';
+      const color = (STATUS_PEN_MAP[p.status]?.dot) || '#9ca3af';
       return `
       <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
         <div class="search-result-icon" style="background:#fef9ee">
