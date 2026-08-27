@@ -1891,10 +1891,6 @@ tr:hover td { background: var(--bg-hover); }
   #calendarContainer .fc .fc-next-button {
     padding: 4px 8px !important;
   }
-  .cal-filter-toggle { display: inline-flex; width: 100%; justify-content: center; gap: 6px; }
-  .cal-filters { display: none; }
-  .cal-filters.open { display: flex; flex-direction: column; width: 100%; gap: 8px; }
-  .cal-filters.open select { width: 100%; }
 
   /* ── Procedure Cards ── */
   .proc-card {
@@ -2856,8 +2852,6 @@ body.dark-theme .overdue-banner {
   font-weight: 600;
   color: var(--accent);
 }
-.cal-filter-toggle { display: none; }
-.cal-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Calendar mobile -- merged into main mobile block above */
 
 /* ── GLOBAL SEARCH (Sprint 7) ── */
