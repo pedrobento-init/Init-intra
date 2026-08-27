@@ -274,6 +274,10 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
           <select class="form-select" name="status">
             ${Object.entries(VISIT_STATUS_MAP).map(([k,m]) => `<option value="${k}" ${(v.status||'agendada')===k?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
           </select></div>
+        <div class="form-group"><label class="form-label">Recorrência</label>
+          <select class="form-select" name="recurrence">
+            ${RECURRENCE_OPTIONS.map(o => `<option value="${o.value}" ${(v.recurrence||'')===o.value?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}
+          </select></div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -335,6 +339,7 @@ function submitVisitForm(e, id) {
       observacoes: g('observacoes').trim(),
       relatorio: g('relatorio').trim(),
       status: g('status') || 'agendada',
+      recurrence: g('recurrence'),
     };
     saveVisit(data);
     closeModal();
@@ -435,6 +440,12 @@ function openConcludeVisitModal(id) {
         </label>
         <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>
       </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)">
+          <input type="checkbox" id="concludeCreatePendencia" style="width:16px;height:16px;accent-color:var(--accent)" />
+          Criar pendência de acompanhamento vinculada a esta visita
+        </label>
+      </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Voltar</button>
         <button type="submit" class="btn" style="background:#16a34a;color:#fff;border:none">
@@ -459,6 +470,21 @@ function submitConcludeVisit(e, id) {
   v.relatorio = rel;
   v.status = 'concluida';
   saveVisit(v);
+
+  if (document.getElementById('concludeCreatePendencia')?.checked && typeof savePendencia === 'function') {
+    savePendencia({
+      clientId: v.clientId,
+      clientName: v.clientName,
+      tipo: 'Suporte',
+      descricao: (v.motivo ? v.motivo + ' — ' : '') + 'Acompanhamento da visita ' + v.id,
+      responsible: v.operator || (typeof getUser === 'function' ? getUser().name : ''),
+      status: 'aberto',
+      priority: 'media',
+      team: v.team || 'init',
+      visitId: v.id,
+    });
+  }
+
   closeModal();
   showToast('Visita concluída com relatório salvo!', 'success');
   if (document.getElementById('visitViewArea')) renderVisitView(false);

@@ -283,7 +283,7 @@ async function _runSupabaseSync() {
     if (penErr) console.warn('Supabase pendencias error:', penErr);
     if (remotePens) {
       const local = dbGet(DB.PENDENCIAS);
-      const fMap = { id:'id', client_id:'clientId', client_name:'clientName', tipo:'tipo', descricao:'descricao', responsible:'responsible', status:'status', priority:'priority', deadline:'deadline', notes:'notes', link_util:'linkUtil', team:'team', attachments:'attachments', checklist:'checklist', tags:'tags', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
+      const fMap = { id:'id', client_id:'clientId', client_name:'clientName', tipo:'tipo', descricao:'descricao', responsible:'responsible', status:'status', priority:'priority', deadline:'deadline', notes:'notes', link_util:'linkUtil', team:'team', attachments:'attachments', checklist:'checklist', tags:'tags', recurrence:'recurrence', visit_id:'visitId', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
       const { merged, conflicts, conflictDetails } = _mergeRecords(local, remotePens, fMap);
       totalConflicts += conflicts;
       allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Pendências' })));
@@ -367,7 +367,7 @@ async function _runSupabaseSync() {
         console.warn('Supabase visits (sync pulado):', visErr.message);
       } else if (remoteVisits) {
         const local = dbGet(DB.VISITS);
-        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', relatorio:'relatorio', status:'status', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
+        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', relatorio:'relatorio', status:'status', recurrence:'recurrence', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
         const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteVisits, fMap);
         totalConflicts += conflicts;
         allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Visitas' })));
@@ -491,8 +491,19 @@ function getAttachments(type, itemId) {
   return (item && item.attachments) ? item.attachments : [];
 }
 
+async function _uploadAttachmentToStorage(type, itemId, attId, file) {
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || !window._supabaseAuthActive) return null;
+  try {
+    const path = `${type}/${itemId}/${attId}-${file.name}`;
+    const { error } = await supabaseClient.storage.from('attachments').upload(path, file, { upsert: true });
+    if (error) { console.warn('Storage upload error:', error.message); return null; }
+    const { data } = supabaseClient.storage.from('attachments').getPublicUrl(path);
+    return { url: data?.publicUrl || null, path };
+  } catch (e) { console.warn('Storage upload exception:', e); return null; }
+}
+
 function addAttachment(type, itemId, fileObj) {
-  // fileObj = {name, type, size, data (base64)}
+  // fileObj = {name, mimeType/type, size, data (base64) | url, path}
   if (fileObj.size > ATTACHMENT_MAX_SIZE) {
     return { error: 'Arquivo excede o limite de 2MB.' };
   }
@@ -507,11 +518,13 @@ function addAttachment(type, itemId, fileObj) {
     return { error: `Máximo de ${ATTACHMENT_MAX_COUNT} anexos por item.` };
   }
   const att = {
-    id: 'ATT-' + Date.now() + '-' + _secureRandStr(4),
+    id: fileObj.id || ('ATT-' + Date.now() + '-' + _secureRandStr(4)),
     name: fileObj.name,
-    mimeType: fileObj.type,
+    mimeType: fileObj.mimeType || fileObj.type,
     size: fileObj.size,
-    data: fileObj.data,
+    data: fileObj.data || null,
+    url: fileObj.url || null,
+    path: fileObj.path || null,
     uploadedBy: (getSession()?.name) || 'Sistema',
     uploadedAt: new Date().toISOString()
   };
@@ -532,11 +545,15 @@ function removeAttachment(type, itemId, attachmentId) {
   if (!list[idx].attachments) return false;
   const attIdx = list[idx].attachments.findIndex(a => a.id === attachmentId);
   if (attIdx === -1) return false;
-  const attName = list[idx].attachments[attIdx].name;
+  const att = list[idx].attachments[attIdx];
+  const attName = att.name;
   list[idx].attachments.splice(attIdx, 1);
   list[idx].updatedAt = new Date().toISOString();
   dbSet(key, list);
   addLog('Removeu anexo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, attName);
+  if (att.path && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.storage.from('attachments').remove([att.path]).then(res => { if (res.error) console.warn('Storage remove error:', res.error.message); }).catch(() => {});
+  }
   return true;
 }
 
@@ -548,23 +565,34 @@ function handleFileUpload(type, itemId, inputElement, callback) {
     inputElement.value = '';
     return;
   }
-  const reader = new FileReader();
-  reader.onload = function(ev) {
+  inputElement.value = '';
+  (async () => {
+    const attId = 'ATT-' + Date.now() + '-' + _secureRandStr(4);
+    let url = null, path = null, data = null;
+    try {
+      const up = await _uploadAttachmentToStorage(type, itemId, attId, file);
+      if (up) { url = up.url; path = up.path; }
+    } catch (e) { url = null; }
+    if (!url) {
+      try {
+        data = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+      } catch (e) { data = null; }
+    }
     const result = addAttachment(type, itemId, {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      data: ev.target.result
+      id: attId, name: file.name, mimeType: file.type, size: file.size, data, url, path
     });
-    if (result.error) {
+    if (result && result.error) {
       if (typeof showToast === 'function') showToast(result.error, 'error');
     } else {
       if (typeof showToast === 'function') showToast('Arquivo anexado!', 'success');
       if (callback) callback(result.attachment);
     }
-    inputElement.value = '';
-  };
-  reader.readAsDataURL(file);
+  })();
 }
 
 function renderAttachmentList(type, itemId, containerId) {
@@ -579,14 +607,15 @@ function renderAttachmentList(type, itemId, containerId) {
     const isImage = a.mimeType && a.mimeType.startsWith('image/');
     const sizeKB = (a.size / 1024).toFixed(1);
     const icon = isImage ? '🖼️' : a.mimeType?.includes('pdf') ? '📄' : '📎';
+    const src = a.url || a.data || '';
     return `<div class="attachment-item">
-      ${isImage ? `<img src="${a.data}" class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="window.open(this.src,'_blank')" />` : `<div class="attachment-icon">${icon}</div>`}
+      ${isImage ? `<img src="${src}" class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="window.open(this.src,'_blank')" />` : `<div class="attachment-icon">${icon}</div>`}
       <div class="attachment-info">
         <div class="attachment-name">${escapeHtml(a.name)}</div>
         <div class="attachment-meta">${sizeKB} KB · ${escapeHtml(a.uploadedBy)} · ${formatDateTime(a.uploadedAt)}</div>
       </div>
       <div class="attachment-actions">
-        <a href="${a.data}" download="${escapeHtml(a.name)}" class="btn btn-sm btn-secondary" title="Baixar">⬇</a>
+        <a href="${src}" download="${escapeHtml(a.name)}" class="btn btn-sm btn-secondary" title="Baixar">⬇</a>
         <button class="btn btn-sm btn-danger" onclick="removeAttachmentUI('${type}','${itemId}','${a.id}','${containerId}')" title="Remover">✕</button>
       </div>
     </div>`;
@@ -737,13 +766,33 @@ function savePendencia(data) {
     data.status = data.status || 'em_andamento';
     list.push(data);
   }
-  if (data.status === 'concluido' && oldStatus !== 'concluido') {
+  const justConcluded = data.status === 'concluido' && oldStatus !== 'concluido';
+  if (justConcluded) {
     data.completedAt = now;
     const idx = list.findIndex(p => p.id === data.id);
     if (idx !== -1) list[idx].completedAt = data.completedAt;
   }
   dbSet(DB.PENDENCIAS, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, data.descricao);
+
+  if (justConcluded && data.recurrence) {
+    try {
+      savePendencia({
+        clientId: data.clientId,
+        clientName: data.clientName,
+        tipo: data.tipo,
+        descricao: data.descricao,
+        responsible: data.responsible,
+        status: 'aberto',
+        priority: data.priority,
+        deadline: nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence),
+        linkUtil: data.linkUtil || '',
+        tags: data.tags || [],
+        team: data.team || 'init',
+        recurrence: data.recurrence,
+      });
+    } catch (e) { console.warn('⚠️ Erro ao gerar pendência recorrente:', e); }
+  }
 
   // Notificação por e-mail (não bloqueia a operação)
   setTimeout(() => {
@@ -773,6 +822,8 @@ function savePendencia(data) {
       attachments: data.attachments || [],
       checklist: data.checklist || [],
       tags: data.tags || [],
+      recurrence: data.recurrence || null,
+      visit_id: data.visitId || null,
       timer_running: data.timerRunning === true,
       timer_started_at: data.timerStartedAt || null,
       timer_total_seconds: data.timerTotalSeconds || 0,
@@ -1002,9 +1053,10 @@ function saveVisit(data) {
     data.timeEnd = data.timeEnd || '';
   }
   const now = new Date().toISOString();
+  let oldStatus = null;
   if (isEdit) {
     const i = list.findIndex(v => v.id === data.id);
-    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now }; }
     else list.push({ ...data, createdAt: now, updatedAt: now });
   } else {
     data.id = nextId('VIS');
@@ -1014,6 +1066,25 @@ function saveVisit(data) {
   }
   dbSet(DB.VISITS, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Visita', data.id, data.clientName + ' – ' + (data.motivo || ''));
+
+  if (data.status === 'concluida' && oldStatus !== 'concluida' && data.recurrence) {
+    try {
+      saveVisit({
+        clientId: data.clientId,
+        clientName: data.clientName,
+        operator: data.operator,
+        date: nextRecurrenceDate(data.date, data.recurrence),
+        time: data.time,
+        timeEnd: data.timeEnd,
+        allDay: data.allDay,
+        motivo: data.motivo,
+        observacoes: data.observacoes,
+        status: 'agendada',
+        team: data.team || 'init',
+        recurrence: data.recurrence,
+      });
+    } catch (e) { console.warn('⚠️ Erro ao gerar visita recorrente:', e); }
+  }
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('visits').upsert({
@@ -1029,6 +1100,7 @@ function saveVisit(data) {
       observacoes: data.observacoes || '',
       relatorio: data.relatorio || '',
       status: data.status,
+      recurrence: data.recurrence || null,
       team: data.team || 'init',
       categories: data.categories || [],
       checklist: data.checklist || [],

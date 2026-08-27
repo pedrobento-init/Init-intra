@@ -367,9 +367,57 @@ function checkDeadlineReminders() {
   });
 }
 
+function notifyStalePendencia(p, days) {
+  const recipients = collectRecipients(p.responsible);
+  if (!recipients.length) return;
+  const status = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.label) || p.status;
+  const html = emailBody(`
+    <div style="margin-bottom:16px">
+      <div style="display:inline-block;background:#d9770615;color:#d97706;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">🕓 Pendência parada</div>
+      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(p.descricao || 'Sem descrição')}</h2>
+    </div>
+    <p style="font-size:14px;color:#475569;margin:0 0 16px">Esta pendência está sem atualização há <strong>${days} dias</strong>.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
+      <tr><td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b;width:120px"><strong>Cliente</strong></td><td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(p.clientName || '—')}</td></tr>
+      <tr><td style="padding:8px 12px;font-size:12px;color:#64748b"><strong>Responsável</strong></td><td style="padding:8px 12px;font-size:13px">${escapeHtml(p.responsible || '—')}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b"><strong>Status</strong></td><td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(status)}</td></tr>
+    </table>
+    <div style="text-align:center;margin-top:20px">
+      <a href="${window.location.origin}${window.location.pathname}#pendencias" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
+    </div>
+  `);
+  sendEmailNotification({
+    to: recipients,
+    subject: `[Init Intra] 🕓 Pendência parada há ${days} dias: ${p.descricao || 'Pendência'}`,
+    html,
+  });
+}
+
+function checkStalePendencias() {
+  if (typeof getSession === 'function' && !getSession()) return;
+  const prefs = getNotifPrefs();
+  if (!prefs.onDeadlineReminder) return;
+  getPendencias().forEach(p => {
+    if (isPendenciaClosed(p.status)) return;
+    const ref = p.updatedAt || p.createdAt;
+    if (!ref) return;
+    const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+    if (days >= 7) {
+      const sentKey = `notif_stale_${p.id}_${ref}`;
+      if (!sessionStorage.getItem(sentKey)) {
+        notifyStalePendencia(p, days);
+        sessionStorage.setItem(sentKey, '1');
+      }
+    }
+  });
+}
+
 // Auto-check reminders on load
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => setTimeout(checkDeadlineReminders, 3000));
+  window.addEventListener('load', () => setTimeout(() => {
+    checkDeadlineReminders();
+    checkStalePendencias();
+  }, 3000));
 }
 
 // ── UI: Modal de Configurações de Notificação ──

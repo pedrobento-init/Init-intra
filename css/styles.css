@@ -266,7 +266,7 @@ body {
 /* ── GRID ── */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-@media(max-width:900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+@media(max-width:900px) { .grid-2, .grid-3, .hours-report-grid { grid-template-columns: 1fr; } }
 
 /* ── SECTION HEADER ── */
 .section-header {

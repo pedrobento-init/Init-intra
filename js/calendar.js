@@ -62,6 +62,10 @@ function renderCalendar() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
         Nova Visita
       </button>
+      <button class="btn btn-secondary btn-sm" onclick="exportCalendarICS()" title="Baixar calendário em .ics (Google/Outlook)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        iCal
+      </button>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <div id="calendarContainer" style="padding:16px"></div>
@@ -342,4 +346,47 @@ function applyCalendarDarkMode(isDark) {
     const title = container.querySelector('.fc-toolbar-title');
     if (title) title.style.color = '';
   }
+}
+
+function _icsEscape(str) {
+  return String(str || '').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+}
+function _icsDate(dateStr) {
+  return String(dateStr || '').replace(/-/g, '');
+}
+function exportCalendarICS() {
+  const pens = getFilteredCalendarPendencias();
+  const visits = getFilteredCalendarVisits();
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Init Intra//PT'];
+  pens.forEach(p => {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:pen-${p.id}`);
+    lines.push(`DTSTART;VALUE=DATE:${_icsDate(p.deadline)}`);
+    lines.push(`SUMMARY:${_icsEscape(p.descricao || 'Pendência')}`);
+    lines.push(`DESCRIPTION:${_icsEscape((p.clientName || '') + ' — ' + (p.responsible || ''))}`);
+    lines.push('END:VEVENT');
+  });
+  visits.forEach(v => {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:vis-${v.id}`);
+    const allDay = v.allDay === true || !v.time;
+    if (allDay) {
+      lines.push(`DTSTART;VALUE=DATE:${_icsDate(v.date)}`);
+    } else {
+      const t = (v.time || '').toString().slice(0, 5).replace(':', '');
+      lines.push(`DTSTART:${_icsDate(v.date)}T${t}00`);
+    }
+    lines.push(`SUMMARY:${_icsEscape('Visita: ' + (v.clientName || ''))}`);
+    lines.push(`DESCRIPTION:${_icsEscape((v.motivo || '') + ' — ' + (v.operator || ''))}`);
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'init-intra-calendario.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Calendário .ics exportado!', 'success');
 }

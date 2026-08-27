@@ -242,6 +242,7 @@ async function _pushImportToSupabase(data) {
       responsible: p.responsible, status: p.status, priority: p.priority, deadline: p.deadline || null,
       notes: p.notes || [], link_util: p.linkUtil || '', team: p.team || 'init',
       attachments: p.attachments || [], checklist: p.checklist || [], tags: p.tags || [],
+      recurrence: p.recurrence || null, visit_id: p.visitId || null,
       completed_at: p.completedAt || null, created_at: p.createdAt || now, updated_at: p.updatedAt || now
     })));
   } catch (e) { errors.push('pendencias: ' + e.message); }
@@ -274,6 +275,7 @@ async function _pushImportToSupabase(data) {
       id: v.id, client_id: v.clientId, client_name: v.clientName, operator: v.operator,
       date: v.date, time: v.time, time_end: v.timeEnd || null, all_day: v.allDay === true,
       motivo: v.motivo, observacoes: v.observacoes, relatorio: v.relatorio || '', status: v.status,
+      recurrence: v.recurrence || null,
       team: v.team || 'init', categories: v.categories || [], checklist: v.checklist || [],
       created_at: v.createdAt || now, updated_at: v.updatedAt || now
     })));
@@ -418,6 +420,10 @@ function renderDashboard() {
         <button class="btn btn-secondary btn-sm" onclick="exportPendenciasCSV()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV Pendências
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="openHoursReport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Horas
         </button>
         <button class="btn btn-secondary btn-sm" onclick="window.print()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -794,6 +800,38 @@ function updateBadges() {
   if (vbadge) { vbadge.textContent = upcoming; vbadge.classList.toggle('hidden', upcoming === 0); }
 
   // badge-chamados removido (módulo descontinuado na interface)
+}
+
+function openHoursReport() {
+  const pens = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
+  const clientMap = {};
+  const opMap = {};
+  let total = 0;
+  pens.forEach(p => {
+    const secs = (typeof getElapsedSeconds === 'function') ? getElapsedSeconds(p) : (p.timerTotalSeconds || 0);
+    const h = secs / 3600;
+    if (h <= 0) return;
+    total += h;
+    const ck = p.clientName || p.clientId || 'Sem cliente';
+    clientMap[ck] = (clientMap[ck] || 0) + h;
+    const ok = p.responsible || 'Sem responsável';
+    opMap[ok] = (opMap[ok] || 0) + h;
+  });
+  const fmt = h => h.toFixed(1) + 'h';
+  const rows = map => Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td style="text-align:right;font-weight:600">${fmt(v)}</td></tr>`).join('') || '<tr><td colspan="2" style="color:var(--text-muted)">Sem registros</td></tr>';
+  openModal('Horas trabalhadas', `
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">Total acumulado: <strong style="color:var(--text-primary)">${fmt(total)}</strong> (timers de pendências)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="hours-report-grid">
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700">Por cliente</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Cliente</th><th style="text-align:right">Horas</th></tr></thead><tbody>${rows(clientMap)}</tbody></table></div>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700">Por operador</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Operador</th><th style="text-align:right">Horas</th></tr></thead><tbody>${rows(opMap)}</tbody></table></div>
+      </div>
+    </div>
+  `, 'lg');
 }
 
 function updateDashboardBadge() { updateBadges(); }

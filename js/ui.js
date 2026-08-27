@@ -277,6 +277,24 @@ function parseDeadline(deadlineStr) {
   if (!deadlineStr) return null;
   return parseDateOnly(deadlineStr);
 }
+
+const RECURRENCE_OPTIONS = [
+  { value: '', label: 'Não se repete' },
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'biweekly', label: 'Quinzenal' },
+  { value: 'monthly', label: 'Mensal' },
+];
+
+function nextRecurrenceDate(baseISO, recurrence) {
+  if (!recurrence) return null;
+  const base = baseISO ? parseDateOnly(baseISO) : new Date();
+  const d = new Date(base.getTime());
+  if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
+  else if (recurrence === 'biweekly') d.setDate(d.getDate() + 14);
+  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1);
+  else return null;
+  return localDateISO(d);
+}
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Copiado!', 'success'));
 }
@@ -301,6 +319,13 @@ const STATUS_PEN_MAP = {
 
 const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }
+
+function isStalePendencia(p, days = 7) {
+  if (!p || isPendenciaClosed(p.status)) return false;
+  const ref = p.updatedAt || p.createdAt;
+  if (!ref) return false;
+  return ((Date.now() - new Date(ref).getTime()) / 86400000) >= days;
+}
 
 function priorityTag(p) {
   const m = PRIORITY_MAP[p] || { label: p, cls: 'tag-gray', dot: '#94a3b8' };

@@ -144,6 +144,7 @@ function renderClientTab(tab, id) {
               ${p.category ? `<span class="tag tag-blue" style="margin-top:4px">${escapeHtml(p.category)}</span>` : ''}
             </div>
             <div class="proc-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-secondary" onclick="duplicateProcedure('${escapeHtml(id)}','${escapeHtml(p.id)}')">Duplicar</button>
               <button class="btn btn-sm btn-secondary" onclick="openProcedureForm('${escapeHtml(id)}','${escapeHtml(p.id)}')">Editar</button>
               <button class="btn btn-sm btn-danger" onclick="deleteProcedureConfirm('${escapeHtml(p.id)}','${escapeHtml(id)}')">✕</button>
             </div>
@@ -182,6 +183,14 @@ function renderClientTab(tab, id) {
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
       ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th></tr></thead><tbody>${pens.map(p=>`<tr><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(p.descricao||'—')}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
   }
+}
+
+function duplicateProcedure(clientId, procId) {
+  const p = getProcedures(clientId).find(x => x.id === procId);
+  if (!p) return;
+  saveProcedure({ clientId, title: (p.title || '') + ' (cópia)', category: p.category, content: p.content });
+  renderClientTab('procedimentos', clientId);
+  showToast('Procedimento duplicado!', 'success');
 }
 
 function openProcedureForm(clientId, procId = null) {

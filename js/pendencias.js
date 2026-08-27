@@ -5,6 +5,7 @@ const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro
 const PEN_KANBAN_COLS = Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot }));
 
 let penView = 'kanban';
+let penScope = 'active';
 let _filteredPens = [];
 
 function renderPendencias() {
@@ -43,8 +44,18 @@ function renderPendencias() {
         <option value="alta">Alta</option>
         <option value="critica">Crítica</option>
       </select>
+      <select class="form-select filter-select" id="penSavedFilter" onchange="applySavedPenFilter()">
+        <option value="">Filtros salvos...</option>
+        ${getSavedPenFilters().map(f => `<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual">💾</button>
+      <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
     </div>
     <div class="page-action-row">
+      <div class="view-toggles">
+        <button class="btn btn-sm ${penScope==='active'?'btn-primary':'btn-secondary'}" onclick="setPenScope('active')">Ativas</button>
+        <button class="btn btn-sm ${penScope==='archived'?'btn-primary':'btn-secondary'}" onclick="setPenScope('archived')">Arquivadas</button>
+      </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-new-action" onclick="openPendenciaForm()" aria-label="Nova Pendência">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -80,8 +91,11 @@ function renderPenKanban(area) {
   if (isPenMobile()) {
     area.innerHTML = renderPenMobileGrid(pens);
   } else {
+    var cols = penScope === 'archived'
+      ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
+      : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
     area.innerHTML = '<div class="kanban-board">' + 
-      PEN_KANBAN_COLS.map(function(col) {
+      cols.map(function(col) {
         var cards = pens.filter(function(p) { return p.status === col.id; });
         return '<div class="kanban-col"' +
           ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
@@ -125,6 +139,7 @@ function _applyPenCardMotion(area) {
 function penKanbanCard(p) {
   var c = getClientById(p.clientId);
   var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
+  var isStale = isStalePendencia(p);
   var sla = slaCountdown(p, 48);
   return '<div class="kanban-card"' +
     ' draggable="true"' +
@@ -140,6 +155,7 @@ function penKanbanCard(p) {
       priorityTag(p.priority) + ' ' +
       '<span style="font-size:11px">' + escapeHtml(p.responsible || '—') + '</span>' +
       (isOverdue ? ' <span style="color:#dc2626;font-weight:600">⚠️ Vencida</span>' : '') +
+      (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px">🕓 Parada</span>' : '') +
       (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px">⏱ ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="kanban-card-meta" style="margin-top:4px">' +
@@ -160,6 +176,7 @@ function penMobileCard(p) {
   const c = getClientById(p.clientId);
   const st = STATUS_PEN_MAP[p.status] || { label: p.status || '—', dot: '#94a3b8' };
   const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
+  const isStale = isStalePendencia(p);
   const sla = slaCountdown(p, 48);
   return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
     '<div class="pen-mobile-card-top">' +
@@ -174,6 +191,7 @@ function penMobileCard(p) {
       priorityTag(p.priority) +
       '<span>' + escapeHtml(p.responsible || '—') + '</span>' +
       (isOverdue ? '<span class="pen-mobile-overdue">⚠️ Vencida</span>' : '') +
+      (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600">🕓 Parada</span>' : '') +
       (sla ? '<span style="color:' + sla.color + ';font-weight:600">⏱ ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="pen-mobile-card-footer">' +
@@ -221,6 +239,8 @@ function getFilteredPendencias() {
     if (resp && p.responsible !== resp) return false;
     if (st   && p.status     !== st)   return false;
     if (pr   && p.priority   !== pr)   return false;
+    if (penScope === 'archived' && !isPendenciaClosed(p.status)) return false;
+    if (penScope === 'active' && isPendenciaClosed(p.status)) return false;
     return true;
   });
 }
@@ -234,6 +254,56 @@ function savePenFilters() {
     priority: document.getElementById('penPriority')?.value||'',
     view: penView
   });
+}
+
+function setPenScope(scope) {
+  penScope = scope;
+  renderPendencias();
+}
+
+function getSavedPenFilters() {
+  return (typeof getCacheKV === 'function' ? getCacheKV('intra_pen_saved_filters', []) : []) || [];
+}
+
+function saveCurrentPenFilter() {
+  const name = window.prompt('Nome do filtro:');
+  if (!name || !name.trim()) return;
+  const list = getSavedPenFilters();
+  const filter = {
+    name: name.trim(),
+    search: document.getElementById('penSearch')?.value || '',
+    client: document.getElementById('penClient')?.value || '',
+    resp: document.getElementById('penResponsible')?.value || '',
+    status: document.getElementById('penStatus')?.value || '',
+    priority: document.getElementById('penPriority')?.value || '',
+  };
+  const idx = list.findIndex(f => f.name === filter.name);
+  if (idx !== -1) list[idx] = filter; else list.push(filter);
+  if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
+  renderPendencias();
+  showToast('Filtro salvo!', 'success');
+}
+
+function applySavedPenFilter() {
+  const name = document.getElementById('penSavedFilter')?.value;
+  if (!name) return;
+  const f = getSavedPenFilters().find(x => x.name === name);
+  if (!f) return;
+  if (f.search) document.getElementById('penSearch').value = f.search;
+  if (f.client) document.getElementById('penClient').value = f.client;
+  if (f.resp) document.getElementById('penResponsible').value = f.resp;
+  if (f.status) document.getElementById('penStatus').value = f.status;
+  if (f.priority) document.getElementById('penPriority').value = f.priority;
+  renderPenView(false);
+}
+
+function deleteSavedPenFilter() {
+  const name = document.getElementById('penSavedFilter')?.value;
+  if (!name) return;
+  const list = getSavedPenFilters().filter(f => f.name !== name);
+  if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
+  renderPendencias();
+  showToast('Filtro removido.', 'info');
 }
 
 window.debouncedRenderPenView = debounce(renderPenView, 300);
@@ -260,6 +330,7 @@ function openPendenciaDetail(id) {
       </select>
       <button class="btn btn-primary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
       <button class="btn btn-secondary btn-sm" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
+      <button class="btn btn-secondary btn-sm" onclick="duplicatePendencia('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicar</button>
       <div style="margin-left:auto" class="timer-row">${timerWidget(p, 'pendencia')}</div>
     </div>
     <div class="ticket-info-grid">
@@ -383,8 +454,14 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
         <div class="form-group"><label class="form-label">Prazo Limite</label>
           <input type="date" class="form-input" name="deadline" value="${escapeHtml(p.deadline||preDate||'')}" /></div>
       </div>
-      <div class="form-group"><label class="form-label">Link Útil (opcional)</label>
-        <input class="form-input" name="linkUtil" value="${escapeHtml(p.linkUtil||'')}" placeholder="https://..." /></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Recorrência</label>
+          <select class="form-select" name="recurrence">
+            ${RECURRENCE_OPTIONS.map(o => `<option value="${o.value}" ${(p.recurrence||'')===o.value?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">Link Útil (opcional)</label>
+          <input class="form-input" name="linkUtil" value="${escapeHtml(p.linkUtil||'')}" placeholder="https://..." /></div>
+      </div>
       <div class="form-group"><label class="form-label">Tags (separadas por vírgula)</label>
         <input class="form-input" name="tags" value="${escapeHtml((p.tags||[]).join(', '))}" placeholder="Ex: urgente, firewall, vpn" /></div>
       <div class="form-actions">
@@ -418,6 +495,7 @@ function submitPendenciaForm(e, id) {
       priority: g('priority'), deadline: g('deadline'),
       linkUtil: safeUrl(linkUtil) !== '#' ? linkUtil : '',
       tags: tagsRaw,
+      recurrence: g('recurrence'),
     };
     const errors = validatePendencia(data);
     if (errors.length) { showToast(errors[0], 'error'); return; }
@@ -427,6 +505,29 @@ function submitPendenciaForm(e, id) {
     updateBadges();
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
   } catch (err) { showToast('Erro ao salvar pendência: ' + err.message, 'error'); }
+}
+
+function duplicatePendencia(id) {
+  const p = getPendenciaById(id);
+  if (!p) return;
+  savePendencia({
+    clientId: p.clientId,
+    clientName: p.clientName,
+    tipo: p.tipo,
+    descricao: (p.descricao || '') + ' (cópia)',
+    responsible: p.responsible,
+    status: 'aberto',
+    priority: p.priority,
+    deadline: p.deadline,
+    linkUtil: p.linkUtil,
+    tags: p.tags || [],
+    team: p.team || 'init',
+    recurrence: p.recurrence,
+  });
+  closeModal();
+  renderPenView(false);
+  updateBadges();
+  showToast('Pendência duplicada!', 'success');
 }
 
 function deletePendenciaConfirm(id) {

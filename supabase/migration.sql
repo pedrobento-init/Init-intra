@@ -137,6 +137,8 @@ alter table public.pendencias add column if not exists team text default 'init';
 alter table public.pendencias add column if not exists attachments jsonb default '[]'::jsonb;
 alter table public.pendencias add column if not exists checklist jsonb default '[]'::jsonb;
 alter table public.pendencias add column if not exists tags jsonb default '[]'::jsonb;
+alter table public.pendencias add column if not exists recurrence text;
+alter table public.pendencias add column if not exists visit_id text;
 alter table public.pendencias add column if not exists timer_running boolean default false;
 alter table public.pendencias add column if not exists timer_started_at timestamptz;
 alter table public.pendencias add column if not exists timer_total_seconds integer default 0;
@@ -177,6 +179,7 @@ alter table public.visits add column if not exists all_day boolean default false
 alter table public.visits add column if not exists motivo text;
 alter table public.visits add column if not exists observacoes text;
 alter table public.visits add column if not exists relatorio text;
+alter table public.visits add column if not exists recurrence text;
 alter table public.visits add column if not exists status text default 'agendada';
 alter table public.visits add column if not exists team text default 'init';
 alter table public.visits add column if not exists categories jsonb default '[]'::jsonb;

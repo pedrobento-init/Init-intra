@@ -59,7 +59,7 @@ const _RT_TABLE_META = {
             id: r.id, clientId: r.client_id, clientName: r.client_name, tipo: r.tipo, descricao: r.descricao,
             responsible: r.responsible, status: r.status, priority: r.priority, deadline: r.deadline,
             notes: r.notes, linkUtil: r.link_util, team: r.team, attachments: r.attachments,
-            checklist: r.checklist, tags: r.tags, timerRunning: r.timer_running, timerStartedAt: r.timer_started_at,
+            checklist: r.checklist, tags: r.tags, recurrence: r.recurrence, visitId: r.visit_id, timerRunning: r.timer_running, timerStartedAt: r.timer_started_at,
             timerTotalSeconds: r.timer_total_seconds, timerOperator: r.timer_operator, completedAt: r.completed_at,
             createdAt: r.created_at, updatedAt: r.updated_at
         }),
@@ -98,7 +98,7 @@ const _RT_TABLE_META = {
         dbKey: 'intra_visits',
         map: r => ({
             id: r.id, clientId: r.client_id, clientName: r.client_name, operator: r.operator, date: r.date,
-            time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status, team: r.team,
+            time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status, recurrence: r.recurrence, team: r.team,
             timeEnd: r.time_end, allDay: r.all_day === true,
             categories: r.categories || [], checklist: r.checklist || [],
             createdAt: r.created_at, updatedAt: r.updated_at
