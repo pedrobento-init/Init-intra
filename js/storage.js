@@ -363,7 +363,7 @@ async function _runSupabaseSync() {
         console.warn('Supabase visits (sync pulado):', visErr.message);
       } else if (remoteVisits) {
         const local = dbGet(DB.VISITS);
-        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', status:'status', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
+        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', relatorio:'relatorio', status:'status', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
         const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteVisits, fMap);
         totalConflicts += conflicts;
         allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Visitas' })));

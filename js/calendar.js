@@ -14,8 +14,11 @@ const STATUS_COLORS = {
   em_andamento:  '#6366f1',
   pausado:       '#f59e0b',
   aguardando:    '#7c3aed',
+  aguardando_cliente: '#7c3aed',
   concluido:     '#16a34a',
+  resolvido:     '#16a34a',
   cancelado:     '#94a3b8',
+  fechado:       '#94a3b8',
 };
 
 const VISIT_COLORS = {
@@ -52,12 +55,7 @@ function renderCalendar() {
       </select>
       <select class="form-select filter-select" id="calStatus" onchange="refreshCalendar()">
         <option value="">Todos os status</option>
-        <option value="aberto">Aberto</option>
-        <option value="em_andamento">Em Andamento</option>
-        <option value="pausado">Pausado</option>
-        <option value="aguardando">Aguardando</option>
-        <option value="concluido">Concluído</option>
-        <option value="cancelado">Cancelado</option>
+        ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('')}
       </select>
       <select class="form-select filter-select-sm" id="calPriority" onchange="refreshCalendar()">
         <option value="">Prioridade</option>
@@ -97,7 +95,7 @@ function getFilteredCalendarPendencias() {
   const pr   = document.getElementById('calPriority')?.value || '';
   return getPendencias().filter(p => {
     if (!p.deadline) return false;
-    if (!st && ['concluido', 'cancelado'].includes(p.status)) return false;
+    if (!st && isPendenciaClosed(p.status)) return false;
     if (cid  && p.clientId   !== cid)   return false;
     if (resp && p.responsible !== resp) return false;
     if (st   && p.status     !== st)    return false;
@@ -121,7 +119,7 @@ function getFilteredCalendarVisits() {
 function mapPendenciasToEvents(pendencias) {
   return pendencias.map(p => {
     const color = PRIORITY_COLORS[p.priority] || PRIORITY_COLORS.media;
-    const isOverdue = p.deadline < localDateISO() && !['concluido', 'cancelado'].includes(p.status);
+    const isOverdue = p.deadline < localDateISO() && !isPendenciaClosed(p.status);
     const statusColor = STATUS_COLORS[p.status] || '#94a3b8';
     const borderColor = isOverdue ? '#dc2626' : statusColor;
 

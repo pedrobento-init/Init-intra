@@ -3,12 +3,15 @@
 const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro'];
 
 const PEN_KANBAN_COLS = [
-  { id: 'aberto',       label: 'Aberto',       color: '#3b82f6' },
-  { id: 'em_andamento', label: 'Em Andamento',  color: '#6366f1' },
-  { id: 'pausado',      label: 'Pausado',       color: '#f59e0b' },
-  { id: 'aguardando',   label: 'Aguardando',    color: '#d97706' },
-  { id: 'concluido',    label: 'Concluído',     color: '#22c55e' },
-  { id: 'cancelado',    label: 'Cancelado',     color: '#64748b' },
+  { id: 'aberto',            label: 'Aberto',            color: '#3b82f6' },
+  { id: 'em_andamento',      label: 'Em Andamento',      color: '#6366f1' },
+  { id: 'pausado',           label: 'Pausado',           color: '#f59e0b' },
+  { id: 'aguardando',        label: 'Aguardando',        color: '#d97706' },
+  { id: 'aguardando_cliente',label: 'Aguard. Cliente',   color: '#7c3aed' },
+  { id: 'concluido',         label: 'Concluído',         color: '#22c55e' },
+  { id: 'resolvido',         label: 'Resolvido',         color: '#16a34a' },
+  { id: 'cancelado',         label: 'Cancelado',         color: '#64748b' },
+  { id: 'fechado',           label: 'Fechado',           color: '#94a3b8' },
 ];
 
 let penView = 'kanban';
@@ -41,12 +44,7 @@ function renderPendencias() {
       </select>
       <select class="form-select filter-select" id="penStatus" onchange="savePenFilters();renderPenView()">
         <option value="">Todos os status</option>
-        <option value="aberto">Aberto</option>
-        <option value="em_andamento">Em Andamento</option>
-        <option value="pausado">Pausado</option>
-        <option value="aguardando">Aguardando</option>
-        <option value="concluido">Concluído</option>
-        <option value="cancelado">Cancelado</option>
+        ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('')}
       </select>
       <select class="form-select filter-select-sm" id="penPriority" onchange="savePenFilters();renderPenView()">
         <option value="">Prioridade</option>
@@ -136,7 +134,7 @@ function _applyPenCardMotion(area) {
 
 function penKanbanCard(p) {
   var c = getClientById(p.clientId);
-  var isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
+  var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   var sla = slaCountdown(p, 48);
   return '<div class="kanban-card"' +
     ' draggable="true"' +
@@ -171,7 +169,7 @@ function renderPenMobileGrid(pens) {
 function penMobileCard(p) {
   const c = getClientById(p.clientId);
   const st = STATUS_PEN_MAP[p.status] || { label: p.status || '—', dot: '#94a3b8' };
-  const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
+  const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   const sla = slaCountdown(p, 48);
   return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
     '<div class="pen-mobile-card-top">' +

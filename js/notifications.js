@@ -351,7 +351,7 @@ function checkDeadlineReminders() {
   const reminderDays = prefs.reminderDaysBefore || 2;
 
   pens.forEach(p => {
-    if (!p.deadline || ['concluido', 'cancelado'].includes(p.status)) return;
+    if (!p.deadline || isPendenciaClosed(p.status)) return;
 
     const deadline = parseDeadline(p.deadline);
     const diffMs = deadline - today;

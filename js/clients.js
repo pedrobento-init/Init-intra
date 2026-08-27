@@ -53,7 +53,7 @@ function renderClientGrid() {
     const pageClients = clients.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
 
     grid.innerHTML = pageClients.map(c => {
-      const pending = getPendencias().filter(p => p.clientId === c.id && !['concluido','cancelado'].includes(p.status)).length;
+      const pending = getPendencias().filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length;
       return `<div class="client-card" onclick="viewClient('${escapeHtml(c.id)}')">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
       <div class="client-card-name">${escapeHtml(c.name)}</div>

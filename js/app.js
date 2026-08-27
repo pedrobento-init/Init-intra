@@ -290,7 +290,8 @@ async function _pushImportToSupabase(data) {
   try {
     await chunk('visits', (data.visits || []).map(v => ({
       id: v.id, client_id: v.clientId, client_name: v.clientName, operator: v.operator,
-      date: v.date, time: v.time, motivo: v.motivo, observacoes: v.observacoes, status: v.status,
+      date: v.date, time: v.time, time_end: v.timeEnd || null, all_day: v.allDay === true,
+      motivo: v.motivo, observacoes: v.observacoes, relatorio: v.relatorio || '', status: v.status,
       team: v.team || 'init', categories: v.categories || [], checklist: v.checklist || [],
       created_at: v.createdAt || now, updated_at: v.updatedAt || now
     })));
@@ -365,13 +366,13 @@ function renderDashboard() {
   const open     = pens.filter(p => p.status === 'aberto');
   const inProg   = pens.filter(p => p.status === 'em_andamento');
   const paused   = pens.filter(p => p.status === 'pausado');
-  const critical = pens.filter(p => ['alta','critica'].includes(p.priority) && !['concluido','cancelado'].includes(p.status));
-  const activePens = pens.filter(p => !['concluido','cancelado'].includes(p.status));
+  const critical = pens.filter(p => ['alta','critica'].includes(p.priority) && !isPendenciaClosed(p.status));
+  const activePens = pens.filter(p => !isPendenciaClosed(p.status));
   const overdue = activePens.filter(p => p.deadline && p.deadline < today);
   const dueToday = activePens.filter(p => p.deadline === today);
   const unassigned = activePens.filter(p => !p.responsible || !p.responsible.trim());
   const recentPens = [...pens]
-    .filter(p => !['concluido','cancelado'].includes(p.status) && p.responsible === currentUser)
+    .filter(p => !isPendenciaClosed(p.status) && p.responsible === currentUser)
     .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, 5);
 
@@ -628,7 +629,7 @@ function renderCharts(pens, visits) {
       Chart.defaults.font.family = "'Inter', sans-serif";
     } else return;
 
-  const activeItems = pens.filter(p => !['concluido','cancelado'].includes(p.status));
+  const activeItems = pens.filter(p => !isPendenciaClosed(p.status));
   const pCount = {baixa:0, media:0, alta:0, critica:0};
   activeItems.forEach(i => { if(pCount[i.priority] !== undefined) pCount[i.priority]++; else pCount.media++; });
   
@@ -661,7 +662,7 @@ function renderCharts(pens, visits) {
   const techMap = {};
   const visitMap = {};
   ops.forEach(o => { techMap[o.name] = 0; visitMap[o.name] = 0; });
-  pens.filter(p => !['concluido','cancelado'].includes(p.status)).forEach(p => {
+  pens.filter(p => !isPendenciaClosed(p.status)).forEach(p => {
     if (techMap[p.responsible] !== undefined) techMap[p.responsible]++;
   });
   (visits || []).filter(v => v.status !== 'cancelada' && v.status !== 'concluida').forEach(v => {
@@ -789,7 +790,7 @@ function updateBadges() {
   var session = getSession();
   var currentUser = session ? session.name : '';
   var pens = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
-  var open = pens.filter(function(p) { return !['concluido','cancelado'].includes(p.status) && p.responsible === currentUser; }).length;
+  var open = pens.filter(function(p) { return !isPendenciaClosed(p.status) && p.responsible === currentUser; }).length;
   var badge = document.getElementById('badge-pendencias');
   if (badge) { badge.textContent = open; badge.classList.toggle('hidden', open === 0); }
 

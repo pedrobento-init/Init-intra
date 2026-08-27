@@ -299,6 +299,9 @@ const STATUS_PEN_MAP = {
   fechado:            { label: 'Fechado',        cls: 'tag-gray',   dot: '#94a3b8' },
 };
 
+const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
+function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }
+
 function priorityTag(p) {
   const m = PRIORITY_MAP[p] || { label: p, cls: 'tag-gray', dot: '#94a3b8' };
   return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${m.label}</span>`;
@@ -764,8 +767,8 @@ function checkOverdueAlerts() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = localDateISO(tomorrow);
 
-  const overdue = pens.filter(p => p.deadline && p.deadline <= todayStr && !['concluido', 'cancelado'].includes(p.status));
-  const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !['concluido', 'cancelado'].includes(p.status));
+  const overdue = pens.filter(p => p.deadline && p.deadline <= todayStr && !isPendenciaClosed(p.status));
+  const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !isPendenciaClosed(p.status));
 
   if (overdue.length > 0 || dueTomorrow.length > 0) {
     let msg = '';

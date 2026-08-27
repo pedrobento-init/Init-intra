@@ -122,7 +122,7 @@ function _renderOpGrid() {
   const pageOps = ops.slice(startIdx, startIdx + OP_PAGE_SIZE);
 
   // Count active tasks per operator
-  const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(p => !['concluido','cancelado'].includes(p.status));
+  const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(p => !isPendenciaClosed(p.status));
   const session = getSession();
   const isAdminUser = isCurrentAdmin();
 
@@ -575,15 +575,15 @@ function openOpPendencias(opId) {
   if (!op) return;
 
   const allPens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(p => p.responsible === op.name);
-  const activePens = allPens.filter(p => !['concluido','cancelado'].includes(p.status));
-  const donePens   = allPens.filter(p =>  ['concluido','cancelado'].includes(p.status));
+  const activePens = allPens.filter(p => !isPendenciaClosed(p.status));
+  const donePens   = allPens.filter(p => isPendenciaClosed(p.status));
 
   const renderPenList = (list) => {
     if (!list.length) return '<p class="text-muted" style="padding:8px 0;font-size:13px">Nenhuma pendência.</p>';
     return list.map(p => {
       const c = getClientById(p.clientId);
       const color = c?.color || '#2563eb';
-        const isOverdue = p.deadline && p.deadline < localDateISO() && !['concluido','cancelado'].includes(p.status);
+        const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:border-color .15s;background:var(--bg-surface)"
              onmouseover="this.style.borderColor='#1a56db'" onmouseout="this.style.borderColor='var(--border)'"
