@@ -39,7 +39,12 @@ function renderCalendar() {
   const opNames = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar">
+    <div class="search-bar cal-search-bar">
+      <button type="button" class="btn btn-secondary btn-sm cal-filter-toggle" id="calFilterToggle" onclick="toggleCalFilters()" aria-expanded="false" aria-controls="calFilters">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtrar
+      </button>
+      <div class="cal-filters" id="calFilters">
       <select class="form-select filter-select-md" id="calType" onchange="refreshCalendar()" title="Tipo de evento">
         <option value="all">Pendências + Visitas</option>
         <option value="pendencias">Apenas Pendências</option>
@@ -64,6 +69,7 @@ function renderCalendar() {
         <option value="alta">Alta</option>
         <option value="critica">Crítica</option>
       </select>
+      </div>
       <button class="btn btn-primary btn-sm btn-new-action" onclick="openPendenciaForm()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Nova Pendência
@@ -86,6 +92,14 @@ function renderCalendar() {
   if (savedFilters.priority) document.getElementById('calPriority').value = savedFilters.priority;
 
   initFullCalendar();
+}
+
+function toggleCalFilters() {
+  const el = document.getElementById('calFilters');
+  const btn = document.getElementById('calFilterToggle');
+  if (!el) return;
+  const open = el.classList.toggle('open');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 function getFilteredCalendarPendencias() {
@@ -221,9 +235,9 @@ async function initFullCalendar() {
     locale: 'pt-br',
     initialView: isMobile ? 'listWeek' : 'dayGridMonth',
     headerToolbar: isMobile ? {
-      left: 'prev,next',
+      left: 'prev,today,next',
       center: 'title',
-      right: 'listWeek,dayGridMonth',
+      right: 'listWeek,dayGridMonth,timeGridDay',
     } : {
       left: 'prev,next today',
       center: 'title',
@@ -233,13 +247,19 @@ async function initFullCalendar() {
       today: 'Hoje',
       month: 'Mês',
       week: 'Semana',
+      day: 'Dia',
       list: 'Lista',
       prev: '‹',
       next: '›',
     },
+    navLinks: true,
+    dayHeaderFormat: { weekday: 'short' },
+    listDayFormat: { weekday: 'short', day: 'numeric', month: 'short' },
+    listDaySideFormat: { hour: 'numeric', minute: '2-digit' },
+    noEventsText: 'Sem eventos',
     events: events,
     eventDisplay: 'block',
-    dayMaxEvents: isMobile ? 2 : 4,
+    dayMaxEvents: isMobile ? true : 4,
     nowIndicator: true,
     height: 'auto',
     eventContent: function(arg) {
