@@ -106,8 +106,9 @@ function timerWidget(item, type = 'pendencia') {
  */
 function toggleTimer(type, id, btnEl) {
   const now = new Date().toISOString();
-  const item = getPendenciaById(id);
-  const saveFn = savePendencia;
+  const isTicket = type === 'ticket';
+  const item = isTicket ? getTicketById(id) : getPendenciaById(id);
+  const saveFn = isTicket ? saveTicket : savePendencia;
   const renderFn = renderPenView;
   const addUpdateFn = addPendenciaNote;
   const updateLabel = 'Pendência';

@@ -191,27 +191,6 @@ async function _runImportBackup(data) {
     if (data.visits)     dbSet('intra_visits',     data.visits);
     if (data.tickets)    dbSet('intra_tickets',    data.tickets);
 
-    // Contadores a partir dos IDs importados
-    if (typeof dbGetObj === 'function' && typeof dbSet === 'function') {
-      const c = dbGetObj(DB.COUNTER, {}) || {};
-      const maxN = (arr, prefix) => {
-        let m = 0;
-        (arr || []).forEach(x => {
-          const n = parseInt(String(x.id || '').replace(prefix + '-', ''), 10);
-          if (!isNaN(n) && n > m) m = n;
-        });
-        return m;
-      };
-      c.CLI = Math.max(c.CLI || 0, maxN(data.clients, 'CLI'));
-      c.PEN = Math.max(c.PEN || 0, maxN(data.pendencias, 'PEN'));
-      c.OP  = Math.max(c.OP  || 0, maxN(data.operators, 'OP'));
-      c.VIS = Math.max(c.VIS || 0, maxN(data.visits, 'VIS'));
-      c.PROC = Math.max(c.PROC || 0, maxN(data.procedures, 'PROC'));
-      c.TPL = Math.max(c.TPL || 0, maxN(data.procedureTemplates, 'TPL'));
-      c.TCK = Math.max(c.TCK || 0, maxN(data.tickets, 'TCK'));
-      dbSet(DB.COUNTER, c);
-    }
-
     const cloudOk = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
     if (cloudOk) {
       showToast('Enviando backup para a nuvem...', 'info');

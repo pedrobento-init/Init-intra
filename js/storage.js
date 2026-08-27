@@ -103,10 +103,7 @@ function getCurrentTeam() {
 }
 
 function isTeamAdmin() {
-  const session = getSession();
-  if (!session) return false;
-  const op = getOperatorById(session.opId);
-  return op ? (op.isAdmin === true || op.team === 'init') : false;
+  return getCurrentPermissions().viewAll;
 }
 
 function canViewTeam(targetTeam) {
@@ -199,6 +196,13 @@ function _secureRandStr(len) {
 }
 
 // ── SUPABASE CLOUD SYNC HELPERS ──
+function _valuesDiffer(a, b) {
+  if (a !== null && typeof a === 'object' && b !== null && typeof b === 'object') {
+    return JSON.stringify(a) !== JSON.stringify(b);
+  }
+  return String(a) !== String(b);
+}
+
 function _mergeRecords(local, remote, localKeyFromRemote) {
   const merged = [];
   let conflicts = 0;
@@ -218,7 +222,7 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
       const changedFields = [];
       for (const [rk, lk] of Object.entries(localKeyFromRemote)) {
         mapped[lk] = rem[rk];
-        if (loc[lk] !== undefined && rem[rk] !== undefined && String(loc[lk]) !== String(rem[rk])) {
+        if (loc[lk] !== undefined && rem[rk] !== undefined && _valuesDiffer(loc[lk], rem[rk])) {
           changedFields.push({ field: lk, local: loc[lk], remote: rem[rk] });
         }
       }
@@ -618,7 +622,7 @@ function getClientsByTeam(team) {
 function getMyClients() {
   return filterByTeam(getClients());
 }
-function getClientById(id) { return getClients().find(c => c.id === id) || null; }
+function getClientById(id) { return dbGet(DB.CLIENTS).find(c => c.id === id) || null; }
 function saveClient(data) {
   const clients = getClients();
   const isEdit = !!data.id;
@@ -1340,6 +1344,11 @@ function resetOperatorPassword(opId) {
     list[i].pinHash = null;
     list[i].updatedAt = new Date().toISOString();
     dbSet(DB.OPERATORS, list);
+
+    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+      supabaseClient.from('operators').update({ pin_hash: null, updated_at: list[i].updatedAt }).eq('id', opId).then(res => { if (res.error) console.error('❌ Supabase reset de senha:', String(res.error.message || res.error)); });
+    }
+
     // If the reset operator is the current session, update it
     const session = getSession();
     if (session && session.opId === opId) {
@@ -1576,7 +1585,7 @@ function validatePendencia(data) {
 function validateTicket(data) {
   const errors = [];
   if (!Validators.required(data.title)) errors.push('Título é obrigatório.');
-  if (data.technician && !Validators.email(data.technician) && data.technician.includes('@')) errors.push('E-mail do técnico inválido.');
+  if (data.technician && data.technician.includes('@') && !Validators.email(data.technician)) errors.push('E-mail do técnico inválido.');
   return errors;
 }
 
