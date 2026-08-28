@@ -22,7 +22,7 @@
   --purple-dim: rgba(124,58,237,0.1);
   --text-primary: #1e293b;
   --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
+  --text-muted: #64748b;
   --sidebar-bg: #1e2a3a;
   --sidebar-text: #cbd5e1;
   --sidebar-text-active: #ffffff;
@@ -39,6 +39,7 @@
   --hamburger-bg: rgba(15, 23, 42, 0.04);
   --hamburger-bg-hover: rgba(15, 23, 42, 0.08);
   --hamburger-border: rgba(15, 23, 42, 0.1);
+  --focus-ring: rgba(26, 86, 219, 0.55);
 }
 
 .skip-link {
@@ -59,6 +60,20 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+img { max-width: 100%; height: auto; }
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.form-input:focus-visible,
+.form-select:focus-visible,
+.form-textarea:focus-visible,
+.login-input:focus-visible,
+.global-search-input-row input:focus-visible {
+  outline: none;
+}
 
 body {
   font-family: 'Inter', sans-serif;
@@ -1424,6 +1439,9 @@ tr:hover td { background: var(--bg-hover); }
   /* ── Topbar ── */
   .hamburger-btn {
     display: inline-flex;
+    width: 44px;
+    height: 44px;
+    padding: 0;
   }
   .topbar {
     padding: 10px 12px;
@@ -1453,11 +1471,13 @@ tr:hover td { background: var(--bg-hover); }
     gap: 6px;
   }
   .topbar-right .global-search-trigger {
-    min-width: 0;
+    min-width: 40px;
+    min-height: 40px;
     padding: 6px 8px;
     font-size: 0;
     border: none;
     background: transparent;
+    justify-content: center;
   }
   .topbar-right .global-search-trigger svg {
     display: block;
@@ -1472,8 +1492,8 @@ tr:hover td { background: var(--bg-hover); }
     display: none;
   }
   .topbar-right .theme-toggle-btn {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
   }
   .topbar-right #topbarActionBtn {
     padding: 10px 14px;
@@ -1644,12 +1664,6 @@ tr:hover td { background: var(--bg-hover); }
     flex: 1 1 calc(33.33% - 8px);
     min-width: 0;
     padding: 10px 8px;
-  .grid-2 .card .btn-primary,
-  .grid-2 .card .btn-secondary {
-    padding: 10px 14px;
-    font-size: 13px;
-    min-height: 42px;
-  }
   }
   .op-stat-value {
     font-size: 20px;
@@ -1742,23 +1756,11 @@ tr:hover td { background: var(--bg-hover); }
     font-size: 12px;
   }
 
-  .visit-table .col-date,
-  .visit-table .col-client,
-  .visit-table .col-desc,
-  .visit-table .col-resp,
-  .visit-table .col-status,
-  .visit-table .col-notes,
-  .visit-table .col-att,
-  .visit-table .col-link,
-  .visit-table .col-actions {
-    display: flex !important;
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
   }
 
-  .visit-table tr {
-    padding: 12px;
-  }
-
-    /* ── Tabs (Client Modal) ── */
+  /* ── Tabs (Client Modal) ── */
   .tabs {
     gap: 0;
     flex-wrap: wrap;
@@ -1846,16 +1848,6 @@ tr:hover td { background: var(--bg-hover); }
   .card > div[style*="grid-template-columns"] {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px;
-  }
-  .grid-2 .card .section-header .btn-sm {
-    font-size: 10px;
-    padding: 4px 8px;
-  }
-  .grid-2 .card .btn-primary,
-  .grid-2 .card .btn-secondary {
-    padding: 10px 14px;
-    font-size: 13px;
-    min-height: 42px;
   }
 
   /* ── Calendar ── */
@@ -2122,6 +2114,53 @@ tr:hover td { background: var(--bg-hover); }
     font-size: 12px;
   }
 
+  /* ── Touch targets (acessibilidade) ── */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-icon {
+    min-height: 44px;
+  }
+  .btn-sm {
+    min-height: 40px;
+  }
+  .btn-icon {
+    min-width: 44px;
+    justify-content: center;
+  }
+  .nav-item {
+    min-height: 44px;
+  }
+  .modal-close {
+    width: 44px;
+    height: 44px;
+    font-size: 26px;
+  }
+  .tab {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .period-btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .timer-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+  .copy-btn {
+    min-height: 40px;
+    padding: 8px 6px;
+  }
+  .theme-toggle-btn {
+    width: 40px;
+    height: 40px;
+  }
+
   /* ── Dark mode mobile ── */
   body.dark-theme .topbar {
     background: rgba(11, 15, 25, 0.9);
@@ -2245,6 +2284,7 @@ body.dark-theme {
   --hamburger-bg: rgba(255,255,255,0.05);
   --hamburger-bg-hover: rgba(255,255,255,0.1);
   --hamburger-border: rgba(255,255,255,0.1);
+  --focus-ring: rgba(96, 165, 250, 0.7);
 }
 
 /* ── Dark mode: elements with hardcoded #fff ── */
