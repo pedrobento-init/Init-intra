@@ -76,6 +76,8 @@ img { max-width: 100%; height: auto; }
   outline: none;
 }
 
+html { overflow-x: hidden; }
+
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg-base);
@@ -86,6 +88,16 @@ body {
 }
 
 #app { display: flex; min-height: 100vh; }
+
+/* Grid/flex children must be allowed to shrink below content width
+   to avoid horizontal overflow (especially charts and tables). */
+.stats-grid > *,
+.grid-2 > *,
+.grid-3 > *,
+.dashboard-charts-grid > *,
+.hours-report-grid > * {
+  min-width: 0;
+}
 
 /* ── SIDEBAR ── */
 .sidebar {
@@ -1575,6 +1587,7 @@ tr:hover td { background: var(--bg-hover); }
   .content-area {
     padding: 14px;
     font-size: 15px;
+    overflow-x: hidden;
   }
   td {
     font-size: 14px;
@@ -1849,9 +1862,15 @@ tr:hover td { background: var(--bg-hover); }
   }
   .dashboard-charts-grid .card {
     padding: 12px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .dashboard-charts-grid .card > div {
+    min-width: 0;
   }
   .dashboard-charts-grid canvas {
     max-height: 200px;
+    max-width: 100%;
   }
   .card .section-header .section-title {
     font-size: 13px;
