@@ -605,10 +605,10 @@ function _visitReportCollect(monthInput) {
   visits.forEach(v => {
     const key = v.clientId || v.clientName || '_sem_cliente';
     if (!byClient[key]) {
-      byClient[key] = { clientName: v.clientName || '—', count: 0, motivos: [], operators: new Set() };
+      byClient[key] = { clientName: v.clientName || '—', count: 0, motivos: new Set(), operators: new Set() };
     }
     byClient[key].count += 1;
-    if (v.motivo) byClient[key].motivos.push(v.motivo);
+    if (v.motivo) byClient[key].motivos.add(v.motivo);
     if (v.operator) byClient[key].operators.add(v.operator);
     const st = v.status || '—';
     byStatus[st] = (byStatus[st] || 0) + 1;
@@ -665,7 +665,7 @@ function _exportVisitMonthCsv(data) {
       'RESUMO',
       row.clientName,
       String(row.count),
-      row.motivos.join(' | '),
+      [...row.motivos].join(' | '),
       [...row.operators].join(', '),
     ].map(_visitReportCsvCell).join(';'));
   });
@@ -703,6 +703,23 @@ function _exportVisitMonthExcel(data) {
   const cancelada = byStatus['cancelada'] || 0;
   const clientsN = summary.length;
 
+  const durations = visits
+    .filter(v => !v.allDay && v.time && v.timeEnd)
+    .map(v => {
+      const [h1, m1] = String(v.time).slice(0, 5).split(':').map(Number);
+      const [h2, m2] = String(v.timeEnd).slice(0, 5).split(':').map(Number);
+      return (h2 * 60 + m2) - (h1 * 60 + m1);
+    })
+    .filter(m => m > 0);
+  const avgMinutes = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
+  const avgDurationLabel = avgMinutes == null
+    ? '—'
+    : (avgMinutes >= 60
+        ? `${Math.floor(avgMinutes / 60)}h${avgMinutes % 60 ? ' ' + (avgMinutes % 60) + 'min' : ''}`
+        : `${avgMinutes}min`);
+
+  const kpiColor = (val, accent) => (val > 0 ? accent : '#cbd5e1');
+
   const th = 'background:#1a56db;color:#ffffff;font-weight:700;font-size:11pt;padding:10px 12px;border:1px solid #1341a8;text-align:left;';
   const td = 'padding:8px 12px;border:1px solid #d0d7de;font-size:10.5pt;vertical-align:top;';
   const tdAlt = td + 'background:#f3f6fb;';
@@ -716,7 +733,7 @@ function _exportVisitMonthExcel(data) {
     summaryRows += `<tr>
       <td style="${s}">${_visitReportEscHtml(row.clientName)}</td>
       <td style="${s}text-align:center;font-weight:700;color:#1a56db;">${row.count}</td>
-      <td style="${s}">${_visitReportEscHtml(row.motivos.join(' · ') || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml([...row.motivos].join(' · ') || '—')}</td>
       <td style="${s}">${_visitReportEscHtml([...row.operators].join(', ') || '—')}</td>
     </tr>`;
   });
@@ -725,6 +742,9 @@ function _exportVisitMonthExcel(data) {
   visits.forEach((v, i) => {
     const s = i % 2 ? tdAlt : td;
     const d = v.date ? (typeof formatDate === 'function' ? formatDate(v.date) : v.date) : '—';
+    const relatorioText = (v.relatorio && v.relatorio.trim())
+      ? v.relatorio
+      : (v.status === 'cancelada' ? 'Visita cancelada' : '—');
     detailRows += `<tr>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(d)}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5) || '—'))}</td>
@@ -732,7 +752,7 @@ function _exportVisitMonthExcel(data) {
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(formatVisitTimeRange(v))}</td>
       <td style="${s}">${_visitReportEscHtml(v.clientName || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(v.motivo || '—')}</td>
-      <td style="${s}">${_visitReportEscHtml(v.relatorio || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(relatorioText)}</td>
       <td style="${s}">${_visitReportEscHtml(v.operator || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(statusLabel(v.status))}</td>
     </tr>`;
@@ -760,17 +780,20 @@ function _exportVisitMonthExcel(data) {
 <body>
   <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
     <tr>
-      <td colspan="4" style="background:#1a56db;color:#fff;padding:22px 24px;border:none;">
+      <td colspan="6" style="background:#1a56db;color:#fff;padding:22px 24px;border:none;">
         <div style="font-size:11pt;font-weight:600;letter-spacing:.08em;opacity:.9;text-transform:uppercase;">Init Intra</div>
         <div style="font-size:22pt;font-weight:800;margin-top:4px;">Relatório de Visitas Técnicas</div>
         <div style="font-size:13pt;margin-top:6px;opacity:.95;">${_visitReportEscHtml(monthLabel)}</div>
       </td>
     </tr>
     <tr>
-      <td colspan="4" style="background:#e8eefc;padding:10px 24px;border:none;font-size:10pt;color:#334155;">
+      <td colspan="5" style="background:#e8eefc;padding:10px 24px;border:none;font-size:10pt;color:#334155;">
         Gerado em <strong>${_visitReportEscHtml(genStr)}</strong>
         &nbsp;·&nbsp; Por <strong>${_visitReportEscHtml(operatorName)}</strong>
         &nbsp;·&nbsp; Equipe <strong>${_visitReportEscHtml(teamLabel)}</strong>
+      </td>
+      <td style="background:#e8eefc;padding:10px 24px;border:none;font-size:10pt;color:#334155;text-align:right;white-space:nowrap;">
+        Tempo médio por visita: <strong>${_visitReportEscHtml(avgDurationLabel)}</strong>
       </td>
     </tr>
   </table>
@@ -779,10 +802,10 @@ function _exportVisitMonthExcel(data) {
     <tr>
       <td style="${kpiBox}"><div style="${kpiVal}">${visits.length}</div><div style="${kpiLab}">Total visitas</div></td>
       <td style="${kpiBox}"><div style="${kpiVal}">${clientsN}</div><div style="${kpiLab}">Clientes</div></td>
-      <td style="${kpiBox}"><div style="${kpiVal};color:#16a34a">${concluida}</div><div style="${kpiLab}">Concluídas</div></td>
-      <td style="${kpiBox}"><div style="${kpiVal};color:#f59e0b">${agendada}</div><div style="${kpiLab}">Agendadas</div></td>
-      <td style="${kpiBox}"><div style="${kpiVal};color:#0ea5e9">${andamento}</div><div style="${kpiLab}">Em andamento</div></td>
-      <td style="${kpiBox}"><div style="${kpiVal};color:#94a3b8">${cancelada}</div><div style="${kpiLab}">Canceladas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(concluida, '#16a34a')}">${concluida}</div><div style="${kpiLab}">Concluídas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(agendada, '#f59e0b')}">${agendada}</div><div style="${kpiLab}">Agendadas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(andamento, '#0ea5e9')}">${andamento}</div><div style="${kpiLab}">Em andamento</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(cancelada, '#94a3b8')}">${cancelada}</div><div style="${kpiLab}">Canceladas</div></td>
     </tr>
   </table>
 
