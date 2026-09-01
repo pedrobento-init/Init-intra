@@ -1,0 +1,4 @@
+node_modules
+js/config.js
+js/config.example.js
+package-lock.json

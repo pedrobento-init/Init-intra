@@ -196,59 +196,8 @@ function _secureRandStr(len) {
 }
 
 // ── SUPABASE CLOUD SYNC HELPERS ──
-function _valuesDiffer(a, b) {
-  if (a !== null && typeof a === 'object' && b !== null && typeof b === 'object') {
-    return JSON.stringify(a) !== JSON.stringify(b);
-  }
-  return String(a) !== String(b);
-}
-
-function _mergeRecords(local, remote, localKeyFromRemote) {
-  const merged = [];
-  let conflicts = 0;
-  const conflictDetails = [];
-  const remoteById = new Map(remote.map(r => [r.id, r]));
-  for (const loc of local) {
-    const rem = remoteById.get(loc.id);
-    // Supabase is authoritative for records that no longer exist remotely.
-    // Keeping these local orphans makes deleted records reappear on the next push.
-    if (!rem) { continue; }
-    const localTime = new Date(loc.updatedAt || 0).getTime();
-    const remoteTime = new Date(rem.updated_at || 0).getTime();
-    if (localTime > remoteTime) { merged.push(loc); }
-    else {
-      conflicts++;
-      const mapped = {};
-      const changedFields = [];
-      for (const [rk, lk] of Object.entries(localKeyFromRemote)) {
-        mapped[lk] = rem[rk];
-        if (loc[lk] !== undefined && rem[rk] !== undefined && _valuesDiffer(loc[lk], rem[rk])) {
-          changedFields.push({ field: lk, local: loc[lk], remote: rem[rk] });
-        }
-      }
-      if (changedFields.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.descricao || loc.id, fields: changedFields });
-      merged.push({ ...loc, ...mapped });
-    }
-    remoteById.delete(loc.id);
-  }
-  for (const rem of remoteById.values()) {
-    const mapped = {};
-    for (const [rk, lk] of Object.entries(localKeyFromRemote)) mapped[lk] = rem[rk];
-    merged.push(mapped);
-  }
-  return { merged, conflicts, conflictDetails };
-}
-
-function _mapToRemote(record, fieldMap) {
-  const out = {};
-  for (const [rk, lk] of Object.entries(fieldMap)) out[rk] = record[lk] ?? null;
-  return out;
-}
-
-function _needsPush(local, remote) {
-  if (!remote) return true;
-  return new Date(local.updatedAt || 0).getTime() > new Date(remote.updated_at || 0).getTime();
-}
+// (_valuesDiffer, _mergeRecords, _mapToRemote, _mapFromRemote e _needsPush
+//  agora vivem em js/schema.js — fonte única.)
 
 let _syncPromise = null;
 async function syncSupabaseToLocal() {
@@ -261,151 +210,46 @@ async function syncSupabaseToLocal() {
 async function _runSupabaseSync() {
   let totalConflicts = 0;
   let allConflictDetails = [];
+
+  const _syncEntity = async (e) => {
+    const { data: remote, error } = await supabaseClient.from(e.table).select('*');
+    if (error) { console.warn(`Supabase ${e.table} error:`, error); return; }
+    if (!remote) return;
+    const local = dbGet(e.dbKey);
+    const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote, e.fields);
+    totalConflicts += conflicts;
+    allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: e.label })));
+    const final = (typeof e.onMerged === 'function') ? e.onMerged(merged, local, remote) : merged;
+    dbSet(e.dbKey, final);
+    for (const rec of final) {
+      const r = remote.find(x => x.id === rec.id);
+      if (_needsPush(rec, r)) {
+        await supabaseClient.from(e.table).upsert(
+          (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields)
+        );
+      }
+    }
+  };
+
   try {
-    // 1. CLIENTS
-    const { data: remoteClients, error: cliErr } = await supabaseClient.from('clients').select('*');
-    if (cliErr) console.warn('Supabase clients error:', cliErr);
-    if (remoteClients) {
-      const local = dbGet(DB.CLIENTS);
-      const fMap = { id:'id', name:'name', cnpj:'cnpj', segment:'segment', color:'color', initials:'initials', logo:'logo', logo_shape:'logoShape', owner:'owner', owner_phone:'ownerPhone', responsible:'responsible', responsible_phone:'responsiblePhone', technician:'technician', server:'server', hosting:'hosting', backup:'backup', licenses:'licenses', emails:'emails', google_sheet_url:'googleSheetUrl', team:'team', notes:'notes', attachments:'attachments', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteClients, fMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Clientes' })));
-      dbSet(DB.CLIENTS, merged);
-      for (const c of merged) {
-        const r = remoteClients.find(x => x.id === c.id);
-        if (_needsPush(c, r)) await supabaseClient.from('clients').upsert(_mapToRemote(c, fMap));
+    for (const e of SYNC_ENTITIES) {
+      if (e.optional) {
+        try { await _syncEntity(e); }
+        catch (err) { console.warn(`Supabase ${e.table} (sync pulado — tabela ausente?):`, err.message); }
+      } else {
+        await _syncEntity(e);
       }
     }
 
-    // 2. PENDÊNCIAS
-    const { data: remotePens, error: penErr } = await supabaseClient.from('pendencias').select('*');
-    if (penErr) console.warn('Supabase pendencias error:', penErr);
-    if (remotePens) {
-      const local = dbGet(DB.PENDENCIAS);
-      const fMap = { id:'id', client_id:'clientId', client_name:'clientName', tipo:'tipo', descricao:'descricao', responsible:'responsible', status:'status', priority:'priority', deadline:'deadline', notes:'notes', link_util:'linkUtil', team:'team', attachments:'attachments', checklist:'checklist', tags:'tags', recurrence:'recurrence', visit_id:'visitId', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remotePens, fMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Pendências' })));
-      dbSet(DB.PENDENCIAS, merged);
-      for (const p of merged) {
-        const r = remotePens.find(x => x.id === p.id);
-        if (_needsPush(p, r)) await supabaseClient.from('pendencias').upsert(_mapToRemote(p, fMap));
-      }
-    }
-
-    // 3. TICKETS
-    const { data: remoteTix, error: tckErr } = await supabaseClient.from('tickets').select('*');
-    if (tckErr) console.warn('Supabase tickets error:', tckErr);
-    if (remoteTix) {
-      const local = dbGet(DB.TICKETS);
-      const fMap = { id:'id', client_id:'clientId', client_name:'clientName', title:'title', description:'description', status:'status', priority:'priority', technician:'technician', updates:'updates', team:'team', attachments:'attachments', timer_running:'timerRunning', timer_started_at:'timerStartedAt', timer_total_seconds:'timerTotalSeconds', timer_operator:'timerOperator', completed_at:'completedAt', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteTix, fMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Chamados' })));
-      dbSet(DB.TICKETS, merged);
-      for (const t of merged) {
-        const r = remoteTix.find(x => x.id === t.id);
-        if (_needsPush(t, r)) await supabaseClient.from('tickets').upsert(_mapToRemote(t, fMap));
-      }
-    }
-
-    // 4. OPERATORS — use timestamp-based merge, preserve pinHash/pinSalt
-    const { data: remoteOps, error: opErr } = await supabaseClient.from('operators').select('*');
-    if (opErr) console.warn('Supabase operators error:', opErr);
-    if (remoteOps) {
-      const localOps = dbGet(DB.OPERATORS);
-      const opFieldMap = { id:'id', name:'name', initials:'initials', color:'color', role:'role', phone:'phone', email:'email', is_admin:'isAdmin', active:'active', team:'team', auth_user_id:'auth_user_id', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(localOps, remoteOps, opFieldMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Operadores' })));
-      // Preserve pinHash/pinSalt: use local if local is newer, remote if remote is newer
-      const localMap = new Map(localOps.map(o => [o.id, o]));
-      const remoteMap = new Map(remoteOps.map(r => [r.id, r]));
-      for (const o of merged) {
-        const loc = localMap.get(o.id);
-        const rem = remoteMap.get(o.id);
-        const localTime = new Date(loc?.updatedAt || 0).getTime();
-        const remoteTime = new Date(rem?.updated_at || 0).getTime();
-        if (localTime >= remoteTime) {
-          o.pinHash = loc?.pinHash || null;
-          o.pinSalt = loc?.pinSalt || null;
-        } else {
-          o.pinHash = rem?.pin_hash || loc?.pinHash || null;
-          o.pinSalt = rem?.pin_salt || loc?.pinSalt || null;
-        }
-      }
-      dbSet(DB.OPERATORS, merged);
-      for (const o of merged) {
-        const r = remoteOps.find(x => x.id === o.id);
-        if (_needsPush(o, r)) {
-          await supabaseClient.from('operators').upsert({ id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone, email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null, is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init', auth_user_id: o.auth_user_id || null, created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString() });
-        }
-      }
-    }
-
-    // 5. PROCEDURES
-    const { data: remoteProcs, error: procErr } = await supabaseClient.from('procedures').select('*');
-    if (procErr) console.warn('Supabase procedures error:', procErr);
-    if (remoteProcs) {
-      const local = dbGet(DB.PROCEDURES);
-      const fMap = { id:'id', client_id:'clientId', title:'title', category:'category', content:'content', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteProcs, fMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Procedimentos' })));
-      dbSet(DB.PROCEDURES, merged);
-      for (const p of merged) {
-        const r = remoteProcs.find(x => x.id === p.id);
-        if (_needsPush(p, r)) await supabaseClient.from('procedures').upsert(_mapToRemote(p, fMap));
-      }
-    }
-
-    // 4.5 VISITS
-    try {
-      const { data: remoteVisits, error: visErr } = await supabaseClient.from('visits').select('*');
-      if (visErr) {
-        console.warn('Supabase visits (sync pulado):', visErr.message);
-      } else if (remoteVisits) {
-        const local = dbGet(DB.VISITS);
-        const fMap = { id:'id', client_id:'clientId', client_name:'clientName', operator:'operator', date:'date', time:'time', time_end:'timeEnd', all_day:'allDay', motivo:'motivo', observacoes:'observacoes', relatorio:'relatorio', status:'status', recurrence:'recurrence', team:'team', categories:'categories', checklist:'checklist', created_at:'createdAt', updated_at:'updatedAt' };
-        const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteVisits, fMap);
-        totalConflicts += conflicts;
-        allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Visitas' })));
-        dbSet(DB.VISITS, merged);
-        for (const v of merged) {
-          const r = remoteVisits.find(x => x.id === v.id);
-          if (_needsPush(v, r)) await supabaseClient.from('visits').upsert(_mapToRemote(v, fMap));
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase visits (sync pulado — tabela ausente?):', e.message);
-    }
-
-    // 5.1 PROCEDURE TEMPLATES
-    const { data: remoteTpls, error: tplErr } = await supabaseClient.from('procedure_templates').select('*');
-    if (tplErr) console.warn('Supabase procedure_templates error:', tplErr);
-    if (remoteTpls) {
-      const local = dbGet(DB.PROCEDURE_TEMPLATES);
-      const fMap = { id:'id', title:'title', category:'category', content:'content', created_by:'createdBy', created_at:'createdAt', updated_at:'updatedAt' };
-      const { merged, conflicts, conflictDetails } = _mergeRecords(local, remoteTpls, fMap);
-      totalConflicts += conflicts;
-      allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: 'Modelos' })));
-      dbSet(DB.PROCEDURE_TEMPLATES, merged);
-      for (const t of merged) {
-        const r = remoteTpls.find(x => x.id === t.id);
-        if (_needsPush(t, r)) await supabaseClient.from('procedure_templates').upsert(_mapToRemote(t, fMap));
-      }
-    }
-
-    // 6. LOGS — merge remote with local (don't wipe local logs)
+    // LOGS — merge remote with local (don't wipe local logs)
     const { data: remoteLogs, error: logErr } = await supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500);
     if (logErr) console.warn('Supabase logs error:', logErr);
     if (remoteLogs && remoteLogs.length > 0) {
       const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
       const localLogs = getLogs();
-       const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
-       const allIds = new Map(localLogs.map(l => [logKey(l), l]));
-       for (const l of mapped) { allIds.set(logKey(l), l); }
+      const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
+      const allIds = new Map(localLogs.map(l => [logKey(l), l]));
+      for (const l of mapped) { allIds.set(logKey(l), l); }
       const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       if (typeof setCacheTable === 'function') setCacheTable('audit_logs', mergedLogs);
       else dbSet(DB.LOGS, mergedLogs);

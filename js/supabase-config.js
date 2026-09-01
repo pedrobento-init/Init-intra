@@ -52,92 +52,17 @@ function saveSupabaseConfigFromModal() {
 // Inicializador de escutadores em Tempo Real (Realtime WebSockets)
 let _realtimeChannel = null;
 
-const _RT_TABLE_META = {
-    pendencias: {
-        dbKey: 'intra_pendencias',
-        map: r => ({
-            id: r.id, clientId: r.client_id, clientName: r.client_name, tipo: r.tipo, descricao: r.descricao,
-            responsible: r.responsible, status: r.status, priority: r.priority, deadline: r.deadline,
-            notes: r.notes, linkUtil: r.link_util, team: r.team, attachments: r.attachments,
-            checklist: r.checklist, tags: r.tags, recurrence: r.recurrence, visitId: r.visit_id, timerRunning: r.timer_running, timerStartedAt: r.timer_started_at,
-            timerTotalSeconds: r.timer_total_seconds, timerOperator: r.timer_operator, completedAt: r.completed_at,
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {
-            if (typeof updateBadges === 'function') updateBadges();
-            if ((window.location.hash.replace('#','') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
-        }
-    },
-    clients: {
-        dbKey: 'intra_clients',
-        map: r => ({
-            id: r.id, name: r.name, cnpj: r.cnpj, segment: r.segment, color: r.color, initials: r.initials,
-            logo: r.logo, logoShape: r.logo_shape, owner: r.owner, ownerPhone: r.owner_phone,
-            responsible: r.responsible, responsiblePhone: r.responsible_phone, technician: r.technician,
-            server: r.server, hosting: r.hosting, backup: r.backup, licenses: r.licenses, emails: r.emails,
-            googleSheetUrl: r.google_sheet_url, team: r.team, notes: r.notes, attachments: r.attachments,
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
-        }
-    },
-    operators: {
-        dbKey: 'intra_operators',
-        map: r => ({
-            id: r.id, name: r.name, initials: r.initials, color: r.color, role: r.role, phone: r.phone,
-            email: r.email, isAdmin: r.is_admin === true, active: r.active !== false, team: r.team || 'init',
-            auth_user_id: r.auth_user_id,
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'operadores' && document.getElementById('opGridWrap') && typeof filterOperadores === 'function') filterOperadores();
-        }
-    },
-    visits: {
-        dbKey: 'intra_visits',
-        map: r => ({
-            id: r.id, clientId: r.client_id, clientName: r.client_name, operator: r.operator, date: r.date,
-            time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status, recurrence: r.recurrence, team: r.team,
-            timeEnd: r.time_end, allDay: r.all_day === true,
-            categories: r.categories || [], checklist: r.checklist || [],
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {
-            const h = window.location.hash.replace('#','') || '';
-            if (h === 'visitas' && document.getElementById('visitViewArea') && typeof renderVisitView === 'function') renderVisitView();
-            if (h === 'calendario' && typeof refreshCalendar === 'function') refreshCalendar();
-        }
-    },
-    procedures: {
-        dbKey: 'intra_procedures',
-        map: r => ({
-            id: r.id, clientId: r.client_id, title: r.title, category: r.category, content: r.content,
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {}
-    },
-    procedure_templates: {
-        dbKey: 'intra_procedure_templates',
-        map: r => ({
-            id: r.id, title: r.title, category: r.category, content: r.content, createdBy: r.created_by,
-            createdAt: r.created_at, updatedAt: r.updated_at
-        }),
-        onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'templates' && document.getElementById('templatesGridWrap') && typeof renderTemplatesGrid === 'function') renderTemplatesGrid();
-        }
-    },
-    audit_logs: {
-        dbKey: 'intra_logs',
-        map: r => ({
-            id: r.id, operatorName: r.operator_name, action: r.action, type: r.type,
-            targetId: r.target_id, details: r.details, timestamp: r.timestamp
-        }),
-        onChange: () => {
-            if ((window.location.hash.replace('#','') || '') === 'historico' && typeof renderLogs === 'function') renderLogs();
-        }
+// Metadados de Realtime derivados do registro central (js/schema.js)
+const _RT_TABLE_META = {};
+ENTITIES.forEach(e => { if (e.realtime !== false) _RT_TABLE_META[e.table] = e; });
+
+function _realtimeTeamFilter() {
+    // null = sem filtro (admin vendo todas as equipes)
+    if (typeof isTeamAdmin === 'function' && isTeamAdmin()) {
+        return (typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam : null;
     }
-};
+    return typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
+}
 
 function _applyRealtimePayload(table, payload) {
     const meta = _RT_TABLE_META[table];
@@ -150,7 +75,9 @@ function _applyRealtimePayload(table, payload) {
             const id = payload.old.id;
             list = list.filter(x => x.id !== id);
         } else if ((event === 'INSERT' || event === 'UPDATE') && payload.new) {
-            const row = meta.map(payload.new);
+            const row = (typeof meta.mapRow === 'function') ? meta.mapRow(payload.new) : _mapFromRemote(payload.new, meta.fields);
+            // Defesa em profundidade: não aplica dados de outra equipe no cache local
+            if (meta.hasTeam && typeof row.team === 'string' && typeof canViewTeam === 'function' && !canViewTeam(row.team)) return;
             const idx = list.findIndex(x => x.id === row.id);
             if (idx !== -1) {
                 const localT = new Date(list[idx].updatedAt || list[idx].timestamp || 0).getTime();
@@ -167,8 +94,8 @@ function _applyRealtimePayload(table, payload) {
                 list.unshift(row);
             }
         }
-        if (table === 'audit_logs' && typeof setCacheTable === 'function') {
-            setCacheTable('audit_logs', list);
+        if (meta.cacheTable && typeof setCacheTable === 'function') {
+            setCacheTable(meta.cacheTable, list);
         } else {
             dbSet(meta.dbKey, list);
         }
@@ -184,9 +111,13 @@ function initSupabaseRealtime() {
         _realtimeChannel = null;
     }
 
+    const teamFilter = _realtimeTeamFilter();
     let channel = supabaseClient.channel('public-changes');
     Object.keys(_RT_TABLE_META).forEach(table => {
-        channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
+        const meta = _RT_TABLE_META[table];
+        const opts = { event: '*', schema: 'public', table };
+        if (teamFilter && meta.hasTeam) opts.filter = `team=eq.${teamFilter}`;
+        channel = channel.on('postgres_changes', opts, payload => {
             _applyRealtimePayload(table, payload);
         });
     });

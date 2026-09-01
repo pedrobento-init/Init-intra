@@ -46,6 +46,8 @@ function onTeamChange(value) {
   _selectedTeam = value;
   // Save preference
   if (typeof setCacheKV === 'function') setCacheKV('intra_selected_team', value);
+  // Rebuild realtime channel with the team filter
+  if (typeof initSupabaseRealtime === 'function') initSupabaseRealtime();
   // Re-render current page
   const hash = window.location.hash.replace('#','');
   if (hash) navigateTo(hash);
