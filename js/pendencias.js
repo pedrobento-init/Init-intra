@@ -62,6 +62,7 @@ function renderPendencias() {
         Nova Pendência
       </button>
     </div>
+    <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;
@@ -72,11 +73,25 @@ function renderPendencias() {
   renderPenView();
 }
 
+function _renderPendenciaSlaSummary() {
+  const el = document.getElementById('penSlaSummary');
+  if (!el) return;
+  const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+  const slaMap = typeof getAllSlaStats === 'function' ? getAllSlaStats(getPendencias(), today) : {};
+  const entries = Object.entries(slaMap).sort((a,b)=> b[1].vencidas - a[1].vencidas || b[1].totalAbertas - a[1].totalAbertas);
+  if (!entries.length) { el.innerHTML=''; return; }
+  el.innerHTML = `<div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0">${entries.slice(0,8).map(([cid, s]) => {
+    const c = getClientById(cid);
+    return `<div style="min-width:140px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary)"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c?c.name:s.clientName)}</div><div style="font-size:11px;color:var(--text-muted)">${s.totalAbertas} abertas · <span style="color:${s.vencidas?'#dc2626':'#16a34a'}">${s.vencidas} vencidas</span> · ${s.dentroPrazo} no prazo</div></div>`;
+  }).join('')}${entries.length>8?`<div style="min-width:80px;display:flex;align-items:center;font-size:11px;color:var(--text-muted)">+${entries.length-8} clientes</div>`:''}</div>`;
+}
+
 function renderPenView(resetPage) {
   var area = document.getElementById('penViewArea');
   if (!area) return;
   setTimeout(function() {
     _filteredPens = getFilteredPendencias();
+    _renderPendenciaSlaSummary();
     renderPenKanban(area);
   }, 10);
 }

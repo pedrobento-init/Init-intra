@@ -117,9 +117,11 @@ function _renderLanding(mesAno, label, existingMeeting) {
             Iniciar Reunião de ${label}
           </button>`}
 
-      ${existingMeeting && existingMeeting.status === 'encerrada' && existingMeeting.relatorio
-        ? `<button class="btn btn-secondary" style="margin-top:12px" onclick="showMeetingReport('${existingMeeting.id}')">📄 Ver Relatório Anterior</button>`
-        : ''}
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+        ${existingMeeting && existingMeeting.status === 'encerrada' && existingMeeting.relatorio
+          ? `<button class="btn btn-secondary" onclick="showMeetingReport('${existingMeeting.id}')">📄 Ver Relatório Anterior</button>` : ''}
+        <button class="btn btn-secondary" onclick="openMeetingCompareModal()">📊 Comparar meses</button>
+      </div>
     </div>`;
 }
 
@@ -184,12 +186,30 @@ function _buildClientList() {
   const base = _getMeetingBaseClients().slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base', numeric: true }));
   const com = [];
   const sem = [];
+  const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+  const slaMap = typeof getAllSlaStats === 'function' ? getAllSlaStats(getMyPendencias(), today) : {};
   base.forEach(c => {
     const pens = _getOpenPensForClient(c.id);
     const entry = { clientId: c.id, clientName: c.name, clientColor: c.color, clientInitials: c.initials, clientObj: c, pens };
     if (pens.length > 0) com.push(entry); else sem.push(entry);
   });
+  // 4. Ordena "com pendência" por SLA: mais vencidas primeiro (via metrics.js)
+  if (typeof sortClientsBySla === 'function' && Object.keys(slaMap).length) {
+    const comClientsOnly = com.map(e => ({ id: e.clientId, name: e.clientName }));
+    const sortedIds = sortClientsBySla(comClientsOnly, slaMap).map(x => x.id);
+    com.sort((a,b) => sortedIds.indexOf(a.clientId) - sortedIds.indexOf(b.clientId));
+  }
   _meetingState.clients = [...com, ...sem];
+}
+
+function _getStreakBadgeHtml(clientId) {
+  if (typeof getConsecutiveMeetingStreak !== 'function' || typeof getMyReunioes !== 'function') return '';
+  try {
+    const reunioes = getMyReunioes().filter(r => r.status === 'encerrada').sort((a,b) => (b.mesAno||'').localeCompare(a.mesAno||''));
+    const streak = getConsecutiveMeetingStreak(clientId, reunioes, getMyPendencias());
+    if (streak >= 2) return `<span class="tag" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;margin-left:6px">🔁 ${streak} meses seguidos</span>`;
+  } catch(_) {}
+  return '';
 }
 
 function renderMeetingFlow() {
@@ -231,10 +251,14 @@ function renderMeetingFlow() {
         </div>
       </div>
 
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="openMeetingCompareModal()">📊 Comparar meses</button>
+        <span style="font-size:12px;color:var(--text-muted);align-self:center">Fila ordenada por SLA (vencidas primeiro)</span>
+      </div>
       <div style="background:var(--bg-secondary);border-radius:8px;padding:4px;margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:13px;font-weight:600">
           <span>Cliente ${index + 1} de ${clients.length} (${comPendCount} com pendência)</span>
-          <span style="display:flex;align-items:center;gap:8px">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}</span>
+          <span style="display:flex;align-items:center;gap:8px">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}${_getStreakBadgeHtml(group.clientId)}</span>
         </div>
         <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden">
           <div style="height:100%;width:${Math.round(progress)}%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
@@ -276,6 +300,7 @@ function _meetingEmptyClientHtml(group) {
           <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
             ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}
           </select>
+          <button class="btn btn-secondary btn-sm" onclick="meetingUseTemplate('${cid}')" style="white-space:nowrap">📋 Usar modelo</button>
           <button class="btn btn-primary btn-sm" onclick="meetingCreateInlinePendencia('${cid}')" style="white-space:nowrap">+ Adicionar</button>
         </div>
       </div>
@@ -473,6 +498,81 @@ function meetingCreateInlinePendencia(clientId) {
     showToast('Pendência criada!', 'success');
     renderMeetingFlow();
   } catch (err) { showToast('Erro ao criar pendência: ' + err.message, 'error'); }
+}
+
+function meetingUseTemplate(clientId) {
+  const templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
+  if (!templates.length) { showToast('Nenhum modelo cadastrado.', 'warning'); return; }
+  const g = _meetingState?.clients[_meetingState.index];
+  const clientName = g ? g.clientName : clientId;
+  openModal(`Usar modelo — ${escapeHtml(clientName)}`, `
+    <div style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+      ${templates.map(t => `
+        <button class="card" style="text-align:left;padding:10px;cursor:pointer" onclick="meetingApplyTemplate('${escapeHtml(clientId)}','${escapeHtml(t.id)}')">
+          <div style="font-weight:600;font-size:13px">${escapeHtml(t.title)}</div>
+          ${t.category ? `<span class="tag tag-blue" style="font-size:10px">${escapeHtml(t.category)}</span>` : ''}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;max-height:40px;overflow:hidden">${escapeHtml((t.content||'').slice(0,120))}</div>
+        </button>`).join('')}
+    </div>
+    <div class="form-actions" style="margin-top:12px"><button class="btn btn-secondary" onclick="closeModal();renderMeetingFlow()">Voltar</button></div>
+  `);
+}
+
+function meetingApplyTemplate(clientId, templateId) {
+  const tpl = typeof getProcedureTemplateById === 'function' ? getProcedureTemplateById(templateId) : null;
+  if (!tpl) return;
+  closeModal();
+  // Re-render first to ensure textarea exists, then fill
+  renderMeetingFlow();
+  setTimeout(() => {
+    const ta = document.getElementById('meeting-new-desc-' + clientId);
+    if (ta) { ta.value = tpl.content || tpl.title || ''; ta.focus(); }
+    showToast(`Modelo "${tpl.title}" carregado`, 'success');
+  }, 30);
+}
+
+function openMeetingCompareModal() {
+  const reunioes = (typeof getMyReunioes === 'function' ? getMyReunioes() : []).filter(r => r.status === 'encerrada').sort((a,b)=>(b.mesAno||'').localeCompare(a.mesAno||''));
+  if (reunioes.length < 2) { showToast('É preciso ter pelo menos 2 reuniões encerradas para comparar.', 'warning'); return; }
+  const opts = reunioes.map(r => `<option value="${escapeHtml(r.mesAno)}">${escapeHtml(_getMesAnoLabel(r.mesAno))} — ${escapeHtml(r.id)}</option>`).join('');
+  openModal('Comparativo mês a mês', `
+    <div style="display:flex;gap:12px;margin-bottom:12px">
+      <div class="form-group" style="flex:1"><label class="form-label">Mês A</label><select class="form-select" id="compareMesA">${opts}</select></div>
+      <div class="form-group" style="flex:1"><label class="form-label">Mês B</label><select class="form-select" id="compareMesB">${opts}</select></div>
+    </div>
+    <button class="btn btn-primary" onclick="renderMeetingCompare()">Comparar</button>
+    <div id="meetingCompareResult" style="margin-top:16px"></div>
+  `);
+  // Default: two most recent
+  setTimeout(() => {
+    const a = document.getElementById('compareMesA');
+    const b = document.getElementById('compareMesB');
+    if (a && reunioes[1]) a.value = reunioes[1].mesAno;
+    if (b && reunioes[0]) b.value = reunioes[0].mesAno;
+  }, 10);
+}
+
+function renderMeetingCompare() {
+  const mesA = document.getElementById('compareMesA')?.value;
+  const mesB = document.getElementById('compareMesB')?.value;
+  if (!mesA || !mesB) { showToast('Selecione os dois meses.', 'error'); return; }
+  if (mesA === mesB) { showToast('Selecione meses diferentes.', 'error'); return; }
+  const clients = _getMeetingBaseClients();
+  const pendencias = getMyPendencias();
+  const rows = typeof compareMeetings === 'function' ? compareMeetings(mesA, mesB, pendencias, clients) : [];
+  const el = document.getElementById('meetingCompareResult');
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Nenhum cliente com pendência vinculada a essas reuniões.</p>'; return; }
+  el.innerHTML = `
+    <div class="table-wrapper"><table><thead><tr><th>Cliente</th><th>${escapeHtml(_getMesAnoLabel(mesA))}</th><th>${escapeHtml(_getMesAnoLabel(mesB))}</th><th>Δ</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.clientName)}</td>
+        <td>${r.abertasA} abertas / ${r.fechadasA} fechadas <span style="font-size:11px;color:var(--text-muted)">(${r.totalReviewedA} vistas)</span></td>
+        <td>${r.abertasB} abertas / ${r.fechadasB} fechadas <span style="font-size:11px;color:var(--text-muted)">(${r.totalReviewedB} vistas)</span></td>
+        <td style="font-weight:700;color:${r.deltaAbertas>0?'#dc2626':r.deltaAbertas<0?'#16a34a':'var(--text-muted)'}">${r.deltaAbertas>0?'+':''}${r.deltaAbertas}</td>
+      </tr>`).join('')}</tbody></table></div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Base: pendências com reviewedInMeeting == REU-mês. Δ = abertas B - abertas A.</p>
+  `;
 }
 
 function endReuniao() {

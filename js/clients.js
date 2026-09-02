@@ -53,13 +53,24 @@ function renderClientGrid() {
     const pageClients = clients.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
 
     grid.innerHTML = pageClients.map(c => {
-      const pending = getPendencias().filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length;
+      const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+      const sla = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(getPendencias(), c.id, today) : { totalAbertas: getPendencias().filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length, vencidas: 0, dentroPrazo: 0 };
+      if (!sla.dentroPrazo && sla.totalAbertas) sla.dentroPrazo = sla.totalAbertas - sla.vencidas;
+      const health = typeof getHealthForClient === 'function' ? getHealthForClient(getPendencias(), c.id, today) : null;
+      const pending = sla.totalAbertas;
+      const vencidas = sla.vencidas;
+      const dentro = sla.dentroPrazo;
       return `<div class="client-card" onclick="viewClient('${escapeHtml(c.id)}')">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
-      <div class="client-card-name">${escapeHtml(c.name)}</div>
+      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${health.totalAbertas} abertas, ${health.vencidas} vencidas, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" style="font-size:14px">${health.emoji}</span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin:4px 0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+        <span>${pending} abertas</span>
+        <span style="color:${vencidas? '#dc2626':'var(--text-muted)'}">${vencidas} vencidas</span>
+        <span style="color:#16a34a">${dentro} no prazo</span>
+      </div>
       <div class="client-card-footer">
-        ${pending > 0 ? `<span class="tag tag-yellow">${pending} pendência${pending>1?'s':''}</span>` : `<span class="tag tag-green">Em dia</span>`}
+        ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
         <div style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientForm('${escapeHtml(c.id)}')">Editar</button>
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteClientConfirm('${escapeHtml(c.id)}')">✕</button>
@@ -89,13 +100,14 @@ function viewClient(id) {
       <div class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</div>
       <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
       <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
+      <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
     </div>
     <div id="clientTabContent"></div>`, 'lg');
   renderClientTab('ficha', id);
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','documentos'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','documentos','historico'][i]===tab));
   renderClientTab(tab, id);
 }
 
@@ -104,11 +116,28 @@ function renderClientTab(tab, id) {
   const el = document.getElementById('clientTabContent');
   if (tab === 'ficha') {
     const ir = (label, val) => `<div class="info-item"><div class="info-key">${label}</div><div class="info-value ${val?'':'empty'}">${val||'Não informado'}</div></div>`;
+    const todayF = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+    const slaF = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(getPendencias(), id, todayF) : { totalAbertas: 0, vencidas: 0, dentroPrazo: 0 };
+    const healthF = typeof getHealthForClient === 'function' ? getHealthForClient(getPendencias(), id, todayF) : null;
+    const healthCard = healthF ? `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;border:1px solid ${healthF.color}30;background:${healthF.color}10;margin-bottom:16px">
+        <span style="font-size:28px">${healthF.emoji}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;color:${healthF.color}">${escapeHtml(healthF.label)} — Saúde do cliente</div>
+          <div style="font-size:12px;color:var(--text-muted)">${healthF.totalAbertas} abertas · ${healthF.vencidas} vencidas · média ${healthF.avgHours ? healthF.avgHours.toFixed(1)+'h' : 'sem histórico'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Limiares: 🟢 ≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.greenMaxVencidas:0} vencidas/≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.greenMaxAbertas:3} abertas/≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.greenMaxAvgHours:48}h · 🟡 ≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.yellowMaxVencidas:2}/≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.yellowMaxAbertas:8}/≤${typeof HEALTH_THRESHOLDS!=='undefined'?HEALTH_THRESHOLDS.yellowMaxAvgHours:120}h · 🔴 demais</div>
+        </div>
+        <span class="tag" style="background:${healthF.color}20;color:${healthF.color};border:1px solid ${healthF.color}40">${slaF.vencidas} vencidas / ${slaF.dentroPrazo} no prazo</span>
+      </div>` : `
+      <div style="padding:10px;border-radius:8px;background:var(--bg-secondary);margin-bottom:16px;font-size:12px;color:var(--text-muted)">
+        SLA: ${slaF.totalAbertas} abertas · ${slaF.vencidas} vencidas · ${slaF.dentroPrazo} no prazo
+      </div>`;
     el.innerHTML = `
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" onclick="closeModal();openClientForm('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
         <button class="btn btn-secondary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button>
       </div>
+      ${healthCard}
       <div class="client-detail-section">
         <div class="client-detail-section-title">👤 Identificação</div>
         <div class="info-grid">${ir('CNPJ/CPF',c.cnpj)}${ir('Segmento',c.segment)}${ir('Dono',c.owner)}${ir('Contato Dono',c.ownerPhone)}${ir('Responsável TI',c.responsible)}${ir('Contato',c.responsiblePhone)}${ir('Técnico',c.technician)}</div>
@@ -178,6 +207,30 @@ function renderClientTab(tab, id) {
         <td>${typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : escapeHtml(v.status)}</td>
         <td style="text-align:right"><button class="btn btn-sm btn-secondary" onclick="openVisitDetail('${escapeHtml(v.id)}')">Abrir</button></td>
       </tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma visita registrada para este cliente.</p></div>`}`;
+  } else if (tab === 'historico') {
+    const client = getClientById(id);
+    const clientName = client ? client.name : '';
+    const pensIds = new Set(getPendencias().filter(p => p.clientId === id).map(p => p.id));
+    const visitIds = new Set(getVisits().filter(v => v.clientId === id).map(v => v.id));
+    const logs = typeof getLogs === 'function' ? getLogs() : [];
+    const filtered = logs.filter(l => {
+      if (l.targetId === id) return true;
+      if (pensIds.has(l.targetId)) return true;
+      if (visitIds.has(l.targetId)) return true;
+      if (clientName && l.details && l.details.toLowerCase().includes(clientName.toLowerCase())) return true;
+      if (l.type === 'Cliente' && l.details === clientName) return true;
+      return false;
+    }).slice(0, 80);
+    if (!filtered.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px"><p>Nenhum histórico para este cliente.</p></div>`;
+    } else {
+      el.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${filtered.length} registro(s) — reaproveitando estilo do Histórico</div>
+        <div class="log-timeline">${filtered.map(log => {
+          const actionKey = (log.action || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+          const actionClass = ['criou','ativou','editou','excluiu','desativou','login','backup','limpou'].includes(actionKey.split('-')[0]) ? 'log-action-' + actionKey.split('-')[0] : 'log-action-default';
+          return `<div class="log-card"><div class="log-dot ${actionClass}" style="background:currentColor"></div><div class="log-header"><span class="log-action-label">${escapeHtml(log.action)}</span><span class="log-type-badge ${actionClass}">${escapeHtml(log.type)}</span><span style="flex:1"></span><span class="log-meta">${formatDateTime(log.timestamp)}</span></div><div class="log-details">${escapeHtml(log.details)}</div><div class="log-meta">👤 ${escapeHtml(log.operatorName||'Sistema')}</div></div>`;
+        }).join('')}</div>`;
+    }
   } else {
     const pens = getPendencias().filter(p => p.clientId === id);
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>

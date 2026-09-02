@@ -4,6 +4,7 @@
 let _dashPeriod = 'all';
 let _dashCustomStart = '';
 let _dashCustomEnd   = '';
+let _dashWorkloadPeriod = 'all';
 
 // ── Team Filter ────────────────────────────────────────────────────────────────
 let _selectedTeam = ''; // '' = all teams (for init/admin), specific team for others
@@ -94,6 +95,8 @@ function setDashCustomDates() {
   if (e) _dashCustomEnd = e.value;
   renderDashboard();
 }
+
+function setWorkloadPeriod(v) { _dashWorkloadPeriod = v; renderDashboard(); }
 
 function getDashDateRange() {
   const today = _brasiliaNow();
@@ -530,6 +533,16 @@ function renderDashboard() {
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:18px">
+      <div class="section-header"><span class="section-title">Carga por Operador (horas em pendências)</span>
+        <select id="workloadPeriod" class="form-select" style="width:160px" onchange="setWorkloadPeriod(this.value)">
+          <option value="all" ${(_dashWorkloadPeriod||'all')==='all'?'selected':''}>Todo período</option>
+          <option value="week" ${(_dashWorkloadPeriod||'all')==='week'?'selected':''}>Semana atual</option>
+          <option value="month" ${(_dashWorkloadPeriod||'all')==='month'?'selected':''}>Mês atual</option>
+        </select>
+      </div>
+      <div id="workloadList" style="padding:12px"></div>
+    </div>
     <div class="dashboard-charts-grid">
       <div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Distribuição por Prioridade</span></div>
@@ -608,6 +621,35 @@ function renderDashboard() {
         </div>
       </div>
     </div>`;
+
+  // ── Carga por operador (timer.js) ──
+  (function(){
+    const wlEl = document.getElementById('workloadList');
+    if (!wlEl) return;
+    const getPeriodFilter = () => {
+      if (_dashWorkloadPeriod === 'week') {
+        const today = _brasiliaNow();
+        const start = new Date(today); start.setDate(today.getDate() - today.getDay() + 1);
+        const end = new Date(start); end.setDate(start.getDate()+6);
+        return p => { const d=_parseItemDate(p); return d>=start && d<=end; };
+      }
+      if (_dashWorkloadPeriod === 'month') {
+        const today=_brasiliaNow();
+        const s=new Date(today.getFullYear(), today.getMonth(),1);
+        const e=new Date(today.getFullYear(), today.getMonth()+1,0);
+        return p => { const d=_parseItemDate(p); return d>=s && d<=e; };
+      }
+      return null;
+    };
+    const filterFn = getPeriodFilter();
+    const workloadMap = typeof getWorkloadInPeriod === 'function' ? getWorkloadInPeriod(allPens, getElapsedSeconds, filterFn) : {};
+    const entries = Object.entries(workloadMap).sort((a,b)=>b[1]-a[1]);
+    if (!entries.length) wlEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted);padding:8px">Sem horas registradas no período.</p>';
+    else wlEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">${entries.map(([op, secs]) => {
+      const h=(secs/3600).toFixed(1);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px">${escapeHtml(op)}</span><span style="font-weight:700;font-size:13px">${h}h</span></div>`;
+    }).join('')}</div>`;
+  })();
   
   setTimeout(() => renderCharts(pens, visits), 50);
   animateDashboardCounters();
