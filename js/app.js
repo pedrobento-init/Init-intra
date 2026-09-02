@@ -143,6 +143,7 @@ function exportData() {
     operators:  safeOps,
     visits:     getVisits(),
     tickets:    getTickets(),
+    reunioes:   getReunioes(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -192,6 +193,7 @@ async function _runImportBackup(data) {
     if (data.operators)  dbSet('intra_operators',  data.operators);
     if (data.visits)     dbSet('intra_visits',     data.visits);
     if (data.tickets)    dbSet('intra_tickets',    data.tickets);
+    if (data.reunioes)   dbSet('intra_reunioes',   data.reunioes);
 
     const cloudOk = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
     if (cloudOk) {
@@ -245,6 +247,7 @@ async function _pushImportToSupabase(data) {
       notes: p.notes || [], link_util: p.linkUtil || '', team: p.team || 'init',
       attachments: p.attachments || [], checklist: p.checklist || [], tags: p.tags || [],
       recurrence: p.recurrence || null, visit_id: p.visitId || null,
+      reviewed_in_meeting: p.reviewedInMeeting || null,
       completed_at: p.completedAt || null, created_at: p.createdAt || now, updated_at: p.updatedAt || now
     })));
   } catch (e) { errors.push('pendencias: ' + e.message); }
@@ -296,6 +299,15 @@ async function _pushImportToSupabase(data) {
     })));
   } catch (e) { errors.push('tickets: ' + e.message); }
 
+  try {
+    await chunk('reunioes', (data.reunioes || []).map(r => ({
+      id: r.id, mes_ano: r.mesAno || null, status: r.status || 'aberta',
+      started_at: r.startedAt || null, ended_at: r.endedAt || null,
+      team: r.team || 'init', relatorio: r.relatorio || '', participants: r.participants || [],
+      created_at: r.createdAt || now, updated_at: r.updatedAt || now
+    })));
+  } catch (e) { errors.push('reunioes: ' + e.message); }
+
   return errors;
 }
 
@@ -332,6 +344,7 @@ function navigateTo(page) {
   else if (page === 'pendencias')  renderPendencias();
   else if (page === 'calendario')  renderCalendar();
   else if (page === 'visitas')     renderVisitas();
+  else if (page === 'reuniao')     renderReuniao();
   else if (page === 'operadores')  renderOperadores();
   else if (page === 'historico')   renderLogs();
 
@@ -874,7 +887,7 @@ function _startApp() {
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['dashboard','clientes','pendencias','calendario','operadores','historico','templates','visitas'];
+  const pages = ['dashboard','clientes','pendencias','calendario','operadores','historico','templates','visitas','reuniao'];
   navigateTo(pages.includes(hash) ? hash : 'dashboard');
   if (!_appStarted) {
     _appStarted = true;

@@ -38,6 +38,7 @@ const ENTITIES = [
       responsible: 'responsible', status: 'status', priority: 'priority', deadline: 'deadline',
       notes: 'notes', link_util: 'linkUtil', team: 'team', attachments: 'attachments',
       checklist: 'checklist', tags: 'tags', recurrence: 'recurrence', visit_id: 'visitId',
+      reviewed_in_meeting: 'reviewedInMeeting',
       timer_running: 'timerRunning', timer_started_at: 'timerStartedAt', timer_total_seconds: 'timerTotalSeconds',
       timer_operator: 'timerOperator', completed_at: 'completedAt', created_at: 'createdAt', updated_at: 'updatedAt'
     },
@@ -146,6 +147,29 @@ const ENTITIES = [
       const h = window.location.hash.replace('#', '') || '';
       if (h === 'visitas' && document.getElementById('visitViewArea') && typeof renderVisitView === 'function') renderVisitView();
       if (h === 'calendario' && typeof refreshCalendar === 'function') refreshCalendar();
+    }
+  },
+  {
+    table: 'reunioes',
+    dbKey: 'intra_reunioes',
+    label: 'Reuniões',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true,
+    fields: {
+      id: 'id', mes_ano: 'mesAno', status: 'status', started_at: 'startedAt', ended_at: 'endedAt',
+      team: 'team', relatorio: 'relatorio', participants: 'participants',
+      created_at: 'createdAt', updated_at: 'updatedAt'
+    },
+    mapRow: r => ({
+      id: r.id, mesAno: r.mes_ano, status: r.status, startedAt: r.started_at, endedAt: r.ended_at,
+      team: r.team, relatorio: r.relatorio, participants: r.participants || [],
+      createdAt: r.created_at, updatedAt: r.updated_at
+    }),
+    onChange: () => {
+      const h = window.location.hash.replace('#', '') || '';
+      if (h === 'reuniao' && document.getElementById('reuniaoViewArea') && typeof renderReuniaoView === 'function') renderReuniaoView();
     }
   },
   {

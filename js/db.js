@@ -23,6 +23,10 @@ idb.version(3).stores({
   visits: 'id, clientId, operator, status, date'
 });
 
+idb.version(4).stores({
+  reunioes: 'id, status, mesAno'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -31,6 +35,7 @@ const _dbCache = {
   procedure_templates: [],
   operators: [],
   visits: [],
+  reunioes: [],
   keyvalue: {},
   user_profile: {},
   counters: {},
@@ -118,6 +123,7 @@ async function initIndexedDB() {
     _dbCache.procedure_templates = await idb.procedure_templates.toArray();
     _dbCache.operators = await idb.operators.toArray();
     _dbCache.visits = await idb.visits.toArray();
+    _dbCache.reunioes = await idb.reunioes.toArray();
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {

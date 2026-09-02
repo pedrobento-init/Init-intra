@@ -144,6 +144,7 @@ alter table public.pendencias add column if not exists timer_started_at timestam
 alter table public.pendencias add column if not exists timer_total_seconds integer default 0;
 alter table public.pendencias add column if not exists timer_operator text;
 alter table public.pendencias add column if not exists completed_at timestamptz;
+alter table public.pendencias add column if not exists reviewed_in_meeting text;
 alter table public.pendencias add column if not exists created_at timestamptz default now();
 alter table public.pendencias add column if not exists updated_at timestamptz default now();
 create index if not exists idx_pendencias_team on public.pendencias(team);
@@ -264,8 +265,38 @@ begin
     begin alter publication supabase_realtime add table public.procedures; exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.procedure_templates; exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.audit_logs; exception when duplicate_object then null; end;
+    begin alter publication supabase_realtime add table public.reunioes; exception when duplicate_object then null; end;
   end if;
 end $$;
+
+-- 10. REUNIÕES
+create table if not exists public.reunioes (
+  id text primary key,
+  mes_ano text,
+  status text default 'aberta',
+  started_at timestamptz,
+  ended_at timestamptz,
+  team text default 'init',
+  relatorio text default '',
+  participants jsonb default '[]'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.reunioes add column if not exists mes_ano text;
+alter table public.reunioes add column if not exists status text default 'aberta';
+alter table public.reunioes add column if not exists started_at timestamptz;
+alter table public.reunioes add column if not exists ended_at timestamptz;
+alter table public.reunioes add column if not exists team text default 'init';
+alter table public.reunioes add column if not exists relatorio text default '';
+alter table public.reunioes add column if not exists participants jsonb default '[]'::jsonb;
+alter table public.reunioes add column if not exists created_at timestamptz default now();
+alter table public.reunioes add column if not exists updated_at timestamptz default now();
+create index if not exists idx_reunioes_team on public.reunioes(team);
+create index if not exists idx_reunioes_status on public.reunioes(status);
+create index if not exists idx_reunioes_mes_ano on public.reunioes(mes_ano);
+alter table public.reunioes enable row level security;
+drop policy if exists "reunioes all" on public.reunioes;
+create policy "reunioes all" on public.reunioes for all using (true) with check (true);
 
 -- ============================================================================
 -- FIM

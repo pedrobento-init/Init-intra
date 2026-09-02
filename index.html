@@ -72,6 +72,10 @@
           <span>Pendências</span>
           <span class="badge hidden" id="badge-pendencias">0</span>
         </a>
+        <a class="nav-item" id="nav-reuniao" onclick="navigateTo('reuniao')" tabindex="0" role="link" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateTo('reuniao')}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="M7 21h10"/><path d="M12 17v4"/></svg>
+          <span>Reunião</span>
+        </a>
         <a class="nav-item" id="nav-calendario" onclick="navigateTo('calendario')" tabindex="0" role="link" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateTo('calendario')}">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>Calendário</span>
@@ -262,6 +266,7 @@
   <script src="js/templates.js"></script>
   <script src="js/global-search.js"></script>
   <script src="js/timer.js"></script>
+  <script src="js/reunioes.js"></script>
   <script src="js/app.js"></script>
   <script src="js/sw-register.js"></script>
 </body>

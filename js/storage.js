@@ -8,6 +8,7 @@ const DB = {
   OPERATORS: 'intra_operators',
   TICKETS: 'intra_tickets',
   VISITS: 'intra_visits',
+  REUNIOES: 'intra_reunioes',
   USER: 'intra_user',
   COUNTER: 'intra_counter',
   SESSION: 'intra_session',
@@ -124,7 +125,8 @@ const KEY_TO_TABLE = {
   [DB.PROCEDURE_TEMPLATES]: 'procedure_templates',
   [DB.OPERATORS]: 'operators',
   [DB.TICKETS]: 'tickets',
-  [DB.VISITS]: 'visits'
+  [DB.VISITS]: 'visits',
+  [DB.REUNIOES]: 'reunioes'
 };
 
 const KV_TO_V2TABLE = {
@@ -668,6 +670,7 @@ function savePendencia(data) {
       tags: data.tags || [],
       recurrence: data.recurrence || null,
       visit_id: data.visitId || null,
+      reviewed_in_meeting: data.reviewedInMeeting || null,
       timer_running: data.timerRunning === true,
       timer_started_at: data.timerStartedAt || null,
       timer_total_seconds: data.timerTotalSeconds || 0,
@@ -966,6 +969,69 @@ function deleteVisit(id) {
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) console.error('❌ Supabase excluir visita:', res.error); });
+  }
+}
+
+// ── REUNIÕES (Reunião Mensal) ──
+function getReunioes() { return dbGet(DB.REUNIOES); }
+function getReunioesByTeam(team) {
+  const all = getReunioes();
+  if (!team) return all;
+  return all.filter(r => (r.team || 'init') === team);
+}
+function getMyReunioes() { return filterByTeam(getReunioes()); }
+function getReuniaoById(id) { return getReunioes().find(r => r.id === id) || null; }
+function saveReuniao(data) {
+  const list = getReunioes();
+  const isEdit = !!data.id;
+  const now = new Date().toISOString();
+  if (!data.team) data.team = getCurrentTeam();
+  if (isEdit) {
+    const i = list.findIndex(r => r.id === data.id);
+    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    else list.push({ ...data, createdAt: now, updatedAt: now });
+  } else {
+    data.id = nextId('REU');
+    data.createdAt = now;
+    data.updatedAt = now;
+    list.push(data);
+  }
+  dbSet(DB.REUNIOES, list);
+  addLog(isEdit ? 'Editou' : 'Criou', 'Reunião', data.id, data.mesAno || '');
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.from('reunioes').upsert({
+      id: data.id,
+      mes_ano: data.mesAno || null,
+      status: data.status || 'aberta',
+      started_at: data.startedAt || null,
+      ended_at: data.endedAt || null,
+      team: data.team || 'init',
+      relatorio: data.relatorio || '',
+      participants: data.participants || [],
+      created_at: data.createdAt || now,
+      updated_at: now
+    }).then(res => {
+      if (res.error) console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message);
+    }).catch(err => {
+      console.warn('⚠️ Erro de rede Supabase reunião:', err.message);
+    });
+  }
+
+  return data;
+}
+function deleteReuniao(id) {
+  if (!canDelete()) {
+    if (typeof showToast === 'function') showToast('Permissão negada para excluir reuniões.', 'error');
+    return false;
+  }
+  const r = getReuniaoById(id);
+  const desc = r ? r.mesAno : 'Desconhecida';
+  dbSet(DB.REUNIOES, getReunioes().filter(x => x.id !== id));
+  addLog('Excluiu', 'Reunião', id, desc);
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) console.error('❌ Supabase excluir reunião:', res.error); });
   }
 }
 

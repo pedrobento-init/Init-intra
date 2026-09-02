@@ -27,7 +27,7 @@ describe('ENTITIES (schema central)', () => {
 
   it('apenas as tabelas com RLS por equipe têm hasTeam=true', () => {
     const teamScoped = ENTITIES.filter((e) => e.hasTeam).map((e) => e.table).sort();
-    expect(teamScoped).toEqual(['clients', 'pendencias', 'visits']);
+    expect(teamScoped).toEqual(['clients', 'pendencias', 'reunioes', 'visits']);
   });
 });
 
