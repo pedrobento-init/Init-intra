@@ -33,14 +33,14 @@ function _getMeetingTeam() {
 
 function _getOpenPensForClient(clientId) {
   const all = getMyPendencias();
-  return all.filter(p => p.clientId === clientId && !isPendenciaClosed(p.status) && !(p.reviewedInMeeting && _meetingState && p.reviewedInMeeting === _meetingState.id));
+  return all.filter(p => p.clientId === clientId && !isPendenciaClosed(p.status) && !(_meetingState && _meetingState.reviewedIds && _meetingState.reviewedIds.has(p.id)));
 }
 
 function _groupOpenPendenciasByClient(pens) {
   const groups = {};
   pens.forEach(p => {
     if (isPendenciaClosed(p.status)) return;
-    if (p.reviewedInMeeting && _meetingState && p.reviewedInMeeting === _meetingState.id) return;
+    if (_meetingState && _meetingState.reviewedIds && _meetingState.reviewedIds.has(p.id)) return;
     const key = p.clientId || p.clientName || '_sem_cliente';
     if (!groups[key]) groups[key] = { clientId: p.clientId, clientName: p.clientName || '—', pens: [] };
     groups[key].pens.push(p);
@@ -233,7 +233,7 @@ function renderMeetingFlow() {
   const comPendCount = clients.filter(c => c.pens.length > 0).length;
 
   const cardsHtml = group.pens.length > 0
-    ? group.pens.map(p => _meetingPenCard(p)).join('')
+    ? group.pens.map(p => _meetingPenCard(p)).join('') + _meetingNewPendenciaFooterHtml(group)
     : _meetingEmptyClientHtml(group);
 
   content.innerHTML = `
@@ -280,18 +280,11 @@ function renderMeetingFlow() {
     </div>`;
 }
 
-function _meetingEmptyClientHtml(group) {
+function _meetingInlineFormInnerHtml(cid) {
   const team = _getMeetingTeam();
   const opNames = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
   const currentUser = typeof getUser === 'function' ? getUser().name : '';
-  const cid = escapeHtml(group.clientId);
   return `
-    <div class="card" style="text-align:center;padding:24px">
-      <div style="font-size:32px;margin-bottom:8px">✅</div>
-      <div style="font-weight:600;margin-bottom:4px">Sem pendências no momento</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Nenhuma pendência aberta para ${escapeHtml(group.clientName)}</div>
-      <div style="text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para este cliente</div>
         <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Nova pendência para este cliente..."></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
@@ -302,9 +295,43 @@ function _meetingEmptyClientHtml(group) {
           </select>
           <button class="btn btn-secondary btn-sm" onclick="meetingUseTemplate('${cid}')" style="white-space:nowrap">📋 Usar modelo</button>
           <button class="btn btn-primary btn-sm" onclick="meetingCreateInlinePendencia('${cid}')" style="white-space:nowrap">+ Adicionar</button>
-        </div>
+        </div>`;
+}
+
+function _meetingEmptyClientHtml(group) {
+  const cid = escapeHtml(group.clientId);
+  return `
+    <div class="card" style="text-align:center;padding:24px">
+      <div style="font-size:32px;margin-bottom:8px">✅</div>
+      <div style="font-weight:600;margin-bottom:4px">Sem pendências no momento</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Nenhuma pendência aberta para ${escapeHtml(group.clientName)}</div>
+      <div style="text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para este cliente</div>
+        ${_meetingInlineFormInnerHtml(cid)}
       </div>
     </div>`;
+}
+
+function _meetingNewPendenciaFooterHtml(group) {
+  const cid = escapeHtml(group.clientId);
+  return `
+    <div class="card" style="padding:12px">
+      <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="toggleMeetingInlineForm('${cid}')">+ Nova pendência para este cliente</button>
+      <div id="meeting-inline-form-${cid}" style="display:none;margin-top:12px;text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para ${escapeHtml(group.clientName)}</div>
+        ${_meetingInlineFormInnerHtml(cid)}
+      </div>
+    </div>`;
+}
+
+function toggleMeetingInlineForm(clientId) {
+  const el = document.getElementById('meeting-inline-form-' + clientId);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'block') {
+    const ta = document.getElementById('meeting-new-desc-' + clientId);
+    if (ta) ta.focus();
+  }
 }
 
 function _meetingPenCard(p) {
@@ -486,17 +513,44 @@ function meetingCreateInlinePendencia(clientId) {
   if (!descricao) { showToast('Descreva a pendência.', 'error'); return; }
   const tipo = tipoEl?.value || (typeof TIPOS !== 'undefined' ? TIPOS[0] : 'Outro');
   const responsible = respEl?.value || (typeof getUser === 'function' ? getUser().name : '');
+  const wasEmpty = g.pens.length === 0;
   try {
-    const data = { clientId, clientName: g.clientName, descricao, tipo, responsible, status: 'aberto', priority: 'media' };
+    const data = { clientId, clientName: g.clientName, descricao, tipo, responsible, status: 'aberto', priority: 'media', reviewedInMeeting: _meetingState.id };
     if (typeof validatePendencia === 'function') {
       const errs = validatePendencia(data);
       if (errs.length) { showToast(errs[0], 'error'); return; }
     }
-    savePendencia(data);
+    const saved = savePendencia(data);
     if (descEl) descEl.value = '';
-    _refreshCurrentGroupPens();
+    // Inserção imediata no card sem re-render da página inteira
+    // Para manter fila estável, atualiza apenas o grupo atual
+    const newPen = saved || getPendenciaById(data.id) || data;
+    // Garante que não está marcado como revisada no filtro (aparece no card)
+    // save já gravou reviewedInMeeting, mas mantemos visível nesta sessão
+    g.pens.push(newPen);
     showToast('Pendência criada!', 'success');
-    renderMeetingFlow();
+    if (wasEmpty) {
+      // Cliente sem pendência virou com pendência — re-render leve do card
+      renderMeetingFlow();
+    } else {
+      // Inserção incremental no DOM
+      const container = document.getElementById('meetingPenCards');
+      if (container) {
+        const footer = container.querySelector('.card:last-child');
+        const temp = document.createElement('div');
+        temp.innerHTML = _meetingPenCard(newPen);
+        if (footer && footer.innerHTML.includes('Nova pendência para este cliente')) {
+          container.insertBefore(temp.firstElementChild, footer);
+        } else {
+          container.appendChild(temp.firstElementChild);
+        }
+        // Limpa textarea já foi feito; mantém formulário recolhido
+        const form = document.getElementById('meeting-inline-form-' + clientId);
+        if (form) form.style.display = 'none';
+      } else {
+        renderMeetingFlow();
+      }
+    }
   } catch (err) { showToast('Erro ao criar pendência: ' + err.message, 'error'); }
 }
 
