@@ -145,6 +145,88 @@ function getConsecutiveMeetingStreak(clientId, reunioesSortedDesc, pendencias) {
   return streak;
 }
 
+// ── Minha fila do dia (Dashboard) ───────────────────────────────────────────
+const PRIORITY_WEIGHT = { critica: 4, alta: 3, media: 2, baixa: 1 };
+
+function _addDaysISO(iso, days) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function getMinhaFilaDoDia(pendencias, userName, todayISO, opts) {
+  opts = opts || {};
+  const isClosed = opts.isClosedFn || function(s) { return ['concluido','resolvido','cancelado','fechado'].includes(s); };
+  const isStale = opts.isStaleFn || function(p) {
+    if (!p || isClosed(p.status)) return false;
+    const ref = p.updatedAt || p.createdAt;
+    if (!ref) return false;
+    return ((Date.now() - new Date(ref).getTime()) / 86400000) >= 7;
+  };
+  const tomorrowISO = opts.tomorrowISO || _addDaysISO(todayISO, 1);
+  const filtered = (pendencias || []).filter(function(p) {
+    if (isClosed(p.status)) return false;
+    if ((p.responsible || '') !== (userName || '')) return false;
+    const highPri = ['alta','critica'].includes(p.priority);
+    const dueSoon = p.deadline === todayISO || p.deadline === tomorrowISO || (p.deadline && p.deadline < todayISO);
+    const stale = isStale(p);
+    return highPri || dueSoon || stale === true;
+  });
+  filtered.sort(function(a, b) {
+    const aOver = a.deadline && a.deadline < todayISO ? 1 : 0;
+    const bOver = b.deadline && b.deadline < todayISO ? 1 : 0;
+    if (bOver !== aOver) return bOver - aOver;
+    const aW = PRIORITY_WEIGHT[a.priority] || 0;
+    const bW = PRIORITY_WEIGHT[b.priority] || 0;
+    if (bW !== aW) return bW - aW;
+    const aStale = isStale(a) ? 1 : 0;
+    const bStale = isStale(b) ? 1 : 0;
+    if (bStale !== aStale) return bStale - aStale;
+    if (a.deadline && b.deadline && a.deadline !== b.deadline) return a.deadline.localeCompare(b.deadline);
+    return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+  });
+  return filtered;
+}
+
+// ── Busca global helpers (puros) ────────────────────────────────────────────
+function _escapeForSnippet(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function getNoteSnippet(text, query, radius) {
+  if (!text || !query) return null;
+  radius = radius == null ? 60 : radius;
+  const lowerText = String(text).toLowerCase();
+  const lowerQ = String(query).toLowerCase();
+  const idx = lowerText.indexOf(lowerQ);
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - radius);
+  const end = Math.min(text.length, idx + query.length + radius);
+  const before = text.slice(start, idx);
+  const match = text.slice(idx, idx + query.length);
+  const after = text.slice(idx + query.length, end);
+  let snippet = _escapeForSnippet(before) + '<mark>' + _escapeForSnippet(match) + '</mark>' + _escapeForSnippet(after);
+  if (start > 0) snippet = '…' + snippet;
+  if (end < text.length) snippet = snippet + '…';
+  return snippet;
+}
+
+function parseSearchShortcuts(query) {
+  const q = String(query || '');
+  const regex = /(\w+):("[^"]+"|\S+)/g;
+  const filters = {};
+  let m;
+  while ((m = regex.exec(q)) !== null) {
+    const key = m[1].toLowerCase();
+    let val = m[2];
+    if (val.length >= 2 && val[0] === '"' && val[val.length - 1] === '"') val = val.slice(1, -1);
+    filters[key] = val;
+  }
+  const remainingText = q.replace(regex, '').trim().replace(/\s+/g, ' ').trim();
+  return { filters, remainingText };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     HEALTH_THRESHOLDS,
@@ -152,5 +234,6 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateAvgResolutionHours, calculateHealthScore, getHealthForClient,
     getWorkloadByOperator, getWorkloadInPeriod,
     compareMeetings, getConsecutiveMeetingStreak,
+    PRIORITY_WEIGHT, getMinhaFilaDoDia, getNoteSnippet, parseSearchShortcuts,
   };
 }

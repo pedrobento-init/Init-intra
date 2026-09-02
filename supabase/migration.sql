@@ -18,6 +18,7 @@ create table if not exists public.operators (
   active boolean default true,
   team text default 'init',
   auth_user_id uuid,
+  on_leave boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -34,6 +35,7 @@ alter table public.operators add column if not exists is_admin boolean default f
 alter table public.operators add column if not exists active boolean default true;
 alter table public.operators add column if not exists team text default 'init';
 alter table public.operators add column if not exists auth_user_id uuid;
+alter table public.operators add column if not exists on_leave boolean default false;
 alter table public.operators add column if not exists created_at timestamptz default now();
 alter table public.operators add column if not exists updated_at timestamptz default now();
 create index if not exists idx_operators_email on public.operators(email);
@@ -67,6 +69,7 @@ create table if not exists public.clients (
   team text default 'init',
   notes text,
   attachments jsonb default '[]'::jsonb,
+  documents jsonb default '[]'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -91,6 +94,7 @@ alter table public.clients add column if not exists google_sheet_url text;
 alter table public.clients add column if not exists team text default 'init';
 alter table public.clients add column if not exists notes text;
 alter table public.clients add column if not exists attachments jsonb default '[]'::jsonb;
+alter table public.clients add column if not exists documents jsonb default '[]'::jsonb;
 alter table public.clients add column if not exists created_at timestamptz default now();
 alter table public.clients add column if not exists updated_at timestamptz default now();
 create index if not exists idx_clients_team on public.clients(team);

@@ -15,6 +15,37 @@ const DB = {
   LOGS: 'intra_logs',
 };
 
+// ── FILA DE SINCRONIZAÇÃO VISÍVEL ───────────────────────────────────────────
+if (typeof window !== 'undefined') {
+  if (typeof window._pendingSyncCount !== 'number') window._pendingSyncCount = 0;
+  if (typeof window._syncPending !== 'number') window._syncPending = window._pendingSyncCount;
+}
+function getPendingSyncCount() {
+  if (typeof window !== 'undefined') return window._pendingSyncCount || window._syncPending || 0;
+  return 0;
+}
+function incrementPendingSync() {
+  if (typeof window !== 'undefined') {
+    window._pendingSyncCount = (window._pendingSyncCount || 0) + 1;
+    window._syncPending = window._pendingSyncCount;
+    try {
+      const msgEl = document.getElementById('offlineBannerMsg');
+      const banner = document.getElementById('offlineBanner');
+      const cnt = window._pendingSyncCount;
+      if (msgEl && cnt > 0) {
+        msgEl.textContent = cnt + ' alterações aguardando sincronizar';
+        if (banner) { banner.className = 'offline-banner offline visible'; }
+      }
+    } catch (_) {}
+  }
+}
+function resetPendingSyncCount() {
+  if (typeof window !== 'undefined') {
+    window._pendingSyncCount = 0;
+    window._syncPending = 0;
+  }
+}
+
 // ── EQUIPES / PERFIS ──
 const TEAMS = {
   INIT: 'init',
@@ -166,6 +197,11 @@ function dbGetObj(key, def = {}) {
 }
 
 function dbSet(key, value) {
+  try {
+    const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    const notConnected = typeof isSupabaseConnected === 'function' ? (!isSupabaseConnected() || !window._supabaseAuthActive) : false;
+    if (offline || notConnected) incrementPendingSync();
+  } catch (_) {}
   if (typeof setCacheStore === 'function') {
     if (KEY_TO_TABLE[key]) {
       setCacheStore(KEY_TO_TABLE[key], value);
@@ -260,6 +296,7 @@ async function _runSupabaseSync() {
     if (allConflictDetails.length > 0) {
       console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
     }
+    resetPendingSyncCount();
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);
   }
@@ -481,6 +518,97 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+// ── CLIENT DOCUMENTS (permanentes, campo documents) ──
+function getClientDocuments(clientId) {
+  const c = getClientById(clientId);
+  return (c && c.documents) ? c.documents : [];
+}
+
+function addClientDocument(clientId, fileObj) {
+  if (fileObj.size > ATTACHMENT_MAX_SIZE) return { error: 'Arquivo excede o limite de 2MB.' };
+  const list = dbGet(DB.CLIENTS);
+  const idx = list.findIndex(function(c){ return c.id === clientId; });
+  if (idx === -1) return { error: 'Cliente não encontrado.' };
+  if (!list[idx].documents) list[idx].documents = [];
+  if (list[idx].documents.length >= ATTACHMENT_MAX_COUNT) return { error: 'Máximo de ' + ATTACHMENT_MAX_COUNT + ' documentos por cliente.' };
+  var doc = {
+    id: fileObj.id || ('DOC-' + Date.now() + '-' + _secureRandStr(4)),
+    name: fileObj.name,
+    mimeType: fileObj.mimeType || fileObj.type,
+    size: fileObj.size,
+    data: fileObj.data || null,
+    url: fileObj.url || null,
+    path: fileObj.path || null,
+    uploadedBy: (getSession && getSession()?.name) || 'Sistema',
+    uploadedAt: new Date().toISOString()
+  };
+  list[idx].documents.push(doc);
+  list[idx].updatedAt = new Date().toISOString();
+  dbSet(DB.CLIENTS, list);
+  addLog('Anexou documento', 'Cliente', clientId, fileObj.name);
+  return { success: true, document: doc };
+}
+
+function removeClientDocument(clientId, docId) {
+  const list = dbGet(DB.CLIENTS);
+  const idx = list.findIndex(function(c){ return c.id === clientId; });
+  if (idx === -1) return false;
+  if (!list[idx].documents) return false;
+  var dIdx = list[idx].documents.findIndex(function(d){ return d.id === docId; });
+  if (dIdx === -1) return false;
+  var doc = list[idx].documents[dIdx];
+  var docName = doc.name;
+  list[idx].documents.splice(dIdx, 1);
+  list[idx].updatedAt = new Date().toISOString();
+  dbSet(DB.CLIENTS, list);
+  addLog('Removeu documento', 'Cliente', clientId, docName);
+  if (doc.path && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    supabaseClient.storage.from('attachments').remove([doc.path]).then(function(res){ if(res.error) console.warn('Storage remove error:', res.error.message); }).catch(function(){});
+  }
+  return true;
+}
+
+function renderClientDocumentsList(clientId, containerId) {
+  var docs = getClientDocuments(clientId);
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  if (!docs.length) { container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Nenhum documento permanente.</p>'; return; }
+  container.innerHTML = docs.map(function(a){
+    var isImage = a.mimeType && a.mimeType.startsWith('image/');
+    var sizeKB = (a.size / 1024).toFixed(1);
+    var icon = isImage ? '🖼️' : a.mimeType && a.mimeType.includes('pdf') ? '📄' : '📎';
+    var src = a.url || a.data || '';
+    return '<div class="attachment-item">' +
+      (isImage ? '<img src="' + src + '" class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="window.open(this.src,\'_blank\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
+      '<div class="attachment-info"><div class="attachment-name">' + escapeHtml(a.name) + '</div><div class="attachment-meta">' + sizeKB + ' KB · ' + escapeHtml(a.uploadedBy) + ' · ' + formatDateTime(a.uploadedAt) + '</div></div>' +
+      '<div class="attachment-actions"><a href="' + src + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary" title="Baixar">⬇</a><button class="btn btn-sm btn-danger" onclick="removeClientDocumentUI(\'' + clientId + '\',\'' + a.id + '\',\'' + containerId + '\')" title="Remover">✕</button></div></div>';
+  }).join('');
+}
+
+function removeClientDocumentUI(clientId, docId, containerId) {
+  if (removeClientDocument(clientId, docId)) {
+    if (typeof showToast === 'function') showToast('Documento removido.', 'info');
+    renderClientDocumentsList(clientId, containerId);
+  }
+}
+
+function handleClientDocumentUpload(clientId, inputElement, callback) {
+  var file = inputElement.files[0];
+  if (!file) return;
+  if (file.size > ATTACHMENT_MAX_SIZE) { if (typeof showToast === 'function') showToast('Arquivo excede o limite de 2MB.', 'error'); inputElement.value=''; return; }
+  inputElement.value='';
+  (async function(){
+    var docId = 'DOC-' + Date.now() + '-' + _secureRandStr(4);
+    var url=null,path=null,data=null;
+    try { var up = await _uploadAttachmentToStorage('clients', clientId, docId, file); if(up){ url=up.url; path=up.path; } } catch(e){ url=null; }
+    if (!url) {
+      try { data = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(r.result); }; r.onerror=reject; r.readAsDataURL(file); }); } catch(e){ data=null; }
+    }
+    var result = addClientDocument(clientId, { id:docId, name:file.name, mimeType:file.type, size:file.size, data:data, url:url, path:path });
+    if (result && result.error) { if (typeof showToast==='function') showToast(result.error,'error'); }
+    else { if (typeof showToast==='function') showToast('Documento anexado!', 'success'); if (callback) callback(result.document); renderClientDocumentsList(clientId, 'cliDocumentsList'); }
+  })();
+}
 
 // ── CLIENTS ──
 function getClients() {
@@ -540,6 +668,7 @@ function saveClient(data) {
       notes: data.notes,
       team: data.team || 'init',
       attachments: data.attachments || [],
+      documents: data.documents || [],
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
@@ -704,13 +833,67 @@ function deletePendencia(id) {
   }
   return true;
 }
+// ── @MENÇÃO HELPERS ──
+function _getOperatorNamesList() {
+  try {
+    if (typeof getOperatorNames === 'function') return getOperatorNames();
+    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperatorNames === 'function') return globalThis.getOperatorNames();
+    if (typeof getOperators === 'function') return getOperators().map(function(o){ return o.name; });
+    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperators === 'function') return globalThis.getOperators().map(function(o){ return o.name; });
+  } catch (_) {}
+  return [];
+}
+function _escapeHtmlLocal(str){
+  if (typeof escapeHtml === 'function') return escapeHtml(str);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.escapeHtml === 'function') return globalThis.escapeHtml(str);
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function parseMentionedOperators(text) {
+  if (!text) return [];
+  var names = _getOperatorNamesList();
+  if (!names.length) return [];
+  var regex = /@([A-Za-zÀ-ÿ0-9_]+)/g;
+  var mentions = [];
+  var m;
+  while ((m = regex.exec(text)) !== null) mentions.push(m[1]);
+  if (!mentions.length) return [];
+  var result = [];
+  var seen = new Set();
+  mentions.forEach(function(tok){
+    var tokLower = tok.toLowerCase();
+    names.forEach(function(n){
+      var nLower = n.toLowerCase();
+      var parts = nLower.split(/\s+/);
+      var matches = parts.some(function(p){ return p === tokLower; }) || nLower === tokLower;
+      if (matches && !seen.has(n)) { seen.add(n); result.push(n); }
+    });
+  });
+  return result;
+}
+
+function highlightMentions(text) {
+  var esc = _escapeHtmlLocal(text);
+  var names = _getOperatorNamesList();
+  if (!names.length) return esc;
+  return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function(match, p1){
+    var tokLower = p1.toLowerCase();
+    var isMention = names.some(function(n){
+      var parts = n.toLowerCase().split(/\s+/);
+      return parts.some(function(part){ return part === tokLower; }) || n.toLowerCase() === tokLower;
+    });
+    if (isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@' + p1 + '</span>';
+    return match;
+  });
+}
+
 function addPendenciaNote(id, text, author) {
   const list = getPendencias();
   const i = list.findIndex(p => p.id === id);
   if (i === -1) return;
   if (!list[i].notes) list[i].notes = [];
-  const note = { text, author, createdAt: new Date().toISOString() };
-  list[i].notes.push(note);
+  var mentionedOperators = parseMentionedOperators(text);
+  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators };
   list[i].updatedAt = new Date().toISOString();
   dbSet(DB.PENDENCIAS, list);
 
@@ -1215,9 +1398,12 @@ async function saveOperator(data) {
     data.createdAt = now;
     data.updatedAt = now;
     data.active = true;
+    data.onLeave = data.onLeave === true;
     list.push(data);
     savedOp = data;
   }
+  // ensure boolean normalization for onLeave
+  if (savedOp) savedOp.onLeave = savedOp.onLeave === true;
   dbSet(DB.OPERATORS, list);
   
   // Sync the current session if this operator is the one logged in
@@ -1245,6 +1431,7 @@ async function saveOperator(data) {
       is_admin: savedOp.isAdmin === true,
        active: savedOp.active !== false,
        team: savedOp.team || 'init',
+      on_leave: savedOp.onLeave === true,
       created_at: savedOp.createdAt || now,
       updated_at: now
     }).then(res => {
@@ -1585,4 +1772,8 @@ function validateTemplate(data) {
   if (!Validators.required(data.title)) errors.push('Título é obrigatório.');
   if (!Validators.required(data.content)) errors.push('Conteúdo é obrigatório.');
   return errors;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument };
 }

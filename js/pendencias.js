@@ -2,11 +2,71 @@
 
 const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro'];
 
-const PEN_KANBAN_COLS = Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot }));
+const PEN_KANBAN_COLS = typeof STATUS_PEN_MAP !== 'undefined' ? Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot })) : [];
 
 let penView = 'kanban';
 let penScope = 'active';
 let _filteredPens = [];
+
+// ── @MENÇÃO: fallback se storage.js não carregou (ex: testes) ──
+function _getOpNamesFallback(){
+  try{
+    if(typeof getOperatorNames==='function') return getOperatorNames();
+    if(typeof globalThis!=='undefined' && typeof globalThis.getOperatorNames==='function') return globalThis.getOperatorNames();
+    if(typeof getOperators==='function') return getOperators().map(function(o){return o.name;});
+    if(typeof globalThis!=='undefined' && typeof globalThis.getOperators==='function') return globalThis.getOperators().map(function(o){return o.name;});
+  }catch(_){}
+  return [];
+}
+function _escapeHtmlFallback(str){
+  if(typeof escapeHtml==='function') return escapeHtml(str);
+  if(typeof globalThis!=='undefined' && typeof globalThis.escapeHtml==='function') return globalThis.escapeHtml(str);
+  if(str==null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+if (typeof parseMentionedOperators !== 'function') {
+  var parseMentionedOperators = function(text) {
+    if (!text) return [];
+    var names = _getOpNamesFallback();
+    if (!names.length) return [];
+    var regex = /@([A-Za-zÀ-ÿ0-9_]+)/g, mentions=[], m; while((m=regex.exec(text))!==null) mentions.push(m[1]);
+    if(!mentions.length) return [];
+    var result=[], seen=new Set();
+    mentions.forEach(function(tok){ var tl=tok.toLowerCase(); names.forEach(function(n){ var nl=n.toLowerCase(), parts=nl.split(/\s+/); var ok=parts.some(function(p){return p===tl;})||nl===tl; if(ok&&!seen.has(n)){seen.add(n); result.push(n);} }); });
+    return result;
+  };
+}
+if (typeof highlightMentions !== 'function') {
+  var highlightMentions = function(text) {
+    var esc = _escapeHtmlFallback(text);
+    var names=_getOpNamesFallback();
+    if(!names.length) return esc;
+    return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function(match,p1){ var tl=p1.toLowerCase(); var isMention=names.some(function(n){ var parts=n.toLowerCase().split(/\s+/); return parts.some(function(p){return p===tl;})||n.toLowerCase()===tl; }); if(isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@'+p1+'</span>'; return match; });
+  };
+}
+
+// ── TEMPLATE SUGGESTION HELPERS (puras) ──
+function _tokenizeWords(str) {
+  return String(str||'').toLowerCase().split(/\s+/).map(function(w){ return w.replace(/[^a-zà-ÿ0-9]/gi,''); }).filter(function(w){ return w.length>2; });
+}
+function suggestTemplateForDescription(descText, templates) {
+  var words = _tokenizeWords(descText);
+  if (!words.length || !templates || !templates.length) return null;
+  var best=null, bestScore=-1;
+  templates.forEach(function(t){
+    var tplText = ((t.title||'')+' '+(t.category||'')+' '+(t.content||'')).toLowerCase();
+    var matches = words.filter(function(w){ return tplText.includes(w); }).length;
+    var meets = matches>=2 || matches>=words.length*0.5;
+    if (meets && matches>bestScore) { bestScore=matches; best=t; }
+  });
+  return best;
+}
+function applyTemplateSuggestion(tplId) {
+  var tpl = typeof getProcedureTemplateById==='function'?getProcedureTemplateById(tplId):null;
+  if(!tpl) return;
+  var ta = document.querySelector('textarea[name="descricao"]');
+  if(ta){ ta.value = tpl.content||''; ta.dispatchEvent(new Event('input',{bubbles:true})); if(typeof showToast==='function') showToast('Modelo "'+tpl.title+'" aplicado!','success'); var sug=document.getElementById('templateSuggestion'); if(sug) sug.style.display='none'; }
+}
 
 function renderPendencias() {
   document.getElementById('pageTitle').textContent = 'Pendências';
@@ -156,6 +216,9 @@ function penKanbanCard(p) {
   var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   var isStale = isStalePendencia(p);
   var sla = slaCountdown(p, 48);
+  var onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
+  var onLeaveBadge = onLeave ? ' <span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : '';
+  var reassignBtn = onLeave ? ' <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
   return '<div class="kanban-card"' +
     ' draggable="true"' +
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
@@ -169,6 +232,7 @@ function penKanbanCard(p) {
     '<div class="kanban-card-meta" style="margin-top:6px">' +
       priorityTag(p.priority) + ' ' +
       '<span style="font-size:11px">' + escapeHtml(p.responsible || '—') + '</span>' +
+      onLeaveBadge + reassignBtn +
       (isOverdue ? ' <span style="color:#dc2626;font-weight:600">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px">🕓 Parada</span>' : '') +
       (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px">⏱ ' + sla.label + '</span>' : '') +
@@ -193,6 +257,9 @@ function penMobileCard(p) {
   const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   const isStale = isStalePendencia(p);
   const sla = slaCountdown(p, 48);
+  const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
+  const onLeaveBadge = onLeave ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : '';
+  const reassignBtn = onLeave ? '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
   return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
     '<div class="pen-mobile-card-top">' +
       '<div class="pen-mobile-card-client">' +
@@ -205,6 +272,7 @@ function penMobileCard(p) {
     '<div class="pen-mobile-card-meta">' +
       priorityTag(p.priority) +
       '<span>' + escapeHtml(p.responsible || '—') + '</span>' +
+      onLeaveBadge + reassignBtn +
       (isOverdue ? '<span class="pen-mobile-overdue">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600">🕓 Parada</span>' : '') +
       (sla ? '<span style="color:' + sla.color + ';font-weight:600">⏱ ' + sla.label + '</span>' : '') +
@@ -321,10 +389,10 @@ function deleteSavedPenFilter() {
   showToast('Filtro removido.', 'info');
 }
 
-window.debouncedRenderPenView = debounce(renderPenView, 300);
+if (typeof window !== 'undefined') window.debouncedRenderPenView = debounce(renderPenView, 300);
 
 let _penMobileState = null;
-window.addEventListener('resize', debounce(function() {
+if (typeof window !== 'undefined') window.addEventListener('resize', debounce(function() {
   const area = document.getElementById('penViewArea');
   if (!area || penView !== 'kanban') return;
   const nowMobile = isPenMobile();
@@ -380,7 +448,7 @@ function openPendenciaDetail(id) {
           <div class="timeline-dot">&#x270F;&#xFE0F;</div>
           <div class="timeline-content">
             <div class="timeline-meta">👤 <strong>${escapeHtml(n.author)}</strong> · ${formatDateTime(n.createdAt)}</div>
-            <div class="timeline-text">${escapeHtml(n.text)}</div>
+            <div class="timeline-text">${typeof highlightMentions==='function'?highlightMentions(n.text):escapeHtml(n.text)}</div>
           </div>
         </div>`).join('') : '<p class="text-muted">Nenhuma nota ainda.</p>'}
     </div>
@@ -401,6 +469,35 @@ function openPendenciaDetail(id) {
   setTimeout(() => {
     renderAttachmentList('pendencias', id, 'penAttachmentsList');
     renderPenChecklist(id);
+    var ta = document.getElementById('newNoteText');
+    if (ta && !ta.dataset.clipboardBound) {
+      ta.dataset.clipboardBound='1';
+      ta.addEventListener('paste', function(e){
+        if(!e.clipboardData || !e.clipboardData.items) return;
+        var items=e.clipboardData.items;
+        for(var i=0;i<items.length;i++){
+          var item=items[i];
+          if(item.type && item.type.startsWith('image/')){
+            e.preventDefault();
+            var file=item.getAsFile();
+            if(!file) continue;
+            if(!file.name) { try{ Object.defineProperty(file,'name',{value:'clipboard-'+Date.now()+'.png'}); }catch(_){ file.name='clipboard-'+Date.now()+'.png'; } }
+            (async function(f){
+              var attId='ATT-'+Date.now()+'-'+_secureRandStr(4);
+              var url=null,path=null,data=null;
+              try{ var up=await _uploadAttachmentToStorage('pendencias', id, attId, f); if(up){ url=up.url; path=up.path; } }catch(_){}
+              if(!url){
+                try{ data=await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsDataURL(f); }); }catch(_){}
+              }
+              var result=addAttachment('pendencias', id, {id:attId, name:f.name, mimeType:f.type, size:f.size, data:data, url:url, path:path});
+              if(result && result.error){ if(typeof showToast==='function') showToast(result.error,'error'); }
+              else { if(typeof showToast==='function') showToast('Imagem anexada via clipboard','success'); renderAttachmentList('pendencias', id, 'penAttachmentsList'); }
+            })(file);
+            break;
+          }
+        }
+      });
+    }
   }, 20);
 }
 
@@ -444,7 +541,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
           </select></div>
       </div>
       <div class="form-group"><label class="form-label">Descrição da Pendência *</label>
-        <textarea class="form-textarea" name="descricao" rows="3" placeholder="Descreva o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea></div>
+        <textarea class="form-textarea" name="descricao" rows="3" placeholder="Descreva o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px"></div></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Responsável</label>
           <select class="form-select" name="responsible">
@@ -484,6 +581,20 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`);
+  setTimeout(function(){
+    var ta=document.querySelector('textarea[name="descricao"]');
+    var sug=document.getElementById('templateSuggestion');
+    if(!ta||!sug) return;
+    ta.addEventListener('input', function(){
+      var txt=ta.value||'';
+      var tpls=typeof getProcedureTemplates==='function'?getProcedureTemplates():[];
+      var best=suggestTemplateForDescription(txt, tpls);
+      if(best){
+        sug.style.display='block';
+        sug.innerHTML="Usar modelo '"+escapeHtml(best.title)+"'? <button class=\"btn btn-sm btn-primary\" onclick=\"applyTemplateSuggestion('"+escapeHtml(best.id)+"')\">Aplicar</button>";
+      } else { sug.style.display='none'; sug.innerHTML=''; }
+    });
+  }, 30);
 }
 
 function submitPendenciaForm(e, id) {
@@ -616,4 +727,55 @@ function removeCheckItem(id, index) {
   renderPenChecklist(id);
   renderPenView(false);
   showToast('Sub-tarefa removida.', 'info');
+}
+
+function openReassignPendencia(penId) {
+  const pen = getPendenciaById(penId);
+  if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); return; }
+  const eligible = typeof getOperators === 'function' ? getOperators().filter(o => o.active !== false && o.onLeave !== true) : [];
+  if (!eligible.length) { if (typeof showToast === 'function') showToast('Nenhum operador disponível para reatribuição.', 'error'); return; }
+  const current = pen.responsible || '';
+  const team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
+  let options = eligible;
+  if (team && typeof isTeamAdmin === 'function' && !isTeamAdmin()) {
+    const filtered = eligible.filter(o => (o.team || 'init') === team);
+    if (filtered.length) options = filtered;
+  }
+  openModal('Reatribuir pendência', `
+    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(pen.descricao || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : ''}</p>
+    <div class="form-group">
+      <label class="form-label">Novo responsável *</label>
+      <select class="form-select" id="reassignSelect">
+        ${options.map(o => `<option value="${escapeHtml(o.name)}" ${o.name===current?'selected':''}>${escapeHtml(o.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitReassignPendencia('${escapeHtml(penId)}')">Salvar</button>
+    </div>
+  `);
+}
+
+function submitReassignPendencia(penId) {
+  const pen = getPendenciaById(penId);
+  if (!pen) return;
+  const sel = document.getElementById('reassignSelect');
+  const novo = sel ? sel.value : '';
+  if (!novo) { if (typeof showToast === 'function') showToast('Selecione um operador.', 'error'); return; }
+  if (novo === pen.responsible) { if (typeof showToast === 'function') showToast('Selecione um responsável diferente.', 'error'); return; }
+  const old = pen.responsible;
+  pen.responsible = novo;
+  savePendencia(pen);
+  if (typeof addLog === 'function') addLog('Reatribuiu', 'Pendência', pen.id, old + ' → ' + novo);
+  closeModal();
+  if (typeof showToast === 'function') showToast('Pendência reatribuída para ' + novo + '!', 'success');
+  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
+  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
+function meetingReassignPen(penId) { return openReassignPendencia(penId); }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { suggestTemplateForDescription, _tokenizeWords, parseMentionedOperators, highlightMentions };
 }

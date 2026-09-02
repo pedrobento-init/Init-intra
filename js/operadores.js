@@ -154,8 +154,11 @@ function _renderOpGrid() {
       <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" onclick="openOpPendencias('${escapeHtml(op.id)}')">
         <div class="op-card-header">
           <div class="op-avatar" style="background:${color}">${escapeHtml(initials)}</div>
-          <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
-            ${isActive ? 'Ativo' : 'Inativo'}
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
+              ${isActive ? 'Ativo' : 'Inativo'}
+            </div>
+            ${op.onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : ''}
           </div>
         </div>
         <div class="op-card-name">${escapeHtml(op.name)}</div>
@@ -328,6 +331,10 @@ function openOperadorForm(id = null) {
           <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op?.isAdmin ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opIsAdmin" class="form-label" style="margin-bottom:0;cursor:pointer;font-weight:600">Perfil Administrador</label>
         </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input type="checkbox" name="onLeave" id="opOnLeave" ${op?.onLeave ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
+          <label for="opOnLeave" class="form-label" style="margin-bottom:0;cursor:pointer">🏖️ Afastado (onLeave)</label>
+        </div>
         ` : `
         <input type="hidden" name="team" value="${op?.team||'init'}" />
         <input type="hidden" name="active" value="${op?.active !== false ? '1' : '0'}" />
@@ -467,6 +474,13 @@ async function submitOperadorForm(e, id) {
       isAdminVal = existing.isAdmin === true;
     }
 
+    let onLeaveVal = false;
+    if (isAdminUser) {
+      onLeaveVal = fd.get('onLeave') !== null;
+    } else if (existing) {
+      onLeaveVal = existing.onLeave === true;
+    }
+
     const opData = {
       id: id || null,
       name,
@@ -478,6 +492,7 @@ async function submitOperadorForm(e, id) {
       notes:  g('notes'),
       active: activeVal,
       isAdmin: isAdminVal,
+      onLeave: onLeaveVal,
       team:   g('team') || 'init',
       pinHash,
       pinSalt: existing?.pinSalt,
@@ -569,6 +584,15 @@ function getOperatorNames(team) {
   return ops.filter(o => (o.team || 'init') === team).map(o => o.name);
 }
 
+function isOperatorOnLeave(name) {
+  if (!name) return false;
+  const ops = getOperators();
+  const byName = ops.find(o => o.name === name);
+  if (byName) return byName.onLeave === true;
+  const byId = typeof getOperatorById === 'function' ? getOperatorById(name) : null;
+  return byId ? byId.onLeave === true : false;
+}
+
 // ── Modal: pendências por operador ───────────────────────────────
 function openOpPendencias(opId) {
   const op = getOperatorById(opId);
@@ -608,7 +632,7 @@ function openOpPendencias(opId) {
     <div class="op-detail-header" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-base);border-radius:var(--radius);margin-bottom:20px">
       <div style="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700">${escapeHtml(op.name)}</div>
+        <div style="font-size:16px;font-weight:700">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : ''}</div>
         <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(op.role || 'Técnico')}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">

@@ -247,6 +247,7 @@ function renderMeetingFlow() {
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <span style="font-size:13px;color:var(--text-muted)">${_meetingState.notes.length} notas · ${_meetingState.resolvedIds.length} resolvidas</span>
+          <button class="btn btn-secondary btn-sm" onclick="enterPresentationMode()">🖥️ Modo Apresentação</button>
           <button class="btn btn-danger btn-sm" onclick="endReuniao()">Encerrar Reunião</button>
         </div>
       </div>
@@ -278,6 +279,59 @@ function renderMeetingFlow() {
         </button>
       </div>
     </div>`;
+}
+
+let _presentationPrev = null;
+function _ensurePresentationStyle(){
+  if(document.getElementById('presentationModeStyle')) return;
+  var st=document.createElement('style');
+  st.id='presentationModeStyle';
+  st.textContent='.presentation-mode .card{font-size:1.2em} .presentation-mode #topbar,.presentation-mode .topbar{ display:none !important } .presentation-mode .offline-banner{ display:none !important }';
+  document.head.appendChild(st);
+}
+function enterPresentationMode(){
+  _ensurePresentationStyle();
+  var sidebar=document.getElementById('sidebar');
+  var main=document.getElementById('mainContent');
+  var topbar=document.querySelector('.topbar');
+  _presentationPrev={
+    sidebarDisplay: sidebar ? sidebar.style.display : '',
+    mainMargin: main ? main.style.marginLeft : '',
+    bodyClass: document.body.className,
+    topbarDisplay: topbar ? topbar.style.display : ''
+  };
+  if(sidebar) sidebar.style.display='none';
+  if(main) main.style.marginLeft='0';
+  if(topbar) topbar.style.display='none';
+  document.body.classList.add('presentation-mode');
+  var existing=document.getElementById('exitPresentationBtn');
+  if(!existing){
+    var btn=document.createElement('button');
+    btn.id='exitPresentationBtn';
+    btn.textContent='Sair do modo';
+    btn.className='btn btn-secondary';
+    btn.style.cssText='position:fixed;top:12px;right:12px;z-index:9999';
+    btn.onclick=exitPresentationMode;
+    document.body.appendChild(btn);
+  }
+}
+function exitPresentationMode(){
+  var sidebar=document.getElementById('sidebar');
+  var main=document.getElementById('mainContent');
+  var topbar=document.querySelector('.topbar');
+  if(_presentationPrev){
+    if(sidebar) sidebar.style.display=_presentationPrev.sidebarDisplay;
+    if(main) main.style.marginLeft=_presentationPrev.mainMargin;
+    if(topbar) topbar.style.display=_presentationPrev.topbarDisplay;
+    document.body.className=_presentationPrev.bodyClass;
+  } else {
+    if(sidebar) sidebar.style.display='';
+    if(main) main.style.marginLeft='';
+    if(topbar) topbar.style.display='';
+    document.body.classList.remove('presentation-mode');
+  }
+  var btn=document.getElementById('exitPresentationBtn');
+  if(btn) btn.remove();
 }
 
 function _meetingInlineFormInnerHtml(cid) {
@@ -337,6 +391,9 @@ function toggleMeetingInlineForm(clientId) {
 function _meetingPenCard(p) {
   const isReviewed = _meetingState && _meetingState.reviewedIds.has(p.id);
   const isResolved = _meetingState && _meetingState.resolvedIds.includes(p.id);
+  const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
+  const onLeaveBadge = onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : '';
+  const reassignBtn = onLeave ? `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')">Reatribuir</button>` : '';
 
   return `
     <div class="card" id="meeting-card-${escapeHtml(p.id)}" style="border-left:4px solid ${
@@ -348,6 +405,8 @@ function _meetingPenCard(p) {
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-muted)">
             ${priorityTag(p.priority)}
             <span>Resp: ${escapeHtml(p.responsible || '—')}</span>
+            ${onLeaveBadge}
+            ${reassignBtn}
             ${p.deadline ? `<span>Prazo: ${formatDate(parseDeadline(p.deadline))}</span>` : ''}
           </div>
         </div>

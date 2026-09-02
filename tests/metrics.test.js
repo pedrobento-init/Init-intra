@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const metrics = require('../js/metrics.js');
 
-const { getSlaStatsForClient, getAllSlaStats, sortClientsBySla, calculateAvgResolutionHours, calculateHealthScore, getHealthForClient, getWorkloadByOperator, compareMeetings, getConsecutiveMeetingStreak } = metrics;
+const { getSlaStatsForClient, getAllSlaStats, sortClientsBySla, calculateAvgResolutionHours, calculateHealthScore, getHealthForClient, getWorkloadByOperator, compareMeetings, getConsecutiveMeetingStreak, getMinhaFilaDoDia, getNoteSnippet, parseSearchShortcuts } = metrics;
 
 function isClosed(s) { return ['concluido','resolvido','cancelado','fechado'].includes(s); }
 
@@ -95,5 +95,64 @@ describe('streak N meses seguidos', () => {
     expect(streak).toBe(2);
     const streak2 = getConsecutiveMeetingStreak('CLI-2', reunioes, pens);
     expect(streak2).toBe(0);
+  });
+});
+
+describe('Minha fila do dia', () => {
+  const today = '2024-05-10';
+  const tomorrow = '2024-05-11';
+  function mkStale(isStaleIds) {
+    return (p) => isStaleIds.includes(p.id);
+  }
+  it('filtra por responsável e urgência (alta/critica, hoje/amanhã, stale)', () => {
+    const pens = [
+      { id:'PEN-1', responsible:'Ana', status:'aberto', priority:'alta', deadline:'2024-05-20', updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-2', responsible:'Ana', status:'aberto', priority:'baixa', deadline:today, updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-3', responsible:'Ana', status:'aberto', priority:'baixa', deadline:'2024-05-20', updatedAt:'2024-05-01T10:00:00Z' },
+      { id:'PEN-4', responsible:'Bob', status:'aberto', priority:'critica', deadline:'2024-05-20', updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-5', responsible:'Ana', status:'concluido', priority:'critica', deadline:today, updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-6', responsible:'Ana', status:'aberto', priority:'baixa', deadline:'2024-05-20', updatedAt:'2024-05-09T10:00:00Z' },
+    ];
+    const queue = getMinhaFilaDoDia(pens, 'Ana', today, { tomorrowISO: tomorrow, isStaleFn: mkStale(['PEN-3']) });
+    const ids = queue.map(p=>p.id);
+    expect(ids).toContain('PEN-1');
+    expect(ids).toContain('PEN-2');
+    expect(ids).toContain('PEN-3');
+    expect(ids).not.toContain('PEN-4');
+    expect(ids).not.toContain('PEN-5');
+    expect(ids).not.toContain('PEN-6');
+  });
+  it('ordena vencidas primeiro, depois prioridade, depois stale', () => {
+    const pens = [
+      { id:'PEN-A', responsible:'Ana', status:'aberto', priority:'media', deadline:'2024-05-09', updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-B', responsible:'Ana', status:'aberto', priority:'critica', deadline:'2024-05-20', updatedAt:'2024-05-09T10:00:00Z' },
+      { id:'PEN-C', responsible:'Ana', status:'aberto', priority:'baixa', deadline:tomorrow, updatedAt:'2024-05-01T10:00:00Z' },
+      { id:'PEN-D', responsible:'Ana', status:'aberto', priority:'alta', deadline:today, updatedAt:'2024-05-09T10:00:00Z' },
+    ];
+    const queue = getMinhaFilaDoDia(pens, 'Ana', today, { tomorrowISO: tomorrow, isStaleFn: mkStale(['PEN-C']) });
+    expect(queue[0].id).toBe('PEN-A');
+    expect(queue[1].id).toBe('PEN-B');
+  });
+});
+
+describe('Busca global helpers (puros)', () => {
+  it('parseSearchShortcuts extrai cliente e status e texto livre', () => {
+    const r1 = parseSearchShortcuts('status:aberto pagamento');
+    expect(r1.filters.status).toBe('aberto');
+    expect(r1.remainingText).toBe('pagamento');
+    const r2 = parseSearchShortcuts('cliente:"Padaria Central" status:aberto');
+    expect(r2.filters.cliente).toBe('Padaria Central');
+    expect(r2.filters.status).toBe('aberto');
+    expect(r2.remainingText).toBe('');
+  });
+  it('getNoteSnippet destaca com <mark> e 60 chars ao redor', () => {
+    const text = 'A'.repeat(70) + ' pagamento pendente ' + 'B'.repeat(70);
+    const snippet = getNoteSnippet(text, 'pagamento', 60);
+    expect(snippet).toContain('<mark>pagamento</mark>');
+    expect(snippet.startsWith('…')).toBe(true);
+    expect(snippet.endsWith('…')).toBe(true);
+  });
+  it('getNoteSnippet retorna null se não há match', () => {
+    expect(getNoteSnippet('hello world', 'xyz')).toBeNull();
   });
 });

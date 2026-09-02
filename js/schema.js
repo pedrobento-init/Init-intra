@@ -20,7 +20,7 @@ const ENTITIES = [
       owner_phone: 'ownerPhone', responsible: 'responsible', responsible_phone: 'responsiblePhone',
       technician: 'technician', server: 'server', hosting: 'hosting', backup: 'backup',
       licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', team: 'team',
-      notes: 'notes', attachments: 'attachments', created_at: 'createdAt', updated_at: 'updatedAt'
+      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_at: 'updatedAt'
     },
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
@@ -72,6 +72,7 @@ const ENTITIES = [
     fields: {
       id: 'id', name: 'name', initials: 'initials', color: 'color', role: 'role', phone: 'phone',
       email: 'email', is_admin: 'isAdmin', active: 'active', team: 'team', auth_user_id: 'auth_user_id',
+      on_leave: 'onLeave',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     // pinHash/pinSalt não vêm do mapeamento genérico — são preservados por onMerged
@@ -97,13 +98,13 @@ const ENTITIES = [
       id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone,
       email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null,
       is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init',
-      auth_user_id: o.auth_user_id || null,
+      auth_user_id: o.auth_user_id || null, on_leave: o.onLeave === true,
       created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
     }),
     mapRow: r => ({
       id: r.id, name: r.name, initials: r.initials, color: r.color, role: r.role, phone: r.phone,
       email: r.email, isAdmin: r.is_admin === true, active: r.active !== false, team: r.team || 'init',
-      auth_user_id: r.auth_user_id, createdAt: r.created_at, updatedAt: r.updated_at
+      auth_user_id: r.auth_user_id, onLeave: r.on_leave === true, createdAt: r.created_at, updatedAt: r.updated_at
     }),
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'operadores' && document.getElementById('opGridWrap') && typeof filterOperadores === 'function') filterOperadores();

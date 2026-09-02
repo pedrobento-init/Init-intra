@@ -5,6 +5,34 @@ let _clientPage = 1;
 let _filteredClients = [];
 const CLIENT_PAGE_SIZE = 30;
 
+function _getPendenciasList(){ if(typeof getPendencias==='function') return getPendencias(); if(typeof globalThis!=='undefined' && typeof globalThis.getPendencias==='function') return globalThis.getPendencias(); return []; }
+function _getHealthForClientProxy(pens,cid,today){ if(typeof getHealthForClient==='function') return getHealthForClient(pens,cid,today); if(typeof globalThis!=='undefined' && typeof globalThis.getHealthForClient==='function') return globalThis.getHealthForClient(pens,cid,today); return null; }
+function _calcAvgProxy(arr){ if(typeof calculateAvgResolutionHours==='function') return calculateAvgResolutionHours(arr); if(typeof globalThis!=='undefined' && typeof globalThis.calculateAvgResolutionHours==='function') return globalThis.calculateAvgResolutionHours(arr); return null; }
+function _formatDateProxy(d){ if(typeof formatDate==='function') return formatDate(d); if(typeof globalThis!=='undefined' && typeof globalThis.formatDate==='function') return globalThis.formatDate(d); return new Date(d).toLocaleDateString('pt-BR'); }
+function _localDateProxy(){ if(typeof localDateISO==='function') return localDateISO(); if(typeof globalThis!=='undefined' && typeof globalThis.localDateISO==='function') return globalThis.localDateISO(); return new Date().toISOString().slice(0,10); }
+function buildClientNarrative(clientId) {
+  try {
+    var allPens = _getPendenciasList().filter(function(p){ return p.clientId===clientId; });
+    var today = _localDateProxy();
+    var total = allPens.length;
+    var firstDate = null;
+    if(allPens.length){
+      var min = allPens.reduce(function(a,b){ return new Date(a.createdAt)<new Date(b.createdAt)?a:b; });
+      firstDate = min.createdAt;
+    }
+    var avg = null;
+    try{
+      var concluidas = allPens.filter(function(p){ return ['concluido','resolvido'].includes(p.status); });
+      avg = _calcAvgProxy(concluidas);
+    }catch(_){}
+    var health=null; try{ health=_getHealthForClientProxy(_getPendenciasList(), clientId, today); }catch(_){}
+    var desde = firstDate ? _formatDateProxy(firstDate) : '—';
+    var mediaText = avg!=null ? avg.toFixed(1)+'h' : 'sem média';
+    var statusText = health ? health.emoji+' '+health.label : '—';
+    return 'Cliente desde '+desde+' · '+total+' pendências no histórico · média '+mediaText+' · status '+statusText;
+  } catch(_){ return ''; }
+}
+
 function renderClients() {
   document.getElementById('pageTitle').textContent = 'Clientes';
   const filterState = loadFilterState('clients', {});
@@ -27,7 +55,7 @@ function renderClients() {
   renderClientGrid();
 }
 
-window.debouncedFilterClientCards = debounce(filterClientCards, 300);
+if (typeof window !== 'undefined') window.debouncedFilterClientCards = debounce(filterClientCards, 300);
 
 function filterClientCards() {
   _clientPage = 1;
@@ -132,12 +160,14 @@ function renderClientTab(tab, id) {
       <div style="padding:10px;border-radius:8px;background:var(--bg-secondary);margin-bottom:16px;font-size:12px;color:var(--text-muted)">
         SLA: ${slaF.totalAbertas} abertas · ${slaF.vencidas} vencidas · ${slaF.dentroPrazo} no prazo
       </div>`;
+    var narrative = buildClientNarrative(id);
     el.innerHTML = `
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" onclick="closeModal();openClientForm('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
         <button class="btn btn-secondary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button>
       </div>
       ${healthCard}
+      <div style="padding:10px 12px;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border);margin-bottom:16px;font-size:13px;line-height:1.5;color:var(--text-secondary)">${escapeHtml(narrative)}</div>
       <div class="client-detail-section">
         <div class="client-detail-section-title">👤 Identificação</div>
         <div class="info-grid">${ir('CNPJ/CPF',c.cnpj)}${ir('Segmento',c.segment)}${ir('Dono',c.owner)}${ir('Contato Dono',c.ownerPhone)}${ir('Responsável TI',c.responsible)}${ir('Contato',c.responsiblePhone)}${ir('Técnico',c.technician)}</div>
@@ -184,16 +214,27 @@ function renderClientTab(tab, id) {
     el.innerHTML = `
       <div class="attachment-section" style="margin-top:0">
         <div class="section-header" style="margin-bottom:12px">
-          <span class="section-title">📁 Documentos e Anexos do Cliente (Máx 2MB)</span>
+          <span class="section-title">📄 Documentos permanentes (Máx 2MB)</span>
           <label class="btn btn-primary btn-sm" style="cursor:pointer">
-            + Enviar Documento
+            + Enviar Documento permanente
+            <input type="file" id="cliDocFileInput" style="display:none" onchange="handleClientDocumentUpload('${id}',this,()=>renderClientDocumentsList('${id}','cliDocumentsList'))" />
+          </label>
+        </div>
+        <div class="attachment-list" id="cliDocumentsList"></div>
+      </div>
+      <hr class="divider" />
+      <div class="attachment-section" style="margin-top:0">
+        <div class="section-header" style="margin-bottom:12px">
+          <span class="section-title">📁 Anexos do Cliente (Máx 2MB)</span>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+            + Enviar Anexo
             <input type="file" id="cliFileInput" style="display:none" onchange="handleFileUpload('clients','${id}',this,()=>renderAttachmentList('clients','${id}','cliAttachmentsList'))" />
           </label>
         </div>
         <div class="attachment-list" id="cliAttachmentsList"></div>
       </div>
     `;
-    setTimeout(() => renderAttachmentList('clients', id, 'cliAttachmentsList'), 20);
+    setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); }, 20);
   } else if (tab === 'visitas') {
     const visits = getVisitsByClient(id);
     el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
@@ -1084,4 +1125,8 @@ function executeClientImport() {
   renderClientGrid();
   updateBadges();
   showToast(`${created} cliente(s) importado(s)${skipped ? ` · ${skipped} linha(s) ignoradas` : ''}`, 'success');
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildClientNarrative };
 }

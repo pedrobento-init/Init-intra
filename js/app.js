@@ -389,6 +389,35 @@ function renderDashboard() {
     .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, 5);
 
+  // ── Minha fila do dia (urgência) ───────────────────────────────────────────
+  const _tomorrowISO = (function(){ const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+  let myQueue = [];
+  if (typeof getMinhaFilaDoDia === 'function') {
+    try { myQueue = getMinhaFilaDoDia(allPens, currentUser, today, { tomorrowISO: _tomorrowISO }); } catch (_) { myQueue = []; }
+  } else {
+    const P_W = (typeof PRIORITY_WEIGHT !== 'undefined' ? PRIORITY_WEIGHT : { critica:4, alta:3, media:2, baixa:1 });
+    const _isClosed = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s); };
+    const _isStale = typeof isStalePendencia === 'function' ? isStalePendencia : function(){ return false; };
+    myQueue = (allPens||[]).filter(function(p){
+      if (_isClosed(p.status)) return false;
+      if ((p.responsible||'') !== currentUser) return false;
+      const highPri = ['alta','critica'].includes(p.priority);
+      const dueSoon = p.deadline === today || p.deadline === _tomorrowISO || (p.deadline && p.deadline < today);
+      const stale = _isStale(p);
+      return highPri || dueSoon || stale;
+    }).sort(function(a,b){
+      const aOver = a.deadline && a.deadline < today ? 1 : 0;
+      const bOver = b.deadline && b.deadline < today ? 1 : 0;
+      if (bOver !== aOver) return bOver - aOver;
+      const aW = P_W[a.priority] || 0; const bW = P_W[b.priority] || 0;
+      if (bW !== aW) return bW - aW;
+      const aSt = _isStale(a) ? 1 : 0; const bSt = _isStale(b) ? 1 : 0;
+      if (bSt !== aSt) return bSt - aSt;
+      if (a.deadline && b.deadline && a.deadline !== b.deadline) return a.deadline.localeCompare(b.deadline);
+      return new Date(b.updatedAt||0) - new Date(a.updatedAt||0);
+    });
+  }
+
   const visits       = allVisits.filter(v => itemInDashPeriod(v));
   const upcomingVisits = [...allVisits]
     .filter(v => v.date >= today && v.status !== 'cancelada' && v.status !== 'concluida')
@@ -560,6 +589,25 @@ function renderDashboard() {
         <div class="section-header"><span class="section-title">Ranking de Produtividade (Resolvidos)</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartRanking"></canvas></div>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="section-header"><span class="section-title">Minha fila do dia</span><span style="font-size:11px;color:var(--text-muted)">${myQueue.length} ${myQueue.length===1?'item':'itens'}</span></div>
+      ${myQueue.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + myQueue.slice(0,8).map(function(p){
+        const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
+        const isOverdue = p.deadline && p.deadline < today;
+        const isStale = typeof isStalePendencia === 'function' ? isStalePendencia(p) : false;
+        const priTag = typeof priorityTag === 'function' ? priorityTag(p.priority) : '';
+        const stTag = typeof statusTag === 'function' ? statusTag(p.status) : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="navigateTo('pendencias');setTimeout(function(){ openPendenciaDetail('${p.id}'); },100)">
+          ${c ? clientAvatar(c, 30) : ''}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.descricao)||'(sem descrição)'}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${escapeHtml(p.clientName)||'—'} ${priTag} ${p.deadline ? '· ' + escapeHtml(formatDate(parseDeadline(p.deadline))) : ''} ${isOverdue?'· <span style="color:#dc2626">⚠️ Vencida</span>':''} ${isStale && !isOverdue ? '· <span style="color:#d97706">🕓 Parada</span>' : ''}</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">${stTag}</div>
+        </div>`;
+      }).join('') + `</div>` + (myQueue.length>8?`<div style="text-align:center;margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="navigateTo('pendencias')">Ver todas (${myQueue.length}) →</button></div>`:'') : `<div class="empty-state" style="padding:20px"><p>Nenhum item urgente 🎉</p></div>`}
     </div>
 
     <div class="grid-2">

@@ -7,6 +7,54 @@
 let _searchActive = -1;
 let _searchResults = [];
 
+// ── Helpers puros (testáveis) ───────────────────────────────────────────────
+function _snippetEscapeHtml(str) {
+  if (typeof escapeHtml === 'function') return escapeHtml(str);
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function getNoteSnippet(text, query, radius) {
+  if (!text || !query) return null;
+  radius = radius == null ? 60 : radius;
+  const lowerText = String(text).toLowerCase();
+  const lowerQ = String(query).toLowerCase();
+  const idx = lowerText.indexOf(lowerQ);
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - radius);
+  const end = Math.min(text.length, idx + query.length + radius);
+  const before = text.slice(start, idx);
+  const match = text.slice(idx, idx + query.length);
+  const after = text.slice(idx + query.length, end);
+  let snippet = _snippetEscapeHtml(before) + '<mark>' + _snippetEscapeHtml(match) + '</mark>' + _snippetEscapeHtml(after);
+  if (start > 0) snippet = '…' + snippet;
+  if (end < text.length) snippet = snippet + '…';
+  return snippet;
+}
+function parseSearchShortcuts(query) {
+  const q = String(query || '');
+  const regex = /(\w+):("[^"]+"|\S+)/g;
+  const filters = {};
+  let m;
+  while ((m = regex.exec(q)) !== null) {
+    const key = m[1].toLowerCase();
+    let val = m[2];
+    if (val.length >= 2 && val[0] === '"' && val[val.length - 1] === '"') val = val.slice(1, -1);
+    filters[key] = val;
+  }
+  const remainingText = q.replace(regex, '').trim().replace(/\s+/g, ' ').trim();
+  return { filters, remainingText };
+}
+function _getPendingSyncCountSafe() {
+  if (typeof getPendingSyncCount === 'function') return getPendingSyncCount();
+  if (typeof window !== 'undefined') return window._pendingSyncCount || window._syncPending || 0;
+  return 0;
+}
+function _getPendingSyncText() {
+  const cnt = _getPendingSyncCountSafe();
+  if (cnt > 0) return cnt + ' alterações aguardando sincronizar';
+  return null;
+}
+
 function openGlobalSearch() {
   const modal = document.getElementById('globalSearchModal');
   if (!modal) return;
@@ -32,9 +80,14 @@ function _renderSearchResults(query) {
   const container = document.getElementById('searchResultsContainer');
   if (!container) return;
 
-  const q = query.trim().toLowerCase();
+  const raw = String(query || '');
+  const parsed = parseSearchShortcuts(raw);
+  const filters = parsed.filters || {};
+  const remainingText = parsed.remainingText || '';
+  const q = remainingText.trim().toLowerCase();
+  const hasFilters = Object.keys(filters).length > 0;
 
-  if (!q) {
+  if (!q && !hasFilters) {
     container.innerHTML = '<div class="search-empty">Digite para pesquisar…</div>';
     _searchResults = [];
     return;
@@ -46,17 +99,33 @@ function _renderSearchResults(query) {
   const pendencias = (typeof getMyPendencias === 'function') ? getMyPendencias()
                    : (typeof getPendencias === 'function')   ? getPendencias() : [];
 
-  const matchClients = clients.filter(c =>
-    (c.name || '').toLowerCase().includes(q) ||
-    (c.cnpj || '').toLowerCase().includes(q) ||
-    (c.segment || '').toLowerCase().includes(q)
-  ).slice(0, 5);
+  const clienteFilter = filters.cliente || filters.clientes || filters.client || null;
+  const statusFilter = filters.status || null;
 
-  const matchPens = pendencias.filter(p =>
-    (p.descricao || '').toLowerCase().includes(q) ||
-    (p.clientName || '').toLowerCase().includes(q) ||
-    (p.responsible || '').toLowerCase().includes(q)
-  ).slice(0, 5);
+  const matchClients = clients.filter(c => {
+    if (clienteFilter) {
+      const cf = String(clienteFilter).toLowerCase();
+      const inName = (c.name || '').toLowerCase().includes(cf);
+      const inSeg = (c.segment || '').toLowerCase().includes(cf);
+      if (!inName && !inSeg) return false;
+      if (!q) return true;
+    } else if (!q) return false;
+    if (!q) return true;
+    return (c.name || '').toLowerCase().includes(q) ||
+           (c.cnpj || '').toLowerCase().includes(q) ||
+           (c.segment || '').toLowerCase().includes(q);
+  }).slice(0, 5);
+
+  const matchPens = pendencias.filter(p => {
+    if (statusFilter && String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
+    if (clienteFilter && !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
+    if (!q) return true;
+    const inDescricao = (p.descricao || '').toLowerCase().includes(q);
+    const inClient = (p.clientName || '').toLowerCase().includes(q);
+    const inResp = (p.responsible || '').toLowerCase().includes(q);
+    const inNotes = Array.isArray(p.notes) && p.notes.some(n => String(n.text || '').toLowerCase().includes(q));
+    return inDescricao || inClient || inResp || inNotes;
+  }).slice(0, 5);
 
   _searchResults = [
     ...matchClients.map(c => ({ type: 'client', data: c })),
@@ -64,11 +133,28 @@ function _renderSearchResults(query) {
   ];
 
   if (_searchResults.length === 0) {
-    container.innerHTML = `<div class="search-empty">Nenhum resultado para "<strong>${escapeHtml(query)}</strong>"</div>`;
+    const esc = typeof escapeHtml === 'function' ? escapeHtml(raw) : raw;
+    let emptyHtml = `<div class="search-empty">Nenhum resultado para "<strong>${esc}</strong>"</div>`;
+    if (hasFilters) {
+      const badges = Object.entries(filters).map(function(entry){ const k=entry[0], v=entry[1]; const ek = typeof escapeHtml==='function'?escapeHtml(k):k; const ev=typeof escapeHtml==='function'?escapeHtml(v):v; return '<span class="tag tag-blue" style="font-size:11px">'+ek+':'+ev+'</span>'; }).join(' ');
+      emptyHtml = '<div style="display:flex;gap:6px;padding:6px 18px;flex-wrap:wrap">'+badges+'</div>' + emptyHtml;
+    }
+    container.innerHTML = emptyHtml;
     return;
   }
 
   let html = '';
+
+  if (hasFilters) {
+    html += '<div style="display:flex;gap:6px;padding:6px 18px;flex-wrap:wrap">';
+    Object.entries(filters).forEach(function(entry){
+      const k=entry[0], v=entry[1];
+      const ek = typeof escapeHtml==='function'?escapeHtml(k):k;
+      const ev = typeof escapeHtml==='function'?escapeHtml(v):v;
+      html += '<span class="tag tag-blue" style="font-size:11px">'+ek+':'+ev+'</span>';
+    });
+    html += '</div>';
+  }
 
   if (matchClients.length) {
     html += `<div class="search-group-label">Clientes</div>`;
@@ -90,7 +176,15 @@ function _renderSearchResults(query) {
     html += `<div class="search-group-label">Pendências</div>`;
     html += matchPens.map((p, i) => {
       const idx = clientOffset + i;
-      const color = (STATUS_PEN_MAP[p.status]?.dot) || '#9ca3af';
+      const color = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.dot) || '#9ca3af';
+      let preview = '';
+      if (q && Array.isArray(p.notes)) {
+        const hit = p.notes.find(n => String(n.text||'').toLowerCase().includes(q));
+        if (hit) {
+          const snippet = getNoteSnippet(hit.text, remainingText, 60);
+          if (snippet) preview = '<div class="search-result-sub" style="font-size:11px;margin-top:2px;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+snippet+'</div>';
+        }
+      }
       return `
       <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
         <div class="search-result-icon" style="background:#fef9ee">
@@ -99,6 +193,7 @@ function _renderSearchResults(query) {
         <div style="min-width:0;flex:1">
           <div class="search-result-title">${escapeHtml(p.descricao || '(sem descrição)')}</div>
           <div class="search-result-sub">${escapeHtml(p.clientName || '—')} · ${escapeHtml(p.responsible || '—')}</div>
+          ${preview}
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>`;
@@ -141,7 +236,7 @@ function _highlightSearchItem(idx) {
 }
 
 // Keyboard navigation
-document.addEventListener('keydown', (e) => {
+if (typeof document !== 'undefined') document.addEventListener('keydown', (e) => {
   // Ctrl+K or Cmd+K to open search
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
@@ -182,7 +277,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Live search input
-document.addEventListener('input', (e) => {
+if (typeof document !== 'undefined') document.addEventListener('input', (e) => {
   if (e.target && e.target.id === 'globalSearchInput') {
     _searchActive = -1;
     _renderSearchResults(e.target.value);
@@ -204,14 +299,29 @@ function _updateConnectionStatus(isOnline) {
 
   if (!banner) return;
 
+  const pendingText = _getPendingSyncText();
+  const pendingCount = _getPendingSyncCountSafe();
+
   if (!isOnline) {
     _wasOffline = true;
     banner.className = 'offline-banner offline visible';
-    if (msg) msg.textContent = 'Sem conexão – modo offline ativo';
+    if (msg) msg.textContent = pendingCount > 0 ? pendingText : 'Sem conexão – modo offline ativo';
     if (syncBtn) syncBtn.style.display = 'none';
     if (dot) { dot.classList.add('offline'); dot.title = 'Offline'; }
   } else {
     if (dot) { dot.classList.remove('offline'); dot.title = 'Online'; }
+    if (pendingCount > 0) {
+      banner.className = 'offline-banner offline visible';
+      if (msg) msg.textContent = pendingText;
+      if (syncBtn) syncBtn.style.display = 'inline-block';
+      if (_wasOffline) {
+        _wasOffline = false;
+        if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
+          syncSupabaseToLocal().catch(err => console.warn('Sincronização após reconexão:', err));
+        }
+      }
+      return;
+    }
     if (_wasOffline) {
       // Just came back online
       _wasOffline = false;
@@ -257,15 +367,21 @@ function syncNow() {
 }
 
 // Listen to browser online/offline events
-window.addEventListener('online',  () => _updateConnectionStatus(true));
-window.addEventListener('offline', () => _updateConnectionStatus(false));
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && navigator.onLine && window._supabaseAuthActive && typeof syncSupabaseToLocal === 'function') {
+if (typeof window !== 'undefined') {
+  window.addEventListener('online',  () => _updateConnectionStatus(true));
+  window.addEventListener('offline', () => _updateConnectionStatus(false));
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && typeof navigator !== 'undefined' && navigator.onLine && typeof window !== 'undefined' && window._supabaseAuthActive && typeof syncSupabaseToLocal === 'function') {
     syncSupabaseToLocal().catch(err => console.warn('Sincronização ao retornar à aba:', err));
   }
 });
 
 // Initial check
-window.addEventListener('DOMContentLoaded', () => {
-  _updateConnectionStatus(navigator.onLine);
+if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', () => {
+  _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseSearchShortcuts, getNoteSnippet, _getPendingSyncCountSafe, _getPendingSyncText };
+}
