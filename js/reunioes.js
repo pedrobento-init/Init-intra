@@ -19,6 +19,23 @@ function _getReuniaoId(mesAno) {
   return 'REU-' + mesAno;
 }
 
+function _getMeetingBaseClients() {
+  if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) {
+    return getClientsByTeam(_selectedTeam);
+  }
+  return getMyClients();
+}
+
+function _getMeetingTeam() {
+  if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) return _selectedTeam;
+  return getCurrentTeam();
+}
+
+function _getOpenPensForClient(clientId) {
+  const all = getMyPendencias();
+  return all.filter(p => p.clientId === clientId && !isPendenciaClosed(p.status) && !(p.reviewedInMeeting && _meetingState && p.reviewedInMeeting === _meetingState.id));
+}
+
 function _groupOpenPendenciasByClient(pens) {
   const groups = {};
   pens.forEach(p => {
@@ -29,6 +46,13 @@ function _groupOpenPendenciasByClient(pens) {
     groups[key].pens.push(p);
   });
   return Object.values(groups).sort((a, b) => a.clientName.localeCompare(b.clientName, 'pt-BR', { sensitivity: 'base' }));
+}
+
+function _refreshCurrentGroupPens() {
+  if (!_meetingState) return;
+  const g = _meetingState.clients[_meetingState.index];
+  if (!g) return;
+  g.pens = _getOpenPensForClient(g.clientId);
 }
 
 function renderReuniao() {
@@ -48,8 +72,10 @@ function renderReuniao() {
 }
 
 function _renderLanding(mesAno, label, existingMeeting) {
+  const baseClients = _getMeetingBaseClients();
   const allOpen = getMyPendencias().filter(p => !isPendenciaClosed(p.status));
   const pendenciaCount = allOpen.length;
+  const clientesComPend = baseClients.filter(c => _getOpenPensForClient(c.id).length > 0).length;
 
   const content = document.getElementById('contentArea');
   content.innerHTML = `
@@ -70,17 +96,21 @@ function _renderLanding(mesAno, label, existingMeeting) {
           <div class="stat-value" style="font-size:28px;color:var(--accent)">${pendenciaCount}</div>
           <div class="stat-label">Pendências abertas</div>
         </div>
-        ${allOpen.length > 0 ? `
+        <div class="stat-card" style="min-width:120px">
+          <div class="stat-value" style="font-size:28px">${baseClients.length}</div>
+          <div class="stat-label">Clientes na fila</div>
+        </div>
+        ${baseClients.length > 0 ? `
           <div class="stat-card" style="min-width:120px">
-            <div class="stat-value" style="font-size:28px">${_groupOpenPendenciasByClient(allOpen).length}</div>
-            <div class="stat-label">Clientes envolvidos</div>
+            <div class="stat-value" style="font-size:28px">${clientesComPend}</div>
+            <div class="stat-label">Com pendência</div>
           </div>
         ` : ''}
       </div>
 
-      ${pendenciaCount === 0
+      ${baseClients.length === 0
         ? `<div style="padding:20px;background:var(--bg-secondary);border-radius:8px;margin-bottom:20px">
-            <p style="color:var(--text-muted);margin:0">Nenhuma pendência aberta para revisar 🎉</p>
+            <p style="color:var(--text-muted);margin:0">Nenhum cliente cadastrado.</p>
           </div>`
         : `<button class="btn btn-primary" style="padding:12px 32px;font-size:15px" onclick="startReuniao('${mesAno}')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -151,7 +181,15 @@ function _resumeMeeting(meeting, mesAno) {
 
 function _buildClientList() {
   if (!_meetingState) return;
-  _meetingState.clients = _groupOpenPendenciasByClient(getMyPendencias());
+  const base = _getMeetingBaseClients().slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base', numeric: true }));
+  const com = [];
+  const sem = [];
+  base.forEach(c => {
+    const pens = _getOpenPensForClient(c.id);
+    const entry = { clientId: c.id, clientName: c.name, clientColor: c.color, clientInitials: c.initials, clientObj: c, pens };
+    if (pens.length > 0) com.push(entry); else sem.push(entry);
+  });
+  _meetingState.clients = [...com, ...sem];
 }
 
 function renderMeetingFlow() {
@@ -172,6 +210,11 @@ function renderMeetingFlow() {
 
   const group = clients[index];
   const progress = ((index) / clients.length) * 100;
+  const comPendCount = clients.filter(c => c.pens.length > 0).length;
+
+  const cardsHtml = group.pens.length > 0
+    ? group.pens.map(p => _meetingPenCard(p)).join('')
+    : _meetingEmptyClientHtml(group);
 
   content.innerHTML = `
     <div style="max-width:800px;margin:0 auto">
@@ -190,8 +233,8 @@ function renderMeetingFlow() {
 
       <div style="background:var(--bg-secondary);border-radius:8px;padding:4px;margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:13px;font-weight:600">
-          <span>Cliente ${index + 1} de ${clients.length}</span>
-          <span>${escapeHtml(group.clientName)}</span>
+          <span>Cliente ${index + 1} de ${clients.length} (${comPendCount} com pendência)</span>
+          <span style="display:flex;align-items:center;gap:8px">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}</span>
         </div>
         <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden">
           <div style="height:100%;width:${Math.round(progress)}%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
@@ -199,7 +242,7 @@ function renderMeetingFlow() {
       </div>
 
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px" id="meetingPenCards">
-        ${group.pens.map(p => _meetingPenCard(p)).join('')}
+        ${cardsHtml}
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -209,6 +252,32 @@ function renderMeetingFlow() {
         <button class="btn btn-primary" onclick="nextMeetingClient()">
           Próximo cliente →
         </button>
+      </div>
+    </div>`;
+}
+
+function _meetingEmptyClientHtml(group) {
+  const team = _getMeetingTeam();
+  const opNames = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
+  const currentUser = typeof getUser === 'function' ? getUser().name : '';
+  const cid = escapeHtml(group.clientId);
+  return `
+    <div class="card" style="text-align:center;padding:24px">
+      <div style="font-size:32px;margin-bottom:8px">✅</div>
+      <div style="font-weight:600;margin-bottom:4px">Sem pendências no momento</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Nenhuma pendência aberta para ${escapeHtml(group.clientName)}</div>
+      <div style="text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para este cliente</div>
+        <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Nova pendência para este cliente..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
+            ${(typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro']).map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
+          </select>
+          <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
+            ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="meetingCreateInlinePendencia('${cid}')" style="white-space:nowrap">+ Adicionar</button>
+        </div>
       </div>
     </div>`;
 }
@@ -274,7 +343,6 @@ function _meetingPenCard(p) {
 function prevMeetingClient() {
   if (!_meetingState || _meetingState.index <= 0) return;
   _meetingState.index--;
-  _buildClientList();
   renderMeetingFlow();
 }
 
@@ -282,7 +350,6 @@ function nextMeetingClient() {
   if (!_meetingState) return;
   if (_meetingState.index < _meetingState.clients.length - 1) {
     _meetingState.index++;
-    _buildClientList();
     renderMeetingFlow();
   } else {
     _renderMeetingComplete();
@@ -337,6 +404,7 @@ function meetingToggleReviewed(penId) {
     pen.reviewedInMeeting = _meetingState.id;
   }
   savePendencia(pen);
+  _refreshCurrentGroupPens();
   renderMeetingFlow();
 }
 
@@ -358,7 +426,7 @@ function meetingChangePenStatus(penId) {
   }
 
   showToast('Status atualizado!', 'success');
-  _buildClientList();
+  _refreshCurrentGroupPens();
   renderMeetingFlow();
 }
 
@@ -379,8 +447,32 @@ function meetingAddPenNote(penId) {
   });
 
   showToast('Nota registrada!', 'success');
-  _buildClientList();
   renderMeetingFlow();
+}
+
+function meetingCreateInlinePendencia(clientId) {
+  if (!_meetingState) return;
+  const g = _meetingState.clients[_meetingState.index];
+  if (!g || g.clientId !== clientId) return;
+  const descEl = document.getElementById('meeting-new-desc-' + clientId);
+  const tipoEl = document.getElementById('meeting-new-tipo-' + clientId);
+  const respEl = document.getElementById('meeting-new-resp-' + clientId);
+  const descricao = (descEl?.value || '').trim();
+  if (!descricao) { showToast('Descreva a pendência.', 'error'); return; }
+  const tipo = tipoEl?.value || (typeof TIPOS !== 'undefined' ? TIPOS[0] : 'Outro');
+  const responsible = respEl?.value || (typeof getUser === 'function' ? getUser().name : '');
+  try {
+    const data = { clientId, clientName: g.clientName, descricao, tipo, responsible, status: 'aberto', priority: 'media' };
+    if (typeof validatePendencia === 'function') {
+      const errs = validatePendencia(data);
+      if (errs.length) { showToast(errs[0], 'error'); return; }
+    }
+    savePendencia(data);
+    if (descEl) descEl.value = '';
+    _refreshCurrentGroupPens();
+    showToast('Pendência criada!', 'success');
+    renderMeetingFlow();
+  } catch (err) { showToast('Erro ao criar pendência: ' + err.message, 'error'); }
 }
 
 function endReuniao() {
