@@ -68,6 +68,15 @@ function renderCalendar() {
       </button>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
+      <div class="cal-legend" id="calLegend" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);font-size:11px;align-items:center;background:var(--bg-secondary)">
+        <span style="font-weight:700;color:var(--text-secondary)">Legenda:</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#0ea5e9;display:inline-block"></span> Visita</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#991b1b;display:inline-block"></span> Crítica</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block"></span> Alta</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;display:inline-block"></span> Média</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#16a34a;display:inline-block"></span> Baixa</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block;border:2px solid #991b1b"></span> Vencida</span>
+      </div>
       <div id="calendarContainer" style="padding:16px"></div>
     </div>
   `;
@@ -186,11 +195,74 @@ function mapVisitsToEvents(visits) {
   });
 }
 
+// ── Heatmap: conta deadlines por dia ────────────────────────────────────────
+function getDeadlineHeatMap() {
+  const map = {};
+  try {
+    const pens = getFilteredCalendarPendencias();
+    pens.forEach(p => {
+      const d = p.deadline;
+      if (!d) return;
+      map[d] = (map[d] || 0) + 1;
+    });
+  } catch(_) {}
+  return map;
+}
+function getHeatLevel(count) {
+  if (!count) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  if (count >= 3) return 3;
+  return 0;
+}
+
+// ── Bottom-sheet do dia ─────────────────────────────────────────────────────
+function openCalendarDaySheet(dateStr) {
+  const heatMap = getDeadlineHeatMap();
+  const type = document.getElementById('calType')?.value || 'all';
+  const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
+  const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
+  const total = allPens.length + allVisits.length;
+  const title = formatDate(dateStr) + (total ? ` — ${total} evento(s)` : ' — sem eventos');
+
+  let html = `<div style="max-height:60vh;overflow-y:auto">`;
+  if (!total) {
+    html += `<p style="font-size:13px;color:var(--text-muted);padding:12px;text-align:center">Nenhum evento neste dia.</p>`;
+  } else {
+    if (allVisits.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Visitas (${allVisits.length})</div>`;
+      html += allVisits.map(v => {
+        const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
+        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
+          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${escapeHtml(v.clientName||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
+      }).join('');
+    }
+    if (allPens.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Pendências (${allPens.length})</div>`;
+      html += allPens.map(p => {
+        const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
+        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
+          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${escapeHtml(p.descricao||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div style="display:flex;gap:4px">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
+      }).join('');
+    }
+  }
+  html += `</div>`;
+  html += `<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><button class="btn btn-primary btn-sm" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Pendência em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="background:#0ea5e9;border-color:#0ea5e9;color:#fff" onclick="closeModal();openVisitForm(null,'${escapeHtml(dateStr)}')">+ Visita em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="closeModal()">Fechar</button></div>`;
+
+  openModal(title, html, 'sm');
+  // Acessibilidade: bottom-sheet em mobile
+  const modal = document.getElementById('modal');
+  if (window.innerWidth <= 768) {
+    modal.style.marginTop = 'auto';
+    modal.style.borderRadius = '16px 16px 0 0';
+    modal.style.maxHeight = '75vh';
+  }
+}
+
 async function initFullCalendar() {
   const container = document.getElementById('calendarContainer');
   if (!container) return;
 
-  // Carrega o CDN do FullCalendar
   await loadFullCalendar();
 
   if (typeof FullCalendar === 'undefined') {
@@ -199,9 +271,7 @@ async function initFullCalendar() {
   }
 
   const events = getCalendarEvents();
-
-  // Se nao tem eventos e queremos evitar tela vazia: mostra o calendario mesmo vazio
-  // (antes so renderizava se houvesse pendência com deadline — agr mostra sempre)
+  const heatMap = getDeadlineHeatMap();
 
   const isDark = document.body.classList.contains('dark-theme');
   const isMobile = window.innerWidth <= 768;
@@ -211,13 +281,41 @@ async function initFullCalendar() {
     _fcInstance = null;
   }
 
+  // Injeta CSS dedicado do calendário (heatmap, fim de semana, hoje, altura adaptativa)
+  let calStyle = document.getElementById('calCustomStyle');
+  if (!calStyle) {
+    calStyle = document.createElement('style');
+    calStyle.id = 'calCustomStyle';
+    document.head.appendChild(calStyle);
+  }
+  calStyle.textContent = `
+    .fc .fc-daygrid-day.fc-day-weekend { background: rgba(148,163,184,0.10) !important; }
+    .fc .fc-col-header-cell.fc-day-sat, .fc .fc-col-header-cell.fc-day-sun { background: rgba(148,163,184,0.18) !important; color:#475569 !important; }
+    .dark-theme .fc .fc-daygrid-day.fc-day-weekend { background: rgba(71,85,105,0.18) !important; }
+    .fc .fc-day-today { background: rgba(26,86,219,0.10) !important; border: 2px solid #1a56db !important; }
+    .fc .fc-day-today .fc-daygrid-day-number { background:#1a56db;color:#fff;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-weight:800; }
+    .fc .fc-button.fc-today-button { background:#1a56db !important;border-color:#1a56db !important;color:#fff !important;font-weight:700 !important;box-shadow:0 2px 8px rgba(26,86,219,0.35) !important; }
+    .fc .fc-button.fc-today-button:hover { background:#1444b8 !important; }
+    .fc-day-heat-1 { background: rgba(220,38,38,0.06) !important; }
+    .fc-day-heat-2 { background: rgba(220,38,38,0.12) !important; }
+    .fc-day-heat-3 { background: rgba(220,38,38,0.20) !important; }
+    .fc-daygrid-day.fc-day-no-events { min-height: 60px !important; }
+    .fc-daygrid-day.fc-day-no-events .fc-daygrid-day-frame { min-height: 60px !important; }
+    .fc-daygrid-day { cursor: pointer; }
+    @media (max-width:768px){
+      .fc .fc-daygrid-event { padding:1px 2px !important; }
+      .fc-event-compact .fc-event-title { display:none !important; }
+      .fc-event-compact .fc-event-badge { width:8px;height:8px;border-radius:50%;display:inline-block !important; }
+    }
+  `;
+
   _fcInstance = new FullCalendar.Calendar(container, {
     locale: 'pt-br',
-    initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+    initialView: isMobile ? 'dayGridMonth' : 'dayGridMonth',
     headerToolbar: isMobile ? {
       left: 'prev,next',
       center: 'title',
-      right: 'listWeek,dayGridMonth',
+      right: 'today',
     } : {
       left: 'prev,next today',
       center: 'title',
@@ -233,12 +331,25 @@ async function initFullCalendar() {
     },
     events: events,
     eventDisplay: 'block',
-    dayMaxEvents: isMobile ? 2 : 4,
+    dayMaxEvents: isMobile ? 3 : 4,
+    moreLinkContent: function(args){ return '+' + args.num + ' mais'; },
     nowIndicator: true,
     height: 'auto',
+    fixedWeekCount: false,
+    showNonCurrentDates: true,
     eventContent: function(arg) {
       const props = arg.event.extendedProps;
-      if (props.kind !== 'visit') return true; // pendências: default
+      // Mobile compacto: se coluna muito estreita, mostra só badge
+      try {
+        const colWidth = arg.el.closest('.fc-daygrid-day')?.offsetWidth || 0;
+        const isCompact = isMobile || colWidth < 90;
+        if (isCompact && props.kind === 'pendencia') {
+          const dot = PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media;
+          const border = props.isOverdue ? '#dc2626' : (STATUS_COLORS[props.status] || '#94a3b8');
+          return { html: '<span class="fc-event-badge" style="width:8px;height:8px;border-radius:50%;background:' + dot.bg + ';border:2px solid ' + border + ';display:inline-block"></span>' };
+        }
+      } catch(_){}
+      if (props.kind !== 'visit') return true;
       const client = typeof getClientById === 'function' ? getClientById(props.clientId) : null;
       const avatar = client ? (typeof clientAvatar === 'function' ? clientAvatar(client, 20) : props.clientName) : props.clientName;
       const name = props.clientName || '—';
@@ -246,6 +357,7 @@ async function initFullCalendar() {
     },
     eventClick: function(info) {
       info.jsEvent.preventDefault();
+      info.jsEvent.stopPropagation();
       const props = info.event.extendedProps;
       if (props.kind === 'visit') {
         if (typeof openVisitDetail === 'function') openVisitDetail(props.visitId);
@@ -254,10 +366,32 @@ async function initFullCalendar() {
       }
     },
     dateClick: function(info) {
-      const dateStr = info.dateStr;
-      if (typeof openPendenciaForm === 'function') {
-        openPendenciaForm(null, null, dateStr);
+      openCalendarDaySheet(info.dateStr);
+    },
+    moreLinkClick: function(info){
+      info.jsEvent.preventDefault();
+      openCalendarDaySheet(info.date.toISOString().slice(0,10));
+      return 'none';
+    },
+    dayCellDidMount: function(info){
+      const dateStr = info.date.toISOString().slice(0,10);
+      const d = info.date;
+      // Fim de semana
+      const day = d.getDay();
+      if (day === 0 || day === 6) {
+        info.el.classList.add('fc-day-weekend');
       }
+      // Heatmap
+      const cnt = heatMap[dateStr] || 0;
+      const lvl = getHeatLevel(cnt);
+      if (lvl) info.el.classList.add('fc-day-heat-' + lvl);
+      if (lvl) info.el.title = cnt + ' pendência(s) com vencimento neste dia';
+      // Altura adaptativa: marca dias sem evento
+      const hasEvents = events.some(ev => {
+        const evDate = (ev.start || '').toString().slice(0,10);
+        return evDate === dateStr;
+      });
+      if (!hasEvents) info.el.classList.add('fc-day-no-events');
     },
     eventDidMount: function(info) {
       const props = info.event.extendedProps;
@@ -276,6 +410,15 @@ async function initFullCalendar() {
     },
     viewDidMount: function() {
       applyCalendarDarkMode(isDark);
+      // Reaplica altura adaptativa após view montar
+      setTimeout(()=> {
+        document.querySelectorAll('.fc-daygrid-day').forEach(el=>{
+          const dateStr = el.getAttribute('data-date');
+          if (!dateStr) return;
+          const has = events.some(ev => (ev.start||'').toString().slice(0,10)===dateStr);
+          if (!has) el.classList.add('fc-day-no-events');
+        });
+      }, 30);
     },
   });
 
@@ -304,8 +447,24 @@ function refreshCalendar() {
   const priority    = document.getElementById('calPriority')?.value || '';
   saveFilterState('calendar', {type, client, responsible, status, priority});
   const events = getCalendarEvents();
+  const heatMap = getDeadlineHeatMap();
   _fcInstance.removeAllEvents();
   _fcInstance.addEventSource(events);
+  // Reaplica heatmap e altura adaptativa
+  setTimeout(()=>{
+    document.querySelectorAll('.fc-daygrid-day').forEach(el=>{
+      const dateStr = el.getAttribute('data-date');
+      if (!dateStr) return;
+      el.classList.remove('fc-day-heat-1','fc-day-heat-2','fc-day-heat-3','fc-day-no-events');
+      const day = new Date(dateStr+'T12:00:00').getDay();
+      if (day===0||day===6) el.classList.add('fc-day-weekend');
+      const cnt = heatMap[dateStr]||0;
+      const lvl = getHeatLevel(cnt);
+      if (lvl) el.classList.add('fc-day-heat-'+lvl);
+      const has = events.some(ev => (ev.start||'').toString().slice(0,10)===dateStr);
+      if (!has) el.classList.add('fc-day-no-events');
+    });
+  }, 30);
 }
 
 function applyCalendarDarkMode(isDark) {
@@ -320,7 +479,7 @@ function applyCalendarDarkMode(isDark) {
     container.style.setProperty('--fc-button-hover-border-color', '#3b82f6');
     container.style.setProperty('--fc-button-active-bg-color', '#1a56db');
     container.style.setProperty('--fc-button-active-border-color', '#1a56db');
-    container.style.setProperty('--fc-today-bg-color', 'rgba(26,86,219,0.08)');
+    container.style.setProperty('--fc-today-bg-color', 'rgba(26,86,219,0.12)');
     container.style.setProperty('--fc-page-bg-color', 'transparent');
     container.style.setProperty('--fc-neutral-bg-color', 'rgba(255,255,255,0.04)');
     container.style.setProperty('--fc-list-event-hover-bg-color', 'rgba(255,255,255,0.06)');
