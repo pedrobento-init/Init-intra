@@ -231,6 +231,18 @@ function _applyPenCardMotion(area) {
   });
 }
 
+// Número amigável de exibição (#001...). Só apresentação: usa a função pura
+// getPendenciaDisplayNumber (metrics.js) sobre a lista atual; o id interno
+// (PEN-...) segue intacto em onclick, banco, sync e exports.
+function penDisplayNumber(p) {
+  try {
+    if (p && typeof getPendenciaDisplayNumber === 'function' && typeof getPendencias === 'function') {
+      return getPendenciaDisplayNumber(getPendencias(), p.id);
+    }
+  } catch (_) {}
+  return '#---';
+}
+
 function penKanbanCard(p) {
   var c = getClientById(p.clientId);
   var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
@@ -244,7 +256,7 @@ function penKanbanCard(p) {
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
     ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
-    '<div class="kanban-card-title">' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="kanban-card-title"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
     '<div class="kanban-card-meta">' +
       (c ? clientAvatar(c, 18) : '') + ' ' +
       escapeHtml(p.clientName || '—') +
@@ -288,7 +300,7 @@ function penMobileCard(p) {
       '</div>' +
       statusTag(p.status) +
     '</div>' +
-    '<div class="pen-mobile-card-desc">' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="pen-mobile-card-desc"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
     '<div class="pen-mobile-card-meta">' +
       priorityTag(p.priority) +
       '<span>' + escapeHtml(p.responsible || '—') + '</span>' +
@@ -426,7 +438,7 @@ function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
   const c = getClientById(p.clientId);
-  openModal(`${escapeHtml(p.id)} – ${escapeHtml(p.descricao)||'Pendência'}`, `
+  openModal(`${penDisplayNumber(p)} – ${escapeHtml(p.descricao)||'Pendência'}`, `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
       <select class="form-select filter-select" id="chgStatus">
         ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}

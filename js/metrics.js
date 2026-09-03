@@ -448,6 +448,23 @@ function buildDaySummary({ dueToday, todayVisits, overloadedOps, onLeaveOps }) {
   return s;
 }
 
+// ── Número amigável de exibição da pendência (#001, #002, ...) ───────────────
+// SOMENTE apresentação: o id interno (ex: PEN-xxxx) continua intacto e é o
+// único usado em banco, sync, URLs e lógica. A numeração é a posição (1-based)
+// na lista ordenada por createdAt asc (desempate por id), sem buracos: ao
+// excluir uma pendência, as posteriores "andam" um número. Não persiste nada.
+function getPendenciaDisplayNumber(pendencias, id) {
+  const list = Array.isArray(pendencias) ? pendencias.slice() : [];
+  list.sort((a, b) => {
+    const byDate = String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    if (byDate !== 0) return byDate;
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
+  const idx = list.findIndex((p) => p.id === id);
+  if (idx === -1) return '#---';
+  return '#' + String(idx + 1).padStart(3, '0');
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     HEALTH_THRESHOLDS, DASH_SILENCE_DAYS,
@@ -459,5 +476,6 @@ if (typeof module !== 'undefined' && module.exports) {
     getPreviousDashRange, calcPeriodDelta, filterItemsByDateRange, calcPeriodStats,
     getClientLastContact, getSilentClients, getClientAnniversaries,
     getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
+    getPendenciaDisplayNumber,
   };
 }
