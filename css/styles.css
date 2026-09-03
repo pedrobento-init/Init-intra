@@ -500,11 +500,11 @@ tr:hover td { background: var(--bg-hover); }
 .kanban-card-meta { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ── KANBAN CARD — conteúdo variável (badges condicionais) ── */
-/* Sem altura fixa: o card cresce conforme os badges presentes
-   (timer, vencida, prazo, afastado são condicionais). */
+/* Altura 100% automática, sem mínimo fixo: o conteúdo (título + badges +
+   timer + data) dita o tamanho do card; nada é cortado verticalmente. */
 .kanban-card {
   min-width: 0;
-  min-height: 96px;
+  height: auto;
 }
 /* Título truncado de forma limpa (máx. 3 linhas + reticências). */
 .kanban-card-title {
