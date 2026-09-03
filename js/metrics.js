@@ -448,6 +448,17 @@ function buildDaySummary({ dueToday, todayVisits, overloadedOps, onLeaveOps }) {
   return s;
 }
 
+// ── ASSUNTO x DESCRIÇÃO da pendência (puro, testável) ────────────────────────
+// Espelha os helpers globais de ui.js: `assunto` é o título; registros antigos
+// sem `assunto` usam `descricao` como fallback de leitura.
+function getPendenciaAssunto(p) { return String((p && p.assunto) || '').trim(); }
+function getPendenciaTitulo(p) {
+  const a = getPendenciaAssunto(p);
+  if (a) return a;
+  const d = String((p && p.descricao) || '').trim();
+  return d || 'Sem descrição';
+}
+
 // ── Número amigável de exibição da pendência (#001, #002, ...) ───────────────
 // SOMENTE apresentação: o id interno (ex: PEN-xxxx) continua intacto e é o
 // único usado em banco, sync, URLs e lógica. A numeração é a posição (1-based)
@@ -476,6 +487,6 @@ if (typeof module !== 'undefined' && module.exports) {
     getPreviousDashRange, calcPeriodDelta, filterItemsByDateRange, calcPeriodStats,
     getClientLastContact, getSilentClients, getClientAnniversaries,
     getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
-    getPendenciaDisplayNumber,
+    getPendenciaDisplayNumber, getPendenciaAssunto, getPendenciaTitulo,
   };
 }

@@ -256,7 +256,7 @@ function penKanbanCard(p) {
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
     ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
-    '<div class="kanban-card-title" title="' + escapeHtml(p.descricao || 'Sem descrição') + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="kanban-card-title" title="' + escapeHtml(getPendenciaTitulo(p)) + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(getPendenciaTitulo(p)) + '</div>' +
     '<div class="kanban-card-meta">' +
       (c ? clientAvatar(c, 18) : '') + ' ' +
       escapeHtml(p.clientName || '—') +
@@ -302,7 +302,7 @@ function penMobileCard(p) {
       '</div>' +
       statusTag(p.status) +
     '</div>' +
-    '<div class="pen-mobile-card-desc" title="' + escapeHtml(p.descricao || 'Sem descrição') + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="pen-mobile-card-desc" title="' + escapeHtml(getPendenciaTitulo(p)) + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(getPendenciaTitulo(p)) + '</div>' +
     '<div class="pen-mobile-card-meta">' +
       priorityTag(p.priority) +
       (p.responsible
@@ -353,7 +353,7 @@ function getFilteredPendencias() {
   const pr   = document.getElementById('penPriority')?.value||'';
   var base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
   return base.filter(p => {
-    if (q && !p.descricao?.toLowerCase().includes(q) && !p.clientName?.toLowerCase().includes(q) && !p.responsible?.toLowerCase().includes(q)) return false;
+    if (q && !p.assunto?.toLowerCase().includes(q) && !p.descricao?.toLowerCase().includes(q) && !p.clientName?.toLowerCase().includes(q) && !p.responsible?.toLowerCase().includes(q)) return false;
     if (cid  && p.clientId   !== cid)  return false;
     if (resp && p.responsible !== resp) return false;
     if (st   && p.status     !== st)   return false;
@@ -442,7 +442,7 @@ function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
   const c = getClientById(p.clientId);
-  openModal(`${penDisplayNumber(p)} – ${escapeHtml(p.descricao)||'Pendência'}`, `
+  openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
       <select class="form-select filter-select" id="chgStatus">
         ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
@@ -462,6 +462,8 @@ function openPendenciaDetail(id) {
       <div class="ticket-info-item"><div class="ticket-info-label">Trabalhando agora</div><div class="ticket-info-value">${getCurrentWorker(p) ? workerBadgeHTML(p) + ' — ' + timerDisplayHTML(p) : '<span style="color:var(--text-muted)">Ninguém</span>'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Tempo acumulado</div><div class="ticket-info-value">${formatTimer(getElapsedSeconds(p))}</div></div>
     </div>
+    <div class="ticket-info-item" style="margin-top:12px"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
+    <div class="form-group" style="margin-top:8px"><label class="form-label">Descrição</label><div style="font-size:13px;white-space:pre-wrap">${escapeHtml(p.descricao)||'—'}</div></div>
     ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div class="form-group"><label class="form-label">Link Útil</label><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">🔗 Abrir link</a></div>`:''}
     
     <hr class="divider"/>
@@ -576,8 +578,10 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
             ${TIPOS.map(t=>`<option ${p.tipo===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
           </select></div>
       </div>
+      <div class="form-group"><label class="form-label">Assunto *</label>
+        <input class="form-input" name="assunto" maxlength="120" placeholder="Título/resumo da pendência..." value="${escapeHtml(p.assunto||'')}" required /></div>
       <div class="form-group"><label class="form-label">Descrição da Pendência *</label>
-        <textarea class="form-textarea" name="descricao" rows="3" placeholder="Descreva o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px"></div></div>
+        <textarea class="form-textarea" name="descricao" rows="4" placeholder="Descreva em detalhes o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px"></div></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Responsável</label>
           <select class="form-select" name="responsible">
@@ -638,6 +642,7 @@ function submitPendenciaForm(e, id) {
   try {
     const fd = new FormData(e.target);
     const g  = k => fd.get(k)||'';
+    const assunto = g('assunto').trim();
     const descricao = g('descricao').trim();
     const linkUtil = g('linkUtil').trim();
     const clientId = g('clientId');
@@ -653,7 +658,7 @@ function submitPendenciaForm(e, id) {
     const tagsRaw = g('tags').split(',').map(function(t){return t.trim();}).filter(Boolean);
     const data = {
       id: id||null, clientId, clientName: client?.name||'', tipo: g('tipo'),
-      descricao, responsible: g('responsible'), status: g('status'),
+      assunto, descricao, responsible: g('responsible'), status: g('status'),
       priority: g('priority'), deadline: g('deadline'),
       linkUtil: safeUrl(linkUtil) !== '#' ? linkUtil : '',
       tags: tagsRaw,
@@ -676,7 +681,8 @@ function duplicatePendencia(id) {
     clientId: p.clientId,
     clientName: p.clientName,
     tipo: p.tipo,
-    descricao: (p.descricao || '') + ' (cópia)',
+    assunto: ((p.assunto || '').trim() || p.descricao || '') + ' (cópia)',
+    descricao: p.descricao || '',
     responsible: p.responsible,
     status: 'aberto',
     priority: p.priority,
@@ -778,7 +784,7 @@ function openReassignPendencia(penId) {
     if (filtered.length) options = filtered;
   }
   openModal('Reatribuir pendência', `
-    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(pen.descricao || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : ''}</p>
+    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : ''}</p>
     <div class="form-group">
       <label class="form-label">Novo responsável *</label>
       <select class="form-select" id="reassignSelect">

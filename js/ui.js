@@ -320,6 +320,19 @@ const STATUS_PEN_MAP = {
 const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }
 
+// ── ASSUNTO x DESCRIÇÃO da pendência ─────────────────────────────────────────
+// `assunto`: título/resumo curto (obrigatório em novas pendências).
+// `descricao`: detalhamento completo (obrigatório em novas pendências).
+// Registros antigos podem ter `assunto` vazio — o título cai para `descricao`
+// (somente leitura/fallback, sem alterar os dados salvos).
+function getPendenciaAssunto(p) { return String((p && p.assunto) || '').trim(); }
+function getPendenciaTitulo(p) {
+  const a = getPendenciaAssunto(p);
+  if (a) return a;
+  const d = String((p && p.descricao) || '').trim();
+  return d || 'Sem descrição';
+}
+
 function isStalePendencia(p, days = 7) {
   if (!p || isPendenciaClosed(p.status)) return false;
   const ref = p.updatedAt || p.createdAt;
@@ -780,11 +793,12 @@ function exportClientsCSV() {
 
 function exportPendenciasCSV() {
   const pens = typeof getPendencias === 'function' ? getPendencias() : [];
-  const headers = ['ID', 'Cliente', 'Descrição', 'Status', 'Prioridade', 'Responsável', 'Criado Em', 'Prazo'];
+  const headers = ['ID', 'Cliente', 'Assunto', 'Descrição', 'Status', 'Prioridade', 'Responsável', 'Criado Em', 'Prazo'];
   const rows = pens.map(p => [
-    p.id, 
-    p.clientName || '', 
-    p.descricao ? p.descricao.replace(/\n/g, ' ') : '', 
+    p.id,
+    p.clientName || '',
+    p.assunto ? String(p.assunto).replace(/\n/g, ' ') : '',
+    p.descricao ? p.descricao.replace(/\n/g, ' ') : '',
     p.status || '', 
     p.priority || '', 
     p.responsible || '', 

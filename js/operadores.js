@@ -614,7 +614,7 @@ function openOpPendencias(opId) {
              onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">
           ${c ? clientAvatar(c, 28) : ''}
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.descricao || '(sem descrição)')}</div>
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(getPendenciaTitulo(p))}</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
               <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName || '—')}</span>
               ${p.deadline ? `· <span style="${isOverdue ? 'color:#dc2626;font-weight:600' : ''}">${formatDate(parseDeadline(p.deadline))}</span>` : ''}

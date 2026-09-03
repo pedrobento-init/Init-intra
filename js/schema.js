@@ -34,7 +34,7 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo', descricao: 'descricao',
+      id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo', assunto: 'assunto', descricao: 'descricao',
       responsible: 'responsible', status: 'status', priority: 'priority', deadline: 'deadline',
       notes: 'notes', link_util: 'linkUtil', team: 'team', attachments: 'attachments',
       checklist: 'checklist', tags: 'tags', recurrence: 'recurrence', visit_id: 'visitId',
@@ -255,7 +255,7 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
           changedFields.push({ field: lk, local: loc[lk], remote: rem[rk] });
         }
       }
-      if (changedFields.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.descricao || loc.id, fields: changedFields });
+      if (changedFields.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.assunto || loc.descricao || loc.id, fields: changedFields });
       merged.push({ ...loc, ...mapped });
     }
     remoteById.delete(loc.id);

@@ -147,11 +147,12 @@ function _renderSearchResults(query) {
     if (statusFilter && String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
     if (clienteFilter && !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
     if (!q) return true;
+    const inAssunto = (p.assunto || '').toLowerCase().includes(q);
     const inDescricao = (p.descricao || '').toLowerCase().includes(q);
     const inClient = (p.clientName || '').toLowerCase().includes(q);
     const inResp = (p.responsible || '').toLowerCase().includes(q);
     const inNotes = Array.isArray(p.notes) && p.notes.some(n => String(n.text || '').toLowerCase().includes(q));
-    return inDescricao || inClient || inResp || inNotes;
+    return inAssunto || inDescricao || inClient || inResp || inNotes;
   }).slice(0, 5);
 
   _searchResults = [
@@ -218,7 +219,7 @@ function _renderSearchResults(query) {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
         <div style="min-width:0;flex:1">
-          <div class="search-result-title">${escapeHtml(p.descricao || '(sem descrição)')}</div>
+          <div class="search-result-title">${escapeHtml(getPendenciaTitulo(p))}</div>
           <div class="search-result-sub">${escapeHtml(p.clientName || '—')} · ${escapeHtml(p.responsible || '—')}</div>
           ${preview}
         </div>

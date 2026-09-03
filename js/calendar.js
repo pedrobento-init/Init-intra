@@ -128,7 +128,7 @@ function mapPendenciasToEvents(pendencias) {
 
     return {
       id: 'PEN-' + p.id,
-      title: p.descricao || '(sem descrição)',
+      title: getPendenciaTitulo(p),
       start: p.deadline,
       allDay: true,
       backgroundColor: color.bg,
@@ -242,7 +242,7 @@ function openCalendarDaySheet(dateStr) {
       html += allPens.map(p => {
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
         return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
-          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${escapeHtml(p.descricao||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div style="display:flex;gap:4px">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
+          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div style="display:flex;gap:4px">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
       }).join('');
     }
   }
@@ -521,7 +521,7 @@ function exportCalendarICS() {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:pen-${p.id}`);
     lines.push(`DTSTART;VALUE=DATE:${_icsDate(p.deadline)}`);
-    lines.push(`SUMMARY:${_icsEscape(p.descricao || 'Pendência')}`);
+    lines.push(`SUMMARY:${_icsEscape(getPendenciaTitulo(p))}`);
     lines.push(`DESCRIPTION:${_icsEscape((p.clientName || '') + ' — ' + (p.responsible || ''))}`);
     lines.push('END:VEVENT');
   });

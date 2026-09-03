@@ -177,7 +177,7 @@ function notifyPendenciaCreated(pendencia) {
   const html = emailBody(`
     <div style="margin-bottom:16px">
       <div style="display:inline-block;background:${priorityColor(pendencia.priority)}15;color:${priorityColor(pendencia.priority)};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">Nova Pendência</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(pendencia.descricao || 'Sem descrição')}</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
       <tr>
@@ -208,7 +208,7 @@ function notifyPendenciaCreated(pendencia) {
 
   sendEmailNotification({
     to: recipients,
-    subject: `[Init Intra] Nova Pendência: ${pendencia.descricao || 'Sem descrição'}`,
+    subject: `[Init Intra] Nova Pendência: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
 }
@@ -227,7 +227,7 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
   const html = emailBody(`
     <div style="margin-bottom:16px">
       <div style="display:inline-block;background:#3b82f615;color:#3b82f6;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">Pendência Atualizada</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(pendencia.descricao || 'Sem descrição')}</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
     ${statusChanged ? `
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:16px;text-align:center">
@@ -259,7 +259,7 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
 
   sendEmailNotification({
     to: recipients,
-    subject: `[Init Intra] Pendência Atualizada: ${pendencia.descricao || 'Sem descrição'}`,
+    subject: `[Init Intra] Pendência Atualizada: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
 }
@@ -274,7 +274,7 @@ function notifyPendenciaNote(pendencia, note) {
   const html = emailBody(`
     <div style="margin-bottom:16px">
       <div style="display:inline-block;background:#7c3aed15;color:#7c3aed;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">Nova Nota</div>
-      <h2 style="margin:0;font-size:16px;font-weight:700;color:#1e293b">${escapeHtml(pendencia.descricao || 'Pendência')}</h2>
+      <h2 style="margin:0;font-size:16px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px">
       <div style="font-size:12px;color:#64748b;margin-bottom:6px">
@@ -289,7 +289,7 @@ function notifyPendenciaNote(pendencia, note) {
 
   sendEmailNotification({
     to: recipients,
-    subject: `[Init Intra] Nova nota em: ${pendencia.descricao || 'Pendência'}`,
+    subject: `[Init Intra] Nova nota em: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
 }
@@ -306,7 +306,7 @@ function notifyDeadlineReminder(pendencia, daysLeft) {
   const html = emailBody(`
     <div style="margin-bottom:16px">
       <div style="display:inline-block;background:${urgencyColor}15;color:${urgencyColor};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">⏰ Lembrete de Prazo</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(pendencia.descricao || 'Sem descrição')}</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
     <div style="background:${urgencyBg};border:1px solid ${urgencyColor}30;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
       <div style="font-size:24px;font-weight:800;color:${urgencyColor};margin-bottom:4px">${urgency}</div>
@@ -333,7 +333,7 @@ function notifyDeadlineReminder(pendencia, daysLeft) {
 
   sendEmailNotification({
     to: recipients,
-    subject: `[Init Intra] ⏰ Prazo ${urgency}: ${pendencia.descricao || 'Pendência'}`,
+    subject: `[Init Intra] ⏰ Prazo ${urgency}: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
 }
@@ -374,7 +374,7 @@ function notifyStalePendencia(p, days) {
   const html = emailBody(`
     <div style="margin-bottom:16px">
       <div style="display:inline-block;background:#d9770615;color:#d97706;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">🕓 Pendência parada</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(p.descricao || 'Sem descrição')}</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(p))}</h2>
     </div>
     <p style="font-size:14px;color:#475569;margin:0 0 16px">Esta pendência está sem atualização há <strong>${days} dias</strong>.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
@@ -388,7 +388,7 @@ function notifyStalePendencia(p, days) {
   `);
   sendEmailNotification({
     to: recipients,
-    subject: `[Init Intra] 🕓 Pendência parada há ${days} dias: ${p.descricao || 'Pendência'}`,
+    subject: `[Init Intra] 🕓 Pendência parada há ${days} dias: ${getPendenciaTitulo(p)}`,
     html,
   });
 }

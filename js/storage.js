@@ -795,7 +795,7 @@ function savePendencia(data) {
     if (idx !== -1) list[idx].completedAt = data.completedAt;
   }
   dbSet(DB.PENDENCIAS, list);
-  addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, data.descricao);
+  addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, (data.assunto || '').trim() || data.descricao);
 
   if (justConcluded && data.recurrence) {
     try {
@@ -803,6 +803,7 @@ function savePendencia(data) {
         clientId: data.clientId,
         clientName: data.clientName,
         tipo: data.tipo,
+        assunto: data.assunto || '',
         descricao: data.descricao,
         responsible: data.responsible,
         status: 'aberto',
@@ -833,6 +834,7 @@ function savePendencia(data) {
       client_id: data.clientId,
       client_name: data.clientName,
       tipo: data.tipo,
+      assunto: data.assunto || '',
       descricao: data.descricao,
       responsible: data.responsible,
       status: data.status,
@@ -870,7 +872,7 @@ function deletePendencia(id) {
     return false;
   }
   const pen = getPendenciaById(id);
-  const desc = pen ? pen.descricao : 'Desconhecido';
+  const desc = pen ? ((pen.assunto || '').trim() || pen.descricao || 'Desconhecido') : 'Desconhecido';
   const remaining = getPendencias().filter(p => p.id !== id);
   if (remaining.length === getPendencias().length) return false;
   dbSet(DB.PENDENCIAS, remaining);
@@ -1652,35 +1654,35 @@ function seedDemoData() {
     {
       id: 'PEN-1', createdAt: '2025-04-28T08:00:00Z', updatedAt: '2025-04-29T14:00:00Z', team: 'init',
       clientId: 'CLI-1', clientName: 'Padaria Central',
-      tipo: 'Projeto', descricao: 'Cabeamento estruturado no andar 2',
+      tipo: 'Projeto', assunto: 'Cabeamento estruturado', descricao: 'Cabeamento estruturado no andar 2',
       responsible: 'Pedro', status: 'em_andamento', priority: 'media',
       deadline: '2025-05-15', notes: [], linkUtil: ''
     },
     {
       id: 'PEN-2', createdAt: '2025-04-29T10:00:00Z', updatedAt: '2025-04-29T10:00:00Z', team: 'init',
       clientId: 'CLI-2', clientName: 'Distribuidora Ômega',
-      tipo: 'Projeto', descricao: 'Migração para AWS',
+      tipo: 'Projeto', assunto: 'Migração para AWS', descricao: 'Migração para AWS',
       responsible: 'Giovane', status: 'em_andamento', priority: 'alta',
       deadline: '2025-06-01', notes: [], linkUtil: ''
     },
     {
       id: 'PEN-3', createdAt: '2025-04-30T07:00:00Z', updatedAt: '2025-04-30T07:00:00Z', team: 'init',
       clientId: 'CLI-3', clientName: 'Al Marques',
-      tipo: 'Suporte', descricao: 'Verificação mensal de backup e segurança',
+      tipo: 'Suporte', assunto: 'Verificação mensal de backup', descricao: 'Verificação mensal de backup e segurança',
       responsible: 'Rafael', status: 'aberto', priority: 'baixa',
       deadline: '', notes: [], linkUtil: ''
     },
     {
       id: 'PEN-4', createdAt: '2025-05-01T09:00:00Z', updatedAt: '2025-05-01T09:00:00Z', team: 'init',
       clientId: 'CLI-1', clientName: 'Padaria Central',
-      tipo: 'Manutenção', descricao: 'Atualização do antivírus em todos os terminais',
+      tipo: 'Manutenção', assunto: 'Atualização do antivírus', descricao: 'Atualização do antivírus em todos os terminais',
       responsible: 'Joarli', status: 'aberto', priority: 'media',
       deadline: '2025-05-20', notes: [], linkUtil: ''
     },
     {
       id: 'PEN-5', createdAt: '2025-05-02T11:00:00Z', updatedAt: '2025-05-02T11:00:00Z', team: 'init',
       clientId: 'CLI-2', clientName: 'Distribuidora Ômega',
-      tipo: 'Suporte', descricao: 'Configurar VPN para novos colaboradores',
+      tipo: 'Suporte', assunto: 'Configurar VPN', descricao: 'Configurar VPN para novos colaboradores',
       responsible: 'Felipe', status: 'em_andamento', priority: 'alta',
       deadline: '2025-05-10', notes: [], linkUtil: ''
     }
@@ -1799,6 +1801,7 @@ function validateClient(data) {
 
 function validatePendencia(data) {
   const errors = [];
+  if (!Validators.required(data.assunto)) errors.push('Assunto é obrigatório.');
   if (!Validators.required(data.descricao)) errors.push('Descrição é obrigatória.');
   if (data.linkUtil && !/^https?:\/\//.test(data.linkUtil) && !/^mailto:/.test(data.linkUtil)) errors.push('Link inválido (use https://...).');
   return errors;

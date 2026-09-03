@@ -121,6 +121,7 @@ function validateClient(data) {
 
 function validatePendencia(data) {
   const errors = [];
+  if (!Validators.required(data.assunto)) errors.push('Assunto é obrigatório.');
   if (!Validators.required(data.descricao)) errors.push('Descrição é obrigatória.');
   if (data.linkUtil && !Validators.email(data.linkUtil) && !/^https?:\/\//.test(data.linkUtil)) errors.push('Link inválido (use https://...).');
   return errors;

@@ -339,7 +339,8 @@ function _meetingInlineFormInnerHtml(cid) {
   const opNames = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
   const currentUser = typeof getUser === 'function' ? getUser().name : '';
   return `
-        <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Nova pendência para este cliente..."></textarea>
+        <input class="form-input" id="meeting-new-assunto-${cid}" maxlength="120" placeholder="Assunto (título)..." style="margin-bottom:8px" />
+        <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Descrição detalhada..."></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
             ${(typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro']).map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
@@ -383,8 +384,9 @@ function toggleMeetingInlineForm(clientId) {
   if (!el) return;
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
   if (el.style.display === 'block') {
-    const ta = document.getElementById('meeting-new-desc-' + clientId);
-    if (ta) ta.focus();
+    const ai = document.getElementById('meeting-new-assunto-' + clientId);
+    if (ai) ai.focus();
+    else { const ta = document.getElementById('meeting-new-desc-' + clientId); if (ta) ta.focus(); }
   }
 }
 
@@ -401,7 +403,7 @@ function _meetingPenCard(p) {
     }">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(p.descricao || 'Sem descrição')}</div>
+          <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(getPendenciaTitulo(p))}</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-muted)">
             ${priorityTag(p.priority)}
             <span>Resp: ${escapeHtml(p.responsible || '—')}</span>
@@ -551,7 +553,7 @@ function meetingAddPenNote(penId) {
   addPendenciaNote(penId, text, getUser().name);
   _meetingState.notes.push({
     penId,
-    penDesc: (getPendenciaById(penId) || {}).descricao || '',
+    penDesc: getPendenciaTitulo(getPendenciaById(penId) || {}),
     text,
     author: getUser().name,
     at: new Date().toISOString()
@@ -565,21 +567,25 @@ function meetingCreateInlinePendencia(clientId) {
   if (!_meetingState) return;
   const g = _meetingState.clients[_meetingState.index];
   if (!g || g.clientId !== clientId) return;
+  const assuntoEl = document.getElementById('meeting-new-assunto-' + clientId);
   const descEl = document.getElementById('meeting-new-desc-' + clientId);
   const tipoEl = document.getElementById('meeting-new-tipo-' + clientId);
   const respEl = document.getElementById('meeting-new-resp-' + clientId);
+  const assunto = (assuntoEl?.value || '').trim();
   const descricao = (descEl?.value || '').trim();
+  if (!assunto) { showToast('Informe o assunto.', 'error'); return; }
   if (!descricao) { showToast('Descreva a pendência.', 'error'); return; }
   const tipo = tipoEl?.value || (typeof TIPOS !== 'undefined' ? TIPOS[0] : 'Outro');
   const responsible = respEl?.value || (typeof getUser === 'function' ? getUser().name : '');
   const wasEmpty = g.pens.length === 0;
   try {
-    const data = { clientId, clientName: g.clientName, descricao, tipo, responsible, status: 'aberto', priority: 'media', reviewedInMeeting: _meetingState.id };
+    const data = { clientId, clientName: g.clientName, assunto, descricao, tipo, responsible, status: 'aberto', priority: 'media', reviewedInMeeting: _meetingState.id };
     if (typeof validatePendencia === 'function') {
       const errs = validatePendencia(data);
       if (errs.length) { showToast(errs[0], 'error'); return; }
     }
     const saved = savePendencia(data);
+    if (assuntoEl) assuntoEl.value = '';
     if (descEl) descEl.value = '';
     // Inserção imediata no card sem re-render da página inteira
     // Para manter fila estável, atualiza apenas o grupo atual
@@ -638,6 +644,8 @@ function meetingApplyTemplate(clientId, templateId) {
   // Re-render first to ensure textarea exists, then fill
   renderMeetingFlow();
   setTimeout(() => {
+    const ai = document.getElementById('meeting-new-assunto-' + clientId);
+    if (ai && !ai.value) ai.value = tpl.title || '';
     const ta = document.getElementById('meeting-new-desc-' + clientId);
     if (ta) { ta.value = tpl.content || tpl.title || ''; ta.focus(); }
     showToast(`Modelo "${tpl.title}" carregado`, 'success');
@@ -716,7 +724,7 @@ function endReuniao() {
       relatorio += `\n─── PENDÊNCIAS RESOLVIDAS ───\n`;
       _meetingState.resolvedIds.forEach(id => {
         const p = getPendenciaById(id);
-        relatorio += `• ${p ? (p.descricao || p.id) : id}\n`;
+        relatorio += `• ${p ? (getPendenciaTitulo(p) || p.id) : id}\n`;
       });
     }
 
@@ -730,7 +738,7 @@ function endReuniao() {
     if (remainingCount > 0) {
       relatorio += `\n─── PENDÊNCIAS PENDENTES ───\n`;
       allOpen.forEach(p => {
-        relatorio += `• ${escapeHtml(p.descricao || p.id)} — ${escapeHtml(p.responsible || '—')} [${p.status}]\n`;
+        relatorio += `• ${escapeHtml(getPendenciaTitulo(p) || p.id)} — ${escapeHtml(p.responsible || '—')} [${p.status}]\n`;
       });
     }
 

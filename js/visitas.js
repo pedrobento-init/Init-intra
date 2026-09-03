@@ -394,7 +394,7 @@ function openVisitDetail(id) {
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
       if (!linked.length) return `<div style="margin-top:16px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
-      return `<div style="margin-top:16px"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(p.descricao||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">Abrir</button></div>`).join('')}</div></div>`;
+      return `<div style="margin-top:16px"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">Abrir</button></div>`).join('')}</div></div>`;
     })()}
     <div class="form-group" style="margin-top:16px"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -481,6 +481,7 @@ function submitConcludeVisit(e, id) {
       clientId: v.clientId,
       clientName: v.clientName,
       tipo: 'Suporte',
+      assunto: 'Acompanhamento da visita ' + v.id,
       descricao: (v.motivo ? v.motivo + ' — ' : '') + 'Acompanhamento da visita ' + v.id,
       responsible: v.operator || (typeof getUser === 'function' ? getUser().name : ''),
       status: 'aberto',

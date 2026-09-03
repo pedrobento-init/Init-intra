@@ -367,7 +367,7 @@ async function _pushImportToSupabase(data) {
 
   try {
     await chunk('pendencias', (data.pendencias || []).map(p => ({
-      id: p.id, client_id: p.clientId, client_name: p.clientName, tipo: p.tipo, descricao: p.descricao,
+      id: p.id, client_id: p.clientId, client_name: p.clientName, tipo: p.tipo, assunto: p.assunto || '', descricao: p.descricao,
       responsible: p.responsible, status: p.status, priority: p.priority, deadline: p.deadline || null,
       notes: p.notes || [], link_util: p.linkUtil || '', team: p.team || 'init',
       attachments: p.attachments || [], checklist: p.checklist || [], tags: p.tags || [],
@@ -902,7 +902,7 @@ function renderDashboard() {
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="navigateTo('pendencias');setTimeout(function(){ openPendenciaDetail('${p.id}'); },100)">
           ${c ? clientAvatar(c, 30) : ''}
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.descricao)||'(sem descrição)'}</div>
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(getPendenciaTitulo(p))}</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${escapeHtml(p.clientName)||'—'} ${priTag} ${p.deadline ? '· ' + escapeHtml(formatDate(parseDeadline(p.deadline))) : ''} ${isOverdue?'· <span style="color:#dc2626">⚠️ Vencida</span>':''} ${isStale && !isOverdue ? '· <span style="color:#d97706">🕓 Parada</span>' : ''}</div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">${stTag}</div>
@@ -927,7 +927,7 @@ function renderDashboard() {
               return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
                 ${c ? clientAvatar(c, 30) : ''}
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.descricao)||'(sem descrição)'}</div>
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(getPendenciaTitulo(p))}</div>
                   <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${escapeHtml(p.clientName)||'—'} · ${escapeHtml(p.responsible)||'—'} ${isOverdue?'· <span style="color:#dc2626">⚠️ Vencida</span>':''}</div>
                 </div>
                 <div style="display:flex;gap:4px;flex-shrink:0">${statusTag(p.status)}</div>

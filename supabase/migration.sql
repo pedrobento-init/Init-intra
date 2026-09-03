@@ -108,6 +108,7 @@ create table if not exists public.pendencias (
   client_id text,
   client_name text,
   tipo text,
+  assunto text default '',
   descricao text,
   responsible text,
   status text default 'aberto',
@@ -130,6 +131,7 @@ create table if not exists public.pendencias (
 alter table public.pendencias add column if not exists client_id text;
 alter table public.pendencias add column if not exists client_name text;
 alter table public.pendencias add column if not exists tipo text;
+alter table public.pendencias add column if not exists assunto text default '';
 alter table public.pendencias add column if not exists descricao text;
 alter table public.pendencias add column if not exists responsible text;
 alter table public.pendencias add column if not exists status text default 'aberto';
