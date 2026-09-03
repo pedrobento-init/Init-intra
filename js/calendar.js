@@ -9,7 +9,21 @@ const PRIORITY_COLORS = {
   critica: { bg: '#991b1b', text: '#fff' },
 };
 
-const STATUS_COLORS = Object.fromEntries(Object.entries(STATUS_PEN_MAP).map(([k, v]) => [k, v.dot]));
+// ── Regra visual única dos eventos de pendência (precedência documentada) ────
+// 1. Preenchimento = prioridade (legenda: Crítica #991b1b, Alta #dc2626,
+//    Média #d97706, Baixa #16a34a) — mesma PRIORITY_COLORS da legenda.
+// 2. Borda = Vencida (#991b1b + largura 3, como a legenda) quando vencida;
+//    senão igual ao preenchimento (sem cor de status: a legenda não tem cores
+//    de status, e o status aparece no tooltip/detalhe).
+// 3. Vencida = deadline < hoje (data; deadline é DATE, sem hora) e status não
+//    final — mesma regra dos cards (isPendenciaClosed). Prioridade nunca muda
+//    por vencimento: Alta+Vencida mantém o vermelho da prioridade + borda.
+// Retorna { fill, border, width, overdue }.
+function penEventColors(p) {
+  const fill = (PRIORITY_COLORS[p.priority] || PRIORITY_COLORS.media).bg;
+  const overdue = !!p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
+  return { fill, border: overdue ? '#991b1b' : fill, width: overdue ? 3 : 2, overdue };
+}
 
 const VISIT_COLORS = {
   agendada:     { bg: '#0ea5e9', border: '#0284c7' },
@@ -121,20 +135,17 @@ function getFilteredCalendarVisits() {
 
 function mapPendenciasToEvents(pendencias) {
   return pendencias.map(p => {
-    const color = PRIORITY_COLORS[p.priority] || PRIORITY_COLORS.media;
-    const isOverdue = p.deadline < localDateISO() && !isPendenciaClosed(p.status);
-    const statusColor = STATUS_COLORS[p.status] || '#94a3b8';
-    const borderColor = isOverdue ? '#dc2626' : statusColor;
+    const ev = penEventColors(p);
 
     return {
       id: 'PEN-' + p.id,
       title: getPendenciaTitulo(p),
       start: p.deadline,
       allDay: true,
-      backgroundColor: color.bg,
-      textColor: color.text,
-      borderColor: borderColor,
-      borderWidth: isOverdue ? 3 : 2,
+      backgroundColor: ev.fill,
+      textColor: '#fff',
+      borderColor: ev.border,
+      borderWidth: ev.width,
       classNames: ['fc-event-pendencia'],
       extendedProps: {
         kind: 'pendencia',
@@ -145,7 +156,9 @@ function mapPendenciasToEvents(pendencias) {
         status: p.status,
         priority: p.priority,
         tipo: p.tipo,
-        isOverdue: isOverdue,
+        isOverdue: ev.overdue,
+        evFill: ev.fill,
+        evBorder: ev.border,
       },
     };
   });
@@ -291,6 +304,7 @@ async function initFullCalendar() {
   calStyle.textContent = `
     .fc .fc-daygrid-day.fc-day-weekend { background: rgba(148,163,184,0.10) !important; }
     .fc .fc-col-header-cell.fc-day-sat, .fc .fc-col-header-cell.fc-day-sun { background: rgba(148,163,184,0.18) !important; color:#475569 !important; }
+    .dark-theme .fc .fc-col-header-cell.fc-day-sat, .dark-theme .fc .fc-col-header-cell.fc-day-sun { color: var(--text-secondary) !important; }
     .dark-theme .fc .fc-daygrid-day.fc-day-weekend { background: rgba(71,85,105,0.18) !important; }
     .fc .fc-day-today { background: rgba(26,86,219,0.10) !important; border: 2px solid #1a56db !important; }
     .fc .fc-day-today .fc-daygrid-day-number { background:#1a56db;color:#fff;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-weight:800; }
@@ -344,9 +358,10 @@ async function initFullCalendar() {
         const colWidth = arg.el.closest('.fc-daygrid-day')?.offsetWidth || 0;
         const isCompact = isMobile || colWidth < 90;
         if (isCompact && props.kind === 'pendencia') {
-          const dot = PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media;
-          const border = props.isOverdue ? '#dc2626' : (STATUS_COLORS[props.status] || '#94a3b8');
-          return { html: '<span class="fc-event-badge" style="width:8px;height:8px;border-radius:50%;background:' + dot.bg + ';border:2px solid ' + border + ';display:inline-block"></span>' };
+          // Mesma regra central (penEventColors), lida das props calculadas no mapa.
+          const fill = props.evFill || (PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media).bg;
+          const border = props.evBorder || (props.isOverdue ? '#991b1b' : fill);
+          return { html: '<span class="fc-event-badge" style="width:8px;height:8px;border-radius:50%;background:' + fill + ';border:2px solid ' + border + ';display:inline-block"></span>' };
         }
       } catch(_){}
       if (props.kind !== 'visit') return true;
