@@ -462,7 +462,7 @@ tr:hover td { background: var(--bg-hover); }
 .kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; min-height: 420px; }
 .kanban-col {
   flex: 1 1 220px;
-  min-width: 200px;
+  min-width: 220px;
   max-width: 340px;
   background: var(--bg-base);
   border: 1px solid var(--border);
@@ -494,6 +494,56 @@ tr:hover td { background: var(--bg-hover); }
 .kanban-card-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; color: var(--text-primary); }
 .kanban-card-meta { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
+/* ── KANBAN CARD — conteúdo variável (badges condicionais) ── */
+/* Sem altura fixa: o card cresce conforme os badges presentes
+   (timer, vencida, prazo, afastado são condicionais). */
+.kanban-card {
+  min-width: 0;
+  min-height: 96px;
+}
+/* Título truncado de forma limpa (máx. 3 linhas + reticências). */
+.kanban-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+/* Linha de badges quebra para baixo em vez de estourar a largura. */
+.kanban-card-meta {
+  row-gap: 6px;
+  overflow-wrap: anywhere;
+}
+.kanban-card-meta > * {
+  min-width: 0;
+}
+.kanban-card-meta img {
+  flex-shrink: 0;
+}
+/* Badge/tag mais largo que a coluna trunca com … em vez de vazar. */
+.kanban-card .tag,
+.pen-mobile-card .tag {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Timer (botão + badge do operador + tempo): pode quebrar em 2 linhas
+   dentro do card em vez de forçar overflow (ex.: nome longo + 37h). */
+.timer-widget {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.worker-badge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── PENDÊNCIAS MOBILE GRID ── */
 .pen-mobile-grid {
   display: grid;
@@ -512,6 +562,7 @@ tr:hover td { background: var(--bg-hover); }
   gap: 8px;
   box-shadow: var(--shadow-sm);
   transition: border-color var(--transition), box-shadow var(--transition);
+  min-width: 0;
 }
 .pen-mobile-card:active { box-shadow: var(--shadow); }
 .pen-mobile-card-top {
@@ -535,12 +586,24 @@ tr:hover td { background: var(--bg-hover); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Status longo (ex.: "Aguard. Cliente") nunca comprime o nome do cliente. */
+.pen-mobile-card-top .tag {
+  flex-shrink: 0;
+}
 .pen-mobile-card-desc {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.35;
   word-break: break-word;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .pen-mobile-card-meta {
   font-size: 11px;
