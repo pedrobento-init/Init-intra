@@ -894,7 +894,8 @@ function renderDashboard() {
       <div class="section-header"><span class="section-title">Minha fila do dia</span><span style="font-size:11px;color:var(--text-muted)">${myQueue.length} ${myQueue.length===1?'item':'itens'}</span></div>
       ${myQueue.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + myQueue.slice(0,8).map(function(p){
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        const isOverdue = p.deadline && p.deadline < today;
+        const _isClosedQ = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s || ''); };
+        const isOverdue = p.deadline && p.deadline < today && !_isClosedQ(p.status);
         const isStale = typeof isStalePendencia === 'function' ? isStalePendencia(p) : false;
         const priTag = typeof priorityTag === 'function' ? priorityTag(p.priority) : '';
         const stTag = typeof statusTag === 'function' ? statusTag(p.status) : '';
@@ -921,7 +922,8 @@ function renderDashboard() {
           ${recentPens.length ? `<div style="display:flex;flex-direction:column;gap:1px">
             ${recentPens.map(p => {
               const c = getClientById(p.clientId);
-               const isOverdue = p.deadline && p.deadline < localDateISO();
+               const _isClosedR = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s || ''); };
+               const isOverdue = p.deadline && p.deadline < localDateISO() && !_isClosedR(p.status);
               return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
                 ${c ? clientAvatar(c, 30) : ''}
                 <div style="flex:1;min-width:0">

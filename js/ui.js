@@ -338,6 +338,13 @@ function statusTag(s) {
 
 function slaCountdown(item, defaultHours) {
   if (!item || !item.createdAt) return null;
+  // Regra de negócio: chamado resolvido/fechado nunca está vencido.
+  // O status final tem prioridade sobre o SLA/prazo — não gera alerta vermelho.
+  try {
+    if (typeof isPendenciaClosed === 'function' ? isPendenciaClosed(item.status) : ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(item.status || '')) return null;
+  } catch (_) {
+    if (['concluido', 'resolvido', 'cancelado', 'fechado'].includes((item && item.status) || '')) return null;
+  }
   var created = new Date(item.createdAt).getTime();
   var slaMs = (defaultHours || 24) * 60 * 60 * 1000;
   var deadline = created + slaMs;
