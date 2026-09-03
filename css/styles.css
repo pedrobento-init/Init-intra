@@ -218,6 +218,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
   transition: margin-left var(--transition);
 }
 .main-content.expanded { margin-left: 60px; }
@@ -245,7 +246,7 @@ body {
 }
 .user-quick:hover { border-color: var(--accent); color: var(--text-primary); }
 
-.content-area { padding: 24px; flex: 1; font-size: 15px; }
+.content-area { padding: 24px; flex: 1; font-size: 15px; min-width: 0; }
 
 .content-area.transitioning {
   animation: pageFadeIn 0.18s ease;
@@ -480,7 +481,11 @@ tr:hover td { background: var(--bg-hover); }
 }
 .kanban-col-title { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 7px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-secondary); }
 .kanban-col-count { background: var(--border); padding: 1px 8px; border-radius: 20px; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
-.kanban-cards { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.kanban-cards { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+/* Indicador de scroll horizontal: sombra interna na borda do lado com coluna oculta. */
+.kanban-board.has-scroll-left { box-shadow: inset 18px 0 14px -14px rgba(15, 23, 42, 0.35); }
+.kanban-board.has-scroll-right { box-shadow: inset -18px 0 14px -14px rgba(15, 23, 42, 0.35); }
+.kanban-board.has-scroll-left.has-scroll-right { box-shadow: inset 18px 0 14px -14px rgba(15, 23, 42, 0.35), inset -18px 0 14px -14px rgba(15, 23, 42, 0.35); }
 .kanban-card {
   background: var(--bg-card);
   border: 1px solid var(--border);

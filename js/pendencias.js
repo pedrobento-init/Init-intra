@@ -191,8 +191,28 @@ function renderPenKanban(area) {
         '</div>';
       }).join('') +
     '</div>';
+    var board = area.querySelector('.kanban-board');
+    if (board) {
+      _updateKanbanScrollShadows(board);
+      board.onscroll = function() { _updateKanbanScrollShadows(board); };
+      if (typeof window !== 'undefined') {
+        if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
+        window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
+        window.addEventListener('resize', window._kanbanResizeHandler);
+      }
+    }
   }
   _applyPenCardMotion(area);
+}
+
+// Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
+function _updateKanbanScrollShadows(board) {
+  if (!board) return;
+  try {
+    var max = board.scrollWidth - board.clientWidth;
+    board.classList.toggle('has-scroll-left', board.scrollLeft > 4);
+    board.classList.toggle('has-scroll-right', max > 4 && board.scrollLeft < max - 4);
+  } catch (_) {}
 }
 
 function _applyPenCardMotion(area) {
