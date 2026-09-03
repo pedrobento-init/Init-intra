@@ -91,12 +91,29 @@ function timerActionBtnHTML(item, type = 'pendencia') {
 }
 
 /**
+ * Status final (resolvido/fechado/...) — fonte única isPendenciaClosed quando
+ * disponível, com fallback para não quebrar em testes/ordem de scripts.
+ */
+function _isTimerClosedStatus(status) {
+  try {
+    if (typeof isPendenciaClosed === 'function') return isPendenciaClosed(status);
+  } catch (_) {}
+  return ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(status || '');
+}
+
+/**
  * Widget completo (botão + indicador + tempo)
+ * Em chamado finalizado não há ação de execução: exibe só o tempo acumulado,
+ * sem botão play/pause, para não sugerir que ainda está em andamento.
  */
 function timerWidget(item, type = 'pendencia') {
+  if (item && _isTimerClosedStatus(item.status)) {
+    const secs = getElapsedSeconds(item);
+    return `<span class="timer-widget" title="Tempo total trabalhado (chamado finalizado)"><span style="font-size:11px;color:var(--text-muted)">⏱ ${formatTimer(secs)}</span></span>`;
+  }
   const worker = getCurrentWorker(item);
   if (!worker) {
-    return `<span class="timer-widget">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)">Ninguém</span></span>`;
+    return `<span class="timer-widget">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)" title="Ninguém trabalhando agora">Ninguém</span></span>`;
   }
   return `<span class="timer-widget">${timerActionBtnHTML(item, type)} ${workerBadgeHTML(item)} ${timerDisplayHTML(item)}</span>`;
 }
@@ -114,6 +131,13 @@ function toggleTimer(type, id, btnEl) {
   const updateLabel = 'Pendência';
 
   if (!item) { showToast('Item não encontrado.', 'error'); return; }
+
+  // Chamado finalizado não pode iniciar/retomar execução pelo card.
+  // Reabra (mude o status) para voltar a trabalhar — evita resolvido com timer rodando.
+  if (_isTimerClosedStatus(item.status)) {
+    showToast('Chamado finalizado — reabra para retomar o trabalho.', 'info');
+    return;
+  }
 
   const user = getUser();
   const myName = user?.name || 'Operador';

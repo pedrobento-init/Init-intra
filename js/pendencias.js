@@ -263,7 +263,9 @@ function penKanbanCard(p) {
     '</div>' +
     '<div class="kanban-card-meta" style="margin-top:6px">' +
       priorityTag(p.priority) + ' ' +
-      '<span style="font-size:11px">' + escapeHtml(p.responsible || '—') + '</span>' +
+      (p.responsible
+        ? '<span style="font-size:11px" title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
+        : '<span style="font-size:11px;color:var(--text-muted)" title="Sem responsável definido">👤 Sem responsável</span>') +
       onLeaveBadge + reassignBtn +
       (isOverdue ? ' <span style="color:#dc2626;font-weight:600">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px">🕓 Parada</span>' : '') +
@@ -303,7 +305,9 @@ function penMobileCard(p) {
     '<div class="pen-mobile-card-desc"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
     '<div class="pen-mobile-card-meta">' +
       priorityTag(p.priority) +
-      '<span>' + escapeHtml(p.responsible || '—') + '</span>' +
+      (p.responsible
+        ? '<span title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
+        : '<span style="color:var(--text-muted)" title="Sem responsável definido">👤 Sem responsável</span>') +
       onLeaveBadge + reassignBtn +
       (isOverdue ? '<span class="pen-mobile-overdue">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600">🕓 Parada</span>' : '') +
