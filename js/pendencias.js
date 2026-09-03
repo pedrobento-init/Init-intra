@@ -249,7 +249,7 @@ function penKanbanCard(p) {
   var isStale = isStalePendencia(p);
   var sla = slaCountdown(p, 48);
   var onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
-  var onLeaveBadge = onLeave ? ' <span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : '';
+  var onLeaveBadge = onLeave ? ' <span class="tag badge-afastado">🏖️ Afastado</span>' : '';
   var reassignBtn = onLeave ? ' <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
   return '<div class="kanban-card"' +
     ' draggable="true"' +
@@ -292,7 +292,7 @@ function penMobileCard(p) {
   const isStale = isStalePendencia(p);
   const sla = slaCountdown(p, 48);
   const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
-  const onLeaveBadge = onLeave ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : '';
+  const onLeaveBadge = onLeave ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : '';
   const reassignBtn = onLeave ? '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
   return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
     '<div class="pen-mobile-card-top">' +
@@ -581,7 +581,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
       <div class="form-group"><label class="form-label">Assunto *</label>
         <input class="form-input" name="assunto" maxlength="120" placeholder="Título/resumo da pendência..." value="${escapeHtml(p.assunto||'')}" required /></div>
       <div class="form-group"><label class="form-label">Descrição da Pendência *</label>
-        <textarea class="form-textarea" name="descricao" rows="4" placeholder="Descreva em detalhes o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px"></div></div>
+        <textarea class="form-textarea" name="descricao" rows="4" placeholder="Descreva em detalhes o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" class="template-suggestion" style="display:none"></div></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Responsável</label>
           <select class="form-select" name="responsible">
@@ -784,7 +784,7 @@ function openReassignPendencia(penId) {
     if (filtered.length) options = filtered;
   }
   openModal('Reatribuir pendência', `
-    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>' : ''}</p>
+    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : ''}</p>
     <div class="form-group">
       <label class="form-label">Novo responsável *</label>
       <select class="form-select" id="reassignSelect">

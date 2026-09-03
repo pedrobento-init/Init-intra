@@ -158,7 +158,7 @@ function _renderOpGrid() {
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}
             </div>
-            ${op.onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : ''}
+            ${op.onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : ''}
           </div>
         </div>
         <div class="op-card-name">${escapeHtml(op.name)}</div>
@@ -632,7 +632,7 @@ function openOpPendencias(opId) {
     <div class="op-detail-header" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-base);border-radius:var(--radius);margin-bottom:20px">
       <div style="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : ''}</div>
+        <div style="font-size:16px;font-weight:700">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : ''}</div>
         <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(op.role || 'Técnico')}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">

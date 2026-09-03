@@ -421,6 +421,27 @@ tr:hover td { background: var(--bg-hover); }
 .tag-purple { background: var(--purple-dim); color: var(--purple); }
 .tag-indigo { background: rgba(99,102,241,0.12); color: #6366f1; }
 .tag-gray   { background: #f1f5f9;           color: var(--text-muted); }
+/* Badge "Afastado" (operador em afastamento): mesmas cores no light mode;
+   no dark mode usa os tokens amarelos do tema em vez do amarelo claro fixo. */
+.badge-afastado { background: #fef3c7; color: #92400e; }
+body.dark-theme .badge-afastado { background: var(--yellow-dim); color: var(--yellow); }
+
+/* ── SUGESTÃO DE MODELO (ex.: abaixo da descrição da pendência) ── */
+/* Caixa informativa temática: fundo, borda e texto acompanham o tema claro/escuro. */
+.template-suggestion {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+body.dark-theme .template-suggestion {
+  background: var(--accent-dim);
+  border-color: var(--accent-light);
+  color: var(--text-primary);
+}
 
 /* ── MODAL ── */
 .modal-overlay {

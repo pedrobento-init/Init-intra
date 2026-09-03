@@ -394,7 +394,7 @@ function _meetingPenCard(p) {
   const isReviewed = _meetingState && _meetingState.reviewedIds.has(p.id);
   const isResolved = _meetingState && _meetingState.resolvedIds.includes(p.id);
   const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
-  const onLeaveBadge = onLeave ? `<span class="tag" style="background:#fef3c7;color:#92400e">🏖️ Afastado</span>` : '';
+  const onLeaveBadge = onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : '';
   const reassignBtn = onLeave ? `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')">Reatribuir</button>` : '';
 
   return `
