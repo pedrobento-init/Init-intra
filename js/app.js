@@ -127,6 +127,121 @@ function itemInDashPeriod(item) {
   return d >= start && d <= end;
 }
 
+// ── Dashboard widgets: personalização + helpers puros (sem duplicar cálculos) ─
+const DASH_SILENCE_DAYS_FALLBACK = 30;
+
+function _dashOperatorKey() {
+  try {
+    const s = typeof getSession === 'function' ? getSession() : null;
+    return s?.opId || s?.name || 'anon';
+  } catch (_) { return 'anon'; }
+}
+function _dashHiddenKey() { return 'dash_hidden_widgets_' + _dashOperatorKey(); }
+function _getDashHidden() {
+  try {
+    if (typeof getCacheKV === 'function') return getCacheKV(_dashHiddenKey(), []) || [];
+  } catch (_) {}
+  return [];
+}
+function _dashIsHidden(id) {
+  try { return _getDashHidden().includes(id); } catch (_) { return false; }
+}
+function toggleDashWidget(id) {
+  try {
+    const key = _dashHiddenKey();
+    const cur = _getDashHidden();
+    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    if (typeof setCacheKV === 'function') setCacheKV(key, next);
+  } catch (_) {}
+  renderDashboard();
+}
+function resetDashWidgets() {
+  try {
+    if (typeof setCacheKV === 'function') setCacheKV(_dashHiddenKey(), []);
+    else if (typeof removeCacheKV === 'function') removeCacheKV(_dashHiddenKey());
+  } catch (_) {}
+  renderDashboard();
+  if (typeof showToast === 'function') showToast('Widgets do Dashboard restaurados.', 'success');
+}
+function _dashHideBtn(id) {
+  return `<button class="dash-hide-btn" title="Ocultar widget" onclick="event.stopPropagation();toggleDashWidget('${id}')">✕</button>`;
+}
+function dashGoPresentation() {
+  navigateTo('reuniao');
+  setTimeout(() => { if (typeof enterPresentationMode === 'function') enterPresentationMode(); }, 150);
+}
+function dashGoToPendenciasByOperator(name) {
+  try {
+    if (typeof saveFilterState === 'function') saveFilterState('pendencias', { resp: name, search: '', client: '', status: '', priority: '' });
+  } catch (_) {}
+  navigateTo('pendencias');
+}
+// Selo de comparativo: verde = melhora, vermelho = piora, cinza = estável/sem base.
+function _dashDeltaBadge(delta) {
+  if (!delta || delta.improved == null || delta.direction === 'flat') {
+    return `<span class="dash-delta dash-delta-flat" title="Sem variação relevante">• 0%</span>`;
+  }
+  const color = delta.improved ? '#16a34a' : '#dc2626';
+  const arrow = delta.direction === 'up' ? '↑' : '↓';
+  return `<span class="dash-delta" style="color:${color}" title="${delta.improved ? 'Melhora' : 'Piora'} vs. período anterior">${arrow}${delta.pct}%</span>`;
+}
+// Faixa anterior espelhando getDashDateRange (reaproveita metrics.js quando disponível).
+function _getPreviousDashRange() {
+  try {
+    if (typeof getPreviousDashRange === 'function') {
+      return getPreviousDashRange(_dashPeriod, _dashCustomStart, _dashCustomEnd, _brasiliaNow());
+    }
+  } catch (_) {}
+  const today = _brasiliaNow();
+  const day = 86400000;
+  if (_dashPeriod === 'week') {
+    const dow = (today.getDay() + 6) % 7;
+    const start = new Date(today.getTime() - dow * day);
+    const prevEnd = new Date(start.getTime() - day);
+    const prevStart = new Date(prevEnd.getTime() - 6 * day);
+    return { start: prevStart, end: prevEnd };
+  }
+  if (_dashPeriod === 'month') {
+    return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: new Date(today.getFullYear(), today.getMonth(), 0) };
+  }
+  if (_dashPeriod === 'quarter') {
+    const q = Math.floor(today.getMonth() / 3);
+    return { start: new Date(today.getFullYear(), q * 3 - 3, 1), end: new Date(today.getFullYear(), q * 3, 0) };
+  }
+  return null;
+}
+function _filterPensByRange(pens, range) {
+  if (!range || !range.start || !range.end) return [];
+  return (pens || []).filter(p => {
+    const d = _parseItemDate(p);
+    return d >= range.start && d <= range.end;
+  });
+}
+function _calcDashStats(pens) {
+  try {
+    if (typeof calcPeriodStats === 'function') return calcPeriodStats(pens, typeof isPendenciaClosed === 'function' ? isPendenciaClosed : undefined);
+  } catch (_) {}
+  const isClosed = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : (s => ['concluido','resolvido','cancelado','fechado'].includes(s));
+  const active = (pens || []).filter(p => !isClosed(p.status));
+  const resolved = (pens || []).filter(p => p.status === 'concluido').length;
+  const done = (pens || []).filter(p => p.status === 'concluido' && p.createdAt && (p.completedAt || p.updatedAt));
+  let total = 0, count = 0;
+  done.forEach(p => {
+    const h = (new Date(p.completedAt || p.updatedAt) - new Date(p.createdAt)) / 3600000;
+    if (h >= 0 && h < 365 * 24) { total += h; count++; }
+  });
+  return { open: active.length, avgSlaHours: count ? Number((total / count).toFixed(1)) : 0, completionRate: pens?.length ? Math.round((resolved / pens.length) * 100) : 0 };
+}
+function _calcDashDelta(cur, prev, higherIsBetter) {
+  try {
+    if (typeof calcPeriodDelta === 'function') return calcPeriodDelta(cur, prev, higherIsBetter);
+  } catch (_) {}
+  if (!prev) return { pct: cur ? 100 : 0, direction: cur ? 'up' : 'flat', improved: cur ? higherIsBetter : null };
+  const pct = Math.round(((cur - prev) / Math.abs(prev)) * 100);
+  const direction = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  return { pct: Math.abs(pct), direction, improved: direction === 'flat' ? null : (higherIsBetter ? direction === 'up' : direction === 'down') };
+}
+
 // ── Export / Import ────────────────────────────────────────────────────────────
 function exportData() {
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
@@ -189,20 +304,27 @@ async function _runImportBackup(data) {
   try {
     showToast('Importando backup...', 'info');
 
-    if (data.clients)    dbSet('intra_clients',    data.clients);
-    if (data.pendencias) dbSet('intra_pendencias', data.pendencias);
-    if (data.procedures) dbSet('intra_procedures', data.procedures);
-    if (data.procedureTemplates) dbSet('intra_procedure_templates', data.procedureTemplates);
-    if (data.operators)  dbSet('intra_operators',  data.operators);
-    if (data.visits)     dbSet('intra_visits',     data.visits);
-    if (data.tickets)    dbSet('intra_tickets',    data.tickets);
-    if (data.reunioes)   dbSet('intra_reunioes',   data.reunioes);
+    // Restore em massa — não é edição do usuário (não conta como pendência).
+    if (typeof window !== 'undefined') window._suppressPendingSync = true;
+    try {
+      if (data.clients)    dbSet('intra_clients',    data.clients);
+      if (data.pendencias) dbSet('intra_pendencias', data.pendencias);
+      if (data.procedures) dbSet('intra_procedures', data.procedures);
+      if (data.procedureTemplates) dbSet('intra_procedure_templates', data.procedureTemplates);
+      if (data.operators)  dbSet('intra_operators',  data.operators);
+      if (data.visits)     dbSet('intra_visits',     data.visits);
+      if (data.tickets)    dbSet('intra_tickets',    data.tickets);
+      if (data.reunioes)   dbSet('intra_reunioes',   data.reunioes);
+    } finally {
+      if (typeof window !== 'undefined') window._suppressPendingSync = false;
+    }
 
     const cloudOk = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
     if (cloudOk) {
       showToast('Enviando backup para a nuvem...', 'info');
       const errors = await _pushImportToSupabase(data);
       if (errors.length) {
+        if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
         showToast(`Backup local OK, mas ${errors.length} erro(s) no envio à nuvem.`, 'warning', 6000);
       } else {
         showToast('Backup importado e sincronizado!', 'success');
@@ -438,6 +560,92 @@ function renderDashboard() {
   const resolvedCount = pens.filter(p => p.status === 'concluido').length;
   const completionRate = pens.length ? Math.round((resolvedCount / pens.length) * 100) : 0;
 
+  // ── Evolução Dashboard: reaproveita pens/overdue/dueToday/etc (sem duplicar) ─
+  const _dashOpenCount = open.length + inProg.length + paused.length;
+  const _effTeam = typeof getEffectiveTeam === 'function' ? getEffectiveTeam() : '';
+  let _allReunioes = [];
+  try {
+    if (typeof getMyReunioes === 'function') _allReunioes = (isTeamAdmin() && _selectedTeam && typeof getReunioesByTeam === 'function') ? getReunioesByTeam(_selectedTeam) : getMyReunioes();
+    else if (typeof getReunioes === 'function') _allReunioes = getReunioes();
+  } catch (_) { _allReunioes = []; }
+  let _nextMeeting = null;
+  try {
+    if (typeof getNextMeeting === 'function') _nextMeeting = getNextMeeting(_allReunioes, (isTeamAdmin() && _selectedTeam) ? _selectedTeam : null);
+    else {
+      const _open = (_allReunioes || []).filter(r => r.status === 'aberta').sort((a,b) => String(a.mesAno||'').localeCompare(String(b.mesAno||'')));
+      _nextMeeting = _open[0] || (_allReunioes || []).slice().sort((a,b) => String(b.mesAno||'').localeCompare(String(a.mesAno||'')))[0] || null;
+    }
+  } catch (_) { _nextMeeting = null; }
+  const _meetingLabel = (() => {
+    if (!_nextMeeting?.mesAno) return '—';
+    try {
+      if (typeof _getMesAnoLabel === 'function') return _getMesAnoLabel(_nextMeeting.mesAno);
+    } catch (_) {}
+    return _nextMeeting.mesAno;
+  })();
+  // Recorrência: streak >= 2 (reaproveita getConsecutiveMeetingStreak)
+  let _recurrent = [];
+  try {
+    if (typeof getRecurrentClients === 'function') {
+      const _sorted = (_allReunioes || []).filter(r => r.status === 'encerrada').sort((a,b) => String(b.mesAno||'').localeCompare(String(a.mesAno||'')));
+      _recurrent = getRecurrentClients(allClients, _sorted, allPens, 2, 5);
+    } else if (typeof getConsecutiveMeetingStreak === 'function' && typeof getMyReunioes === 'function') {
+      const _sorted = (_allReunioes || []).filter(r => r.status === 'encerrada').sort((a,b) => String(b.mesAno||'').localeCompare(String(a.mesAno||'')));
+      _recurrent = allClients.map(c => ({ client: c, clientId: c.id, clientName: c.name, streak: getConsecutiveMeetingStreak(c.id, _sorted, allPens) }))
+        .filter(r => r.streak > 1).sort((a,b) => b.streak - a.streak).slice(0, 5);
+    }
+  } catch (_) { _recurrent = []; }
+  // Risco: piores scores (reaproveita cálculo de clients.js/metrics.js)
+  let _risk = [];
+  try {
+    if (typeof getRiskRanking === 'function') _risk = getRiskRanking(clients.length ? clients : allClients, pens.length ? pens : allPens, today, 5, typeof isPendenciaClosed === 'function' ? isPendenciaClosed : undefined);
+    else if (typeof getHealthForClient === 'function') {
+      const _base = clients.length ? clients : allClients;
+      const _pens = pens.length ? pens : allPens;
+      _risk = _base.map(c => ({ client: c, clientId: c.id, clientName: c.name, health: getHealthForClient(_pens, c.id, today) }))
+        .sort((a,b) => ({red:0,yellow:1,green:2}[a.health.level] - {red:0,yellow:1,green:2}[b.health.level]) || (b.health.vencidas - a.health.vencidas))
+        .filter(r => r.health.totalAbertas > 0).slice(0, 5);
+    }
+  } catch (_) { _risk = []; }
+  // Silêncio: 30 dias sem contato (usa histórico completo, não o filtro de período)
+  let _silent = [];
+  try {
+    const _days = (typeof DASH_SILENCE_DAYS !== 'undefined' ? DASH_SILENCE_DAYS : (typeof DASH_SILENCE_DAYS_FALLBACK !== 'undefined' ? DASH_SILENCE_DAYS_FALLBACK : 30));
+    if (typeof getSilentClients === 'function') _silent = getSilentClients(allClients, allPens, allVisits, _days, today).slice(0, 5);
+  } catch (_) { _silent = []; }
+  // Aniversários no mês corrente (usa createdAt do cliente)
+  let _anniv = [];
+  try {
+    if (typeof getClientAnniversaries === 'function') _anniv = getClientAnniversaries(allClients, _brasiliaNow()).slice(0, 5);
+  } catch (_) { _anniv = []; }
+  // Afastados (onLeave) + sobrecarga para o resumo do dia
+  let _allOps = [];
+  try { _allOps = typeof getOperators === 'function' ? getOperators() : []; } catch (_) { _allOps = []; }
+  const _onLeaveOps = _allOps.filter(o => o.onLeave === true && (!_effTeam || !isTeamAdmin() || !_selectedTeam || (o.team || 'init') === _selectedTeam));
+  const _onLeaveWithCount = _onLeaveOps.map(o => ({ name: o.name, count: activePens.filter(p => p.responsible === o.name).length }));
+  const _loadByResp = {};
+  activePens.forEach(p => { const k = p.responsible || 'Sem responsável'; _loadByResp[k] = (_loadByResp[k] || 0) + 1; });
+  const _overloaded = Object.entries(_loadByResp).filter(([k, v]) => k !== 'Sem responsável' && v >= 6)
+    .map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count).slice(0, 2);
+  let _daySummary = '';
+  try {
+    if (typeof buildDaySummary === 'function') _daySummary = buildDaySummary({ dueToday, todayVisits, overloadedOps: _overloaded, onLeaveOps: _onLeaveOps.map(o => o.name) });
+    else _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).` + (_overloaded.length || _onLeaveOps.length ? ' Atenção: ' + [..._overloaded.map(o => `${o.name} está sobrecarregado (${o.count} ativas)`), ..._onLeaveOps.map(o => `${o.name} está afastado`)].join('; ') + '.' : '');
+  } catch (_) { _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).`; }
+  // Comparativo com período anterior (apenas quando há filtro de período)
+  let _prevStats = null, _deltaOpen = null, _deltaSla = null, _deltaComp = null;
+  if (_dashPeriod !== 'all') {
+    const _range = _getPreviousDashRange();
+    if (_range && _range.start && _range.end) {
+      const _prevPens = _filterPensByRange(allPens, _range);
+      _prevStats = _calcDashStats(_prevPens);
+      const _curStats = { open: _dashOpenCount, avgSlaHours: Number(avgSlaHours) || 0, completionRate };
+      _deltaOpen = _calcDashDelta(_curStats.open, _prevStats.open, false);
+      _deltaSla = _calcDashDelta(_curStats.avgSlaHours, _prevStats.avgSlaHours, false);
+      _deltaComp = _calcDashDelta(_curStats.completionRate, _prevStats.completionRate, true);
+    }
+  }
+
   const periodLabel = {all:'Todos',week:'Esta Semana',month:'Este Mês',quarter:'Este Trimestre',custom:'Personalizado'}[_dashPeriod] || 'Todos';
 
   document.getElementById('contentArea').innerHTML = `
@@ -480,10 +688,91 @@ function renderDashboard() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Relatório Mensal
         </button>
+        <button class="btn btn-secondary btn-sm" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">🖥️ Apresentar</button>
+        <button class="btn btn-secondary btn-sm" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">⚙️ Widgets</button>
       </div>
     </div>
+
+    ${!_dashIsHidden('resumo-dia') ? `
+    <div class="card dash-widget" style="margin-bottom:18px">
+      ${_dashHideBtn('resumo-dia')}
+      <div class="section-header"><span class="section-title">📌 Resumo do dia</span></div>
+      <p class="dash-day-summary">${escapeHtml(_daySummary)}</p>
+    </div>` : ''}
+
+    ${!_dashIsHidden('reuniao') ? `
+    <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #7c3aed">
+      ${_dashHideBtn('reuniao')}
+      <div class="section-header">
+        <span class="section-title">👥 Reunião Mensal — ${escapeHtml(_meetingLabel)}${_nextMeeting ? ` <span class="tag ${String(_nextMeeting.status) === 'aberta' ? 'tag-green' : 'tag-gray'}">${escapeHtml(_nextMeeting.status || '—')}</span>` : ''}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar</button>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('reuniao')">${_nextMeeting && _nextMeeting.status === 'aberta' ? 'Continuar Reunião' : 'Iniciar/Continuar Reunião'}</button>
+        </div>
+      </div>
+      ${_nextMeeting
+        ? `<div style="font-size:13px;color:var(--text-secondary)">${activePens.length} pendência(s) aberta(s) aguardando revisão · ${allClients.length} cliente(s) no escopo${_effTeam ? ` · equipe ${escapeHtml(_effTeam)}` : ''}</div>`
+        : `<div style="font-size:13px;color:var(--text-muted)">Nenhuma reunião encontrada no escopo. Acesse o módulo para criar.</div>`}
+    </div>` : ''}
+
+    ${(!_dashIsHidden('afastados') && _onLeaveWithCount.length) ? `
+    <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #d97706">
+      ${_dashHideBtn('afastados')}
+      <div class="section-header"><span class="section-title">🏖️ Operadores afastados</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${_onLeaveWithCount.map(o => `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--bg-secondary)">
+            <span style="font-size:13px;flex:1"><strong>${escapeHtml(o.name)}</strong> está afastado — ${o.count} pendência(s) aguardando reatribuição</span>
+            <button class="btn btn-secondary btn-sm" onclick="dashGoToPendenciasByOperator('${escapeHtml(o.name)}')">Ver pendências →</button>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="grid-2" style="margin-bottom:18px">
+      ${!_dashIsHidden('recorrentes') ? `
+      <div class="card dash-widget">
+        ${_dashHideBtn('recorrentes')}
+        <div class="section-header"><span class="section-title">🔁 Pendência recorrente (top 5)</span></div>
+        ${_recurrent.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _recurrent.map(r => `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(r.clientId)}')">
+            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.clientName)}</span>
+            <span class="tag" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px">🔁 ${r.streak} meses seguidos</span>
+          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Nenhum cliente recorrente 🎉</p></div>`}
+      </div>` : ''}
+      ${!_dashIsHidden('riscos') ? `
+      <div class="card dash-widget">
+        ${_dashHideBtn('riscos')}
+        <div class="section-header"><span class="section-title">🔴 Clientes em risco (score de saúde)</span></div>
+        ${_risk.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _risk.map(r => `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(r.clientId)}')">
+            <span style="font-size:14px">${r.health.emoji}</span>
+            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.clientName)}</span>
+            <span style="font-size:11px;color:var(--text-muted)">${r.health.totalAbertas} abertas · ${r.health.vencidas} vencidas</span>
+          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Sem risco mapeado 🎉</p></div>`}
+      </div>` : ''}
+      ${!_dashIsHidden('silencio') ? `
+      <div class="card dash-widget">
+        ${_dashHideBtn('silencio')}
+        <div class="section-header"><span class="section-title">🔇 Silêncio do cliente (30+ dias)</span></div>
+        ${_silent.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _silent.map(s => `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(s.clientId)}')">
+            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(s.clientName)}</span>
+            <span style="font-size:11px;color:var(--text-muted)">${s.daysSince >= 9999 ? 'sem contato registrado' : `há ${s.daysSince}d`}</span>
+          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Todos os clientes ativos recentemente 🎉</p></div>`}
+      </div>` : ''}
+      ${!_dashIsHidden('aniversarios') ? `
+      <div class="card dash-widget">
+        ${_dashHideBtn('aniversarios')}
+        <div class="section-header"><span class="section-title">🎂 Aniversários de cliente (mês atual)</span></div>
+        ${_anniv.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _anniv.map(a => `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(a.clientId)}')">
+            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(a.clientName)}</span>
+            <span class="tag tag-green">${a.years} ano(s)</span>
+          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Nenhum aniversário neste mês</p></div>`}
+      </div>` : ''}
+    </div>
     
-    <div class="stats-grid">
+    ${!_dashIsHidden('stats') ? `<div class="dash-widget" style="position:relative">${_dashHideBtn('stats')}<div class="stats-grid">` : '<div style="display:none"><div>'}
       <div class="stat-card" onclick="navigateTo('clientes')" style="cursor:pointer">
         <div class="stat-icon" style="background:#eff6ff">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -494,7 +783,7 @@ function renderDashboard() {
         <div class="stat-icon" style="background:#eff6ff">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
-        <div><div class="stat-value" style="color:#1a56db">${open.length + inProg.length + paused.length}</div><div class="stat-label">Pendências abertas${_dashPeriod!=='all'?' (período)':''}</div></div>
+        <div><div class="stat-value" style="color:#1a56db">${open.length + inProg.length + paused.length}</div><div class="stat-label">Pendências abertas${_dashPeriod!=='all'?' (período)':''} ${_deltaOpen ? _dashDeltaBadge(_deltaOpen) : ''}</div></div>
       </div>
       <div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
         <div class="stat-icon" style="background:#fef2f2">
@@ -506,7 +795,7 @@ function renderDashboard() {
         <div class="stat-icon" style="background:#ecfdf5">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
-        <div><div class="stat-value" style="color:#16a34a">${avgSlaHours}h</div><div class="stat-label">SLA Médio${_dashPeriod!=='all'?' (período)':''}</div></div>
+        <div><div class="stat-value" style="color:#16a34a">${avgSlaHours}h</div><div class="stat-label">SLA Médio${_dashPeriod!=='all'?' (período)':''} ${_deltaSla ? _dashDeltaBadge(_deltaSla) : ''}</div></div>
       </div>
       <div class="stat-card" onclick="navigateTo('visitas')" style="cursor:pointer">
         <div class="stat-icon" style="background:#e0f2fe">
@@ -536,11 +825,13 @@ function renderDashboard() {
         <div class="stat-icon" style="background:#f5f3ff">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>
         </div>
-        <div><div class="stat-value" style="color:#7c3aed">${completionRate}%</div><div class="stat-label">Taxa de conclusão</div></div>
+        <div><div class="stat-value" style="color:#7c3aed">${completionRate}%</div><div class="stat-label">Taxa de conclusão ${_deltaComp ? _dashDeltaBadge(_deltaComp) : ''}</div></div>
       </div>
-    </div>
+    </div></div>
 
-    <div class="card" style="margin-bottom:18px">
+    ${!_dashIsHidden('evolucao') ? `
+    <div class="card dash-widget" style="margin-bottom:18px">
+      ${_dashHideBtn('evolucao')}
       <div class="section-header"><span class="section-title">Evolução de Clientes — ${periodLabel}</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px,100%),1fr));gap:12px;padding:12px">
         <div style="text-align:center;padding:12px;border-radius:8px;background:var(--bg-secondary)">
@@ -560,9 +851,11 @@ function renderDashboard() {
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Técnicos Ativos</div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <div class="card" style="margin-bottom:18px">
+    ${!_dashIsHidden('workload') ? `
+    <div class="card dash-widget" style="margin-bottom:18px">
+      ${_dashHideBtn('workload')}
       <div class="section-header"><span class="section-title">Carga por Operador (horas em pendências)</span>
         <select id="workloadPeriod" class="form-select" style="width:160px" onchange="setWorkloadPeriod(this.value)">
           <option value="all" ${(_dashWorkloadPeriod||'all')==='all'?'selected':''}>Todo período</option>
@@ -571,8 +864,11 @@ function renderDashboard() {
         </select>
       </div>
       <div id="workloadList" style="padding:12px"></div>
-    </div>
-    <div class="dashboard-charts-grid">
+    </div>` : ''}
+    ${!_dashIsHidden('charts') ? `
+    <div class="dash-widget" style="position:relative">
+      ${_dashHideBtn('charts')}
+      <div class="dashboard-charts-grid">
       <div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Distribuição por Prioridade</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartPriority"></canvas></div>
@@ -589,9 +885,12 @@ function renderDashboard() {
         <div class="section-header"><span class="section-title">Ranking de Produtividade (Resolvidos)</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartRanking"></canvas></div>
       </div>
-    </div>
+      </div>
+    </div>` : '<div class="dashboard-charts-grid" style="display:none"><div class="card"><canvas id="chartPriority"></canvas></div><div class="card"><canvas id="chartWorkload"></canvas></div><div class="card"><canvas id="chartEvolution"></canvas></div><div class="card"><canvas id="chartRanking"></canvas></div></div>'}
 
-    <div class="card" style="margin-bottom:18px">
+    ${!_dashIsHidden('fila') ? `
+    <div class="card dash-widget" style="margin-bottom:18px">
+      ${_dashHideBtn('fila')}
       <div class="section-header"><span class="section-title">Minha fila do dia</span><span style="font-size:11px;color:var(--text-muted)">${myQueue.length} ${myQueue.length===1?'item':'itens'}</span></div>
       ${myQueue.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + myQueue.slice(0,8).map(function(p){
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
@@ -608,11 +907,13 @@ function renderDashboard() {
           <div style="display:flex;gap:4px;flex-shrink:0">${stTag}</div>
         </div>`;
       }).join('') + `</div>` + (myQueue.length>8?`<div style="text-align:center;margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="navigateTo('pendencias')">Ver todas (${myQueue.length}) →</button></div>`:'') : `<div class="empty-state" style="padding:20px"><p>Nenhum item urgente 🎉</p></div>`}
-    </div>
+    </div>` : ''}
 
     <div class="grid-2">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="card">
+        ${!_dashIsHidden('recentes') ? `
+        <div class="card dash-widget">
+          ${_dashHideBtn('recentes')}
           <div class="section-header">
             <span class="section-title">Minhas Pendências Recentes</span>
             <button class="btn btn-secondary btn-sm" onclick="navigateTo('pendencias')">Ver todas →</button>
@@ -631,9 +932,11 @@ function renderDashboard() {
               </div>`;
             }).join('')}
           </div>` : `<div class="empty-state" style="padding:30px"><p>Nenhuma pendência ativa 🎉</p></div>`}
-        </div>
+        </div>` : ''}
 
-        <div class="card">
+        ${!_dashIsHidden('visitas') ? `
+        <div class="card dash-widget">
+          ${_dashHideBtn('visitas')}
           <div class="section-header">
             <span class="section-title">Próximas Visitas${todayVisits.length ? ` <span style="background:#0ea5e9;color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:6px">${todayVisits.length} hoje</span>` : ''}</span>
             <button class="btn btn-secondary btn-sm" onclick="navigateTo('visitas')">Ver todas →</button>
@@ -655,12 +958,12 @@ function renderDashboard() {
               </div>`;
             }).join('')}
           </div>` : `<div class="empty-state" style="padding:30px"><p>Nenhuma visita agendada 🚗</p></div>`}
-        </div>
+        </div>` : ''}
       </div>
 
       <div style="display:flex;flex-direction:column;gap:16px">
         <div class="card">
-          <div class="section-header"><span class="section-title">Ações Rápidas</span></div>
+          <div class="section-header"><span class="section-title">Ações Rápidas</span><button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar reunião</button></div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn btn-primary" style="justify-content:center" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)">+ Novo Cliente</button>
             <button class="btn btn-secondary" style="justify-content:center" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaForm(),100)">+ Nova Pendência</button>

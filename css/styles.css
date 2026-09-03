@@ -3316,3 +3316,44 @@ body.dark-theme .overdue-banner {
   background: var(--blue-dim);
   color: var(--blue);
 }
+
+/* ── Dashboard evolução (resumo, deltas, widgets ocultáveis) ── */
+.dash-widget { position: relative; }
+.dash-hide-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+  z-index: 2;
+}
+.dash-widget:hover .dash-hide-btn { opacity: 1; }
+.dash-hide-btn:hover { border-color: var(--red); color: var(--red); }
+.dash-day-summary {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.dash-delta {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.dash-delta-flat { color: var(--text-muted); }

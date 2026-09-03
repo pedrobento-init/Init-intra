@@ -67,6 +67,9 @@ function _realtimeTeamFilter() {
 function _applyRealtimePayload(table, payload) {
     const meta = _RT_TABLE_META[table];
     if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
+    // Escrita de origem remota — nunca conta como pendência local.
+    const _prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
+    if (typeof window !== 'undefined') window._suppressPendingSync = true;
     try {
         let list = dbGet(meta.dbKey);
         if (!Array.isArray(list)) list = [];
@@ -100,7 +103,9 @@ function _applyRealtimePayload(table, payload) {
             dbSet(meta.dbKey, list);
         }
         if (typeof meta.onChange === 'function') meta.onChange();
-    } catch (_) {}
+    } catch (_) {} finally {
+        if (typeof window !== 'undefined') window._suppressPendingSync = _prevSuppress;
+    }
 }
 
 function initSupabaseRealtime() {

@@ -54,6 +54,33 @@ function _getPendingSyncText() {
   if (cnt > 0) return cnt + ' alterações aguardando sincronizar';
   return null;
 }
+// Reflete o contador real no banner (o reset do sync já chama isso;
+// aqui é a garantia para syncs disparados em background).
+function _refreshSyncBannerSafe() {
+  try {
+    if (typeof _refreshSyncBanner === 'function') { _refreshSyncBanner(); return; }
+  } catch (_) {}
+  try {
+    if (typeof _updateConnectionStatus === 'function') {
+      _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    }
+  } catch (_) {}
+}
+// Dispara o sync tolerando retorno não-Promise e sempre refresca o banner.
+function _triggerBackgroundSync(logLabel) {
+  try {
+    if (typeof syncSupabaseToLocal !== 'function') return;
+    const p = syncSupabaseToLocal();
+    if (p && typeof p.then === 'function') {
+      p.then(
+        () => _refreshSyncBannerSafe(),
+        (err) => { console.warn(logLabel, err); _refreshSyncBannerSafe(); }
+      );
+    } else {
+      _refreshSyncBannerSafe();
+    }
+  } catch (err) { console.warn(logLabel, err); }
+}
 
 function openGlobalSearch() {
   const modal = document.getElementById('globalSearchModal');
@@ -316,8 +343,8 @@ function _updateConnectionStatus(isOnline) {
       if (syncBtn) syncBtn.style.display = 'inline-block';
       if (_wasOffline) {
         _wasOffline = false;
-        if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
-          syncSupabaseToLocal().catch(err => console.warn('Sincronização após reconexão:', err));
+        if (window._supabaseAuthActive) {
+          _triggerBackgroundSync('Sincronização após reconexão:');
         }
       }
       return;
@@ -328,8 +355,8 @@ function _updateConnectionStatus(isOnline) {
       banner.className = 'offline-banner online visible';
       if (msg) msg.textContent = '✓ Conexão restaurada';
       if (syncBtn) syncBtn.style.display = 'inline-block';
-      if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
-        syncSupabaseToLocal().catch(err => console.warn('Sincronização após reconexão:', err));
+      if (window._supabaseAuthActive) {
+        _triggerBackgroundSync('Sincronização após reconexão:');
       }
       // Auto-hide after 5s
       clearTimeout(_onlineTimeout);
@@ -349,16 +376,21 @@ function syncNow() {
     syncBtn.disabled = true;
   }
   // Trigger Supabase sync if available
-  const syncFn = typeof syncSupabaseToLocal === 'function'
+  const _raw = typeof syncSupabaseToLocal === 'function'
     ? syncSupabaseToLocal()
-    : Promise.resolve();
+    : null;
+  const syncFn = (_raw && typeof _raw.then === 'function') ? _raw : Promise.resolve();
 
   syncFn.then(() => {
     showToast('Sincronizado com sucesso!', 'success');
-    const banner = document.getElementById('offlineBanner');
-    if (banner) banner.classList.remove('visible');
+    _refreshSyncBannerSafe();
+    if (syncBtn) {
+      syncBtn.textContent = '↻ Sincronizar';
+      syncBtn.disabled = false;
+    }
   }).catch(() => {
     showToast('Erro ao sincronizar. Tente novamente.', 'error');
+    _refreshSyncBannerSafe();
     if (syncBtn) {
       syncBtn.textContent = '↻ Sincronizar';
       syncBtn.disabled = false;
@@ -373,7 +405,7 @@ if (typeof window !== 'undefined') {
 }
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && typeof navigator !== 'undefined' && navigator.onLine && typeof window !== 'undefined' && window._supabaseAuthActive && typeof syncSupabaseToLocal === 'function') {
-    syncSupabaseToLocal().catch(err => console.warn('Sincronização ao retornar à aba:', err));
+    _triggerBackgroundSync('Sincronização ao retornar à aba:');
   }
 });
 
@@ -383,5 +415,5 @@ if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', (
 });
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseSearchShortcuts, getNoteSnippet, _getPendingSyncCountSafe, _getPendingSyncText };
+  module.exports = { parseSearchShortcuts, getNoteSnippet, _getPendingSyncCountSafe, _getPendingSyncText, _refreshSyncBannerSafe, _triggerBackgroundSync };
 }

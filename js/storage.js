@@ -16,34 +16,71 @@ const DB = {
 };
 
 // ── FILA DE SINCRONIZAÇÃO VISÍVEL ───────────────────────────────────────────
+// Contador em memória (NÃO persistido): 1 por registro criado/editado
+// localmente enquanto o push está indisponível. Boot sempre começa em 0.
+// Escritas internas (merge do sync, realtime, seed, import/restore) NÃO
+// contam como pendência — ver window._suppressPendingSync.
 if (typeof window !== 'undefined') {
   if (typeof window._pendingSyncCount !== 'number') window._pendingSyncCount = 0;
   if (typeof window._syncPending !== 'number') window._syncPending = window._pendingSyncCount;
+}
+function _isPendingSuppressed() {
+  try { if (typeof window !== 'undefined' && window._suppressPendingSync) return true; } catch (_) {}
+  return false;
 }
 function getPendingSyncCount() {
   if (typeof window !== 'undefined') return window._pendingSyncCount || window._syncPending || 0;
   return 0;
 }
+// Centraliza a UI do banner a partir do contador real (evita texto travado).
+function _refreshSyncBanner() {
+  if (typeof window === 'undefined') return;
+  try {
+    const banner = typeof document !== 'undefined' ? document.getElementById('offlineBanner') : null;
+    const msgEl = typeof document !== 'undefined' ? document.getElementById('offlineBannerMsg') : null;
+    const syncBtn = typeof document !== 'undefined' ? document.getElementById('syncNowBtn') : null;
+    if (!banner || !msgEl) return;
+    const cnt = getPendingSyncCount();
+    const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+    if (cnt > 0) {
+      msgEl.textContent = cnt + ' alterações aguardando sincronizar';
+      banner.className = 'offline-banner offline visible';
+      if (syncBtn && online) syncBtn.style.display = 'inline-block';
+    } else if (online) {
+      banner.classList.remove('visible');
+      if (syncBtn) syncBtn.style.display = 'none';
+    } else {
+      msgEl.textContent = 'Sem conexão – modo offline ativo';
+      banner.className = 'offline-banner offline visible';
+    }
+  } catch (_) {}
+}
 function incrementPendingSync() {
   if (typeof window !== 'undefined') {
+    if (_isPendingSuppressed()) return;
     window._pendingSyncCount = (window._pendingSyncCount || 0) + 1;
     window._syncPending = window._pendingSyncCount;
-    try {
-      const msgEl = document.getElementById('offlineBannerMsg');
-      const banner = document.getElementById('offlineBanner');
-      const cnt = window._pendingSyncCount;
-      if (msgEl && cnt > 0) {
-        msgEl.textContent = cnt + ' alterações aguardando sincronizar';
-        if (banner) { banner.className = 'offline-banner offline visible'; }
-      }
-    } catch (_) {}
+    _refreshSyncBanner();
   }
 }
+// Push ao Supabase falhou com rede online: a escrita não foi confirmada,
+// então conta como pendente. Offline já foi contado no dbSet (sem duplicar).
+function markSyncPushFailed() {
+  try {
+    const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (!offline) incrementPendingSync();
+  } catch (_) {}
+}
 function resetPendingSyncCount() {
+  let prev = 0;
   if (typeof window !== 'undefined') {
+    prev = window._pendingSyncCount || 0;
     window._pendingSyncCount = 0;
     window._syncPending = 0;
   }
+  // TEMP-DEBUG: confirmar visualmente no console que o reset ocorreu após o sync.
+  try { console.debug('[sync] concluída, contador resetado de ' + prev + ' para 0'); } catch (_) {}
+  _refreshSyncBanner();
 }
 
 // ── EQUIPES / PERFIS ──
@@ -198,9 +235,11 @@ function dbGetObj(key, def = {}) {
 
 function dbSet(key, value) {
   try {
-    const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
-    const notConnected = typeof isSupabaseConnected === 'function' ? (!isSupabaseConnected() || !window._supabaseAuthActive) : false;
-    if (offline || notConnected) incrementPendingSync();
+    if (!_isPendingSuppressed()) {
+      const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+      const notConnected = typeof isSupabaseConnected === 'function' ? (!isSupabaseConnected() || !window._supabaseAuthActive) : false;
+      if (offline || notConnected) incrementPendingSync();
+    }
   } catch (_) {}
   if (typeof setCacheStore === 'function') {
     if (KEY_TO_TABLE[key]) {
@@ -269,6 +308,9 @@ async function _runSupabaseSync() {
     }
   };
 
+  // Escritas do próprio merge (1 dbSet por entidade) não são mudanças
+  // pendentes — sem essa supressão o contador somava ~nº de tabelas por sync.
+  if (typeof window !== 'undefined') window._suppressPendingSync = true;
   try {
     for (const e of SYNC_ENTITIES) {
       if (e.optional) {
@@ -299,6 +341,10 @@ async function _runSupabaseSync() {
     resetPendingSyncCount();
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);
+    // Sync falhou: mantém a contagem real e reflete no banner (sem zerar).
+    _refreshSyncBanner();
+  } finally {
+    if (typeof window !== 'undefined') window._suppressPendingSync = false;
   }
 }
 
@@ -672,9 +718,10 @@ function saveClient(data) {
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
-      if (res.error) console.error('❌ Supabase cliente:', String(res.error.message || res.error));
+      if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); }
     }).catch(err => {
       console.error('❌ Erro de rede Supabase cliente:', String(err.message));
+      markSyncPushFailed();
     });
   }
 
@@ -691,7 +738,7 @@ function deleteClient(id) {
   addLog('Excluiu', 'Cliente', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); });
+    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -808,9 +855,10 @@ function savePendencia(data) {
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
-      if (res.error) console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message);
+      if (res.error) { console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); }
     }).catch(err => {
       console.warn('⚠️ Erro de rede Supabase pendência:', err.message);
+      markSyncPushFailed();
     });
   }
 
@@ -829,7 +877,7 @@ function deletePendencia(id) {
   addLog('Excluiu', 'Pendência', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir pendência:', res.error); });
+    supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
   return true;
 }
@@ -910,7 +958,7 @@ function addPendenciaNote(id, text, author) {
     supabaseClient.from('pendencias').update({
       notes: list[i].notes,
       updated_at: list[i].updatedAt
-    }).eq('id', id).then(res => { if(res.error) console.error('❌ Supabase atualizar pendência:', res.error); });
+    }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -994,7 +1042,7 @@ function saveTicket(data) {
       completed_at: data.completedAt || null,
       created_at: data.createdAt || now,
       updated_at: now
-    }).then(res => { if(res.error) console.error('❌ Supabase chamado:', res.error); });
+    }).then(res => { if(res.error) { console.error('❌ Supabase chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 
   return data;
@@ -1010,7 +1058,7 @@ function deleteTicket(id) {
   addLog('Excluiu', 'Chamado', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('tickets').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir chamado:', res.error); });
+    supabaseClient.from('tickets').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 function addTicketUpdate(id, text, author) {
@@ -1027,7 +1075,7 @@ function addTicketUpdate(id, text, author) {
     supabaseClient.from('tickets').update({
       updates: list[i].updates,
       updated_at: now
-    }).eq('id', id).then(res => { if(res.error) console.error('❌ Supabase atualizar chamado:', res.error); });
+    }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -1136,7 +1184,7 @@ function saveVisit(data) {
       checklist: data.checklist || [],
       created_at: data.createdAt,
       updated_at: now
-    }).then(res => { if (res.error) console.error('❌ Supabase visita:', String(res.error.message || res.error)); });
+    }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
   return data;
 }
@@ -1151,7 +1199,7 @@ function deleteVisit(id) {
   addLog('Excluiu', 'Visita', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) console.error('❌ Supabase excluir visita:', res.error); });
+    supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir visita:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -1195,9 +1243,10 @@ function saveReuniao(data) {
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
-      if (res.error) console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message);
+      if (res.error) { console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); }
     }).catch(err => {
       console.warn('⚠️ Erro de rede Supabase reunião:', err.message);
+      markSyncPushFailed();
     });
   }
 
@@ -1214,7 +1263,7 @@ function deleteReuniao(id) {
   addLog('Excluiu', 'Reunião', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) console.error('❌ Supabase excluir reunião:', res.error); });
+    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir reunião:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -1248,7 +1297,7 @@ function saveProcedure(data) {
       content: data.content,
       created_at: data.createdAt || now,
       updated_at: now
-    }).then(res => { if(res.error) console.error('❌ Supabase procedimento:', res.error); });
+    }).then(res => { if(res.error) { console.error('❌ Supabase procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 
   return data;
@@ -1265,7 +1314,7 @@ function deleteProcedure(id) {
   addLog('Excluiu', 'Procedimento', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedures').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir procedimento:', res.error); });
+    supabaseClient.from('procedures').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 
@@ -1305,7 +1354,7 @@ function saveProcedureTemplate(data) {
       created_by: data.createdBy,
       created_at: data.createdAt || now,
       updated_at: now
-    }).then(res => { if(res.error) console.error('❌ Supabase modelo procedimento:', res.error); });
+    }).then(res => { if(res.error) { console.error('❌ Supabase modelo procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 
   return data;
@@ -1322,7 +1371,7 @@ function deleteProcedureTemplate(id) {
   addLog('Excluiu', 'Modelo Procedimento', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedure_templates').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir modelo procedimento:', res.error); });
+    supabaseClient.from('procedure_templates').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir modelo procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
   return true;
 }
@@ -1441,8 +1490,9 @@ async function saveOperator(data) {
         } else {
           console.warn('⚠️ Supabase operadores:', res.error.message);
         }
+        markSyncPushFailed();
       }
-    }).catch(err => console.warn('⚠️ Erro de rede ao salvar operador:', err.message));
+    }).catch(err => { console.warn('⚠️ Erro de rede ao salvar operador:', err.message); markSyncPushFailed(); });
   }
 
   return savedOp;
@@ -1458,7 +1508,7 @@ function deleteOperator(id) {
   addLog('Excluiu', 'Operador', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('operators').delete().eq('id', id).then(res => { if(res.error) console.error('❌ Supabase excluir operador:', res.error); });
+    supabaseClient.from('operators').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir operador:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
 }
 function toggleOperatorActive(id) {
@@ -1470,7 +1520,7 @@ function toggleOperatorActive(id) {
     addLog(list[i].active ? 'Ativou' : 'Desativou', 'Operador', id, list[i].name);
 
     if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-      supabaseClient.from('operators').update({ active: list[i].active }).eq('id', id).then(res => { if(res.error) console.error('❌ Supabase toggle operador:', res.error); });
+      supabaseClient.from('operators').update({ active: list[i].active }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase toggle operador:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
     }
   }
 }
@@ -1515,7 +1565,7 @@ function resetOperatorPassword(opId) {
     dbSet(DB.OPERATORS, list);
 
     if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-      supabaseClient.from('operators').update({ pin_hash: null, updated_at: list[i].updatedAt }).eq('id', opId).then(res => { if (res.error) console.error('❌ Supabase reset de senha:', String(res.error.message || res.error)); });
+      supabaseClient.from('operators').update({ pin_hash: null, updated_at: list[i].updatedAt }).eq('id', opId).then(res => { if (res.error) { console.error('❌ Supabase reset de senha:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
     }
 
     // If the reset operator is the current session, update it
@@ -1535,6 +1585,8 @@ function seedDemoData() {
     return;
   }
   if (getClients().length > 0) return;
+  // Carga inicial local — não é mudança pendente do usuário (não conta no banner).
+  if (typeof window !== 'undefined') window._suppressPendingSync = true;
 
   // Seed operators (emails usam .example.local — domínio reservado, sem relação com endereços reais)
   if (getOperators().length === 0) {
@@ -1681,6 +1733,7 @@ function seedDemoData() {
   }
   const currentCounters = dbGetObj(DB.COUNTER, { CLI: 3, PEN: 5, PROC: 3, OP: 5 });
   dbSet(DB.COUNTER, { ...currentCounters, CLI: 3, PEN: 5, PROC: 3, TPL: 3, OP: 5 });
+  if (typeof window !== 'undefined') window._suppressPendingSync = false;
 }
 
 // ── VALIDAÇÃO ──
@@ -1775,5 +1828,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument };
 }
