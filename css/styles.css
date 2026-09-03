@@ -143,7 +143,7 @@ body {
 }
 .sidebar-toggle:hover { color: #fff; background: var(--sidebar-hover); }
 
-.sidebar-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
 
 .nav-item {
   display: flex; align-items: center; gap: 10px;
@@ -175,7 +175,9 @@ body {
   padding: 10px 8px;
   border-top: 1px solid var(--sidebar-border);
   display: flex; flex-direction: column; gap: 4px;
+  flex-shrink: 0;
 }
+.sidebar.collapsed #teamSelectorWrap { display: none !important; }
 .btn-export {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px;
@@ -221,7 +223,7 @@ body {
   min-width: 0;
   transition: margin-left var(--transition);
 }
-.main-content.expanded { margin-left: 60px; }
+.main-content.expanded { margin-left: 60px; width: auto; }
 
 .topbar {
   height: var(--topbar-h);
@@ -1495,6 +1497,10 @@ tr:hover td { background: var(--bg-hover); }
   .sidebar .sidebar-footer span {
     display: none !important;
   }
+  .sidebar .sidebar-nav a {
+    justify-content: center;
+    padding: 10px;
+  }
   .sidebar .sidebar-header {
     justify-content: center;
     padding: 16px 0;
@@ -1519,6 +1525,14 @@ tr:hover td { background: var(--bg-hover); }
   
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Seletor de equipe não cabe no modo só-ícones (colapsado ou tablet 769–1024px).
+   Mobile (≤768px, drawer de 260px) mantém o seletor visível. */
+@media screen and (max-width: 1024px) and (min-width: 769px) {
+  .sidebar #teamSelectorWrap {
+    display: none !important;
   }
 }
 

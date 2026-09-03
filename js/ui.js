@@ -369,16 +369,68 @@ function clientAvatar(c, size = 40) {
   return `<div style="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${c.color||'#1a56db'};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
 }
 
-// Sidebar toggle
+// Sidebar toggle + auto-colapso responsivo (desktop/notebook/split-screen)
+// - Manual: botão « alterna e salva a preferência (intra_sidebar_collapsed).
+// - Automático: ≤1400px colapsa para só-ícones (cobre notebook 1366 e
+//   split-screen), salvo se o usuário já escolheu manualmente
+//   (a preferência manual sempre vence). 1920+ fica expandido.
+// - Mobile (≤768px, off-canvas) não é afetado.
+const SIDEBAR_AUTO_BREAKPOINT = 1400;
+const SIDEBAR_PREF_KEY = 'intra_sidebar_collapsed';
 const _sidebarToggleBtn = document.getElementById('sidebarToggle');
+
+function _getSidebarPref() {
+  try {
+    if (typeof getCacheKV === 'function') return getCacheKV(SIDEBAR_PREF_KEY, null);
+  } catch (_) {}
+  return null;
+}
+function _setSidebarPref(collapsed) {
+  try {
+    if (typeof setCacheKV === 'function') setCacheKV(SIDEBAR_PREF_KEY, collapsed === true);
+  } catch (_) {}
+}
+function setSidebarCollapsed(collapsed, save) {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  if (sidebar) sidebar.classList.toggle('collapsed', collapsed === true);
+  if (main) main.classList.toggle('expanded', collapsed === true);
+  if (_sidebarToggleBtn) _sidebarToggleBtn.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+  if (save) _setSidebarPref(collapsed);
+}
+function _autoSidebarForWidth() {
+  try {
+    if (window.innerWidth <= 768) return; // mobile off-canvas intacto
+    if (_getSidebarPref() !== null) return; // preferência manual vence
+    setSidebarCollapsed(window.innerWidth <= SIDEBAR_AUTO_BREAKPOINT, false);
+  } catch (_) {}
+}
 if (_sidebarToggleBtn) {
   _sidebarToggleBtn.addEventListener('click', () => {
     const sidebar = document.getElementById('sidebar');
-    const main = document.getElementById('mainContent');
-    const isCollapsed = sidebar.classList.toggle('collapsed');
-    main.classList.toggle('expanded', isCollapsed);
-    _sidebarToggleBtn.title = isCollapsed ? 'Expandir menu' : 'Recolher menu';
+    setSidebarCollapsed(!(sidebar && sidebar.classList.contains('collapsed')), true);
   });
+}
+// Padrão pelo breakpoint já no carregamento; preferência salva (IndexedDB)
+// é aplicada assim que o banco fica pronto.
+_autoSidebarForWidth();
+if (typeof window !== 'undefined' && window.matchMedia) {
+  try {
+    const _sbMedia = window.matchMedia('(max-width: ' + SIDEBAR_AUTO_BREAKPOINT + 'px)');
+    if (typeof _sbMedia.addEventListener === 'function') {
+      _sbMedia.addEventListener('change', _autoSidebarForWidth);
+    } else if (typeof _sbMedia.addListener === 'function') {
+      _sbMedia.addListener(_autoSidebarForWidth);
+    }
+  } catch (_) {}
+}
+if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPromise.then === 'function') {
+  _initDBPromise.then(() => {
+    try {
+      const pref = _getSidebarPref();
+      if (pref !== null && window.innerWidth > 768) setSidebarCollapsed(pref, false);
+    } catch (_) {}
+  }).catch(() => {});
 }
 
 // Sidebar Mobile (Hamburger & Overlay)
