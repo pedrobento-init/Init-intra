@@ -256,7 +256,7 @@ function penKanbanCard(p) {
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
     ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
-    '<div class="kanban-card-title"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="kanban-card-title" title="' + escapeHtml(p.descricao || 'Sem descrição') + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
     '<div class="kanban-card-meta">' +
       (c ? clientAvatar(c, 18) : '') + ' ' +
       escapeHtml(p.clientName || '—') +
@@ -267,14 +267,14 @@ function penKanbanCard(p) {
         ? '<span style="font-size:11px" title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
         : '<span style="font-size:11px;color:var(--text-muted)" title="Sem responsável definido">👤 Sem responsável</span>') +
       onLeaveBadge + reassignBtn +
-      (isOverdue ? ' <span style="color:#dc2626;font-weight:600">⚠️ Vencida</span>' : '') +
-      (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px">🕓 Parada</span>' : '') +
-      (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px">⏱ ' + sla.label + '</span>' : '') +
+      (isOverdue ? ' <span style="color:#dc2626;font-weight:600" title="Prazo vencido">⚠️ Vencida</span>' : '') +
+      (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px" title="Sem atualização há 7+ dias (situação operacional)">🕓 Parada</span>' : '') +
+      (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px" title="' + (sla.expired ? 'SLA vencido (prazo)' : 'Tempo de SLA restante') + '">⏱ ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="kanban-card-meta" style="margin-top:4px">' +
       timerWidget(p, "pendencia") +
     '</div>' +
-    (p.deadline ? '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px">📅 ' + formatDate(parseDeadline(p.deadline)) + '</div>' : '') +
+    (p.deadline ? '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px">📅 ' + formatDate(parseDeadline(p.deadline)) + '</div>' : '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px;color:var(--text-muted)">📅 Sem prazo</div>') +
   '</div>';
 }
 
@@ -302,16 +302,16 @@ function penMobileCard(p) {
       '</div>' +
       statusTag(p.status) +
     '</div>' +
-    '<div class="pen-mobile-card-desc"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
+    '<div class="pen-mobile-card-desc" title="' + escapeHtml(p.descricao || 'Sem descrição') + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(p.descricao || 'Sem descrição') + '</div>' +
     '<div class="pen-mobile-card-meta">' +
       priorityTag(p.priority) +
       (p.responsible
         ? '<span title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
         : '<span style="color:var(--text-muted)" title="Sem responsável definido">👤 Sem responsável</span>') +
       onLeaveBadge + reassignBtn +
-      (isOverdue ? '<span class="pen-mobile-overdue">⚠️ Vencida</span>' : '') +
-      (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600">🕓 Parada</span>' : '') +
-      (sla ? '<span style="color:' + sla.color + ';font-weight:600">⏱ ' + sla.label + '</span>' : '') +
+      (isOverdue ? '<span class="pen-mobile-overdue" title="Prazo vencido">⚠️ Vencida</span>' : '') +
+      (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600" title="Sem atualização há 7+ dias (situação operacional)">🕓 Parada</span>' : '') +
+      (sla ? '<span style="color:' + sla.color + ';font-weight:600" title="' + (sla.expired ? 'SLA vencido (prazo)' : 'Tempo de SLA restante') + '">⏱ ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="pen-mobile-card-footer">' +
       (p.deadline ? '<span>📅 ' + formatDate(parseDeadline(p.deadline)) + '</span>' : '<span>Sem prazo</span>') +

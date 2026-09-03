@@ -77,8 +77,14 @@ function timerActionBtnHTML(item, type = 'pendencia') {
   const itsMe = isCurrentWorker(item);
 
   if (!worker) {
-    // Ninguém trabalhando — mostrar play
-    return `<button class="timer-btn" title="Iniciar trabalho nesta pendência" onclick="toggleTimer('${type}','${_jsEscape(item.id)}',this)">▶</button>`;
+    // Ninguém trabalhando — play com rótulo coerente com o status (mesma ação/funcionalidade).
+    // aberto: iniciar move para em_andamento; em_andamento parado: retomar mantém o status.
+    var _st = item && item.status;
+    var _playTitle = _st === 'aberto' ? 'Iniciar atendimento (move para Em Andamento)'
+      : _st === 'em_andamento' ? 'Retomar trabalho (já em andamento)'
+      : _st === 'pausado' ? 'Retomar trabalho (move para Em Andamento)'
+      : 'Iniciar trabalho neste chamado';
+    return `<button class="timer-btn" title="${_playTitle}" onclick="toggleTimer('${type}','${_jsEscape(item.id)}',this)">▶</button>`;
   }
 
   if (itsMe) {
