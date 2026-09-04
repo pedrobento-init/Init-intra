@@ -136,7 +136,7 @@ function priorityLabel(priority) {
 }
 
 function statusLabel(status) {
-  return { aberto:'Aberto', em_andamento:'Em Andamento', aguardando:'Aguardando', concluido:'Concluído', cancelado:'Cancelado' }[status] || status;
+  return { aberto:'Aberto', em_andamento:'Em Andamento', aguardando:'Aguard. Terceiro', concluido:'Concluído', cancelado:'Cancelado' }[status] || status;
 }
 
 // ── Coletar destinatários ──

@@ -161,15 +161,30 @@ function isPenMobile() {
   return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
 }
 
+// Resumo compacto da situação (usa os mesmos dados filtrados do kanban;
+// não cria contagens novas: total + breakdown por status do escopo atual).
+function penStatusSummary(pens) {
+  var list = pens || [];
+  var cols = penScope === 'archived'
+    ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
+    : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
+  var parts = cols.map(function(col) {
+    var n = list.filter(function(p) { return p.status === col.id; }).length;
+    return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
+  }).filter(Boolean);
+  var scopeLabel = penScope === 'archived' ? 'arquivadas' : 'ativas';
+  return '<div class="pen-summary" role="status"><strong>' + list.length + '</strong>&nbsp;pendências ' + scopeLabel + (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>';
+}
+
 function renderPenKanban(area) {
   var pens = _filteredPens;
   if (isPenMobile()) {
-    area.innerHTML = renderPenMobileGrid(pens);
+    area.innerHTML = penStatusSummary(pens) + renderPenMobileGrid(pens);
   } else {
     var cols = penScope === 'archived'
       ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
       : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
-    area.innerHTML = '<div class="kanban-board">' + 
+    area.innerHTML = penStatusSummary(pens) + '<div class="kanban-board">' + 
       cols.map(function(col) {
         var cards = pens.filter(function(p) { return p.status === col.id; });
         return '<div class="kanban-col"' +
@@ -186,7 +201,7 @@ function renderPenKanban(area) {
           '<div class="kanban-cards">' +
             (cards.length
               ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-              : '<div class="empty-state" style="padding:30px 10px"><p>Nenhuma</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
+              : '<div class="empty-state" style="padding:30px 10px"><p>Nenhuma</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
           '</div>' +
         '</div>';
       }).join('') +
@@ -269,12 +284,14 @@ function penKanbanCard(p) {
       onLeaveBadge + reassignBtn +
       (isOverdue ? ' <span style="color:#dc2626;font-weight:600" title="Prazo vencido">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? ' <span style="color:#d97706;font-weight:600;font-size:11px" title="Sem atualização há 7+ dias (situação operacional)">🕓 Parada</span>' : '') +
-      (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px" title="' + (sla.expired ? 'SLA vencido (prazo)' : 'Tempo de SLA restante') + '">⏱ ' + sla.label + '</span>' : '') +
+      (sla ? ' <span style="color:' + sla.color + ';font-weight:600;font-size:11px" title="' + (sla.expired ? 'SLA vencido (prazo de atendimento de 48h estourado)' : 'SLA restante (prazo de atendimento de 48h)') + '">⏱ SLA ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="kanban-card-meta" style="margin-top:4px">' +
       timerWidget(p, "pendencia") +
     '</div>' +
-    (p.deadline ? '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px">📅 ' + formatDate(parseDeadline(p.deadline)) + '</div>' : '<div class="kanban-card-meta" style="margin-top:4px;font-size:11px;color:var(--text-muted)">📅 Sem prazo</div>') +
+    (p.deadline
+      ? '<div class="kanban-card-date' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Prazo vencido' : 'Prazo') + '">📅 ' + formatDate(parseDeadline(p.deadline)) + '</div>'
+      : '<div class="kanban-card-date is-empty" title="Sem prazo definido — atenção para não esquecer">📅 Sem prazo</div>') +
   '</div>';
 }
 
@@ -311,10 +328,12 @@ function penMobileCard(p) {
       onLeaveBadge + reassignBtn +
       (isOverdue ? '<span class="pen-mobile-overdue" title="Prazo vencido">⚠️ Vencida</span>' : '') +
       (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600" title="Sem atualização há 7+ dias (situação operacional)">🕓 Parada</span>' : '') +
-      (sla ? '<span style="color:' + sla.color + ';font-weight:600" title="' + (sla.expired ? 'SLA vencido (prazo)' : 'Tempo de SLA restante') + '">⏱ ' + sla.label + '</span>' : '') +
+      (sla ? '<span style="color:' + sla.color + ';font-weight:600" title="' + (sla.expired ? 'SLA vencido (prazo de atendimento de 48h estourado)' : 'SLA restante (prazo de atendimento de 48h)') + '">⏱ SLA ' + sla.label + '</span>' : '') +
     '</div>' +
     '<div class="pen-mobile-card-footer">' +
-      (p.deadline ? '<span>📅 ' + formatDate(parseDeadline(p.deadline)) + '</span>' : '<span>Sem prazo</span>') +
+      (p.deadline
+        ? '<span' + (isOverdue ? ' style="color:#dc2626;font-weight:600" title="Prazo vencido"' : ' title="Prazo"') + '>📅 ' + formatDate(parseDeadline(p.deadline)) + '</span>'
+        : '<span style="color:var(--text-muted)" title="Sem prazo definido — atenção para não esquecer">📅 Sem prazo</span>') +
       timerWidget(p, 'pendencia') +
     '</div>' +
   '</div>';

@@ -303,13 +303,13 @@ const PRIORITY_MAP = {
   baixa:   { label: 'Baixa',   cls: 'tag-green',  dot: '#16a34a' },
   media:   { label: 'Média',   cls: 'tag-yellow', dot: '#d97706' },
   alta:    { label: 'Alta',    cls: 'tag-red',    dot: '#dc2626' },
-  critica: { label: 'Crítica', cls: 'tag-red',    dot: '#dc2626' },
+  critica: { label: 'Crítica', cls: 'tag-red',    dot: '#991b1b' },
 };
 const STATUS_PEN_MAP = {
   aberto:             { label: 'Aberto',         cls: 'tag-blue',   dot: '#3b82f6' },
   em_andamento:       { label: 'Em Andamento',   cls: 'tag-indigo', dot: '#6366f1' },
   pausado:            { label: 'Pausado',        cls: 'tag-yellow', dot: '#f59e0b' },
-  aguardando:         { label: 'Aguardando',     cls: 'tag-purple', dot: '#7c3aed' },
+  aguardando:         { label: 'Aguard. Terceiro', cls: 'tag-purple', dot: '#7c3aed' },
   aguardando_cliente: { label: 'Aguard. Cliente', cls: 'tag-purple', dot: '#7c3aed' },
   concluido:          { label: 'Concluído',      cls: 'tag-green',  dot: '#16a34a' },
   resolvido:          { label: 'Resolvido',      cls: 'tag-green',  dot: '#16a34a' },

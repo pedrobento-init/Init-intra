@@ -379,7 +379,7 @@ tr:hover td { background: var(--bg-hover); }
 .table-actions { display: flex; gap: 5px; }
 
 /* ── SEARCH BAR ── */
-.search-bar { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
 .search-input-wrap { position: relative; min-width: 0; }
 .search-input-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
 .search-input-wrap input { padding-left: 34px; }
@@ -503,7 +503,7 @@ body.dark-theme .template-suggestion {
   border-radius: var(--radius) var(--radius) 0 0;
 }
 .kanban-col-title { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 7px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-secondary); }
-.kanban-col-count { background: var(--border); padding: 1px 8px; border-radius: 20px; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.kanban-col-count { background: var(--accent-dim); padding: 1px 9px; border-radius: 20px; font-size: 11px; color: var(--text-primary); font-weight: 700; min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; }
 .kanban-cards { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 /* Indicador de scroll horizontal: sombra interna na borda do lado com coluna oculta. */
 .kanban-board.has-scroll-left { box-shadow: inset 18px 0 14px -14px rgba(15, 23, 42, 0.35); }
@@ -519,8 +519,15 @@ body.dark-theme .template-suggestion {
   box-shadow: var(--shadow-sm);
 }
 .kanban-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
-.kanban-card-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; color: var(--text-primary); }
+.kanban-card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); line-height: 1.35; }
 .kanban-card-meta { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Linha de prazo do card: data com peso próprio, separada dos metadados. */
+.kanban-card-date { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.kanban-card-date.is-overdue { color: #dc2626; font-weight: 600; }
+.kanban-card-date.is-empty { color: var(--text-muted); }
+/* Resumo compacto da situação (contagens por status, já filtradas). */
+.pen-summary { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pen-summary strong { color: var(--text-primary); font-weight: 700; }
 
 /* ── KANBAN CARD — conteúdo variável (badges condicionais) ── */
 /* Altura 100% automática, sem mínimo fixo: o conteúdo (título + badges +
