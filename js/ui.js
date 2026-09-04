@@ -319,6 +319,9 @@ const STATUS_PEN_MAP = {
 
 const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }
+// Êxito (verde): Concluído + Resolvido contam nas métricas de "resolvidas".
+// Cancelado/Fechado são finais, mas não contam como resolvidas.
+function isPendenciaResolvida(status) { return ['concluido', 'resolvido'].includes(status || ''); }
 
 // ── ASSUNTO x DESCRIÇÃO da pendência ─────────────────────────────────────────
 // `assunto`: título/resumo curto (obrigatório em novas pendências).

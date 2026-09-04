@@ -223,8 +223,8 @@ function _calcDashStats(pens) {
   } catch (_) {}
   const isClosed = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : (s => ['concluido','resolvido','cancelado','fechado'].includes(s));
   const active = (pens || []).filter(p => !isClosed(p.status));
-  const resolved = (pens || []).filter(p => p.status === 'concluido').length;
-  const done = (pens || []).filter(p => p.status === 'concluido' && p.createdAt && (p.completedAt || p.updatedAt));
+  const resolved = (pens || []).filter(p => isPendenciaResolvida(p.status)).length;
+  const done = (pens || []).filter(p => isPendenciaResolvida(p.status) && p.createdAt && (p.completedAt || p.updatedAt));
   let total = 0, count = 0;
   done.forEach(p => {
     const h = (new Date(p.completedAt || p.updatedAt) - new Date(p.createdAt)) / 3600000;
@@ -549,7 +549,7 @@ function renderDashboard() {
 
   const opsAtivos = getOperators().filter(o => o.active !== false).length;
 
-  const resolvedPens = pens.filter(p => p.status === 'concluido' && p.createdAt && (p.completedAt || p.updatedAt));
+  const resolvedPens = pens.filter(p => isPendenciaResolvida(p.status) && p.createdAt && (p.completedAt || p.updatedAt));
   const getHours = (start, end) => (new Date(end) - new Date(start)) / (1000 * 60 * 60);
   let totalHours = 0; let totalCount = 0;
   resolvedPens.forEach(p => {
@@ -557,7 +557,7 @@ function renderDashboard() {
     if (hours >= 0) { totalHours += hours; totalCount++; }
   });
   const avgSlaHours = totalCount > 0 ? (totalHours / totalCount).toFixed(1) : 0;
-  const resolvedCount = pens.filter(p => p.status === 'concluido').length;
+  const resolvedCount = pens.filter(p => isPendenciaResolvida(p.status)).length;
   const completionRate = pens.length ? Math.round((resolvedCount / pens.length) * 100) : 0;
 
   // ── Evolução Dashboard: reaproveita pens/overdue/dueToday/etc (sem duplicar) ─
@@ -1121,7 +1121,7 @@ function renderCharts(pens, visits) {
   }
 
   const openedByMonth = months.map(m => pens.filter(p => p.createdAt && p.createdAt.slice(0,7) === m.key).length);
-  const resolvedByMonth = months.map(m => pens.filter(p => p.status === 'concluido' && p.updatedAt && p.updatedAt.slice(0,7) === m.key).length);
+  const resolvedByMonth = months.map(m => pens.filter(p => isPendenciaResolvida(p.status) && p.updatedAt && p.updatedAt.slice(0,7) === m.key).length);
 
   const ctx4 = document.getElementById('chartEvolution');
   if (ctx4) {
@@ -1155,7 +1155,7 @@ function renderCharts(pens, visits) {
   // 5. Chart Ranking (Operator productivity - resolved count)
   const rankMap = {};
   ops.forEach(o => rankMap[o.name] = 0);
-  pens.filter(p => p.status === 'concluido').forEach(p => { if (rankMap[p.responsible] !== undefined) rankMap[p.responsible]++; });
+  pens.filter(p => isPendenciaResolvida(p.status)).forEach(p => { if (rankMap[p.responsible] !== undefined) rankMap[p.responsible]++; });
 
   const rankSorted = Object.entries(rankMap).sort((a,b) => b[1] - a[1]);
   const ctx5 = document.getElementById('chartRanking');
@@ -1518,7 +1518,7 @@ function generateMonthlyReport() {
   var monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   var monthPens = pens.filter(function(p) { return new Date(p.createdAt) >= monthStart; });
-  var resolvedPens = monthPens.filter(function(p) { return p.status === 'concluido'; });
+  var resolvedPens = monthPens.filter(function(p) { return isPendenciaResolvida(p.status); });
 
   var w = window.open('', '_blank', 'width=900,height=700');
   if (!w) {

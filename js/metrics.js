@@ -15,6 +15,11 @@ const HEALTH_THRESHOLDS = {
   yellowMaxAvgHours: 120,
 };
 
+// ── Status de êxito (puro, testável; espelha isPendenciaResolvida de ui.js) ───
+// Concluído + Resolvido contam como "resolvidas" no Dashboard.
+// Cancelado/Fechado são finais, mas não contam como resolvidas.
+function isPendenciaResolvida(status) { return ['concluido', 'resolvido'].includes(status || ''); }
+
 // ── SLA por cliente ─────────────────────────────────────────────────────────
 function _isOverduePure(p, todayISO, isClosedFn) {
   if (!p.deadline) return false;
@@ -84,7 +89,7 @@ function calculateHealthScore({ totalAbertas, vencidas, avgHours }) {
 
 function getHealthForClient(pendencias, clientId, todayISO, isClosedFn) {
   const sla = getSlaStatsForClient(pendencias, clientId, todayISO, isClosedFn);
-  const concluidas = pendencias.filter(p => p.clientId === clientId && ['concluido','resolvido'].includes(p.status));
+  const concluidas = pendencias.filter(p => p.clientId === clientId && isPendenciaResolvida(p.status));
   const avg = calculateAvgResolutionHours(concluidas);
   return calculateHealthScore({ totalAbertas: sla.totalAbertas, vencidas: sla.vencidas, avgHours: avg });
 }
@@ -308,9 +313,9 @@ function calcPeriodStats(pens, isClosedFn) {
   const list = pens || [];
   const active = list.filter((p) => !isClosed(p.status));
   const open = active.length;
-  const resolved = list.filter((p) => p.status === 'concluido').length;
+  const resolved = list.filter((p) => isPendenciaResolvida(p.status)).length;
   const completionRate = list.length ? Math.round((resolved / list.length) * 100) : 0;
-  const done = list.filter((p) => p.status === 'concluido' && p.createdAt && (p.completedAt || p.updatedAt));
+  const done = list.filter((p) => isPendenciaResolvida(p.status) && p.createdAt && (p.completedAt || p.updatedAt));
   let total = 0; let count = 0;
   done.forEach((p) => {
     const h = (new Date(p.completedAt || p.updatedAt) - new Date(p.createdAt)) / 3600000;
@@ -488,5 +493,6 @@ if (typeof module !== 'undefined' && module.exports) {
     getClientLastContact, getSilentClients, getClientAnniversaries,
     getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
     getPendenciaDisplayNumber, getPendenciaAssunto, getPendenciaTitulo,
+    isPendenciaResolvida,
   };
 }

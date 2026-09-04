@@ -8,6 +8,7 @@ const {
   calcPeriodDelta,
   calcPeriodStats,
   filterItemsByDateRange,
+  isPendenciaResolvida,
   getClientLastContact,
   getSilentClients,
   getClientAnniversaries,
@@ -69,6 +70,23 @@ describe('comparativo com período anterior', () => {
     expect(s.open).toBe(1);
     expect(s.completionRate).toBe(Math.round((2 / 3) * 100));
     expect(s.avgSlaHours).toBeCloseTo(13, 0);
+  });
+
+  it('resolvido conta como resolvido no Dashboard (concluido + resolvido)', () => {
+    expect(isPendenciaResolvida('concluido')).toBe(true);
+    expect(isPendenciaResolvida('resolvido')).toBe(true);
+    expect(isPendenciaResolvida('fechado')).toBe(false);
+    expect(isPendenciaResolvida('cancelado')).toBe(false);
+    expect(isPendenciaResolvida('aberto')).toBe(false);
+    const pens = [
+      { status: 'aberto', createdAt: '2024-05-01T10:00:00Z' },
+      { status: 'resolvido', createdAt: '2024-05-01T10:00:00Z', updatedAt: '2024-05-02T10:00:00Z' },
+      { status: 'concluido', createdAt: '2024-05-01T10:00:00Z', completedAt: '2024-05-01T12:00:00Z' },
+      { status: 'fechado', createdAt: '2024-05-01T10:00:00Z', updatedAt: '2024-05-02T10:00:00Z' },
+    ];
+    const s = calcPeriodStats(pens, (st) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(st));
+    expect(s.open).toBe(1);
+    expect(s.completionRate).toBe(Math.round((2 / 4) * 100));
   });
 
   it('filterItemsByDateRange respeita start/end', () => {
