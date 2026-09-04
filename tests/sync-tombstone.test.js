@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ENTITIES,
   _mergeRecords,
   _needsPush,
   TOMBSTONE_TTL_MS,
@@ -111,6 +112,14 @@ describe('C1-fix: push falhou não perde o dado local nem duplica', () => {
   it('sem falhas, merged passa intacto (mesma referência, sem cópia)', () => {
     const merged = [{ id: 'A' }];
     expect(_retainFailedPush(merged, [])).toBe(merged);
+  });
+});
+
+describe('C1-fix: entidade opcional ausente não prende o sync', () => {
+  it('tickets é optional (tabela ausente em produção = 404 no select)', () => {
+    const tickets = ENTITIES.find((e) => e.table === 'tickets');
+    expect(tickets).toBeTruthy();
+    expect(tickets.optional).toBe(true);
   });
 });
 

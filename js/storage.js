@@ -382,7 +382,13 @@ async function _runSupabaseSync() {
   const _syncEntity = async (e) => {
     let entityOk = true;
     const { data: remoteRaw, error } = await supabaseClient.from(e.table).select('*');
-    if (error) { console.warn(`Supabase ${e.table} error:`, error); return false; }
+    if (error) {
+      console.warn(`Supabase ${e.table} error:`, error);
+      // Entidade opcional (tabela pode não existir, ex.: tickets 404):
+      // pula sem marcar erro — comportamento anterior a C1.
+      if (e.optional) return true;
+      return false;
+    }
     if (!remoteRaw) return true;
     const nowIso = new Date().toISOString();
     const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields);
