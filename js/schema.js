@@ -273,8 +273,72 @@ function _needsPush(local, remote) {
   return new Date(local.updatedAt || 0).getTime() > new Date(remote.updated_at || 0).getTime();
 }
 
+// ── Tombstones + plano de sync (puros, testáveis) ────────────────────────────
+// Causa raiz que motivou: `_mergeRecords` trata "ausente no remoto" sempre
+// como "deletado no servidor" e o descarta do merged. Isso perde registros
+// criados offline (pull antes do push) e ressuscita deletes via realtime.
+// Estratégia (sem refatorar o merge genérico):
+// - Deleções locais geram tombstones `{ dbKey: { id: deletedAtISO } }` com TTL.
+// - Push de deletes (idempotente) roda ANTES do pull/merge.
+// - Linhas remotas cobertas por tombstone são filtradas, EXCETO se o remoto
+//   for mais novo que o tombstone (recriado de verdade → revive).
+// - Locais sem correspondente remoto são classificados: criado após o último
+//   sync bem-sucedido (ou sem sync anterior) → push; mais antigo → deletado
+//   no servidor → descarta do merged (propagação de delete, sem ressuscitar).
+const TOMBSTONE_TTL_MS = 30 * 86400000;
+
+function _pruneTombstones(tombs, nowMs, ttlMs) {
+  const now = (typeof nowMs === 'number' && !isNaN(nowMs)) ? nowMs : Date.now();
+  const ttl = (typeof ttlMs === 'number' && ttlMs > 0) ? ttlMs : TOMBSTONE_TTL_MS;
+  const out = {};
+  for (const [dbKey, ids] of Object.entries(tombs || {})) {
+    const kept = {};
+    for (const [id, at] of Object.entries(ids || {})) {
+      if (now - new Date(at || 0).getTime() <= ttl) kept[id] = at;
+    }
+    if (Object.keys(kept).length) out[dbKey] = kept;
+  }
+  return out;
+}
+
+// Filtra linhas remotas contra os tombstones de UMA entidade.
+// Retorna { remote, revived }: `remote` sem as linhas cobertas por tombstone
+// staler; `revived` com os ids cujo remoto é MAIS NOVO que o tombstone
+// (recriado após nossa deleção → o chamador deve limpar o tombstone e
+// aceitar o remoto, sem ressuscitar nada).
+function _filterRemoteByTombstones(remote, tombsForKey, updatedAtKey) {
+  const tombs = tombsForKey || {};
+  if (!Object.keys(tombs).length) return { remote: (remote || []).slice(), revived: [] };
+  const uk = updatedAtKey || 'updated_at';
+  const kept = [];
+  const revived = [];
+  for (const row of (remote || [])) {
+    const tAt = tombs[row.id];
+    if (!tAt) { kept.push(row); continue; }
+    const remoteMs = new Date((row && row[uk]) || 0).getTime();
+    const tombMs = new Date(tAt || 0).getTime();
+    if (remoteMs > tombMs) { kept.push(row); revived.push(row.id); }
+    // else: nossa deleção ainda não propagada (ou snapshot stale) → filtra.
+  }
+  return { remote: kept, revived };
+}
+
+// Classifica registros locais sem correspondente no remoto.
+// lastSyncAt: ISO do último pull bem-sucedido da entidade (ou null/'' na
+// primeira sincronização). Comparação lexicográfica vale para ISO-8601.
+function _classifyLocalOnly(localOnly, lastSyncAt) {
+  const toPush = [];
+  const toDrop = [];
+  for (const loc of (localOnly || [])) {
+    const stamp = (loc && (loc.createdAt || loc.updatedAt)) || '';
+    if (!lastSyncAt || (stamp && stamp >= lastSyncAt)) toPush.push(loc);
+    else toDrop.push(loc);
+  }
+  return { toPush, toDrop };
+}
+
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush };
+  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly };
 }

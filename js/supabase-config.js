@@ -73,6 +73,19 @@ function _applyRealtimePayload(table, payload) {
     try {
         let list = dbGet(meta.dbKey);
         if (!Array.isArray(list)) list = [];
+        // Anti-ressuscitação (C1): ignora INSERT/UPDATE de id com tombstone
+        // local, salvo se o remoto for mais novo (recriado de verdade).
+        try {
+          if (typeof _tombTimeFor === 'function') {
+            const pid = (payload.new && payload.new.id) || (payload.old && payload.old.id);
+            const tAt = pid ? _tombTimeFor(meta.dbKey, pid) : null;
+            if (tAt) {
+              const rAt = (payload.new && (payload.new.updated_at || payload.new.updatedAt)) || null;
+              if (!rAt || new Date(rAt).getTime() <= new Date(tAt).getTime()) return;
+              if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
+            }
+          }
+        } catch (_) {}
         const event = payload.eventType || payload.event;
         if (event === 'DELETE' && payload.old) {
             const id = payload.old.id;

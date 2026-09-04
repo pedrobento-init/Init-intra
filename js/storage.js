@@ -83,6 +83,93 @@ function resetPendingSyncCount() {
   _refreshSyncBanner();
 }
 
+// ── TOMBSTONES DE DELEÇÃO (persistentes) + ÚLTIMO SYNC POR ENTIDADE ──────────
+// Causa raiz (C1): o merge descarta todo local sem correspondente remoto.
+// Sem distinguir os casos, isso apaga criados-offline (pull antes do push) e
+// ressuscita deletados (pull/realtime após delete offline). Estratégia:
+// - Todo delete* local grava tombstone `{ dbKey: { id: deletedAtISO } }` (TTL).
+// - No sync: push dos deletes (idempotente) ANTES do pull/merge; linhas
+//   remotas cobertas por tombstone são filtradas, salvo remoto mais novo
+//   (recriado de verdade → revive e limpa o tombstone).
+// - Locais sem correspondente: criado após o último sync ok (ou sem sync
+//   anterior) → push; mais antigo → deletado no servidor → descarta local.
+// Persistência em localStorage (sobrevive a reload, ao contrário do contador
+// em memória); fallback em memória fora do browser (testes).
+const TOMBSTONE_LS_KEY = 'intra_tombstones_v1';
+const SYNC_AT_LS_KEY = 'intra_sync_at_v1';
+let _memTombstones = null;
+let _memSyncAt = null;
+function _loadTombstones() {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(TOMBSTONE_LS_KEY);
+      if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') return p; }
+    } catch (_) {}
+  }
+  if (!_memTombstones) _memTombstones = {};
+  return _memTombstones;
+}
+function _saveTombstones(t) {
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.setItem(TOMBSTONE_LS_KEY, JSON.stringify(t || {})); return; }
+    catch (_) {}
+  }
+  _memTombstones = t || {};
+}
+function _addTombstone(dbKey, id, at) {
+  if (!dbKey || !id) return;
+  try {
+    const t = _loadTombstones();
+    if (!t[dbKey]) t[dbKey] = {};
+    t[dbKey][id] = at || new Date().toISOString();
+    _saveTombstones(t);
+  } catch (_) {}
+}
+function _removeTombstone(dbKey, id) {
+  try {
+    const t = _loadTombstones();
+    if (t && t[dbKey] && t[dbKey][id]) { delete t[dbKey][id]; _saveTombstones(t); }
+  } catch (_) {}
+}
+// Guarda para o realtime (supabase-config.js): retorna o ISO ou null.
+function _tombTimeFor(dbKey, id) {
+  try { const t = _loadTombstones(); return (t && t[dbKey] && t[dbKey][id]) || null; }
+  catch (_) { return null; }
+}
+function _clearTombstone(dbKey, id) { _removeTombstone(dbKey, id); }
+function _pruneTombstonesPersisted() {
+  try {
+    const ttl = (typeof TOMBSTONE_TTL_MS === 'number') ? TOMBSTONE_TTL_MS : 30 * 86400000;
+    const pruned = (typeof _pruneTombstones === 'function')
+      ? _pruneTombstones(_loadTombstones(), Date.now(), ttl)
+      : _loadTombstones();
+    _saveTombstones(pruned);
+  } catch (_) {}
+}
+function _loadSyncAt() {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(SYNC_AT_LS_KEY);
+      if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') return p; }
+    } catch (_) {}
+  }
+  if (!_memSyncAt) _memSyncAt = {};
+  return _memSyncAt;
+}
+function _saveSyncAt(m) {
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.setItem(SYNC_AT_LS_KEY, JSON.stringify(m || {})); return; }
+    catch (_) {}
+  }
+  _memSyncAt = m || {};
+}
+function _getLastSyncAt(table) {
+  try { return _loadSyncAt()[table] || null; } catch (_) { return null; }
+}
+function _setLastSyncAt(table, iso) {
+  try { const m = _loadSyncAt(); m[table] = iso; _saveSyncAt(m); } catch (_) {}
+}
+
 // ── EQUIPES / PERFIS ──
 const TEAMS = {
   INIT: 'init',
@@ -288,36 +375,104 @@ async function _runSupabaseSync() {
   let totalConflicts = 0;
   let allConflictDetails = [];
 
+  // Ordem segura anti-perda (C1): push-deletes → pull → push-criados →
+  // merge → dbSet → push-updates. Falhas de item não abortam as demais
+  // entidades; lastSyncAt só avança com a entidade 100% ok (viés: em dúvida,
+  // preserva o dado local em vez de descartar).
   const _syncEntity = async (e) => {
-    const { data: remote, error } = await supabaseClient.from(e.table).select('*');
-    if (error) { console.warn(`Supabase ${e.table} error:`, error); return; }
-    if (!remote) return;
+    let entityOk = true;
+    const { data: remoteRaw, error } = await supabaseClient.from(e.table).select('*');
+    if (error) { console.warn(`Supabase ${e.table} error:`, error); return false; }
+    if (!remoteRaw) return true;
+    const nowIso = new Date().toISOString();
+    const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields);
+    // 1. Push de deletes pendentes (tombstones) — idempotente.
+    let tombsForKey = {};
+    try { tombsForKey = _loadTombstones()[e.dbKey] || {}; } catch (_) { tombsForKey = {}; }
+    for (const tid of Object.keys(tombsForKey)) {
+      try {
+        const res = await supabaseClient.from(e.table).delete().eq('id', tid);
+        if (res && res.error) throw new Error(res.error.message || 'delete falhou');
+      } catch (err) {
+        console.warn(`Supabase ${e.table} (delete ${tid} pulado):`, err && err.message);
+        entityOk = false;
+      }
+    }
+    // 2. Filtra o remoto contra tombstones (revive só se recriado depois).
+    let remote = remoteRaw;
+    try {
+      const fr = (typeof _filterRemoteByTombstones === 'function')
+        ? _filterRemoteByTombstones(remoteRaw, tombsForKey, 'updated_at')
+        : { remote: remoteRaw, revived: [] };
+      remote = fr.remote;
+      (fr.revived || []).forEach(id => _removeTombstone(e.dbKey, id));
+    } catch (_) {}
+    const remoteById = new Map(remote.map(r => [r.id, r]));
+    // 3. Locais sem correspondente: push (criado offline) vs drop (deletado
+    //    no servidor). Classificação pura e testável em schema.js.
     const local = dbGet(e.dbKey);
-    const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote, e.fields);
+    let toPush = [];
+    try {
+      const cls = (typeof _classifyLocalOnly === 'function')
+        ? _classifyLocalOnly(local.filter(l => !remoteById.has(l.id)), _getLastSyncAt(e.table))
+        : { toPush: [], toDrop: [] };
+      toPush = cls.toPush;
+    } catch (_) { toPush = []; }
+    const synthRemote = [];
+    for (const rec of toPush) {
+      try {
+        const res = await supabaseClient.from(e.table).upsert(mapPayload(rec));
+        if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
+        const synth = mapPayload(rec);
+        if (synth && typeof synth === 'object') {
+          if (!synth.updated_at) synth.updated_at = rec.updatedAt || nowIso;
+          synthRemote.push({ ...synth, id: rec.id });
+        } else {
+          synthRemote.push({ id: rec.id, updated_at: rec.updatedAt || nowIso });
+        }
+      } catch (err) {
+        console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+        entityOk = false;
+      }
+    }
+    // 4. Merge (genérico, inalterado) + persistência local.
+    const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote.concat(synthRemote), e.fields);
     totalConflicts += conflicts;
     allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: e.label })));
     const final = (typeof e.onMerged === 'function') ? e.onMerged(merged, local, remote) : merged;
     dbSet(e.dbKey, final);
+    // 5. Push de updates — por item (um item offline não trava os demais).
+    const remoteById2 = new Map(remote.concat(synthRemote).map(r => [r.id, r]));
     for (const rec of final) {
-      const r = remote.find(x => x.id === rec.id);
+      const r = remoteById2.get(rec.id);
       if (_needsPush(rec, r)) {
-        await supabaseClient.from(e.table).upsert(
-          (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields)
-        );
+        try {
+          const res = await supabaseClient.from(e.table).upsert(mapPayload(rec));
+          if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
+        } catch (err) {
+          console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+          entityOk = false;
+          try { markSyncPushFailed(); } catch (_) {}
+        }
       }
     }
+    if (entityOk) _setLastSyncAt(e.table, nowIso);
+    return entityOk;
   };
 
   // Escritas do próprio merge (1 dbSet por entidade) não são mudanças
   // pendentes — sem essa supressão o contador somava ~nº de tabelas por sync.
   if (typeof window !== 'undefined') window._suppressPendingSync = true;
+  let syncHadErrors = false;
   try {
+    try { _pruneTombstonesPersisted(); } catch (_) {}
     for (const e of SYNC_ENTITIES) {
       if (e.optional) {
-        try { await _syncEntity(e); }
+        try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
         catch (err) { console.warn(`Supabase ${e.table} (sync pulado — tabela ausente?):`, err.message); }
       } else {
-        await _syncEntity(e);
+        try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
+        catch (err) { console.warn(`Supabase ${e.table} (sync pulado):`, err.message); syncHadErrors = true; }
       }
     }
 
@@ -338,7 +493,9 @@ async function _runSupabaseSync() {
     if (allConflictDetails.length > 0) {
       console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
     }
-    resetPendingSyncCount();
+    // Só zera o contador com sync 100% ok; com falha, mantém o banner real.
+    if (syncHadErrors) { try { markSyncPushFailed(); } catch (_) {} _refreshSyncBanner(); }
+    else resetPendingSyncCount();
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);
     // Sync falhou: mantém a contagem real e reflete no banner (sem zerar).
@@ -735,6 +892,7 @@ function deleteClient(id) {
   const client = getClientById(id);
   const name = client ? client.name : 'Desconhecido';
   dbSet(DB.CLIENTS, getClients().filter(c => c.id !== id));
+  _addTombstone(DB.CLIENTS, id);
   addLog('Excluiu', 'Cliente', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -876,6 +1034,7 @@ function deletePendencia(id) {
   const remaining = getPendencias().filter(p => p.id !== id);
   if (remaining.length === getPendencias().length) return false;
   dbSet(DB.PENDENCIAS, remaining);
+  _addTombstone(DB.PENDENCIAS, id);
   addLog('Excluiu', 'Pendência', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1057,6 +1216,7 @@ function deleteTicket(id) {
   const tck = getTicketById(id);
   const title = tck ? tck.title : 'Desconhecido';
   dbSet(DB.TICKETS, getTickets().filter(t => t.id !== id));
+  _addTombstone(DB.TICKETS, id);
   addLog('Excluiu', 'Chamado', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1198,6 +1358,7 @@ function deleteVisit(id) {
   const v = getVisitById(id);
   const desc = v ? (v.clientName + ' – ' + (v.motivo || '')) : 'Desconhecido';
   dbSet(DB.VISITS, getVisits().filter(x => x.id !== id));
+  _addTombstone(DB.VISITS, id);
   addLog('Excluiu', 'Visita', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1262,6 +1423,7 @@ function deleteReuniao(id) {
   const r = getReuniaoById(id);
   const desc = r ? r.mesAno : 'Desconhecida';
   dbSet(DB.REUNIOES, getReunioes().filter(x => x.id !== id));
+  _addTombstone(DB.REUNIOES, id);
   addLog('Excluiu', 'Reunião', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1313,6 +1475,7 @@ function deleteProcedure(id) {
   const proc = list.find(p => p.id === id);
   const title = proc ? proc.title : 'Desconhecido';
   dbSet(DB.PROCEDURES, list.filter(p => p.id !== id));
+  _addTombstone(DB.PROCEDURES, id);
   addLog('Excluiu', 'Procedimento', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1370,6 +1533,7 @@ function deleteProcedureTemplate(id) {
   const tpl = list.find(t => t.id === id);
   const title = tpl ? tpl.title : 'Desconhecido';
   dbSet(DB.PROCEDURE_TEMPLATES, list.filter(t => t.id !== id));
+  _addTombstone(DB.PROCEDURE_TEMPLATES, id);
   addLog('Excluiu', 'Modelo Procedimento', id, title);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -1507,6 +1671,7 @@ function deleteOperator(id) {
   const op = getOperatorById(id);
   const name = op ? op.name : 'Desconhecido';
   dbSet(DB.OPERATORS, getOperators().filter(o => o.id !== id));
+  _addTombstone(DB.OPERATORS, id);
   addLog('Excluiu', 'Operador', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
