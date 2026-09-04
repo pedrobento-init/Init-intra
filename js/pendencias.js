@@ -201,7 +201,7 @@ function renderPenKanban(area) {
           '<div class="kanban-cards">' +
             (cards.length
               ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-              : '<div class="empty-state" style="padding:30px 10px"><p>Nenhuma</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
+              : '<div class="empty-state" style="padding:18px 10px"><p>Nenhuma pendência</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
           '</div>' +
         '</div>';
       }).join('') +
@@ -276,7 +276,7 @@ function penKanbanCard(p) {
       (c ? clientAvatar(c, 18) : '') + ' ' +
       escapeHtml(p.clientName || '—') +
     '</div>' +
-    '<div class="kanban-card-meta" style="margin-top:6px">' +
+    '<div class="kanban-card-meta" style="margin-top:5px">' +
       priorityTag(p.priority) + ' ' +
       (p.responsible
         ? '<span style="font-size:11px" title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
