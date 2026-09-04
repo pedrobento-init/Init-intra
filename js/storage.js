@@ -419,6 +419,7 @@ async function _runSupabaseSync() {
       toPush = cls.toPush;
     } catch (_) { toPush = []; }
     const synthRemote = [];
+    const failedPush = [];
     for (const rec of toPush) {
       try {
         const res = await supabaseClient.from(e.table).upsert(mapPayload(rec));
@@ -433,15 +434,26 @@ async function _runSupabaseSync() {
       } catch (err) {
         console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
         entityOk = false;
+        failedPush.push(rec);
       }
     }
-    // 4. Merge (genérico, inalterado) + persistência local.
+    // 4. Merge (genérico, inalterado) + persistência local. Registros cujo
+    // push falhou são retidos no merged: descartá-los seria perda de dados.
     const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote.concat(synthRemote), e.fields);
     totalConflicts += conflicts;
     allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: e.label })));
-    const final = (typeof e.onMerged === 'function') ? e.onMerged(merged, local, remote) : merged;
+    let final = (typeof e.onMerged === 'function') ? e.onMerged(merged, local, remote) : merged;
+    try {
+      if (typeof _retainFailedPush === 'function') final = _retainFailedPush(final, failedPush) || final;
+      else if (failedPush.length) {
+        const ids = new Set(final.map(m => m && m.id));
+        for (const rec of failedPush) if (rec && rec.id && !ids.has(rec.id)) { final.push(rec); ids.add(rec.id); }
+      }
+    } catch (_) {}
     dbSet(e.dbKey, final);
-    // 5. Push de updates — por item (um item offline não trava os demais).
+    // 5. Push de updates — por item (um item com falha não trava os demais).
+    // Falha de background NÃO incrementa o contador (ele conta alterações
+    // do usuário, já contabilizadas; inflar aqui prendia o banner).
     const remoteById2 = new Map(remote.concat(synthRemote).map(r => [r.id, r]));
     for (const rec of final) {
       const r = remoteById2.get(rec.id);
@@ -452,7 +464,6 @@ async function _runSupabaseSync() {
         } catch (err) {
           console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
           entityOk = false;
-          try { markSyncPushFailed(); } catch (_) {}
         }
       }
     }
@@ -493,8 +504,10 @@ async function _runSupabaseSync() {
     if (allConflictDetails.length > 0) {
       console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
     }
-    // Só zera o contador com sync 100% ok; com falha, mantém o banner real.
-    if (syncHadErrors) { try { markSyncPushFailed(); } catch (_) {} _refreshSyncBanner(); }
+    // Só zera o contador com sync 100% ok; com falha, mantém o banner com
+    // a contagem real (falha de background não soma: o contador é de
+    // alterações do usuário, e inflá-lo prendia o banner para sempre).
+    if (syncHadErrors) { try { _refreshSyncBanner(); } catch (_) {} }
     else resetPendingSyncCount();
   } catch (err) {
     console.warn('Sincronização Supabase em background:', err);

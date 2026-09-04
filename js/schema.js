@@ -337,8 +337,20 @@ function _classifyLocalOnly(localOnly, lastSyncAt) {
   return { toPush, toDrop };
 }
 
+// Reintegra ao merged os registros cujo push FALHOU: o merge os descarta
+// (ausentes no remoto), mas descartar do dbSet local seria perda de dados.
+// Retorna o mesmo array quando nada falta (sem cópia, sem duplicar).
+function _retainFailedPush(merged, failedRecs) {
+  if (!failedRecs || !failedRecs.length) return merged;
+  const ids = new Set((merged || []).map(m => m && m.id));
+  for (const rec of failedRecs) {
+    if (rec && rec.id && !ids.has(rec.id)) { merged.push(rec); ids.add(rec.id); }
+  }
+  return merged;
+}
+
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly };
+  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush };
 }

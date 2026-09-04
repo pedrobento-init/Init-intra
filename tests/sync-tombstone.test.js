@@ -6,6 +6,7 @@ import {
   _pruneTombstones,
   _filterRemoteByTombstones,
   _classifyLocalOnly,
+  _retainFailedPush,
 } from '../js/schema.js';
 
 const FIELDS = {
@@ -93,6 +94,23 @@ describe('C1: deletado com cópia local + sem duplicação/ressuscitação', () 
     const rem = { id: 'PEN-d', assunto: 'R', created_at: T0, updated_at: T1 };
     const { merged } = _mergeRecords([loc], [rem], FIELDS);
     expect(merged.filter((r) => r.id === 'PEN-d')).toHaveLength(1);
+  });
+});
+
+describe('C1-fix: push falhou não perde o dado local nem duplica', () => {
+  it('merge descarta, mas _retainFailedPush reintegra sem duplicar', () => {
+    const loc = { id: 'PEN-off', assunto: 'Criado offline', createdAt: T2, updatedAt: T2 };
+    const { merged } = _mergeRecords([loc], [], FIELDS);
+    expect(merged).toEqual([]);
+    const retained = _retainFailedPush(merged, [loc]);
+    expect(retained.filter((r) => r.id === 'PEN-off')).toHaveLength(1);
+    const again = _retainFailedPush(retained, [loc]);
+    expect(again.filter((r) => r.id === 'PEN-off')).toHaveLength(1);
+  });
+
+  it('sem falhas, merged passa intacto (mesma referência, sem cópia)', () => {
+    const merged = [{ id: 'A' }];
+    expect(_retainFailedPush(merged, [])).toBe(merged);
   });
 });
 
