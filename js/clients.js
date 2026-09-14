@@ -522,7 +522,16 @@ function openClientForm(id = null) {
           <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" name="name" value="${esc(c.name)}" required /></div>
           <div class="form-group"><label class="form-label">CNPJ / CPF</label><input class="form-input" name="cnpj" value="${esc(c.cnpj)}" /></div>
         </div>
-        <div class="form-group"><label class="form-label">Segmento</label><input class="form-input" name="segment" value="${esc(c.segment)}" /></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Segmento</label><input class="form-input" name="segment" value="${esc(c.segment)}" /></div>
+          ${(() => {
+            const opts = (typeof TEAM_OPTIONS !== 'undefined') ? TEAM_OPTIONS : [{ value: 'init', label: 'Init' }];
+            const cur = c.team || 'init';
+            const canEdit = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
+            if (!canEdit) return `<input type="hidden" name="team" value="${esc(cur)}" />`;
+            return `<div class="form-group"><label class="form-label">Equipe *</label><select class="form-select" name="team" required title="Time dono deste cliente (define quem visualiza as pendências)">${opts.map(o => `<option value="${escapeHtml(o.value)}" ${cur === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select></div>`;
+          })()}
+        </div>
       </div>
       <div class="form-section">
         <div class="form-section-title">Responsáveis</div>
@@ -830,8 +839,17 @@ function submitClientForm(e, id) {
       if (s) lics.push({ software: s, key: fd.get(`lk_${i}`), expiry: fd.get(`le_${i}`) });
     });
     const logoValue = window._currentLogoData || g('logo');
+    const existing = id ? getClientById(id) : null;
+    const teamOpts = (typeof TEAM_OPTIONS !== 'undefined') ? TEAM_OPTIONS.map(o => o.value) : ['init'];
+    const postedTeam = g('team');
+    // Só admin pode trocar a equipe do cliente; demais preservam a atual
+    // (nunca confia no POST: evita elevação via devtools).
+    const canEditTeam = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
+    const team = canEditTeam
+      ? (teamOpts.includes(postedTeam) ? postedTeam : (existing?.team || getCurrentTeam()))
+      : (existing?.team || getCurrentTeam());
     const clientData = {
-      id: id||null, name:g('name'), cnpj:g('cnpj'), segment:g('segment'),
+      id: id||null, name:g('name'), cnpj:g('cnpj'), segment:g('segment'), team,
       color: window._selectedColor||COLORS[0], initials:g('initials'), logo: logoValue,
       logoShape: window._selectedLogoShape||'circle',
       owner:g('owner'), ownerPhone:g('ownerPhone'), responsible:g('responsible'),
