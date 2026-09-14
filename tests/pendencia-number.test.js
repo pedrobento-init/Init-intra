@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const metrics = require('../js/metrics.js');
 
-const { getPendenciaDisplayNumber } = metrics;
+const { getPendenciaDisplayNumber, getPendenciaDisplayMap } = metrics;
 
 function pen(id, createdAt) {
   return { id, createdAt };
@@ -57,5 +57,34 @@ describe('getPendenciaDisplayNumber (só exibição, id interno intacto)', () =>
     expect(getPendenciaDisplayNumber(list, 'PEN-c')).toBe('#003');
     const semB = list.filter((p) => p.id !== 'PEN-b');
     expect(getPendenciaDisplayNumber(semB, 'PEN-c')).toBe('#002');
+  });
+});
+
+describe('getPendenciaDisplayMap (FASE 1 — memoização por render)', () => {
+  it('retorna o mesmo número que getPendenciaDisplayNumber para todos os ids', () => {
+    const list = [pen('PEN-c', '2024-05-03T10:00:00Z'), pen('PEN-a', '2024-05-01T10:00:00Z'), pen('PEN-b', '2024-05-02T10:00:00Z')];
+    const map = getPendenciaDisplayMap(list);
+    for (const p of list) {
+      expect(map.get(p.id)).toBe(getPendenciaDisplayNumber(list, p.id));
+    }
+    expect(map.get('PEN-a')).toBe('#001');
+  });
+
+  it('lista vazia/nula gera Map vazio (sem quebrar)', () => {
+    expect(getPendenciaDisplayMap([]).size).toBe(0);
+    expect(getPendenciaDisplayMap(null).size).toBe(0);
+  });
+
+  it('duplicatas mantêm o número da primeira ocorrência (igual ao findIndex)', () => {
+    const list = [pen('PEN-a', '2024-05-01T10:00:00Z'), pen('PEN-a', '2024-05-01T10:00:00Z')];
+    const map = getPendenciaDisplayMap(list);
+    expect(map.get('PEN-a')).toBe(getPendenciaDisplayNumber(list, 'PEN-a'));
+  });
+
+  it('não muta a lista de entrada', () => {
+    const list = [pen('PEN-b', '2024-05-02T10:00:00Z'), pen('PEN-a', '2024-05-01T10:00:00Z')];
+    const before = list.map((p) => p.id);
+    getPendenciaDisplayMap(list);
+    expect(list.map((p) => p.id)).toEqual(before);
   });
 });

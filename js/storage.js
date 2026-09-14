@@ -607,6 +607,64 @@ async function _uploadAttachmentToStorage(type, itemId, attId, file) {
   } catch (e) { console.warn('Storage upload exception:', e); return null; }
 }
 
+// ── FASE 2: backfill incremental base64 → Storage (compatível) ──────────────
+// Anexos antigos (ou criados offline) têm só `data` (dataURL embutido, pesado:
+// viaja em todo select/sync/cache). Quando ONLINE, sobe o conteúdo p/ o mesmo
+// bucket/path de sempre e troca por url/path, zerando `data`. Render e
+// download preferem `url` e funcionam com ambos (renderAttachmentList:715) —
+// nada quebra se a migração não rodar (offline) ou falhar (mantém `data`).
+// Sem spam: persiste via dbSet; o sync de fundo propaga pelo _needsPush.
+function _dataUrlToBlob(dataUrl) {
+  if (typeof dataUrl !== 'string') return null;
+  const m = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+  if (!m) return null;
+  try {
+    const mime = m[1] || 'application/octet-stream';
+    const raw = m[3] || '';
+    const bin = (typeof atob === 'function' ? atob(raw)
+      : Buffer.from(raw, 'base64').toString('binary'));
+    const len = bin.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    if (typeof Blob === 'function') return new Blob([bytes], { type: mime });
+    return null;
+  } catch (_) { return null; }
+}
+
+async function migrateAttachmentDataToStorage(type, itemId) {
+  try {
+    if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()
+        || (typeof window !== 'undefined' && !window._supabaseAuthActive)) return 0;
+    if (typeof File === 'undefined' || typeof supabaseClient === 'undefined') return 0;
+    const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
+    const key = keyMap[type];
+    if (!key) return 0;
+    const list = dbGet(key);
+    const idx = list.findIndex(i => i.id === itemId);
+    if (idx === -1 || !Array.isArray(list[idx].attachments)) return 0;
+    let migrated = 0;
+    for (const att of list[idx].attachments) {
+      if (!att || !att.data || att.url || att._migrating) continue;
+      att._migrating = true;
+      try {
+        const blob = _dataUrlToBlob(att.data);
+        if (!blob) continue;
+        const file = new File([blob], att.name || 'anexo', { type: att.mimeType || blob.type });
+        const up = await _uploadAttachmentToStorage(type, itemId, att.id, file);
+        if (up && up.url) {
+          att.url = up.url; att.path = up.path; att.data = null; migrated++;
+        }
+      } catch (_) { /* mantém base64 — tenta de novo na próxima vez */ }
+      finally { delete att._migrating; }
+    }
+    if (migrated) {
+      list[idx].updatedAt = new Date().toISOString();
+      dbSet(key, list); // sync de fundo propaga (sem e-mail de "atualizado")
+    }
+    return migrated;
+  } catch (_) { return 0; }
+}
+
 function addAttachment(type, itemId, fileObj) {
   // fileObj = {name, mimeType/type, size, data (base64) | url, path}
   if (fileObj.size > ATTACHMENT_MAX_SIZE) {
@@ -707,6 +765,15 @@ function renderAttachmentList(type, itemId, containerId) {
   if (!atts.length) {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Nenhum anexo.</p>';
     return;
+  }
+  // FASE 2: 1× por container, migra base64→Storage em fundo e re-renderiza
+  // só se algo mudou (comportamento idêntico se offline/falha).
+  if (!container._attBackfillDone && atts.some(a => a && a.data && !a.url)
+      && typeof migrateAttachmentDataToStorage === 'function') {
+    container._attBackfillDone = true;
+    migrateAttachmentDataToStorage(type, itemId).then(n => {
+      if (n > 0 && container.isConnected) renderAttachmentList(type, itemId, containerId);
+    }).catch(() => {});
   }
   container.innerHTML = atts.map(a => {
     const isImage = a.mimeType && a.mimeType.startsWith('image/');
@@ -928,6 +995,124 @@ function getPendenciasByTeam(team) {
 }
 function getMyPendencias() {
   return filterByTeam(getPendencias());
+}
+
+// ── FASE 3: paginação server-side por escopo ────────────────────────────────
+// Mesma cadeia operador→equipe→cliente→pendência, agora com filtro/ordenação/
+// paginação NO BANCO (RLS continua valendo p/ o JWT). Uso: tela de pendências
+// quando ONLINE; offline ou falha → caminho local atual (inalterado).
+// - scope 'active' (padrão): status NOT IN (fechados)
+// - scope 'archived': status IN (fechados) — sob demanda, nunca junto
+// - team: não-admin SEMPRE restrito ao próprio team; admin sem filtro vê tudo
+//   (RLS is_admin), admin com _selectedTeam restringe àquele team.
+const PEN_PAGE_DEFAULT_SIZE = 50;
+const PEN_CLOSED_LIST = ['concluido', 'resolvido', 'cancelado', 'fechado'];
+
+function _penServerAvailable() {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+    if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return false;
+    if (typeof window !== 'undefined' && !window._supabaseAuthActive) return false;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
+    return true;
+  } catch (_) { return false; }
+}
+
+function _penPageScope() {
+  // Retorna { team: string|null, adminSeeAll: boolean }.
+  try {
+    const admin = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
+    const sel = (typeof _selectedTeam !== 'undefined') ? _selectedTeam : '';
+    if (admin && sel) return { team: sel, adminSeeAll: false };
+    if (admin) return { team: null, adminSeeAll: true };
+  } catch (_) {}
+  try {
+    if (typeof getCurrentTeam === 'function') return { team: getCurrentTeam(), adminSeeAll: false };
+  } catch (_) {}
+  return { team: 'init', adminSeeAll: false };
+}
+
+function _sanitizeIlike(s) {
+  return String(s || '').replace(/[%_\\]/g, '').replace(/[,()]/g, ' ').trim().slice(0, 80);
+}
+
+// Puro e testável: encadeia filtros num builder postgrest (ou mock). Retorna q.
+function applyPendenciaPageFilters(q, opts) {
+  const o = opts || {};
+  if (!o.adminSeeAll && o.team) q = q.eq('team', o.team);
+  if (o.scope === 'archived') q = q.in('status', PEN_CLOSED_LIST);
+  else q = q.not('status', 'in', '(' + PEN_CLOSED_LIST.join(',') + ')');
+  if (o.clientId) q = q.eq('client_id', o.clientId);
+  if (o.responsible) q = q.eq('responsible', o.responsible);
+  if (o.status) q = q.eq('status', o.status);
+  if (o.priority) q = q.eq('priority', o.priority);
+  const sq = _sanitizeIlike(o.search);
+  if (sq) {
+    const pat = '%' + sq + '%';
+    q = q.or('assunto.ilike.' + pat + ',descricao.ilike.' + pat + ',client_name.ilike.' + pat + ',responsible.ilike.' + pat);
+  }
+  return q;
+}
+
+function _penFields() {
+  try {
+    if (typeof ENTITIES !== 'undefined') {
+      const e = ENTITIES.find(x => x.table === 'pendencias');
+      if (e && e.fields) return e.fields;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function fetchPendenciasPage(opts) {
+
+  const o = Object.assign({ scope: 'active', page: 0, pageSize: PEN_PAGE_DEFAULT_SIZE }, opts || {});
+  const sc = _penPageScope();
+  const page = Math.max(0, parseInt(o.page, 10) || 0);
+  const pageSize = Math.min(200, Math.max(1, parseInt(o.pageSize, 10) || PEN_PAGE_DEFAULT_SIZE));
+  const fields = _penFields();
+  if (!fields) throw new Error('Schema de pendências indisponível');
+  let q = supabaseClient.from('pendencias').select('*', { count: 'exact' });
+  q = applyPendenciaPageFilters(q, {
+    scope: o.scope === 'archived' ? 'archived' : 'active',
+    team: sc.team, adminSeeAll: sc.adminSeeAll,
+    clientId: o.clientId || '', responsible: o.responsible || '',
+    status: o.status || '', priority: o.priority || '', search: o.search || ''
+  });
+  q = q.order('created_at', { ascending: false }).order('id', { ascending: true });
+  const from = page * pageSize;
+  const res = await q.range(from, from + pageSize - 1);
+  if (res.error) throw new Error(res.error.message || 'Falha na consulta paginada');
+  const rows = (res.data || []).map(r => _mapFromRemote(r, fields));
+  return { rows, total: (typeof res.count === 'number') ? res.count : rows.length, page, pageSize };
+}
+
+// ── FASE 6: contadores no banco ────────────────────────────────────────────
+// Totais por status do escopo SEM trazer as linhas: consulta só a coluna
+// `status` (≈ bytes por registro) com os mesmos team/scope da paginação
+// (+ RLS). Agregação local via countPendenciaStatuses (pura, testada).
+// PostgREST não faz GROUP BY sem RPC — esta é a forma sem criar backend.
+function countPendenciaStatuses(statusRows) {
+  const byStatus = {};
+  let total = 0;
+  for (const r of (statusRows || [])) {
+    const s = (r && r.status) || 'aberto';
+    byStatus[s] = (byStatus[s] || 0) + 1;
+    total++;
+  }
+  return { byStatus, total };
+}
+
+async function fetchPendenciaStatusCounts(scope) {
+  const sc = _penPageScope();
+  let q = supabaseClient.from('pendencias').select('status');
+  q = applyPendenciaPageFilters(q, {
+    scope: scope === 'archived' ? 'archived' : 'active',
+    team: sc.team, adminSeeAll: sc.adminSeeAll
+  });
+  const res = await q;
+  if (res.error) throw new Error(res.error.message || 'Falha na contagem');
+  return countPendenciaStatuses(res.data || []);
 }
 function getPendenciaById(id) { return getPendencias().find(p => p.id === id) || null; }
 function uniquePendenciaId(list) {
@@ -2015,5 +2200,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses };
 }

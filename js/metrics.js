@@ -470,15 +470,28 @@ function getPendenciaTitulo(p) {
 // na lista ordenada por createdAt asc (desempate por id), sem buracos: ao
 // excluir uma pendência, as posteriores "andam" um número. Não persiste nada.
 function getPendenciaDisplayNumber(pendencias, id) {
+  const m = getPendenciaDisplayMap(pendencias);
+  return m.has(id) ? m.get(id) : '#---';
+}
+
+// Versão em lote (O(n log n) 1×): mesmo comparador/resultado de
+// getPendenciaDisplayNumber, para memoizar por render em vez de ordenar
+// a lista inteira a cada card (O(n² log n)). Map<penId, '#NNN'>.
+function getPendenciaDisplayMap(pendencias) {
   const list = Array.isArray(pendencias) ? pendencias.slice() : [];
   list.sort((a, b) => {
     const byDate = String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
     if (byDate !== 0) return byDate;
     return String(a.id || '').localeCompare(String(b.id || ''));
   });
-  const idx = list.findIndex((p) => p.id === id);
-  if (idx === -1) return '#---';
-  return '#' + String(idx + 1).padStart(3, '0');
+  const map = new Map();
+  for (let i = 0; i < list.length; i++) {
+    const pid = list[i] && list[i].id;
+    // findIndex parava no primeiro: duplicatas (que não deveriam existir)
+    // mantêm o número da primeira ocorrência.
+    if (pid != null && !map.has(pid)) map.set(pid, '#' + String(i + 1).padStart(3, '0'));
+  }
+  return map;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -492,7 +505,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getPreviousDashRange, calcPeriodDelta, filterItemsByDateRange, calcPeriodStats,
     getClientLastContact, getSilentClients, getClientAnniversaries,
     getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
-    getPendenciaDisplayNumber, getPendenciaAssunto, getPendenciaTitulo,
+    getPendenciaDisplayNumber, getPendenciaDisplayMap, getPendenciaAssunto, getPendenciaTitulo,
     isPendenciaResolvida,
   };
 }

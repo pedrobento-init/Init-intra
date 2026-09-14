@@ -149,11 +149,96 @@ function _renderPendenciaSlaSummary() {
 function renderPenView(resetPage) {
   var area = document.getElementById('penViewArea');
   if (!area) return;
+  var sig = _penViewSig();
+  if (resetPage || sig !== _penLastSig) { _penPage = 0; _penLastSig = sig; }
+  // FASE 3: online → página do banco (filtros/ordenação/paginação no servidor,
+  // escopo do time sempre aplicado + RLS). Offline/falha → caminho local atual.
+  if (typeof _penServerAvailable === 'function' && _penServerAvailable()
+      && typeof fetchPendenciasPage === 'function') {
+    _penServerMode = true;
+    area.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Carregando pendências…</p></div>';
+    var pageReq = fetchPendenciasPage({
+      scope: penScope, page: _penPage, pageSize: PEN_UI_PAGE_SIZE,
+      clientId: document.getElementById('penClient')?.value || '',
+      responsible: document.getElementById('penResponsible')?.value || '',
+      status: document.getElementById('penStatus')?.value || '',
+      priority: document.getElementById('penPriority')?.value || '',
+      search: document.getElementById('penSearch')?.value || ''
+    });
+    // FASE 6: totais por status vêm do banco (só coluna status), não da página.
+    var countReq = (typeof fetchPendenciaStatusCounts === 'function')
+      ? fetchPendenciaStatusCounts(penScope) : Promise.resolve(null);
+    Promise.all([pageReq, countReq]).then(function (arr) {
+      if (sig !== _penLastSig) return; // filtro mudou durante o fetch — descarta
+      _filteredPens = arr[0].rows;
+      _penTotal = arr[0].total;
+      _penCounts = arr[1];
+      _renderPendenciaSlaSummary();
+      renderPenKanban(area);
+    }).catch(function () {
+      _penServerMode = false; _penTotal = null; _penCounts = null;
+      _filteredPens = getFilteredPendencias();
+      _renderPendenciaSlaSummary();
+      renderPenKanban(area);
+    });
+    return;
+  }
+  _penServerMode = false; _penTotal = null; _penCounts = null;
   setTimeout(function() {
     _filteredPens = getFilteredPendencias();
     _renderPendenciaSlaSummary();
     renderPenKanban(area);
   }, 10);
+}
+
+// ── FASE 3: estado de paginação da lista ─────────────────────────────────────
+let _penPage = 0;
+const PEN_UI_PAGE_SIZE = 50;
+let _penTotal = null;
+let _penServerMode = false;
+let _penLastSig = '';
+let _penCounts = null; // FASE 6: { byStatus, total } do banco (modo servidor)
+// FASE 6: resumo idêntico ao penStatusSummary, mas dos totais do banco.
+function _penServerSummary() {
+  var counts = _penCounts || { byStatus: {}, total: 0 };
+  var cols = penScope === 'archived'
+    ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
+    : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
+  var parts = cols.map(function(col) {
+    var n = counts.byStatus[col.id] || 0;
+    return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
+  }).filter(Boolean);
+  var scopeLabel = penScope === 'archived' ? 'arquivadas' : 'ativas';
+  return '<div class="pen-summary" role="status"><strong>' + counts.total + '</strong>&nbsp;pendências ' + scopeLabel + (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>';
+}
+function _penViewSig() {
+  var team = '';
+  try {
+    team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined') ? (_selectedTeam || '') : '';
+  } catch (_) {}
+  return JSON.stringify({
+    scope: (typeof penScope !== 'undefined') ? penScope : 'active',
+    q: document.getElementById('penSearch')?.value || '',
+    cid: document.getElementById('penClient')?.value || '',
+    resp: document.getElementById('penResponsible')?.value || '',
+    st: document.getElementById('penStatus')?.value || '',
+    pr: document.getElementById('penPriority')?.value || '',
+    team: team
+  });
+}
+function penGotoPage(d) {
+  _penPage = Math.max(0, _penPage + (parseInt(d, 10) || 0));
+  renderPenView(false);
+}
+function _penPagerBar() {
+  if (!_penServerMode || _penTotal == null) return '';
+  var totalPages = Math.max(1, Math.ceil(_penTotal / PEN_UI_PAGE_SIZE));
+  if (_penPage >= totalPages) _penPage = totalPages - 1;
+  return '<div class="pen-pager" role="navigation" aria-label="Paginação de pendências">' +
+    '<button class="btn btn-secondary btn-sm" onclick="penGotoPage(-1)"' + (_penPage <= 0 ? ' disabled' : '') + ' title="Página anterior">‹ Anterior</button>' +
+    '<span class="pen-pager-info">Página ' + (_penPage + 1) + ' de ' + totalPages + ' · ' + _filteredPens.length + ' de ' + _penTotal + ' no banco</span>' +
+    '<button class="btn btn-secondary btn-sm" onclick="penGotoPage(1)"' + ((_penPage + 1) >= totalPages ? ' disabled' : '') + ' title="Próxima página">Próxima ›</button>' +
+  '</div>';
 }
 
 // ── Kanban drag-and-drop de pendências ───────────────────────────────────────
@@ -178,13 +263,18 @@ function penStatusSummary(pens) {
 
 function renderPenKanban(area) {
   var pens = _filteredPens;
+  _primePenRenderCache();
+  try {
+  // FASE 3: no modo servidor o resumo por status refletiria só a página;
+  // FASE 6 usa os totais do banco (mesmo markup do resumo local).
+  var summaryHtml = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
   if (isPenMobile()) {
-    area.innerHTML = penStatusSummary(pens) + renderPenMobileGrid(pens);
+    area.innerHTML = _penPagerBar() + summaryHtml + renderPenMobileGrid(pens);
   } else {
     var cols = penScope === 'archived'
       ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
       : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
-    area.innerHTML = penStatusSummary(pens) + '<div class="kanban-board">' + 
+    area.innerHTML = _penPagerBar() + summaryHtml + '<div class="kanban-board">' + 
       cols.map(function(col) {
         var cards = pens.filter(function(p) { return p.status === col.id; });
         return '<div class="kanban-col"' +
@@ -218,6 +308,9 @@ function renderPenKanban(area) {
     }
   }
   _applyPenCardMotion(area);
+  } finally {
+    _clearPenRenderCache();
+  }
 }
 
 // Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
@@ -246,11 +339,39 @@ function _applyPenCardMotion(area) {
   });
 }
 
+// ── Cache por render (FASE 1 — memoização) ─────────────────────────────────
+// penKanbanCard/penMobileCard rodam 1× por card; sem cache cada card reordenava
+// a lista inteira (getPendenciaDisplayNumber) e varria clientes com find
+// (getClientById) → O(n² log n) por render. O cache é primado 1× em
+// renderPenKanban (único ponto de render da lista) e limpo ao fim.
+// Fora do render (modal, busca, calendário, export) o fallback calcula direto,
+// com resultado idêntico — só mais lento para chamadas isoladas (irrelevante).
+let _penNumCache = null;    // Map<penId, '#NNN'> | null
+let _penClientCache = null; // Map<clientId, client> | null
+function _primePenRenderCache() {
+  try {
+    const all = (typeof getPendencias === 'function') ? getPendencias() : [];
+    _penNumCache = (typeof getPendenciaDisplayMap === 'function')
+      ? getPendenciaDisplayMap(all) : null;
+    _penClientCache = new Map();
+    const clients = (typeof getClients === 'function') ? getClients() : [];
+    for (const c of clients) { if (c && c.id != null && !_penClientCache.has(c.id)) _penClientCache.set(c.id, c); }
+  } catch (_) { _penNumCache = null; _penClientCache = null; }
+}
+function _clearPenRenderCache() { _penNumCache = null; _penClientCache = null; }
+function _penRenderClient(clientId) {
+  try {
+    if (_penClientCache && _penClientCache.has(clientId)) return _penClientCache.get(clientId) || null;
+  } catch (_) {}
+  return (typeof getClientById === 'function') ? getClientById(clientId) : null;
+}
+
 // Número amigável de exibição (#001...). Só apresentação: usa a função pura
 // getPendenciaDisplayNumber (metrics.js) sobre a lista atual; o id interno
 // (PEN-...) segue intacto em onclick, banco, sync e exports.
 function penDisplayNumber(p) {
   try {
+    if (p && _penNumCache && _penNumCache.has(p.id)) return _penNumCache.get(p.id);
     if (p && typeof getPendenciaDisplayNumber === 'function' && typeof getPendencias === 'function') {
       return getPendenciaDisplayNumber(getPendencias(), p.id);
     }
@@ -259,7 +380,7 @@ function penDisplayNumber(p) {
 }
 
 function penKanbanCard(p) {
-  var c = getClientById(p.clientId);
+  var c = _penRenderClient(p.clientId);
   var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   var isStale = isStalePendencia(p);
   var sla = slaCountdown(p, 48);
@@ -303,7 +424,7 @@ function renderPenMobileGrid(pens) {
 }
 
 function penMobileCard(p) {
-  const c = getClientById(p.clientId);
+  const c = _penRenderClient(p.clientId);
   const st = STATUS_PEN_MAP[p.status] || { label: p.status || '—', dot: '#94a3b8' };
   const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
   const isStale = isStalePendencia(p);

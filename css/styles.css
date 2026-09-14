@@ -3607,6 +3607,15 @@ body.dark-theme .overdue-banner {
 .pen-check-add { display: flex; gap: 6px; margin-top: 8px; }
 .pen-check-add .form-input { flex: 1; min-width: 0; }
 .pen-empty { font-size: 12px; padding: 4px 0; }
+/* ── FASE 3: paginação server-side da lista ── */
+.pen-pager {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px; padding: 8px 12px;
+  background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.pen-pager-info { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.pen-pager .btn[disabled] { opacity: .45; cursor: not-allowed; }
 @media (hover: none) { .pen-check-remove { opacity: 1; } }
 @media (max-width: 640px) {
   .pen-prop { grid-template-columns: 108px 1fr; }

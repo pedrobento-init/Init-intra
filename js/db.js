@@ -183,9 +183,17 @@ function setCacheStore(storeName, items) {
 
   if (idb[storeName]) {
     const previous = _storeWriteQueues[storeName] || Promise.resolve();
+    // FASE 5: sem clear() integral — upsert + remove só chaves obsoletas.
+    // Todos os chamadores passam o array COMPLETO (lista, filtrada ou merge),
+    // então o resultado final é idêntico ao clear+bulkPut, com ~metade do I/O.
     _storeWriteQueues[storeName] = previous.then(() => idb.transaction('rw', idb[storeName], async () => {
-      await idb[storeName].clear();
-      if (data && data.length) await idb[storeName].bulkPut(data);
+      if (!Array.isArray(data)) return;
+      const keep = new Set(data.map(d => d && (d.id ?? d.key)));
+      const keys = await idb[storeName].toCollection().primaryKeys();
+      const stale = keys.filter(k => !keep.has(k));
+      if (stale.length) await idb[storeName].bulkDelete(stale);
+      if (data.length) await idb[storeName].bulkPut(data);
+      else if (!stale.length) await idb[storeName].clear();
     })).catch(err => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
   }
 }
@@ -214,9 +222,14 @@ function setCacheTable(tableName, data) {
   _dbCache[tableName] = data;
   if (Array.isArray(data)) {
     const previous = _storeWriteQueues[tableName] || Promise.resolve();
+    // FASE 5: idem setCacheStore — sem clear() integral.
     _storeWriteQueues[tableName] = previous.then(() => idb.transaction('rw', idb[tableName], async () => {
-      await idb[tableName].clear();
+      const keep = new Set(data.map(d => d && (d.id ?? d.key)));
+      const keys = await idb[tableName].toCollection().primaryKeys();
+      const stale = keys.filter(k => !keep.has(k));
+      if (stale.length) await idb[tableName].bulkDelete(stale);
       if (data.length) await idb[tableName].bulkPut(data);
+      else if (!stale.length) await idb[tableName].clear();
     })).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
   } else if (data && typeof data === 'object' && data.key) {
     idb.transaction('rw', idb[tableName], async () => {
