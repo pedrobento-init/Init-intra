@@ -943,3 +943,95 @@ function promptInstall() {
     _deferredInstall = null;
   });
 }
+
+// ── RICH TEXT (links) + TEMPO AMIGÁVEL ───────────────────────────────────────
+// Evolução da renderização de textos do usuário (descrição/notas/checklist):
+// antes era só escapeHtml (URL virava texto puro e podia estourar o container).
+// Agora: escapa tudo (anti-XSS) e converte URLs/e-mails em <a> clicáveis via
+// safeUrl. URLs muito longas (>60 chars) viram "🔗 Abrir link" com a URL
+// completa no title/tooltip + href intacto (DOM preserva a URL original).
+// Palavras normais não são afetadas: a quebra longa vive só no <a> via CSS
+// (.rich-link { overflow-wrap:anywhere; word-break:break-word }).
+function _richEsc(str) {
+  if (typeof escapeHtml === 'function') return escapeHtml(str);
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function _richMentionNames() {
+  try {
+    if (typeof getOperatorNames === 'function') {
+      var n = getOperatorNames();
+      if (n && n.length) return n;
+    }
+  } catch (_) {}
+  return [];
+}
+function _richApplyMentions(escapedChunk) {
+  var names = _richMentionNames();
+  if (!names.length) return escapedChunk;
+  return String(escapedChunk).replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function (match, p1) {
+    var tl = String(p1).toLowerCase();
+    var isMention = names.some(function (n) {
+      var parts = String(n).toLowerCase().split(/\s+/);
+      return parts.some(function (p) { return p === tl; }) || String(n).toLowerCase() === tl;
+    });
+    if (isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@' + p1 + '</span>';
+    return match;
+  });
+}
+function renderRichText(text) {
+  var raw = String(text == null ? '' : text);
+  if (!raw) return '';
+  var re = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+  var out = '', last = 0, m;
+  var safeFn = (typeof safeUrl === 'function') ? safeUrl : function () { return '#'; };
+  while ((m = re.exec(raw)) !== null) {
+    out += _richEsc(raw.slice(last, m.index));
+    var tok = m[0];
+    // Separa pontuação final (".", ",", ")", etc.) do link.
+    var trail = '';
+    var tm = tok.match(/[.,;:!?)\]}'"”’]+$/);
+    var clean = tok;
+    if (tm) { trail = tm[0]; clean = tok.slice(0, tok.length - trail.length); }
+    if (!clean) { out += _richEsc(tok); last = m.index + tok.length; continue; }
+    var href = clean;
+    var isEmail = false;
+    if (/^www\./i.test(clean)) href = 'https://' + clean;
+    else if (!/^https?:\/\//i.test(clean) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) { href = 'mailto:' + clean; isEmail = true; }
+    var safe = safeFn(href);
+    if (safe === '#') { out += _richEsc(clean) + _richEsc(trail); }
+    else if (!isEmail && clean.length > 60) {
+      out += '<a href="' + _richEsc(safe) + '" target="_blank" rel="noopener noreferrer" class="rich-link rich-link--short" title="' + _richEsc(clean) + '">🔗 Abrir link</a>' + _richEsc(trail);
+    } else {
+      out += '<a href="' + _richEsc(safe) + '" target="_blank" rel="noopener noreferrer" class="rich-link" title="' + _richEsc(clean) + '">' + _richEsc(clean) + '</a>' + _richEsc(trail);
+    }
+    last = m.index + tok.length;
+  }
+  out += _richEsc(raw.slice(last));
+  return out;
+}
+// Mesma coisa + @menções (só fora dos <a>, para não quebrar href).
+function renderRichNoteText(text) {
+  var html = renderRichText(text);
+  if (html.indexOf('<a ') === -1) return _richApplyMentions(html);
+  var parts = html.split(/(<a\b[^>]*>.*?<\/a>)/g);
+  for (var i = 0; i < parts.length; i++) {
+    if (!/^<a\b/i.test(parts[i])) parts[i] = _richApplyMentions(parts[i]);
+  }
+  return parts.join('');
+}
+// Formatação amigável do tempo acumulado (só apresentação; o cálculo continua
+// em getElapsedSeconds/formatTimer). 0 → "Nenhum tempo registrado".
+function formatElapsedFriendly(totalSeconds) {
+  var s = Number(totalSeconds) || 0;
+  if (s < 0) s = 0;
+  if (s === 0) return 'Nenhum tempo registrado';
+  if (s < 60) return 'menos de 1 min';
+  var m = Math.floor(s / 60);
+  var h = Math.floor(m / 60);
+  var rm = m % 60;
+  if (h === 0) return m + 'min';
+  if (rm === 0) return h + 'h';
+  return h + 'h ' + String(rm).padStart(2, '0') + 'min';
+}

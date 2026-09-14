@@ -457,70 +457,155 @@ if (typeof window !== 'undefined') window.addEventListener('resize', debounce(fu
   renderPenView(false);
 }, 200));
 
+function _penRichDesc(text) {
+  try {
+    if (typeof renderRichText === 'function') return renderRichText(text);
+    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichText === 'function') return globalThis.renderRichText(text);
+  } catch (_) {}
+  return _escapeHtmlFallback(text);
+}
+function _penRichNote(text) {
+  try {
+    if (typeof renderRichNoteText === 'function') return renderRichNoteText(text);
+    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichNoteText === 'function') return globalThis.renderRichNoteText(text);
+  } catch (_) {}
+  try {
+    if (typeof highlightMentions === 'function') return highlightMentions(text);
+  } catch (_) {}
+  return _escapeHtmlFallback(text);
+}
+function _penFriendlyTime(p) {
+  var secs = 0;
+  try { secs = (typeof getElapsedSeconds === 'function') ? getElapsedSeconds(p) : 0; } catch (_) {}
+  var exact = '00:00:00';
+  try { exact = (typeof formatTimer === 'function') ? formatTimer(secs) : exact; } catch (_) {}
+  var friendly = exact;
+  try {
+    if (typeof formatElapsedFriendly === 'function') friendly = formatElapsedFriendly(secs);
+    else if (typeof globalThis !== 'undefined' && typeof globalThis.formatElapsedFriendly === 'function') friendly = globalThis.formatElapsedFriendly(secs);
+  } catch (_) {}
+  return { secs: secs, exact: exact, friendly: friendly };
+}
+// Edição inline: passa pelas MESMAS validações/regras do form
+// (validatePendencia + savePendencia). Só campos seguros: priority,
+// deadline, responsible, status.
+function quickUpdatePendenciaField(id, field, value) {
+  var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
+  if (!p) return;
+  if (['priority', 'deadline', 'responsible', 'status'].indexOf(field) === -1) return;
+  if (field === 'priority' && ['baixa', 'media', 'alta', 'critica'].indexOf(value) === -1) {
+    if (typeof showToast === 'function') showToast('Prioridade inválida.', 'error');
+    openPendenciaDetail(id);
+    return;
+  }
+  if (field === 'deadline' && value && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    if (typeof showToast === 'function') showToast('Data inválida.', 'error');
+    return;
+  }
+  if (field === 'responsible') {
+    value = String(value || '').trim();
+    if (!value) { if (typeof showToast === 'function') showToast('Selecione um responsável.', 'error'); return; }
+  }
+  p[field] = value;
+  var errors = [];
+  try { errors = (typeof validatePendencia === 'function') ? (validatePendencia(p) || []) : []; } catch (_) {}
+  if (errors.length) {
+    if (typeof showToast === 'function') showToast(errors[0], 'error');
+    openPendenciaDetail(id);
+    return;
+  }
+  savePendencia(p);
+  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof showToast === 'function') showToast('Atualizado!', 'success');
+  openPendenciaDetail(id);
+  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_) {} }
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_) {} }
+}
+
 function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
   const c = getClientById(p.clientId);
+  const _worker = (typeof getCurrentWorker === 'function') ? getCurrentWorker(p) : null;
+  const _ft = _penFriendlyTime(p);
+  const _attCount = (typeof getAttachments === 'function') ? (getAttachments('pendencias', id) || []).length : 0;
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-      <select class="form-select filter-select" id="chgStatus">
-        ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
-      </select>
-      <button class="btn btn-primary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
-      <button class="btn btn-secondary btn-sm" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
-      <button class="btn btn-secondary btn-sm" onclick="duplicatePendencia('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicar</button>
-      <div style="margin-left:auto" class="timer-row">${timerWidget(p, 'pendencia')}</div>
+    <div class="pen-detail">
+    <div class="pen-detail-actions">
+      <div class="pen-status-wrap">
+        <select class="form-select pen-status-select" id="chgStatus" title="Status da pendência">
+          ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
+      </div>
+      <div class="pen-header-btns">
+        <button class="btn btn-secondary btn-sm pen-btn-secondary" title="Editar todos os campos" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
+        <button class="btn btn-secondary btn-sm pen-btn-secondary" title="Criar uma cópia desta pendência" onclick="duplicatePendencia('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicar</button>
+        <div class="timer-row">${timerWidget(p, 'pendencia')}</div>
+      </div>
     </div>
-    <div class="ticket-info-grid">
-      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c?`<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(p.clientName)}</span></div>`:escapeHtml(p.clientName)||'—'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Tipo</div><div class="ticket-info-value">${escapeHtml(p.tipo)||'—'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Responsável</div><div class="ticket-info-value">${escapeHtml(p.responsible)||'—'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Prioridade</div><div class="ticket-info-value">${priorityTag(p.priority)}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Prazo</div><div class="ticket-info-value">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Aberto em</div><div class="ticket-info-value">${formatDate(p.createdAt)}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Trabalhando agora</div><div class="ticket-info-value">${getCurrentWorker(p) ? workerBadgeHTML(p) + ' — ' + timerDisplayHTML(p) : '<span style="color:var(--text-muted)">Ninguém</span>'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Tempo acumulado</div><div class="ticket-info-value">${formatTimer(getElapsedSeconds(p))}</div></div>
+    <div class="pen-work ${_worker ? 'is-working' : 'is-free'}" title="${_worker ? _escapeHtmlFallback(_worker) + ' está trabalhando nesta pendência' : 'Ninguém trabalhando agora'}">
+      <span class="pen-work-dot" aria-hidden="true"></span>
+      <div class="pen-work-text">
+        ${_worker
+          ? `<strong>${_escapeHtmlFallback(_worker)} está trabalhando nesta pendência</strong> <span class="pen-work-time">${timerDisplayHTML(p)}</span>`
+          : `<strong>Disponível</strong> <span class="pen-work-hint">· Ninguém trabalhando agora</span>`}
+      </div>
+      <div class="pen-work-side">
+        <span class="pen-time" title="Tempo total exato: ${_escapeHtmlFallback(_ft.exact)}">⏱ ${_escapeHtmlFallback(_ft.friendly)}</span>
+      </div>
     </div>
-    <div class="ticket-info-item" style="margin-top:12px"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
-    <div class="form-group" style="margin-top:8px"><label class="form-label">Descrição</label><div style="font-size:13px;white-space:pre-wrap">${escapeHtml(p.descricao)||'—'}</div></div>
-    ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div class="form-group"><label class="form-label">Link Útil</label><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">🔗 Abrir link</a></div>`:''}
+    <div class="pen-section-label">Propriedades</div>
+    <dl class="pen-props">
+      <div class="pen-prop"><dt>Cliente</dt><dd>${c?`<span class="pen-client">${clientAvatar(c,22)}<span>${escapeHtml(p.clientName)}</span></span>`:escapeHtml(p.clientName)||'—'}</dd></div>
+      <div class="pen-prop"><dt>Tipo</dt><dd>${escapeHtml(p.tipo)||'—'}</dd></div>
+      <div class="pen-prop"><dt>Responsável</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.responsible)||'—'}<button class="pen-inline-edit" title="Alterar responsável" onclick="openReassignPendencia('${escapeHtml(id)}')">✏️</button></span></dd></div>
+      <div class="pen-prop"><dt>Prioridade</dt><dd><span class="pen-inline-wrap">${priorityTag(p.priority)}<select class="pen-inline-select" title="Alterar prioridade" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','priority',this.value)">${['baixa','media','alta','critica'].map(v=>`<option value="${v}" ${p.priority===v?'selected':''}>${v==='baixa'?'Baixa':v==='media'?'Média':v==='alta'?'Alta':'Crítica'}</option>`).join('')}</select></span></dd></div>
+      <div class="pen-prop"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" value="${escapeHtml(p.deadline||'')}" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','deadline',this.value)" /></span></dd></div>
+      <div class="pen-prop"><dt>Aberto em</dt><dd>${formatDate(p.createdAt)}</dd></div>
+    </dl>
+    <div class="ticket-info-item pen-assunto" style="margin-top:12px"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
+    <div class="pen-desc-block"><div class="pen-section-label">Descrição</div><div class="pen-desc">${_penRichDesc(p.descricao)||'—'}</div></div>
+    ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div class="form-group"><label class="form-label">Link Útil</label><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link</a></div>`:''}
     
     <hr class="divider"/>
-    <div class="attachment-section">
-      <div class="section-header" style="margin-bottom:8px">
-        <span class="section-title">📎 Anexos (Máx 2MB por arquivo)</span>
-        <label class="btn btn-secondary btn-sm" style="cursor:pointer">
-          + Anexar Arquivo
+    <div class="attachment-section pen-attachments">
+      <div class="section-header pen-sec-head">
+        <span class="section-title">📎 Anexos${_attCount ? ` (${_attCount})` : ''}</span>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">
+          + Anexar
           <input type="file" id="penFileInput" style="display:none" onchange="handleFileUpload('pendencias','${id}',this,()=>renderAttachmentList('pendencias','${id}','penAttachmentsList'))" />
         </label>
       </div>
+      <div class="pen-hint">Máx 2MB por arquivo</div>
       <div class="attachment-list" id="penAttachmentsList"></div>
     </div>
 
     <hr class="divider"/>
-    <div class="section-header"><span class="section-title">Notas da Atualização (Ata)</span></div>
-    <div class="timeline" id="penTimeline">
+    <div class="section-header pen-sec-head"><span class="section-title">Notas da Atualização</span></div>
+    <div class="timeline pen-timeline" id="penTimeline">
       ${(p.notes||[]).length ? (p.notes).map(n=>`
         <div class="timeline-item">
           <div class="timeline-dot">&#x270F;&#xFE0F;</div>
           <div class="timeline-content">
             <div class="timeline-meta">👤 <strong>${escapeHtml(n.author)}</strong> · ${formatDateTime(n.createdAt)}</div>
-            <div class="timeline-text">${typeof highlightMentions==='function'?highlightMentions(n.text):escapeHtml(n.text)}</div>
+            <div class="timeline-text pen-note-text">${_penRichNote(n.text)}</div>
           </div>
         </div>`).join('') : '<p class="text-muted">Nenhuma nota ainda.</p>'}
     </div>
     <hr class="divider"/>
-    <div class="section-header"><span class="section-title">☑ Checklist</span></div>
+    <div class="section-header pen-sec-head"><span class="section-title">☑ Checklist</span><span class="pen-count" id="penCheckCounter"></span></div>
     <div id="penChecklist"></div>
-    <div style="display:flex;gap:6px;margin-top:8px">
-      <input class="form-input" id="newCheckItem" placeholder="Nova sub-tarefa..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCheckItem('${escapeHtml(id)}')}" />
-      <button class="btn btn-sm btn-primary" onclick="addCheckItem('${escapeHtml(id)}')">+</button>
+    <div class="pen-check-add">
+      <input class="form-input" id="newCheckItem" placeholder="Adicionar item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCheckItem('${escapeHtml(id)}')}" />
+      <button class="btn btn-sm btn-secondary" title="Adicionar item ao checklist" onclick="addCheckItem('${escapeHtml(id)}')">+ Adicionar</button>
     </div>
     <hr class="divider"/>
     <div class="form-group pen-note-compose"><label class="form-label">Nova Nota</label>
       <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas?"></textarea></div>
     <div class="pen-note-actions">
       <button type="button" class="btn btn-primary" onclick="submitPenNote('${escapeHtml(id)}')">&#x1F4DD; Registrar Nota</button>
+    </div>
     </div>
   `);
   setTimeout(() => {
@@ -742,17 +827,23 @@ function renderPenChecklist(id) {
   if (!p) return;
   var list = p.checklist || [];
   var el = document.getElementById('penChecklist');
+  var counter = document.getElementById('penCheckCounter');
+  var done = list.filter(function (it) { return it && it.done; }).length;
+  if (counter) counter.textContent = list.length ? done + '/' + list.length : '';
   if (!el) return;
   if (!list.length) {
-    el.innerHTML = '<p class="text-muted" style="font-size:12px;padding:4px 0">Nenhuma sub-tarefa.</p>';
+    el.innerHTML = '<p class="text-muted pen-empty">Nenhum item no checklist.</p>';
     return;
   }
   el.innerHTML = list.map(function(item, i) {
-    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px">' +
-      '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' onchange="toggleCheckItem(\'' + escapeHtml(id) + '\',' + i + ')" style="accent-color:var(--accent);width:16px;height:16px" />' +
-      '<span style="' + (item.done ? 'text-decoration:line-through;color:var(--text-muted)' : '') + '">' + escapeHtml(item.text) + '</span>' +
-      '<button class="btn btn-sm btn-danger" onclick="removeCheckItem(\'' + escapeHtml(id) + '\',' + i + ')" style="margin-left:auto;padding:2px 6px;font-size:10px">✕</button>' +
-    '</label>';
+    var isDone = !!(item && item.done);
+    return '<div class="pen-check-item' + (isDone ? ' is-done' : '') + '">' +
+      '<label class="pen-check-label" title="' + (isDone ? 'Marcar como pendente' : 'Marcar como concluído') + '">' +
+      '<input type="checkbox" class="pen-check-box" ' + (isDone ? 'checked' : '') + ' onchange="toggleCheckItem(\'' + escapeHtml(id) + '\',' + i + ')" />' +
+      '<span class="pen-check-text">' + escapeHtml(item.text) + '</span>' +
+      '</label>' +
+      '<button class="pen-check-remove" title="Remover item" onclick="removeCheckItem(\'' + escapeHtml(id) + '\',' + i + ')">✕</button>' +
+    '</div>';
   }).join('');
 }
 
