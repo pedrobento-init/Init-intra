@@ -110,7 +110,15 @@ function getFilteredCalendarPendencias() {
   const resp = document.getElementById('calResponsible')?.value || '';
   const st   = document.getElementById('calStatus')?.value || '';
   const pr   = document.getElementById('calPriority')?.value || '';
-  return getPendencias().filter(p => {
+  // Escopo por equipe: mesma base da listagem (pendencias.js) e das visitas
+  // acima — getMyPendencias() = filterByTeam; admin com time selecionado usa
+  // getPendenciasByTeam. Sem isso o calendário lia getPendencias() global.
+  // (Segurança real continua no RLS/banco; aqui só se apresenta o permitido.)
+  const scoped = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam && typeof getPendenciasByTeam === 'function')
+    ? getPendenciasByTeam(_selectedTeam)
+    : (typeof getMyPendencias === 'function' ? getMyPendencias()
+      : (typeof getPendencias === 'function' ? getPendencias() : []));
+  return scoped.filter(p => {
     if (!p.deadline) return false;
     if (!st && isPendenciaClosed(p.status)) return false;
     if (cid  && p.clientId   !== cid)   return false;
