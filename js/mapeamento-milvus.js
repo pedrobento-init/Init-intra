@@ -50,13 +50,17 @@ function buildMapeamentoRows(milvusNames, mapRows, clients) {
   const byId = new Map((clients || []).map((c) => [c.id, c.name || c.id]));
   return (milvusNames || []).map((n) => {
     const clientId = byNome.get(String(n.nome).toLowerCase()) || null;
-    return {
+    const row = {
       nome: n.nome,
-      quantidadeDispositivos: n.quantidadeDispositivos || 0,
+      quantidadeDispositivos: (typeof n.quantidadeDispositivos === 'number') ? n.quantidadeDispositivos : null,
       clientId: clientId,
       clientName: clientId ? (byId.get(clientId) || null) : null,
       status: clientId ? 'mapeado' : 'pendente',
     };
+    if (n.milvusClienteId !== undefined) row.milvusClienteId = n.milvusClienteId;
+    if (n.cnpj !== undefined) row.cnpj = n.cnpj;
+    if (n.duplicado !== undefined) row.duplicado = n.duplicado === true;
+    return row;
   });
 }
 
@@ -110,22 +114,29 @@ function parseMilvusNameList(text) {
 }
 
 // Une nomes da API + lista colada (chave exata, sem aproximação).
-// Quantidade = maior das duas fontes (a lista completa é mais confiável).
+// Quantidade = maior das duas fontes (null = fora da amostra: não conta).
+// Extras (id/CNPJ/duplicado) vêm da API e são preservados no conflito.
 function mergeMilvusNameSources(apiNames, importedNames) {
   const map = new Map();
   for (const n of (apiNames || []).concat(importedNames || [])) {
     if (!n || !n.nome) continue;
     const key = String(n.nome).toLowerCase();
     const entry = map.get(key);
+    const q = (typeof n.quantidadeDispositivos === 'number') ? n.quantidadeDispositivos : null;
     if (entry) {
-      entry.quantidadeDispositivos = Math.max(
-        entry.quantidadeDispositivos || 0, n.quantidadeDispositivos || 0);
+      if (q !== null && (entry.quantidadeDispositivos === null || q > entry.quantidadeDispositivos)) {
+        entry.quantidadeDispositivos = q;
+      }
     } else {
-      map.set(key, { nome: n.nome, quantidadeDispositivos: n.quantidadeDispositivos || 0 });
+      const obj = { nome: n.nome, quantidadeDispositivos: q };
+      if (n.milvusClienteId !== undefined) obj.milvusClienteId = n.milvusClienteId;
+      if (n.cnpj !== undefined) obj.cnpj = n.cnpj;
+      if (n.duplicado !== undefined) obj.duplicado = n.duplicado === true;
+      map.set(key, obj);
     }
   }
   return [...map.values()].sort((a, b) =>
-    b.quantidadeDispositivos - a.quantidadeDispositivos ||
+    (b.quantidadeDispositivos ?? -1) - (a.quantidadeDispositivos ?? -1) ||
     a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
@@ -316,11 +327,16 @@ function renderMapeamentoTable() {
     return;
   }
   const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s === null || s === undefined ? '' : s);
-  wrap.innerHTML = `<table><thead><tr><th>Nome no Milvus</th><th>Dispositivos</th><th>Cliente do sistema</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((r) => {
+  wrap.innerHTML = `<table><thead><tr><th>Nome no Milvus</th><th>ID</th><th>Dispositivos</th><th>Cliente do sistema</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((r) => {
     const idx = _mapRows.indexOf(r);
     const opts = `<option value="">Selecionar…</option>` + clients.map((c) =>
       `<option value="${esc(c.id)}"${r.clientId === c.id ? ' selected' : ''}>${esc(c.name || c.id)}</option>`).join('');
-    return `<tr><td><strong>${esc(r.nome)}</strong></td><td>${r.quantidadeDispositivos}</td>` +
+    const qtd = (typeof r.quantidadeDispositivos === 'number') ? r.quantidadeDispositivos : '—';
+    const sub = [r.cnpj ? `CNPJ ${esc(r.cnpj)}` : '', r.duplicado ? '⚠ 2+ cadastros no Milvus — confira o CNPJ' : '']
+      .filter(Boolean).join(' · ');
+    return `<tr><td><strong>${esc(r.nome)}</strong>${sub ? `<div style="font-size:11px;color:var(--text-muted)">${sub}</div>` : ''}</td>` +
+      `<td>${r.milvusClienteId !== undefined && r.milvusClienteId !== null ? esc(String(r.milvusClienteId)) : '—'}</td>` +
+      `<td>${qtd}</td>` +
       `<td><select class="form-select" style="min-width:220px" onchange="onMapeamentoSelectIdx(${idx},this.value)">${opts}</select></td>` +
       `<td>${r.status === 'mapeado' ? '<span class="tag tag-green">Mapeado</span>' : '<span class="tag tag-yellow">Pendente</span>'}</td>` +
       `<td style="text-align:right">${r.status === 'mapeado' ? `<button class="btn btn-sm btn-danger" title="Remover vínculo" onclick="removeMapeamentoUIIdx(${idx})">✕</button>` : ''}</td></tr>`;

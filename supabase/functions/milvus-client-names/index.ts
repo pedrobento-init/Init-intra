@@ -44,6 +44,66 @@ function json(body: unknown, status = 200) {
   });
 }
 
+const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/cliente/busca`;
+
+// GET genérico ao Milvus (clientes/tipos): status antes do corpo,
+// 1 retry para 429/5xx/conexão, nunca para 401/403.
+async function milvusGet(path: string, params: Record<string, string>): Promise<unknown> {
+  const url = `${path}?${new URLSearchParams(params).toString()}`;
+  let attempt = 0;
+  while (attempt < 2) {
+    attempt++;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "Authorization": MILVUS_API_TOKEN },
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      clearTimeout(timer);
+      throw new Error("Falha de autenticação com o Milvus");
+    }
+    if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+      clearTimeout(timer);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      throw new Error(`Milvus indisponível (HTTP ${res.status})`);
+    }
+    if (!res.ok) {
+      clearTimeout(timer);
+      throw new Error(`Milvus retornou HTTP ${res.status}`);
+    }
+    try {
+      const data: unknown = await res.json();
+      clearTimeout(timer);
+      return data;
+    } catch {
+      clearTimeout(timer);
+      throw new Error("Resposta inválida do Milvus");
+    }
+  }
+  throw new Error("Falha inesperada ao consultar o Milvus");
+}
+
+function _milvusList(data: unknown): Record<string, unknown>[] {
+  const lista = (data as Record<string, unknown> | null)?.["lista"] as unknown;
+  if (Array.isArray(lista)) return lista as Record<string, unknown>[];
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  return [];
+}
+
 async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current: number; last: number }> {
   const url = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/listagem`;
   const body = {
@@ -167,11 +227,34 @@ serve(async (req: Request) => {
     return json({ error: "Somente administradores" }, 403);
   }
 
-  // 3) Pagina o Milvus e agrega por nome_fantasia (deduplicado).
-  const counts = new Map<string, { nome: string; quantidadeDispositivos: number }>();
-  // 3) Pagina o Milvus: a 1ª página descobre last_page; as demais vêm em
-  // lotes paralelos (8 por vez) para caber no timeout da plataforma.
-  // Teto anti-loop mantido em MAX_PAGES.
+  // 3) Lista completa de clientes (id + fantasia + CNPJ) + contagens
+  // da amostra visível de dispositivos. A listagem de dispositivos
+  // ignora paginação no servidor — as contagens cobrem só a amostra;
+  // nomes fora dela vêm com quantidade null ("—" na tela).
+  const byFantasia = new Map<string, { nome: string; ids: number[]; cnpj: string }>();
+  try {
+    const data = await milvusGet(CLIENTS_URL, { status: "3" });
+    for (const c of _milvusList(data)) {
+      const nome = String(c["nome_fantasia"] ?? "").trim();
+      const id = Number(c["id"]);
+      if (!nome || !Number.isFinite(id)) continue;
+      const key = nome.toLowerCase();
+      const entry = byFantasia.get(key);
+      if (entry) {
+        if (!entry.ids.includes(id)) entry.ids.push(id);
+      } else {
+        byFantasia.set(key, { nome, ids: [id], cnpj: String(c["cnpj_cpf"] ?? "") });
+      }
+    }
+  } catch (e) {
+    console.error(`milvus-client-names: clientes erro: ${(e as Error)?.message ?? "erro"}`);
+    return json({ error: `Falha ao consultar clientes do Milvus: ${(e as Error)?.message ?? "erro inesperado"}` }, 502);
+  }
+  if (!byFantasia.size) {
+    return json({ error: "Nenhum cliente retornado pelo Milvus" }, 502);
+  }
+
+  const counts = new Map<string, number>();
   let pages = 0;
   let received = 0;
   // Dedupe por id do dispositivo: a API pode repetir a mesma página
@@ -190,9 +273,7 @@ serve(async (req: Request) => {
       }
       fresh++;
       const key = nome.toLowerCase();
-      const entry = counts.get(key);
-      if (entry) entry.quantidadeDispositivos++;
-      else counts.set(key, { nome, quantidadeDispositivos: 1 });
+      counts.set(key, (counts.get(key) || 0) + 1);
     }
     return fresh;
   };
@@ -224,18 +305,25 @@ serve(async (req: Request) => {
       }
     }
   } catch (e) {
-    console.error(`milvus-client-names: erro: ${(e as Error)?.message ?? "erro"}`);
-    return json({ error: `Falha ao consultar nomes do Milvus: ${(e as Error)?.message ?? "erro inesperado"}` }, 502);
+    // Amostra é complementar: falha aqui não derruba a lista de clientes.
+    console.log(`milvus-client-names: amostra indisponível (${(e as Error)?.message ?? "erro"})`);
   }
 
-  const nomes = [...counts.values()].sort((a, b) =>
-    b.quantidadeDispositivos - a.quantidadeDispositivos ||
+  const nomes = [...byFantasia.values()].map((c) => ({
+    nome: c.nome,
+    milvusClienteId: c.ids[0],
+    milvusClienteIds: c.ids,
+    duplicado: c.ids.length > 1,
+    cnpj: c.cnpj,
+    quantidadeDispositivos: counts.get(c.nome.toLowerCase()) ?? null,
+  })).sort((a, b) =>
+    (b.quantidadeDispositivos ?? -1) - (a.quantidadeDispositivos ?? -1) ||
     a.nome.localeCompare(b.nome, "pt-BR"),
   );
 
   const durationMs = Date.now() - startedAt;
   console.log(
-    `milvus-client-names: ok names=${nomes.length} devices=${received} ` +
+    `milvus-client-names: ok names=${nomes.length} sample_devices=${received} ` +
     `pages=${pages} duration_ms=${durationMs}`,
   );
   return json({ success: true, nomes, totalNomes: nomes.length });

@@ -85,6 +85,19 @@ describe('mergeMilvusNameSources (API + lista, sem aproximação)', () => {
     );
     expect(out).toHaveLength(2);
   });
+  it('preserva id/CNPJ/duplicado da API e trata contagem nula', () => {
+    const out = map.mergeMilvusNameSources(
+      [{ nome: 'X LTDA', quantidadeDispositivos: null, milvusClienteId: 907519, cnpj: '123', duplicado: true }],
+      [{ nome: 'X LTDA', quantidadeDispositivos: 5 }],
+    );
+    expect(out).toEqual([{
+      nome: 'X LTDA', quantidadeDispositivos: 5,
+      milvusClienteId: 907519, cnpj: '123', duplicado: true,
+    }]);
+    const onlyList = map.mergeMilvusNameSources([], [{ nome: 'Y LTDA', quantidadeDispositivos: 2 }]);
+    expect(onlyList[0].quantidadeDispositivos).toBe(2);
+    expect(onlyList[0].duplicado).toBeFalsy();
+  });
 });
 
 describe('loadMapeamentoClients (Supabase primeiro, cache como fallback)', () => {

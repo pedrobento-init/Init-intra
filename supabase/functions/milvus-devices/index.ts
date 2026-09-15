@@ -124,6 +124,7 @@ function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: s
 
 const BUSCAR_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/buscar`;
 const TYPES_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/lista/tipo-dispositivo`;
+const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/cliente/busca`;
 
 // GET genérico ao Milvus (buscar/tipos): status antes do corpo,
 // 1 retry para 429/5xx/conexão, nunca para 401/403.
@@ -181,6 +182,24 @@ function _buscarList(data: unknown): Record<string, unknown>[] {
   if (Array.isArray(lista)) return lista as Record<string, unknown>[];
   if (Array.isArray(data)) return data as Record<string, unknown>[];
   return [];
+}
+
+// Índice fantasia → cliente_id a partir da lista completa de clientes
+// (GET /cliente/busca). Falha = mapa vazio (caímos nos fallbacks).
+async function fetchMilvusClientIndex(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  try {
+    const data = await milvusGet(CLIENTS_URL, { status: "3" });
+    for (const c of _buscarList(data)) {
+      const key = String(c["nome_fantasia"] ?? "").trim().toLowerCase();
+      const id = Number(c["id"]);
+      if (key && Number.isFinite(id) && !out.has(key)) out.set(key, id);
+    }
+    console.log(`milvus-devices: índice de clientes size=${out.size}`);
+  } catch (e) {
+    console.log(`milvus-devices: índice indisponível (${(e as Error)?.message ?? "erro"})`);
+  }
+  return out;
 }
 
 // Mapa id→descrição dos tipos (1 chamada por sync; falha = textos vazios).
@@ -476,17 +495,21 @@ serve(async (req: Request) => {
   }
 
   const tipoMap = await fetchTipoMap();
+  const clientIndex = await fetchMilvusClientIndex();
   let listagemSample: { id: number; nome: string }[] | null = null;
 
   // 5) Por nome mapeado: resolve cliente_id → buscar?cliente (completa).
-  // Falha de UM nome não derruba os demais (vai para unresolvedNames).
+  // Ordem: lista de clientes (autoritativa) → cache → dispositivo
+  // conhecido → amostra da listagem. Falha de UM nome não derruba os
+  // demais (vai para unresolvedNames).
   const collected: { [k: string]: unknown }[] = [];
   const resolvedNames: string[] = [];
   const unresolvedNames: string[] = [];
+  const seenMids = new Set<number>();
   let received = 0;
   for (const m of mapList) {
     const key = m.nome.toLowerCase();
-    let cid: number | null = m.clienteId;
+    let cid: number | null = clientIndex.get(key) ?? m.clienteId;
     try {
       if (cid === null) {
         const known = knownByName.get(key) || [];
@@ -513,7 +536,15 @@ serve(async (req: Request) => {
       received += items.length;
       for (const raw of items) {
         const row = normalizeBuscarDevice(raw, clientId, cliTeam, m.nome, tipoMap);
-        if (row) collected.push(row as unknown as { [k: string]: unknown });
+        if (!row) continue;
+        // Mesmo dispositivo via 2 nomes (mesmo cliente Milvus): 1ª ocorrência
+        // vence — duplicata no batch quebra o upsert (ON CONFLICT).
+        const mid = (row as { milvus_device_id: unknown }).milvus_device_id;
+        if (typeof mid === "number") {
+          if (seenMids.has(mid)) continue;
+          seenMids.add(mid);
+        }
+        collected.push(row as unknown as { [k: string]: unknown });
       }
       resolvedNames.push(m.nome);
       console.log(`milvus-devices: nome client_id=${clientId} nome="${m.nome}" milvus_cliente=${cid} items=${items.length}`);
@@ -543,6 +574,7 @@ serve(async (req: Request) => {
     if (h && !byHost.has(h)) byHost.set(h, e);
   }
   const rows: { [k: string]: unknown }[] = [];
+  const seenRowIds = new Set<string>();
   let created = 0;
   let updated = 0;
   for (const row of collected) {
@@ -550,27 +582,32 @@ serve(async (req: Request) => {
     const prev = (typeof mid === "number" && byMid.get(mid)) ||
       bySerial.get(String(row["numero_serial"] ?? "").toLowerCase()) ||
       byHost.get(String(row["hostname"] ?? "").toLowerCase()) || null;
-    if (prev) {
-      const robs = String(row["observacao"] ?? "");
-      const pobs = String(prev["observacao"] ?? "");
-      rows.push({
+    const final = prev
+      ? {
         ...prev, ...row,
         id: prev["id"],
         created_at: prev["created_at"],
-        observacao: robs || pobs,
-      });
-      updated++;
-    } else {
-      rows.push(row);
-      created++;
-    }
+        observacao: String(row["observacao"] ?? "") || String(prev["observacao"] ?? ""),
+      }
+      : row;
+    // Mesma linha alcançada por dois caminhos: 1ª vence — duplicata no
+    // batch quebra o upsert (ON CONFLICT).
+    const rid = String(final["id"] ?? "");
+    if (!rid || seenRowIds.has(rid)) continue;
+    seenRowIds.add(rid);
+    rows.push(final);
+    if (prev) updated++;
+    else created++;
   }
 
   for (let i = 0; i < rows.length; i += UPSERT_BATCH) {
     const batch = rows.slice(i, i + UPSERT_BATCH);
+    // Alvo = PK `id` (determinístico e único por dispositivo). Mirar
+    // (client_id, milvus_device_id) quebrava quando a linha mesclada
+    // reaproveitava um id existente com mid de outra linha (409/23505).
     const { error } = await admin
       .from("client_devices")
-      .upsert(batch, { onConflict: "client_id,milvus_device_id" });
+      .upsert(batch);
     if (error) {
       console.error(`milvus-devices: upsert falhou client_id=${clientId}: ${error.message}`);
       return json({ error: "Falha ao gravar inventário" }, 500);
