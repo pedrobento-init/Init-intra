@@ -3628,3 +3628,33 @@ body.dark-theme .overdue-banner {
   .pen-work { flex-wrap: wrap; }
   .pen-work-side { flex-direction: row; align-items: baseline; gap: 8px; }
 }
+
+/* ── MILVUS (Chamados + Inventário — refinamento visual, mesmos tokens) ── */
+.mtickets-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.mticket-list { display: flex; flex-direction: column; gap: 6px; }
+.mticket-row {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.mticket-row:hover { border-color: var(--accent); background: var(--bg-hover); }
+.mticket-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mticket-code { font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.mticket-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.mticket-row .tag { flex-shrink: 0; }
+.mticket-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.mticket-desc {
+  background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 13px; line-height: 1.6; color: var(--text-primary);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.mticket-log { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.mticket-log-text { font-size: 13px; color: var(--text-primary); overflow-wrap: anywhere; }
+/* Inventário: herda a tabela global; aqui só hierarquia, respiro e larguras. */
+.milvus-table th { white-space: nowrap; }
+.milvus-table td { padding: 8px 10px; font-size: 13px; }
+.milvus-table .c-main { white-space: nowrap; }
+.milvus-table .c-main strong { font-weight: 700; }
+.milvus-table .c-so { min-width: 200px; }
+.milvus-table .c-nowrap { white-space: nowrap; }

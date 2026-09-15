@@ -292,6 +292,10 @@ function milvusTicketStatusTag(status) {
   const s = String(status || '').toLowerCase();
   if (/finaliz|conclu|resolv|fechado/.test(s)) return '<span class="tag tag-green">Finalizado</span>';
   if (/atend|andamento|aberto|pendente/.test(s)) return `<span class="tag tag-yellow">${escapeHtml(status)}</span>`;
+  if (/pausado/.test(s)) return `<span class="tag tag-gray">${escapeHtml(status)}</span>`;
+  if (/agendado/.test(s)) return `<span class="tag tag-blue">${escapeHtml(status)}</span>`;
+  if (/confer[eê]ncia/.test(s)) return `<span class="tag tag-purple">${escapeHtml(status)}</span>`;
+  if (/fazer/.test(s)) return `<span class="tag tag-yellow">${escapeHtml(status)}</span>`;
   if (/cancel/.test(s)) return `<span class="tag tag-red">${escapeHtml(status)}</span>`;
   return `<span class="tag">${escapeHtml(status || '—')}</span>`;
 }
@@ -314,7 +318,7 @@ function renderClientMilvusTicketsTab(clientId) {
     : 'nunca';
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
-      <span style="font-size:13px;font-weight:700">📋 Últimos chamados no Milvus</span>
+      <span class="mtickets-title">📋 Últimos chamados no Milvus</span>
       <span style="flex:1"></span>
       <button class="btn btn-secondary btn-sm" id="milvusTicketsSyncBtn" onclick="syncClientMilvusTicketsUI('${escapeHtml(clientId)}')">↻ Sincronizar</button>
     </div>
@@ -340,15 +344,15 @@ async function loadClientMilvusTicketsUI(clientId) {
     wrap.innerHTML = '<div class="empty-state" style="padding:16px"><p>Nenhum chamado sincronizado.</p><p style="font-size:12px">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
     return;
   }
-  wrap.innerHTML = tickets.slice(0, 10).map((t) => `
-    <div class="proc-card" style="cursor:pointer" onclick="openMilvusTicketDetail('${escapeHtml(clientId)}','${escapeHtml(t.id)}')" title="Ver detalhes">
-      <div style="display:flex;align-items:center;gap:8px;min-width:0">
-        <strong style="font-size:12px;white-space:nowrap">#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))}</strong>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${escapeHtml(t.assunto || 'Sem assunto')}</span>
+  wrap.innerHTML = `<div class="mticket-list">` + tickets.slice(0, 10).map((t) => `
+    <div class="mticket-row" onclick="openMilvusTicketDetail('${escapeHtml(clientId)}','${escapeHtml(t.id)}')" title="Ver detalhes">
+      <div class="mticket-top">
+        <strong class="mticket-code">#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))}</strong>
+        <span class="mticket-subject">${escapeHtml(t.assunto || 'Sem assunto')}</span>
         ${milvusTicketStatusTag(t.status)}
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${_fmtTicketDate(t.data_criacao)}${t.tecnico ? ` · ${escapeHtml(t.tecnico)}` : ''}</div>
-    </div>`).join('');
+      <div class="mticket-meta">${_fmtTicketDate(t.data_criacao)}${t.tecnico ? ` · ${escapeHtml(t.tecnico)}` : ''}</div>
+    </div>`).join('') + `</div>`;
 }
 
 async function syncClientMilvusTicketsUI(clientId, opts) {
@@ -393,7 +397,7 @@ async function openMilvusTicketDetail(clientId, ticketId) {
   const ir = (label, val) => `<div class="info-item"><div class="info-key">${label}</div><div class="info-value ${val && val !== '—' ? '' : 'empty'}">${val || '—'}</div></div>`;
   const cat = [t.categoria_primaria, t.categoria_secundaria].filter(Boolean).map(escapeHtml).join(' / ') || '—';
   const log = t.ultima_log && (t.ultima_log.texto || t.ultima_log.data)
-    ? `<div style="font-size:13px">${escapeHtml(t.ultima_log.texto || '')}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${_fmtTicketDate(t.ultima_log.data)}${t.ultima_log.tecnico ? ` · ${escapeHtml(t.ultima_log.tecnico)}` : ''}</div>`
+    ? `<div class="mticket-log-text">${escapeHtml(t.ultima_log.texto || '')}</div><div class="mticket-meta">${_fmtTicketDate(t.ultima_log.data)}${t.ultima_log.tecnico ? ` · ${escapeHtml(t.ultima_log.tecnico)}` : ''}</div>`
     : '<span style="color:var(--text-muted);font-size:13px">—</span>';
   openModal(`#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))} · ${escapeHtml(t.assunto || 'Chamado')}`, `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -408,8 +412,8 @@ async function openMilvusTicketDetail(clientId, ticketId) {
       ${ir('Modificado em', _fmtTicketDate(t.data_modificacao))}
       ${ir('Solucionado em', t.data_solucao ? _fmtTicketDate(t.data_solucao) : '')}
     </div>
-    ${t.descricao ? `<div class="client-detail-section"><div class="client-detail-section-title">📝 Descrição</div><div class="timeline-text">${escapeHtml(t.descricao)}</div></div>` : ''}
-    <div class="client-detail-section"><div class="client-detail-section-title">💬 Última interação</div><div>${log}</div></div>`, 'sm');
+    ${t.descricao ? `<div class="client-detail-section"><div class="client-detail-section-title">📝 Descrição</div><div class="mticket-desc">${escapeHtml(t.descricao)}</div></div>` : ''}
+    <div class="client-detail-section mticket-log"><div class="client-detail-section-title">💬 Última interação</div><div>${log}</div></div>`);
 }
 
 // ── Inventário Milvus (somente listagem; sem licença, sem status, sem softwares) ──
@@ -446,10 +450,10 @@ async function loadClientInventoryUI(clientId) {
     wrap.innerHTML = '<div class="empty-state"><p>Nenhum dispositivo sincronizado para este cliente.</p></div>';
     return;
   }
-  wrap.innerHTML = `<table><thead><tr><th>Hostname</th><th>Apelido</th><th>Fabricante</th><th>Marca</th><th>Modelo</th><th>Sistema operacional</th><th>Nº serial</th><th>Usuário logado</th><th>Tipo</th><th>IP interno</th><th>Status</th><th>Atualizado em</th></tr></thead><tbody>${devices.map((d) => {
+  wrap.innerHTML = `<table class="milvus-table"><thead><tr><th>Hostname</th><th>Apelido</th><th>Fabricante</th><th>Marca</th><th>Modelo</th><th>Sistema operacional</th><th>Nº serial</th><th>Usuário logado</th><th>Tipo</th><th>IP interno</th><th>Status</th><th>Atualizado em</th></tr></thead><tbody>${devices.map((d) => {
     const upd = d.data_ultima_atualizacao || d.updatedAt;
     const updTxt = upd ? (typeof formatDateTime === 'function' ? formatDateTime(upd) : new Date(upd).toLocaleString('pt-BR')) : '—';
-    return `<tr><td><strong>${escapeHtml(d.hostname || '—')}</strong></td><td>${escapeHtml(d.apelido || '—')}</td><td>${escapeHtml(d.fabricante || '—')}</td><td>${escapeHtml(d.marca || '—')}</td><td>${escapeHtml(d.modelo_notebook || '—')}</td><td>${escapeHtml(d.sistema_operacional || '—')}</td><td>${escapeHtml(d.numero_serial || '—')}</td><td>${escapeHtml(d.usuario_logado || '—')}</td><td>${escapeHtml(d.tipo_dispositivo_text || '—')}</td><td>${escapeHtml(d.ip_interno || '—')}</td><td>${d.is_ativo !== false ? '<span class="tag tag-green">Ativo</span>' : '<span class="tag tag-red">Inativo</span>'}</td><td>${escapeHtml(updTxt)}</td></tr>`;
+    return `<tr><td class="c-main" title="${escapeHtml(d.hostname || '')}"><strong>${escapeHtml(d.hostname || '—')}</strong></td><td>${escapeHtml(d.apelido || '—')}</td><td>${escapeHtml(d.fabricante || '—')}</td><td>${escapeHtml(d.marca || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.modelo_notebook || '')}">${escapeHtml(d.modelo_notebook || '—')}</td><td class="c-so" title="${escapeHtml(d.sistema_operacional || '')}">${escapeHtml(d.sistema_operacional || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.numero_serial || '')}">${escapeHtml(d.numero_serial || '—')}</td><td>${escapeHtml(d.usuario_logado || '—')}</td><td>${escapeHtml(d.tipo_dispositivo_text || '—')}</td><td class="c-nowrap">${escapeHtml(d.ip_interno || '—')}</td><td>${d.is_ativo !== false ? '<span class="tag tag-green">Ativo</span>' : '<span class="tag tag-red">Inativo</span>'}</td><td class="c-nowrap">${escapeHtml(updTxt)}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
 
