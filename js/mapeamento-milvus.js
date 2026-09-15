@@ -6,6 +6,8 @@
 // "ACME…") exigem seleção manual. O frontend NUNCA vê o token do Milvus.
 
 let _mapNomes = [];
+let _mapApiNomes = [];
+let _mapImported = [];
 let _mapRows = [];
 let _mapSearch = '';
 let _mapFilter = 'todos';
@@ -86,6 +88,46 @@ function validateMapeamento(nome, clientId, rows) {
   return { ok: true };
 }
 
+// Converte texto colado (um nome por linha) em nomes deduplicados.
+// Ignora linhas vazias e eventual cabeçalho ("nome"/"nome_fantasia").
+// Retorna SOMENTE [{nome, quantidadeDispositivos}] — nada sensível.
+function parseMilvusNameList(text) {
+  const counts = new Map();
+  const lines = String(text || '').split(/\r?\n/);
+  for (const line of lines) {
+    const nome = normalizeMilvusName(line);
+    if (!nome) continue;
+    if (/^nome(_fantasia)?$/i.test(nome)) continue;
+    const key = nome.toLowerCase();
+    const entry = counts.get(key);
+    if (entry) entry.quantidadeDispositivos++;
+    else counts.set(key, { nome: nome, quantidadeDispositivos: 1 });
+  }
+  return [...counts.values()].sort((a, b) =>
+    b.quantidadeDispositivos - a.quantidadeDispositivos ||
+    a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+// Une nomes da API + lista colada (chave exata, sem aproximação).
+// Quantidade = maior das duas fontes (a lista completa é mais confiável).
+function mergeMilvusNameSources(apiNames, importedNames) {
+  const map = new Map();
+  for (const n of (apiNames || []).concat(importedNames || [])) {
+    if (!n || !n.nome) continue;
+    const key = String(n.nome).toLowerCase();
+    const entry = map.get(key);
+    if (entry) {
+      entry.quantidadeDispositivos = Math.max(
+        entry.quantidadeDispositivos || 0, n.quantidadeDispositivos || 0);
+    } else {
+      map.set(key, { nome: n.nome, quantidadeDispositivos: n.quantidadeDispositivos || 0 });
+    }
+  }
+  return [...map.values()].sort((a, b) =>
+    b.quantidadeDispositivos - a.quantidadeDispositivos ||
+    a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 // ── Serviço (Edge + Supabase com RLS do usuário) ──
 async function fetchMilvusClientNames() {
   if (!isMilvusMappingAdmin()) throw new Error('Somente administradores.');
@@ -159,6 +201,15 @@ function renderMapeamentoMilvus() {
       </div>
     </div>
     <div id="mapStats" style="font-size:12px;color:var(--text-muted);margin-bottom:10px"></div>
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:600">📋 Importar lista de nomes (planilha do Milvus)</summary>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0">Cole um nome por linha. A lista é unida aos nomes da API sem nenhuma aproximação automática — o vínculo continua manual.</p>
+      <textarea class="form-textarea" id="mapImportText" rows="4" placeholder="EMPRESA ABC LTDA&#10;EMPRESA XYZ LTDA" style="width:100%"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-secondary btn-sm" onclick="importMilvusNameList()">Importar nomes</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearMilvusNameList()">Limpar lista importada</button>
+      </div>
+    </details>
     <div class="table-wrapper" id="mapTableWrap"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Clique em “Atualizar nomes do Milvus” para começar.</p></div>`;
 }
 
@@ -170,16 +221,43 @@ async function loadMapeamentoData() {
   if (wrap) wrap.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Consultando nomes no Milvus…</p>';
   try {
     const [nomes, map] = await Promise.all([fetchMilvusClientNames(), loadMilvusMap()]);
-    const clients = typeof getClients === 'function' ? getClients() : [];
-    _mapNomes = nomes;
-    _mapRows = buildMapeamentoRows(nomes, map, clients);
-    renderMapeamentoTable();
+    _mapApiNomes = nomes;
+    _mapLastMap = map;
+    refreshMapeamentoRows();
   } catch (e) {
     if (wrap) wrap.innerHTML = '<div class="empty-state"><p>Não foi possível consultar os nomes do Milvus. Tente novamente.</p></div>';
     if (stats) stats.textContent = '';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔄 Atualizar nomes do Milvus'; }
   }
+}
+
+let _mapLastMap = [];
+
+function refreshMapeamentoRows() {
+  const clients = typeof getClients === 'function' ? getClients() : [];
+  _mapNomes = mergeMilvusNameSources(_mapApiNomes, _mapImported);
+  _mapRows = buildMapeamentoRows(_mapNomes, _mapLastMap, clients);
+  renderMapeamentoTable();
+}
+
+function importMilvusNameList() {
+  const ta = document.getElementById('mapImportText');
+  const parsed = parseMilvusNameList(ta ? ta.value : '');
+  if (!parsed.length) {
+    if (typeof showToast === 'function') showToast('Nenhum nome válido na lista.', 'warning');
+    return;
+  }
+  _mapImported = parsed;
+  refreshMapeamentoRows();
+  if (typeof showToast === 'function') showToast(`${parsed.length} nome(s) importado(s)!`, 'success');
+}
+
+function clearMilvusNameList() {
+  _mapImported = [];
+  const ta = document.getElementById('mapImportText');
+  if (ta) ta.value = '';
+  refreshMapeamentoRows();
 }
 
 function onMapeamentoSearch(v) {
@@ -207,7 +285,8 @@ function renderMapeamentoTable() {
   const rows = filterMapeamentoRows(_mapRows, _mapSearch, _mapFilter);
   const mapped = _mapRows.filter((r) => r.status === 'mapeado').length;
   const devs = _mapRows.reduce((s, r) => s + (r.quantidadeDispositivos || 0), 0);
-  if (stats) stats.textContent = `${_mapRows.length} nome(s) no Milvus · ${mapped} mapeado(s) · ${_mapRows.length - mapped} pendente(s) · ${devs} dispositivo(s)`;
+  if (stats) stats.textContent = `${_mapRows.length} nome(s) no Milvus · ${mapped} mapeado(s) · ${_mapRows.length - mapped} pendente(s) · ${devs} dispositivo(s)` +
+    (_mapImported.length ? ` · ${_mapImported.length} da lista importada` : '');
   if (!_mapRows.length) {
     wrap.innerHTML = '<div class="empty-state"><p>Nenhum nome carregado. Clique em “Atualizar nomes do Milvus”.</p></div>';
     return;
@@ -295,6 +374,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeMilvusName: normalizeMilvusName,
     aggregateMilvusNames: aggregateMilvusNames,
+    parseMilvusNameList: parseMilvusNameList,
+    mergeMilvusNameSources: mergeMilvusNameSources,
     buildMapeamentoRows: buildMapeamentoRows,
     filterMapeamentoRows: filterMapeamentoRows,
     validateMapeamento: validateMapeamento,

@@ -53,6 +53,40 @@ describe('aggregateMilvusNames (deduplicação, sem heurística)', () => {
   });
 });
 
+describe('parseMilvusNameList (colagem da planilha)', () => {
+  it('um por linha, trim, ignora vazias e cabeçalho', () => {
+    const out = map.parseMilvusNameList('nome_fantasia\n  ACME LTDA \n\nACME LTDA\nBT ADVOGADOS\n');
+    expect(out).toEqual([
+      { nome: 'ACME LTDA', quantidadeDispositivos: 2 },
+      { nome: 'BT ADVOGADOS', quantidadeDispositivos: 1 },
+    ]);
+  });
+  it('texto vazio vira lista vazia', () => {
+    expect(map.parseMilvusNameList('')).toEqual([]);
+    expect(map.parseMilvusNameList(null)).toEqual([]);
+  });
+});
+
+describe('mergeMilvusNameSources (API + lista, sem aproximação)', () => {
+  it('união por igualdade exata, quantidade = maior das fontes', () => {
+    const out = map.mergeMilvusNameSources(
+      [{ nome: 'ACME LTDA', quantidadeDispositivos: 50 }],
+      [{ nome: 'acme ltda', quantidadeDispositivos: 14 }, { nome: 'NOVA LTDA', quantidadeDispositivos: 3 }],
+    );
+    expect(out).toEqual([
+      { nome: 'ACME LTDA', quantidadeDispositivos: 50 },
+      { nome: 'NOVA LTDA', quantidadeDispositivos: 3 },
+    ]);
+  });
+  it('nomes parecidos continuam separados', () => {
+    const out = map.mergeMilvusNameSources(
+      [],
+      [{ nome: 'BOTTINI-DF', quantidadeDispositivos: 1 }, { nome: 'BOTTINI-SP', quantidadeDispositivos: 1 }],
+    );
+    expect(out).toHaveLength(2);
+  });
+});
+
 describe('buildMapeamentoRows', () => {
   it('cruza nome→mapa→cliente com status mapeado/pendente', () => {
     const rows = map.buildMapeamentoRows(

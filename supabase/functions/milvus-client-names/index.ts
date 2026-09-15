@@ -55,7 +55,7 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
   };
 
   let attempt = 0;
-  while (attempt < 2) {
+  while (attempt < 3) {
     attempt++;
     // Um único AbortController cobre headers + corpo: se o Milvus travar
     // no meio do body, o abort interrompe em ~25s em vez de pendurar a
@@ -82,27 +82,39 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
       throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
     }
     let data: unknown;
-    try {
-      data = await res.json();
-    } catch {
-      clearTimeout(timer);
-      throw new Error("Resposta inválida do Milvus");
-    }
-    clearTimeout(timer);
-
+    // Status ANTES do corpo: 429/5xx com corpo vazio precisam do retry
+    // (e da mensagem certa), não de "resposta inválida".
     if (res.status === 401 || res.status === 403) {
+      clearTimeout(timer);
+      // Erro de autenticação: NUNCA repetir automaticamente.
       throw new Error("Falha de autenticação com o Milvus");
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
-      if (attempt < 2) {
-        await new Promise((r) => setTimeout(r, 2000));
+      clearTimeout(timer);
+      // 5xx/429 voltam rápido: 2 retries com backoff crescente.
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, attempt * 2000));
         continue;
       }
       throw new Error(`Milvus indisponível (HTTP ${res.status})`);
     }
     if (!res.ok) {
+      clearTimeout(timer);
       throw new Error(`Milvus retornou HTTP ${res.status}`);
     }
+    try {
+      data = await res.json();
+    } catch {
+      clearTimeout(timer);
+      // 200 com corpo vazio/truncado: soluço transitório, 1 retry.
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      throw new Error("Resposta inválida do Milvus");
+    }
+    clearTimeout(timer);
+
     const d = data as Record<string, unknown>;
     const lista = (d["lista"] ?? d["data"] ?? d["devices"] ?? null) as unknown;
     if (!Array.isArray(lista)) throw new Error("Resposta do Milvus sem lista de dispositivos");
@@ -162,16 +174,27 @@ serve(async (req: Request) => {
   // Teto anti-loop mantido em MAX_PAGES.
   let pages = 0;
   let received = 0;
-  const ingest = (list: unknown[]) => {
+  // Dedupe por id do dispositivo: a API pode repetir a mesma página
+  // (paginação ignorada) — sem isso, contagens saem multiplicadas.
+  const seenIds = new Set<string>();
+  const ingest = (list: unknown[]): number => {
+    let fresh = 0;
     received += list.length;
     for (const raw of list) {
       const nome = String((raw as Record<string, unknown>)?.["nome_fantasia"] ?? "").trim();
       if (!nome) continue;
+      const id = String((raw as Record<string, unknown>)?.["id"] ?? "");
+      if (id) {
+        if (seenIds.has(id)) continue;
+        seenIds.add(id);
+      }
+      fresh++;
       const key = nome.toLowerCase();
       const entry = counts.get(key);
       if (entry) entry.quantidadeDispositivos++;
       else counts.set(key, { nome, quantidadeDispositivos: 1 });
     }
+    return fresh;
   };
   try {
     const first = await fetchMilvusPage(1);
@@ -188,11 +211,16 @@ serve(async (req: Request) => {
       const BATCH = 8;
       for (let i = 0; i < rest.length; i += BATCH) {
         const results = await Promise.all(rest.slice(i, i + BATCH).map((p) => fetchMilvusPage(p)));
+        let batchFresh = 0;
         for (const r of results) {
           pages++;
-          ingest(r.list);
+          batchFresh += ingest(r.list);
         }
         console.log(`milvus-client-names: progresso pages=${pages}/${last}`);
+        if (batchFresh === 0) {
+          console.log(`milvus-client-names: páginas repetidas, interrompendo em pages=${pages}`);
+          break;
+        }
       }
     }
   } catch (e) {
