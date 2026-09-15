@@ -49,6 +49,7 @@ function renderClients() {
         <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
       </div>
       <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
+      ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)">📥 Milvus</button>` : ''}
     </div>
     <div class="client-cards-grid" id="clientGrid"></div>`;
   showSkeleton('clientGrid', 8);
@@ -282,6 +283,72 @@ function renderClientTab(tab, id) {
     const pens = getPendencias().filter(p => p.clientId === id);
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
       ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th></tr></thead><tbody>${pens.map(p=>`<tr><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+  }
+}
+
+// ── Importar clientes do Milvus (prévia → confirmação; admin) ──
+let _milvusImportPreview = [];
+
+function _milvusImportStatusTag(st) {
+  if (st === 'novo') return '<span class="tag tag-green">Novo</span>';
+  if (st === 'existe_cnpj') return '<span class="tag tag-blue">Já existe (CNPJ)</span>';
+  return '<span class="tag tag-yellow">Já existe (nome)</span>';
+}
+
+async function openMilvusClientsImportModal() {
+  openModal('📥 Importar clientes do Milvus', `
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">Novos entram com equipe <strong>init</strong> e vínculo no mapa Milvus. Existentes (mesmo CNPJ ou nome) são pulados.</p>
+    <div id="milvusImportBody"><p style="color:var(--text-muted);font-size:12px">Consultando clientes no Milvus…</p></div>`);
+  try {
+    const data = await previewMilvusClientsImport();
+    _milvusImportPreview = data.preview || [];
+    const t = data.totals || summarizeImportPreview(_milvusImportPreview.map((p) => ({ status: p.status })));
+    const body = document.getElementById('milvusImportBody');
+    if (!body) return;
+    if (!_milvusImportPreview.length) {
+      body.innerHTML = '<div class="empty-state"><p>Nenhum cliente retornado pelo Milvus.</p></div>';
+      return;
+    }
+    body.innerHTML = `
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${t.total} no Milvus · <strong>${t.novos} novos</strong> · ${t.existeCnpj} por CNPJ · ${t.existeNome} por nome</div>
+      <div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th></th><th>Nome</th><th>CNPJ</th><th>Status</th></tr></thead><tbody>
+      ${_milvusImportPreview.map((p, i) => `<tr>
+        <td>${p.status === 'novo' ? `<input type="checkbox" data-mi-idx="${i}" checked />` : ''}</td>
+        <td><strong>${escapeHtml(p.nome)}</strong>${p.razao && p.razao !== p.nome ? `<div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.razao)}</div>` : ''}</td>
+        <td style="font-size:12px">${escapeHtml(p.cnpj || '—')}</td>
+        <td>${_milvusImportStatusTag(p.status)}</td>
+      </tr>`).join('')}</tbody></table></div>
+      <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" onclick="confirmMilvusClientsImport()">Importar selecionados</button></div>
+      <div id="milvusImportMsg" style="font-size:13px;margin-top:8px"></div>`;
+  } catch (e) {
+    const body = document.getElementById('milvusImportBody');
+    if (body) body.innerHTML = '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
+  }
+}
+
+async function confirmMilvusClientsImport() {
+  const btn = document.getElementById('milvusImportConfirmBtn');
+  const setMsg = (html) => { const m = document.getElementById('milvusImportMsg'); if (m) m.innerHTML = html; };
+  const checked = [...document.querySelectorAll('[data-mi-idx]:checked')].map((el) => Number(el.dataset.miIdx));
+  const onlyIds = checked
+    .map((i) => _milvusImportPreview[i] && _milvusImportPreview[i].status === 'novo' ? _milvusImportPreview[i].milvusId : null)
+    .filter((v) => typeof v === 'number');
+  if (!onlyIds.length) {
+    setMsg('<span style="color:var(--text-muted)">Nenhum cliente novo selecionado.</span>');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
+  try {
+    const res = await commitMilvusClientsImport(onlyIds);
+    setMsg(`<span style="color:var(--success,#16a34a)">${res.created} cliente(s) importado(s)${res.skipped && res.skipped.length ? ` · ${res.skipped.length} pulado(s)` : ''}.</span>`);
+    try {
+      if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal().catch(() => {});
+      if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${res.created} novo(s) do Milvus`);
+    } catch (_) {}
+  } catch (e) {
+    setMsg('<span style="color:var(--danger,#dc2626)">Falha na importação. Tente novamente.</span>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importar selecionados'; }
   }
 }
 
