@@ -173,7 +173,7 @@ function renderClientTab(tab, id) {
       <div style="padding:10px 12px;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border);margin-bottom:16px;font-size:13px;line-height:1.5;color:var(--text-secondary)">${escapeHtml(narrative)}</div>
       <div class="client-detail-section">
         <div class="client-detail-section-title">👤 Identificação</div>
-        <div class="info-grid">${ir('CNPJ/CPF',c.cnpj)}${ir('Segmento',c.segment)}${ir('Dono',c.owner)}${ir('Contato Dono',c.ownerPhone)}${ir('Responsável TI',c.responsible)}${ir('Contato',c.responsiblePhone)}${ir('Técnico',c.technician)}</div>
+        <div class="info-grid">${ir('CNPJ/CPF',c.cnpj)}${ir('Segmento',c.segment)}${ir('Dono',c.owner)}${ir('Contato Dono',c.ownerPhone)}${ir('Responsável TI',c.responsible)}${ir('Contato',c.responsiblePhone)}${ir('Técnico',c.technician)}${c.milvusClientToken ? `<div class="info-item"><div class="info-key">Token Milvus</div><div class="info-value"><code style="background:var(--bg-base);padding:2px 6px;border-radius:4px">${escapeHtml(c.milvusClientToken)}</code> <button class="btn btn-sm btn-secondary" title="Copiar token (instalação do cliente Milvus)" onclick="copyMilvusClientToken('${escapeHtml(c.id)}')">📋 Copiar</button></div></div>` : ''}</div>
       </div>
       <div class="client-detail-section">
         <div class="client-detail-section-title">🖥️ Servidor</div>
@@ -1256,6 +1256,38 @@ async function handleImportFile(input) {
 // transformação — vazio vira '' (o sync grava NULL). Não é o segredo da API.
 function normalizeMilvusClientToken(v) {
   return String(v === null || v === undefined ? '' : v).trim();
+}
+
+// Copia o token (visível na ficha) para uso na instalação do cliente Milvus.
+function copyMilvusClientToken(clientId) {
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const token = c ? String(c.milvusClientToken || '') : '';
+  if (!token) {
+    if (typeof showToast === 'function') showToast('Cliente sem token Milvus.', 'warning');
+    return;
+  }
+  const done = () => { if (typeof showToast === 'function') showToast('Token copiado!', 'success'); };
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(token).then(done).catch(() => fallbackCopyMilvusToken(token, done));
+    } else {
+      fallbackCopyMilvusToken(token, done);
+    }
+  } catch (_) { fallbackCopyMilvusToken(token, done); }
+}
+
+function fallbackCopyMilvusToken(token, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = token;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch (_) {
+    if (typeof showToast === 'function') showToast('Não foi possível copiar.', 'error');
+  }
 }
 
 function handleImportPaste(text) {
