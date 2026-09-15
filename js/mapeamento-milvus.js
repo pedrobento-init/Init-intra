@@ -8,6 +8,7 @@
 let _mapNomes = [];
 let _mapApiNomes = [];
 let _mapImported = [];
+let _mapClients = [];
 let _mapRows = [];
 let _mapSearch = '';
 let _mapFilter = 'todos';
@@ -153,6 +154,25 @@ async function loadMilvusMap() {
   return Array.isArray(data) ? data : [];
 }
 
+// Clientes direto do Supabase (RLS: admin vê todos) — o cache local
+// pode estar incompleto/desatualizado e esconder clientes do select.
+async function loadMapeamentoClients() {
+  try {
+    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() &&
+        typeof supabaseClient !== 'undefined' && supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('clients')
+        .select('id,name,team')
+        .order('name', { ascending: true });
+      if (!error && Array.isArray(data) && data.length) return data;
+    }
+  } catch (_) {}
+  try {
+    if (typeof getClients === 'function') return getClients();
+  } catch (_) {}
+  return [];
+}
+
 async function saveMilvusMapping(nome, clientId) {
   if (!isMilvusMappingAdmin()) throw new Error('Somente administradores.');
   const clean = normalizeMilvusName(nome);
@@ -220,8 +240,9 @@ async function loadMapeamentoData() {
   if (btn) { btn.disabled = true; btn.textContent = 'Consultando Milvus…'; }
   if (wrap) wrap.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Consultando nomes no Milvus…</p>';
   try {
-    const [nomes, map] = await Promise.all([fetchMilvusClientNames(), loadMilvusMap()]);
+    const [nomes, map, clients] = await Promise.all([fetchMilvusClientNames(), loadMilvusMap(), loadMapeamentoClients()]);
     _mapApiNomes = nomes;
+    _mapClients = clients;
     _mapLastMap = map;
     refreshMapeamentoRows();
   } catch (e) {
@@ -235,9 +256,8 @@ async function loadMapeamentoData() {
 let _mapLastMap = [];
 
 function refreshMapeamentoRows() {
-  const clients = typeof getClients === 'function' ? getClients() : [];
   _mapNomes = mergeMilvusNameSources(_mapApiNomes, _mapImported);
-  _mapRows = buildMapeamentoRows(_mapNomes, _mapLastMap, clients);
+  _mapRows = buildMapeamentoRows(_mapNomes, _mapLastMap, _mapClients);
   renderMapeamentoTable();
 }
 
@@ -281,7 +301,7 @@ function renderMapeamentoTable() {
   const wrap = document.getElementById('mapTableWrap');
   const stats = document.getElementById('mapStats');
   if (!wrap) return;
-  const clients = typeof getClients === 'function' ? getClients() : [];
+  const clients = _mapClients;
   const rows = filterMapeamentoRows(_mapRows, _mapSearch, _mapFilter);
   const mapped = _mapRows.filter((r) => r.status === 'mapeado').length;
   const devs = _mapRows.reduce((s, r) => s + (r.quantidadeDispositivos || 0), 0);
@@ -321,8 +341,7 @@ async function onMapeamentoSelectIdx(idx, clientId) {
   const apply = async () => {
     try {
       await saveMilvusMapping(row.nome, clientId);
-      const clients = typeof getClients === 'function' ? getClients() : [];
-      const c = clients.find((x) => x.id === clientId);
+      const c = _mapClients.find((x) => x.id === clientId);
       row.clientId = clientId;
       row.clientName = c ? (c.name || clientId) : clientId;
       row.status = 'mapeado';
@@ -379,5 +398,6 @@ if (typeof module !== 'undefined' && module.exports) {
     buildMapeamentoRows: buildMapeamentoRows,
     filterMapeamentoRows: filterMapeamentoRows,
     validateMapeamento: validateMapeamento,
+    loadMapeamentoClients: loadMapeamentoClients,
   };
 }

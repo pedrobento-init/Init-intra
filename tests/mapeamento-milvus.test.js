@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const map = require('../js/mapeamento-milvus.js');
@@ -84,6 +84,36 @@ describe('mergeMilvusNameSources (API + lista, sem aproximação)', () => {
       [{ nome: 'BOTTINI-DF', quantidadeDispositivos: 1 }, { nome: 'BOTTINI-SP', quantidadeDispositivos: 1 }],
     );
     expect(out).toHaveLength(2);
+  });
+});
+
+describe('loadMapeamentoClients (Supabase primeiro, cache como fallback)', () => {
+  const _g = globalThis;
+  afterEach(() => {
+    delete _g.isSupabaseConnected;
+    delete _g.supabaseClient;
+    delete _g.getClients;
+  });
+  it('online: usa as linhas do Supabase (lista completa do servidor)', async () => {
+    _g.isSupabaseConnected = () => true;
+    _g.supabaseClient = {
+      from: () => ({ select: () => ({ order: async () => ({ data: [{ id: 'CLI-9', name: 'ZETA' }], error: null }) }) }),
+    };
+    _g.getClients = () => [{ id: 'CLI-1', name: 'LOCAL' }];
+    await expect(map.loadMapeamentoClients()).resolves.toEqual([{ id: 'CLI-9', name: 'ZETA' }]);
+  });
+  it('offline: cai para o cache local', async () => {
+    _g.isSupabaseConnected = () => false;
+    _g.getClients = () => [{ id: 'CLI-1', name: 'LOCAL' }];
+    await expect(map.loadMapeamentoClients()).resolves.toEqual([{ id: 'CLI-1', name: 'LOCAL' }]);
+  });
+  it('erro/retorno vazio do servidor: cai para o cache local', async () => {
+    _g.isSupabaseConnected = () => true;
+    _g.supabaseClient = {
+      from: () => ({ select: () => ({ order: async () => ({ data: null, error: { message: 'x' } }) }) }),
+    };
+    _g.getClients = () => [{ id: 'CLI-1', name: 'LOCAL' }];
+    await expect(map.loadMapeamentoClients()).resolves.toEqual([{ id: 'CLI-1', name: 'LOCAL' }]);
   });
 });
 
