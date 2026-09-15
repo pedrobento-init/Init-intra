@@ -294,6 +294,10 @@ function renderClientInventoryTab(clientId) {
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="milvusSyncBtn" onclick="syncClientInventoryUI('${escapeHtml(clientId)}')">↻ Sincronizar inventário</button>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Importar export Excel do Milvus (.xlsx)">
+        📥 Importar planilha
+        <input type="file" id="milvusImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientInventoryUI('${escapeHtml(clientId)}',this)" />
+      </label>
       <span style="font-size:12px;color:var(--text-muted)">Última sincronização: <strong id="milvusLastSync">${escapeHtml(lastTxt)}</strong></span>
     </div>
     <div id="milvusSyncMsg" style="font-size:13px;margin-bottom:10px"></div>
@@ -341,6 +345,28 @@ async function syncClientInventoryUI(clientId) {
     if (msg) msg.innerHTML = '<span style="color:var(--danger,#dc2626)">Não foi possível sincronizar o inventário. Tente novamente.</span>';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar inventário'; }
+  }
+}
+
+async function importClientInventoryUI(clientId, input) {
+  const file = input && input.files && input.files[0];
+  if (input) input.value = '';
+  if (!file) return;
+  const setMsg = (html) => { const m = document.getElementById('milvusSyncMsg'); if (m) m.innerHTML = html; };
+  try {
+    setMsg('<span style="color:var(--text-muted)">Lendo planilha…</span>');
+    const rows = await readMilvusExportFile(file);
+    setMsg(`<span style="color:var(--text-muted)">Importando ${rows.length} linha(s)…</span>`);
+    const res = await importClientDevicesFromRows(clientId, rows);
+    setMsg(`<span style="color:var(--success,#16a34a)">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outro(s) cliente(s), ignorados` : ''}</span>`);
+    try {
+      const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
+      const lastEl = document.getElementById('milvusLastSync');
+      if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
+    } catch (_) {}
+    await loadClientInventoryUI(clientId);
+  } catch (e) {
+    setMsg(`<span style="color:var(--danger,#dc2626)">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`);
   }
 }
 
