@@ -3509,28 +3509,32 @@ body.dark-theme .overdue-banner {
 .modal-body { overflow-x: hidden; }
 .pen-detail { min-width: 0; }
 .pen-detail-actions {
-  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-  margin-bottom: 14px;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+  margin-bottom: 10px;
 }
+.pen-status-block { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pen-status-block .pen-section-label { margin: 0; }
 .pen-status-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .pen-status-select { max-width: 190px; }
 .pen-header-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; }
 .pen-btn-secondary { font-weight: 500; }
 /* Faixa "trabalhando agora" + tempo: mesmo timerWidget/timer.js por baixo. */
 .pen-work {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 12px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--bg-base); padding: 9px 12px; margin-bottom: 14px; min-width: 0;
+  background: var(--bg-base); padding: 10px 12px; margin-bottom: 10px; min-width: 0;
 }
 .pen-work-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--green); }
 .pen-work.is-free .pen-work-dot { background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
 .pen-work.is-working .pen-work-dot { background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); animation: penPulse 2s infinite; }
 @keyframes penPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
-.pen-work-text { font-size: 13px; color: var(--text-primary); min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.pen-work-text { font-size: 13px; color: var(--text-primary); min-width: 0; flex: 1; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; }
 .pen-work-text strong { font-weight: 650; }
+.pen-work-label { display: block; font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.pen-work-value { display: block; min-width: 0; overflow-wrap: anywhere; }
 .pen-work-hint { color: var(--text-muted); font-weight: 400; }
 .pen-work-time { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
-.pen-work-side { flex-shrink: 0; }
+.pen-work-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .pen-time { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Rótulos de seção discretos (hierarquia sem excesso de cards). */
 .pen-section-label {
@@ -3622,4 +3626,5 @@ body.dark-theme .overdue-banner {
   .pen-header-btns { margin-left: 0; }
   .pen-status-select { max-width: 100%; flex: 1; min-width: 140px; }
   .pen-work { flex-wrap: wrap; }
+  .pen-work-side { flex-direction: row; align-items: baseline; gap: 8px; }
 }

@@ -653,14 +653,17 @@ function openPendenciaDetail(id) {
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="pen-detail">
     <div class="pen-detail-actions">
-      <div class="pen-status-wrap">
+      <div class="pen-status-block">
+        <label class="pen-section-label" for="chgStatus">Status</label>
+        <div class="pen-status-wrap">
         <select class="form-select pen-status-select" id="chgStatus" title="Status da pendência">
           ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
         </select>
-        <button class="btn btn-primary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
+        <button class="btn btn-secondary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
+        </div>
       </div>
       <div class="pen-header-btns">
-        <button class="btn btn-secondary btn-sm pen-btn-secondary" title="Editar todos os campos" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
+        <button class="btn btn-primary btn-sm pen-btn-secondary" title="Editar todos os campos" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>
         <button class="btn btn-secondary btn-sm pen-btn-secondary" title="Criar uma cópia desta pendência" onclick="duplicatePendencia('${escapeHtml(id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicar</button>
         <div class="timer-row">${timerWidget(p, 'pendencia')}</div>
       </div>
@@ -668,11 +671,13 @@ function openPendenciaDetail(id) {
     <div class="pen-work ${_worker ? 'is-working' : 'is-free'}" title="${_worker ? _escapeHtmlFallback(_worker) + ' está trabalhando nesta pendência' : 'Ninguém trabalhando agora'}">
       <span class="pen-work-dot" aria-hidden="true"></span>
       <div class="pen-work-text">
-        ${_worker
-          ? `<strong>${_escapeHtmlFallback(_worker)} está trabalhando nesta pendência</strong> <span class="pen-work-time">${timerDisplayHTML(p)}</span>`
-          : `<strong>Disponível</strong> <span class="pen-work-hint">· Ninguém trabalhando agora</span>`}
+        <span class="pen-work-label">Trabalhando agora</span>
+        <span class="pen-work-value">${_worker
+          ? `<strong>${_escapeHtmlFallback(_worker)}</strong> <span class="pen-work-time">${timerDisplayHTML(p)}</span>`
+          : `<strong>Ninguém</strong> <span class="pen-work-hint">· Disponível</span>`}</span>
       </div>
       <div class="pen-work-side">
+        <span class="pen-work-label">Tempo acumulado</span>
         <span class="pen-time" title="Tempo total exato: ${_escapeHtmlFallback(_ft.exact)}">⏱ ${_escapeHtmlFallback(_ft.friendly)}</span>
       </div>
     </div>
