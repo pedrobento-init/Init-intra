@@ -118,6 +118,17 @@ function diffMilvusUpsert(existingIds, rows) {
   return { created: created, updated: updated };
 }
 
+// Formata o retorno do sync p/ a tela (puro, testável).
+function formatMilvusSyncResult(res) {
+  const s = Number((res && res.synced)) || 0;
+  const c = Number((res && res.created)) || 0;
+  const u = Number((res && res.updated)) || 0;
+  const un = Array.isArray(res && res.unresolvedNames) ? res.unresolvedNames : [];
+  let line = `${s} dispositivos sincronizados · ${c} novos · ${u} atualizados`;
+  if (un.length) line += ` · ${un.length} nome(s) sem resolução: ${un.slice(0, 5).join(', ')}${un.length > 5 ? '…' : ''}`;
+  return { line: line, unresolved: un.length };
+}
+
 // ── Última sincronização (local, por cliente) ──
 function getMilvusLastSyncAt(clientId) {
   try {
@@ -537,5 +548,6 @@ if (typeof module !== 'undefined' && module.exports) {
     matchDraftToClient: matchDraftToClient,
     mergeImportWithExisting: mergeImportWithExisting,
     importClientDevicesFromRows: importClientDevicesFromRows,
+    formatMilvusSyncResult: formatMilvusSyncResult,
   };
 }

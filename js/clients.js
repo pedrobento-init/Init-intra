@@ -330,10 +330,10 @@ async function syncClientInventoryUI(clientId) {
   if (msg) { msg.innerHTML = '<span style="color:var(--text-muted)">Sincronizando inventário…</span>'; }
   try {
     const res = await syncClientDevices(clientId);
-    const s = Number(res && res.synced) || 0;
-    const c = Number(res && res.created) || 0;
-    const u = Number(res && res.updated) || 0;
-    if (msg) msg.innerHTML = `<span style="color:var(--success,#16a34a)">${s} dispositivos sincronizados · ${c} novos · ${u} atualizados</span>`;
+    const fmt = typeof formatMilvusSyncResult === 'function'
+      ? formatMilvusSyncResult(res)
+      : { line: `${(res && res.synced) || 0} dispositivos sincronizados`, unresolved: 0 };
+    if (msg) msg.innerHTML = `<span style="color:var(--success,#16a34a)">${escapeHtml(fmt.line)}</span>`;
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');

@@ -17,6 +17,15 @@
 //   admin (is_admin) passa; não-admin só se team do operador == team
 //   do cliente. Service role é usada só para a escrita server-side
 //   APÓS essa checagem — não é bypass para o frontend.
+//
+// FLUXO (v2 — a listagem ignora paginação no servidor, mas
+// GET /buscar?cliente=<id> devolve a lista completa, sem paginação):
+// por nome mapeado → resolve o cliente_id do Milvus (cache no mapa,
+// via id/serial de dispositivo conhecido, ou amostra da listagem) →
+// buscar?cliente → normaliza → merge com o existente (por milvus id,
+// serial ou hostname) → upsert. O vínculo continua explícito: o
+// cliente_id só é usado como chave de busca DENTRO de nome já
+// mapeado manualmente pelo administrador.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -111,6 +120,174 @@ function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: s
     tipo_dispositivo_text: _toText(raw["tipo_dispositivo_text"]),
     updated_at: now,
   };
+}
+
+const BUSCAR_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/buscar`;
+const TYPES_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/lista/tipo-dispositivo`;
+
+// GET genérico ao Milvus (buscar/tipos): status antes do corpo,
+// 1 retry para 429/5xx/conexão, nunca para 401/403.
+async function milvusGet(path: string, params: Record<string, string>): Promise<unknown> {
+  const url = `${path}?${new URLSearchParams(params).toString()}`;
+  let attempt = 0;
+  while (attempt < 2) {
+    attempt++;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "Authorization": MILVUS_API_TOKEN },
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      clearTimeout(timer);
+      throw new Error("Falha de autenticação com o Milvus");
+    }
+    if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+      clearTimeout(timer);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      throw new Error(`Milvus indisponível (HTTP ${res.status})`);
+    }
+    if (!res.ok) {
+      clearTimeout(timer);
+      throw new Error(`Milvus retornou HTTP ${res.status}`);
+    }
+    try {
+      const data: unknown = await res.json();
+      clearTimeout(timer);
+      return data;
+    } catch {
+      clearTimeout(timer);
+      throw new Error("Resposta inválida do Milvus");
+    }
+  }
+  throw new Error("Falha inesperada ao consultar o Milvus");
+}
+
+function _buscarList(data: unknown): Record<string, unknown>[] {
+  const lista = (data as Record<string, unknown> | null)?.["lista"] as unknown;
+  if (Array.isArray(lista)) return lista as Record<string, unknown>[];
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  return [];
+}
+
+// Mapa id→descrição dos tipos (1 chamada por sync; falha = textos vazios).
+async function fetchTipoMap(): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  try {
+    const data = await milvusGet(TYPES_URL, {});
+    for (const t of _buscarList(data)) {
+      const id = Number((t as Record<string, unknown>)["id"]);
+      if (Number.isFinite(id)) out.set(id, String((t as Record<string, unknown>)["descricao"] ?? ""));
+    }
+  } catch (e) {
+    console.log(`milvus-devices: tipos indisponíveis (${(e as Error)?.message ?? "erro"})`);
+  }
+  return out;
+}
+
+// Normaliza UM item do /buscar (registro completo, sem nome_fantasia —
+// o vínculo vem do nome mapeado que originou a busca). Licença ignorada.
+function normalizeBuscarDevice(
+  raw: Record<string, unknown>, clientId: string, team: string,
+  fantasia: string, tipoMap: Map<number, string>,
+) {
+  const milvusId = _toIntOrNull(raw["id"]);
+  if (milvusId === null) return null;
+  const now = new Date().toISOString();
+  const tipoId = _toIntOrNull(raw["tipo_dispositivo_id"]);
+  return {
+    id: `${clientId}:milvus-${milvusId}`,
+    client_id: clientId,
+    team,
+    milvus_device_id: milvusId,
+    hostname: _toText(raw["hostname"]),
+    apelido: _toText(raw["apelido"]),
+    ip_interno: _toText(raw["ip_interno"]),
+    ip_externo: _toText(raw["ip_externo"]),
+    mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
+    marca: _toText(raw["marca"]),
+    fabricante: _toText(raw["fabricante"]),
+    is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
+      ? true
+      : raw["is_ativo"] === true || raw["is_ativo"] === 1 || raw["is_ativo"] === "1",
+    data_criacao: _toIsoOrNull(raw["data_criacao"]),
+    data_ultima_atualizacao: _toIsoOrNull(raw["data_ultima_atualizacao"]),
+    dominio: _toText(raw["dominio"]),
+    sistema_operacional: _toText(raw["sistema_operacional"]),
+    placa_mae: _toText(raw["placa_mae"]),
+    placa_mae_serial: _toText(raw["placa_mae_serial"]),
+    processador: _toText(raw["processador"]),
+    versao_client: _toText(raw["versao_client"]),
+    observacao: _toText(raw["observacao"]),
+    usuario_logado: _toText(raw["usuario_logado"]),
+    total_processadores: _toIntOrNull(raw["total_processadores"]),
+    numero_serial: _toText(raw["numero_serial"]),
+    placa_mae_modelo: _toText(raw["placa_mae_modelo"]),
+    data_compra: _toDateOrNull(raw["data_compra"]),
+    data_garantia: _toDateOrNull(raw["data_garantia"]),
+    modelo_notebook: _toText(raw["modelo_notebook"] ?? raw["modelo"]),
+    nome_fantasia: fantasia,
+    tipo_dispositivo_id: tipoId,
+    tipo_dispositivo_text: (tipoId !== null && tipoMap.get(tipoId)) || _toText(raw["tipo_dispositivo_text"]),
+    updated_at: now,
+  };
+}
+
+// Descobre o cliente_id do Milvus a partir de dispositivos conhecidos
+// (id ou serial). Nunca joga erro pra cima: retorna null se não achar.
+async function resolveClienteId(
+  known: { milvus_device_id: number | null; numero_serial: string }[],
+): Promise<number | null> {
+  for (const k of known) {
+    try {
+      let data: unknown = null;
+      if (k.milvus_device_id) data = await milvusGet(BUSCAR_URL, { id: String(k.milvus_device_id) });
+      else if (k.numero_serial) data = await milvusGet(BUSCAR_URL, { serial: k.numero_serial });
+      else continue;
+      const item = _buscarList(data)[0];
+      const cid = item ? Number(item["cliente_id"]) : NaN;
+      if (Number.isFinite(cid)) return cid;
+    } catch (_) { /* tenta o próximo conhecido */ }
+  }
+  return null;
+}
+
+// Amostra da listagem (p1 + p2 com parada em repetição) como ÚLTIMO
+// recurso de resolução: devolve itens {id, nome_fantasia}.
+async function fetchListagemSample(): Promise<{ id: number; nome: string }[]> {
+  const out: { id: number; nome: string }[] = [];
+  const seen = new Set<number>();
+  for (let p = 1; p <= 3; p++) {
+    let r;
+    try {
+      r = await fetchMilvusPage(p);
+    } catch {
+      break;
+    }
+    let fresh = 0;
+    for (const raw of r.list) {
+      const id = Number((raw as Record<string, unknown>)?.["id"]);
+      if (!Number.isFinite(id) || seen.has(id)) continue;
+      seen.add(id);
+      fresh++;
+      out.push({ id, nome: String((raw as Record<string, unknown>)?.["nome_fantasia"] ?? "").trim() });
+    }
+    if (fresh === 0 || r.list.length === 0) break;
+  }
+  return out;
 }
 
 async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current: number; last: number }> {
@@ -263,97 +440,130 @@ serve(async (req: Request) => {
 
   console.log(`milvus-devices: início client_id=${clientId} team=${cliTeam}`);
 
-  // 4) Mapa explícito nome_fantasia → este cliente.
+  // 4) Mapa explícito nome_fantasia → este cliente (+ cache cliente_id).
   const { data: mapRows } = await admin
     .from("milvus_client_map")
-    .select("milvus_nome")
+    .select("milvus_nome,milvus_cliente_id")
     .eq("client_id", clientId);
-  const mappedNames = new Set(
-    (mapRows || []).map((r: { milvus_nome: string }) => r.milvus_nome.trim().toLowerCase()).filter(Boolean),
-  );
+  const mapList = (mapRows || []).map((r: { milvus_nome: string; milvus_cliente_id: number | null }) => ({
+    nome: String(r.milvus_nome || "").trim(),
+    clienteId: (typeof r.milvus_cliente_id === "number") ? r.milvus_cliente_id : null as number | null,
+  })).filter((m) => m.nome);
+  if (!mapList.length) {
+    return json({
+      success: true, clientId, synced: 0, created: 0, updated: 0,
+      resolved: 0, unresolvedNames: [], received: 0, lastSyncAt: new Date().toISOString(),
+    });
+  }
 
-  // 5) Pagina o Milvus: a 1ª página descobre last_page; as demais vêm em
-  // lotes paralelos (8 por vez) para caber no timeout da plataforma.
-  // Teto anti-loop mantido em MAX_PAGES.
-  let pages = 0;
+  // Dispositivos conhecidos: resolvem o cliente_id (via id ou serial) e
+  // evitam duplicar linhas vindas da planilha no merge.
+  const { data: knownRows } = await admin
+    .from("client_devices")
+    .select("id,milvus_device_id,numero_serial,hostname,nome_fantasia")
+    .eq("client_id", clientId)
+    .limit(3000);
+  const knownByName = new Map<string, { milvus_device_id: number | null; numero_serial: string }[]>();
+  for (const k of (knownRows || []) as Record<string, unknown>[]) {
+    const key = String(k["nome_fantasia"] ?? "").trim().toLowerCase();
+    if (!key) continue;
+    const arr = knownByName.get(key) || [];
+    arr.push({
+      milvus_device_id: (typeof k["milvus_device_id"] === "number") ? k["milvus_device_id"] as number : null,
+      numero_serial: String(k["numero_serial"] ?? ""),
+    });
+    knownByName.set(key, arr);
+  }
+
+  const tipoMap = await fetchTipoMap();
+  let listagemSample: { id: number; nome: string }[] | null = null;
+
+  // 5) Por nome mapeado: resolve cliente_id → buscar?cliente (completa).
+  // Falha de UM nome não derruba os demais (vai para unresolvedNames).
+  const collected: { [k: string]: unknown }[] = [];
+  const resolvedNames: string[] = [];
+  const unresolvedNames: string[] = [];
   let received = 0;
-  const matched: Record<string, unknown>[] = [];
-  let skippedUnmapped = 0;
-  // Dedupe por id do dispositivo: a API pode repetir a mesma página
-  // (paginação ignorada) — sem isso, o mesmo dispositivo seria
-  // processado N vezes.
-  const seenIds = new Set<string>();
-  const ingest = (list: unknown[]): number => {
-    let fresh = 0;
-    received += list.length;
-    for (const raw of list) {
-      const id = String((raw as Record<string, unknown>)?.["id"] ?? "");
-      if (id) {
-        if (seenIds.has(id)) continue;
-        seenIds.add(id);
+  for (const m of mapList) {
+    const key = m.nome.toLowerCase();
+    let cid: number | null = m.clienteId;
+    try {
+      if (cid === null) {
+        const known = knownByName.get(key) || [];
+        if (known.length) cid = await resolveClienteId(known);
       }
-      fresh++;
-      const nome = String((raw as Record<string, unknown>)?.["nome_fantasia"] ?? "").trim().toLowerCase();
-      if (nome && mappedNames.has(nome)) {
-        matched.push(raw as Record<string, unknown>);
-      } else {
-        skippedUnmapped++;
-      }
-    }
-    return fresh;
-  };
-  try {
-    const first = await fetchMilvusPage(1);
-    pages++;
-    ingest(first.list);
-    let last = first.last;
-    if (last > MAX_PAGES) {
-      console.log(`milvus-devices: teto de páginas (${MAX_PAGES}) atingido client_id=${clientId} (last_page=${last})`);
-      last = MAX_PAGES;
-    }
-    if (first.current < last && first.list.length > 0) {
-      const rest: number[] = [];
-      for (let p = first.current + 1; p <= last; p++) rest.push(p);
-      const BATCH = 8;
-      for (let i = 0; i < rest.length; i += BATCH) {
-        const results = await Promise.all(rest.slice(i, i + BATCH).map((p) => fetchMilvusPage(p)));
-        let batchFresh = 0;
-        for (const r of results) {
-          pages++;
-          batchFresh += ingest(r.list);
-        }
-        console.log(`milvus-devices: progresso client_id=${clientId} pages=${pages}/${last}`);
-        if (batchFresh === 0) {
-          console.log(`milvus-devices: páginas repetidas, interrompendo client_id=${clientId} pages=${pages}`);
-          break;
+      if (cid === null) {
+        if (!listagemSample) listagemSample = await fetchListagemSample();
+        const hit = listagemSample.find((s) => s.nome.toLowerCase() === key);
+        if (hit) {
+          try {
+            const data = await milvusGet(BUSCAR_URL, { id: String(hit.id) });
+            const item = _buscarList(data)[0];
+            const n = item ? Number(item["cliente_id"]) : NaN;
+            if (Number.isFinite(n)) cid = n;
+          } catch (_) {}
         }
       }
+      if (cid === null) { unresolvedNames.push(m.nome); continue; }
+      if (cid !== m.clienteId) {
+        await admin.from("milvus_client_map").update({ milvus_cliente_id: cid }).eq("milvus_nome", m.nome);
+      }
+      const data = await milvusGet(BUSCAR_URL, { cliente: String(cid) });
+      const items = _buscarList(data);
+      received += items.length;
+      for (const raw of items) {
+        const row = normalizeBuscarDevice(raw, clientId, cliTeam, m.nome, tipoMap);
+        if (row) collected.push(row as unknown as { [k: string]: unknown });
+      }
+      resolvedNames.push(m.nome);
+      console.log(`milvus-devices: nome client_id=${clientId} nome="${m.nome}" milvus_cliente=${cid} items=${items.length}`);
+    } catch (e) {
+      // Mensagem amigável no retorno; detalhe só no log seguro (sem token).
+      console.error(`milvus-devices: nome falhou client_id=${clientId} nome="${m.nome}": ${(e as Error)?.message ?? "erro"}`);
+      unresolvedNames.push(m.nome);
     }
-  } catch (e) {
-    // Mensagem amigável; detalhe técnico só no log seguro (sem token).
-    console.error(`milvus-devices: erro client_id=${clientId}: ${(e as Error)?.message ?? "erro"}`);
-    return json({ error: `Falha ao sincronizar inventário: ${(e as Error)?.message ?? "erro inesperado"}` }, 502);
   }
 
-  // 6) Normaliza + upsert em lote (id = client + milvus id; nunca hostname).
-  const rows = [];
-  for (const raw of matched) {
-    const row = normalizeDevice(raw, clientId, cliTeam);
-    if (row) rows.push(row);
-  }
-
-  // Dispositivo que sumiu de uma sincronização NÃO é excluído (histórico).
+  // 6) Merge com o existente (por milvus id, serial ou hostname) + upsert.
+  // Dispositivo que sumiu NÃO é excluído (histórico). Linhas da planilha
+  // (id imp-*) casadas por serial/hostname ganham o milvus id aqui.
   const { data: existing } = await admin
     .from("client_devices")
-    .select("milvus_device_id")
-    .eq("client_id", clientId);
-  const existingIds = new Set((existing || []).map((r: { milvus_device_id: number }) => r.milvus_device_id));
-
+    .select("*")
+    .eq("client_id", clientId)
+    .limit(3000);
+  const byMid = new Map<number, Record<string, unknown>>();
+  const bySerial = new Map<string, Record<string, unknown>>();
+  const byHost = new Map<string, Record<string, unknown>>();
+  for (const e of (existing || []) as Record<string, unknown>[]) {
+    if (typeof e["milvus_device_id"] === "number") byMid.set(e["milvus_device_id"] as number, e);
+    const s = String(e["numero_serial"] ?? "").toLowerCase();
+    if (s && !bySerial.has(s)) bySerial.set(s, e);
+    const h = String(e["hostname"] ?? "").toLowerCase();
+    if (h && !byHost.has(h)) byHost.set(h, e);
+  }
+  const rows: { [k: string]: unknown }[] = [];
   let created = 0;
   let updated = 0;
-  for (const r of rows) {
-    if (existingIds.has((r as { milvus_device_id: number }).milvus_device_id)) updated++;
-    else { created++; existingIds.add((r as { milvus_device_id: number }).milvus_device_id); }
+  for (const row of collected) {
+    const mid = row["milvus_device_id"];
+    const prev = (typeof mid === "number" && byMid.get(mid)) ||
+      bySerial.get(String(row["numero_serial"] ?? "").toLowerCase()) ||
+      byHost.get(String(row["hostname"] ?? "").toLowerCase()) || null;
+    if (prev) {
+      const robs = String(row["observacao"] ?? "");
+      const pobs = String(prev["observacao"] ?? "");
+      rows.push({
+        ...prev, ...row,
+        id: prev["id"],
+        created_at: prev["created_at"],
+        observacao: robs || pobs,
+      });
+      updated++;
+    } else {
+      rows.push(row);
+      created++;
+    }
   }
 
   for (let i = 0; i < rows.length; i += UPSERT_BATCH) {
@@ -370,9 +580,10 @@ serve(async (req: Request) => {
   const durationMs = Date.now() - startedAt;
   const lastSyncAt = new Date().toISOString();
   console.log(
-    `milvus-devices: fim client_id=${clientId} pages=${pages} received=${received} ` +
+    `milvus-devices: fim client_id=${clientId} received=${received} ` +
     `matched=${rows.length} created=${created} updated=${updated} ` +
-    `skipped_unmapped=${skippedUnmapped} duration_ms=${durationMs} ok`,
+    `resolved=${resolvedNames.length} unresolved=${unresolvedNames.length} ` +
+    `duration_ms=${durationMs} ok`,
   );
   return json({
     success: true,
@@ -380,8 +591,8 @@ serve(async (req: Request) => {
     synced: rows.length,
     created,
     updated,
-    skippedUnmapped,
-    pages,
+    resolved: resolvedNames.length,
+    unresolvedNames,
     received,
     lastSyncAt,
   });

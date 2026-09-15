@@ -107,6 +107,27 @@ describe('classifyMilvusError', () => {
   });
 });
 
+describe('formatMilvusSyncResult', () => {
+  it('linha padrão sem pendências', () => {
+    expect(milvus.formatMilvusSyncResult({ synced: 88, created: 80, updated: 8 }))
+      .toEqual({ line: '88 dispositivos sincronizados · 80 novos · 8 atualizados', unresolved: 0 });
+  });
+  it('lista nomes sem resolução (máx. 5 + reticência)', () => {
+    const r = milvus.formatMilvusSyncResult({
+      synced: 0, created: 0, updated: 0,
+      unresolvedNames: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+    });
+    expect(r.unresolved).toBe(7);
+    expect(r.line).toContain('7 nome(s) sem resolução');
+    expect(r.line).toContain('A, B, C, D, E');
+    expect(r.line.endsWith('…')).toBe(true);
+  });
+  it('tolerante a resposta vazia', () => {
+    expect(milvus.formatMilvusSyncResult(null))
+      .toEqual({ line: '0 dispositivos sincronizados · 0 novos · 0 atualizados', unresolved: 0 });
+  });
+});
+
 describe('diffMilvusUpsert + idempotência (dupla sincronização)', () => {
   const rows = [{ milvus_device_id: 1 }, { milvus_device_id: 2 }];
   it('primeira sync: tudo novo', () => {
