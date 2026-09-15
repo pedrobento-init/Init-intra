@@ -127,6 +127,7 @@ function viewClient(id) {
       <div class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</div>
       <div class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</div>
       <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
+      <div class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</div>
       <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
       <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
     </div>
@@ -135,7 +136,7 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','documentos','historico'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','documentos','historico'][i]===tab));
   renderClientTab(tab, id);
 }
 
@@ -248,6 +249,8 @@ function renderClientTab(tab, id) {
         <td>${typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : escapeHtml(v.status)}</td>
         <td style="text-align:right"><button class="btn btn-sm btn-secondary" onclick="openVisitDetail('${escapeHtml(v.id)}')">Abrir</button></td>
       </tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma visita registrada para este cliente.</p></div>`}`;
+  } else if (tab === 'inventario') {
+    renderClientInventoryTab(id);
   } else if (tab === 'historico') {
     const client = getClientById(id);
     const clientName = client ? client.name : '';
@@ -276,6 +279,68 @@ function renderClientTab(tab, id) {
     const pens = getPendencias().filter(p => p.clientId === id);
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
       ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th></tr></thead><tbody>${pens.map(p=>`<tr><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+  }
+}
+
+// ── Inventário Milvus (somente listagem; sem licença, sem status, sem softwares) ──
+function renderClientInventoryTab(clientId) {
+  const el = document.getElementById('clientTabContent');
+  if (!el) return;
+  let lastSync = null;
+  try { lastSync = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null; } catch (_) {}
+  const lastTxt = lastSync
+    ? (typeof formatDateTime === 'function' ? formatDateTime(lastSync) : new Date(lastSync).toLocaleString('pt-BR'))
+    : 'nunca';
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="milvusSyncBtn" onclick="syncClientInventoryUI('${escapeHtml(clientId)}')">↻ Sincronizar inventário</button>
+      <span style="font-size:12px;color:var(--text-muted)">Última sincronização: <strong id="milvusLastSync">${escapeHtml(lastTxt)}</strong></span>
+    </div>
+    <div id="milvusSyncMsg" style="font-size:13px;margin-bottom:10px"></div>
+    <div class="table-wrapper" id="milvusTableWrap"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando inventário…</p></div>`;
+  loadClientInventoryUI(clientId);
+}
+
+async function loadClientInventoryUI(clientId) {
+  const wrap = document.getElementById('milvusTableWrap');
+  if (!wrap) return;
+  let devices = [];
+  try {
+    devices = typeof getClientDevices === 'function' ? await getClientDevices(clientId) : [];
+  } catch (_) { devices = []; }
+  if (!devices.length) {
+    wrap.innerHTML = '<div class="empty-state"><p>Nenhum dispositivo sincronizado para este cliente.</p></div>';
+    return;
+  }
+  wrap.innerHTML = `<table><thead><tr><th>Hostname</th><th>Apelido</th><th>Fabricante</th><th>Marca</th><th>Modelo</th><th>Sistema operacional</th><th>Nº serial</th><th>Usuário logado</th><th>Tipo</th><th>IP interno</th><th>Status</th><th>Atualizado em</th></tr></thead><tbody>${devices.map((d) => {
+    const upd = d.data_ultima_atualizacao || d.updatedAt;
+    const updTxt = upd ? (typeof formatDateTime === 'function' ? formatDateTime(upd) : new Date(upd).toLocaleString('pt-BR')) : '—';
+    return `<tr><td><strong>${escapeHtml(d.hostname || '—')}</strong></td><td>${escapeHtml(d.apelido || '—')}</td><td>${escapeHtml(d.fabricante || '—')}</td><td>${escapeHtml(d.marca || '—')}</td><td>${escapeHtml(d.modelo_notebook || '—')}</td><td>${escapeHtml(d.sistema_operacional || '—')}</td><td>${escapeHtml(d.numero_serial || '—')}</td><td>${escapeHtml(d.usuario_logado || '—')}</td><td>${escapeHtml(d.tipo_dispositivo_text || '—')}</td><td>${escapeHtml(d.ip_interno || '—')}</td><td>${d.is_ativo !== false ? '<span class="tag tag-green">Ativo</span>' : '<span class="tag tag-red">Inativo</span>'}</td><td>${escapeHtml(updTxt)}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+async function syncClientInventoryUI(clientId) {
+  const btn = document.getElementById('milvusSyncBtn');
+  const msg = document.getElementById('milvusSyncMsg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando inventário…'; }
+  if (msg) { msg.innerHTML = '<span style="color:var(--text-muted)">Sincronizando inventário…</span>'; }
+  try {
+    const res = await syncClientDevices(clientId);
+    const s = Number(res && res.synced) || 0;
+    const c = Number(res && res.created) || 0;
+    const u = Number(res && res.updated) || 0;
+    if (msg) msg.innerHTML = `<span style="color:var(--success,#16a34a)">${s} dispositivos sincronizados · ${c} novos · ${u} atualizados</span>`;
+    try {
+      const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
+      const lastEl = document.getElementById('milvusLastSync');
+      if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
+    } catch (_) {}
+    await loadClientInventoryUI(clientId);
+  } catch (e) {
+    // Mensagem amigável; sem token ou detalhe sensível.
+    if (msg) msg.innerHTML = '<span style="color:var(--danger,#dc2626)">Não foi possível sincronizar o inventário. Tente novamente.</span>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar inventário'; }
   }
 }
 

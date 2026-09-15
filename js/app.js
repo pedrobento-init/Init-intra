@@ -444,8 +444,9 @@ function navigateTo(page) {
   const currentHash = window.location.hash.replace('#', '') || 'dashboard';
 
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    if (page === 'dashboard' || page === 'historico') {
+    if (page === 'dashboard' || page === 'historico' || page === 'mapeamento-milvus') {
       if (page === 'historico') showToast('Apenas administradores podem ver o histórico.', 'error');
+      if (page === 'mapeamento-milvus') showToast('Somente administradores podem acessar o mapeamento.', 'error');
       page = 'pendencias';
     }
   }
@@ -471,6 +472,7 @@ function navigateTo(page) {
   else if (page === 'visitas')     renderVisitas();
   else if (page === 'reuniao')     renderReuniao();
   else if (page === 'operadores')  renderOperadores();
+  else if (page === 'mapeamento-milvus') renderMapeamentoMilvus();
   else if (page === 'historico')   renderLogs();
 
   window.location.hash = page;
@@ -1276,13 +1278,15 @@ function _startApp() {
     if (dashNav) dashNav.style.display = 'none';
     var histNav = document.getElementById('nav-historico');
     if (histNav) histNav.style.display = 'none';
+    var mapNav = document.getElementById('nav-mapeamento-milvus');
+    if (mapNav) mapNav.style.display = 'none';
   }
   document.querySelectorAll('.btn-export').forEach(function (btn) {
     btn.style.display = isAdmin ? '' : 'none';
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['dashboard','clientes','pendencias','calendario','operadores','historico','templates','visitas','reuniao'];
+  const pages = ['dashboard','clientes','pendencias','calendario','operadores','mapeamento-milvus','historico','templates','visitas','reuniao'];
   navigateTo(pages.includes(hash) ? hash : 'dashboard');
   if (!_appStarted) {
     _appStarted = true;
