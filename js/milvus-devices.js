@@ -43,7 +43,9 @@ function normalizeMilvusDevice(raw, clientId, team) {
     ip_interno: txt(raw.ip_interno),
     ip_externo: txt(raw.ip_externo),
     mac_address: txt(raw.macaddres !== undefined ? raw.macaddres : raw.mac_address),
-    marca: txt(raw.marca),
+    // marca ← fabricante quando a API omite (mesma família; placa_mae só
+    // entra como último recurso na exibição, via mapMilvusRowToLocal).
+    marca: txt(raw.marca) || txt(raw.fabricante),
     fabricante: txt(raw.fabricante),
     is_ativo: raw.is_ativo === undefined || raw.is_ativo === null
       ? true
@@ -189,7 +191,9 @@ function mapMilvusRowToLocal(r) {
     hostname: r.hostname || '',
     apelido: r.apelido || '',
     fabricante: r.fabricante || '',
-    marca: r.marca || '',
+    // A API raramente preenche marca/fabricante (vem null); para notebook,
+    // placa_mae (ex.: LENOVO) é o melhor sinal disponível — só exibição.
+    marca: r.marca || r.fabricante || r.placa_mae || '',
     modelo_notebook: r.modelo_notebook || '',
     sistema_operacional: r.sistema_operacional || '',
     numero_serial: r.numero_serial || '',
@@ -549,5 +553,6 @@ if (typeof module !== 'undefined' && module.exports) {
     mergeImportWithExisting: mergeImportWithExisting,
     importClientDevicesFromRows: importClientDevicesFromRows,
     formatMilvusSyncResult: formatMilvusSyncResult,
+    mapMilvusRowToLocal: mapMilvusRowToLocal,
   };
 }

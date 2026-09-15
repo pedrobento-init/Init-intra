@@ -128,6 +128,20 @@ describe('formatMilvusSyncResult', () => {
   });
 });
 
+describe('marca (fallback sem inventar dado)', () => {
+  it('normalize: marca ← fabricante quando a API omite', () => {
+    expect(milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: 'Dell' }, 'C', 't').marca).toBe('Dell');
+    expect(milvus.normalizeMilvusDevice({ id: 1, marca: 'Lenovo', fabricante: 'X' }, 'C', 't').marca).toBe('Lenovo');
+    expect(milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: null }, 'C', 't').marca).toBe('');
+  });
+  it('exibição: marca || fabricante || placa_mae (caso PB-27 → LENOVO)', () => {
+    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: '', placa_mae: 'LENOVO' }).marca).toBe('LENOVO');
+    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: 'Acer', placa_mae: 'X' }).marca).toBe('Acer');
+    expect(milvus.mapMilvusRowToLocal({ marca: 'Dell', fabricante: '', placa_mae: '' }).marca).toBe('Dell');
+    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: '', placa_mae: '' }).marca).toBe('');
+  });
+});
+
 describe('diffMilvusUpsert + idempotência (dupla sincronização)', () => {
   const rows = [{ milvus_device_id: 1 }, { milvus_device_id: 2 }];
   it('primeira sync: tudo novo', () => {

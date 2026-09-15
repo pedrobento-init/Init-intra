@@ -94,7 +94,9 @@ function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: s
     ip_interno: _toText(raw["ip_interno"]),
     ip_externo: _toText(raw["ip_externo"]),
     mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
-    marca: _toText(raw["marca"]),
+    // marca ← fabricante quando a API omite (mesma família; placa_mae só
+    // entra como último recurso na exibição, no frontend).
+    marca: _toText(raw["marca"]) || _toText(raw["fabricante"]),
     fabricante: _toText(raw["fabricante"]),
     is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
       ? true
@@ -237,7 +239,9 @@ function normalizeBuscarDevice(
     ip_interno: _toText(raw["ip_interno"]),
     ip_externo: _toText(raw["ip_externo"]),
     mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
-    marca: _toText(raw["marca"]),
+    // marca ← fabricante quando a API omite (mesma família; placa_mae só
+    // entra como último recurso na exibição, no frontend).
+    marca: _toText(raw["marca"]) || _toText(raw["fabricante"]),
     fabricante: _toText(raw["fabricante"]),
     is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
       ? true
