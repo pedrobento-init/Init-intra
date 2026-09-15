@@ -221,6 +221,7 @@ function renderMapeamentoMilvus() {
     </p>
     <div class="search-bar">
       <button class="btn btn-primary btn-sm" id="mapRefreshBtn" onclick="loadMapeamentoData()">🔄 Atualizar nomes do Milvus</button>
+      <button class="btn btn-secondary btn-sm" id="mapTokensBtn" onclick="openMilvusTokenBackfillModal()" title="Preenche o token vazio a partir da lista do Milvus (prévia antes)">🔑 Preencher tokens</button>
       <div class="search-input-wrap" style="flex:1">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="mapSearch" placeholder="Buscar por nome do Milvus ou cliente..." value="${typeof escapeHtml === 'function' ? escapeHtml(_mapSearch) : _mapSearch}" oninput="onMapeamentoSearch(this.value)" />
@@ -242,6 +243,69 @@ function renderMapeamentoMilvus() {
       </div>
     </details>
     <div class="table-wrapper" id="mapTableWrap"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Clique em “Atualizar nomes do Milvus” para começar.</p></div>`;
+}
+
+// ── Backfill de tokens (prévia → confirmação; admin) ──
+let _tokenBackfillPreview = [];
+
+function _tokenBackfillStatusTag(st) {
+  if (st === 'pronto') return '<span class="tag tag-green">Pronto p/ preencher</span>';
+  if (st === 'ja_preenchido') return '<span class="tag tag-blue">Já preenchido</span>';
+  if (st === 'ambiguo') return '<span class="tag tag-yellow">Ambíguo (2+ tokens)</span>';
+  return '<span class="tag tag-gray">Não encontrado</span>';
+}
+
+async function openMilvusTokenBackfillModal() {
+  openModal('🔑 Preencher tokens do Milvus', `
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">Preenche o token vazio a partir da lista do Milvus (match exato, sem aproximação). Valores manuais nunca são sobrescritos; ambíguos ficam para decisão manual.</p>
+    <div id="tokenBackfillBody"><p style="color:var(--text-muted);font-size:12px">Consultando tokens no Milvus…</p></div>`);
+  try {
+    const data = await previewMilvusTokenBackfill();
+    _tokenBackfillPreview = data.preview || [];
+    const t = data.totals || summarizeBackfillPreview(_tokenBackfillPreview);
+    const body = document.getElementById('tokenBackfillBody');
+    if (!body) return;
+    if (!_tokenBackfillPreview.length) {
+      body.innerHTML = '<div class="empty-state"><p>Nenhum vínculo no mapa para avaliar.</p></div>';
+      return;
+    }
+    body.innerHTML = `
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${t.total} vínculo(s) · <strong>${t.prontos} pronto(s)</strong> · ${t.jaPreenchidos} preenchidos · ${t.naoEncontrados} não encontrados · ${t.ambiguos} ambíguos</div>
+      <div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th></th><th>Nome Milvus</th><th>Token</th><th>Status</th></tr></thead><tbody>
+      ${_tokenBackfillPreview.map((p, i) => `<tr>
+        <td>${p.status === 'pronto' ? `<input type="checkbox" data-tb-idx="${i}" checked />` : ''}</td>
+        <td><strong>${escapeHtml(p.milvusNome)}</strong></td>
+        <td style="font-size:12px">${p.token ? `<code style="background:var(--bg-base);padding:2px 6px;border-radius:4px">${escapeHtml(p.token)}</code>` : '—'}</td>
+        <td>${_tokenBackfillStatusTag(p.status)}</td>
+      </tr>`).join('')}</tbody></table></div>
+      <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="button" class="btn btn-primary" id="tokenBackfillConfirmBtn" onclick="confirmMilvusTokenBackfill()">Preencher selecionados</button></div>
+      <div id="tokenBackfillMsg" style="font-size:13px;margin-top:8px"></div>`;
+  } catch (e) {
+    const body = document.getElementById('tokenBackfillBody');
+    if (body) body.innerHTML = '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
+  }
+}
+
+async function confirmMilvusTokenBackfill() {
+  const btn = document.getElementById('tokenBackfillConfirmBtn');
+  const setMsg = (html) => { const m = document.getElementById('tokenBackfillMsg'); if (m) m.innerHTML = html; };
+  const onlyNomes = [...document.querySelectorAll('[data-tb-idx]:checked')]
+    .map((el) => _tokenBackfillPreview[Number(el.dataset.tbIdx)])
+    .filter((p) => p && p.status === 'pronto')
+    .map((p) => p.milvusNome);
+  if (!onlyNomes.length) {
+    setMsg('<span style="color:var(--text-muted)">Nenhum item pronto selecionado.</span>');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Preenchendo…'; }
+  try {
+    const res = await commitMilvusTokenBackfill(onlyNomes);
+    setMsg(`<span style="color:var(--success,#16a34a)">${res.filled} token(s) preenchido(s)${res.skipped && res.skipped.length ? ` · ${res.skipped.length} pulado(s)` : ''}.</span>`);
+  } catch (e) {
+    setMsg('<span style="color:var(--danger,#dc2626)">Falha ao preencher. Tente novamente.</span>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Preencher selecionados'; }
+  }
 }
 
 async function loadMapeamentoData() {
