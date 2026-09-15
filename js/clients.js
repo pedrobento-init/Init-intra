@@ -431,7 +431,12 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
   if (btn && !silent) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
   try {
     const res = await syncClientMilvusTickets(clientId);
-    if (res && res.unmapped) {
+    const st = typeof resolveMilvusTicketsSyncState === 'function'
+      ? resolveMilvusTicketsSyncState(res)
+      : { kind: res && res.unmapped ? 'unmapped' : 'ok', synced: (res && res.synced) || 0 };
+    if (st.kind === 'no-token') {
+      setMsg('<span style="color:var(--text-muted)">Este cliente ainda não possui token configurado no Milvus.</span>');
+    } else if (st.kind === 'unmapped') {
       setMsg('<span style="color:var(--text-muted)">Cliente não possui mapeamento no Milvus.</span>');
     } else if (!silent) {
       const s = (res && res.synced) || 0;
@@ -826,6 +831,10 @@ function openClientForm(id = null) {
         </div>
       </div>
       <div class="form-section">
+        <div class="form-section-title">Integração Milvus</div>
+        <div class="form-group"><label class="form-label">Token do cliente no Milvus</label><input class="form-input" name="milvusClientToken" maxlength="64" value="${esc(c.milvusClientToken)}" placeholder="Ex.: ABC123" /><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Identificador utilizado para localizar este cliente no Milvus. Deixe vazio se o cliente não utiliza Milvus.</div></div>
+      </div>
+      <div class="form-section">
         <div class="form-section-title">Responsáveis</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Dono</label><input class="form-input" name="owner" value="${esc(c.owner)}" /></div>
@@ -1142,6 +1151,7 @@ function submitClientForm(e, id) {
       : (existing?.team || getCurrentTeam());
     const clientData = {
       id: id||null, name:g('name'), cnpj:g('cnpj'), segment:g('segment'), team,
+      milvusClientToken: normalizeMilvusClientToken(g('milvusClientToken')),
       color: window._selectedColor||COLORS[0], initials:g('initials'), logo: logoValue,
       logoShape: window._selectedLogoShape||'circle',
       owner:g('owner'), ownerPhone:g('ownerPhone'), responsible:g('responsible'),
@@ -1240,6 +1250,12 @@ async function handleImportFile(input) {
     };
     reader.readAsText(file);
   }
+}
+
+// Token do cliente no Milvus: só trim. Sem lowercase, sem máscara, sem
+// transformação — vazio vira '' (o sync grava NULL). Não é o segredo da API.
+function normalizeMilvusClientToken(v) {
+  return String(v === null || v === undefined ? '' : v).trim();
 }
 
 function handleImportPaste(text) {
@@ -1438,5 +1454,5 @@ function executeClientImport() {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildClientNarrative };
+  module.exports = { buildClientNarrative, normalizeMilvusClientToken };
 }

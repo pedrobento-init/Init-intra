@@ -9,12 +9,16 @@
 //   supabase functions deploy milvus-tickets
 //
 // FLUXO (1 cliente → 1 consulta → 10 chamados → upsert → prune):
-// - filtro_body.cliente_id = milvus_client_map.milvus_cliente_id
+// - Preferência: filtro_body.cliente_token = clients.milvus_client_token
+//   (identificador do CLIENTE; nunca o MILVUS_API_TOKEN, que é segredo).
+// - Fallback: filtro_body.cliente_id = milvus_client_map.milvus_cliente_id
 //   (id numérico resolvido via /cliente/busca; sem fuzzy de nome).
 // - A API ignora total_registros (sempre 50/página): 1 página,
 //   corta os 10 primeiros (código descrescente), apaga o excedente
 //   SOMENTE deste client_id. Nunca toca outros clientes.
 // - Coleta vazia NÃO apaga nada (falha transitória não limpa histórico).
+// - Sem token E sem mapa: { success:false, code:
+//   MILVUS_CLIENT_TOKEN_NOT_CONFIGURED } — sem consultar o Milvus.
 //
 // SEGURANÇA (mesmo padrão de milvus-devices):
 // - Token só em Deno.env: nunca retornado, logado ou em erro.
@@ -103,14 +107,14 @@ function normalizeTicket(raw: Record<string, unknown>, clientId: string, team: s
   };
 }
 
-async function fetchTicketsPage(clienteId: number): Promise<unknown[]> {
+async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknown[]> {
   const body = {
     is_paginate: true,
     is_descending: true,
     order_by: "codigo",
     total_registros: 50,
     pagina: 1,
-    filtro_body: { cliente_id: clienteId },
+    filtro_body: filter,
   };
 
   let attempt = 0;
@@ -224,7 +228,7 @@ serve(async (req: Request) => {
 
   const { data: client } = await admin
     .from("clients")
-    .select("id, name, team")
+    .select("id, name, team, milvus_client_token")
     .eq("id", clientId)
     .maybeSingle();
   if (!client) return json({ error: "Cliente não encontrado" }, 404);
@@ -239,7 +243,9 @@ serve(async (req: Request) => {
 
   console.log(`milvus-tickets: início client_id=${clientId} team=${cliTeam}`);
 
-  // 4) Identificadores Milvus mapeados (sem fuzzy — só o explícito).
+  // 4) Filtro preferencial: clients.milvus_client_token (trim; nunca o
+  // segredo da API). Fallback: ids do mapa explícito (sem fuzzy).
+  const clientToken = String(client.milvus_client_token ?? "").trim();
   const { data: mapRows } = await admin
     .from("milvus_client_map")
     .select("milvus_nome,milvus_cliente_id")
@@ -247,15 +253,25 @@ serve(async (req: Request) => {
   const clienteIds = [...new Set((mapRows || [])
     .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
     .filter((n): n is number => typeof n === "number"))];
-  if (!clienteIds.length) {
-    return json({ success: true, clientId, synced: 0, created: 0, updated: 0, pruned: 0, unmapped: true, lastSyncAt: new Date().toISOString() });
+  if (!clientToken && !clienteIds.length) {
+    return json({
+      success: false, code: "MILVUS_CLIENT_TOKEN_NOT_CONFIGURED",
+      clientId, unmapped: true, synced: 0, created: 0, updated: 0, pruned: 0,
+      lastSyncAt: new Date().toISOString(),
+    });
   }
 
-  // 5) 1 consulta por cliente Milvus (sem paginar os 20k+).
+  // 5) 1 consulta por filtro (sem paginar os 20k+). Log registra só a
+  // presença do token, nunca o valor.
+  const via = clientToken ? "token" : "map";
+  console.log(`milvus-tickets: filtro client_id=${clientId} via=${via} hasToken=${!!clientToken}`);
   const seen = new Map<number, Record<string, unknown>>();
   try {
-    for (const cid of clienteIds) {
-      const items = await fetchTicketsPage(cid);
+    const filters: Record<string, unknown>[] = clientToken
+      ? [{ cliente_token: clientToken }]
+      : clienteIds.map((cid) => ({ cliente_id: cid }));
+    for (const filter of filters) {
+      const items = await fetchTicketsPage(filter);
       for (const raw of items) {
         const row = normalizeTicket(raw as Record<string, unknown>, clientId, cliTeam);
         if (row && !seen.has(row.milvus_ticket_id as number)) {
@@ -327,8 +343,8 @@ serve(async (req: Request) => {
   const durationMs = Date.now() - startedAt;
   const lastSyncAt = new Date().toISOString();
   console.log(
-    `milvus-tickets: fim client_id=${clientId} synced=${rows.length} ` +
+    `milvus-tickets: fim client_id=${clientId} via=${via} synced=${rows.length} ` +
     `created=${created} updated=${updated} pruned=${pruned} duration_ms=${durationMs} ok`,
   );
-  return json({ success: true, clientId, synced: rows.length, created, updated, pruned, lastSyncAt });
+  return json({ success: true, clientId, via, synced: rows.length, created, updated, pruned, lastSyncAt });
 });

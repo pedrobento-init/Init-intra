@@ -954,6 +954,7 @@ function saveClient(data) {
       licenses: data.licenses,
       emails: data.emails,
       google_sheet_url: data.googleSheetUrl || null,
+      milvus_client_token: data.milvusClientToken || null,
       notes: data.notes,
       team: data.team || 'init',
       attachments: data.attachments || [],

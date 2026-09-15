@@ -165,11 +165,19 @@ async function syncClientMilvusTickets(clientId) {
   });
   if (error) throw new Error('Não foi possível atualizar os chamados do Milvus.');
   if (data && data.error) throw new Error('Não foi possível atualizar os chamados do Milvus.');
+  // Estado controlado (ex.: sem token): não é exceção — a UI decide a mensagem.
   try {
     if (data && data.lastSyncAt) setMilvusTicketsLastSyncAt(clientId, data.lastSyncAt);
     else setMilvusTicketsLastSyncAt(clientId, new Date().toISOString());
   } catch (_) {}
   return data;
+}
+
+// Mapeia o retorno do sync p/ estado de UI (puro, testável).
+function resolveMilvusTicketsSyncState(res) {
+  if (res && res.code === 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED') return { kind: 'no-token' };
+  if (res && res.unmapped) return { kind: 'unmapped' };
+  return { kind: 'ok', synced: Number(res && res.synced) || 0 };
 }
 
 // Export para testes (Node/Vitest).
@@ -182,5 +190,7 @@ if (typeof module !== 'undefined' && module.exports) {
     topMilvusTickets: topMilvusTickets,
     staleMilvusTicketIds: staleMilvusTicketIds,
     shouldAutoSyncMilvusTickets: shouldAutoSyncMilvusTickets,
+    resolveMilvusTicketsSyncState: resolveMilvusTicketsSyncState,
+    syncClientMilvusTickets: syncClientMilvusTickets,
   };
 }

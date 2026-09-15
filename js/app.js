@@ -360,7 +360,7 @@ async function _pushImportToSupabase(data) {
       logo: c.logo, logo_shape: c.logoShape || 'circle', owner: c.owner, owner_phone: c.ownerPhone,
       responsible: c.responsible, responsible_phone: c.responsiblePhone, technician: c.technician,
       server: c.server, hosting: c.hosting, backup: c.backup, licenses: c.licenses, emails: c.emails,
-      google_sheet_url: c.googleSheetUrl || null, notes: c.notes, team: c.team || 'init',
+      google_sheet_url: c.googleSheetUrl || null, milvus_client_token: c.milvusClientToken || null, notes: c.notes, team: c.team || 'init',
       attachments: c.attachments || [], created_at: c.createdAt || now, updated_at: c.updatedAt || now
     })));
   } catch (e) { errors.push('clients: ' + e.message); }
