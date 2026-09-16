@@ -540,6 +540,28 @@ function renderRelatorios(){
   _atendDoFetchAndRender(true);
 }
 
+// ── Auto-refresh global ──
+(function(){
+  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
+  if(window._atendAutoRefresh) return;
+  window._atendAutoRefresh=true;
+  onDataChanged('atendimentos', function(){
+    var h=(window.location.hash.replace('#','')||'dashboard');
+    // global Relatórios
+    if(h==='relatorios'){
+      try{ preserveScrollAround(function(){ _atendDoFetchAndRender(true); }); }catch(_){}
+      return;
+    }
+    // aba cliente Atendimentos dentro do modal
+    try{
+      var tab=document.querySelector('#clientTabs .tab.active');
+      if(tab && tab.textContent.trim().toLowerCase().indexOf('atendimento')!==-1 && document.getElementById('atendList')){
+        preserveScrollAround(function(){ _atendDoFetchAndRender(false); });
+      }
+    }catch(_){}
+  });
+})();
+
 // Helpers puros para testes/UI
 function _clearMilvusAtendCache(){ MILVUS_ATEND_CACHE.clear(); }
 

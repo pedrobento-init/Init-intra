@@ -1489,6 +1489,26 @@ function executeClientImport() {
   showToast(`${created} cliente(s) importado(s)${skipped ? ` · ${skipped} linha(s) ignoradas` : ''}`, 'success');
 }
 
+// ── Auto-refresh global (preserva filtros/paginação/scroll) ──
+function _refreshClientsInPlace(){
+  try{
+    var q=(document.getElementById('clientSearch')?.value||'').toLowerCase();
+    var all=typeof getMyClients==='function'?getMyClients(): (typeof getClients==='function'?getClients():[]);
+    _filteredClients = q ? all.filter(function(c){ return (c.name||'').toLowerCase().indexOf(q)!==-1 || (c.segment||'').toLowerCase().indexOf(q)!==-1; }) : all;
+    preserveScrollAround(function(){ renderClientGrid(); });
+  }catch(_){ try{ renderClientGrid(); }catch(_){} }
+}
+(function(){
+  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
+  if(window._cliAutoRefresh) return;
+  window._cliAutoRefresh=true;
+  onDataChanged('clientes', function(){
+    var h=(window.location.hash.replace('#','')||'dashboard');
+    if(h!=='clientes') return;
+    _refreshClientsInPlace();
+  });
+})();
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { buildClientNarrative, normalizeMilvusClientToken };
 }

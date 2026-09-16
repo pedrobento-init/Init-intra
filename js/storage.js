@@ -386,6 +386,13 @@ function dbSet(key, value) {
     } else {
       setCacheKV(key, value);
     }
+    try{
+      if(!_isPendingSuppressed() && typeof window!=='undefined' && typeof window.emitDataChanged==='function'){
+        var _map={}; _map[DB.CLIENTS]='clientes'; _map[DB.PENDENCIAS]='pendencias'; _map[DB.OPERATORS]='operadores'; _map[DB.VISITS]='visitas'; _map[DB.REUNIOES]='reunioes'; _map[DB.PROCEDURES]='procedimentos'; _map[DB.PROCEDURE_TEMPLATES]='templates';
+        var _ent=_map[key];
+        if(_ent) window.emitDataChanged(_ent, {key:key, via:'dbSet'});
+      }
+    }catch(_){}
     return;
   }
   console.error('dbSet called before IndexedDB is ready for key:', key);

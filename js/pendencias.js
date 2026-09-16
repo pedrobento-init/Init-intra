@@ -1240,6 +1240,18 @@ function submitReassignPendencia(penId) {
 
 function meetingReassignPen(penId) { return openReassignPendencia(penId); }
 
+// ── Auto-refresh global (preserva filtros/paginação/scroll) ──
+(function(){
+  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
+  if(window._pendAutoRefresh) return;
+  window._pendAutoRefresh=true;
+  onDataChanged('pendencias', function(){
+    var h=(window.location.hash.replace('#','')||'dashboard');
+    if(h!=='pendencias' && h!=='dashboard' && h!=='calendario') return;
+    try{ preserveScrollAround(function(){ if(document.getElementById('penViewArea')) renderPenView(false); }); }catch(_){}
+  });
+})();
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { suggestTemplateForDescription, _tokenizeWords, parseMentionedOperators, highlightMentions };
 }

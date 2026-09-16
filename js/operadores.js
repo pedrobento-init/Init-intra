@@ -730,3 +730,33 @@ function openOpPendencias(opId) {
     </div>
   `, 'lg');
 }
+
+// ── Auto-refresh global (preserva filtros/paginação/scroll) ──
+function _refreshOperadoresInPlace(){
+  try{
+    var q=(document.getElementById('opSearch')?.value||'').toLowerCase();
+    var ops=typeof getOperators==='function'?getOperators():[];
+    if(typeof isTeamAdmin==='function' && !isTeamAdmin()){
+      ops=ops.filter(function(o){ return (o.team||'init')=== (typeof getCurrentTeam==='function'?getCurrentTeam():'init'); });
+    } else if(typeof _selectedTeam!=='undefined' && _selectedTeam){
+      ops=ops.filter(function(o){ return (o.team||'init')===_selectedTeam; });
+    }
+    if(window._opFilter==='ativos') ops=ops.filter(function(o){return o.active;});
+    if(window._opFilter==='inativos') ops=ops.filter(function(o){return !o.active;});
+    if(q) ops=ops.filter(function(o){ return (o.name||'').toLowerCase().indexOf(q)!==-1 || (o.role||'').toLowerCase().indexOf(q)!==-1; });
+    _filteredOps=ops;
+    preserveScrollAround(function(){ _renderOpGrid(); });
+  }catch(_){ try{ _renderOpGrid(); }catch(_){} }
+}
+(function(){
+  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
+  if(window._opAutoRefresh) return;
+  window._opAutoRefresh=true;
+  onDataChanged('operadores', function(){
+    var h=(window.location.hash.replace('#','')||'dashboard');
+    if(h!=='operadores') return;
+    _refreshOperadoresInPlace();
+  });
+  // reload total se sessão/permissões mudarem
+  onDataChanged('session', function(){ window.location.reload(); });
+})();
