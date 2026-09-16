@@ -171,41 +171,48 @@ function _setLastSyncAt(table, iso) {
 }
 
 // ── EQUIPES / PERFIS ──
+// Poiesis 1-6 unificados em "poiesis" único (031). Legados mantidos como alias.
 const TEAMS = {
   INIT: 'init',
   MAM: 'mam',
-  POIESIS_1: 'poiesis_1',
-  POIESIS_2: 'poiesis_2',
-  POIESIS_3: 'poiesis_3',
-  POIESIS_4: 'poiesis_4',
-  POIESIS_5: 'poiesis_5',
-  POIESIS_6: 'poiesis_6',
+  POIESIS: 'poiesis',
   BT: 'bt',
+  // aliases retrocompatíveis — não usar em novos registros
+  POIESIS_1: 'poiesis',
+  POIESIS_2: 'poiesis',
+  POIESIS_3: 'poiesis',
+  POIESIS_4: 'poiesis',
+  POIESIS_5: 'poiesis',
+  POIESIS_6: 'poiesis',
 };
 
 const TEAM_LABELS = {
   init: 'Init',
   mam: 'MAM',
-  poiesis_1: 'Poiesis 1',
-  poiesis_2: 'Poiesis 2',
-  poiesis_3: 'Poiesis 3',
-  poiesis_4: 'Poiesis 4',
-  poiesis_5: 'Poiesis 5',
-  poiesis_6: 'Poiesis 6',
+  poiesis: 'Poiesis',
   bt: 'BT',
+  // legados (leitura de dados antigos)
+  poiesis_1: 'Poiesis',
+  poiesis_2: 'Poiesis',
+  poiesis_3: 'Poiesis',
+  poiesis_4: 'Poiesis',
+  poiesis_5: 'Poiesis',
+  poiesis_6: 'Poiesis',
 };
 
 const TEAM_OPTIONS = [
   { value: 'init', label: 'Init' },
   { value: 'mam', label: 'MAM' },
-  { value: 'poiesis_1', label: 'Poiesis 1' },
-  { value: 'poiesis_2', label: 'Poiesis 2' },
-  { value: 'poiesis_3', label: 'Poiesis 3' },
-  { value: 'poiesis_4', label: 'Poiesis 4' },
-  { value: 'poiesis_5', label: 'Poiesis 5' },
-  { value: 'poiesis_6', label: 'Poiesis 6' },
+  { value: 'poiesis', label: 'Poiesis' },
   { value: 'bt', label: 'BT' },
 ];
+
+function normalizeTeam(team){
+  if(!team) return team;
+  var t=String(team).toLowerCase().trim();
+  if(t.indexOf('poiesis_')===0) return 'poiesis';
+  return t;
+}
 
 // ── PIN HASH (SHA-256 via crypto.subtle – assíncrono e nativo) ──
 async function hashPin(pin, salt) {
@@ -255,7 +262,7 @@ function clearSession() {
 // ── TEAM HELPERS ──
 function getCurrentTeam() {
   const session = getSession();
-  return session?.team || 'init';
+  return normalizeTeam(session?.team || 'init');
 }
 
 function isTeamAdmin() {
@@ -264,13 +271,55 @@ function isTeamAdmin() {
 
 function canViewTeam(targetTeam) {
   if (isTeamAdmin()) return true;
-  return getCurrentTeam() === (targetTeam || 'init');
+  return normalizeTeam(getCurrentTeam()) === normalizeTeam(targetTeam || 'init');
 }
 
 function filterByTeam(items) {
   if (isTeamAdmin()) return items;
-  const myTeam = getCurrentTeam();
-  return items.filter(i => (i.team || 'init') === myTeam);
+  const myTeam = normalizeTeam(getCurrentTeam());
+  return items.filter(i => normalizeTeam(i.team || 'init') === myTeam);
+}
+
+// Migra registros locais legados poiesis_1..6 -> poiesis (idempotente)
+async function _migratePoiesisTeamsLocal(){
+  try{
+    if(typeof getCacheStore!=='function' || typeof setCacheStore!=='function') return;
+    var tables=['clients','pendencias','operators','visits','reunioes','tickets','client_devices','client_milvus_tickets'];
+    for(var ti=0; ti<tables.length; ti++){
+      var t=tables[ti];
+      try{
+        var rows=getCacheStore(t);
+        if(!Array.isArray(rows) || !rows.length) continue;
+        var changed=false;
+        var now=new Date().toISOString();
+        for(var i=0;i<rows.length;i++){
+          var r=rows[i];
+          if(r && r.team && String(r.team).indexOf('poiesis_')===0){
+            r.team='poiesis';
+            if('updatedAt' in r) r.updatedAt=now;
+            if('updated_at' in r) r.updated_at=now;
+            changed=true;
+          }
+        }
+        if(changed) setCacheStore(t, rows);
+      }catch(_){}
+    }
+    // sessão legada
+    try{
+      var sess=getSession();
+      if(sess && sess.team && String(sess.team).indexOf('poiesis_')===0){
+        sess.team='poiesis';
+        if(typeof setCacheTable==='function') setCacheTable('sessions', {key: DB.SESSION, value: sess});
+      }
+    }catch(_){}
+  }catch(_){}
+}
+if(typeof window!=='undefined'){
+  // tenta após DB pronto, com fallback imediato
+  if(typeof _initDBPromise!=='undefined' && _initDBPromise && typeof _initDBPromise.then==='function'){
+    _initDBPromise.then(function(){ _migratePoiesisTeamsLocal(); }).catch(function(){});
+  }
+  window.addEventListener('load', function(){ setTimeout(_migratePoiesisTeamsLocal, 800); });
 }
 
 const KEY_TO_TABLE = {
