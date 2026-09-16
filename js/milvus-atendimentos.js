@@ -509,8 +509,17 @@ function renderMilvusAtendimentosTab(clientId){
   _atendDoFetchAndRender(false);
 }
 
-// Render página global Relatórios (chamada por app.js navigateTo)
+// Render página global Relatórios (chamada por app.js navigateTo) — só time init
 function renderRelatorios(){
+  try {
+    var _team = typeof getCurrentTeam==='function' ? String(getCurrentTeam()||'').toLowerCase().trim() : String((typeof getSession==='function'&&getSession()?.team)||'init').toLowerCase().trim();
+    if (_team !== 'init') {
+      document.getElementById('pageTitle').textContent='Relatórios';
+      document.getElementById('contentArea').innerHTML='<div class="empty-state" style="padding:40px"><p>Acesso restrito ao time Init.</p></div>';
+      if (typeof showToast==='function') showToast('Relatórios disponível apenas para o time Init.', 'error');
+      return;
+    }
+  } catch(_){}
   document.getElementById('pageTitle').textContent='Relatórios — Atendimentos';
   var content=document.getElementById('contentArea');
   var range=_monthRangeISO();

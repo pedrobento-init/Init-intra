@@ -56,6 +56,15 @@ function _refreshCurrentGroupPens() {
 }
 
 function renderReuniao() {
+  try {
+    var _t = typeof getCurrentTeam==='function' ? String(getCurrentTeam()||'').toLowerCase().trim() : 'init';
+    if (_t !== 'init') {
+      document.getElementById('pageTitle').textContent='Reunião Mensal';
+      document.getElementById('contentArea').innerHTML='<div class="empty-state" style="padding:40px"><p>Acesso restrito ao time Init.</p></div>';
+      if (typeof showToast==='function') showToast('Reunião disponível apenas para o time Init.', 'error');
+      return;
+    }
+  } catch(_){}
   document.getElementById('pageTitle').textContent = 'Reunião Mensal';
   const btn = document.getElementById('topbarActionBtn');
   if (btn) btn.style.display = 'none';

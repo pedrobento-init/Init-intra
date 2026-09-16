@@ -29,9 +29,10 @@ function initTeamSelector() {
     select.style.opacity = '0.7';
     select.style.cursor = 'not-allowed';
     select.title = 'Sua equipe';
+    if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
     return;
   }
-  
+
   // Admin/Init: show selector
   wrap.style.display = 'block';
   select.disabled = false;
@@ -41,14 +42,35 @@ function initTeamSelector() {
   select.innerHTML = '<option value="">Todas as equipes</option>' +
     TEAM_OPTIONS.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
   select.value = _selectedTeam;
+  if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
 }
 
+function canViewInitOnly() {
+  try {
+    if (typeof getCurrentTeam === 'function') {
+      var t = String(getCurrentTeam() || '').toLowerCase().trim();
+      return t === 'init';
+    }
+    var s = typeof getSession === 'function' ? getSession() : null;
+    return String(s?.team || 'init').toLowerCase().trim() === 'init';
+  } catch (_) { return false; }
+}
+function canViewRelatorios() { return canViewInitOnly(); }
+function canViewReuniao() { return canViewInitOnly(); }
+function updateRelatoriosVisibility() {
+  var allowed = canViewInitOnly();
+  var navRel = document.getElementById('nav-relatorios');
+  if (navRel) navRel.style.display = allowed ? '' : 'none';
+  var navReu = document.getElementById('nav-reuniao');
+  if (navReu) navReu.style.display = allowed ? '' : 'none';
+}
 function onTeamChange(value) {
   _selectedTeam = value;
   // Save preference
   if (typeof setCacheKV === 'function') setCacheKV('intra_selected_team', value);
   // Rebuild realtime channel with the team filter
   if (typeof initSupabaseRealtime === 'function') initSupabaseRealtime();
+  if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
   // Re-render current page
   const hash = window.location.hash.replace('#','');
   if (hash) navigateTo(hash);
@@ -449,6 +471,14 @@ function navigateTo(page) {
       if (page === 'mapeamento-milvus') showToast('Somente administradores podem acessar o mapeamento.', 'error');
       page = 'pendencias';
     }
+  }
+  if (page === 'relatorios' && typeof canViewInitOnly === 'function' && !canViewInitOnly()) {
+    if (typeof showToast === 'function') showToast('Relatórios disponível apenas para o time Init.', 'error');
+    page = 'pendencias';
+  }
+  if (page === 'reuniao' && typeof canViewInitOnly === 'function' && !canViewInitOnly()) {
+    if (typeof showToast === 'function') showToast('Reunião disponível apenas para o time Init.', 'error');
+    page = 'pendencias';
   }
 
   if (currentHash !== page && contentArea) {
@@ -1282,12 +1312,13 @@ function _startApp() {
     var mapNav = document.getElementById('nav-mapeamento-milvus');
     if (mapNav) mapNav.style.display = 'none';
   }
+  if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
   document.querySelectorAll('.btn-export').forEach(function (btn) {
     btn.style.display = isAdmin ? '' : 'none';
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['dashboard','clientes','pendencias','calendario','operadores','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','mapeamento-milvus','historico','templates','visitas','reuniao'];
   navigateTo(pages.includes(hash) ? hash : 'dashboard');
   if (!_appStarted) {
     _appStarted = true;
