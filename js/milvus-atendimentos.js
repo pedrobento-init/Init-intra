@@ -285,8 +285,9 @@ function _atendFmtHora(h){ return _normalizeHHMM(h); }
 var _atendUI = {clientId:'', dataInicial:'', dataFinal:'', codigo:'', tecnico:'', nomeMesa:'', isExterno:'', isComercial:'', motivoPausa:'', page:1, perPage:50, isDescending:true};
 function _atendGetFilters(fromGlobal){
   var prefix = fromGlobal ? 'gAtend' : 'atend';
+  var selClient = fromGlobal ? (document.getElementById('gAtendClient')?.value || _atendUI.clientId || '') : (_atendUI.clientId||'');
   return {
-    clientId: fromGlobal ? '' : (_atendUI.clientId||''),
+    clientId: selClient,
     dataInicial: document.getElementById(prefix+'DataInicial')?.value || _atendUI.dataInicial || '',
     dataFinal: document.getElementById(prefix+'DataFinal')?.value || _atendUI.dataFinal || '',
     codigo: document.getElementById(prefix+'Codigo')?.value || '',
@@ -386,9 +387,14 @@ function _atendDoFetchAndRender(isGlobal){
   if(listEl) listEl.innerHTML='<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando…</p>';
   if(resumoEl) resumoEl.innerHTML=_atendSkeleton();
   var pageBtn=document.getElementById(prefix+'PageInfo');
+  // sincroniza seletor global antes do fetch
+  if(isGlobal){
+    var sel=document.getElementById('gAtendClient');
+    if(sel) _atendUI.clientId=sel.value||'';
+  }
   // chama fetch
   var opts={
-    clientId: isGlobal?'':_atendUI.clientId,
+    clientId: filtros.clientId || _atendUI.clientId || '',
     dataInicial: filtros.dataInicial,
     dataFinal: filtros.dataFinal,
     codigo: filtros.codigo,
@@ -431,10 +437,10 @@ function _atendApplyFilters(isGlobal){
 }
 function _atendExport(tipo){
   var isGlobal=document.getElementById('gAtendList')!=null;
-  var prefix=isGlobal?'gAtend':'atend';
+  if(isGlobal){ var sel=document.getElementById('gAtendClient'); if(sel) _atendUI.clientId=sel.value||''; }
   var f=_atendGetFilters(isGlobal);
   var opts={
-    clientId: isGlobal?'':_atendUI.clientId,
+    clientId: f.clientId || _atendUI.clientId || '',
     dataInicial: f.dataInicial,
     dataFinal: f.dataFinal,
     codigo: f.codigo,
