@@ -2434,7 +2434,7 @@ body,
 }
 
 body.dark-theme {
-  /* Core palette - premium dark slate */
+  /* Core palette - premium dark slate — WCAG AA contrast (8) */
   --bg-base: #0b0f19;
   --bg-surface: #131c2e;
   --bg-card: #131c2e;
@@ -2443,8 +2443,8 @@ body.dark-theme {
   --border: rgba(255,255,255,0.09);
   --border-light: rgba(255,255,255,0.15);
   --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #8494a7;
+  --text-secondary: #b0bfcf;
+  --text-muted: #9aa8be;
   --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25);
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
   --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
@@ -3622,7 +3622,61 @@ body.dark-theme .overdue-banner {
 }
 .pen-pager-info { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .pen-pager .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.pen-pager--single { justify-content: center; background: var(--bg-surface); }
 @media (hover: none) { .pen-check-remove { opacity: 1; } }
+
+/* ── 2. CARROSSEL CLIENTES (chips horizontais, altura reduzida) ── */
+.pen-client-carousel-wrap { display:flex; align-items:center; gap:10px; overflow:hidden; }
+.pen-client-carousel { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; flex:1; padding:4px 2px; scroll-snap-type:x proximity; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+.pen-client-carousel::-webkit-scrollbar { height:4px; }
+.pen-client-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:20px; border:1px solid var(--border); background:var(--bg-surface); font-size:12px; font-weight:500; color:var(--text-primary); white-space:nowrap; cursor:pointer; flex-shrink:0; scroll-snap-align:start; transition:border-color var(--transition), background var(--transition); }
+.pen-client-chip:hover { border-color:var(--accent); background:var(--accent-dim); }
+.pen-chip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.pen-chip-name { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.pen-chip-counts { font-size:11px; color:var(--text-muted); font-variant-numeric:tabular-nums; }
+.pen-chip-toggle { flex-shrink:0; white-space:nowrap; }
+.pen-client-carousel.has-scroll-left { box-shadow: inset 12px 0 8px -8px rgba(15,23,42,0.12); }
+.pen-client-carousel.has-scroll-right { box-shadow: inset -12px 0 8px -8px rgba(15,23,42,0.12); }
+
+/* ── 3. BARRA DE FILTROS — Mais filtros ── */
+.pen-search-bar { position:relative; }
+.pen-more-btn { position:relative; display:inline-flex; align-items:center; gap:6px; }
+.pen-more-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; line-height:1; }
+.pen-more-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); min-width:280px; max-width:100%; }
+.pen-search-bar .pen-more-panel { right:auto; left:0; }
+@media(max-width:640px){ .pen-more-panel{ left:0; right:0; min-width:0; } }
+
+/* ── 6. ORDENAÇÃO POR COLUNA ── */
+.kanban-col-sort { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:4px; border:1px solid transparent; background:transparent; color:var(--text-muted); font-size:12px; cursor:pointer; transition:all var(--transition); }
+.kanban-col-sort:hover { border-color:var(--border); background:var(--bg-hover); color:var(--text-primary); }
+
+/* ── 7. DENSIDADE DOS CARDS (2 linhas compactas) ── */
+.kanban-card { padding:9px 10px; }
+.kanban-card-compact { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.2; }
+.kanban-card-compact--bottom { justify-content:space-between; margin-top:6px; border-top:1px dashed var(--border); padding-top:5px; }
+.kc-client { display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--text-primary); max-width:110px; min-width:0; }
+.kc-client-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kc-pri .tag { padding:1px 6px; font-size:10px; }
+.kc-resp { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--text-secondary); max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kc-resp--empty { color:var(--text-muted); font-style:italic; }
+.kc-overdue, .kc-stale, .kc-sla { display:inline-flex; align-items:center; gap:2px; font-size:10.5px; font-weight:600; white-space:nowrap; }
+.kc-sla--muted { background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:10px; border:1px solid #fde68a; }
+body.dark-theme .kc-sla--muted { background:rgba(217,119,6,0.15); color:#fbbf24; border-color:rgba(217,119,6,0.3); }
+.kc-deadline { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); }
+.kc-deadline.is-empty { color:var(--text-muted); }
+.kc-deadline.is-overdue { color:#dc2626; font-weight:600; }
+.kc-timer .timer-widget { font-size:10.5px; }
+.kc-timer .timer-btn { padding:2px 6px; font-size:10px; }
+
+/* ── 5. ÍCONE NEUTRO PARA "NINGUÉM" ── */
+.pen-work.is-free .pen-work-dot { background:#94a3b8 !important; box-shadow:0 0 0 3px rgba(148,163,184,0.15) !important; animation:none !important; }
+.pen-work.is-free { border-style:dashed; }
+
+/* ── 8. CONTRASTE WCAG AA (ajustes finos para secundários) ── */
+.kanban-card-date, .pen-summary, .kc-deadline.is-empty, .kc-resp--empty { color:var(--text-secondary); }
+body.dark-theme .kanban-card-date, body.dark-theme .kanban-card-date.is-empty, body.dark-theme .pen-summary, body.dark-theme .kc-resp--empty { color:#a8b5c8; }
+body.dark-theme .kanban-card-meta, body.dark-theme .pen-mobile-card-meta, body.dark-theme .pen-mobile-card-footer { color:#a8b5c8; }
+body.dark-theme .pen-chip-counts, body.dark-theme .pen-pager-info { color:#cbd5e1; }
 @media (max-width: 640px) {
   .pen-prop { grid-template-columns: 108px 1fr; }
   .pen-header-btns { margin-left: 0; }
