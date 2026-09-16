@@ -517,10 +517,12 @@ body.dark-theme .template-suggestion {
   border-radius: var(--radius-sm);
   padding: 11px 12px;
   cursor: pointer;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition), box-shadow var(--transition), transform 0.2s ease-out;
   box-shadow: var(--shadow-sm);
+  will-change: transform;
+  transform: translateY(0);
 }
-.kanban-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+.kanban-card:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-3px); }
 .kanban-card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); line-height: 1.35; }
 .kanban-card-meta { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; column-gap: 8px; row-gap: 5px; flex-wrap: wrap; }
 /* Linha de prazo do card: data com peso próprio, separada dos metadados. */
@@ -1470,7 +1472,7 @@ body.dark-theme .template-suggestion {
 /* ── KANBAN DRAG & DROP ── */
 .kanban-card.dragging {
   opacity: 0.35;
-  transform: scale(0.97);
+  transform: scale(0.97) !important;
   cursor: grabbing;
 }
 .kanban-card { cursor: grab; }

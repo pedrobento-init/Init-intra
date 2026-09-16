@@ -332,10 +332,25 @@ function _applyPenCardMotion(area) {
     );
   });
   area.querySelectorAll('.kanban-card').forEach(function(card) {
+    if (card.dataset.motionHoverBound) return;
+    card.dataset.motionHoverBound = '1';
     Motion.hover(card,
       function() { Motion.animate(card, { y: -3 }, { duration: 0.2, ease: 'easeOut' }); },
       function() { Motion.animate(card, { y: 0 }, { duration: 0.2, ease: 'easeOut' }); }
     );
+    // Fallback nativo: garante que o card volte ao estado original mesmo se
+    // o Motion.hover não disparar o leave (ex: drag, pointer rápido, ou falha da lib)
+    var resetHover = function() {
+      try { Motion.animate(card, { y: 0 }, { duration: 0.15, ease: 'easeOut' }); } catch(_) {}
+      // Limpeza do inline style que o Motion deixa (evita ficar em translateY(-3px))
+      setTimeout(function(){
+        if (!card.matches(':hover')) card.style.transform = '';
+      }, 220);
+    };
+    card.addEventListener('mouseleave', resetHover);
+    card.addEventListener('pointerleave', resetHover);
+    card.addEventListener('dragend', resetHover);
+    card.addEventListener('blur', resetHover);
   });
 }
 
