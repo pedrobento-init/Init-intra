@@ -472,6 +472,7 @@ function navigateTo(page) {
   else if (page === 'visitas')     renderVisitas();
   else if (page === 'reuniao')     renderReuniao();
   else if (page === 'operadores')  renderOperadores();
+  else if (page === 'relatorios')  { if(typeof renderRelatorios==='function') renderRelatorios(); else document.getElementById('contentArea').innerHTML='<p>Relatórios em carregamento...</p>'; }
   else if (page === 'mapeamento-milvus') renderMapeamentoMilvus();
   else if (page === 'historico')   renderLogs();
 

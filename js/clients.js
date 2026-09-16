@@ -130,6 +130,7 @@ function viewClient(id) {
       <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
       <div class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</div>
       <div class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</div>
+      <div class="tab" onclick="switchClientTab('atendimentos','${id}')">Atendimentos</div>
       <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
       <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
     </div>
@@ -138,7 +139,7 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','documentos','historico'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','atendimentos','documentos','historico'][i]===tab));
   renderClientTab(tab, id);
 }
 
@@ -255,6 +256,9 @@ function renderClientTab(tab, id) {
     renderClientInventoryTab(id);
   } else if (tab === 'chamados') {
     renderClientMilvusTicketsTab(id);
+  } else if (tab === 'atendimentos') {
+    if(typeof renderMilvusAtendimentosTab==='function') renderMilvusAtendimentosTab(id);
+    else el.innerHTML='<p style="color:var(--text-muted)">Módulo Atendimentos não carregado.</p>';
   } else if (tab === 'historico') {
     const client = getClientById(id);
     const clientName = client ? client.name : '';
