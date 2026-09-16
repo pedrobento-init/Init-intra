@@ -1156,6 +1156,11 @@ body.dark-theme .template-suggestion {
   flex-direction: column;
   transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
   overflow: hidden;
+  position: relative;
+}
+.op-card--menu-open {
+  overflow: visible;
+  z-index: 40;
 }
 .op-card:hover {
   border-color: var(--accent);
@@ -1226,7 +1231,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 .op-card-actions .op-edit-btn { flex:1; justify-content:center; font-size:11.5px; min-width:0; }
 .op-kebab-wrap { position:relative; flex-shrink:0; }
 .op-kebab-btn { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
-.op-kebab-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:20; min-width:180px; background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); padding:6px; display:flex; flex-direction:column; gap:4px; }
+.op-kebab-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:50; min-width:180px; background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); padding:6px; display:flex; flex-direction:column; gap:4px; }
 .op-kebab-item { display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px; border:none; background:transparent; border-radius:6px; font-size:12.5px; font-weight:500; color:var(--text-primary); cursor:pointer; text-align:left; transition:background var(--transition); }
 .op-kebab-item:hover { background:var(--bg-hover); }
 .op-kebab-item--danger { color:var(--red); }

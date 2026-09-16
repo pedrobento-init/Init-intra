@@ -30,14 +30,24 @@ function _opLeaveIcon(){
 function toggleOpMenu(id){
   var menu=document.getElementById('opMenu-'+id);
   if(!menu) return;
-  var open=menu.dataset.open==='1';
-  document.querySelectorAll('.op-kebab-menu[data-open=\"1\"]').forEach(function(m){ m.dataset.open='0'; m.style.display='none'; });
-  if(!open){ menu.dataset.open='1'; menu.style.display='flex'; }
-  else { menu.dataset.open='0'; menu.style.display='none'; }
+  var isOpen=menu.dataset.open==='1';
+  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function(m){
+    m.dataset.open='0'; m.style.display='none';
+    var c=m.closest && m.closest('.op-card'); if(c) c.classList.remove('op-card--menu-open');
+  });
+  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
+  if(isOpen) return;
+  menu.dataset.open='1'; menu.style.display='flex';
+  var card=menu.closest && menu.closest('.op-card'); if(card) card.classList.add('op-card--menu-open');
+  var wrap=menu.closest('.op-kebab-wrap'); if(wrap){ var b2=wrap.querySelector('.op-kebab-btn'); if(b2) b2.setAttribute('aria-expanded','true'); }
 }
 function _closeOpMenus(e){
   if(e.target.closest && e.target.closest('.op-kebab-wrap')) return;
-  document.querySelectorAll('.op-kebab-menu[data-open=\"1\"]').forEach(function(m){ m.dataset.open='0'; m.style.display='none'; });
+  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function(m){
+    m.dataset.open='0'; m.style.display='none';
+    var c=m.closest && m.closest('.op-card'); if(c) c.classList.remove('op-card--menu-open');
+  });
+  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
 }
 if(typeof window!=='undefined' && !window._opMenuBound){
   window._opMenuBound=true;
