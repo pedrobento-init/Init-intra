@@ -5,6 +5,45 @@ const OP_COLORS = [
   '#4f46e5','#6366f1','#7c3aed','#d97706','#dc2626'
 ];
 
+function _opHash(str){
+  var s=String(str||'').toLowerCase().trim();
+  var h=0; for(var i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0; }
+  return Math.abs(h);
+}
+function getOpAvatarColor(opOrName){
+  var name = typeof opOrName==='string' ? opOrName : (opOrName && opOrName.name) || '';
+  var idx = _opHash(name || '?') % OP_COLORS.length;
+  return OP_COLORS[idx];
+}
+function _opKebabIcon(){
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+}
+function _opTrashIcon(){
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+}
+function _opKeyIcon(){
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="7.5" r="3.5"/><path d="M10.5 10.5 L21 21"/><path d="M15 21l3-3-3-3"/><path d="M19 11a7 7 0 1 1-7-7"/></svg>';
+}
+function _opLeaveIcon(){
+  return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a4 4 0 1 0-8 0 4 4 0 0 0 8 0z"/><path d="M4 20a8 8 0 0 1 16 0"/><line x1="4" y1="4" x2="20" y2="20"/></svg>';
+}
+function toggleOpMenu(id){
+  var menu=document.getElementById('opMenu-'+id);
+  if(!menu) return;
+  var open=menu.dataset.open==='1';
+  document.querySelectorAll('.op-kebab-menu[data-open=\"1\"]').forEach(function(m){ m.dataset.open='0'; m.style.display='none'; });
+  if(!open){ menu.dataset.open='1'; menu.style.display='flex'; }
+  else { menu.dataset.open='0'; menu.style.display='none'; }
+}
+function _closeOpMenus(e){
+  if(e.target.closest && e.target.closest('.op-kebab-wrap')) return;
+  document.querySelectorAll('.op-kebab-menu[data-open=\"1\"]').forEach(function(m){ m.dataset.open='0'; m.style.display='none'; });
+}
+if(typeof window!=='undefined' && !window._opMenuBound){
+  window._opMenuBound=true;
+  document.addEventListener('click', _closeOpMenus);
+}
+
 let _opPage = 1;
 let _filteredOps = [];
 const OP_PAGE_SIZE = 30;
@@ -129,25 +168,31 @@ function _renderOpGrid() {
   grid.innerHTML = pageOps.map(op => {
     const penCount = pens.filter(p => p.responsible === op.name).length;
     const initials  = op.initials || op.name.substring(0, 2).toUpperCase();
-    const color     = op.color || OP_COLORS[0];
+    const color     = op.color || getOpAvatarColor(op.name);
     const isActive  = op.active !== false;
     const isSelf = session && session.opId === op.id;
+    // 1. Ação principal sempre visível + menu ⋮ para secundárias
     let actionsHtml = '';
+    let kebabItems = '';
     if (isAdminUser || isSelf) {
-      actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openOperadorForm('${escapeHtml(op.id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
+      actionsHtml += `<button class="btn btn-secondary btn-sm op-edit-btn" onclick="event.stopPropagation();openOperadorForm('${escapeHtml(op.id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
     }
     if (isAdminUser) {
-      actionsHtml += `
-        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleOp('${escapeHtml(op.id)}')" title="${isActive ? 'Desativar' : 'Ativar'}">
+      kebabItems += `
+        <button class="op-kebab-item" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');toggleOp('${escapeHtml(op.id)}')" title="${isActive ? 'Desativar' : 'Ativar'}">
           ${isActive
             ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`
             : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 14 14"/></svg>`
           }
-          ${isActive ? 'Desativar' : 'Ativar'}
-        </button>
-        ${op.email ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();resendOperatorInvite('${escapeHtml(op.id)}')" title="Reenviar convite por e-mail">📧 Reenviar</button>` : ''}
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteOpConfirm('${escapeHtml(op.id)}')">&#10005;</button>
-      `;
+          <span>${isActive ? 'Desativar' : 'Ativar'}</span>
+        </button>`;
+      if(op.email){
+        kebabItems += `<button class="op-kebab-item" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');resendOperatorInvite('${escapeHtml(op.id)}')" title="Reenviar convite"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span>Reenviar convite</span></button>`;
+      }
+      kebabItems += `<button class="op-kebab-item op-kebab-item--danger" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');deleteOpConfirm('${escapeHtml(op.id)}')" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
+    }
+    if(kebabItems){
+      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}')" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu" id="opMenu-${escapeHtml(op.id)}" data-open="0" style="display:none">${kebabItems}</div></div>`;
     }
 
     return `
@@ -158,7 +203,7 @@ function _renderOpGrid() {
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}
             </div>
-            ${op.onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : ''}
+            ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}
           </div>
         </div>
         <div class="op-card-name">${escapeHtml(op.name)}</div>
@@ -168,9 +213,9 @@ function _renderOpGrid() {
         <div class="op-card-tasks">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           <span>${penCount} pendência(s)</span>
-          ${penCount > 0 ? '<span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:600">Ver →</span>' : ''}
+          ${penCount > 0 ? '<span class="op-tasks-link">Ver →</span>' : '<span class="op-tasks-empty" aria-hidden="true"></span>'}
         </div>
-        ${actionsHtml ? `<div class="op-card-actions" style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${actionsHtml}</div>` : ''}
+        ${actionsHtml ? `<div class="op-card-actions">${actionsHtml}</div>` : ''}
       </div>`;
   }).join('') + (totalPages > 1 ? `
     <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)">
@@ -259,7 +304,7 @@ function openOperadorForm(id = null) {
   }
 
   const op = id ? getOperatorById(id) : {};
-  const selColor = op?.color || OP_COLORS[0];
+  const selColor = op?.color || getOpAvatarColor(op?.name || '') || OP_COLORS[0];
   const isSelf = session && session.opId === op.id;
   const hasCurrentPassword = !!op.pinHash;
   const esc = v => escapeHtml(v || '');
@@ -274,7 +319,7 @@ function openOperadorForm(id = null) {
   ` : '';
 
   const adminBanner = isAdminUser 
-    ? `<div style="padding:8px 12px;background:rgba(26,86,219,0.1);border:1px solid rgba(26,86,219,0.3);border-radius:6px;margin-bottom:12px;font-size:12px;color:var(--accent);font-weight:600">🔑 Modo Administrador — você pode editar todos os campos</div>`
+    ? `<div style="padding:8px 12px;background:rgba(26,86,219,0.1);border:1px solid rgba(26,86,219,0.3);border-radius:6px;margin-bottom:12px;font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
     : '';
 
   openModal(id ? 'Editar Operador' : 'Novo Operador', `
@@ -287,7 +332,10 @@ function openOperadorForm(id = null) {
         <div style="flex:1">
           <div class="form-group" style="margin-bottom:6px"><label class="form-label">Cor do avatar</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap" id="opColorPicker">
-              ${OP_COLORS.map(col => `<div onclick="selectOpColor('${col}')" style="width:26px;height:26px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${selColor===col?'#0f172a':'transparent'};transition:border-color .15s" data-color="${col}"></div>`).join('')}
+              ${OP_COLORS.map(col => {
+                var isSel = selColor===col;
+                return `<button type="button" onclick="selectOpColor('${col}')" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
+              }).join('')}
             </div>
           </div>
         </div>
@@ -328,12 +376,12 @@ function openOperadorForm(id = null) {
           </div>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op?.isAdmin ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
+          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opIsAdmin" class="form-label" style="margin-bottom:0;cursor:pointer;font-weight:600">Perfil Administrador</label>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <input type="checkbox" name="onLeave" id="opOnLeave" ${op?.onLeave ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
-          <label for="opOnLeave" class="form-label" style="margin-bottom:0;cursor:pointer">🏖️ Afastado (onLeave)</label>
+          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
+          <label for="opOnLeave" class="form-label" style="margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px">${_opLeaveIcon()} Afastado</label>
         </div>
         ` : `
         <input type="hidden" name="team" value="${op?.team||'init'}" />
@@ -388,8 +436,14 @@ function openOperadorForm(id = null) {
 
 function selectOpColor(col) {
   window._selectedOpColor = col;
-  document.querySelectorAll('#opColorPicker div').forEach(d => {
-    d.style.border = `3px solid ${d.dataset.color === col ? '#0f172a' : 'transparent'}`;
+  document.querySelectorAll('#opColorPicker button').forEach(function(btn){
+    var isSel = btn.dataset.color === col;
+    btn.style.border = isSel ? '2px solid #0f172a' : '2px solid transparent';
+    btn.style.outline = isSel ? '2px solid #fff' : '';
+    btn.style.outlineOffset = isSel ? '-4px' : '0';
+    btn.style.boxShadow = isSel ? '0 0 0 2px #0f172a' : '';
+    btn.setAttribute('aria-pressed', isSel ? 'true' : 'false');
+    btn.innerHTML = isSel ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '';
   });
   updateOpPreview();
 }
@@ -485,7 +539,7 @@ async function submitOperadorForm(e, id) {
       id: id || null,
       name,
       initials,
-      color:  window._selectedOpColor || OP_COLORS[0],
+      color:  window._selectedOpColor || getOpAvatarColor(name) || OP_COLORS[0],
       role:   g('role') || 'Técnico',
       phone:  g('phone'),
       email:  g('email'),
@@ -632,7 +686,7 @@ function openOpPendencias(opId) {
     <div class="op-detail-header" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-base);border-radius:var(--radius);margin-bottom:20px">
       <div style="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : ''}</div>
+        <div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}</div>
         <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(op.role || 'Técnico')}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">

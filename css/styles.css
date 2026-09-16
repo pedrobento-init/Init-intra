@@ -400,6 +400,9 @@ tr:hover td { background: var(--bg-hover); }
   gap: 8px;
   margin-bottom: 24px;
 }
+.pen-scope-row { justify-content:flex-start; gap:12px; margin-bottom:14px; }
+.pen-scope-count { font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums; margin-left:4px; }
+.pen-scope-count:empty { display:none; }
 
 /* ── TEMPLATES GRID ── */
 #templatesGridWrap {
@@ -1187,8 +1190,9 @@ body.dark-theme .template-suggestion {
   letter-spacing: .3px;
   text-transform: uppercase;
 }
-.op-badge-active   { background: rgba(22,163,74,0.12);  color: var(--green); }
-.op-badge-inactive { background: #f1f5f9; color: var(--text-muted); }
+.op-badge-active   { background: rgba(22,163,74,0.12);  color: var(--green); border:1px solid rgba(22,163,74,0.2); }
+.op-badge-inactive { background: #f1f5f9; color: #475569; border:1px solid #e2e8f0; }
+body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: #94a3b8; border-color: rgba(255,255,255,0.08); }
 
 .op-card-name {
   font-size: 16px; font-weight: 700;
@@ -1214,10 +1218,23 @@ body.dark-theme .template-suggestion {
   margin-top: auto;
 }
 .op-card-actions {
-  display: flex; gap: 5px; flex-wrap: wrap;
+  display: flex; gap: 8px; align-items:center;
   padding: 10px 14px 14px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
 }
-.op-card-actions .btn { flex: 1; justify-content: center; font-size: 11.5px; }
+.op-card-actions .op-edit-btn { flex:1; justify-content:center; font-size:11.5px; min-width:0; }
+.op-kebab-wrap { position:relative; flex-shrink:0; }
+.op-kebab-btn { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
+.op-kebab-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:20; min-width:180px; background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); padding:6px; display:flex; flex-direction:column; gap:4px; }
+.op-kebab-item { display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px; border:none; background:transparent; border-radius:6px; font-size:12.5px; font-weight:500; color:var(--text-primary); cursor:pointer; text-align:left; transition:background var(--transition); }
+.op-kebab-item:hover { background:var(--bg-hover); }
+.op-kebab-item--danger { color:var(--red); }
+.op-kebab-item--danger:hover { background:var(--red-dim); }
+.op-tasks-link { margin-left:auto; font-size:10px; color:var(--accent); font-weight:600; white-space:nowrap; }
+.op-tasks-empty { margin-left:auto; }
+.op-card-tasks { min-height:32px; }
+.badge-afastado { display:inline-flex; align-items:center; gap:4px; }
 
 /* ── LOGIN SCREEN ── */
 .login-header {

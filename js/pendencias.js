@@ -215,16 +215,12 @@ function renderPendencias() {
         <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
       </div>
     </div>
-    <div class="page-action-row">
+    <div class="page-action-row pen-scope-row">
       <div class="view-toggles">
         <button class="btn btn-sm ${penScope==='active'?'btn-primary':'btn-secondary'}" onclick="setPenScope('active')">Ativas</button>
         <button class="btn btn-sm ${penScope==='archived'?'btn-primary':'btn-secondary'}" onclick="setPenScope('archived')">Arquivadas</button>
       </div>
-      <div style="flex:1"></div>
-      <button class="btn btn-primary btn-new-action" onclick="openPendenciaForm()" aria-label="Nova Pendência">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Nova Pendência
-      </button>
+      <span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>
     </div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <div id="penViewArea"></div>`;
@@ -461,6 +457,15 @@ function renderPenKanban(area) {
     }
   }
   _applyPenCardMotion(area);
+  // Atualiza contador inline na linha das abas (evita espaço vazio após remoção do CTA duplicado)
+  try{
+    var cntEl=document.getElementById('penScopeCount');
+    if(cntEl){
+      var total = _penServerMode && _penTotal!=null ? _penTotal : pens.length;
+      var label = penScope==='archived' ? 'arquivadas' : 'ativas';
+      cntEl.textContent = total ? total + ' ' + label : '';
+    }
+  }catch(_){}
   } finally {
     _clearPenRenderCache();
   }
