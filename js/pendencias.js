@@ -4,6 +4,23 @@ const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro
 
 const PEN_KANBAN_COLS = typeof STATUS_PEN_MAP !== 'undefined' ? Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot })) : [];
 
+// Colunas/status ocultos da VISUALIZAÇÃO de Pendências (kanban, resumos e
+// grade mobile). Somente apresentação: registros com esses status continuam
+// existindo, sincronizando e acessíveis (filtro de status, busca, detalhe,
+// dashboard, relatórios). O escopo Ativas/Arquivadas e a lógica de
+// sincronização (isPendenciaClosed, PEN_CLOSED_LIST) ficam intactos.
+const PEN_HIDDEN_COLS = ['concluido', 'fechado'];
+function penColVisible(colOrStatusId) {
+  var id = (colOrStatusId && colOrStatusId.id) || colOrStatusId;
+  return PEN_HIDDEN_COLS.indexOf(id) === -1;
+}
+function penBoardCols() {
+  var cols = penScope === 'archived'
+    ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
+    : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
+  return cols.filter(penColVisible);
+}
+
 let penView = 'kanban';
 let penScope = 'active';
 let _filteredPens = [];
@@ -337,9 +354,7 @@ let _penCounts = null; // FASE 6: { byStatus, total } do banco (modo servidor)
 // FASE 6: resumo idêntico ao penStatusSummary, mas dos totais do banco.
 function _penServerSummary() {
   var counts = _penCounts || { byStatus: {}, total: 0 };
-  var cols = penScope === 'archived'
-    ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
-    : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
+  var cols = penBoardCols();
   var parts = cols.map(function(col) {
     var n = counts.byStatus[col.id] || 0;
     return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
@@ -392,9 +407,7 @@ function isPenMobile() {
 // não cria contagens novas: total + breakdown por status do escopo atual).
 function penStatusSummary(pens) {
   var list = pens || [];
-  var cols = penScope === 'archived'
-    ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
-    : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
+  var cols = penBoardCols();
   var parts = cols.map(function(col) {
     var n = list.filter(function(p) { return p.status === col.id; }).length;
     return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
@@ -413,10 +426,8 @@ function renderPenKanban(area) {
   if (isPenMobile()) {
     area.innerHTML = _penPagerBar() + summaryHtml + renderPenMobileGrid(pens);
   } else {
-    var cols = penScope === 'archived'
-      ? PEN_KANBAN_COLS.filter(function(c) { return isPendenciaClosed(c.id); })
-      : PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id); });
-    area.innerHTML = _penPagerBar() + summaryHtml + '<div class="kanban-board">' + 
+    var cols = penBoardCols();
+    area.innerHTML = _penPagerBar() + summaryHtml + '<div class="kanban-board">' +
       cols.map(function(col) {
         var rawCards = pens.filter(function(p) { return p.status === col.id; });
         var cards = _penSortCards(rawCards, col.id);
@@ -597,10 +608,11 @@ function penKanbanCard(p) {
 }
 
 function renderPenMobileGrid(pens) {
-  if (!pens.length) {
+  var visible = (pens || []).filter(function(p) { return penColVisible(p.status); });
+  if (!visible.length) {
     return '<div class="card"><div class="empty-state"><p>Nenhuma pendência encontrada.</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div></div>';
   }
-  return '<div class="pen-mobile-grid">' + pens.map(penMobileCard).join('') + '</div>';
+  return '<div class="pen-mobile-grid">' + visible.map(penMobileCard).join('') + '</div>';
 }
 
 function penMobileCard(p) {
