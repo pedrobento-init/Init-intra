@@ -660,9 +660,10 @@ function onPenKanbanDrop(e, colId) {
   var id = e.dataTransfer.getData('penId');
   var p = getPendenciaById(id);
   if (!p || p.status === colId) return;
-  var oldStatus = p.status;
-  p.status = colId;
-  savePendencia(p);
+  // Cópia destacada: getPendenciaById devolve a referência viva do cache e
+  // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
+  // gera a próxima ocorrência recorrente em savePendencia.
+  savePendencia({ ...p, status: colId });
   updateBadges();
   renderPenView(false);
   var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
@@ -957,8 +958,9 @@ function openPendenciaDetail(id) {
 
 function changePenStatus(id) {
   const p = getPendenciaById(id);
-  p.status = document.getElementById('chgStatus').value;
-  savePendencia(p);
+  // Cópia destacada (ver onPenKanbanDrop): preserva a detecção de transição
+  // que gera a próxima ocorrência recorrente em savePendencia.
+  savePendencia({ ...p, status: document.getElementById('chgStatus').value });
   updateBadges();
   showToast('Status atualizado!', 'success');
   openPendenciaDetail(id);

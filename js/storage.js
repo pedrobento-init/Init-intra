@@ -1459,21 +1459,33 @@ function savePendencia(data) {
 
   if (justConcluded && data.recurrence) {
     try {
-      savePendencia({
-        clientId: data.clientId,
-        clientName: data.clientName,
-        tipo: data.tipo,
-        assunto: data.assunto || '',
-        descricao: data.descricao,
-        responsible: data.responsible,
-        status: 'aberto',
-        priority: data.priority,
-        deadline: nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence),
-        linkUtil: data.linkUtil || '',
-        tags: data.tags || [],
-        team: data.team || 'init',
-        recurrence: data.recurrence,
-      });
+      const nextDeadline = nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence);
+      // Idempotência (idem visitas): mesma chave lógica — cliente + deadline
+      // + assunto — impede duplicata em conclusão repetida/offline/2 devices.
+      const penKey = p => ((p.assunto || '').trim() || p.descricao);
+      const already = nextDeadline && getPendencias().some(x => x.id !== data.id
+        && (x.clientId || '') === (data.clientId || '')
+        && (x.deadline || '') === nextDeadline
+        && penKey(x) === penKey(data));
+      if (already) {
+        console.debug('[recorrência] pendência de ' + nextDeadline + ' já existe — geração pulada (sem duplicar).');
+      } else {
+        savePendencia({
+          clientId: data.clientId,
+          clientName: data.clientName,
+          tipo: data.tipo,
+          assunto: data.assunto || '',
+          descricao: data.descricao,
+          responsible: data.responsible,
+          status: 'aberto',
+          priority: data.priority,
+          deadline: nextDeadline,
+          linkUtil: data.linkUtil || '',
+          tags: data.tags || [],
+          team: data.team || 'init',
+          recurrence: data.recurrence,
+        });
+      }
     } catch (e) { console.warn('⚠️ Erro ao gerar pendência recorrente:', e); }
   }
 
@@ -1816,20 +1828,32 @@ function saveVisit(data) {
 
   if (data.status === 'concluida' && oldStatus !== 'concluida' && data.recurrence) {
     try {
-      saveVisit({
-        clientId: data.clientId,
-        clientName: data.clientName,
-        operator: data.operator,
-        date: nextRecurrenceDate(data.date, data.recurrence),
-        time: data.time,
-        timeEnd: data.timeEnd,
-        allDay: data.allDay,
-        motivo: data.motivo,
-        observacoes: data.observacoes,
-        status: 'agendada',
-        team: data.team || 'init',
-        recurrence: data.recurrence,
-      });
+      const nextDate = nextRecurrenceDate(data.date, data.recurrence);
+      // Idempotência: concluir a mesma visita 2× (reload, offline/online, 2
+      // dispositivos) não pode duplicar a ocorrência. Chave lógica: mesmo
+      // cliente + mesma data + mesmo motivo.
+      const already = nextDate && getVisits().some(x => x.id !== data.id
+        && (x.clientId || '') === (data.clientId || '')
+        && (x.date || '') === nextDate
+        && (x.motivo || '') === (data.motivo || ''));
+      if (already) {
+        console.debug('[recorrência] visita de ' + nextDate + ' já existe — geração pulada (sem duplicar).');
+      } else {
+        saveVisit({
+          clientId: data.clientId,
+          clientName: data.clientName,
+          operator: data.operator,
+          date: nextDate,
+          time: data.time,
+          timeEnd: data.timeEnd,
+          allDay: data.allDay,
+          motivo: data.motivo,
+          observacoes: data.observacoes,
+          status: 'agendada',
+          team: data.team || 'init',
+          recurrence: data.recurrence,
+        });
+      }
     } catch (e) { console.warn('⚠️ Erro ao gerar visita recorrente:', e); }
   }
 

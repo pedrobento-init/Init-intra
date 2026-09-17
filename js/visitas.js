@@ -431,8 +431,10 @@ function changeVisitStatus(id) {
     return;
   }
 
-  v.status = newStatus;
-  saveVisit(v);
+  // Passa cópia destacada: getVisitById devolve a referência viva do cache e
+  // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
+  // gera a próxima ocorrência recorrente em saveVisit.
+  saveVisit({ ...v, status: newStatus });
   showToast('Status atualizado!', 'success');
   openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
@@ -483,9 +485,10 @@ function submitConcludeVisit(e, id) {
     showToast('Descreva o que foi feito para concluir a visita.', 'error');
     return;
   }
-  v.relatorio = rel;
-  v.status = 'concluida';
-  saveVisit(v);
+  // Cópia destacada (não muta o cache antes do save): a transição
+  // agendada/em_andamento → concluida é o que dispara a próxima ocorrência
+  // recorrente em saveVisit.
+  saveVisit({ ...v, relatorio: rel, status: 'concluida' });
 
   if (document.getElementById('concludeCreatePendencia')?.checked && typeof savePendencia === 'function') {
     savePendencia({
