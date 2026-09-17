@@ -27,6 +27,11 @@
 // FLUXO finalizar (visita concluída → chamado finalizado):
 // - Frontend envia SOMENTE { visitId, action:"finalizar" }. O token e o
 //   payload ficam aqui — o frontend NUNCA vê o MILVUS_API_TOKEN.
+// - Pré-passo "play" (best-effort): POST /api/chamado/atualizar atribuindo
+//   o técnico default. Atribuir técnico costuma mover Novo → Em atendimento,
+//   que é o pré-requisito do Milvus p/ finalizar. Falha aqui NÃO bloqueia o
+//   PUT seguinte (o chamado pode já estar em atendimento). Fase 2: trocar o
+//   técnico default pelo e-mail do operador da visita (ver abaixo).
 // - Fast-path: visits.milvus_finalizar_status já "finalizado" → devolve o
 //   código SEM chamar o Milvus (reload/retry não repetem a operação).
 // - Sem milvus_chamado_codigo → MILVUS_VISIT_WITHOUT_CODIGO (permanente:
@@ -68,6 +73,7 @@ const MILVUS_DEFAULTS = {
 
 const CREATE_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/criar`;
 const LIST_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/listagem`;
+const ATUALIZAR_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/atualizar`;
 const FINALIZE_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/finalizar`;
 const FETCH_TIMEOUT_MS = 25000;
 
@@ -333,6 +339,23 @@ async function _handleFinalizar(
   }
 
   console.log(`milvus-chamado-create: finalizar início visit_id=${visitId} codigo=${codigo}`);
+
+  // Pré-passo "play": atribui o técnico default (fase 1). Fase 2 = e-mail
+  // do operador da visita (buscar em operators pelo nome e usar aqui).
+  if (MILVUS_DEFAULTS.tecnico) {
+    try {
+      const upd = await _fetchMilvus(ATUALIZAR_URL, {
+        chamado_ids: String(codigo),
+        chamado_tecnico: MILVUS_DEFAULTS.tecnico,
+      });
+      console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status}`);
+    } catch (e) {
+      console.warn(`milvus-chamado-create: finalizar pré-atualizar falhou visit_id=${visitId} (segue p/ finalizar): ${(e as Error)?.name ?? "erro"}`);
+    }
+  } else {
+    console.log(`milvus-chamado-create: finalizar sem técnico default — pulando pré-atualizar visit_id=${visitId}`);
+  }
+
   const payload = buildFinalizePayload(
     { ...v, client_name: null, operator: null, date: null, time: null, time_end: null, motivo: null, observacoes: null } as Visit,
     codigo,
