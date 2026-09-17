@@ -382,8 +382,18 @@ function syncNow() {
     : null;
   const syncFn = (_raw && typeof _raw.then === 'function') ? _raw : Promise.resolve();
 
-  syncFn.then(() => {
-    showToast('Sincronizado com sucesso!', 'success');
+  syncFn.then((res) => {
+    if (res && res.ok) {
+      showToast('Sincronizado com sucesso!', 'success');
+    } else if (res && (res.reason === 'offline' || res.reason === 'connectivity' || res.reason === 'timeout')) {
+      showToast('Sem conexão com o servidor. Dados locais preservados — tenta de novo depois.', 'warning', 5000);
+    } else if (res && res.reason === 'partial') {
+      showToast('Sincronização parcial: alguns itens seguem pendentes.', 'warning', 5000);
+    } else if (res && (res.reason === 'not-configured' || res.reason === 'not-authenticated')) {
+      showToast('Sincronização indisponível no momento.', 'warning');
+    } else {
+      showToast('Sincronização concluída com ressalvas. Confira o console ([sync]).', 'warning');
+    }
     _refreshSyncBannerSafe();
     if (syncBtn) {
       syncBtn.textContent = '↻ Sincronizar';

@@ -419,17 +419,178 @@ function _secureRandStr(len) {
 // (_valuesDiffer, _mergeRecords, _mapToRemote, _mapFromRemote e _needsPush
 //  agora vivem em js/schema.js — fonte única.)
 
+// ── OFFLINE-FIRST: boot sync não-bloqueante + verificação real de backend ────
+// Regras:
+// - A UI sempre monta a partir do banco local; o sync roda em segundo plano.
+// - `navigator.onLine` NÃO decide sozinho: antes de sincronizar há uma leitura
+//   real e barata no backend, com timeout curto.
+// - Falha de rede/timeout/backend fora do ar NUNCA lança exceção para fora e
+//   NUNCA apaga dado local: o que não foi confirmado permanece pendente.
+// - Logs com prefixo [sync] marcam início, fim, motivo e o tipo da falha
+//   (conectividade × dados/conflito).
+const BACKEND_CHECK_TIMEOUT_MS = 5000;
+const SUPABASE_OP_TIMEOUT_MS = 12000;
+const SYNC_RETRY_DELAY_MS = 30000;
+
+let _syncRetryTimer = null;
+
+function _isBrowserOnline() {
+  try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return false; }
+  catch (_) {}
+  return true;
+}
+
+// Corrida com timeout que nunca mantém o processo vivo (unref em Node/testes).
+function _withSyncTimeout(promise, ms, label) {
+  let timer = null;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`[sync] timeout após ${ms}ms em ${label || 'backend'}`);
+      err.code = 'SYNC_TIMEOUT';
+      reject(err);
+    }, ms);
+    try { if (timer && typeof timer.unref === 'function') timer.unref(); } catch (_) {}
+  });
+  return Promise.race([Promise.resolve(promise), guard]).then(
+    (v) => { try { clearTimeout(timer); } catch (_) {} return v; },
+    (e) => { try { clearTimeout(timer); } catch (_) {} throw e; }
+  );
+}
+
+// Diferencia erro de CONECTIVIDADE (rede/timeout/backend fora do ar → tenta
+// de novo depois) de erro de DADOS (HTTP 4xx, validação, conflito → loga e
+// segue, sem retry agressivo).
+function _isConnectivityError(err) {
+  if (!err) return false;
+  try {
+    if (err.code === 'SYNC_TIMEOUT') return true;
+    const status = Number(err.status ?? err.statusCode ?? (err.error && err.error.status));
+    if (status === 502 || status === 503 || status === 504) return true;
+    if (status >= 400 && status < 500) return false;
+  } catch (_) {}
+  const msg = String((err && err.message) || err || '').toLowerCase();
+  return /timeout|timed out|failed to fetch|fetch failed|networkerror|network request failed|failed to load|load failed|offline|econn|enotfound|eai_again|ehostunreach|enetunreach|socket|dns|abort|aborted|connection|internet|503|502|504|temporar|unavailable|indispon/.test(msg);
+}
+
+// Verificação REAL do backend (não só navigator.onLine): leitura barata com
+// timeout. Nunca lança exceção; retorna { ok, reason, detail }.
+async function checkBackendConnectivity(opts) {
+  const o = opts || {};
+  const timeoutMs = Number(o.timeoutMs) > 0 ? Number(o.timeoutMs) : BACKEND_CHECK_TIMEOUT_MS;
+  if (!_isBrowserOnline()) return { ok: false, reason: 'offline', detail: 'navegador sem conexão (navigator.onLine=false)' };
+  try {
+    if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+      return { ok: false, reason: 'not-configured', detail: 'cliente Supabase ausente' };
+    }
+    if (typeof window !== 'undefined' && window._supabaseAuthActive === false) {
+      return { ok: false, reason: 'not-authenticated', detail: 'sessão Supabase inativa' };
+    }
+    const t0 = Date.now();
+    const res = await _withSyncTimeout(
+      supabaseClient.from('operators').select('id').limit(1),
+      timeoutMs,
+      'backend-check'
+    );
+    if (res && res.error && _isConnectivityError(res.error)) {
+      return { ok: false, reason: 'connectivity', detail: String(res.error.message || res.error) };
+    }
+    // Respondeu (mesmo com erro de dados/permissão): backend está alcançável.
+    return { ok: true, reason: 'reachable', latencyMs: Date.now() - t0 };
+  } catch (err) {
+    const connective = _isConnectivityError(err);
+    return { ok: false, reason: connective ? 'connectivity' : 'error', detail: String((err && err.message) || err) };
+  }
+}
+
+function _scheduleSyncRetry(syncReason) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (_syncRetryTimer) return; // já há uma nova tentativa agendada
+    _syncRetryTimer = setTimeout(() => {
+      _syncRetryTimer = null;
+      try {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+          _scheduleSyncRetry(syncReason); // aba oculta: adia sem gastar rede
+          return;
+        }
+      } catch (_) {}
+      triggerStartupSync('retry:' + (syncReason || 'sync'));
+    }, SYNC_RETRY_DELAY_MS);
+    try { if (_syncRetryTimer && typeof _syncRetryTimer.unref === 'function') _syncRetryTimer.unref(); } catch (_) {}
+  } catch (_) {}
+}
+
+// Disparo padrão (boot, online, aba visível, retry): nunca bloqueia a UI e
+// nunca lança — toda falha vira { ok:false, reason } + log + banner.
+function triggerStartupSync(reason) {
+  try {
+    const p = syncSupabaseToLocal({ reason: reason || 'startup' });
+    if (p && typeof p.then === 'function') {
+      return p.then(
+        (r) => r,
+        (err) => {
+          console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
+          try { _refreshSyncBanner(); } catch (_) {}
+          return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
+        }
+      );
+    }
+    return Promise.resolve(p);
+  } catch (err) {
+    console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
+    return Promise.resolve({ ok: false, reason: 'unexpected', detail: String((err && err.message) || err) });
+  }
+}
+
 let _syncPromise = null;
-async function syncSupabaseToLocal() {
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return;
+// opts: { reason, checkTimeoutMs, opTimeoutMs, retry }
+// Retorna SEMPRE um resultado { ok, reason, ... } — nunca lança para os
+// chamadores (a UI/offline-first jamais pode cair por causa do sync).
+async function syncSupabaseToLocal(opts) {
+  const reason = (opts && opts.reason) || 'manual';
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+    console.info('[sync] pulada (motivo: ' + reason + '): backend não configurado — mantendo dados locais.');
+    return { ok: false, reason: 'not-configured' };
+  }
   if (_syncPromise) return _syncPromise;
-  _syncPromise = _runSupabaseSync();
+  _syncPromise = _runSupabaseSync(reason, opts);
   try { return await _syncPromise; } finally { _syncPromise = null; }
 }
 
-async function _runSupabaseSync() {
+async function _runSupabaseSync(reason, opts) {
+  const label = reason || 'startup';
+  const o = opts || {};
+  const opTimeoutMs = Number(o.opTimeoutMs) > 0 ? Number(o.opTimeoutMs) : SUPABASE_OP_TIMEOUT_MS;
+  const checkTimeoutMs = Number(o.checkTimeoutMs) > 0 ? Number(o.checkTimeoutMs) : BACKEND_CHECK_TIMEOUT_MS;
+  const allowRetry = o.retry !== false;
+  console.info('[sync] iniciada (motivo: ' + label + ')');
+
+  // Caminho rápido offline: sem internet, nenhuma chamada ao backend (evita
+  // timeouts longos) — a UI já está utilizável com o banco local.
+  if (!_isBrowserOnline()) {
+    console.info('[sync] sem conectividade (navegador offline) — mantendo dados locais; tentativa pendente.');
+    try { _refreshSyncBanner(); } catch (_) {}
+    if (allowRetry) _scheduleSyncRetry(label);
+    return { ok: false, reason: 'offline' };
+  }
+
+  // Verificação real do backend com timeout (não confia só em navigator.onLine).
+  const check = await checkBackendConnectivity({ timeoutMs: checkTimeoutMs });
+  if (!check.ok) {
+    if (check.reason === 'not-authenticated') {
+      console.info('[sync] pulada (motivo: ' + label + '): sessão inativa — mantendo dados locais.');
+      return { ok: false, reason: 'not-authenticated' };
+    }
+    console.warn('[sync] backend indisponível (' + check.reason + (check.detail ? ': ' + check.detail : '') + ') — mantendo dados locais; tenta de novo depois.');
+    try { _refreshSyncBanner(); } catch (_) {}
+    if (allowRetry) _scheduleSyncRetry(label);
+    return { ok: false, reason: check.reason, detail: check.detail };
+  }
+
   let totalConflicts = 0;
   let allConflictDetails = [];
+  let connectivityFailed = false;
+  const timed = (promise, what) => _withSyncTimeout(promise, opTimeoutMs, what);
 
   // Ordem segura anti-perda (C1): push-deletes → pull → push-criados →
   // merge → dbSet → push-updates. Falhas de item não abortam as demais
@@ -437,8 +598,35 @@ async function _runSupabaseSync() {
   // preserva o dado local em vez de descartar).
   const _syncEntity = async (e) => {
     let entityOk = true;
-    const { data: remoteRaw, error } = await supabaseClient.from(e.table).select('*');
+    // Sem conectividade no meio do sync: pula as demais entidades de imediato
+    // (evita N timeouts em sequência); o local fica intacto e pendente.
+    if (connectivityFailed) {
+      console.info('[sync] ' + e.table + ' pulada: conectividade perdida nesta sincronização — dados locais preservados.');
+      return false;
+    }
+    let pull;
+    try {
+      pull = await timed(supabaseClient.from(e.table).select('*'), 'pull:' + e.table);
+    } catch (err) {
+      if (_isConnectivityError(err)) {
+        connectivityFailed = true;
+        console.warn('[sync] ' + e.table + ': sem conectividade (' + ((err && err.message) || err) + ') — mantendo dados locais.');
+      } else {
+        console.warn('[sync] ' + e.table + ' (erro de leitura):', (err && err.message) || err);
+      }
+      // Entidade opcional (tabela pode não existir, ex.: tickets 404):
+      // pula sem marcar erro — comportamento anterior a C1. Falha de
+      // conectividade, porém, sempre marca pendência (precisa de retry).
+      if (e.optional && !_isConnectivityError(err)) return true;
+      return false;
+    }
+    const { data: remoteRaw, error } = pull || {};
     if (error) {
+      if (_isConnectivityError(error)) {
+        connectivityFailed = true;
+        console.warn(`[sync] ${e.table} (conectividade):`, error.message || error, '— mantendo dados locais.');
+        return false;
+      }
       console.warn(`Supabase ${e.table} error:`, error);
       // Entidade opcional (tabela pode não existir, ex.: tickets 404):
       // pula sem marcar erro — comportamento anterior a C1.
@@ -453,10 +641,15 @@ async function _runSupabaseSync() {
     try { tombsForKey = _loadTombstones()[e.dbKey] || {}; } catch (_) { tombsForKey = {}; }
     for (const tid of Object.keys(tombsForKey)) {
       try {
-        const res = await supabaseClient.from(e.table).delete().eq('id', tid);
+        const res = await timed(supabaseClient.from(e.table).delete().eq('id', tid), 'push-delete:' + e.table);
         if (res && res.error) throw new Error(res.error.message || 'delete falhou');
       } catch (err) {
-        console.warn(`Supabase ${e.table} (delete ${tid} pulado):`, err && err.message);
+        if (_isConnectivityError(err)) {
+          connectivityFailed = true;
+          console.warn(`[sync] ${e.table} (delete ${tid}): sem conectividade — exclusão segue pendente.`);
+        } else {
+          console.warn(`Supabase ${e.table} (delete ${tid} pulado):`, err && err.message);
+        }
         entityOk = false;
       }
     }
@@ -484,7 +677,7 @@ async function _runSupabaseSync() {
     const failedPush = [];
     for (const rec of toPush) {
       try {
-        const res = await supabaseClient.from(e.table).upsert(mapPayload(rec));
+        const res = await timed(supabaseClient.from(e.table).upsert(mapPayload(rec)), 'push-create:' + e.table);
         if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
         const synth = mapPayload(rec);
         if (synth && typeof synth === 'object') {
@@ -494,7 +687,12 @@ async function _runSupabaseSync() {
           synthRemote.push({ id: rec.id, updated_at: rec.updatedAt || nowIso });
         }
       } catch (err) {
-        console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+        if (_isConnectivityError(err)) {
+          connectivityFailed = true;
+          console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — registro segue pendente, sem perda local.`);
+        } else {
+          console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+        }
         entityOk = false;
         failedPush.push(rec);
       }
@@ -521,10 +719,15 @@ async function _runSupabaseSync() {
       const r = remoteById2.get(rec.id);
       if (_needsPush(rec, r)) {
         try {
-          const res = await supabaseClient.from(e.table).upsert(mapPayload(rec));
+          const res = await timed(supabaseClient.from(e.table).upsert(mapPayload(rec)), 'push-update:' + e.table);
           if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
         } catch (err) {
-          console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+          if (_isConnectivityError(err)) {
+            connectivityFailed = true;
+            console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — alteração segue pendente, sem perda local.`);
+          } else {
+            console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
+          }
           entityOk = false;
         }
       }
@@ -549,41 +752,72 @@ async function _runSupabaseSync() {
       }
     }
 
-    // LOGS — merge remote with local (don't wipe local logs)
-    const { data: remoteLogs, error: logErr } = await supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500);
-    if (logErr) console.warn('Supabase logs error:', logErr);
-    if (remoteLogs && remoteLogs.length > 0) {
-      const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
-      const localLogs = getLogs();
-      const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
-      const allIds = new Map(localLogs.map(l => [logKey(l), l]));
-      for (const l of mapped) { allIds.set(logKey(l), l); }
-      const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-      if (typeof setCacheTable === 'function') setCacheTable('audit_logs', mergedLogs);
-      else dbSet(DB.LOGS, mergedLogs);
+    if (connectivityFailed) syncHadErrors = true;
+
+    // LOGS — merge remote with local (don't wipe local logs). Com timeout:
+    // um hang aqui nunca trava o fim do sync nem ameaça os dados locais.
+    try {
+      const logsRes = await timed(supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500), 'pull:audit_logs');
+      const { data: remoteLogs, error: logErr } = logsRes || {};
+      if (logErr) console.warn('Supabase logs error:', logErr);
+      if (remoteLogs && remoteLogs.length > 0) {
+        const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
+        const localLogs = getLogs();
+        const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
+        const allIds = new Map(localLogs.map(l => [logKey(l), l]));
+        for (const l of mapped) { allIds.set(logKey(l), l); }
+        const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        if (typeof setCacheTable === 'function') setCacheTable('audit_logs', mergedLogs);
+        else dbSet(DB.LOGS, mergedLogs);
+      }
+    } catch (err) {
+      if (_isConnectivityError(err)) {
+        connectivityFailed = true;
+        syncHadErrors = true;
+        console.warn('[sync] logs (sem conectividade — mantidos locais):', (err && err.message) || err);
+      } else {
+        console.warn('[sync] logs (pulados):', (err && err.message) || err);
+      }
     }
 
-    if (allConflictDetails.length > 0) {
-      console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
-    }
     // Só zera o contador com sync 100% ok; com falha, mantém o banner com
     // a contagem real (falha de background não soma: o contador é de
     // alterações do usuário, e inflá-lo prendia o banner para sempre).
-    if (syncHadErrors) { try { _refreshSyncBanner(); } catch (_) {} }
-    else resetPendingSyncCount();
+    if (!syncHadErrors) {
+      if (allConflictDetails.length > 0) {
+        console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
+      }
+      console.info('[sync] concluída com sucesso (motivo: ' + label + '): ' + SYNC_ENTITIES.length + ' entidade(s), ' + totalConflicts + ' conflito(s).');
+      resetPendingSyncCount();
+      return { ok: true, reason: 'synced', conflicts: totalConflicts };
+    }
+    if (connectivityFailed) {
+      console.warn('[sync] interrompida por falha de conectividade (motivo: ' + label + ') — dados locais preservados; pendências mantidas para a próxima tentativa.');
+    } else {
+      console.warn('[sync] concluída com erros parciais de dados (motivo: ' + label + ') — itens não confirmados seguem pendentes.');
+    }
+    try { _refreshSyncBanner(); } catch (_) {}
+    if (allowRetry) _scheduleSyncRetry(label);
+    return { ok: false, reason: connectivityFailed ? 'connectivity' : 'partial', conflicts: totalConflicts };
   } catch (err) {
-    console.warn('Sincronização Supabase em background:', err);
+    console.warn('[sync] falhou (erro inesperado, motivo: ' + label + '):', (err && err.message) || err, '— dados locais preservados.');
     // Sync falhou: mantém a contagem real e reflete no banner (sem zerar).
-    _refreshSyncBanner();
+    try { _refreshSyncBanner(); } catch (_) {}
+    if (allowRetry) _scheduleSyncRetry(label);
+    return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
   } finally {
     if (typeof window !== 'undefined') window._suppressPendingSync = false;
   }
 }
 
-// Iniciar sincronização ao carregar a página
+// ── Sincronização automática na abertura (offline-first) ──
+// O disparo principal ocorre em _startApp (app.js), DEPOIS de carregar o banco
+// local e montar a UI. Este listener é uma redundância para recarregamentos
+// com sessão já ativa. triggerStartupSync nunca bloqueia a interface e nunca
+// lança exceção (verificação de backend com timeout + fallback local).
 if (typeof window !== 'undefined') {
   window.addEventListener('load', () => setTimeout(() => {
-    if (window._supabaseAuthActive) syncSupabaseToLocal();
+    try { if (typeof triggerStartupSync === 'function') triggerStartupSync('window-load'); } catch (_) {}
   }, 500));
 }
 
@@ -2257,5 +2491,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError };
 }

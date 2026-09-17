@@ -1320,6 +1320,10 @@ function _startApp() {
   const hash  = window.location.hash.replace('#','');
   const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','mapeamento-milvus','historico','templates','visitas','reuniao'];
   navigateTo(pages.includes(hash) ? hash : 'dashboard');
+  // Offline-first: a UI já montou a partir do banco local; a sincronização
+  // automática roda agora em segundo plano, sem bloquear (toda falha de rede
+  // vira fallback local + retry — ver triggerStartupSync em storage.js).
+  try { if (typeof triggerStartupSync === 'function') triggerStartupSync('app-start'); } catch (_) {}
   if (!_appStarted) {
     _appStarted = true;
     window.addEventListener('hashchange', () => {
@@ -1487,6 +1491,26 @@ async function doLogout() {
   showLoginScreen();
 }
 
+// ── Boot offline-first: rede no boot nunca bloqueia a UI ──────────────────────
+// Leituras de operador no restore de sessão tocam a rede; com backend fora do
+// ar elas pendurariam o boot. Com timeout próprio, o app cai para o operador
+// local e segue; o sync de fundo (via _startApp) alinha quando voltar.
+const BOOT_OP_TIMEOUT_MS = 8000;
+function _bootOpWithTimeout(promise, fallback) {
+  try {
+    if (typeof _withSyncTimeout === 'function') {
+      return _withSyncTimeout(promise, BOOT_OP_TIMEOUT_MS, 'boot-operador').then(
+        (v) => (v === undefined ? fallback : v),
+        () => fallback
+      );
+    }
+  } catch (_) {}
+  return Promise.resolve(promise).then(
+    (v) => (v === undefined ? fallback : v),
+    () => fallback
+  );
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 (async function init() {
   if (typeof _initDBPromise !== 'undefined') {
@@ -1510,7 +1534,10 @@ async function doLogout() {
     });
   }
 
-  // Tenta restaurar sessão do Supabase Auth (única fonte de autenticação)
+  // Tenta restaurar sessão do Supabase Auth (única fonte de autenticação).
+  // Offline-first: getSession() do Auth é leitura local (rápida); já as
+  // leituras de operador tocam a rede e têm timeout próprio para nunca
+  // bloquear a UI. A sincronização roda DEPOIS, em background via _startApp.
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     try {
       const { data } = await supabaseClient.auth.getSession();
@@ -1519,16 +1546,15 @@ async function doLogout() {
         const authUser = supaSession.user;
         let op = getOperatorByAuthId(authUser.id) || getOperatorByEmail(authUser.email);
         if (!op) {
-          op = await _resolveOperatorForAuth(authUser);
+          op = await _bootOpWithTimeout(_resolveOperatorForAuth(authUser), null);
         } else {
-          op = await _refreshOperatorFromSupabase(op, authUser);
+          op = await _bootOpWithTimeout(_refreshOperatorFromSupabase(op, authUser), op);
           if (op && !op.auth_user_id) {
-            await _linkOperator(op.id, authUser.id, authUser.email);
+            await _bootOpWithTimeout(_linkOperator(op.id, authUser.id, authUser.email), null);
             op.auth_user_id = authUser.id;
           }
         }
         if (op && op.active !== false) {
-          try { await syncSupabaseToLocal(); } catch (_) {}
           setSession(op.id);
           window._supabaseAuthActive = true;
           _startApp();
