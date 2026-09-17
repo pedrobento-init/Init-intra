@@ -139,7 +139,7 @@ const ENTITIES = [
       id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
       time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
       relatorio: 'relatorio', status: 'status', recurrence: 'recurrence', team: 'team',
-      categories: 'categories', checklist: 'checklist',
+      categories: 'categories', checklist: 'checklist', numero: 'numero',
       milvus_chamado_codigo: 'milvusChamadoCodigo', milvus_chamado_status: 'milvusChamadoStatus',
       milvus_chamado_erro: 'milvusChamadoErro', milvus_chamado_tentativas: 'milvusChamadoTentativas',
       created_at: 'createdAt', updated_at: 'updatedAt'
@@ -149,6 +149,7 @@ const ENTITIES = [
       time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status,
       recurrence: r.recurrence, team: r.team, timeEnd: r.time_end, allDay: r.all_day === true,
       categories: r.categories || [], checklist: r.checklist || [],
+      numero: (Number.isInteger(r.numero) && r.numero > 0) ? r.numero : null,
       milvusChamadoCodigo: r.milvus_chamado_codigo ?? null,
       milvusChamadoStatus: r.milvus_chamado_status ?? null,
       milvusChamadoErro: r.milvus_chamado_erro ?? null,

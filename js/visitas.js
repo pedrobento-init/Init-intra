@@ -86,7 +86,8 @@ function getFilteredVisits() {
          && !(v.clientName || '').toLowerCase().includes(q)
          && !(v.observacoes || '').toLowerCase().includes(q)
          && !(v.relatorio || '').toLowerCase().includes(q)
-         && !(v.operator || '').toLowerCase().includes(q)) return false;
+         && !(v.operator || '').toLowerCase().includes(q)
+         && !visitMatchesNumero(v, q)) return false;
     if (cid && v.clientId !== cid) return false;
     if (op  && v.operator !== op) return false;
     if (st  && v.status   !== st)  return false;
@@ -137,6 +138,33 @@ function visitStatusTag(st) {
   return `<span class="tag" style="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40;font-weight:600">${escapeHtml(m.label)}</span>`;
 }
 
+// ── Número amigável ("Visita #0001") ─────────────────────────────────────
+// Apresentação apenas: o id (UUID) segue como identificador técnico.
+// Formato: #0001–#9999 com zeros; além disso cresce naturalmente (#10000…).
+function getVisitNumero(v) {
+  const n = Number(v && v.numero);
+  return (Number.isInteger(n) && n > 0) ? n : null;
+}
+function formatVisitNumero(v) {
+  const n = getVisitNumero(v);
+  return n === null ? '#----' : '#' + String(n).padStart(4, '0');
+}
+function visitDisplayTitle(v) {
+  return 'Visita ' + formatVisitNumero(v);
+}
+// Normaliza "0001" | "#0001" | "visita #0001" → 1 (puro, testável).
+function parseVisitNumeroQuery(q) {
+  const digits = String(q || '').replace(/\D/g, '');
+  if (!digits) return null;
+  const n = Number(digits);
+  return (Number.isInteger(n) && n > 0) ? n : null;
+}
+function visitMatchesNumero(v, q) {
+  const n = parseVisitNumeroQuery(q);
+  if (n === null) return false;
+  return getVisitNumero(v) === n;
+}
+
 function renderVisitTable(area) {
   const wrap = area || document.getElementById('visitViewArea');
   if (!wrap) return;
@@ -168,6 +196,7 @@ function renderVisitTable(area) {
         <td data-label="Data" class="col-date">
           <div class="visit-date-cell">
             <span class="visit-date-main">${v.date ? formatDate(v.date) : '—'}</span>
+            <span style="font-size:10px;color:var(--text-muted);font-weight:600">${escapeHtml(formatVisitNumero(v))}</span>
             ${(v.allDay || v.time || v.timeEnd) ? `<span class="visit-date-time">${escapeHtml(formatVisitTimeRange(v))}</span>` : ''}
           </div>
         </td>
@@ -224,7 +253,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
   const timeStart = (v.time || '').toString().slice(0, 5);
   const timeEnd = (v.timeEnd || '').toString().slice(0, 5);
 
-  openModal(id ? 'Editar Visita' : 'Nova Visita', `
+  openModal(id ? ('Editar ' + visitDisplayTitle(v)) : 'Nova Visita', `
     <form onsubmit="submitVisitForm(event,'${escapeHtml(id||'')}')">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cliente *</label>
@@ -359,7 +388,7 @@ function openVisitDetail(id) {
   const m = VISIT_STATUS_MAP[v.status] || { label: v.status, color: '#94a3b8' };
   const hasReport = !!(v.relatorio && v.relatorio.trim());
 
-  openModal(`Visita ${escapeHtml(v.id)}`, `
+  openModal(escapeHtml(visitDisplayTitle(v)), `
     <div class="ticket-info-grid">
       <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Operador</div><div class="ticket-info-value">${escapeHtml(v.operator)||'—'}</div></div>

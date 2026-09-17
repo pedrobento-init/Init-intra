@@ -527,20 +527,28 @@ function _scheduleSyncRetry(syncReason) {
 function _kickMilvusChamados(reason) {
   try { if (typeof processPendingMilvusChamados === 'function') processPendingMilvusChamados('post-sync:' + (reason || 'startup')); } catch (_) {}
 }
+// Manutenção local dos números amigáveis (backfill + anti-colisão).
+// Roda após boot e após cada sync (mesmo offline/falho): só escreve no
+// banco local, nunca depende de rede, nunca relança.
+function _kickVisitNumeros(reason) {
+  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
+}
 function triggerStartupSync(reason) {
   try {
     const p = syncSupabaseToLocal({ reason: reason || 'startup' });
     if (p && typeof p.then === 'function') {
       return p.then(
-        (r) => { _kickMilvusChamados(reason); return r; },
+        (r) => { _kickVisitNumeros(reason); _kickMilvusChamados(reason); return r; },
         (err) => {
           console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
           try { _refreshSyncBanner(); } catch (_) {}
+          _kickVisitNumeros(reason);
           _kickMilvusChamados(reason);
           return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
         }
       );
     }
+    _kickVisitNumeros(reason);
     _kickMilvusChamados(reason);
     return Promise.resolve(p);
   } catch (err) {
@@ -1790,6 +1798,92 @@ function getVisitsByOperator(operatorName) {
   return getVisits().filter(v => v.operator === operatorName)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
+
+// ── Número amigável da visita ("Visita #0001") ────────────────────────────
+// O UUID (id) segue como identificador técnico. O `numero` (inteiro,
+// monotônico, nunca reutilizado) é só exibição, mas persistido e
+// sincronizado como campo comum.
+// - Alocação local e imediata (offline-first): max(marca persistida,
+//   maior numero visível) + 1. A marca só cresce → exclusão não recicla.
+// - Multi-dispositivo: dois aparelhos offline podem alocar o mesmo número;
+//   maintainVisitNumeros() reconcilia de forma determinística (mantém o
+//   registro mais antigo; demais ganham max+1 em ordem) e o sync propaga —
+//   converge sem coordenação central.
+const VISIT_NUMERO_SEQ_KEY = 'intra_visita_numero_seq';
+
+function _visitNumeroOf(v) {
+  const n = Number(v && v.numero);
+  return (Number.isInteger(n) && n > 0) ? n : null;
+}
+
+function nextVisitNumero() {
+  let maxSeen = 0;
+  try {
+    for (const v of (getVisits() || [])) {
+      const n = _visitNumeroOf(v);
+      if (n !== null && n > maxSeen) maxSeen = n;
+    }
+  } catch (_) {}
+  let mark = 0;
+  try { mark = Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0; } catch (_) {}
+  const next = Math.max(maxSeen, mark) + 1;
+  try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_) {}
+  return next;
+}
+
+// Backfill (visitas antigas/sem número, por createdAt+id — determinístico)
+// + reparo de colisões. Idempotente: só preenche nulos e só reenumera
+// duplicados. Roda local, sem rede, após boot e após cada sync.
+function maintainVisitNumeros() {
+  let list = [];
+  try { list = getVisits() || []; } catch (_) { return 0; }
+  if (!list.length) return 0;
+  const byId = new Map();
+  let changed = 0;
+  const keyOf = (v) => String(v.createdAt || '') + '|' + String(v.id || '');
+  // 1) Backfill de nulos em ordem determinística (mesma ordem em qualquer
+  // aparelho que veja o mesmo conjunto → mesma atribuição).
+  const missing = list.filter(v => _visitNumeroOf(v) === null)
+    .sort((a, b) => keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
+  let next = null;
+  const alloc = () => {
+    if (next === null) {
+      let m = 0;
+      for (const v of list) { const n = _visitNumeroOf(v); if (n !== null && n > m) m = n; }
+      try { m = Math.max(m, Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0); } catch (_) {}
+      next = m;
+    }
+    next += 1;
+    try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_) {}
+    return next;
+  };
+  for (const v of missing) {
+    if (!v || !v.id || byId.has(v.id)) continue;
+    byId.set(v.id, true);
+    v.numero = alloc();
+    changed++;
+  }
+  // 2) Colisões (mesmo número, ids distintos): mantém o mais antigo
+  // (createdAt, id); demais ganham max+1 em ordem determinística.
+  const seen = new Map();
+  const ordered = list.slice().sort((a, b) => keyOf(a) < keyOf(b) ? -1 : 1);
+  for (const v of ordered) {
+    const n = _visitNumeroOf(v);
+    if (n === null || !v.id) continue;
+    if (!seen.has(n)) { seen.set(n, v.id); continue; }
+    v.numero = alloc();
+    changed++;
+  }
+  if (changed) {
+    const prev = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
+    if (typeof window !== 'undefined') window._suppressPendingSync = true;
+    try { dbSet(DB.VISITS, list); } catch (_) {}
+    if (typeof window !== 'undefined') window._suppressPendingSync = prev;
+    try { console.debug('[visitas] maintainVisitNumeros: ' + changed + ' ajuste(s) aplicado(s).'); } catch (_) {}
+  }
+  return changed;
+}
+
 function saveVisit(data) {
   const list = getVisits();
   const isEdit = !!data.id;
@@ -1816,6 +1910,9 @@ function saveVisit(data) {
     data.id = nextId('VIS');
     data.createdAt = now;
     data.updatedAt = now;
+    // Número amigável imediato (offline-first): nunca nulo em criações novas;
+    // importações/restaurações que já tragam numero o preservam.
+    if (_visitNumeroOf(data) === null) data.numero = nextVisitNumero();
     // Offline-first (integração Milvus): visita nova nasce com o chamado
     // pendente. Visitas antigas (sem o campo) nunca são carimbadas aqui —
     // sem backfill: edições preservam ausência do campo.
@@ -1875,6 +1972,7 @@ function saveVisit(data) {
       team: data.team || 'init',
       categories: data.categories || [],
       checklist: data.checklist || [],
+      numero: _visitNumeroOf(data),
       milvus_chamado_codigo: data.milvusChamadoCodigo ?? null,
       milvus_chamado_status: data.milvusChamadoStatus ?? null,
       milvus_chamado_erro: data.milvusChamadoErro ?? null,
@@ -2538,5 +2636,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros };
 }

@@ -188,9 +188,10 @@ function mapVisitsToEvents(visits) {
         end = v.date + 'T' + tEnd + ':00';
       }
     }
+    const visitNum = (typeof formatVisitNumero === 'function') ? formatVisitNumero(v) + ' · ' : '';
     return {
       id: 'VIS-' + v.id,
-      title: '🚗 ' + (v.clientName || '—'),
+      title: '🚗 ' + visitNum + (v.clientName || '—'),
       start,
       end,
       allDay,
