@@ -142,6 +142,8 @@ const ENTITIES = [
       categories: 'categories', checklist: 'checklist', numero: 'numero',
       milvus_chamado_codigo: 'milvusChamadoCodigo', milvus_chamado_status: 'milvusChamadoStatus',
       milvus_chamado_erro: 'milvusChamadoErro', milvus_chamado_tentativas: 'milvusChamadoTentativas',
+      milvus_finalizar_status: 'milvusFinalizarStatus', milvus_finalizar_erro: 'milvusFinalizarErro',
+      milvus_finalizar_tentativas: 'milvusFinalizarTentativas',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     mapRow: r => ({
@@ -154,6 +156,9 @@ const ENTITIES = [
       milvusChamadoStatus: r.milvus_chamado_status ?? null,
       milvusChamadoErro: r.milvus_chamado_erro ?? null,
       milvusChamadoTentativas: r.milvus_chamado_tentativas ?? 0,
+      milvusFinalizarStatus: r.milvus_finalizar_status ?? null,
+      milvusFinalizarErro: r.milvus_finalizar_erro ?? null,
+      milvusFinalizarTentativas: r.milvus_finalizar_tentativas ?? 0,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
     // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem

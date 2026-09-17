@@ -401,7 +401,17 @@ function openVisitDetail(id) {
       const ms = resolveMilvusChamadoState(v);
       if (ms.kind === 'nao_aplicavel') return '';
       const box = (inner) => `<div class="form-group" style="margin:12px 0 0"><label class="form-label">Chamado Milvus</label><div style="font-size:13px">${inner}</div></div>`;
-      if (ms.kind === 'criado') return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>`);
+      if (ms.kind === 'criado') {
+        let fin = '';
+        if (typeof resolveMilvusFinalizarState === 'function') {
+          const fs = resolveMilvusFinalizarState(v);
+          if (fs.kind === 'finalizado') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">✓ Finalizado</span>`;
+          else if (fs.kind === 'pendente') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Pendente de finalização</span>`;
+          else if (fs.kind === 'finalizando') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Finalizando…</span>`;
+          else if (fs.kind === 'erro') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:6px;border:1px solid #fecaca">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">↻ Tentar novamente</button>`;
+        }
+        return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}`);
+      }
       if (ms.kind === 'pendente') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Aguardando criação do chamado</span>`);
       if (ms.kind === 'criando') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Criando chamado no Milvus…</span>`);
       if (ms.kind === 'sem_token') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:var(--text-muted);background:var(--bg-secondary);padding:4px 10px;border-radius:6px;border:1px solid var(--border)">Cliente sem integração Milvus</span>`);

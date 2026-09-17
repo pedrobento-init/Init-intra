@@ -250,6 +250,36 @@ describe('edição e exclusão preservadas', () => {
   });
 });
 
+describe('etapa 2 Milvus: marcação de finalização na conclusão (saveVisit real)', () => {
+  it('concluir COM codigo marca finalizar pendente; SEM codigo não marca', () => {
+    saveVisit({
+      id: null, clientId: 'CLI-1', clientName: 'Cliente X', operator: 'Op',
+      date: '2026-09-15', motivo: 'M', status: 'agendada', recurrence: '',
+      milvusChamadoCodigo: 1234, milvusChamadoStatus: 'criado',
+    });
+    const withCode = getVisits().find((v) => v.milvusChamadoCodigo === 1234);
+    saveVisit({ ...getVisitById(withCode.id), relatorio: 'Ok', status: 'concluida' });
+    expect(getVisitById(withCode.id).milvusFinalizarStatus).toBe('pendente');
+
+    saveVisit({
+      id: null, clientId: 'CLI-1', clientName: 'Cliente X', operator: 'Op',
+      date: '2026-09-16', motivo: 'M2', status: 'agendada', recurrence: '',
+    });
+    const noCode = getVisits().find((v) => v.motivo === 'M2');
+    saveVisit({ ...getVisitById(noCode.id), relatorio: 'Ok', status: 'concluida' });
+    expect(getVisitById(noCode.id).milvusFinalizarStatus || null).toBe(null);
+  });
+  it('visita antiga já concluída não entra sozinha (sem transição nova)', () => {
+    _stores.visits = [{
+      id: 'OLD-C', clientId: 'CLI-1', status: 'concluida', relatorio: 'Antigo',
+      milvusChamadoCodigo: 77, milvusChamadoStatus: 'criado',
+      createdAt: '2024-01-01T10:00:00.000Z', updatedAt: '2024-01-01T10:00:00.000Z',
+    }];
+    saveVisit({ ...getVisitById('OLD-C'), observacoes: 'edit' });
+    expect(getVisitById('OLD-C').milvusFinalizarStatus || null).toBe(null);
+  });
+});
+
 describe('pendências: mesmo padrão de transição', () => {
   function createPen(deadline) {
     savePendencia({

@@ -23,6 +23,8 @@
 const MILVUS_CHAMADO_EDGE = 'milvus-chamado-create';
 const MILVUS_CHAMADO_MAX_TENTATIVAS = 8;
 const MILVUS_CHAMADO_STALE_MS = 15 * 60 * 1000; // 'criando' +15min = travou
+const MILVUS_FINALIZAR_MAX_TENTATIVAS = 8;
+const MILVUS_FINALIZAR_STALE_MS = 15 * 60 * 1000;
 
 // ── Helpers puros (testáveis) ────────────────────────────────────────────
 
@@ -76,6 +78,67 @@ function extractMilvusCodigo(body) {
     if (Number.isFinite(n) && n > 0) return Math.trunc(n);
   }
   return null;
+}
+
+// Payload da FINALIZAÇÃO a partir do relatório real (puro, testável).
+// ESPELHO da Edge (buildFinalizePayload) — manter iguais.
+// O relatório é texto livre: servico_realizado = relatorio; equipamento e
+// material não existem no modelo → "" (sem inventar dados).
+function buildMilvusFinalizarPayload(visit) {
+  const v = visit || {};
+  return {
+    chamado_codigo: String(v.milvusChamadoCodigo ?? ''),
+    chamado_servico_realizado: String(v.relatorio || ''),
+    chamado_equipamento_retirado: '',
+    chamado_material_utilizado: '',
+  };
+}
+
+// Estado de UI da finalização para UMA visita (puro, testável).
+// kind: finalizado | pendente | finalizando | erro | null (fora do escopo)
+function resolveMilvusFinalizarState(visit) {
+  const v = visit || {};
+  const st = v.milvusFinalizarStatus || null;
+  if (!st) return { kind: null, erro: null };
+  if (st === 'finalizado') return { kind: 'finalizado', erro: null };
+  if (st === 'pendente') return { kind: 'pendente', erro: v.milvusFinalizarErro || null };
+  if (st === 'finalizando') return { kind: 'finalizando', erro: v.milvusFinalizarErro || null };
+  return { kind: 'erro', erro: v.milvusFinalizarErro || null };
+}
+
+// Deve o processador de finalização tentar esta visita agora? (puro)
+// Exige chamado já criado (codigo) — sem codigo, sem requisição inválida.
+function shouldRetryMilvusFinalizar(visit, nowMs) {
+  const v = visit || {};
+  if (!v.milvusChamadoCodigo || Number(v.milvusChamadoCodigo) <= 0) return false;
+  if (v.milvusFinalizarStatus === 'finalizado') return false;
+  const tentativas = Number(v.milvusFinalizarTentativas) || 0;
+  if (tentativas >= MILVUS_FINALIZAR_MAX_TENTATIVAS) return false;
+  if (v.milvusFinalizarStatus === 'pendente') return true;
+  if (v.milvusFinalizarStatus === 'finalizando') {
+    const now = (typeof nowMs === 'number') ? nowMs : Date.now();
+    const upd = new Date(v.updatedAt || 0).getTime();
+    if (isNaN(upd)) return true;
+    return (now - upd) > MILVUS_FINALIZAR_STALE_MS;
+  }
+  return false;
+}
+
+// Classifica o resultado do invoke de finalização (puro, testável).
+// outcome: finalized | permanent | transient
+function classifyMilvusFinalizarResult(res, invokeError) {
+  if (invokeError) return { outcome: 'transient', detail: String((invokeError && invokeError.message) || invokeError) };
+  const data = (res && res.data) || res || {};
+  if (data.success === true) {
+    return { outcome: 'finalized', codigo: extractMilvusCodigo(data.codigo ?? data) || null, recovered: data.already === true };
+  }
+  const code = String(data.code || '');
+  if (code === 'MILVUS_VISIT_WITHOUT_CODIGO' || code === 'MILVUS_VISIT_WITHOUT_CLIENT' ||
+      code === 'MILVUS_VALIDATION_ERROR' || code === 'MILVUS_INVALID_TOKEN') {
+    return { outcome: 'permanent', detail: (data.detail ? code + ': ' + data.detail : code) || 'erro permanente' };
+  }
+  if (data.error) return { outcome: 'transient', detail: String(data.error.message || data.error) };
+  return { outcome: 'transient', detail: code || 'resposta inesperada da integração' };
 }
 
 // Classifica o resultado do invoke da Edge (puro, testável).
@@ -156,7 +219,16 @@ async function processPendingMilvusChamados(reason) {
       const cls = classifyMilvusChamadoResult(res, invokeError);
       try {
         if (cls.outcome === 'created') {
-          saveVisit({ ...getVisitById(v.id), milvusChamadoCodigo: cls.codigo, milvusChamadoStatus: 'criado', milvusChamadoErro: null });
+          const cur0 = (typeof getVisitById === 'function' ? getVisitById(v.id) : null) || v;
+          const patch = { ...cur0, milvusChamadoCodigo: cls.codigo, milvusChamadoStatus: 'criado', milvusChamadoErro: null };
+          // Código chegou numa visita JÁ concluída (concluiu offline antes):
+          // engata a etapa 2 (finalização pendente) — sem isso ela nunca
+          // finalizaria, pois a transição de conclusão já passou.
+          if (cur0.status === 'concluida' && !cur0.milvusFinalizarStatus) {
+            patch.milvusFinalizarStatus = 'pendente';
+            if (patch.milvusFinalizarTentativas === undefined) patch.milvusFinalizarTentativas = 0;
+          }
+          saveVisit(patch);
           summary.created++;
         } else if (cls.outcome === 'no-token') {
           saveVisit({ ...getVisitById(v.id), milvusChamadoStatus: 'sem_token', milvusChamadoErro: 'Cliente sem identificação Milvus (token/mapa).' });
@@ -195,22 +267,115 @@ function retryMilvusChamado(visitId) {
   } catch (_) {}
 }
 
-// Finalização (etapa futura): abstraída, SEM chamada e SEM regra.
-// PUT /api/chamado/finalizar só será acionado quando houver definição explícita.
-async function finalizeMilvusChamado(_visitId) {
-  throw new Error('Finalização automática de chamados Milvus ainda não implementada (sem regra definida).');
+// ── ETAPA 2: finalização (relatório concluído → PUT finalizar) ───────────
+// Mesma arquitetura da criação: fila = registros persistidos com
+// milvusFinalizarStatus 'pendente' (+ stale 'finalizando'); mutex;
+// releitura; trava persistida antes da rede; nunca lança; conclusão local
+// jamais é revertida por falha aqui.
+
+let _milvusFinalizarFlushing = false;
+
+// Atalho pós-conclusão (online): varre pendentes sem bloquear.
+// Offline/sem auth: não faz nada — segue 'pendente' no local.
+function enqueueMilvusFinalizar(visitId) {
+  try {
+    if (!_milvusChamadoCanRun()) return;
+    processPendingMilvusFinalizar('visit:' + (visitId || ''));
+  } catch (_) {}
+}
+
+// Varredura idempotente das finalizações pendentes. PUT repetir é seguro
+// (mesmo estado final no Milvus), então o retry pós-timeout não duplica
+// nada — no máximo refaz uma finalização já aplicada.
+async function processPendingMilvusFinalizar(reason) {
+  if (_milvusFinalizarFlushing) return { ok: true, reason: 'already-running' };
+  if (!_milvusChamadoCanRun()) return { ok: false, reason: 'offline' };
+  if (typeof getVisits !== 'function' || typeof saveVisit !== 'function') {
+    return { ok: false, reason: 'unavailable' };
+  }
+  _milvusFinalizarFlushing = true;
+  const summary = { ok: true, processed: 0, finalized: 0, failed: 0 };
+  try {
+    const pending = getVisits().filter((x) => shouldRetryMilvusFinalizar(x));
+    for (const cand of pending) {
+      const vv = (typeof getVisitById === 'function' ? getVisitById(cand.id) : cand) || cand;
+      if (!shouldRetryMilvusFinalizar(vv)) continue;
+      if (vv.milvusFinalizarStatus === 'finalizado') continue;
+      // Sem código não há o que finalizar (a criação é dona do codigo;
+      // pular em silêncio — nunca requisição inválida).
+      if (!vv.milvusChamadoCodigo || Number(vv.milvusChamadoCodigo) <= 0) continue;
+      summary.processed++;
+
+      try {
+        saveVisit({ ...vv, milvusFinalizarStatus: 'finalizando' });
+      } catch (_) {}
+
+      let res = null;
+      let invokeError = null;
+      try {
+        const r = await supabaseClient.functions.invoke(MILVUS_CHAMADO_EDGE, {
+          body: { visitId: vv.id, action: 'finalizar' },
+        });
+        res = r && r.data !== undefined ? r : { data: r };
+        if (r && r.error) invokeError = r.error;
+      } catch (e) { invokeError = e; }
+
+      const cls = classifyMilvusFinalizarResult(res, invokeError);
+      try {
+        const cur = (typeof getVisitById === 'function' ? getVisitById(vv.id) : null) || vv;
+        if (cls.outcome === 'finalized') {
+          saveVisit({ ...cur, milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
+          summary.finalized++;
+        } else if (cls.outcome === 'permanent') {
+          saveVisit({ ...cur, milvusFinalizarStatus: 'erro', milvusFinalizarErro: String(cls.detail || 'erro').slice(0, 300) });
+          summary.failed++;
+        } else {
+          saveVisit({ ...cur, milvusFinalizarStatus: 'pendente', milvusFinalizarErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusFinalizarTentativas: (Number(cur.milvusFinalizarTentativas) || 0) + 1 });
+          summary.failed++;
+        }
+      } catch (_) {}
+    }
+  } catch (_) {
+    // varredura nunca derruba o chamador
+  } finally {
+    _milvusFinalizarFlushing = false;
+  }
+  return summary;
+}
+
+// Retry manual da finalização (botão na UI): volta a 'pendente' e enfileira.
+// Não cria chamado novo, não toca no relatório.
+function retryMilvusFinalizar(visitId) {
+  try {
+    if (typeof getVisitById !== 'function' || typeof saveVisit !== 'function') return;
+    const vv = getVisitById(visitId);
+    if (!vv) return;
+    if (vv.milvusFinalizarStatus === 'finalizado') return;
+    if (!vv.milvusChamadoCodigo || Number(vv.milvusChamadoCodigo) <= 0) return;
+    saveVisit({ ...vv, milvusFinalizarStatus: 'pendente', milvusFinalizarErro: null });
+    if (typeof showToast === 'function') showToast('Nova tentativa de finalização enfileirada.', 'info');
+    enqueueMilvusFinalizar(visitId);
+    if (typeof openVisitDetail === 'function') {
+      try { openVisitDetail(visitId); } catch (_) {}
+    }
+  } catch (_) {}
 }
 
 // Gatilhos de reconexão/retorno (a verificação real ocorre no processador).
+// Ambas as etapas (criação e finalização) retomam juntas.
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     try { processPendingMilvusChamados('online'); } catch (_) {}
+    try { processPendingMilvusFinalizar('online'); } catch (_) {}
   });
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('visibilitychange', () => {
     try {
       if (document.visibilityState === 'visible') processPendingMilvusChamados('visibility');
+    } catch (_) {}
+    try {
+      if (document.visibilityState === 'visible') processPendingMilvusFinalizar('visibility');
     } catch (_) {}
   });
 }
@@ -221,13 +386,21 @@ if (typeof module !== 'undefined' && module.exports) {
     MILVUS_CHAMADO_EDGE,
     MILVUS_CHAMADO_MAX_TENTATIVAS,
     MILVUS_CHAMADO_STALE_MS,
+    MILVUS_FINALIZAR_MAX_TENTATIVAS,
+    MILVUS_FINALIZAR_STALE_MS,
     resolveMilvusChamadoState,
     shouldRetryMilvusChamado,
     extractMilvusCodigo,
     classifyMilvusChamadoResult,
+    buildMilvusFinalizarPayload,
+    resolveMilvusFinalizarState,
+    shouldRetryMilvusFinalizar,
+    classifyMilvusFinalizarResult,
     enqueueMilvusChamado,
     processPendingMilvusChamados,
     retryMilvusChamado,
-    finalizeMilvusChamado,
+    enqueueMilvusFinalizar,
+    processPendingMilvusFinalizar,
+    retryMilvusFinalizar,
   };
 }

@@ -526,6 +526,7 @@ function _scheduleSyncRetry(syncReason) {
 // pendentes (js/milvus-chamado.js) — sem alterar o resultado do sync.
 function _kickMilvusChamados(reason) {
   try { if (typeof processPendingMilvusChamados === 'function') processPendingMilvusChamados('post-sync:' + (reason || 'startup')); } catch (_) {}
+  try { if (typeof processPendingMilvusFinalizar === 'function') processPendingMilvusFinalizar('post-sync:' + (reason || 'startup')); } catch (_) {}
 }
 // Manutenção local dos números amigáveis (backfill + anti-colisão).
 // Roda após boot e após cada sync (mesmo offline/falho): só escreve no
@@ -1926,6 +1927,24 @@ function saveVisit(data) {
     if (data.milvusChamadoTentativas === undefined) data.milvusChamadoTentativas = 0;
     list.push(data);
   }
+  // Finalização Milvus (etapa 2): ao CONCLUIR (transição real) uma visita que
+  // já tem chamado criado, marca a finalização como pendente — o processador
+  // finaliza em background. O flag vai em `data` E no registro da lista: o
+  // merge acima já copiou `data` para `list[i]`, então só `data` não
+  // persistiria. Relatórios de visitas antigas (sem codigo ou sem transição
+  // nova) nunca entram sozinhos: sem bulk-finalize.
+  // A conclusão local jamais é bloqueada por isso (offline-first).
+  if (data.status === 'concluida' && oldStatus !== 'concluida'
+      && data.milvusChamadoCodigo && Number(data.milvusChamadoCodigo) > 0
+      && !data.milvusFinalizarStatus) {
+    data.milvusFinalizarStatus = 'pendente';
+    if (data.milvusFinalizarTentativas === undefined) data.milvusFinalizarTentativas = 0;
+    const j = list.findIndex(v => v.id === data.id);
+    if (j !== -1) {
+      list[j].milvusFinalizarStatus = data.milvusFinalizarStatus;
+      list[j].milvusFinalizarTentativas = data.milvusFinalizarTentativas;
+    }
+  }
   dbSet(DB.VISITS, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Visita', data.id, data.clientName + ' – ' + (data.motivo || ''));
 
@@ -1983,6 +2002,9 @@ function saveVisit(data) {
       milvus_chamado_status: data.milvusChamadoStatus ?? null,
       milvus_chamado_erro: data.milvusChamadoErro ?? null,
       milvus_chamado_tentativas: data.milvusChamadoTentativas ?? 0,
+      milvus_finalizar_status: data.milvusFinalizarStatus ?? null,
+      milvus_finalizar_erro: data.milvusFinalizarErro ?? null,
+      milvus_finalizar_tentativas: data.milvusFinalizarTentativas ?? 0,
       created_at: data.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
@@ -1993,6 +2015,12 @@ function saveVisit(data) {
   // processador retoma no pós-sync/online/boot. Nunca bloqueia nem lança.
   if (!isEdit) {
     try { if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id); } catch (_) {}
+  }
+  // Finalização Milvus (etapa 2, fire-and-forget): visita concluída com
+  // finalização pendente tenta finalizar já; offline/sem rede o processador
+  // retoma depois. Nunca bloqueia a conclusão nem lança.
+  if (data.status === 'concluida') {
+    try { if (typeof enqueueMilvusFinalizar === 'function') enqueueMilvusFinalizar(data.id); } catch (_) {}
   }
   return data;
 }
