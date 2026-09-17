@@ -617,7 +617,7 @@ function openVisitMonthReportModal() {
         <label class="form-label">Mês de referência</label>
         <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+      <div class="btn-pair-grid">
         <button type="button" class="btn btn-primary" onclick="exportVisitMonthReport('excel')" style="justify-content:center">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
           Excel (.xls)

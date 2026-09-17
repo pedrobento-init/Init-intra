@@ -363,6 +363,11 @@ body {
   text-transform: uppercase; letter-spacing: .6px;
 }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
+/* Par de botões lado a lado (desktop) que empilha em telas estreitas. */
+.btn-pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+@media screen and (max-width: 480px) {
+  .btn-pair-grid { grid-template-columns: 1fr; }
+}
 
 /* ── TABLE ── */
 .table-wrapper { overflow-x: auto; }
@@ -2195,9 +2200,9 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 
   /* ── Toast mobile ── */
   .toast-container {
-    bottom: 12px;
-    right: 12px;
-    left: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    right: max(12px, env(safe-area-inset-right));
+    left: max(12px, env(safe-area-inset-left));
   }
   .toast {
     min-width: 0;
@@ -2352,6 +2357,18 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   /* ── Dark mode mobile ── */
   body.dark-theme .topbar {
     background: rgba(11, 15, 25, 0.9);
+  }
+
+  /* ── Safe areas (notch/Dynamic Island/barra de gestos) ── */
+  .topbar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .sidebar-footer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .modal-body {
+    padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom))) !important;
   }
 
   /* ── Telas muito estreitas (≤380px): aperta espaçamentos em vez de
@@ -3332,6 +3349,21 @@ body.dark-theme .overdue-banner {
   transition: background var(--transition);
 }
 .offline-banner button:hover { background: rgba(255,255,255,0.35); }
+/* Mobile: banner com safe-area do notch, texto compacto e quebra de linha
+   (mensagem + botão nunca estouram 320px). */
+@media screen and (max-width: 768px) {
+  .offline-banner {
+    padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
+    font-size: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    text-align: center;
+  }
+  .offline-banner button {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+}
 .offline-indicator {
   width: 8px;
   height: 8px;
