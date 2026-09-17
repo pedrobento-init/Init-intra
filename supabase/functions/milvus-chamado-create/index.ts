@@ -32,6 +32,9 @@
 //   que é o pré-requisito do Milvus p/ finalizar. Falha aqui NÃO bloqueia o
 //   PUT seguinte (o chamado pode já estar em atendimento). Fase 2: trocar o
 //   técnico default pelo e-mail do operador da visita (ver abaixo).
+// - Consulta de estado (listagem por codigo) antes de agir: já "Finalizado"
+//   no Milvus (resposta perdida antes)? adota sem PUT. Ainda "a fazer"?
+//   MILVUS_CHAMADO_NOT_IN_PROGRESS sem PUT inútil (play pendente).
 // - Fast-path: visits.milvus_finalizar_status já "finalizado" → devolve o
 //   código SEM chamar o Milvus (reload/retry não repetem a operação).
 // - Sem milvus_chamado_codigo → MILVUS_VISIT_WITHOUT_CODIGO (permanente:
@@ -245,6 +248,37 @@ function buildFinalizePayload(v: Visit, codigo: number): Record<string, unknown>
   };
 }
 
+// Consulta o status real de UM chamado pelo código (listagem).
+// Retorna: 'finalizado' | 'aguardando' (a fazer/novo/aberto/agendado) |
+// 'emandamento' (qualquer outro estado com responsável/fluxo) | null
+// (falha na consulta — não bloqueia, o PUT decide). Nunca lança.
+async function findChamadoStatus(codigo: string): Promise<string | null> {
+  try {
+    const res = await _fetchMilvus(LIST_URL, {
+      is_paginate: true,
+      pagina: 1,
+      total_registros: 50,
+      filtro_body: { codigo },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown>;
+    const lista = (data["lista"] ?? data["data"] ?? []) as unknown;
+    if (!Array.isArray(lista)) return null;
+    const row = (lista as Record<string, unknown>[]).find(
+      (r) => Number(r["codigo"]) === Number(codigo),
+    );
+    if (!row) return null;
+    const s = _txt(row["status"]).toLowerCase().replace(/\s+/g, "");
+    if (s.includes("finaliz")) return "finalizado";
+    if (["afazer", "agatendimento", "novo", "aberto", "agendado", "semtecnico"].includes(s)) {
+      return "aguardando";
+    }
+    return "emandamento";
+  } catch {
+    return null;
+  }
+}
+
 // Procura chamado já criado para esta visita (marcador na descrição).
 // Retorna o código adotado ou null. Nunca lança (falha = segue p/ criar).
 async function findCreatedCodigo(
@@ -340,15 +374,36 @@ async function _handleFinalizar(
 
   console.log(`milvus-chamado-create: finalizar início visit_id=${visitId} codigo=${codigo}`);
 
+  // Estado real antes de agir: já finalizado (resposta perdida antes)?
+  // adota sem PUT. Ainda "a fazer"? play pendente — retorna código próprio
+  // sem PUT inútil (o PUT falharia). Falha na consulta ou em atendimento?
+  // segue para o fluxo normal (o PUT decide).
+  const estado = await findChamadoStatus(String(codigo));
+  if (estado === "finalizado") {
+    await admin.from("visits").update({
+      milvus_finalizar_status: "finalizado",
+      milvus_finalizar_erro: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", visitId);
+    console.log(`milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status)`);
+    return json({ success: true, recovered: true, codigo, visitId });
+  }
+  if (estado === "aguardando") {
+    console.log(`milvus-chamado-create: finalizar bloqueado visit_id=${visitId} codigo=${codigo} (chamado ainda não está em atendimento)`);
+    return json({ success: false, code: "MILVUS_CHAMADO_NOT_IN_PROGRESS", visitId });
+  }
+
   // Pré-passo "play": atribui o técnico default (fase 1). Fase 2 = e-mail
   // do operador da visita (buscar em operators pelo nome e usar aqui).
+  // Best-effort com corpo logado em falha (diagnóstico do 404).
   if (MILVUS_DEFAULTS.tecnico) {
     try {
       const upd = await _fetchMilvus(ATUALIZAR_URL, {
         chamado_ids: String(codigo),
         chamado_tecnico: MILVUS_DEFAULTS.tecnico,
       });
-      console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status}`);
+      const updBody = await upd.text().catch(() => "");
+      console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status} body=${updBody.slice(0, 200)}`);
     } catch (e) {
       console.warn(`milvus-chamado-create: finalizar pré-atualizar falhou visit_id=${visitId} (segue p/ finalizar): ${(e as Error)?.name ?? "erro"}`);
     }
