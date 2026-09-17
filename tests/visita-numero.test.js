@@ -234,6 +234,45 @@ describe('TESTE 10 — visitas antigas ganham número persistente', () => {
   });
 });
 
+describe('estabilidade: reparo propaga (updatedAt) e merge não zera', () => {
+  const visitsEntity = () => schema.ENTITIES.find((e) => e.table === 'visits');
+  it('maintain carimba updatedAt junto do numero', () => {
+    _stores.visits = [{ id: 'OLD-1', createdAt: '2024-01-01T10:00:00.000Z', updatedAt: '2024-01-01T10:00:00.000Z' }];
+    maintainVisitNumeros();
+    const v = getVisitById('OLD-1');
+    expect(v.numero).toBe(1);
+    expect(new Date(v.updatedAt).getTime()).toBeGreaterThan(new Date('2024-01-01T10:00:00.000Z').getTime());
+  });
+  it('onMerged restaura numero local quando o merge zerou', () => {
+    const e = visitsEntity();
+    expect(typeof e.onMerged).toBe('function');
+    const local = [{ id: 'VIS-1', numero: 7 }];
+    const out = e.onMerged([{ id: 'VIS-1', numero: null }], local, []);
+    expect(out[0].numero).toBe(7);
+  });
+  it('onMerged preserva número remoto real (reparo de outro aparelho)', () => {
+    const e = visitsEntity();
+    const out = e.onMerged([{ id: 'VIS-1', numero: 9 }], [{ id: 'VIS-1', numero: 7 }], []);
+    expect(out[0].numero).toBe(9);
+  });
+  it('ciclo reload+sync: remoto sem coluna (mesmo timestamp) não renumera', () => {
+    const fields = visitsEntity().fields;
+    const v = mkVisit('2026-09-15'); // numero 1
+    // pull remoto SEM numero e com MESMO timestamp (registro intocado):
+    // merge genérico prefere o remoto no empate e zeraria o numero…
+    const remote = [{ id: v.id, updated_at: v.updatedAt, created_at: v.createdAt }];
+    const { merged } = schema._mergeRecords([getVisitById(v.id)], remote, fields);
+    expect(merged[0].numero == null).toBe(true); // undefined (coluna ausente) ou null
+    // …mas o onMerged da entidade restaura o local antes de persistir:
+    const final = visitsEntity().onMerged(merged, [getVisitById(v.id)], remote);
+    expect(final[0].numero).toBe(1);
+    _stores.visits = final;
+    // e o maintain seguinte não tem o que renumerar (fim do loop 7→17→27):
+    expect(maintainVisitNumeros()).toBe(0);
+    expect(getVisitById(v.id).numero).toBe(1);
+  });
+});
+
 describe('TESTE 11 — busca por número amigável', () => {
   it('"0001", "#0001" e "visita #0001" encontram; vizinho não', () => {
     const v = mkVisit('2026-09-15');

@@ -156,6 +156,20 @@ const ENTITIES = [
       milvusChamadoTentativas: r.milvus_chamado_tentativas ?? 0,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
+    // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem
+    // migration, cliente antigo, edição externa) nunca apaga o numero local.
+    // Remoto COM número (reparo de outro aparelho, mais novo) entra pelo
+    // merge normal — aqui só se restaura o local quando o merge zerou.
+    onMerged: (merged, local) => {
+      const localById = new Map((local || []).map(o => [o.id, o]));
+      for (const m of (merged || [])) {
+        if (!m || (m.numero !== null && m.numero !== undefined)) continue;
+        const loc = m.id ? localById.get(m.id) : null;
+        const n = loc ? Number(loc.numero) : NaN;
+        if (Number.isInteger(n) && n > 0) m.numero = n;
+      }
+      return merged;
+    },
     onChange: () => {
       const h = window.location.hash.replace('#', '') || '';
       if (h === 'visitas' && document.getElementById('visitViewArea') && typeof renderVisitView === 'function') renderVisitView();

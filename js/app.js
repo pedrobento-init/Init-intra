@@ -1320,6 +1320,9 @@ function _startApp() {
 
   const hash  = window.location.hash.replace('#','');
   const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  // Números amigáveis antes da primeira pintura (local, sem rede): evita
+  // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
+  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
   navigateTo(pages.includes(hash) ? hash : 'dashboard');
   // Offline-first: a UI já montou a partir do banco local; a sincronização
   // automática roda agora em segundo plano, sem bloquear (toda falha de rede

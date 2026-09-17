@@ -1841,6 +1841,10 @@ function maintainVisitNumeros() {
   const byId = new Map();
   let changed = 0;
   const keyOf = (v) => String(v.createdAt || '') + '|' + String(v.id || '');
+  // updatedAt acompanha qualquer troca de numero: sem isso o valor reparado
+  // nunca fica "mais novo" que o remoto, perde todo merge e nunca é
+  // propagado pelo push (loop de renumeração a cada sync).
+  const nowIso = new Date().toISOString();
   // 1) Backfill de nulos em ordem determinística (mesma ordem em qualquer
   // aparelho que veja o mesmo conjunto → mesma atribuição).
   const missing = list.filter(v => _visitNumeroOf(v) === null)
@@ -1861,6 +1865,7 @@ function maintainVisitNumeros() {
     if (!v || !v.id || byId.has(v.id)) continue;
     byId.set(v.id, true);
     v.numero = alloc();
+    v.updatedAt = nowIso;
     changed++;
   }
   // 2) Colisões (mesmo número, ids distintos): mantém o mais antigo
@@ -1872,6 +1877,7 @@ function maintainVisitNumeros() {
     if (n === null || !v.id) continue;
     if (!seen.has(n)) { seen.set(n, v.id); continue; }
     v.numero = alloc();
+    v.updatedAt = nowIso;
     changed++;
   }
   if (changed) {
