@@ -373,6 +373,17 @@ describe('TESTE 6 — finalização repetida não repete operação', () => {
     expect(v.relatorio).toBe('R');
     expect(v.milvusChamadoCodigo).toBe(55);
   });
+  it('visita concluída antes da etapa 2 (finalizar null) entra via retry manual', async () => {
+    _visits.push({ id: 'VIS-old', status: 'concluida', relatorio: 'Antigo', milvusChamadoCodigo: 42, milvusChamadoStatus: 'criado' });
+    expect(resolveMilvusFinalizarState(globalThis.getVisitById('VIS-old')).kind).toBe(null);
+    retryMilvusFinalizar('VIS-old');
+    // entrou no fluxo (pendente ou já finalizando pelo processador online)
+    expect(['pendente', 'finalizando', 'finalizado']).toContain(globalThis.getVisitById('VIS-old').milvusFinalizarStatus);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(globalThis.getVisitById('VIS-old').milvusFinalizarStatus).toBe('finalizado');
+    expect(invokeCalls).toHaveLength(1);
+    expect(invokeCalls[0].body).toEqual({ visitId: 'VIS-old', action: 'finalizar' });
+  });
   it('retry manual ignora visita já finalizada', () => {
     _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 1, milvusFinalizarStatus: 'finalizado' });
     retryMilvusFinalizar('VIS-1');
