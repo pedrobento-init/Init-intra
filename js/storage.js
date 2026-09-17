@@ -522,19 +522,26 @@ function _scheduleSyncRetry(syncReason) {
 
 // Disparo padrão (boot, online, aba visível, retry): nunca bloqueia a UI e
 // nunca lança — toda falha vira { ok:false, reason } + log + banner.
+// Ao assentar (ok ou falha), acorda o processador de chamados Milvus
+// pendentes (js/milvus-chamado.js) — sem alterar o resultado do sync.
+function _kickMilvusChamados(reason) {
+  try { if (typeof processPendingMilvusChamados === 'function') processPendingMilvusChamados('post-sync:' + (reason || 'startup')); } catch (_) {}
+}
 function triggerStartupSync(reason) {
   try {
     const p = syncSupabaseToLocal({ reason: reason || 'startup' });
     if (p && typeof p.then === 'function') {
       return p.then(
-        (r) => r,
+        (r) => { _kickMilvusChamados(reason); return r; },
         (err) => {
           console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
           try { _refreshSyncBanner(); } catch (_) {}
+          _kickMilvusChamados(reason);
           return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
         }
       );
     }
+    _kickMilvusChamados(reason);
     return Promise.resolve(p);
   } catch (err) {
     console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
@@ -1797,6 +1804,11 @@ function saveVisit(data) {
     data.id = nextId('VIS');
     data.createdAt = now;
     data.updatedAt = now;
+    // Offline-first (integração Milvus): visita nova nasce com o chamado
+    // pendente. Visitas antigas (sem o campo) nunca são carimbadas aqui —
+    // sem backfill: edições preservam ausência do campo.
+    if (!data.milvusChamadoStatus) data.milvusChamadoStatus = 'pendente';
+    if (data.milvusChamadoTentativas === undefined) data.milvusChamadoTentativas = 0;
     list.push(data);
   }
   dbSet(DB.VISITS, list);
@@ -1839,9 +1851,20 @@ function saveVisit(data) {
       team: data.team || 'init',
       categories: data.categories || [],
       checklist: data.checklist || [],
+      milvus_chamado_codigo: data.milvusChamadoCodigo ?? null,
+      milvus_chamado_status: data.milvusChamadoStatus ?? null,
+      milvus_chamado_erro: data.milvusChamadoErro ?? null,
+      milvus_chamado_tentativas: data.milvusChamadoTentativas ?? 0,
       created_at: data.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  }
+
+  // Integração Milvus (fire-and-forget, só em criações): com rede, tenta
+  // criar o chamado já; offline, a visita segue 'pendente' no local e o
+  // processador retoma no pós-sync/online/boot. Nunca bloqueia nem lança.
+  if (!isEdit) {
+    try { if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id); } catch (_) {}
   }
   return data;
 }

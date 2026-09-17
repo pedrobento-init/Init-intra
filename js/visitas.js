@@ -367,6 +367,17 @@ function openVisitDetail(id) {
       <div class="ticket-info-item"><div class="ticket-info-label">Horário</div><div class="ticket-info-value">${escapeHtml(formatVisitTimeRange(v))}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${visitStatusTag(v.status)}</div></div>
     </div>
+    ${(() => {
+      if (typeof resolveMilvusChamadoState !== 'function') return '';
+      const ms = resolveMilvusChamadoState(v);
+      if (ms.kind === 'nao_aplicavel') return '';
+      const box = (inner) => `<div class="form-group" style="margin:12px 0 0"><label class="form-label">Chamado Milvus</label><div style="font-size:13px">${inner}</div></div>`;
+      if (ms.kind === 'criado') return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>`);
+      if (ms.kind === 'pendente') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Aguardando criação do chamado</span>`);
+      if (ms.kind === 'criando') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Criando chamado no Milvus…</span>`);
+      if (ms.kind === 'sem_token') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:var(--text-muted);background:var(--bg-secondary);padding:4px 10px;border-radius:6px;border:1px solid var(--border)">Cliente sem integração Milvus</span>`);
+      return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:6px;border:1px solid #fecaca">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusChamado('${escapeHtml(id)}')">↻ Tentar novamente</button>`);
+    })()}
     <hr class="divider"/>
     
     <div class="form-group"><label class="form-label">Motivo</label>

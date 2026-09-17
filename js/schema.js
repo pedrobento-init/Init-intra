@@ -139,13 +139,20 @@ const ENTITIES = [
       id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
       time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
       relatorio: 'relatorio', status: 'status', recurrence: 'recurrence', team: 'team',
-      categories: 'categories', checklist: 'checklist', created_at: 'createdAt', updated_at: 'updatedAt'
+      categories: 'categories', checklist: 'checklist',
+      milvus_chamado_codigo: 'milvusChamadoCodigo', milvus_chamado_status: 'milvusChamadoStatus',
+      milvus_chamado_erro: 'milvusChamadoErro', milvus_chamado_tentativas: 'milvusChamadoTentativas',
+      created_at: 'createdAt', updated_at: 'updatedAt'
     },
     mapRow: r => ({
       id: r.id, clientId: r.client_id, clientName: r.client_name, operator: r.operator, date: r.date,
       time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status,
       recurrence: r.recurrence, team: r.team, timeEnd: r.time_end, allDay: r.all_day === true,
       categories: r.categories || [], checklist: r.checklist || [],
+      milvusChamadoCodigo: r.milvus_chamado_codigo ?? null,
+      milvusChamadoStatus: r.milvus_chamado_status ?? null,
+      milvusChamadoErro: r.milvus_chamado_erro ?? null,
+      milvusChamadoTentativas: r.milvus_chamado_tentativas ?? 0,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
     onChange: () => {
