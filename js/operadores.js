@@ -61,8 +61,16 @@ const OP_PAGE_SIZE = 30;
 // ── Render principal ──────────────────────────────────────────────────────────
 function renderOperadores() {
   document.getElementById('pageTitle').textContent = 'Operadores';
-  setTopbarAction('Novo Operador', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
-  window._topbarAction = () => openOperadorForm();
+  // Leitura liberada a todos; o CTA administrativo só existe para admin
+  // (não-admin recebe botão morto se exibido — ver openOperadorForm).
+  if (typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
+    setTopbarAction('Novo Operador', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+    window._topbarAction = () => openOperadorForm();
+  } else {
+    const _btn = document.getElementById('topbarActionBtn');
+    if (_btn) _btn.style.display = 'none';
+    window._topbarAction = null;
+  }
 
   const savedFilters = loadFilterState('operadores', {});
   _buildOperadoresPage(savedFilters);
@@ -159,7 +167,8 @@ function _renderOpGrid() {
   if (!grid) return;
   const ops = _filteredOps;
   if (!ops.length) {
-    grid.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>Nenhum operador encontrado</p><button class="btn btn-primary btn-sm" onclick="openOperadorForm()">+ Novo Operador</button></div>`;
+    const _canCreate = (typeof isCurrentAdmin === 'function' && isCurrentAdmin());
+    grid.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>Nenhum operador encontrado</p>${_canCreate ? '<button class="btn btn-primary btn-sm" onclick="openOperadorForm()">+ Novo Operador</button>' : ''}</div>`;
     return;
   }
 
@@ -177,7 +186,8 @@ function _renderOpGrid() {
 
   grid.innerHTML = pageOps.map(op => {
     const penCount = pens.filter(p => p.responsible === op.name).length;
-    const initials  = op.initials || op.name.substring(0, 2).toUpperCase();
+    // Defesa: registro sem nome/iniciais não pode travar a grade no skeleton.
+    const initials  = op.initials || ((op.name || '?').substring(0, 2).toUpperCase() || '?');
     const color     = op.color || getOpAvatarColor(op.name);
     const isActive  = op.active !== false;
     const isSelf = session && session.opId === op.id;

@@ -198,8 +198,11 @@ async function processPendingMilvusChamados(reason) {
   try {
     const pending = getVisits().filter((v) => shouldRetryMilvusChamado(v));
     for (const cand of pending) {
-      // Releitura: outro gatilho pode ter resolvido enquanto varríamos.
-      const v = (typeof getVisitById === 'function' ? getVisitById(cand.id) : cand) || cand;
+      // Releitura estrita: se a visita sumiu (excluída durante a varredura),
+      // pula — sem isso o save abaixo a ressuscitaria (isEdit com id
+      // inexistente vira push de criação, inclusive no servidor).
+      const v = (typeof getVisitById === 'function' ? getVisitById(cand.id) : cand) || null;
+      if (!v) continue;
       if (!shouldRetryMilvusChamado(v)) continue;
       if (v.milvusChamadoCodigo && Number(v.milvusChamadoCodigo) > 0) continue;
       summary.processed++;
@@ -220,27 +223,28 @@ async function processPendingMilvusChamados(reason) {
       } catch (e) { invokeError = e; }
 
       const cls = classifyMilvusChamadoResult(res, invokeError);
+      // Releitura final: visita excluída no meio do voo → pula (sem ressuscitar).
+      const cur = (typeof getVisitById === 'function' ? getVisitById(v.id) : null) || null;
+      if (!cur) continue;
       try {
         if (cls.outcome === 'created') {
-          const cur0 = (typeof getVisitById === 'function' ? getVisitById(v.id) : null) || v;
-          const patch = { ...cur0, milvusChamadoCodigo: cls.codigo, milvusChamadoStatus: 'criado', milvusChamadoErro: null };
+          const patch = { ...cur, milvusChamadoCodigo: cls.codigo, milvusChamadoStatus: 'criado', milvusChamadoErro: null };
           // Código chegou numa visita JÁ concluída (concluiu offline antes):
           // engata a etapa 2 (finalização pendente) — sem isso ela nunca
           // finalizaria, pois a transição de conclusão já passou.
-          if (cur0.status === 'concluida' && !cur0.milvusFinalizarStatus) {
+          if (cur.status === 'concluida' && !cur.milvusFinalizarStatus) {
             patch.milvusFinalizarStatus = 'pendente';
             if (patch.milvusFinalizarTentativas === undefined) patch.milvusFinalizarTentativas = 0;
           }
           saveVisit(patch);
           summary.created++;
         } else if (cls.outcome === 'no-token') {
-          saveVisit({ ...getVisitById(v.id), milvusChamadoStatus: 'sem_token', milvusChamadoErro: 'Cliente sem identificação Milvus (token/mapa).' });
+          saveVisit({ ...cur, milvusChamadoStatus: 'sem_token', milvusChamadoErro: 'Cliente sem identificação Milvus (token/mapa).' });
           summary.failed++;
         } else if (cls.outcome === 'permanent') {
-          saveVisit({ ...getVisitById(v.id), milvusChamadoStatus: 'erro', milvusChamadoErro: String(cls.detail || 'erro').slice(0, 300) });
+          saveVisit({ ...cur, milvusChamadoStatus: 'erro', milvusChamadoErro: String(cls.detail || 'erro').slice(0, 300) });
           summary.failed++;
         } else {
-          const cur = getVisitById(v.id) || v;
           saveVisit({ ...cur, milvusChamadoStatus: 'pendente', milvusChamadoErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusChamadoTentativas: (Number(cur.milvusChamadoTentativas) || 0) + 1 });
           summary.failed++;
         }
@@ -301,7 +305,9 @@ async function processPendingMilvusFinalizar(reason) {
   try {
     const pending = getVisits().filter((x) => shouldRetryMilvusFinalizar(x));
     for (const cand of pending) {
-      const vv = (typeof getVisitById === 'function' ? getVisitById(cand.id) : cand) || cand;
+      // Releitura estrita (idem criação): visita excluída → pula, sem ressuscitar.
+      const vv = (typeof getVisitById === 'function' ? getVisitById(cand.id) : cand) || null;
+      if (!vv) continue;
       if (!shouldRetryMilvusFinalizar(vv)) continue;
       if (vv.milvusFinalizarStatus === 'finalizado') continue;
       // Sem código não há o que finalizar (a criação é dona do codigo;
@@ -324,8 +330,10 @@ async function processPendingMilvusFinalizar(reason) {
       } catch (e) { invokeError = e; }
 
       const cls = classifyMilvusFinalizarResult(res, invokeError);
+      // Releitura final: visita excluída no meio do voo → pula (sem ressuscitar).
+      const cur = (typeof getVisitById === 'function' ? getVisitById(vv.id) : null) || null;
+      if (!cur) continue;
       try {
-        const cur = (typeof getVisitById === 'function' ? getVisitById(vv.id) : null) || vv;
         if (cls.outcome === 'finalized') {
           saveVisit({ ...cur, milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
           summary.finalized++;

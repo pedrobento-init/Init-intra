@@ -102,7 +102,7 @@ function renderClientGrid() {
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
         <div style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientForm('${escapeHtml(c.id)}')">Editar</button>
-          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteClientConfirm('${escapeHtml(c.id)}')">✕</button>
+          ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteClientConfirm('${escapeHtml(c.id)}')">✕</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -751,6 +751,13 @@ function toggleProcCard(id) {
 }
 
 function deleteClientConfirm(id) {
+  // Barreira antes mesmo do modal: não-admin não abre confirmação, não gera
+  // undo e não encosta no deleteClient (que também é guardado). Vale mesmo
+  // offline — nenhuma exclusão entra na fila.
+  if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem excluir clientes.', 'error');
+    return;
+  }
   var c = getClientById(id);
   if (!c) return;
   confirmAction('Excluir cliente <strong>' + escapeHtml(c.name) + '</strong>?', function() {

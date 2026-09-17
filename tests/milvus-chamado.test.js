@@ -393,3 +393,26 @@ describe('TESTE 6 — finalização repetida não repete operação', () => {
     expect(invokeCalls).toHaveLength(0);
   });
 });
+
+describe('P3.12 — visita excluída durante o voo não é ressuscitada', () => {
+  it('criação: delete no meio do invoke não gera registro fantasma', async () => {
+    _visits.push({ id: 'VIS-1', milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 });
+    invokeBehavior = async () => {
+      _visits.length = 0; // usuário exclui enquanto a Edge processa
+      return { data: { success: true, codigo: 99 }, error: null };
+    };
+    const res = await processPendingMilvusChamados('test');
+    expect(getVisits()).toHaveLength(0);
+    expect(res.created).toBe(0);
+  });
+  it('finalização: delete no meio do invoke não gera registro fantasma', async () => {
+    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 7, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    invokeBehavior = async () => {
+      _visits.length = 0;
+      return { data: { success: true, codigo: 7 }, error: null };
+    };
+    const res = await processPendingMilvusFinalizar('test');
+    expect(getVisits()).toHaveLength(0);
+    expect(res.finalized).toBe(0);
+  });
+});
