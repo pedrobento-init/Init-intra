@@ -1744,6 +1744,11 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     font-size: 15px;
     overflow-x: hidden;
   }
+  /* ── Escala mobile: card base 20px→14px (ganho global de densidade;
+     telas herdam sem override por página). ── */
+  .card {
+    padding: 14px;
+  }
   td {
     font-size: 14px;
   }
@@ -1813,7 +1818,6 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     margin: 0;
   }
   .grid-2 .empty-state {
-    padding: 20px !important;
     font-size: 12px;
   }
   .grid-2 .card .section-header .btn-sm {
@@ -1832,6 +1836,13 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   }
   .op-card {
     padding: 0;
+  }
+  .op-card-header {
+    padding: 14px 14px 8px;
+  }
+  .op-card-actions {
+    padding: 8px 12px 12px;
+    margin-top: 8px;
   }
 
   /* ── Operator Stats ── */
@@ -1854,7 +1865,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     gap: 10px;
   }
   .client-card {
-    padding: 14px 10px 10px;
+    padding: 14px 12px 12px;
     min-height: 170px;
   }
   .client-card-name {
@@ -1954,10 +1965,10 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   /* ── Info Grid (Client Detail) ── */
   .info-grid {
     grid-template-columns: 1fr;
-    gap: 7px;
+    gap: 8px;
   }
   .info-item, .ticket-info-item {
-    padding: 9px 10px;
+    padding: 10px 12px;
   }
 
   /* ── Templates Grid ── */
@@ -2179,7 +2190,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   /* ── Ticket Detail Grid ── */
   .ticket-info-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 7px;
+    gap: 8px;
   }
   /* Telas estreitas (≤480px): 2 colunas espremem o conteúdo (~140px cada
      em 320px) — empilha em 1 coluna ocupando a largura total. */
@@ -2249,6 +2260,8 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   .log-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+    margin-bottom: 12px;
   }
   .log-toolbar .form-input,
   .log-toolbar .form-select {
@@ -2301,7 +2314,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     font-size: 13px;
   }
   .empty-state {
-    padding: 32px 18px;
+    padding: 24px 16px;
   }
   .empty-state p {
     font-size: 12px;
