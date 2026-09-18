@@ -323,7 +323,7 @@ function renderPenView(resetPage) {
       ? fetchPendenciaStatusCounts(penScope) : Promise.resolve(null);
     Promise.all([pageReq, countReq]).then(function (arr) {
       if (sig !== _penLastSig) return; // filtro mudou durante o fetch — descarta
-      _filteredPens = arr[0].rows;
+      _filteredPens = _applyOptimisticPens(arr[0].rows);
       _penTotal = arr[0].total;
       _penCounts = arr[1];
       _renderPendenciaSlaSummary();
@@ -396,6 +396,85 @@ function _penPagerBar() {
     '<span class="pen-pager-info">Página ' + (_penPage + 1) + ' de ' + totalPages + ' · ' + _filteredPens.length + ' de ' + _penTotal + '</span>' +
     '<button class="btn btn-secondary btn-sm" onclick="penGotoPage(1)"' + ((_penPage + 1) >= totalPages ? ' disabled' : '') + ' title="Próxima página">Próxima ›</button>' +
   '</div>';
+}
+
+// ── Patch otimista da lista em tela (Parte 2 — state sync) ─────────────────
+// Em modo servidor, renderPenView() refetcha do banco e pode trazer dado
+// stale (o upsert fire-and-forget ainda não convergiu) — o card "pula de
+// volta". Estas helpers aplicam a mudança na hora em _filteredPens +
+// re-render do kanban; quando o fetch resolve, _applyOptimisticPens
+// reaplica os patches pendentes sobre as linhas do servidor (TTL 8s).
+var _penOptimistic = {}; // id -> { data, at, isNew }
+var _penOptimisticRemoved = {}; // id -> timestamp (anti-ghost do delete)
+var _PEN_OPTIMISTIC_TTL_MS = 8000;
+function _optimisticPenUpsert(next, opts) {
+  try {
+    if (!next || !next.id) return;
+    delete _penOptimisticRemoved[next.id];
+    _penOptimistic[next.id] = { data: { ...next }, at: Date.now(), isNew: !!(opts && opts.isNew) };
+    if (Array.isArray(_filteredPens)) {
+      var idx = _filteredPens.findIndex(function(x) { return x && x.id === next.id; });
+      if (idx !== -1) {
+        _filteredPens[idx] = { ..._filteredPens[idx], ...next };
+      } else if (opts && opts.isNew) {
+        _filteredPens.unshift({ ...next });
+      }
+    }
+    var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
+    if (area) renderPenKanban(area);
+  } catch (_) {}
+}
+function _optimisticPenRemove(id) {
+  try {
+    if (!id) return;
+    delete _penOptimistic[id];
+    _penOptimisticRemoved[id] = Date.now();
+    if (Array.isArray(_filteredPens)) _filteredPens = _filteredPens.filter(function(x) { return !x || x.id !== id; });
+    var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
+    if (area) renderPenKanban(area);
+  } catch (_) {}
+}
+function _clearOptimisticPenRemove(id) {
+  try { if (id) delete _penOptimisticRemoved[id]; } catch (_) {}
+}
+function _applyOptimisticPens(rows) {
+  try {
+    var now = Date.now();
+    var out = (rows || []).filter(function(r) {
+      if (!r || !r.id) return true;
+      var remAt = _penOptimisticRemoved[r.id];
+      if (remAt) {
+        if (now - remAt > _PEN_OPTIMISTIC_TTL_MS) delete _penOptimisticRemoved[r.id];
+        else return false; // servidor ainda tem o id deletado (ghost) — filtra
+      }
+      return true;
+    }).map(function(r) {
+      if (!r || !r.id) return r;
+      var o = _penOptimistic[r.id];
+      if (!o) return r;
+      if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) { delete _penOptimistic[r.id]; return r; }
+      try {
+        // Servidor com updatedAt >= patch = upsert já convergiu → descarta patch.
+        // (updatedAt igual só existe no servidor via nosso próprio upsert.)
+        var sT = new Date(r.updatedAt || 0).getTime();
+        var oT = new Date((o.data && o.data.updatedAt) || 0).getTime();
+        if (sT >= oT) { delete _penOptimistic[r.id]; return r; }
+      } catch (_) {}
+      return { ...r, ...o.data };
+    });
+    // Criações ainda não convergidas: injeta na lista para feedback imediato.
+    try {
+      var seen = {};
+      out.forEach(function(r) { if (r && r.id) seen[r.id] = true; });
+      Object.keys(_penOptimistic).forEach(function(id) {
+        var o = _penOptimistic[id];
+        if (!o || !o.isNew || seen[id]) return;
+        if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) { delete _penOptimistic[id]; return; }
+        out.unshift({ ...o.data });
+      });
+    } catch (_) {}
+    return out;
+  } catch (_) { return rows; }
 }
 
 // ── Kanban drag-and-drop de pendências ───────────────────────────────────────
@@ -675,7 +754,9 @@ function onPenKanbanDrop(e, colId) {
   // Cópia destacada: getPendenciaById devolve a referência viva do cache e
   // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
   // gera a próxima ocorrência recorrente em savePendencia.
-  savePendencia({ ...p, status: colId });
+  var next = { ...p, status: colId };
+  savePendencia(next);
+  _optimisticPenUpsert(next); // move o card na hora; o fetch reconcilia depois
   updateBadges();
   renderPenView(false);
   var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
@@ -989,6 +1070,7 @@ function changePenStatus(id) {
     }
   } catch (_) {}
   savePendencia(next);
+  _optimisticPenUpsert(next); // reflete na lista na hora; o fetch reconcilia depois
   updateBadges();
   showToast('Status atualizado!', 'success');
   openPendenciaDetail(id);
@@ -1114,9 +1196,18 @@ function submitPendenciaForm(e, id) {
     };
     const errors = validatePendencia(data);
     if (errors.length) { showToast(errors[0], 'error'); return; }
-    savePendencia(data);
+    const isNew = !id;
+    savePendencia(data); // preenche data.id/data.createdAt/data.updatedAt no create
     closeModal();
-    renderPenView(false);
+    if (isNew) {
+      // Criado cai na página 0: volta para ela e injeta otimista até convergir.
+      _penPage = 0; _penLastSig = '';
+      _optimisticPenUpsert(data, { isNew: true });
+      renderPenView(true);
+    } else {
+      _optimisticPenUpsert(data);
+      renderPenView(false);
+    }
     updateBadges();
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
   } catch (err) { showToast('Erro ao salvar pendência: ' + err.message, 'error'); }
@@ -1125,7 +1216,7 @@ function submitPendenciaForm(e, id) {
 function duplicatePendencia(id) {
   const p = getPendenciaById(id);
   if (!p) return;
-  savePendencia({
+  const created = savePendencia({
     clientId: p.clientId,
     clientName: p.clientName,
     tipo: p.tipo,
@@ -1141,7 +1232,10 @@ function duplicatePendencia(id) {
     recurrence: p.recurrence,
   });
   closeModal();
-  renderPenView(false);
+  // Cópia é um create: volta para a página 0 e injeta otimista até convergir.
+  _penPage = 0; _penLastSig = '';
+  if (created) _optimisticPenUpsert(created, { isNew: true });
+  renderPenView(true);
   updateBadges();
   showToast('Pendência duplicada!', 'success');
 }
@@ -1265,6 +1359,7 @@ function submitReassignPendencia(penId) {
   if (typeof addLog === 'function') addLog('Reatribuiu', 'Pendência', pen.id, old + ' → ' + novo);
   closeModal();
   if (typeof showToast === 'function') showToast('Pendência reatribuída para ' + novo + '!', 'success');
+  try { _optimisticPenUpsert({ ...pen }); } catch (_) {} // reflete na lista na hora
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
   if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
   if (typeof updateBadges === 'function') updateBadges();
