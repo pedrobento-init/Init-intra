@@ -86,9 +86,10 @@ describe('abas Concluído/Fechado fora da visualização (dados preservados)', (
     expect(T.isPendenciaClosed('fechado')).toBe(true);
     expect(T.isPendenciaClosed('resolvido')).toBe(true);
     expect(T.isPendenciaClosed('aberto')).toBe(false);
-    // mapa de status preservado (filtros, detalhe, dashboard usam)
-    expect(T.STATUS_PEN_MAP.concluido.label).toBe('Concluído');
-    expect(T.STATUS_PEN_MAP.fechado.label).toBe('Fechado');
+    // removidos das opções (menus/filtros/forms), mas a rede de segurança fica
+    expect(T.STATUS_PEN_MAP.concluido).toBeUndefined();
+    expect(T.STATUS_PEN_MAP.fechado).toBeUndefined();
+    expect(T.STATUS_PEN_MAP.resolvido.label).toBe('Resolvido');
     expect(T.PEN_HIDDEN_COLS).toEqual(['concluido', 'fechado']);
   });
 });

@@ -1609,11 +1609,11 @@ function generateMonthlyReport() {
     '<div class="date">' + monthNames[now.getMonth()] + ' de ' + now.getFullYear() + ' — Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</div>' +
     '<div class="kpi">' +
       '<div class="kpi-box"><div class="kpi-num" style="color:#3b82f6">' + clients.length + '</div><div class="kpi-label">Clientes Totais</div></div>' +
-      '<div class="kpi-box"><div class="kpi-num" style="color:#16a34a">' + resolvedPens.length + '</div><div class="kpi-label">Pendências Concluídas</div></div>' +
+      '<div class="kpi-box"><div class="kpi-num" style="color:#16a34a">' + resolvedPens.length + '</div><div class="kpi-label">Pendências Resolvidas</div></div>' +
       '<div class="kpi-box"><div class="kpi-num">' + ops.filter(function(o) { return o.active !== false; }).length + '</div><div class="kpi-label">Técnicos Ativos</div></div>' +
     '</div>' +
     '<h2>Produtividade por Técnico</h2>' +
-    '<table><thead><tr><th>Técnico</th><th>Pendências Concluídas</th></tr></thead><tbody>' +
+    '<table><thead><tr><th>Técnico</th><th>Pendências Resolvidas</th></tr></thead><tbody>' +
     ops.filter(function(o) { return o.active !== false; }).map(function(o) {
       var pCnt = resolvedPens.filter(function(p) { return p.responsible === o.name; }).length;
       return '<tr><td><strong>' + escapeHtml(o.name) + '</strong></td><td>' + pCnt + '</td></tr>';

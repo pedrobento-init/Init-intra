@@ -322,6 +322,59 @@ if(typeof window!=='undefined'){
   window.addEventListener('load', function(){ setTimeout(_migratePoiesisTeamsLocal, 800); });
 }
 
+// ── Migração one-shot: status legados de pendência ───────────────────────────
+// 'concluido' → 'resolvido', 'fechado' → 'cancelado'. Idempotente: sem linhas
+// legadas, não faz nada. Roda no boot em cada aparelho (cobre o Dexie local)
+// e empurra o mesmo mapeamento ao Supabase (cobre o banco compartilhado;
+// o eco do realtime converge pelo updatedAt sem loop).
+var _legacyPenStatusMigratedAtBoot = false;
+function _migrateLegacyPenStatuses() {
+  if (_legacyPenStatusMigratedAtBoot) return 0;
+  _legacyPenStatusMigratedAtBoot = true;
+  var map = { concluido: 'resolvido', fechado: 'cancelado' };
+  var touched = 0;
+  try {
+    if (typeof getPendencias !== 'function') return 0;
+    var list = getPendencias();
+    if (!Array.isArray(list)) return 0;
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      var to = list[i] && map[list[i].status];
+      if (to) {
+        list[i] = { ...list[i], status: to };
+        touched++;
+        changed = true;
+      }
+    }
+    if (!changed) return 0;
+    dbSet(DB.PENDENCIAS, list); // emite bus → UI/badges acompanham
+  } catch (_) { return 0; }
+  try {
+    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()
+        && typeof window !== 'undefined' && window._supabaseAuthActive
+        && typeof supabaseClient !== 'undefined' && supabaseClient) {
+      var now2 = new Date().toISOString();
+      supabaseClient.from('pendencias').update({ status: 'resolvido', updated_at: now2 }).in('status', ['concluido'])
+        .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ resolvido:', res.error.message); })
+        .catch(function() {});
+      supabaseClient.from('pendencias').update({ status: 'cancelado', updated_at: now2 }).in('status', ['fechado'])
+        .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ cancelado:', res.error.message); })
+        .catch(function() {});
+    }
+  } catch (_) {}
+  try {
+    if (touched > 0 && typeof showToast === 'function') showToast(touched + ' pendência(s) antiga(s) atualizada(s) para os novos status.', 'info');
+    else console.debug('[migração] status legados convertidos: ' + touched);
+  } catch (_) {}
+  return touched;
+}
+if(typeof window!=='undefined'){
+  if(typeof _initDBPromise!=='undefined' && _initDBPromise && typeof _initDBPromise.then==='function'){
+    _initDBPromise.then(function(){ try { _migrateLegacyPenStatuses(); } catch (_) {} }).catch(function(){});
+  }
+  window.addEventListener('load', function(){ setTimeout(function(){ try { _migrateLegacyPenStatuses(); } catch (_) {} }, 1200); });
+}
+
 const KEY_TO_TABLE = {
   [DB.CLIENTS]: 'clients',
   [DB.PENDENCIAS]: 'pendencias',
@@ -1473,7 +1526,11 @@ function savePendencia(data) {
     data.status = data.status || 'em_andamento';
     list.push(data);
   }
-  const justConcluded = data.status === 'concluido' && oldStatus !== 'concluido';
+  // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição
+  // para resolvida dispara completedAt + próxima ocorrência recorrente.
+  var _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  const justConcluded = _isResolvida(data.status) && !_isResolvida(oldStatus);
   if (justConcluded) {
     data.completedAt = now;
     const idx = list.findIndex(p => p.id === data.id);

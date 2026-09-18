@@ -327,11 +327,12 @@ const STATUS_PEN_MAP = {
   pausado:            { label: 'Pausado',        cls: 'tag-yellow', dot: '#f59e0b' },
   aguardando:         { label: 'Aguard. Terceiro', cls: 'tag-purple', dot: '#7c3aed' },
   aguardando_cliente: { label: 'Aguard. Cliente', cls: 'tag-purple', dot: '#7c3aed' },
-  concluido:          { label: 'Concluído',      cls: 'tag-green',  dot: '#16a34a' },
   resolvido:          { label: 'Resolvido',      cls: 'tag-green',  dot: '#16a34a' },
   cancelado:          { label: 'Cancelado',      cls: 'tag-gray',   dot: '#94a3b8' },
-  fechado:            { label: 'Fechado',        cls: 'tag-gray',   dot: '#94a3b8' },
 };
+// 'concluido'/'fechado' saíram das opções (migração p/ resolvido/cancelado),
+// mas seguem em PEN_CLOSED_STATUSES/isPendenciaResolvida para não ressuscitar
+// nem deixar de contar registros legados.
 
 const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }

@@ -541,7 +541,7 @@ function meetingChangePenStatus(penId) {
   const newStatus = sel.value;
   const wasOpen = !isPendenciaClosed(pen.status);
   // Cópia destacada (não muta o cache antes do save): a transição
-  // aberto → concluido é o que dispara a próxima ocorrência recorrente em
+  // aberto → resolvido é o que dispara a próxima ocorrência recorrente em
   // savePendencia — mutar a referência viva cegava essa detecção.
   savePendencia({ ...pen, status: newStatus });
 

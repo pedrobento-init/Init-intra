@@ -893,7 +893,7 @@ function _penFriendlyTime(p) {
 function quickUpdatePendenciaField(id, field, value) {
   var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
   if (!p) return;
-  if (['priority', 'deadline', 'responsible', 'status'].indexOf(field) === -1) return;
+  if (['priority', 'deadline', 'responsible'].indexOf(field) === -1) return;
   if (field === 'priority' && ['baixa', 'media', 'alta', 'critica'].indexOf(value) === -1) {
     if (typeof showToast === 'function') showToast('Prioridade inválida.', 'error');
     openPendenciaDetail(id);
@@ -937,7 +937,7 @@ function openPendenciaDetail(id) {
         <label class="pen-section-label" for="chgStatus">Status</label>
         <div class="pen-status-wrap">
         <select class="form-select pen-status-select" id="chgStatus" title="Status da pendência">
-          ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
+          ${(STATUS_PEN_MAP[p.status] ? '' : `<option value="${escapeHtml(p.status || '')}" selected disabled>${escapeHtml({ concluido: 'Concluído', fechado: 'Fechado' }[p.status] || p.status || '—')} (antigo)</option>`) + Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
         </select>
         <button class="btn btn-secondary btn-sm" onclick="changePenStatus('${escapeHtml(id)}')">Atualizar Status</button>
         </div>
