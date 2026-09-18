@@ -1249,10 +1249,13 @@ function deletePendenciaConfirm(id) {
       showToast('Não foi possível excluir esta pendência.', 'error');
       return;
     }
+    _optimisticPenRemove(id); // some da lista na hora (anti-ghost até o delete convergir)
     renderPenView(false);
     updateBadges();
     showUndoToast('Pendência removida.', function() {
-      savePendencia(snapshot);
+      savePendencia(snapshot); // storage preserva o id original (links/anexos intactos)
+      _clearOptimisticPenRemove(id);
+      _optimisticPenUpsert(snapshot, { isNew: true }); // reaparece na hora
       renderPenView(false);
       updateBadges();
       showToast('Pendência restaurada.', 'success');

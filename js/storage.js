@@ -1458,8 +1458,10 @@ function savePendencia(data) {
     const i = list.findIndex(p => p.id === data.id);
     if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now };
     } else {
-      data.id = uniquePendenciaId(list);
-      data.createdAt = now;
+      // Undo/restauração: o id original já vem no snapshot — preservá-lo
+      // mantém links, anexos e visitId. Só gera id novo quando não há um.
+      if (!data.id) data.id = uniquePendenciaId(list);
+      data.createdAt = data.createdAt || now;
       data.updatedAt = now;
       data.status = data.status || 'em_andamento';
       list.push(data);
