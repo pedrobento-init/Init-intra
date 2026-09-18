@@ -43,6 +43,25 @@ function filterTemplatesGrid() {
   renderTemplatesGrid();
 }
 
+// Reconstrói as opções do filtro de categoria preservando busca e seleção.
+// Só re-renderizar a grade deixava categoria nova/excluída invisível no
+// filtro até navegar para outra tela e voltar.
+function _refreshTemplateCategories() {
+  try {
+    var sel = document.getElementById('templateCategorySelect');
+    if (!sel) { renderTemplatesGrid(); return; }
+    var cur = sel.value || '';
+    var templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
+    var cats = Array.from(new Set(templates.map(function(t) { return t.category; }).filter(Boolean)));
+    sel.innerHTML = '<option value="">Todas as categorias</option>' +
+      cats.map(function(cat) {
+        return '<option value="' + escapeHtml(cat) + '"' + (cat === cur ? ' selected' : '') + '>' + escapeHtml(cat) + '</option>';
+      }).join('');
+    if (cur && cats.indexOf(cur) === -1) sel.value = '';
+    renderTemplatesGrid();
+  } catch (_) { try { renderTemplatesGrid(); } catch (_) {} }
+}
+
 function renderTemplatesGrid() {
   const container = document.getElementById('templatesGridWrap');
   if (!container) return;
@@ -137,7 +156,7 @@ function submitTemplateForm(e, id) {
     saveProcedureTemplate(data);
 
     closeModal();
-    renderTemplatesGrid();
+    _refreshTemplateCategories(); // reconstrói o filtro (categoria nova aparece sem F5)
     showToast(id ? 'Modelo atualizado com sucesso!' : 'Novo modelo criado!', 'success');
   } catch (err) { showToast('Erro ao salvar modelo: ' + err.message, 'error'); }
 }
@@ -148,10 +167,10 @@ function deleteTemplateConfirm(id) {
   confirmAction('Deseja realmente excluir o modelo <strong>' + escapeHtml(tpl.title) + '</strong>?', function() {
     var snapshot = JSON.parse(JSON.stringify(tpl));
     if (deleteProcedureTemplate(id)) {
-      renderTemplatesGrid();
+      _refreshTemplateCategories();
       showUndoToast('Modelo "' + tpl.title + '" removido.', function() {
         saveProcedureTemplate(snapshot);
-        renderTemplatesGrid();
+        _refreshTemplateCategories();
         showToast('Modelo restaurado.', 'success');
       });
     }

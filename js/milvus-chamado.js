@@ -184,6 +184,26 @@ function enqueueMilvusChamado(visitId) {
   } catch (_) {}
 }
 
+// Pós-varredura: a lista/calendário já acompanham via bus 'visitas'
+// (saveVisit emite; visitas.js assina). Falta o detalhe aberto de uma
+// visita alterada — sem isso ele fica preso no "Criando…". Re-renderiza
+// só se o modal aberto for de um id alterado (heurística com aspas para
+// evitar falso-positivo de substring).
+function _notifyMilvusVisitUI(changedIds) {
+  try {
+    if (!changedIds || !changedIds.size || typeof document === 'undefined') return;
+    if (typeof openVisitDetail !== 'function') return;
+    var overlay = document.getElementById('modalOverlay');
+    if (!overlay || overlay.style.display === 'none') return;
+    var body = document.getElementById('modalBody');
+    var html = body ? (body.innerHTML || '') : '';
+    if (!html) return;
+    changedIds.forEach(function(id) {
+      if (id && html.indexOf("'" + id + "'") !== -1) { try { openVisitDetail(id); } catch (_) {} }
+    });
+  } catch (_) {}
+}
+
 // Varredura idempotente dos pendentes. Nunca lança; nunca apaga visita;
 // falha transitória volta a 'pendente' (+1 tentativa), permanente vira
 // 'erro'/'sem_token' (sem retry automático).
@@ -195,6 +215,7 @@ async function processPendingMilvusChamados(reason) {
   }
   _milvusChamadoFlushing = true;
   const summary = { ok: true, processed: 0, created: 0, failed: 0 };
+  const changed = new Set();
   try {
     const pending = getVisits().filter((v) => shouldRetryMilvusChamado(v));
     for (const cand of pending) {
@@ -206,6 +227,7 @@ async function processPendingMilvusChamados(reason) {
       if (!shouldRetryMilvusChamado(v)) continue;
       if (v.milvusChamadoCodigo && Number(v.milvusChamadoCodigo) > 0) continue;
       summary.processed++;
+      changed.add(v.id);
 
       // Trava persistida ANTES da rede (crash-safe; stale retoma depois).
       try {
@@ -255,6 +277,7 @@ async function processPendingMilvusChamados(reason) {
   } finally {
     _milvusChamadoFlushing = false;
   }
+  if (summary.processed > 0) _notifyMilvusVisitUI(changed);
   return summary;
 }
 
@@ -302,6 +325,7 @@ async function processPendingMilvusFinalizar(reason) {
   }
   _milvusFinalizarFlushing = true;
   const summary = { ok: true, processed: 0, finalized: 0, failed: 0 };
+  const changed = new Set();
   try {
     const pending = getVisits().filter((x) => shouldRetryMilvusFinalizar(x));
     for (const cand of pending) {
@@ -314,6 +338,7 @@ async function processPendingMilvusFinalizar(reason) {
       // pular em silêncio — nunca requisição inválida).
       if (!vv.milvusChamadoCodigo || Number(vv.milvusChamadoCodigo) <= 0) continue;
       summary.processed++;
+      changed.add(vv.id);
 
       try {
         saveVisit({ ...vv, milvusFinalizarStatus: 'finalizando' });
@@ -351,6 +376,7 @@ async function processPendingMilvusFinalizar(reason) {
   } finally {
     _milvusFinalizarFlushing = false;
   }
+  if (summary.processed > 0) _notifyMilvusVisitUI(changed);
   return summary;
 }
 

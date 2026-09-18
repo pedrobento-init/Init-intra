@@ -1517,6 +1517,22 @@ function _refreshClientsInPlace(){
     if(h!=='clientes') return;
     _refreshClientsInPlace();
   });
+  // Procedimentos aplicados a clientes (templates, outra aba, realtime):
+  // re-renderiza a aba ativa da ficha aberta, sem apagar rascunho em edição.
+  onDataChanged('procedimentos', function(){
+    try{
+      var tab=(typeof document!=='undefined')?document.getElementById('clientTabContent'):null;
+      if(!tab) return;
+      if(tab.querySelector('input:focus, textarea:focus, select:focus')) return;
+      var active=document.querySelector('#clientTabs .tab.active');
+      var oc=active?(active.getAttribute('onclick')||''):'';
+      var m=oc.match(/switchClientTab\('([^']+)','([^']+)'\)/);
+      if(!m || typeof renderClientTab!=='function') return;
+      var sc=tab.scrollTop;
+      renderClientTab(m[1], m[2]);
+      try{ tab.scrollTop=sc; }catch(_){}
+    }catch(_){}
+  });
 })();
 
 if (typeof module !== 'undefined' && module.exports) {

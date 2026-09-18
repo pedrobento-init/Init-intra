@@ -241,17 +241,35 @@ function selectSearchResult(idx) {
   switch (result.type) {
     case 'client':
       navigateTo('clientes');
-      setTimeout(() => {
-        if (typeof viewClient === 'function') viewClient(result.data.id);
-      }, 120);
+      _openSearchDetailWhenReady('client', result.data.id);
       break;
     case 'pendencia':
       navigateTo('pendencias');
-      setTimeout(() => {
-        if (typeof openPendenciaDetail === 'function') openPendenciaDetail(result.data.id);
-      }, 120);
+      _openSearchDetailWhenReady('pendencia', result.data.id);
       break;
   }
+}
+
+// Abre o detalhe quando a grade/lista E o registro existirem (poll com
+// tolerância, em vez de timeout fixo que corria com skeleton/sync lento).
+// Se o registro sumiu (excluído após a busca), avisa em vez de abrir vazio.
+function _openSearchDetailWhenReady(kind, id) {
+  var tries = 0;
+  var tick = function() {
+    tries++;
+    try {
+      if (kind === 'client') {
+        var c = (typeof getClientById === 'function') ? getClientById(id) : null;
+        if (c && document.getElementById('clientGrid') && typeof viewClient === 'function') { viewClient(id); return; }
+      } else {
+        var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
+        if (p && document.getElementById('penViewArea') && typeof openPendenciaDetail === 'function') { openPendenciaDetail(id); return; }
+      }
+    } catch (_) {}
+    if (tries < 25) { setTimeout(tick, 120); return; }
+    if (typeof showToast === 'function') showToast('Registro não encontrado (pode ter sido excluído ou ainda estar sincronizando).', 'warning');
+  };
+  tick();
 }
 
 function _highlightSearchItem(idx) {
@@ -395,6 +413,9 @@ function syncNow() {
       showToast('Sincronização concluída com ressalvas. Confira o console ([sync]).', 'warning');
     }
     _refreshSyncBannerSafe();
+    // O sync pode ter trazido dados novos — re-renderiza a tela atual para
+    // a lista não continuar velha (refreshPage preserva scroll da página).
+    try { if (res && res.ok && typeof refreshPage === 'function') refreshPage(); } catch (_) {}
     if (syncBtn) {
       syncBtn.textContent = '↻ Sincronizar';
       syncBtn.disabled = false;

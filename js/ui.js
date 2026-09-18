@@ -224,7 +224,23 @@ function confirmAction(message, onConfirm) {
       <button class="btn btn-danger" id="confirmBtn">Confirmar</button>
     </div>`, 'sm');
 
-  document.getElementById('confirmBtn').onclick = () => { closeModal(); onConfirm(); };
+  document.getElementById('confirmBtn').onclick = () => {
+    closeModal();
+    // Callbacks async (ex: endReuniao) rejeitados viravam unhandled rejection
+    // silenciosa — converte em toast visível. Síncronos mantêm o comportamento.
+    try {
+      var _r = onConfirm();
+      if (_r && typeof _r.then === 'function') {
+        _r.catch(function(err) {
+          if (typeof showToast === 'function') showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
+          else console.error(err);
+        });
+      }
+    } catch (err) {
+      if (typeof showToast === 'function') showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
+      else console.error(err);
+    }
+  };
 
   const cancelBtn = document.getElementById('confirmCancelBtn');
   if (wasOpen && cancelBtn) {

@@ -1378,7 +1378,11 @@ function meetingReassignPen(penId) { return openReassignPendencia(penId); }
   onDataChanged('pendencias', function(){
     var h=(window.location.hash.replace('#','')||'dashboard');
     if(h!=='pendencias' && h!=='dashboard' && h!=='calendario') return;
-    try{ preserveScrollAround(function(){ if(document.getElementById('penViewArea')) renderPenView(false); }); }catch(_){}
+    try{ preserveScrollAround(function(){
+      if(document.getElementById('penViewArea') && typeof renderPenView==='function') renderPenView(false);
+      // Dashboard visível: números/gráficos acompanham sem navegar e voltar.
+      if(h==='dashboard' && typeof renderDashboard==='function' && document.getElementById('contentArea')) renderDashboard();
+    }); }catch(_){}
   });
 })();
 

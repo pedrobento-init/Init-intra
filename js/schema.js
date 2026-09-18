@@ -45,6 +45,22 @@ const ENTITIES = [
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
+      // Cross-tela: realtime de pendência com dashboard aberto atualiza os
+      // números ( throttle de bursts: no máximo 1 refresh a cada ~1.2s ).
+      try {
+        if ((window.location.hash.replace('#', '') || '') === 'dashboard' && typeof renderDashboard === 'function' && document.getElementById('contentArea')) {
+          if (!window._dashRTRefreshTimer) {
+            window._dashRTRefreshTimer = setTimeout(function() {
+              window._dashRTRefreshTimer = null;
+              try {
+                if ((window.location.hash.replace('#', '') || '') !== 'dashboard') return;
+                if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderDashboard(); });
+                else renderDashboard();
+              } catch (_) {}
+            }, 1200);
+          }
+        }
+      } catch (_) {}
     }
   },
   {

@@ -527,7 +527,9 @@ function meetingToggleReviewed(penId) {
   }
   savePendencia(pen);
   _refreshCurrentGroupPens();
-  renderMeetingFlow();
+  // Re-render preservando o scroll (rebuild total tirava o usuário do lugar).
+  if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderMeetingFlow(); });
+  else renderMeetingFlow();
 }
 
 function meetingChangePenStatus(penId) {
@@ -538,8 +540,10 @@ function meetingChangePenStatus(penId) {
   if (!pen) return;
   const newStatus = sel.value;
   const wasOpen = !isPendenciaClosed(pen.status);
-  pen.status = newStatus;
-  savePendencia(pen);
+  // Cópia destacada (não muta o cache antes do save): a transição
+  // aberto → concluido é o que dispara a próxima ocorrência recorrente em
+  // savePendencia — mutar a referência viva cegava essa detecção.
+  savePendencia({ ...pen, status: newStatus });
 
   if (wasOpen && _MEETING_CLOSED_STATUSES.includes(newStatus)) {
     if (!_meetingState.resolvedIds.includes(penId)) {
@@ -549,7 +553,10 @@ function meetingChangePenStatus(penId) {
 
   showToast('Status atualizado!', 'success');
   _refreshCurrentGroupPens();
-  renderMeetingFlow();
+  if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderMeetingFlow(); });
+  else renderMeetingFlow();
+  try { var _sel2 = document.getElementById('meeting-status-' + penId); if (_sel2) _sel2.focus(); } catch (_) {}
+  if (typeof updateBadges === 'function') updateBadges();
 }
 
 function meetingAddPenNote(penId) {
@@ -569,7 +576,10 @@ function meetingAddPenNote(penId) {
   });
 
   showToast('Nota registrada!', 'success');
-  renderMeetingFlow();
+  if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderMeetingFlow(); });
+  else renderMeetingFlow();
+  // Devolve o foco ao campo de nota (fluxo comum: registrar várias em sequência).
+  setTimeout(function() { try { var el = document.getElementById('meeting-note-' + penId); if (el) el.focus(); } catch (_) {} }, 30);
 }
 
 function meetingCreateInlinePendencia(clientId) {
@@ -603,6 +613,7 @@ function meetingCreateInlinePendencia(clientId) {
     // save já gravou reviewedInMeeting, mas mantemos visível nesta sessão
     g.pens.push(newPen);
     showToast('Pendência criada!', 'success');
+    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
     if (wasEmpty) {
       // Cliente sem pendência virou com pendência — re-render leve do card
       renderMeetingFlow();
@@ -763,6 +774,7 @@ function endReuniao() {
     _meetingState = null;
 
     showToast('Reunião encerrada! Relatório gerado.', 'success');
+    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
     _renderLanding(_getCurrentMesAno(), _getMesAnoLabel(_getCurrentMesAno()), meeting);
   });
 }

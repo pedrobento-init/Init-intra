@@ -12,6 +12,8 @@ let _mapClients = [];
 let _mapRows = [];
 let _mapSearch = '';
 let _mapFilter = 'todos';
+// Nomes com save em voo (anti duplo-clique/race nos selects da tabela).
+var _mapSaving = {};
 
 // ── Guard admin (o servidor revalida is_admin; aqui é UX) ──
 function isMilvusMappingAdmin() {
@@ -301,6 +303,12 @@ async function confirmMilvusTokenBackfill() {
   try {
     const res = await commitMilvusTokenBackfill(onlyNomes);
     setMsg(`<span style="color:var(--success,#16a34a)">${res.filled} token(s) preenchido(s)${res.skipped && res.skipped.length ? ` · ${res.skipped.length} pulado(s)` : ''}.</span>`);
+    // Tokens preenchidos precisam aparecer: recarrega a tabela do mapa e
+    // avisa as fichas de cliente (antes só apareciam após F5).
+    try {
+      if (typeof loadMapeamentoData === 'function') await loadMapeamentoData();
+      if (typeof emitDataChanged === 'function') emitDataChanged('clientes', { via: 'milvus-token-backfill' });
+    } catch (_) {}
   } catch (e) {
     setMsg('<span style="color:var(--danger,#dc2626)">Falha ao preencher. Tente novamente.</span>');
   } finally {
@@ -411,6 +419,12 @@ async function onMapeamentoSelectIdx(idx, clientId) {
   const row = _mapRows[idx];
   if (!row) return;
   if (!clientId) return;
+  // Trava por linha: duplo-clique durante a rede gerava race de vínculos.
+  if (_mapSaving[row.nome]) {
+    if (typeof showToast === 'function') showToast('Salvando vínculo… aguarde.', 'info');
+    renderMapeamentoTable();
+    return;
+  }
   const v = validateMapeamento(row.nome, clientId, _mapRows);
   if (!v.ok) {
     if (typeof showToast === 'function') showToast(v.error, 'error');
@@ -419,15 +433,25 @@ async function onMapeamentoSelectIdx(idx, clientId) {
   }
   if (v.noop) return;
   const apply = async () => {
+    // Patch otimista imediato (tudo local): a linha vira "Mapeado" na hora,
+    // sem o atraso visual do await. Rollback no catch.
+    const prev = { clientId: row.clientId, clientName: row.clientName, status: row.status };
+    const c = _mapClients.find((x) => x.id === clientId);
+    row.clientId = clientId;
+    row.clientName = c ? (c.name || clientId) : clientId;
+    row.status = 'mapeado';
+    renderMapeamentoTable();
+    _mapSaving[row.nome] = true;
     try {
       await saveMilvusMapping(row.nome, clientId);
-      const c = _mapClients.find((x) => x.id === clientId);
-      row.clientId = clientId;
-      row.clientName = c ? (c.name || clientId) : clientId;
-      row.status = 'mapeado';
       if (typeof showToast === 'function') showToast('Mapeamento salvo!', 'success');
     } catch (e) {
+      row.clientId = prev.clientId;
+      row.clientName = prev.clientName;
+      row.status = prev.status;
       if (typeof showToast === 'function') showToast('Falha ao salvar mapeamento. Tente novamente.', 'error');
+    } finally {
+      delete _mapSaving[row.nome];
     }
     renderMapeamentoTable();
   };
@@ -449,15 +473,27 @@ async function onMapeamentoSelectIdx(idx, clientId) {
 function removeMapeamentoUIIdx(idx) {
   const row = _mapRows[idx];
   if (!row) return;
+  if (_mapSaving[row.nome]) {
+    if (typeof showToast === 'function') showToast('Operação em andamento… aguarde.', 'info');
+    return;
+  }
   const doRemove = async () => {
+    const prev = { clientId: row.clientId, clientName: row.clientName, status: row.status };
+    row.clientId = null;
+    row.clientName = null;
+    row.status = 'pendente';
+    renderMapeamentoTable();
+    _mapSaving[row.nome] = true;
     try {
       await removeMilvusMapping(row.nome);
-      row.clientId = null;
-      row.clientName = null;
-      row.status = 'pendente';
       if (typeof showToast === 'function') showToast('Vínculo removido.', 'info');
     } catch (e) {
+      row.clientId = prev.clientId;
+      row.clientName = prev.clientName;
+      row.status = prev.status;
       if (typeof showToast === 'function') showToast('Falha ao remover vínculo. Tente novamente.', 'error');
+    } finally {
+      delete _mapSaving[row.nome];
     }
     renderMapeamentoTable();
   };
