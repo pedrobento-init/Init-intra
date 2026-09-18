@@ -970,9 +970,25 @@ function openPendenciaDetail(id) {
 
 function changePenStatus(id) {
   const p = getPendenciaById(id);
+  if (!p) return;
+  const newStatus = document.getElementById('chgStatus').value;
   // Cópia destacada (ver onPenKanbanDrop): preserva a detecção de transição
   // que gera a próxima ocorrência recorrente em savePendencia.
-  savePendencia({ ...p, status: document.getElementById('chgStatus').value });
+  const next = { ...p, status: newStatus };
+  // Auto-stop: concluir/cancelar/fechar com timer rodando congela o tempo
+  // acumulado em vez de deixar o cronômetro fantasma acumulando.
+  try {
+    var _closed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(newStatus) : ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(newStatus || '');
+    if (_closed && p.timerRunning) {
+      var _el = 0;
+      if (p.timerStartedAt) { _el = Math.max(0, Math.floor((Date.now() - new Date(p.timerStartedAt).getTime()) / 1000)); }
+      next.timerTotalSeconds = (Number(p.timerTotalSeconds) || 0) + _el;
+      next.timerRunning = false;
+      next.timerStartedAt = null;
+      next.timerOperator = null;
+    }
+  } catch (_) {}
+  savePendencia(next);
   updateBadges();
   showToast('Status atualizado!', 'success');
   openPendenciaDetail(id);
@@ -981,9 +997,11 @@ function changePenStatus(id) {
 }
 
 function submitPenNote(id) {
-  const text = document.getElementById('newNoteText').value.trim();
+  const ta = document.getElementById('newNoteText');
+  const text = (ta ? ta.value : '').trim();
   if (!text) { showToast('Escreva algo antes de registrar.', 'error'); return; }
-  addPendenciaNote(id, text, getUser().name);
+  const ok = addPendenciaNote(id, text, getUser().name);
+  if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
   showToast('Nota registrada!', 'success');
   openPendenciaDetail(id);
   renderPenView(false);

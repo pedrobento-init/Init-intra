@@ -113,86 +113,97 @@ function _isTimerClosedStatus(status) {
  * sem botão play/pause, para não sugerir que ainda está em andamento.
  */
 function timerWidget(item, type = 'pendencia') {
+  var _wid = '';
+  try { _wid = (typeof escapeHtml === 'function') ? escapeHtml(item && item.id) : String((item && item.id) || ''); } catch (_) { _wid = String((item && item.id) || ''); }
   if (item && _isTimerClosedStatus(item.status)) {
     const secs = getElapsedSeconds(item);
-    return `<span class="timer-widget" title="Tempo total trabalhado (chamado finalizado)"><span style="font-size:11px;color:var(--text-muted)">⏱ ${formatTimer(secs)}</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}" title="Tempo total trabalhado (chamado finalizado)"><span style="font-size:11px;color:var(--text-muted)">⏱ ${formatTimer(secs)}</span></span>`;
   }
   const worker = getCurrentWorker(item);
   if (!worker) {
-    return `<span class="timer-widget">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)" title="Ninguém trabalhando agora">Ninguém</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)" title="Ninguém trabalhando agora">Ninguém</span></span>`;
   }
-  return `<span class="timer-widget">${timerActionBtnHTML(item, type)} ${workerBadgeHTML(item)} ${timerDisplayHTML(item)}</span>`;
+  return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} ${workerBadgeHTML(item)} ${timerDisplayHTML(item)}</span>`;
 }
 
 /**
- * Alterna play/pause com lógica de atribuição de operador
+ * Alterna play/pause com lógica de atribuição de operador.
+ * Single-write: a nota de timeline vai embutida no mesmo save (evita a
+ * corrida upsert x update que fazia a UI voltar ao estado antigo).
+ * Não muta a referência viva do cache — trabalha sobre cópia.
  */
 function toggleTimer(type, id, btnEl) {
   const now = new Date().toISOString();
   const isTicket = type === 'ticket';
-  const item = isTicket ? getTicketById(id) : getPendenciaById(id);
+  const cur = isTicket ? getTicketById(id) : getPendenciaById(id);
   const saveFn = isTicket ? saveTicket : savePendencia;
   const renderFn = renderPenView;
-  const addUpdateFn = addPendenciaNote;
   const updateLabel = 'Pendência';
 
-  if (!item) { showToast('Item não encontrado.', 'error'); return; }
+  if (!cur) { showToast('Item não encontrado.', 'error'); return; }
 
   // Chamado finalizado não pode iniciar/retomar execução pelo card.
   // Reabra (mude o status) para voltar a trabalhar — evita resolvido com timer rodando.
-  if (_isTimerClosedStatus(item.status)) {
+  if (_isTimerClosedStatus(cur.status)) {
     showToast('Chamado finalizado — reabra para retomar o trabalho.', 'info');
     return;
   }
 
   const user = getUser();
   const myName = user?.name || 'Operador';
-  const worker = getCurrentWorker(item);
+  const worker = getCurrentWorker(cur);
 
   if (worker && worker !== myName) {
     showToast(`Este item já está sendo trabalhado por ${worker}.`, 'warning');
     return;
   }
 
-  if (worker && worker === myName) {
-    // PAUSAR — mover para coluna "Pausado"
-    const started = new Date(item.timerStartedAt).getTime();
-    const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
-    item.timerTotalSeconds = (item.timerTotalSeconds || 0) + elapsed;
-    item.timerRunning = false;
-    item.timerStartedAt = null;
-    item.timerOperator = null;
-    item.status = 'pausado';
-    saveFn(item);
-    if (typeof addUpdateFn === 'function') {
-      addUpdateFn(id, `⏸ ${myName} pausou. Tempo sessão: ${formatTimer(elapsed)}. Total: ${formatTimer(item.timerTotalSeconds)}.`, myName);
-    }
-    showToast('Trabalho pausado — item movido para Pausados.', 'info');
-  } else {
-    // INICIAR
-    item.timerRunning = true;
-    item.timerOperator = myName;
-    item.timerStartedAt = now;
-    if (typeof item.timerTotalSeconds !== 'number') item.timerTotalSeconds = 0;
+  // Anti duplo-clique: o botão antigo será substituído pelo full refresh abaixo.
+  if (btnEl && !btnEl.disabled) { try { btnEl.disabled = true; } catch (_) {} }
 
-    if (!item.responsible) {
-      item.responsible = myName;
+  try {
+    if (worker && worker === myName) {
+      // PAUSAR — mover para coluna "Pausado"
+      const started = cur.timerStartedAt ? new Date(cur.timerStartedAt).getTime() : Date.now();
+      const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+      const total = (Number(cur.timerTotalSeconds) || 0) + elapsed;
+      const note = { text: `⏸ ${myName} pausou. Tempo sessão: ${formatTimer(elapsed)}. Total: ${formatTimer(total)}.`, author: myName, createdAt: now };
+      const next = {
+        ...cur,
+        timerTotalSeconds: total,
+        timerRunning: false,
+        timerStartedAt: null,
+        timerOperator: null,
+        status: 'pausado',
+        notes: [...(cur.notes || []), note],
+        updatedAt: now,
+      };
+      saveFn(next);
+      showToast('Trabalho pausado — item movido para Pausados.', 'info');
+    } else {
+      // INICIAR
+      const next = {
+        ...cur,
+        timerRunning: true,
+        timerOperator: myName,
+        timerStartedAt: now,
+        timerTotalSeconds: (typeof cur.timerTotalSeconds === 'number') ? cur.timerTotalSeconds : 0,
+        responsible: cur.responsible || myName,
+        status: (cur.status === 'pausado' || cur.status === 'aberto') ? 'em_andamento' : cur.status,
+        notes: [...(cur.notes || []), { text: `▶ ${myName} iniciou o trabalho nesta ${updateLabel.toLowerCase()}.`, author: myName, createdAt: now }],
+        updatedAt: now,
+      };
+      saveFn(next);
+      showToast(`Você iniciou o trabalho nesta ${updateLabel.toLowerCase()}!`, 'success');
     }
-
-    if (item.status === 'pausado' || item.status === 'aberto') {
-      item.status = 'em_andamento';
-    }
-
-    saveFn(item);
-    if (typeof addUpdateFn === 'function') {
-      addUpdateFn(id, `▶ ${myName} iniciou o trabalho nesta ${updateLabel.toLowerCase()}.`, myName);
-    }
-    showToast(`Você iniciou o trabalho nesta ${updateLabel.toLowerCase()}!`, 'success');
+  } finally {
+    try { if (btnEl && btnEl.isConnected) btnEl.disabled = false; } catch (_) {}
   }
 
-  _refreshTimerUI(id);
-  if (typeof renderFn === 'function') renderFn();
-  if (typeof updateDashboardBadge === 'function') updateDashboardBadge();
+  _refreshTimerFull(id, type);
+  if (typeof renderFn === 'function') { try { renderFn(); } catch (_) {} }
+  if (typeof updateDashboardBadge === 'function') { try { updateDashboardBadge(); } catch (_) {} }
+  else if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
 }
 
 /**
@@ -208,6 +219,75 @@ function _refreshTimerUI(id) {
     el.textContent = formatTimer(seconds);
     el.dataset.running = running;
   });
+}
+
+/**
+ * Full refresh de um timer: botão ▶/⏸/🔒 + badge de worker + display +
+ * bloco "Trabalhando agora" do modal de detalhe (se aberto para este id).
+ * Chamado logo após toggleTimer para feedback imediato, sem esperar o
+ * fetch do servidor convergir.
+ */
+function _refreshTimerFull(id, type) {
+  var t = type || 'pendencia';
+  var isTicket = t === 'ticket';
+  var item = null;
+  try { item = isTicket ? getTicketById(id) : getPendenciaById(id); } catch (_) { item = null; }
+  if (!item) return;
+  // 1. Displays (texto do cronômetro)
+  try { _refreshTimerUI(id); } catch (_) {}
+  // 2. Widgets completos (botão + badge + tempo) nos cards e no modal
+  try {
+    var widgets = document.querySelectorAll('[data-timer-widget]');
+    widgets.forEach(function(w) {
+      try {
+        if (w.getAttribute('data-timer-widget') !== String(id)) return;
+        var tmp = document.createElement('span');
+        tmp.innerHTML = timerWidget(item, t);
+        var fresh = tmp.firstChild;
+        if (fresh) w.replaceWith(fresh);
+      } catch (_) {}
+    });
+  } catch (_) {}
+  // 3. Bloco "Trabalhando agora" do modal de detalhe (se aberto para este id)
+  try {
+    var overlay = document.getElementById('modalOverlay');
+    var modalVisible = overlay && overlay.style.display !== 'none';
+    if (modalVisible && document.querySelector('#modalBody [data-timer-widget]')) {
+      var workBox = document.querySelector('#modalBody .pen-work');
+      if (workBox) {
+        var w2 = getCurrentWorker(item);
+        workBox.classList.toggle('is-working', !!w2);
+        workBox.classList.toggle('is-free', !w2);
+        var valEl = workBox.querySelector('.pen-work-value');
+        if (valEl) {
+          if (w2) {
+            var esc = (typeof escapeHtml === 'function') ? escapeHtml(w2) : String(w2);
+            valEl.innerHTML = '<strong>' + esc + '</strong> <span class="pen-work-time">' + timerDisplayHTML(item) + '</span>';
+          } else {
+            valEl.innerHTML = '<strong>Ninguém</strong> <span class="pen-work-hint">· Disponível</span>';
+          }
+        }
+        var timeEl = workBox.querySelector('.pen-time');
+        if (timeEl) {
+          var secs = getElapsedSeconds(item);
+          var friendly = formatTimer(secs);
+          try {
+            if (typeof _penFriendlyTime === 'function') {
+              var ft = _penFriendlyTime(item);
+              if (ft && ft.friendly) friendly = ft.friendly;
+            } else if (typeof formatElapsedFriendly === 'function') {
+              friendly = formatElapsedFriendly(secs);
+            }
+          } catch (_) {}
+          timeEl.textContent = '⏱ ' + friendly;
+        }
+      }
+    }
+  } catch (_) {}
+  // 4. Badges da sidebar
+  try {
+    if (typeof updateBadges === 'function') updateBadges();
+  } catch (_) {}
 }
 
 /**

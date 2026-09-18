@@ -1439,6 +1439,20 @@ function savePendencia(data) {
     if (client) data.team = client.team || 'init';
   }
   if (!data.team) data.team = getCurrentTeam();
+  // Safety: status final nunca mantém timer rodando (evita tempo fantasma
+  // quando a conclusão chega por kanban, reunião, import ou outro caller
+  // que não passou pelo auto-stop de changePenStatus).
+  try {
+    var _sClosed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(data.status) : ['concluido', 'resolvido', 'cancelado', 'fechado'].indexOf(data.status || '') !== -1;
+    if (_sClosed && data.timerRunning) {
+      var _sEl = 0;
+      if (data.timerStartedAt) { _sEl = Math.max(0, Math.floor((Date.now() - new Date(data.timerStartedAt).getTime()) / 1000)); }
+      data.timerTotalSeconds = (Number(data.timerTotalSeconds) || 0) + _sEl;
+      data.timerRunning = false;
+      data.timerStartedAt = null;
+      data.timerOperator = null;
+    }
+  } catch (_) {}
   let oldStatus = null;
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
@@ -1622,10 +1636,11 @@ function highlightMentions(text) {
 function addPendenciaNote(id, text, author) {
   const list = getPendencias();
   const i = list.findIndex(p => p.id === id);
-  if (i === -1) return;
+  if (i === -1) return false;
   if (!list[i].notes) list[i].notes = [];
   var mentionedOperators = parseMentionedOperators(text);
   const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators };
+  list[i].notes.push(note);
   list[i].updatedAt = new Date().toISOString();
   dbSet(DB.PENDENCIAS, list);
 
@@ -1644,6 +1659,7 @@ function addPendenciaNote(id, text, author) {
       updated_at: list[i].updatedAt
     }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
+  return true;
 }
 
 // ── TICKETS ──
