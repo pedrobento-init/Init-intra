@@ -256,7 +256,8 @@ function toggleOp(id) {
     return;
   }
   toggleOperatorActive(id);
-  filterOperadores();
+  _refreshOpListKeepPage(); // preserva busca/filtro/página (filterOperadores puro resetaria a página)
+  _refreshOpStats(); // header Total/Ativos/Inativos acompanha o toggle na hora
   const op = getOperatorById(id);
   showToast(`${op?.name} ${op?.active ? 'ativado' : 'desativado'}.`, 'info');
 }
@@ -272,13 +273,21 @@ function deleteOpConfirm(id) {
   confirmAction('Excluir operador <strong>' + escapeHtml(op.name) + '</strong>?', function() {
     var snapshot = JSON.parse(JSON.stringify(op));
     deleteOperator(id);
-    filterOperadores();
-    _updateOpStats();
+    if (getOperatorById(id)) {
+      showToast('Não foi possível excluir este operador.', 'error');
+      return;
+    }
+    _refreshOpListKeepPage();
+    _refreshOpStats();
     showUndoToast('Operador "' + op.name + '" removido.', function() {
-      saveOperator(snapshot);
-      filterOperadores();
-      _updateOpStats();
-      showToast('Operador restaurado.', 'success');
+      // saveOperator é async (hash); só atualiza a UI após persistir.
+      Promise.resolve(saveOperator(snapshot)).then(function() {
+        _refreshOpListKeepPage();
+        _refreshOpStats();
+        showToast('Operador restaurado.', 'success');
+      }).catch(function(err) {
+        showToast('Falha ao restaurar operador: ' + (err && err.message ? err.message : err), 'error');
+      });
     });
   });
 }
@@ -307,6 +316,36 @@ function _updateOpStats() {
   const ops = getOperators();
   // rebuild full page to refresh counters
   _buildOperadoresPage();
+}
+
+// Atualiza os contadores do header (Total/Ativos/Inativos) no lugar, sem
+// rebuild da página — preserva busca, filtro, paginação e scroll.
+function _refreshOpStats() {
+  try {
+    var ops = typeof getOperators === 'function' ? getOperators() : [];
+    if (typeof isTeamAdmin === 'function' && !isTeamAdmin()) {
+      ops = ops.filter(function(o) { return (o.team || 'init') === (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init'); });
+    } else if (typeof _selectedTeam !== 'undefined' && _selectedTeam) {
+      ops = ops.filter(function(o) { return (o.team || 'init') === _selectedTeam; });
+    }
+    var vals = document.querySelectorAll('.op-stats-row .op-stat-value');
+    if (!vals || vals.length < 3) { _updateOpStats(); return; } // fallback: rebuild
+    vals[0].textContent = ops.length;
+    vals[1].textContent = ops.filter(function(o) { return o.active; }).length;
+    vals[2].textContent = ops.filter(function(o) { return !o.active; }).length;
+  } catch (_) { try { _updateOpStats(); } catch (_) {} }
+}
+
+// Reaplica busca/filtro atuais à grade preservando a página (filterOperadores
+// puro sempre volta para a página 1). Não toca no header nem no scroll.
+function _refreshOpListKeepPage() {
+  try {
+    if (!document.getElementById('opGridWrap')) return;
+    var pg = (typeof _opPage === 'number' && _opPage > 0) ? _opPage : 1;
+    if (typeof filterOperadores === 'function') filterOperadores(); // reseta para 1
+    _opPage = pg;
+    if (typeof _renderOpGrid === 'function') _renderOpGrid(); // fixa se passou do total
+  } catch (_) {}
 }
 
 // ── Formulário ───────────────────────────────────────────────────────────────
@@ -576,6 +615,10 @@ async function submitOperadorForm(e, id) {
     const opErrors = validateOperator(opData);
     if (opErrors.length) { showToast(opErrors[0], 'error'); return; }
 
+    // Anti duplo-submit: a sequência abaixo tem awaits longos (hash + rede).
+    var _opSubmitBtn = null;
+    try { _opSubmitBtn = e.target.querySelector('button[type="submit"]'); } catch (_) {}
+    if (_opSubmitBtn) _opSubmitBtn.disabled = true;
     await saveOperator(opData);
 
     // Atualizar senha no Supabase Auth (para o próprio operador logado)
@@ -640,14 +683,21 @@ async function submitOperadorForm(e, id) {
       }
     }
 
+    if (_opSubmitBtn) _opSubmitBtn.disabled = false;
     closeModal();
-    _buildOperadoresPage();
+    // Refresh no lugar: preserva busca/filtro/página/scroll (rebuild perdia tudo).
+    if (typeof _refreshOpListKeepPage === 'function') _refreshOpListKeepPage();
+    else if (typeof filterOperadores === 'function') filterOperadores();
+    if (typeof _refreshOpStats === 'function') _refreshOpStats();
     if (authMsg) {
       showToast(authMsg, authMsg.startsWith('✅') ? 'success' : 'warning', 6000);
     } else {
       showToast(id ? 'Operador atualizado!' : 'Operador cadastrado!', 'success');
     }
-  } catch (err) { showToast('Erro ao salvar operador: ' + err.message, 'error'); }
+  } catch (err) {
+    try { var _b = e.target.querySelector('button[type="submit"]'); if (_b) _b.disabled = false; } catch (_) {}
+    showToast('Erro ao salvar operador: ' + err.message, 'error');
+  }
 }
 
 
@@ -767,6 +817,19 @@ function _refreshOperadoresInPlace(){
     if(h!=='operadores') return;
     _refreshOperadoresInPlace();
   });
-  // reload total se sessão/permissões mudarem
-  onDataChanged('session', function(){ window.location.reload(); });
+  // Mudança de sessão/permissões: refresh suave em vez de reload total
+  // (reload perdia filtros, scroll, modal e estado Milvus).
+  onDataChanged('session', function(){
+    try {
+      if (typeof updateUserUI === 'function') updateUserUI();
+      if (typeof initTeamSelector === 'function') initTeamSelector();
+      if (typeof updateBadges === 'function') updateBadges();
+    } catch (_) {}
+    try {
+      var h = ((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace('#', '') || 'dashboard';
+      if (typeof navigateTo === 'function') navigateTo(h);
+      else if (typeof refreshPage === 'function') refreshPage();
+      else window.location.reload();
+    } catch (_) { try { window.location.reload(); } catch (_) {} }
+  });
 })();

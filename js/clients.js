@@ -348,6 +348,9 @@ async function confirmMilvusClientsImport() {
     try {
       if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal().catch(() => {});
       if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${res.created} novo(s) do Milvus`);
+      // A grade atrás do modal estava ficando stale: reconstrói o filtro e os badges.
+      if (typeof _refreshClientsInPlace === 'function') _refreshClientsInPlace();
+      if (typeof updateBadges === 'function') updateBadges();
     } catch (_) {}
   } catch (e) {
     setMsg('<span style="color:var(--danger,#dc2626)">Falha na importação. Tente novamente.</span>');
@@ -763,11 +766,11 @@ function deleteClientConfirm(id) {
   confirmAction('Excluir cliente <strong>' + escapeHtml(c.name) + '</strong>?', function() {
     var snapshot = JSON.parse(JSON.stringify(c));
     deleteClient(id);
-    renderClientGrid();
+    _refreshClientsInPlace(); // reconstrói _filteredClients (busca ativa) em vez de renderizar o array stale
     updateBadges();
     showUndoToast('Cliente "' + c.name + '" removido.', function() {
       saveClient(snapshot);
-      renderClientGrid();
+      _refreshClientsInPlace();
       updateBadges();
       showToast('Cliente restaurado.', 'success');
     });
@@ -1178,7 +1181,7 @@ function submitClientForm(e, id) {
       if (errors.length) { showToast(errors[0], 'error'); return; }
     }
     saveClient(clientData);
-    closeModal(); renderClientGrid(); updateBadges();
+    closeModal(); _refreshClientsInPlace(); updateBadges();
     showToast(id ? 'Cliente atualizado!' : 'Cliente cadastrado!', 'success');
   } catch (err) { showToast('Erro ao salvar cliente: ' + err.message, 'error'); }
 }
@@ -1491,7 +1494,7 @@ function executeClientImport() {
   }
 
   closeModal();
-  renderClientGrid();
+  _refreshClientsInPlace(); // reconstrói o filtro (importados visíveis mesmo com busca ativa)
   updateBadges();
   showToast(`${created} cliente(s) importado(s)${skipped ? ` · ${skipped} linha(s) ignoradas` : ''}`, 'success');
 }

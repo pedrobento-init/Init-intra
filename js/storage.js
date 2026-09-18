@@ -2298,7 +2298,10 @@ async function saveOperator(data) {
       list[i] = { ...list[i], ...data, updatedAt: now };
       savedOp = list[i];
     } else {
-      savedOp = data;
+      // Undo/restauração: id existe mas saiu da lista (delete) — reinsere em
+      // vez de só retornar (antes o restore local era silenciosamente perdido).
+      savedOp = { ...data, createdAt: data.createdAt || now, updatedAt: now };
+      list.push(savedOp);
     }
   } else {
     data.id = nextId('OP');

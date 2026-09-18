@@ -550,6 +550,9 @@ function submitConcludeVisit(e, id) {
 
   closeModal();
   showToast('Visita concluída com relatório salvo!', 'success');
+  // Reabre o detalhe como changeVisitStatus faz: o usuário vê o relatório
+  // salvo em vez de cair na lista sem contexto.
+  openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
@@ -578,11 +581,15 @@ function submitEditVisitReport(e, id) {
   e.preventDefault();
   const v = getVisitById(id);
   if (!v) return;
-  v.relatorio = (document.getElementById('editVisitReportText')?.value || '').trim();
-  saveVisit(v);
+  // Cópia destacada (não muta o cache antes do save) + refresh cruzado como
+  // os irmãos: calendário (tooltip do relatório) e badges acompanham na hora.
+  const rel = (document.getElementById('editVisitReportText')?.value || '').trim();
+  saveVisit({ ...v, relatorio: rel });
   showToast('Relatório salvo com sucesso!', 'success');
   openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+  if (typeof updateBadges === 'function') updateBadges();
 }
 
 function deleteVisitConfirm(id) {
@@ -591,12 +598,12 @@ function deleteVisitConfirm(id) {
   confirmAction('Excluir esta visita?', function() {
     const snapshot = JSON.parse(JSON.stringify(v));
     deleteVisit(id);
-    renderVisitView();
+    renderVisitView(false); // preserva a página (sem arg voltava para a 1)
     if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
     if (typeof updateBadges === 'function') updateBadges();
     showUndoToast('Visita removida.', function() {
       saveVisit(snapshot);
-      renderVisitView();
+      renderVisitView(false);
       if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
       if (typeof updateBadges === 'function') updateBadges();
       showToast('Visita restaurada.', 'success');
@@ -925,3 +932,23 @@ function _exportVisitMonthExcel(data) {
   _visitReportDownload(`Relatorio_Visitas_${yStr}_${mStr}.xls`, blob);
   showToast(`Excel de ${monthLabel} exportado (${visits.length} visitas).`, 'success');
 }
+
+// ── Auto-refresh global (lista + calendário; o bus 'visitas' não tinha
+// assinante — saves em background, ex: fila Milvus, só apareciam no eco
+// do realtime). Sem loop: renders aqui não salvam.
+(function(){
+  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
+  if(window._visAutoRefresh) return;
+  window._visAutoRefresh=true;
+  onDataChanged('visitas', function(){
+    var h=((typeof window!=='undefined' && window.location && window.location.hash) || '').replace('#','') || 'dashboard';
+    if(h!=='visitas' && h!=='calendario') return;
+    try{
+      var run=function(){
+        if(h==='visitas' && document.getElementById('visitViewArea') && typeof renderVisitView==='function') renderVisitView(false);
+        if(typeof refreshCalendar==='function' && document.getElementById('calendarContainer')) refreshCalendar();
+      };
+      if(typeof preserveScrollAround==='function') preserveScrollAround(run); else run();
+    }catch(_){}
+  });
+})();
