@@ -337,11 +337,14 @@ function _migrateLegacyPenStatuses() {
     if (typeof getPendencias !== 'function') return 0;
     var list = getPendencias();
     if (!Array.isArray(list)) return 0;
+    // updatedAt vai para "agora": sem o bump, um pull/eco com timestamps
+    // empatados faz o remoto (legado) vencer o merge e o status antigo volta.
+    var now3 = new Date().toISOString();
     var changed = false;
     for (var i = 0; i < list.length; i++) {
       var to = list[i] && map[list[i].status];
       if (to) {
-        list[i] = { ...list[i], status: to };
+        list[i] = { ...list[i], status: to, updatedAt: now3 };
         touched++;
         changed = true;
       }
