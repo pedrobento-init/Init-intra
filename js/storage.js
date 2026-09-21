@@ -1281,10 +1281,21 @@ function saveClient(data) {
   const clients = getClients();
   const isEdit = !!data.id;
   var now = new Date().toISOString();
+  // Criação restrita a admin (backstop além da UI — edição e undo passam).
+  if (!isEdit && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem cadastrar clientes.', 'error');
+    throw new Error('Permissão negada para criar clientes.');
+  }
   if (!data.team) data.team = getCurrentTeam();
   if (isEdit) {
     const i = clients.findIndex(c => c.id === data.id);
     if (i !== -1) clients[i] = { ...clients[i], ...data, updatedAt: now };
+    else {
+      // Undo/restauração: reinsere preservando o id (antes era perdido em silêncio).
+      data.createdAt = data.createdAt || now;
+      data.updatedAt = now;
+      clients.push({ ...data });
+    }
   } else {
     data.id = nextId('CLI');
     data.createdAt = now;

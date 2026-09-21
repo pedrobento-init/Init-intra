@@ -865,7 +865,6 @@ document.addEventListener('keydown', e => {
     var tabMap = { '1':'dashboard','2':'pendencias','3':'calendario','4':'clientes','5':'templates','6':'operadores','7':'visitas','8':'historico' };
     var page = tabMap[e.key];
     if (page === 'historico' && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) return;
-    if (page === 'dashboard' && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) return;
     if (page && typeof navigateTo === 'function') { e.preventDefault(); navigateTo(page); }
   }
 

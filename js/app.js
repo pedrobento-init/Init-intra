@@ -1006,7 +1006,7 @@ function renderDashboard() {
         <div class="card">
           <div class="section-header"><span class="section-title">Ações Rápidas</span>${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar reunião</button>` : ''}</div>
           <div style="display:flex;flex-direction:column;gap:8px">
-            <button class="btn btn-primary" style="justify-content:center" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)">+ Novo Cliente</button>
+            ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-primary" style="justify-content:center" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)">+ Novo Cliente</button>` : ''}
             <button class="btn btn-secondary" style="justify-content:center" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaForm(),100)">+ Nova Pendência</button>
             <button class="btn btn-secondary" style="justify-content:center;background:#0ea5e9;border-color:#0ea5e9;color:#fff" onclick="navigateTo('visitas');setTimeout(()=>openVisitForm(),100)">+ Nova Visita</button>
           </div>

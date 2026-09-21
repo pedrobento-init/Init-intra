@@ -37,8 +37,15 @@ function renderClients() {
   document.getElementById('pageTitle').textContent = 'Clientes';
   const filterState = loadFilterState('clients', {});
   _clientPage = filterState._clientPage || 1;
-  setTopbarAction('Novo Cliente', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
-  window._topbarAction = () => openClientForm();
+  // Criação restrita a admin (não-admin edita, mas não cadastra).
+  if (typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
+    setTopbarAction('Novo Cliente', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+    window._topbarAction = () => openClientForm();
+  } else {
+    const _btn = document.getElementById('topbarActionBtn');
+    if (_btn) _btn.style.display = 'none';
+    window._topbarAction = null;
+  }
 
   const clients  = typeof getMyClients === 'function' ? getMyClients() : getClients();
   _filteredClients = clients;
@@ -48,7 +55,7 @@ function renderClients() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
       </div>
-      <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
+      <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
       ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)">📥 Milvus</button>` : ''}
     </div>
     <div class="client-cards-grid" id="clientGrid"></div>`;
@@ -71,7 +78,7 @@ function renderClientGrid() {
   const grid = document.getElementById('clientGrid');
   if (!grid) return;
   const clients = _filteredClients;
-  if (!clients.length) { grid.innerHTML = `<div class="empty-state"><p>Nenhum cliente cadastrado</p><button class="btn btn-primary btn-sm" onclick="openClientForm()">+ Novo Cliente</button></div>`; return; }
+  if (!clients.length) { grid.innerHTML = `<div class="empty-state"><p>Nenhum cliente cadastrado</p>${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '<button class="btn btn-primary btn-sm" onclick="openClientForm()">+ Novo Cliente</button>' : ''}</div>`; return; }
 
   setTimeout(() => {
     const totalPages = Math.ceil(clients.length / CLIENT_PAGE_SIZE);
@@ -778,6 +785,11 @@ function deleteClientConfirm(id) {
 }
 
 function openClientForm(id = null) {
+  // Criação restrita a admin; edição (com id) segue liberada.
+  if (!id && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem cadastrar clientes.', 'error');
+    return;
+  }
   const c = id ? getClientById(id) : {};
   const lics = c.licenses || [];
   const esc = v => escapeHtml(v || '');
@@ -1144,6 +1156,10 @@ function applyCrop() {
 
 function submitClientForm(e, id) {
   e.preventDefault();
+  if (!id && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
+    showToast('Apenas administradores podem cadastrar clientes.', 'error');
+    return;
+  }
   try {
     const fd = new FormData(e.target);
     const g = k => fd.get(k) || '';
@@ -1489,8 +1505,8 @@ function executeClientImport() {
       const errors = validateClient(clientData);
       if (errors.length) { skipped++; continue; }
     }
-    saveClient(clientData);
-    created++;
+    try { saveClient(clientData); created++; }
+    catch (_) { skipped++; }
   }
 
   closeModal();
