@@ -1315,8 +1315,8 @@ function _startApp() {
 
   var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
   if (!isAdmin) {
-    var dashNav = document.getElementById('nav-dashboard');
-    if (dashNav) dashNav.style.display = 'none';
+    // Dashboard visível p/ todos (blocos de gestão filtrados no render);
+    // histórico e mapeamento seguem restritos.
     var histNav = document.getElementById('nav-historico');
     if (histNav) histNav.style.display = 'none';
     var mapNav = document.getElementById('nav-mapeamento-milvus');
