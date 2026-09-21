@@ -2833,12 +2833,25 @@ body.dark-theme .theme-toggle-btn:hover {
   gap: 10px;
   margin-bottom: 20px;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
 }
 .log-toolbar .form-input,
 .log-toolbar .form-select {
   max-width: 260px;
   height: 38px;
+}
+/* Mesma altura dos inputs nos botões da barra */
+.log-toolbar .btn { height: 38px; }
+/* Labels De:/Até: acima do input, com a margem padrão dos labels do sistema */
+.filter-date-wrap { display: flex; flex-direction: column; justify-content: flex-end; }
+.log-toolbar .filter-date-wrap > span { font-weight: 600; margin-bottom: 5px; }
+/* Destrutiva secundária discreta na barra (vermelho cheio fica no modal) */
+.log-toolbar .btn-danger { background: transparent; border-color: transparent; }
+.log-toolbar .btn-danger:hover { background: var(--red-dim); color: var(--red); border-color: rgba(220,38,38,0.25); }
+@media screen and (max-width: 480px) {
+  .log-toolbar { align-items: stretch; }
+  .log-toolbar .form-input,
+  .log-toolbar .form-select { min-height: 44px; }
 }
 /* Log toolbar mobile -- merged into main mobile block above */
 
@@ -2846,16 +2859,19 @@ body.dark-theme .theme-toggle-btn:hover {
   position: relative;
   padding-left: 28px;
 }
-.log-timeline::before {
+/* Linha em segmentos por card (mesma técnica de .timeline-item): conecta ao
+   centro do dot, sem flutuar acima do primeiro item nem órfã com 1 item. */
+.log-card::before {
   content: '';
   position: absolute;
-  left: 10px;
-  top: 0;
-  bottom: 0;
+  left: -19px;
+  top: 26px;
+  bottom: -12px;
   width: 2px;
-  background: linear-gradient(180deg, var(--accent) 0%, var(--border) 60%, transparent 100%);
+  background: var(--border);
   border-radius: 2px;
 }
+.log-card:last-child::before { display: none; }
 
 .log-card {
   position: relative;
