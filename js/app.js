@@ -466,11 +466,12 @@ function navigateTo(page) {
   const currentHash = window.location.hash.replace('#', '') || 'dashboard';
 
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    if (page === 'dashboard' || page === 'historico' || page === 'mapeamento-milvus') {
+    if (page === 'historico' || page === 'mapeamento-milvus') {
       if (page === 'historico') showToast('Apenas administradores podem ver o histórico.', 'error');
       if (page === 'mapeamento-milvus') showToast('Somente administradores podem acessar o mapeamento.', 'error');
       page = 'pendencias';
     }
+    // Dashboard liberado p/ todos os perfis (blocos de gestão filtrados em renderDashboard).
   }
   if (page === 'relatorios' && typeof canViewInitOnly === 'function' && !canViewInitOnly()) {
     if (typeof showToast === 'function') showToast('Relatórios disponível apenas para o time Init.', 'error');
@@ -528,6 +529,9 @@ function renderDashboard() {
   const session     = getSession();
   const currentUser = session ? session.name : '';
   const today       = localDateISO();
+  // Gate único de gestão: admin + supervisor (viewAll). Operador comum vê
+  // só a versão individual do dashboard (blocos marcados abaixo).
+  const _dashCanManage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? true : false;
 
   const clients  = allClients.filter(c => itemInDashPeriod(c));
   const pens     = allPens.filter(p => itemInDashPeriod(p));
@@ -662,8 +666,9 @@ function renderDashboard() {
     .map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count).slice(0, 2);
   let _daySummary = '';
   try {
-    if (typeof buildDaySummary === 'function') _daySummary = buildDaySummary({ dueToday, todayVisits, overloadedOps: _overloaded, onLeaveOps: _onLeaveOps.map(o => o.name) });
-    else _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).` + (_overloaded.length || _onLeaveOps.length ? ' Atenção: ' + [..._overloaded.map(o => `${o.name} está sobrecarregado (${o.count} ativas)`), ..._onLeaveOps.map(o => `${o.name} está afastado`)].join('; ') + '.' : '');
+    // Operador comum: sem nomes de colegas (gestão de equipe) — só contagens.
+    if (typeof buildDaySummary === 'function') _daySummary = buildDaySummary({ dueToday, todayVisits, overloadedOps: (_dashCanManage ? _overloaded : []), onLeaveOps: (_dashCanManage ? _onLeaveOps.map(o => o.name) : []) });
+    else _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).` + ((_dashCanManage && (_overloaded.length || _onLeaveOps.length)) ? ' Atenção: ' + [..._overloaded.map(o => `${o.name} está sobrecarregado (${o.count} ativas)`), ..._onLeaveOps.map(o => `${o.name} está afastado`)].join('; ') + '.' : '');
   } catch (_) { _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).`; }
   // Comparativo com período anterior (apenas quando há filtro de período)
   let _prevStats = null, _deltaOpen = null, _deltaSla = null, _deltaComp = null;
@@ -701,28 +706,28 @@ function renderDashboard() {
         ${typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive ? 'Dados sincronizados' : 'Dados locais'}
       </div>
       <div class="dash-export-btns">
-        <button class="btn btn-secondary btn-sm" onclick="exportClientsCSV()">
+        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="exportClientsCSV()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV Clientes
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="exportPendenciasCSV()">
+        </button>` : ''}
+        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="exportPendenciasCSV()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV Pendências
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="openHoursReport()">
+        </button>` : ''}
+        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="openHoursReport()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Horas
-        </button>
+        </button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="window.print()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           PDF
         </button>
-        <button class="btn btn-primary btn-sm" onclick="generateMonthlyReport()">
+        ${_dashCanManage ? `<button class="btn btn-primary btn-sm" onclick="generateMonthlyReport()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Relatório Mensal
-        </button>
-        <button class="btn btn-secondary btn-sm" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">🖥️ Apresentar</button>
-        <button class="btn btn-secondary btn-sm" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">⚙️ Widgets</button>
+        </button>` : ''}
+        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">🖥️ Apresentar</button>` : ''}
+        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">⚙️ Widgets</button>` : ''}
       </div>
     </div>
 
@@ -733,7 +738,7 @@ function renderDashboard() {
       <p class="dash-day-summary">${escapeHtml(_daySummary)}</p>
     </div>` : ''}
 
-    ${!_dashIsHidden('reuniao') ? `
+    ${(_dashCanManage && !_dashIsHidden('reuniao')) ? `
     <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #7c3aed">
       ${_dashHideBtn('reuniao')}
       <div class="section-header">
@@ -748,7 +753,7 @@ function renderDashboard() {
         : `<div style="font-size:13px;color:var(--text-muted)">Nenhuma reunião encontrada no escopo. Acesse o módulo para criar.</div>`}
     </div>` : ''}
 
-    ${(!_dashIsHidden('afastados') && _onLeaveWithCount.length) ? `
+    ${(_dashCanManage && !_dashIsHidden('afastados') && _onLeaveWithCount.length) ? `
     <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #d97706">
       ${_dashHideBtn('afastados')}
       <div class="section-header"><span class="section-title">🏖️ Operadores afastados</span></div>
@@ -824,12 +829,12 @@ function renderDashboard() {
         </div>
         <div><div class="stat-value" style="color:#dc2626">${critical.length}</div><div class="stat-label">Alta prioridade${_dashPeriod!=='all'?' (período)':''}</div></div>
       </div>
-      <div class="stat-card">
+      ${_dashCanManage ? `<div class="stat-card">
         <div class="stat-icon" style="background:#ecfdf5">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div><div class="stat-value" style="color:#16a34a">${avgSlaHours}h</div><div class="stat-label">SLA Médio${_dashPeriod!=='all'?' (período)':''} ${_deltaSla ? _dashDeltaBadge(_deltaSla) : ''}</div></div>
-      </div>
+      </div>` : ''}
       <div class="stat-card" onclick="navigateTo('visitas')" style="cursor:pointer">
         <div class="stat-icon" style="background:#e0f2fe">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
@@ -848,12 +853,12 @@ function renderDashboard() {
         </div>
         <div><div class="stat-value" style="color:#ea580c">${dueToday.length}</div><div class="stat-label">Vencem hoje</div></div>
       </div>
-      <div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
+      ${_dashCanManage ? `<div class="stat-card" onclick="navigateTo('pendencias')" style="cursor:pointer">
         <div class="stat-icon" style="background:#fefce8">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ca8a04" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
         </div>
         <div><div class="stat-value" style="color:#ca8a04">${unassigned.length}</div><div class="stat-label">Sem responsável</div></div>
-      </div>
+      </div>` : ''}
       <div class="stat-card">
         <div class="stat-icon" style="background:#f5f3ff">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>
@@ -862,7 +867,7 @@ function renderDashboard() {
       </div>
     </div></div>
 
-    ${!_dashIsHidden('evolucao') ? `
+    ${(_dashCanManage && !_dashIsHidden('evolucao')) ? `
     <div class="card dash-widget" style="margin-bottom:18px">
       ${_dashHideBtn('evolucao')}
       <div class="section-header"><span class="section-title">Evolução de Clientes — ${periodLabel}</span></div>
@@ -886,7 +891,7 @@ function renderDashboard() {
       </div>
     </div>` : ''}
 
-    ${!_dashIsHidden('workload') ? `
+    ${(_dashCanManage && !_dashIsHidden('workload')) ? `
     <div class="card dash-widget" style="margin-bottom:18px">
       ${_dashHideBtn('workload')}
       <div class="section-header"><span class="section-title">Carga por Operador (horas em pendências)</span>
@@ -906,18 +911,18 @@ function renderDashboard() {
         <div class="section-header"><span class="section-title">Distribuição por Prioridade</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartPriority"></canvas></div>
       </div>
-      <div class="card" style="display:flex; flex-direction:column;">
+      ${_dashCanManage ? `<div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Carga de Trabalho (Por Técnico)</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartWorkload"></canvas></div>
-      </div>
+      </div>` : ''}
       <div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Evolução — Últimos 6 Meses</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartEvolution"></canvas></div>
       </div>
-      <div class="card" style="display:flex; flex-direction:column;">
+      ${_dashCanManage ? `<div class="card" style="display:flex; flex-direction:column;">
         <div class="section-header"><span class="section-title">Ranking de Produtividade (Resolvidos)</span></div>
         <div style="flex:1; position:relative; min-height:240px;"><canvas id="chartRanking"></canvas></div>
-      </div>
+      </div>` : ''}
       </div>
     </div>` : '<div class="dashboard-charts-grid" style="display:none"><div class="card"><canvas id="chartPriority"></canvas></div><div class="card"><canvas id="chartWorkload"></canvas></div><div class="card"><canvas id="chartEvolution"></canvas></div><div class="card"><canvas id="chartRanking"></canvas></div></div>'}
 
@@ -999,7 +1004,7 @@ function renderDashboard() {
 
       <div style="display:flex;flex-direction:column;gap:16px">
         <div class="card">
-          <div class="section-header"><span class="section-title">Ações Rápidas</span><button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar reunião</button></div>
+          <div class="section-header"><span class="section-title">Ações Rápidas</span>${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar reunião</button>` : ''}</div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn btn-primary" style="justify-content:center" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)">+ Novo Cliente</button>
             <button class="btn btn-secondary" style="justify-content:center" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaForm(),100)">+ Nova Pendência</button>
@@ -1247,6 +1252,10 @@ function updateBadges() {
 }
 
 function openHoursReport() {
+  if (typeof canExport === 'function' && !canExport()) {
+    if (typeof showToast === 'function') showToast('Relatório restrito a administradores/supervisores.', 'error');
+    return;
+  }
   const pens = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
   const clientMap = {};
   const opMap = {};
@@ -1576,6 +1585,10 @@ function _bootOpWithTimeout(promise, fallback) {
 })();
 
 function generateMonthlyReport() {
+  if (typeof canExport === 'function' && !canExport()) {
+    if (typeof showToast === 'function') showToast('Relatório restrito a administradores/supervisores.', 'error');
+    return;
+  }
   var clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   var pens = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
   var ops = getOperators().filter(function(o) { return (o.team || 'init') === (isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam()); });

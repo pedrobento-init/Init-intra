@@ -795,6 +795,10 @@ function setTopbarAction(text, iconSvg) {
 }
 
 function exportClientsCSV() {
+  if (typeof canExport === 'function' && !canExport()) {
+    if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+    return;
+  }
   const clients = typeof getClients === 'function' ? getClients() : [];
   const headers = ['ID', 'Nome', 'CNPJ/CPF', 'Segmento', 'Telefone Dono', 'Telefone Resp.', 'Responsável TI', 'Técnico', 'Data Cadastro'];
   const rows = clients.map(c => [
@@ -812,6 +816,10 @@ function exportClientsCSV() {
 }
 
 function exportPendenciasCSV() {
+  if (typeof canExport === 'function' && !canExport()) {
+    if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+    return;
+  }
   const pens = typeof getPendencias === 'function' ? getPendencias() : [];
   const headers = ['ID', 'Cliente', 'Assunto', 'Descrição', 'Status', 'Prioridade', 'Responsável', 'Criado Em', 'Prazo'];
   const rows = pens.map(p => [
