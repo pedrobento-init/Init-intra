@@ -2432,6 +2432,12 @@ async function saveOperator(data) {
       list.push(savedOp);
     }
   } else {
+    // Backstop além da UI (validateOperator): outros chamadores não passam
+    // pelo form — criação com e-mail repetido lança em vez de duplicar.
+    if (data.email) {
+      const dupe = list.find(o => o && o.email && String(o.email).trim().toLowerCase() === String(data.email).trim().toLowerCase());
+      if (dupe) throw new Error('Já existe um operador com este e-mail (' + dupe.name + ').');
+    }
     data.id = nextId('OP');
     data.createdAt = now;
     data.updatedAt = now;
@@ -2808,6 +2814,14 @@ function validateOperator(data) {
   if (data.email && !Validators.email(data.email)) errors.push('E-mail inválido.');
   if (data.phone && !Validators.phone(data.phone)) errors.push('Telefone inválido.');
   if (data.initials && data.initials.length > 3) errors.push('Iniciais devem ter no máximo 3 caracteres.');
+  // Anti-duplicata: criação com e-mail já cadastrado (case-insensitive).
+  // Edição (com id) passa — o próprio registro é ignorado na comparação.
+  if (!data.id && data.email) {
+    try {
+      const dupe = getOperators().find(o => o && o.email && o.email.trim().toLowerCase() === String(data.email).trim().toLowerCase());
+      if (dupe) errors.push('Já existe um operador com este e-mail (' + dupe.name + ').');
+    } catch (_) {}
+  }
   return errors;
 }
 
@@ -2819,5 +2833,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator };
 }
