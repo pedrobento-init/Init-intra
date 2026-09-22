@@ -980,9 +980,17 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 
 // ── PWA Install Prompt ─────────────────────────────────────────────────────────
 let _deferredInstall = null;
+function _setInstallBtnVisible(v) {
+  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_) {}
+}
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   _deferredInstall = e;
+  _setInstallBtnVisible(true);
+});
+window.addEventListener('appinstalled', () => {
+  _deferredInstall = null;
+  _setInstallBtnVisible(false);
 });
 
 function promptInstall() {
@@ -991,6 +999,7 @@ function promptInstall() {
   _deferredInstall.userChoice.then(r => {
     if (r.outcome === 'accepted') showToast('App instalado com sucesso!', 'success');
     _deferredInstall = null;
+    _setInstallBtnVisible(false);
   });
 }
 

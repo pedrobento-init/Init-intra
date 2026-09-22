@@ -25,6 +25,39 @@ describe('parseGoogleSheetId', () => {
   });
 });
 
+describe('parseGoogleSheetLink (publicado na web)', () => {
+  let clientsMod;
+  beforeEach(() => {
+    delete require.cache[require.resolve('../js/clients.js')];
+    clientsMod = require('../js/clients.js');
+  });
+  it('extrai o ID publicado de URLs /d/e/.../pubhtml (não o literal "e")', () => {
+    expect(clientsMod.parseGoogleSheetLink('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml'))
+      .toEqual({ kind: 'published', id: '2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz' });
+    expect(clientsMod.parseGoogleSheetLink('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml?widget=true'))
+      .toEqual({ kind: 'published', id: '2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz' });
+  });
+  it('parseGoogleSheetId retorna o ID publicado (nunca "e")', () => {
+    expect(clientsMod.parseGoogleSheetId('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml'))
+      .toBe('2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz');
+  });
+  it('classifica link de compartilhamento como sheet', () => {
+    expect(clientsMod.parseGoogleSheetLink('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing'))
+      .toEqual({ kind: 'sheet', id: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms' });
+  });
+});
+
+describe('googleSheetEmbedUrl (publicado na web)', () => {
+  let clientsMod;
+  beforeEach(() => {
+    delete require.cache[require.resolve('../js/clients.js')];
+    clientsMod = require('../js/clients.js');
+  });
+  it('gera pubhtml embed a partir do link publicado', () => {
+    expect(clientsMod.googleSheetEmbedUrl('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml'))
+      .toBe('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml?widget=true&headers=false');
+  });
+});
 describe('googleSheetEmbedUrl', () => {
   let clientsMod;
   beforeEach(() => {

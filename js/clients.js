@@ -1341,24 +1341,44 @@ function fallbackCopyMilvusToken(token, done) {
 // (coluna clients.google_sheet_url, sync bidirecional já mapeado). Gerenciar o
 // vínculo é restrito a admin; visualizar segue a regra da aba (equipe).
 
-// Extrai o ID da planilha de uma URL do Google Sheets ou do próprio ID colado.
-// Retorna o ID ou null (puro, testável).
-function parseGoogleSheetId(v) {
+// Extrai o link da planilha em um dos formatos aceitos (puro, testável):
+// - URL de compartilhamento /spreadsheets/d/<ID>/... → { kind:'sheet' }
+// - URL de "Publicar na web" /spreadsheets/d/e/<PUBID>/pubhtml → { kind:'published' }
+// - ID colado diretamente → { kind:'sheet' }
+// Retorna null se não reconhecer.
+function parseGoogleSheetLink(v) {
   const s = String(v === null || v === undefined ? '' : v).trim();
   if (!s) return null;
-  const m = s.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (m) return m[1];
-  if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return s;
+  let m = s.match(/docs\.google\.com\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
+  if (m) return { kind: 'published', id: m[1] };
+  m = s.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  // '/d/e/...' já tratado acima; um ID real nunca é o literal 'e'.
+  if (m && m[1] !== 'e') return { kind: 'sheet', id: m[1] };
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return { kind: 'sheet', id: s };
   return null;
 }
 
-// Monta a URL de embed a partir do link/ID salvo. A URL normal (/edit) é
-// bloqueada em iframe pelo Google (X-Frame-Options) — por isso a conversão
-// para o formato embedded. Retorna '' se inválido (puro, testável).
+// Extrai o ID da planilha de uma URL do Google Sheets ou do próprio ID colado.
+// Retorna o ID ou null (puro, testável).
+function parseGoogleSheetId(v) {
+  const p = parseGoogleSheetLink(v);
+  return p ? p.id : null;
+}
+
+// Monta a URL de embed a partir do link/ID salvo:
+// - sheet: .../edit?usp=sharing&embedded=true (a URL normal /edit é bloqueada
+//   em iframe pelo Google via X-Frame-Options — daí a conversão; exige a
+//   planilha compartilhada como "qualquer pessoa com o link pode visualizar").
+// - published: .../d/e/<PUBID>/pubhtml?widget=true (exige Arquivo > Publicar
+//   na web; somente leitura, sem login).
+// Retorna '' se inválido (puro, testável).
 function googleSheetEmbedUrl(v) {
-  const sid = parseGoogleSheetId(v);
-  if (!sid) return '';
-  return 'https://docs.google.com/spreadsheets/d/' + sid + '/edit?usp=sharing&embedded=true';
+  const p = parseGoogleSheetLink(v);
+  if (!p) return '';
+  if (p.kind === 'published') {
+    return 'https://docs.google.com/spreadsheets/d/e/' + p.id + '/pubhtml?widget=true&headers=false';
+  }
+  return 'https://docs.google.com/spreadsheets/d/' + p.id + '/edit?usp=sharing&embedded=true';
 }
 
 function _canManageClientSheet() {
@@ -1388,8 +1408,12 @@ function renderClientSheetSection(clientId) {
     body.innerHTML = '<div class="empty-state"><p>Nenhuma planilha vinculada.</p></div>';
     return;
   }
+  const kind = (function(){ try { const p = parseGoogleSheetLink(saved); return p ? p.kind : 'sheet'; } catch (_) { return 'sheet'; } })();
+  const hint = kind === 'published'
+    ? 'Planilha publicada na web (somente leitura, sem login). Para editar, use o botão abaixo.'
+    : 'A planilha precisa estar compartilhada como “Qualquer pessoa com o link pode visualizar” para carregar aqui. Se aparecer a tela de login do Google, ajuste o compartilhamento na planilha.';
   body.innerHTML = `
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">A planilha precisa estar compartilhada como “Qualquer pessoa com o link pode visualizar” para carregar aqui. Se aparecer a tela de login do Google, ajuste o compartilhamento na planilha.</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${hint}</div>
     <iframe src="${escapeHtml(embed)}" style="width:100%;height:600px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface)" loading="lazy" title="Planilha de documentação"></iframe>`;
 }
 
@@ -1403,7 +1427,7 @@ function openSheetLinkModal(clientId) {
   const safeId = escapeHtml(clientId);
   openModal('📊 Vincular planilha de documentação', `
     <div class="form-group"><label class="form-label">Link do Google Sheets</label><input class="form-input" id="sheetLinkInput" value="${escapeHtml(cur)}" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-    <p style="font-size:12px;color:var(--text-muted)">Cole o link de compartilhamento da planilha deste cliente. Depois, no Google, compartilhe como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
+    <p style="font-size:12px;color:var(--text-muted)">Cole o link de <strong>compartilhamento</strong> (…/spreadsheets/d/…) ou o de <strong>Publicar na web</strong> (…/spreadsheets/d/e/…/pubhtml). No primeiro caso, compartilhe no Google como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
     <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="viewClient('${safeId}');switchClientTab('documentos','${safeId}')">Cancelar</button><button type="button" class="btn btn-primary" onclick="saveSheetLink('${safeId}')">Salvar</button></div>
     <div id="sheetLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
 }
@@ -1680,5 +1704,5 @@ function _refreshClientsInPlace(){
 })();
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, googleSheetEmbedUrl };
+  module.exports = { buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl };
 }
