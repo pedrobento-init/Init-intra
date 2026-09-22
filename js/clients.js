@@ -243,8 +243,16 @@ function renderClientTab(tab, id) {
         </div>
         <div class="attachment-list" id="cliAttachmentsList"></div>
       </div>
+      <hr class="divider" />
+      <div class="attachment-section" style="margin-top:0">
+        <div class="section-header" style="margin-bottom:12px">
+          <span class="section-title">📊 Planilha de documentação (Google Sheets)</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="cliSheetActions"></div>
+        </div>
+        <div id="cliSheetBody"></div>
+      </div>
     `;
-    setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); }, 20);
+    setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); renderClientSheetSection(id); }, 20);
   } else if (tab === 'visitas') {
     const visits = getVisitsByClient(id);
     el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
@@ -1328,6 +1336,118 @@ function fallbackCopyMilvusToken(token, done) {
   }
 }
 
+// ── Planilha de documentação (Google Sheets, embed) ──
+// Cada cliente tem sua própria planilha; o link fica em client.googleSheetUrl
+// (coluna clients.google_sheet_url, sync bidirecional já mapeado). Gerenciar o
+// vínculo é restrito a admin; visualizar segue a regra da aba (equipe).
+
+// Extrai o ID da planilha de uma URL do Google Sheets ou do próprio ID colado.
+// Retorna o ID ou null (puro, testável).
+function parseGoogleSheetId(v) {
+  const s = String(v === null || v === undefined ? '' : v).trim();
+  if (!s) return null;
+  const m = s.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return s;
+  return null;
+}
+
+// Monta a URL de embed a partir do link/ID salvo. A URL normal (/edit) é
+// bloqueada em iframe pelo Google (X-Frame-Options) — por isso a conversão
+// para o formato embedded. Retorna '' se inválido (puro, testável).
+function googleSheetEmbedUrl(v) {
+  const sid = parseGoogleSheetId(v);
+  if (!sid) return '';
+  return 'https://docs.google.com/spreadsheets/d/' + sid + '/edit?usp=sharing&embedded=true';
+}
+
+function _canManageClientSheet() {
+  try { return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false; }
+  catch (_) { return false; }
+}
+
+function renderClientSheetSection(clientId) {
+  const body = document.getElementById('cliSheetBody');
+  const actions = document.getElementById('cliSheetActions');
+  if (!body) return;
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const saved = c ? String(c.googleSheetUrl || '').trim() : '';
+  const embed = googleSheetEmbedUrl(saved);
+  const canManage = _canManageClientSheet();
+  const safeId = escapeHtml(clientId);
+  if (actions) {
+    if (!embed) {
+      actions.innerHTML = canManage ? `<button class="btn btn-primary btn-sm" onclick="openSheetLinkModal('${safeId}')">+ Vincular planilha</button>` : '';
+    } else {
+      actions.innerHTML =
+        `<a class="btn btn-secondary btn-sm" href="${escapeHtml(saved)}" target="_blank" rel="noopener">Abrir no Google Sheets ↗</a>` +
+        (canManage ? `<button class="btn btn-secondary btn-sm" onclick="openSheetLinkModal('${safeId}')">Editar link</button><button class="btn btn-sm btn-danger" onclick="removeSheetLinkConfirm('${safeId}')">Remover</button>` : '');
+    }
+  }
+  if (!embed) {
+    body.innerHTML = '<div class="empty-state"><p>Nenhuma planilha vinculada.</p></div>';
+    return;
+  }
+  body.innerHTML = `
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">A planilha precisa estar compartilhada como “Qualquer pessoa com o link pode visualizar” para carregar aqui. Se aparecer a tela de login do Google, ajuste o compartilhamento na planilha.</div>
+    <iframe src="${escapeHtml(embed)}" style="width:100%;height:600px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface)" loading="lazy" title="Planilha de documentação"></iframe>`;
+}
+
+function openSheetLinkModal(clientId) {
+  if (!_canManageClientSheet()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem vincular a planilha.', 'error');
+    return;
+  }
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const cur = c ? String(c.googleSheetUrl || '') : '';
+  const safeId = escapeHtml(clientId);
+  openModal('📊 Vincular planilha de documentação', `
+    <div class="form-group"><label class="form-label">Link do Google Sheets</label><input class="form-input" id="sheetLinkInput" value="${escapeHtml(cur)}" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
+    <p style="font-size:12px;color:var(--text-muted)">Cole o link de compartilhamento da planilha deste cliente. Depois, no Google, compartilhe como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
+    <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="viewClient('${safeId}');switchClientTab('documentos','${safeId}')">Cancelar</button><button type="button" class="btn btn-primary" onclick="saveSheetLink('${safeId}')">Salvar</button></div>
+    <div id="sheetLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
+}
+
+function saveSheetLink(clientId) {
+  if (!_canManageClientSheet()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem vincular a planilha.', 'error');
+    return;
+  }
+  const input = document.getElementById('sheetLinkInput');
+  const raw = input ? String(input.value || '').trim() : '';
+  const setMsg = (html) => { const m = document.getElementById('sheetLinkMsg'); if (m) m.innerHTML = html; };
+  if (raw && !parseGoogleSheetId(raw)) {
+    setMsg('<span style="color:var(--danger,#dc2626)">Link inválido. Cole uma URL do Google Sheets (docs.google.com/spreadsheets/...).</span>');
+    return;
+  }
+  try {
+    const existing = typeof getClientById === 'function' ? getClientById(clientId) : null;
+    if (!existing) {
+      if (typeof showToast === 'function') showToast('Cliente não encontrado.', 'error');
+      return;
+    }
+    saveClient({ ...existing, id: clientId, googleSheetUrl: raw || null });
+    viewClient(clientId);
+    switchClientTab('documentos', clientId);
+    showToast(raw ? 'Planilha vinculada!' : 'Planilha desvinculada.', 'success');
+  } catch (err) { showToast('Erro ao salvar: ' + (err && err.message ? err.message : err), 'error'); }
+}
+
+function removeSheetLinkConfirm(clientId) {
+  if (!_canManageClientSheet()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem remover a planilha.', 'error');
+    return;
+  }
+  confirmAction('Desvincular a planilha de documentação deste cliente?', function() {
+    const existing = typeof getClientById === 'function' ? getClientById(clientId) : null;
+    if (!existing) return;
+    saveClient({ ...existing, id: clientId, googleSheetUrl: null });
+    viewClient(clientId);
+    switchClientTab('documentos', clientId);
+    showToast('Planilha desvinculada.', 'success');
+  });
+}
+
 function handleImportPaste(text) {
   if (!text || text.trim().length < 3) return;
   _importRows = parseDelimitedText(text);
@@ -1560,5 +1680,5 @@ function _refreshClientsInPlace(){
 })();
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildClientNarrative, normalizeMilvusClientToken };
+  module.exports = { buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, googleSheetEmbedUrl };
 }
