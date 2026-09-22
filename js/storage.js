@@ -699,7 +699,7 @@ async function _runSupabaseSync(reason, opts) {
       } else {
         console.warn('[sync] ' + e.table + ' (erro de leitura):', (err && err.message) || err);
       }
-      // Entidade opcional (tabela pode não existir, ex.: tickets 404):
+      // Entidade opcional (tabela pode não existir no banco):
       // pula sem marcar erro — comportamento anterior a C1. Falha de
       // conectividade, porém, sempre marca pendência (precisa de retry).
       if (e.optional && !_isConnectivityError(err)) return true;
@@ -713,7 +713,7 @@ async function _runSupabaseSync(reason, opts) {
         return false;
       }
       console.warn(`Supabase ${e.table} error:`, error);
-      // Entidade opcional (tabela pode não existir, ex.: tickets 404):
+      // Entidade opcional (tabela pode não existir no banco):
       // pula sem marcar erro — comportamento anterior a C1.
       if (e.optional) return true;
       return false;

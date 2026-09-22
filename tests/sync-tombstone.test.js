@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ENTITIES,
+  SYNC_ENTITIES,
   _mergeRecords,
   _needsPush,
   TOMBSTONE_TTL_MS,
@@ -115,11 +116,10 @@ describe('C1-fix: push falhou não perde o dado local nem duplica', () => {
   });
 });
 
-describe('C1-fix: entidade opcional ausente não prende o sync', () => {
-  it('tickets é optional (tabela ausente em produção = 404 no select)', () => {
-    const tickets = ENTITIES.find((e) => e.table === 'tickets');
-    expect(tickets).toBeTruthy();
-    expect(tickets.optional).toBe(true);
+describe('C1-fix: entidade tickets removida do sync', () => {
+  it('tickets fora de ENTITIES e SYNC_ENTITIES (tabela não existe em produção)', () => {
+    expect(ENTITIES.find((e) => e.table === 'tickets')).toBeUndefined();
+    expect(SYNC_ENTITIES.find((e) => e.table === 'tickets')).toBeUndefined();
   });
 });
 

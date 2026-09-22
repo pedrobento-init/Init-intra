@@ -64,25 +64,6 @@ const ENTITIES = [
     }
   },
   {
-    table: 'tickets',
-    dbKey: 'intra_tickets',
-    label: 'Chamados',
-    hasTeam: false,
-    sync: true,
-    realtime: false,
-    // Tabela pode não existir no banco (módulo sem UI; confirmada
-    // ausente em produção — select retorna 404). Como visits/reunioes:
-    // falha de leitura pula a entidade sem sujar o contador de sync.
-    optional: true,
-    fields: {
-      id: 'id', client_id: 'clientId', client_name: 'clientName', title: 'title', description: 'description',
-      status: 'status', priority: 'priority', technician: 'technician', updates: 'updates', team: 'team',
-      attachments: 'attachments', timer_running: 'timerRunning', timer_started_at: 'timerStartedAt',
-      timer_total_seconds: 'timerTotalSeconds', timer_operator: 'timerOperator', completed_at: 'completedAt',
-      created_at: 'createdAt', updated_at: 'updatedAt'
-    }
-  },
-  {
     table: 'operators',
     dbKey: 'intra_operators',
     label: 'Operadores',
