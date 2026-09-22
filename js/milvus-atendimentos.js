@@ -474,19 +474,16 @@ if(typeof window!=='undefined'){
   });
 }
 
-// Render aba cliente (chamada por clients.js)
-function renderMilvusAtendimentosTab(clientId){
-  var el=document.getElementById('clientTabContent');
-  if(!el) return;
-  _atendUI.clientId=clientId;
-  _atendUI.page=1;
-  var range=_monthRangeISO();
-  el.innerHTML=
-    '<div id="atendResumo">'+_atendSkeleton()+'</div>'+
+// HTML da seção Atendimentos (cliente) — reutilizado tanto pela aba unificada
+// "Chamados" (via renderMilvusAtendimentosInline) quanto pelo fallback legado.
+// IDs prefixo 'atend' (contexto cliente); o contexto global usa 'gAtend'.
+function getMilvusAtendimentosClientHtml(range){
+  var r=range || _monthRangeISO();
+  return '<div id="atendResumo">'+_atendSkeleton()+'</div>'+
     '<div class="search-bar" style="flex-wrap:wrap;gap:8px;align-items:center">'+
-      '<input type="date" class="form-input" id="atendDataInicial" value="'+range.start+'" style="width:150px" />'+
+      '<input type="date" class="form-input" id="atendDataInicial" value="'+r.start+'" style="width:150px" />'+
       '<span style="font-size:12px;color:var(--text-muted)">até</span>'+
-      '<input type="date" class="form-input" id="atendDataFinal" value="'+range.end+'" style="width:150px" />'+
+      '<input type="date" class="form-input" id="atendDataFinal" value="'+r.end+'" style="width:150px" />'+
       '<div class="search-input-wrap" style="flex:1;min-width:140px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" oninput="if(this.value===\'\') _atendApplyFilters(false)" /></div>'+
       '<button class="btn btn-primary btn-sm" onclick="_atendApplyFilters(false)">Buscar</button>'+
       '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" onclick="_atendToggleMore(\'atend\')" aria-expanded="false">Mais filtros</button>'+
@@ -506,6 +503,29 @@ function renderMilvusAtendimentosTab(clientId){
       '<input class="form-input" id="atendMotivoPausa" placeholder="Motivo pausa" style="width:150px" />'+
     '</div>'+
     '<div id="atendList"></div>';
+}
+
+// Render aba cliente (chamada por clients.js)
+function renderMilvusAtendimentosTab(clientId){
+  var el=document.getElementById('clientTabContent');
+  if(!el) return;
+  _atendUI.clientId=clientId;
+  _atendUI.page=1;
+  el.innerHTML=getMilvusAtendimentosClientHtml();
+  _atendDoFetchAndRender(false);
+}
+
+// Render inline dentro da aba unificada "Chamados" (chamada por clients.js
+// renderClientMilvusTicketsTab). Monta a mesma UI de filtros/resumo/tabela no
+// elemento indicado, sem tocar no restante da aba. Os filtros valem SOMENTE
+// para esta seção (fonte: edge milvus-atendimentos, transiente); os cards de
+// chamados acima seguem com fonte própria (edge milvus-tickets, top 10).
+function renderMilvusAtendimentosInline(clientId, mountId){
+  var mount=mountId ? document.getElementById(mountId) : null;
+  if(!mount) return;
+  _atendUI.clientId=clientId;
+  _atendUI.page=1;
+  mount.innerHTML=getMilvusAtendimentosClientHtml();
   _atendDoFetchAndRender(false);
 }
 
@@ -561,10 +581,10 @@ function renderRelatorios(){
       try{ preserveScrollAround(function(){ _atendDoFetchAndRender(true); }); }catch(_){}
       return;
     }
-    // aba cliente Atendimentos dentro do modal
+    // aba cliente dentro do modal (agora seção inline na aba unificada
+    // "Chamados"; o alias legado 'atendimentos' também cai aqui)
     try{
-      var tab=document.querySelector('#clientTabs .tab.active');
-      if(tab && tab.textContent.trim().toLowerCase().indexOf('atendimento')!==-1 && document.getElementById('atendList')){
+      if(document.getElementById('atendList')){
         preserveScrollAround(function(){ _atendDoFetchAndRender(false); });
       }
     }catch(_){}

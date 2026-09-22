@@ -137,7 +137,6 @@ function viewClient(id) {
       <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
       <div class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</div>
       <div class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</div>
-      <div class="tab" onclick="switchClientTab('atendimentos','${id}')">Atendimentos</div>
       <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
       <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
     </div>
@@ -146,7 +145,7 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','atendimentos','documentos','historico'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','documentos','historico'][i]===tab));
   renderClientTab(tab, id);
 }
 
@@ -264,8 +263,9 @@ function renderClientTab(tab, id) {
   } else if (tab === 'chamados') {
     renderClientMilvusTicketsTab(id);
   } else if (tab === 'atendimentos') {
-    if(typeof renderMilvusAtendimentosTab==='function') renderMilvusAtendimentosTab(id);
-    else el.innerHTML='<p style="color:var(--text-muted)">Módulo Atendimentos não carregado.</p>';
+    // Aba removida (unificada em "chamados"): alias defensivo para não quebrar
+    // chamadas antigas — renderiza a aba unificada.
+    renderClientMilvusTicketsTab(id);
   } else if (tab === 'historico') {
     const client = getClientById(id);
     const clientName = client ? client.name : '';
@@ -405,8 +405,16 @@ function renderClientMilvusTicketsTab(clientId) {
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Última sincronização: <strong id="milvusTicketsLastSync">${escapeHtml(lastTxt)}</strong> · máx. 10 recentes</div>
     <div id="milvusTicketsMsg" style="font-size:13px;margin-bottom:10px"></div>
-    <div id="milvusTicketsList"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando chamados…</p></div>`;
+    <div id="milvusTicketsList"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando chamados…</p></div>
+    <hr class="divider" style="margin:16px 0" />
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <span class="mtickets-title">⏱️ Horas / Atendimentos</span>
+    </div>
+    <div id="chamadosAtendSection"></div>`;
   loadClientMilvusTicketsUI(clientId);
+  try {
+    if (typeof renderMilvusAtendimentosInline === 'function') renderMilvusAtendimentosInline(clientId, 'chamadosAtendSection');
+  } catch (_) {}
   try {
     if (typeof shouldAutoSyncMilvusTickets === 'function' && shouldAutoSyncMilvusTickets(lastSync, Date.now())) {
       syncClientMilvusTicketsUI(clientId, { silent: true });
