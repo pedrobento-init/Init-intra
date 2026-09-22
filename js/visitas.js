@@ -1,6 +1,6 @@
 // visitas.js – Registro e acompanhamento de Visitas Técnicas
 
-const VISIT_PAGE_SIZE = 30;
+const VISIT_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
 let _visitPage = 1;
 let _filteredVisits = [];
 

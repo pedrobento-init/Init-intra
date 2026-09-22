@@ -56,7 +56,7 @@ if(typeof window!=='undefined' && !window._opMenuBound){
 
 let _opPage = 1;
 let _filteredOps = [];
-const OP_PAGE_SIZE = 30;
+const OP_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
 
 // ── Render principal ──────────────────────────────────────────────────────────
 function renderOperadores() {

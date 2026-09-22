@@ -280,11 +280,20 @@ function filterByTeam(items) {
   return items.filter(i => normalizeTeam(i.team || 'init') === myTeam);
 }
 
-// Migra registros locais legados poiesis_1..6 -> poiesis (idempotente)
+// Migra registros locais legados poiesis_1..6 -> poiesis (idempotente).
+// Resquício pós-migração 031: após a primeira varredura sem nada a migrar,
+// carimba flag local e as próximas cargas retornam de imediato (evita iterar
+// 8 tabelas a cada boot). O servidor já foi unificado pela 031, então nenhum
+// registro poiesis_N novo pode chegar depois do carimbo.
+var _POIESIS_MIG_FLAG = 'intra_poiesis_migrated_v1';
 async function _migratePoiesisTeamsLocal(){
   try{
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem(_POIESIS_MIG_FLAG) === '1') return;
+    } catch (_) {}
     if(typeof getCacheStore!=='function' || typeof setCacheStore!=='function') return;
     var tables=['clients','pendencias','operators','visits','reunioes','tickets','client_devices','client_milvus_tickets'];
+    var anyChanged=false;
     for(var ti=0; ti<tables.length; ti++){
       var t=tables[ti];
       try{
@@ -301,7 +310,7 @@ async function _migratePoiesisTeamsLocal(){
             changed=true;
           }
         }
-        if(changed) setCacheStore(t, rows);
+        if(changed){ setCacheStore(t, rows); anyChanged=true; }
       }catch(_){}
     }
     // sessão legada
@@ -310,8 +319,12 @@ async function _migratePoiesisTeamsLocal(){
       if(sess && sess.team && String(sess.team).indexOf('poiesis_')===0){
         sess.team='poiesis';
         if(typeof setCacheTable==='function') setCacheTable('sessions', {key: DB.SESSION, value: sess});
+        anyChanged=true;
       }
     }catch(_){}
+    if(!anyChanged){
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(_POIESIS_MIG_FLAG, '1'); } catch (_) {}
+    }
   }catch(_){}
 }
 if(typeof window!=='undefined'){
@@ -814,7 +827,11 @@ async function _runSupabaseSync(reason, opts) {
   let syncHadErrors = false;
   try {
     try { _pruneTombstonesPersisted(); } catch (_) {}
-    for (const e of SYNC_ENTITIES) {
+    // Entidades são independentes (tabelas distintas): sincronizam em paralelo
+    // com concorrência limitada — a ordem interna de cada entidade (C1:
+    // push-deletes → pull → push → merge) é preservada. Cai de soma(N) para
+    // ~soma(N)/3 no tempo de boot. Semântica de erro idêntica à serial.
+    const _runEntity = async (e) => {
       if (e.optional) {
         try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
         catch (err) { console.warn(`Supabase ${e.table} (sync pulado — tabela ausente?):`, err.message); }
@@ -822,6 +839,16 @@ async function _runSupabaseSync(reason, opts) {
         try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
         catch (err) { console.warn(`Supabase ${e.table} (sync pulado):`, err.message); syncHadErrors = true; }
       }
+    };
+    {
+      const _queue = SYNC_ENTITIES.slice();
+      const _poolSize = (typeof SYNC_ENTITY_CONCURRENCY === 'number' && SYNC_ENTITY_CONCURRENCY >= 1)
+        ? Math.floor(SYNC_ENTITY_CONCURRENCY) : 3;
+      const _workers = Array.from(
+        { length: Math.min(_poolSize, _queue.length) || 1 },
+        async () => { while (_queue.length) { const _e = _queue.shift(); if (!_e) return; await _runEntity(_e); } }
+      );
+      await Promise.all(_workers);
     }
 
     if (connectivityFailed) syncHadErrors = true;
@@ -1143,7 +1170,7 @@ function renderAttachmentList(type, itemId, containerId) {
     const icon = isImage ? '🖼️' : a.mimeType?.includes('pdf') ? '📄' : '📎';
     const src = a.url || a.data || '';
     return `<div class="attachment-item">
-      ${isImage ? `<img src="${src}" class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="window.open(this.src,'_blank')" />` : `<div class="attachment-icon">${icon}</div>`}
+      ${isImage ? `<img src="${src}" class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="window.open(this.src,'_blank','noopener')" />` : `<div class="attachment-icon">${icon}</div>`}
       <div class="attachment-info">
         <div class="attachment-name">${escapeHtml(a.name)}</div>
         <div class="attachment-meta">${sizeKB} KB · ${escapeHtml(a.uploadedBy)} · ${formatDateTime(a.uploadedAt)}</div>
@@ -1230,7 +1257,7 @@ function renderClientDocumentsList(clientId, containerId) {
     var icon = isImage ? '🖼️' : a.mimeType && a.mimeType.includes('pdf') ? '📄' : '📎';
     var src = a.url || a.data || '';
     return '<div class="attachment-item">' +
-      (isImage ? '<img src="' + src + '" class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="window.open(this.src,\'_blank\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
+      (isImage ? '<img src="' + src + '" class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="window.open(this.src,\'_blank\',\'noopener\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
       '<div class="attachment-info"><div class="attachment-name">' + escapeHtml(a.name) + '</div><div class="attachment-meta">' + sizeKB + ' KB · ' + escapeHtml(a.uploadedBy) + ' · ' + formatDateTime(a.uploadedAt) + '</div></div>' +
       '<div class="attachment-actions"><a href="' + src + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary" title="Baixar">⬇</a><button class="btn btn-sm btn-danger" onclick="removeClientDocumentUI(\'' + clientId + '\',\'' + a.id + '\',\'' + containerId + '\')" title="Remover">✕</button></div></div>';
   }).join('');
@@ -1262,11 +1289,24 @@ function handleClientDocumentUpload(clientId, inputElement, callback) {
 }
 
 // ── CLIENTS ──
+// Lookup O(1) por id + ordenação memoizados por identidade do array
+// (setCacheStore troca a referência a cada escrita): getClients/getClientById
+// são chamados N× por render. Semântica idêntica às versões anteriores.
+let _clientsArr = null;
+let _clientsSorted = null;
+let _clientByIdMap = null;
 function getClients() {
   const all = dbGet(DB.CLIENTS);
-  return all.slice().sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true })
-  );
+  // Memoiza a ordenação por identidade do array. Retorna slice() para
+  // preservar o contrato de "array novo".
+  if (_clientsArr !== all || !_clientsSorted) {
+    _clientsSorted = (all || []).slice().sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true })
+    );
+    _clientsArr = all;
+    _clientByIdMap = null;
+  }
+  return _clientsSorted.slice();
 }
 function getClientsByTeam(team) {
   const all = getClients();
@@ -1276,7 +1316,24 @@ function getClientsByTeam(team) {
 function getMyClients() {
   return filterByTeam(getClients());
 }
-function getClientById(id) { return dbGet(DB.CLIENTS).find(c => c.id === id) || null; }
+// Lookup O(1) por id, memoizado por identidade do array (mesma regra do
+// getClients acima): getClientById é chamado N× por render. Semântica
+// idêntica ao find — mesmos objetos, null quando não acha.
+function getClientById(id) {
+  try {
+    const all = dbGet(DB.CLIENTS) || [];
+    if (_clientsArr !== all || !_clientByIdMap) {
+      _clientByIdMap = new Map();
+      for (const c of all) { if (c && c.id != null && !_clientByIdMap.has(c.id)) _clientByIdMap.set(c.id, c); }
+      _clientsArr = all;
+      _clientsSorted = null;
+    }
+    if (id == null) return null;
+    return _clientByIdMap.has(id) ? (_clientByIdMap.get(id) || null) : null;
+  } catch (_) {
+    try { return (dbGet(DB.CLIENTS) || []).find(c => c && c.id === id) || null; } catch (_) { return null; }
+  }
+}
 function saveClient(data) {
   const clients = getClients();
   const isEdit = !!data.id;

@@ -1,29 +1,42 @@
-const CACHE_NAME = 'init-intra-v42';
-const CDN_CACHE_NAME = 'init-intra-cdn-v42';
+const CACHE_NAME = 'init-intra-v43';
+const CDN_CACHE_NAME = 'init-intra-cdn-v43';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
   '/',
   'index.html',
   'css/styles.css',
+  'js/schema.js',
   'js/supabase-config.js',
   'js/db.js',
   'js/storage.js',
+  'js/app-events.js',
   'js/auth.js',
   'js/ui.js',
   'js/clients.js',
   'js/pendencias.js',
   'js/operadores.js',
+  'js/notifications.js',
   'js/calendar.js',
   'js/visitas.js',
-  'js/notifications.js',
   'js/templates.js',
   'js/global-search.js',
-  'js/app.js',
   'js/timer.js',
+  'js/metrics.js',
+  'js/reunioes.js',
+  'js/mapeamento-milvus.js',
+  'js/milvus-atendimentos.js',
+  'js/milvus-chamado.js',
+  'js/milvus-clients-import.js',
+  'js/milvus-devices.js',
+  'js/milvus-tickets.js',
+  'js/milvus-token-backfill.js',
+  'js/app.js',
   'js/sw-register.js',
   'manifest.json',
-  'icon.svg'
+  'icon.svg',
+  'icon-192.png',
+  'logo-initnet.svg'
 ];
 
 const CDN_ASSETS = [

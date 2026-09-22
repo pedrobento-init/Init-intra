@@ -256,6 +256,10 @@ const ENTITIES = [
 // Entidades que participam do sync bidirecional (na ordem de processamento)
 const SYNC_ENTITIES = ENTITIES.filter(e => e.sync !== false);
 
+// Concorrência do sync entre entidades (tabelas distintas, independentes).
+// 3 = ~3× mais rápido no boot sem pressionar o pool do PostgREST.
+const SYNC_ENTITY_CONCURRENCY = 3;
+
 // ── Funções puras de mapeamento/merge (sem dependência de DOM) ──
 
 function _valuesDiffer(a, b) {

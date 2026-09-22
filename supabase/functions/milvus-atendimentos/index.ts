@@ -130,6 +130,10 @@ serve(async (req: Request) => {
   const paginaRaw = body?.pagina ?? body?.page;
   const totalRegistrosRaw = body?.total_registros ?? body?.totalRegistros ?? body?.perPage;
   const isDescendingRaw = body?.is_descending ?? body?.isDescending;
+  // Novo contrato (frontend não envia mais o token): client_id top-level; a
+  // Edge resolve o token no servidor. Legado: filtro_body.token continua
+  // aceito durante a transição de deploy.
+  const clientIdRaw = String(body?.client_id ?? body?.clientId ?? "").trim().slice(0, 80);
 
   // Sanitização filtros
   const filtro: Record<string, unknown> = {};
@@ -141,8 +145,8 @@ serve(async (req: Request) => {
   const codigoSan = sanitizeCodigo(filtroBodyRaw["codigo"]);
   if (codigoSan) filtro["codigo"] = codigoSan;
 
-  const tokenSan = sanitizeToken(filtroBodyRaw["token"]);
-  if (tokenSan) filtro["token"] = tokenSan;
+  // Token: resolvido no bloco de validação abaixo (client_id novo contrato,
+  // filtro_body.token legado) — nunca confia cegamente no que o frontend manda.
 
   const nomeTec = sanitizeIlike(filtroBodyRaw["nome_tecnico"] ?? filtroBodyRaw["nomeTecnico"]);
   if (nomeTec) filtro["nome_tecnico"] = nomeTec;
@@ -166,9 +170,35 @@ serve(async (req: Request) => {
     filtro["tipo_arquivo"] = tipo === "xlsx" ? "xls" : tipo;
   }
 
-  // Validação cross-team por token cliente
+  // Validação cross-team por cliente (novo contrato) ou por token (legado).
+  // O token do cliente NUNCA precisa sair do servidor: com client_id, a Edge
+  // resolve clients.milvus_client_token e valida a equipe antes de repassar.
   let clientIdForLog: string | null = null;
-  if (tokenSan) {
+  let tokenSan = sanitizeToken(filtroBodyRaw["token"]);
+  let via = "none";
+  if (clientIdRaw) {
+    const { data: client } = await admin
+      .from("clients")
+      .select("id, team, milvus_client_token")
+      .eq("id", clientIdRaw)
+      .maybeSingle();
+    if (!client) {
+      return json({ error: "Cliente não encontrado" }, 404);
+    }
+    const cliTeam = (client as { team: string | null }).team || "init";
+    if (!isAdmin && normalizeTeam(cliTeam) !== normalizeTeam(opTeam)) {
+      return json({ error: "Acesso negado a este cliente" }, 403);
+    }
+    clientIdForLog = (client as { id: string }).id;
+    const serverToken = sanitizeToken((client as { milvus_client_token: string | null }).milvus_client_token);
+    if (!serverToken) {
+      // HTTP 200 + {error}: o frontend exibe data.error sem quebrar o
+      // contrato {lista,resumo} do caminho feliz.
+      return json({ error: "Cliente sem token Milvus configurado.", code: "MILVUS_CLIENT_TOKEN_NOT_CONFIGURED" });
+    }
+    tokenSan = serverToken;
+    via = "client-id";
+  } else if (tokenSan) {
     const { data: client } = await admin
       .from("clients")
       .select("id, team, milvus_client_token")
@@ -182,9 +212,12 @@ serve(async (req: Request) => {
       return json({ error: "Token de cliente não pertence à sua equipe" }, 403);
     }
     clientIdForLog = (client as { id: string }).id;
+    via = "token-legado";
   }
+  if (tokenSan) filtro["token"] = tokenSan;
+  else delete filtro["token"];
 
-  console.log(`milvus-atendimentos: action=${action} team=${opTeam} clientId=${clientIdForLog ?? "-"} tokenHas=${!!tokenSan} isAdmin=${isAdmin}`);
+  console.log(`milvus-atendimentos: action=${action} team=${opTeam} clientId=${clientIdForLog ?? "-"} via=${via} isAdmin=${isAdmin}`);
 
   // Monta payload para Milvus
   const milvusBody: Record<string, unknown> = {

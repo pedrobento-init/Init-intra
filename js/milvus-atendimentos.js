@@ -91,14 +91,8 @@ function canViewMilvusAtendimentos(operator, client){
   return (operator.team||'init') === (client.team||'init');
 }
 
-function _resolveAtendToken(clientId){
-  if(!clientId) return '';
-  try{
-    var c=typeof getClientById==='function'?getClientById(clientId):null;
-    if(c && c.milvusClientToken) return String(c.milvusClientToken).trim();
-  }catch(_){}
-  return '';
-}
+// (Removido _resolveAtendToken: o token do cliente é resolvido no servidor
+// a partir do clientId — não transita mais na requisição.)
 function _monthRangeISO(){
   var now=new Date();
   var y=now.getFullYear(), m=now.getMonth();
@@ -125,10 +119,10 @@ async function fetchMilvusAtendimentos(opts){
   if(perPage>1000) perPage=1000;
   var isDescending=opts.isDescending!==false;
 
-  var token='';
+  // Autorização client-side (defesa; o servidor revalida e resolve o token).
+  // O token do cliente NÃO transita mais na requisição: a Edge resolve
+  // clients.milvus_client_token no servidor a partir do clientId.
   if(clientId){
-    token=_resolveAtendToken(clientId);
-    if(!token) throw new Error('Cliente sem token Milvus configurado.');
     var client=typeof getClientById==='function'?getClientById(clientId):null;
     if(!canViewMilvusAtendimentos(_atendOpView(), client)) throw new Error('Acesso negado a este cliente.');
   }
@@ -145,7 +139,6 @@ async function fetchMilvusAtendimentos(opts){
     data_inicial: dataInicial,
     data_final: dataFinal
   };
-  if(token) filtro_body.token=token;
   if(opts.codigo) filtro_body.codigo=String(opts.codigo);
   if(opts.tecnico) filtro_body.nome_tecnico=String(opts.tecnico);
   if(opts.nomeMesa) filtro_body.nome_mesa=String(opts.nomeMesa);
@@ -155,6 +148,7 @@ async function fetchMilvusAtendimentos(opts){
 
   var payload={
     action: 'list',
+    client_id: clientId || undefined,
     filtro_body: filtro_body,
     pagina: page,
     total_registros: perPage,
@@ -164,7 +158,7 @@ async function fetchMilvusAtendimentos(opts){
   var res=await supabaseClient.functions.invoke('milvus-atendimentos', {body: payload});
   if(res.error) throw new Error(res.error.message || 'Falha ao consultar atendimentos');
   var data=res.data;
-  if(!data || !Array.isArray(data.lista)) throw new Error('Resposta inválida do servidor');
+  if(!data || data.error || !Array.isArray(data.lista)) throw new Error((data && data.error) || 'Resposta inválida do servidor');
 
   var lista=(data.lista||[]).map(function(r){ return normalizeMilvusAtendimento(r); }).filter(Boolean);
   var out={
@@ -193,10 +187,8 @@ async function exportMilvusAtendimentos(opts){
     if(!dataFinal) dataFinal=r.end;
   }
 
-  var token='';
+  // O token é resolvido no servidor a partir do clientId (novo contrato).
   if(clientId){
-    token=_resolveAtendToken(clientId);
-    if(!token) throw new Error('Cliente sem token Milvus configurado.');
     var client=typeof getClientById==='function'?getClientById(clientId):null;
     if(!canViewMilvusAtendimentos(_atendOpView(), client)) throw new Error('Acesso negado a este cliente.');
   }
@@ -210,7 +202,6 @@ async function exportMilvusAtendimentos(opts){
     data_final: dataFinal,
     tipo_arquivo: tipoArquivo
   };
-  if(token) filtro_body.token=token;
   if(opts.codigo) filtro_body.codigo=String(opts.codigo);
   if(opts.tecnico) filtro_body.nome_tecnico=String(opts.tecnico);
   if(opts.nomeMesa) filtro_body.nome_mesa=String(opts.nomeMesa);
@@ -218,20 +209,16 @@ async function exportMilvusAtendimentos(opts){
   if(typeof opts.isComercial==='boolean') filtro_body.is_comercial=opts.isComercial;
   if(opts.motivoPausa) filtro_body.motivo_pausa=String(opts.motivoPausa);
 
-  var payload={action:'export', filtro_body: filtro_body};
+  var payload={action:'export', client_id: clientId || undefined, filtro_body: filtro_body};
 
   var res=await supabaseClient.functions.invoke('milvus-atendimentos', {body: payload});
   if(res.error) throw new Error(res.error.message || 'Falha ao exportar');
   var data=res.data;
-  if(!data || !data.base64) throw new Error('Resposta de exportação inválida');
+  if(!data || data.error || !data.base64) throw new Error((data && data.error) || 'Resposta de exportação inválida');
 
   try{
     var contentType=data.contentType || (tipoArquivo==='xls' ? 'application/vnd.ms-excel' : 'text/csv');
-    var binary=atob(data.base64);
-    var len=binary.length;
-    var bytes=new Uint8Array(len);
-    for(var i=0;i<len;i++) bytes[i]=binary.charCodeAt(i);
-    var blob=new Blob([bytes], {type: contentType});
+    var blob=await _b64ToBlobAsync(data.base64, contentType);
     var ext=tipoArquivo==='xls'?'xls':'csv';
     var fname='relatorio-atendimentos-'+(dataInicial||'')+'_'+(dataFinal||'')+'.'+ext;
     // usa helper existente se houver
@@ -248,8 +235,25 @@ async function exportMilvusAtendimentos(opts){
     throw e;
   }
 }
-function _triggerDownload(blob, filename){
-  try{
+// base64 → Bytes cedendo a thread entre fatias: exports grandes não congelam
+// a UI (o atob integral é 1 passo O(n) rápido; o loop charCodeAt é fatiado
+// com await p/ toasts/inputs respirarem). Puro exceto pelos yields.
+async function _b64ToBytesAsync(b64, sliceSize){
+  var binary=atob(b64);
+  var size=sliceSize||262144;
+  var out=new Uint8Array(binary.length);
+  var o=0, n=0;
+  for(var off=0; off<binary.length; off+=size){
+    var end=Math.min(off+size, binary.length);
+    for(var i=off;i<end;i++) out[o++]=binary.charCodeAt(i);
+    if((++n%4)===0) await new Promise(function(r){ setTimeout(r, 0); });
+  }
+  return out;
+}
+async function _b64ToBlobAsync(b64, contentType){
+  return new Blob([await _b64ToBytesAsync(b64)], {type: contentType});
+}
+function _triggerDownload(blob, filename){  try{
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');
     a.href=url; a.download=filename; a.style.display='none';
@@ -262,15 +266,10 @@ function _triggerDownload(blob, filename){
 
 // ── UI: helpers visuais ───────────────────────────────────────────────────
 function _atendStatusTag(st){
-  if(!st) return '<span class="tag tag-gray">—</span>';
-  var id = (st.id!=null ? st.id : st.text!=null ? st.text : st);
-  var txt = st.text!=null ? String(st.text) : String(st);
-  var t=(txt||'').toLowerCase();
-  if(/finaliz|conclu|resolv/.test(t)) return '<span class="tag tag-green">'+escapeHtml(txt)+'</span>';
-  if(/andamento|aberto|pendente|atend/.test(t)) return '<span class="tag tag-yellow">'+escapeHtml(txt)+'</span>';
-  if(/paus/.test(t)) return '<span class="tag tag-gray">'+escapeHtml(txt)+'</span>';
-  if(/cancel/.test(t)) return '<span class="tag tag-red">'+escapeHtml(txt)+'</span>';
-  return '<span class="tag tag-blue">'+escapeHtml(txt)+'</span>';
+  var txt = (st && typeof st==='object' && st.text!=null) ? String(st.text) : String(st ?? '');
+  if(!txt || txt==='[object Object]') return '<span class="tag tag-gray">—</span>';
+  var cls = (typeof canonicalStatusClass==='function') ? canonicalStatusClass(txt) : 'tag-gray';
+  return '<span class="tag '+cls+'">'+escapeHtml(txt)+'</span>';
 }
 function _atendFmtDate(dt){
   if(!dt) return '—';
@@ -282,7 +281,7 @@ function _atendFmtDate(dt){
 function _atendFmtHora(h){ return _normalizeHHMM(h); }
 
 // Estado UI (separado por contexto: global vs cliente)
-var _atendUI = {clientId:'', dataInicial:'', dataFinal:'', codigo:'', tecnico:'', nomeMesa:'', isExterno:'', isComercial:'', motivoPausa:'', page:1, perPage:50, isDescending:true};
+var _atendUI = {clientId:'', dataInicial:'', dataFinal:'', codigo:'', tecnico:'', nomeMesa:'', isExterno:'', isComercial:'', motivoPausa:'', page:1, perPage:50, isDescending:true, gen:0};
 function _atendGetFilters(fromGlobal){
   var prefix = fromGlobal ? 'gAtend' : 'atend';
   var selClient = fromGlobal ? (document.getElementById('gAtendClient')?.value || _atendUI.clientId || '') : (_atendUI.clientId||'');
@@ -381,6 +380,10 @@ function _atendDoFetchAndRender(isGlobal){
   // normaliza vazios para boolean undefined
   if(filtros.isExterno==='') delete filtros.isExterno;
   if(filtros.isComercial==='') delete filtros.isComercial;
+  // Geração da requisição: troca de cliente/página/filtro invalida respostas
+  // em voo (o invoke da edge não é abortável — descarta o DOM obsoleto).
+  var myGen=++_atendUI.gen;
+  var isStale=function(){ return myGen!==_atendUI.gen || !document.getElementById(prefix+'List'); };
   // valida datas
   var listEl=document.getElementById(prefix+'List');
   var resumoEl=document.getElementById(prefix+'Resumo');
@@ -408,12 +411,14 @@ function _atendDoFetchAndRender(isGlobal){
     isDescending: filtros.isDescending
   };
   fetchMilvusAtendimentos(opts).then(function(data){
+    if(isStale()) return;
     var hideCliente=!isGlobal;
     if(resumoEl) resumoEl.innerHTML=_atendBuildResumoHtml(data.resumo);
     if(listEl){
       listEl.innerHTML=_atendTableHtml(data.lista, hideCliente) + _atendPagerHtml(data.paginate||data.meta?.paginate, _atendUI.perPage||50, _atendUI.page||1, data.paginate?.total || data.meta?.paginate?.total || data.lista.length);
     }
   }).catch(function(e){
+    if(isStale()) return;
     var msg=(e && e.message) ? e.message : 'Falha ao consultar';
     if(resumoEl) resumoEl.innerHTML='';
     if(listEl) listEl.innerHTML='<div class="empty-state" style="padding:24px"><p style="color:var(--red)">'+escapeHtml(msg)+'</p><p style="font-size:12px;color:var(--text-muted)">Verifique o token do cliente e o período.</p></div>';
@@ -505,15 +510,9 @@ function getMilvusAtendimentosClientHtml(range){
     '<div id="atendList"></div>';
 }
 
-// Render aba cliente (chamada por clients.js)
-function renderMilvusAtendimentosTab(clientId){
-  var el=document.getElementById('clientTabContent');
-  if(!el) return;
-  _atendUI.clientId=clientId;
-  _atendUI.page=1;
-  el.innerHTML=getMilvusAtendimentosClientHtml();
-  _atendDoFetchAndRender(false);
-}
+// Render da seção Atendimentos no contexto cliente — SEMPRE inline dentro da
+// aba unificada "Chamados" (via renderMilvusAtendimentosInline). Não há mais
+// aba própria: a antiga renderMilvusAtendimentosTab foi removida.
 
 // Render inline dentro da aba unificada "Chamados" (chamada por clients.js
 // renderClientMilvusTicketsTab). Monta a mesma UI de filtros/resumo/tabela no

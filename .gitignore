@@ -16,5 +16,8 @@ js/config.js
 
 .vercel
 
+# Build output (gerado na Vercel por tools/build-assets.js — nunca commitar)
+dist/
+
 # Supabase CLI local state
 supabase/.temp/

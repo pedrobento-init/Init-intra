@@ -280,6 +280,14 @@ function parseDateOnly(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : new Date(value);
 }
+// ── Convenções visuais centralizadas ────────────────────────────────────────
+// Datas: formatDate/formatDateTime (abaixo, com APP_TIME_ZONE) são canônicos —
+// código novo deve usá-los; os toLocaleString('pt-BR') espalhados são apenas
+// fallbacks defensivos p/ caso ui.js não carregue.
+// Paginação client-side (clientes, visitas, operadores): UI_PAGE_SIZE.
+// Paginação server-side/edge tem tamanho próprio (pendências 50, atendimentos
+// 50/100/200) — não unificar, pois envolve contrato com o servidor.
+const UI_PAGE_SIZE = 30;
 function formatDate(iso) {
   if (!iso) return '—';
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(iso)) ? parseDateOnly(iso) : new Date(iso);
@@ -362,11 +370,29 @@ function isStalePendencia(p, days = 7) {
 
 function priorityTag(p) {
   const m = PRIORITY_MAP[p] || { label: p, cls: 'tag-gray', dot: '#94a3b8' };
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${m.label}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
 }
 function statusTag(s) {
   const m = STATUS_PEN_MAP[s] || { label: s, cls: 'tag-gray', dot: '#94a3b8' };
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${m.label}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
+}
+
+// ── Cor canônica por status (fonte única p/ badges) ─────────────────────────
+// STATUS_PEN_MAP é a referência visual; chamados do Milvus (texto livre da
+// API) usam o mesmo vocabulário: verde=finalizado, azul=aberto,
+// índigo=em atendimento, amarelo=pausado, roxo=aguardando/conferência,
+// cinza=cancelado/sem leitura. Centraliza para não divergir por tela.
+function canonicalStatusClass(s) {
+  const t = String(s === null || s === undefined ? '' : (s.text !== undefined ? s.text : s)).toLowerCase();
+  if (!t) return 'tag-gray';
+  if (/finaliz|conclu|resolv|fechado/.test(t)) return 'tag-green';
+  if (/cancel/.test(t)) return 'tag-gray';
+  if (/paus/.test(t)) return 'tag-yellow';
+  if (/confer[eê]ncia|aguard/.test(t)) return 'tag-purple';
+  if (/andamento|atend/.test(t)) return 'tag-indigo';
+  if (/agend/.test(t)) return 'tag-blue';
+  if (/aberto|pendente|fazer/.test(t)) return 'tag-blue';
+  return 'tag-gray';
 }
 
 function slaCountdown(item, defaultHours) {

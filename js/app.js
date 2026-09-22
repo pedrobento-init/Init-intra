@@ -1599,11 +1599,12 @@ function generateMonthlyReport() {
   var monthPens = pens.filter(function(p) { return new Date(p.createdAt) >= monthStart; });
   var resolvedPens = monthPens.filter(function(p) { return isPendenciaResolvida(p.status); });
 
-  var w = window.open('', '_blank', 'width=900,height=700');
+  var w = window.open('', '_blank', 'width=900,height=700,noopener');
   if (!w) {
     showToast('Permita pop-ups para gerar o relatório.', 'error');
     return;
   }
+  try { w.opener = null; } catch (_) {}
   w.document.write(
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório Mensal — Init Intra</title>' +
     '<style>' +

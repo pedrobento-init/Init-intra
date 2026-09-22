@@ -3,7 +3,7 @@ const COLORS = ['#1a56db','#3b82f6','#6366f1','#4f46e5','#0891b2','#0f766e','#16
 
 let _clientPage = 1;
 let _filteredClients = [];
-const CLIENT_PAGE_SIZE = 30;
+const CLIENT_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
 
 function _getPendenciasList(){ if(typeof getPendencias==='function') return getPendencias(); if(typeof globalThis!=='undefined' && typeof globalThis.getPendencias==='function') return globalThis.getPendencias(); return []; }
 function _getHealthForClientProxy(pens,cid,today){ if(typeof getHealthForClient==='function') return getHealthForClient(pens,cid,today); if(typeof globalThis!=='undefined' && typeof globalThis.getHealthForClient==='function') return globalThis.getHealthForClient(pens,cid,today); return null; }
@@ -376,17 +376,11 @@ async function confirmMilvusClientsImport() {
 
 // ── Últimos chamados Milvus (top 10, compacto; contexto p/ visita) ──
 let _milvusTicketsSyncing = {};
+let _mticketsReq = null; // token p/ descartar resposta de cliente/aba anterior
 
 function milvusTicketStatusTag(status) {
-  const s = String(status || '').toLowerCase();
-  if (/finaliz|conclu|resolv|fechado/.test(s)) return '<span class="tag tag-green">Finalizado</span>';
-  if (/atend|andamento|aberto|pendente/.test(s)) return `<span class="tag tag-yellow">${escapeHtml(status)}</span>`;
-  if (/pausado/.test(s)) return `<span class="tag tag-gray">${escapeHtml(status)}</span>`;
-  if (/agendado/.test(s)) return `<span class="tag tag-blue">${escapeHtml(status)}</span>`;
-  if (/confer[eê]ncia/.test(s)) return `<span class="tag tag-purple">${escapeHtml(status)}</span>`;
-  if (/fazer/.test(s)) return `<span class="tag tag-yellow">${escapeHtml(status)}</span>`;
-  if (/cancel/.test(s)) return `<span class="tag tag-red">${escapeHtml(status)}</span>`;
-  return `<span class="tag">${escapeHtml(status || '—')}</span>`;
+  const cls = (typeof canonicalStatusClass === 'function') ? canonicalStatusClass(status) : 'tag-gray';
+  return `<span class="tag ${cls}">${escapeHtml(status || '—')}</span>`;
 }
 
 function _fmtTicketDate(iso) {
@@ -433,10 +427,16 @@ function renderClientMilvusTicketsTab(clientId) {
 async function loadClientMilvusTicketsUI(clientId) {
   const wrap = document.getElementById('milvusTicketsList');
   if (!wrap) return;
+  // Token da requisição: troca de cliente/aba invalida a resposta em voo
+  // (evita pintar tickets do cliente A no modal do cliente B).
+  const myReq = { clientId };
+  _mticketsReq = myReq;
+  const isStale = () => _mticketsReq !== myReq || !document.getElementById('milvusTicketsList');
   let tickets = [];
   try {
     tickets = typeof getClientMilvusTickets === 'function' ? await getClientMilvusTickets(clientId) : [];
   } catch (_) { tickets = []; }
+  if (isStale()) return;
   if (!tickets.length) {
     wrap.innerHTML = '<div class="empty-state" style="padding:16px"><p>Nenhum chamado sincronizado.</p><p style="font-size:12px">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
     return;

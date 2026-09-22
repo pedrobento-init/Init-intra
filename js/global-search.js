@@ -322,13 +322,19 @@ if (typeof document !== 'undefined') document.addEventListener('keydown', (e) =>
   }
 });
 
-// Live search input
-if (typeof document !== 'undefined') document.addEventListener('input', (e) => {
-  if (e.target && e.target.id === 'globalSearchInput') {
+// Live search input (debounced a 300ms como nas demais telas)
+if (typeof document !== 'undefined') {
+  const _debouncedGlobalSearch = (typeof debounce === 'function') ? debounce((value) => {
     _searchActive = -1;
-    _renderSearchResults(e.target.value);
-  }
-});
+    _renderSearchResults(value);
+  }, 300) : null;
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'globalSearchInput') {
+      if (_debouncedGlobalSearch) _debouncedGlobalSearch(e.target.value);
+      else { _searchActive = -1; _renderSearchResults(e.target.value); }
+    }
+  });
+}
 
 // ══════════════════════════════════════════════
 // SPRINT 9 – STATUS OFFLINE / ONLINE
