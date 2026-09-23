@@ -3745,7 +3745,6 @@ body.dark-theme .overdue-banner {
 }
 .pen-pager-info { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .pen-pager .btn[disabled] { opacity: .45; cursor: not-allowed; }
-.pen-pager--single { justify-content: center; background: var(--bg-surface); }
 @media (hover: none) { .pen-check-remove { opacity: 1; } }
 
 /* ── 2. CARROSSEL CLIENTES (chips horizontais, altura reduzida) ── */
@@ -3763,7 +3762,7 @@ body.dark-theme .overdue-banner {
 
 /* ── 3. BARRA DE FILTROS — Mais filtros ── */
 .pen-search-bar { position:relative; }
-.pen-more-btn { position:relative; display:inline-flex; align-items:center; gap:6px; }
+.pen-more-btn { position:relative; display:inline-flex; align-items:center; gap:6px; min-height:38px; padding:8px 12px; font-size:13px; }
 .pen-more-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; line-height:1; }
 .pen-more-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); min-width:280px; max-width:100%; }
 .pen-search-bar .pen-more-panel { right:auto; left:0; }

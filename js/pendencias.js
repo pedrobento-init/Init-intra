@@ -203,7 +203,7 @@ function renderPendencias() {
         <option value="">Todos os clientes</option>
         ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary btn-sm pen-more-btn" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pen-more-btn" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
@@ -385,10 +385,11 @@ function _penPagerBar() {
   if (!_penServerMode || _penTotal == null) return '';
   var totalPages = Math.max(1, Math.ceil(_penTotal / PEN_UI_PAGE_SIZE));
   if (_penPage >= totalPages) _penPage = totalPages - 1;
-  // 4. Simplificado: se só 1 página, esconde botões e mostra "N pendências"
+  // 4. Simplificado: se só 1 página, não renderiza nada — o total +
+  // breakdown por status já aparecem no resumo abaixo (pen-summary) e no
+  // contador junto às abas (pen-scope-count). Evita barra duplicada.
   if(totalPages <= 1){
-    var n=_penTotal;
-    return '<div class="pen-pager pen-pager--single" role="status"><span class="pen-pager-info">'+ n +' pendência'+(n===1?'':'s')+'</span></div>';
+    return '';
   }
   // Multi-página: mantém navegação, texto enxuto
   return '<div class="pen-pager" role="navigation" aria-label="Paginação de pendências">' +
@@ -666,7 +667,11 @@ function penKanbanCard(p) {
   var deadlineHtml = p.deadline
     ? '<span class="kc-deadline'+(isOverdue?' is-overdue':'')+'" title="'+(isOverdue?'Prazo vencido':'Prazo')+'">📅 '+formatDate(parseDeadline(p.deadline))+'</span>'
     : '<span class="kc-deadline is-empty" title="Sem prazo">📅 Sem prazo</span>';
+  // Faixa lateral com a cor do status (mesmo padrão do card mobile):
+  // identifica a coluna de relance sem depender só do cabeçalho.
+  var _stDot = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]) ? STATUS_PEN_MAP[p.status].dot : '#94a3b8';
   return '<div class="kanban-card"' +
+    ' style="border-left:3px solid '+_stDot+'"' +
     ' draggable="true"' +
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
