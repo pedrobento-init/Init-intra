@@ -256,6 +256,19 @@ function renderPendencias() {
   renderPenView();
 }
 
+// Chips de cliente: toggle com estado pressionado. Clicar filtra pelo cliente
+// (chip fica destacado); clicar de novo limpa para todos os clientes.
+function penClientChipState(selectedId, chipId) {
+  return (selectedId && chipId && String(selectedId) === String(chipId)) ? ' is-active' : '';
+}
+function togglePenClientChip(clientId) {
+  var sel = document.getElementById('penClient');
+  if (!sel) return;
+  sel.value = (sel.value === clientId) ? '' : clientId;
+  if (typeof savePenFilters === 'function') savePenFilters();
+  if (typeof renderPenView === 'function') renderPenView(false);
+}
+
 function _renderPendenciaSlaSummary() {
   const el = document.getElementById('penSlaSummary');
   if (!el) return;
@@ -267,6 +280,7 @@ function _renderPendenciaSlaSummary() {
   var _limit = _collapsed ? 4 : entries.length;
   var visible = entries.slice(0, _limit);
   var overflow = entries.length - visible.length;
+  var _selClient = document.getElementById('penClient')?.value || '';
   el.innerHTML = `<div class="pen-client-carousel-wrap">`+
     `<div class="pen-client-carousel" id="penClientCarousel" role="region" aria-label="Resumo por cliente">`+
       visible.map(function(entry){
@@ -275,7 +289,9 @@ function _renderPendenciaSlaSummary() {
         var name=escapeHtml(c?c.name:s.clientName);
         var hasVenc = s.vencidas>0;
         var dotColor = hasVenc ? '#dc2626' : '#16a34a';
-        return `<button class="pen-client-chip" onclick="document.getElementById('penClient').value='${escapeHtml(cid)}';savePenFilters();renderPenView()" title="${name} · ${s.totalAbertas} abertas, ${s.vencidas} vencidas">`+
+        var chipState = penClientChipState(_selClient, cid);
+        var pressed = chipState ? 'true' : 'false';
+        return `<button class="pen-client-chip${chipState}" aria-pressed="${pressed}" onclick="togglePenClientChip('${escapeHtml(cid)}')" title="${name} · ${s.totalAbertas} abertas, ${s.vencidas} vencidas (clique para filtrar; de novo para limpar)">`+
           `<span class="pen-chip-dot" style="background:${dotColor}"></span>`+
           `<span class="pen-chip-name">${name}</span>`+
           `<span class="pen-chip-counts">${s.totalAbertas}·<span style="color:${hasVenc?'#dc2626':'var(--text-muted)'}">${s.vencidas}v</span></span>`+
