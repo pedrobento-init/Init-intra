@@ -32,8 +32,24 @@ const VISIT_COLORS = {
   cancelada:    { bg: '#94a3b8', border: '#64748b' },
 };
 
+// Título curto: o topbar mobile trunca títulos longos ("Calendário...").
+function calendarPageTitle() { return 'Calendário'; }
+
+// View inicial: grade mensal no desktop, lista no celular (células de ~40px
+// cortam os títulos; a lista mostra tudo sem truncar).
+function calInitialViewForWidth(w) { return (w || 0) <= 768 ? 'listMonth' : 'dayGridMonth'; }
+
+function toggleCalFilters() {
+  var box = document.getElementById('calFilters');
+  var btn = document.getElementById('calFiltersToggle');
+  if (!box || !btn) return;
+  var isOpen = box.dataset.open === '1';
+  box.dataset.open = isOpen ? '0' : '1';
+  btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+}
+
 function renderCalendar() {
-  document.getElementById('pageTitle').textContent = 'Calendário de Prazos';
+  document.getElementById('pageTitle').textContent = calendarPageTitle();
   setTopbarAction('Nova Pendência', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
   window._topbarAction = () => openPendenciaForm();
   if (typeof updateBadges === 'function') updateBadges();
@@ -44,6 +60,11 @@ function renderCalendar() {
 
   document.getElementById('contentArea').innerHTML = `
     <div class="search-bar">
+      <button class="btn btn-secondary cal-filters-toggle" id="calFiltersToggle" onclick="toggleCalFilters()" aria-expanded="false" aria-controls="calFilters" title="Mostrar filtros">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+        Filtros
+      </button>
+      <div class="cal-filters" id="calFilters" data-open="0">
       <select class="form-select filter-select-md" id="calType" onchange="refreshCalendar()" title="Tipo de evento">
         <option value="all">Pendências + Visitas</option>
         <option value="pendencias">Apenas Pendências</option>
@@ -68,6 +89,8 @@ function renderCalendar() {
         <option value="alta">Alta</option>
         <option value="critica">Crítica</option>
       </select>
+      </div>
+      <div class="cal-new-btns">
       <button class="btn btn-primary btn-sm btn-new-action" onclick="openPendenciaForm()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Nova Pendência
@@ -76,6 +99,7 @@ function renderCalendar() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
         Nova Visita
       </button>
+      </div>
       <button class="btn btn-secondary btn-sm" onclick="exportCalendarICS()" title="Baixar calendário em .ics (Google/Outlook)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         iCal
@@ -334,7 +358,7 @@ async function initFullCalendar() {
 
   _fcInstance = new FullCalendar.Calendar(container, {
     locale: 'pt-br',
-    initialView: isMobile ? 'dayGridMonth' : 'dayGridMonth',
+    initialView: calInitialViewForWidth(window.innerWidth),
     headerToolbar: isMobile ? {
       left: 'prev,next',
       center: 'title',
@@ -362,10 +386,12 @@ async function initFullCalendar() {
     showNonCurrentDates: true,
     eventContent: function(arg) {
       const props = arg.event.extendedProps;
-      // Mobile compacto: se coluna muito estreita, mostra só badge
+      // Mobile compacto (só na grade mensal): se coluna muito estreita,
+      // mostra só badge. Na lista (listMonth) mantém o título completo.
       try {
-        const colWidth = arg.el.closest('.fc-daygrid-day')?.offsetWidth || 0;
-        const isCompact = isMobile || colWidth < 90;
+        const dayCell = arg.el.closest('.fc-daygrid-day');
+        const colWidth = dayCell?.offsetWidth || 0;
+        const isCompact = !!dayCell && (isMobile || colWidth < 90);
         if (isCompact && props.kind === 'pendencia') {
           // Mesma regra central (penEventColors), lida das props calculadas no mapa.
           const fill = props.evFill || (PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media).bg;
