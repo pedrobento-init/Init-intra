@@ -21,6 +21,7 @@ function mkEl(id) {
 const _el = {};
 const sandbox = {
   console,
+  Promise,
   window: { addEventListener() {}, location: { hash: '#calendario' }, innerWidth: 360 },
   navigator: { onLine: true },
   document: {
@@ -45,7 +46,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/calendar.js', 'utf8'), sandbox, { filename: 'calendar.js' });
   vm.runInContext(
-    'globalThis.__t = { calendarPageTitle, calInitialViewForWidth, toggleCalFilters };',
+    'globalThis.__t = { calendarPageTitle, calInitialViewForWidth, toggleCalFilters, initFullCalendar };',
     sandbox
   );
 } finally {
@@ -75,6 +76,26 @@ describe('view inicial por largura', () => {
   it('desktop: grade mensal', () => {
     expect(T.calInitialViewForWidth(1024)).toBe('dayGridMonth');
     expect(T.calInitialViewForWidth(1920)).toBe('dayGridMonth');
+  });
+});
+
+describe('primeiro acesso: loading imediato + erro com retry se o CDN falhar', () => {
+  it('mostra "Carregando" na hora e "Tentar novamente" ao falhar', async () => {
+    _el.calendarContainer = mkEl('calendarContainer');
+    // CDN falha de forma assíncrona (como na rede real)
+    vm.runInContext('loadFullCalendar = function(){ return Promise.reject(new Error("cdn")); }', sandbox);
+    const p = vm.runInContext('initFullCalendar()', sandbox);
+    expect(_el.calendarContainer.innerHTML).toContain('Carregando calendário');
+    await p;
+    expect(_el.calendarContainer.innerHTML).toContain('Tentar novamente');
+    expect(_el.calendarContainer.innerHTML).toContain('onclick="initFullCalendar()"');
+    vm.runInContext('delete loadFullCalendar;', sandbox);
+  });
+
+  it('usa timeout em vez de travar para sempre', () => {
+    const src = fs.readFileSync('js/calendar.js', 'utf8');
+    expect(src).toContain('_loadFullCalendarWithTimeout');
+    expect(src).toMatch(/Promise\.race\(\[\s*loadFullCalendar\(\)/);
   });
 });
 

@@ -39,6 +39,17 @@ function calendarPageTitle() { return 'Calendário'; }
 // cortam os títulos; a lista mostra tudo sem truncar).
 function calInitialViewForWidth(w) { return (w || 0) <= 768 ? 'listMonth' : 'dayGridMonth'; }
 
+// Baixa o FullCalendar com timeout: sem isso, uma CDN lenta/travada no 1º
+// acesso deixava a grade vazia para sempre (promise pendente, sem erro).
+function _loadFullCalendarWithTimeout(ms) {
+  return Promise.race([
+    loadFullCalendar(),
+    new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error('timeout FullCalendar')); }, ms || 15000);
+    }),
+  ]);
+}
+
 function toggleCalFilters() {
   var box = document.getElementById('calFilters');
   var btn = document.getElementById('calFiltersToggle');
@@ -309,10 +320,19 @@ async function initFullCalendar() {
   const container = document.getElementById('calendarContainer');
   if (!container) return;
 
-  await loadFullCalendar();
+  // Feedback imediato: no 1º acesso o FullCalendar vem do CDN e a grade
+  // ficava vazia sem explicação enquanto baixava (ou para sempre, se
+  // a rede falhava — sem try/catch o erro era silencioso).
+  container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Carregando calendário…</p></div>';
+  try {
+    await _loadFullCalendarWithTimeout(15000);
+  } catch (_) {
+    container.innerHTML = '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
+    return;
+  }
 
   if (typeof FullCalendar === 'undefined') {
-    container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar. Recarregue a página.</p></div>';
+    container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
     return;
   }
 

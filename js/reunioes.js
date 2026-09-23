@@ -85,6 +85,12 @@ function _renderLanding(mesAno, label, existingMeeting) {
   const allOpen = getMyPendencias().filter(p => !isPendenciaClosed(p.status));
   const pendenciaCount = allOpen.length;
   const clientesComPend = baseClients.filter(c => _getOpenPensForClient(c.id).length > 0).length;
+  // Relatório "anterior": última reunião encerrada de mês estritamente menor
+  // (a do mês atual, se encerrada, não é "anterior").
+  const _allClosed = (typeof getMyReunioes === 'function' ? getMyReunioes() : [])
+    .filter(r => r.status === 'encerrada' && r.relatorio && (r.mesAno || '') < mesAno)
+    .sort((a, b) => (b.mesAno || '').localeCompare(a.mesAno || ''));
+  const prevMeeting = _allClosed[0] || null;
 
   const content = document.getElementById('contentArea');
   content.innerHTML = `
@@ -107,7 +113,7 @@ function _renderLanding(mesAno, label, existingMeeting) {
         </div>
         <div class="stat-card" style="min-width:120px">
           <div class="stat-value" style="font-size:28px">${baseClients.length}</div>
-          <div class="stat-label">Clientes na fila</div>
+          <div class="stat-label">Clientes</div>
         </div>
         ${baseClients.length > 0 ? `
           <div class="stat-card" style="min-width:120px">
@@ -123,12 +129,12 @@ function _renderLanding(mesAno, label, existingMeeting) {
           </div>`
         : `<button class="btn btn-primary" style="padding:12px 32px;font-size:15px" onclick="startReuniao('${mesAno}')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Iniciar Reunião de ${label}
+            ${existingMeeting && existingMeeting.status === 'encerrada' ? 'Reabrir' : 'Iniciar'} Reunião de ${label}
           </button>`}
 
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
-        ${existingMeeting && existingMeeting.status === 'encerrada' && existingMeeting.relatorio
-          ? `<button class="btn btn-secondary" onclick="showMeetingReport('${existingMeeting.id}')">📄 Ver Relatório Anterior</button>` : ''}
+        ${prevMeeting
+          ? `<button class="btn btn-secondary" onclick="showMeetingReport('${prevMeeting.id}')">📄 Ver Relatório Anterior</button>` : ''}
         <button class="btn btn-secondary" onclick="openMeetingCompareModal()">📊 Comparar meses</button>
       </div>
     </div>`;
@@ -783,7 +789,7 @@ function showMeetingReport(meetingId) {
   const m = getReuniaoById(meetingId);
   if (!m || !m.relatorio) { showToast('Relatório não encontrado.', 'error'); return; }
 
-  openModal('Relatório da Reunião', `
+  openModal('Relatório — ' + _getMesAnoLabel(m.mesAno || ''), `
     <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:500px;overflow-y:auto;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">${escapeHtml(m.relatorio)}</div>
     <div class="form-actions" style="margin-top:16px">
       <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
