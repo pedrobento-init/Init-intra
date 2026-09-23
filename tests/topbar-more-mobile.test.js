@@ -164,6 +164,10 @@ describe('contrato mobile no CSS e no HTML', () => {
     expect(mobile).toMatch(/\.sidebar \.sidebar-nav a\s*\{[^}]*justify-content:\s*flex-start/);
   });
 
+  it('aba Reunião oculta no menu em celulares', () => {
+    expect(mobile).toMatch(/#nav-reuniao\s*\{\s*display:\s*none/);
+  });
+
   it('HTML tem o menu suspenso com os 4 itens', () => {
     for (const id of ['topbarMoreBtn', 'topbarMoreMenu', 'topbarMoreAction', 'refreshBtn']) {
       expect(html).toContain(`id="${id}"`);

@@ -1819,6 +1819,10 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     text-align: left;
     padding: 10px 16px;
   }
+  /* Reunião fora do menu em celulares (desktop/tablet intactos). */
+  #nav-reuniao {
+    display: none;
+  }
 
   /* ── Main Content ── */
   .main-content {
