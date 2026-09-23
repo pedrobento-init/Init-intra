@@ -238,6 +238,11 @@ body {
 /* Menu suspenso do topbar: só mobile (≤768px); no desktop fica oculto. */
 .topbar-more-wrap { display: none; }
 .topbar-more-menu[hidden] { display: none; }
+/* Calendário: wrappers transparentes no desktop (filtros/botões fluem na
+   barra como antes); no mobile viram menu colapsável e grade 2 colunas.
+   (Base ANTES do bloco mobile ≤768px para não sobrescrevê-lo.) */
+.cal-filters, .cal-new-btns { display: contents; }
+.cal-filters-toggle { display: none; }
 .user-quick {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 12px 5px 6px;
@@ -3260,10 +3265,6 @@ body.dark-theme .overdue-banner {
   white-space: normal !important;
   line-height: 1.3;
 }
-/* Calendário: wrappers transparentes no desktop (filtros/botões fluem na
-   barra como antes); no mobile viram menu colapsável e grade 2 colunas. */
-.cal-filters, .cal-new-btns { display: contents; }
-.cal-filters-toggle { display: none; }
 .fc-visit-content {
   display: flex !important;
   align-items: center;

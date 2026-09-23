@@ -128,4 +128,12 @@ describe('contrato mobile no CSS', () => {
     expect(norm).toMatch(/\.cal-filters,\s*\.cal-new-btns\s*\{\s*display:\s*contents/);
     expect(norm).toMatch(/\.cal-filters-toggle\s*\{\s*display:\s*none/);
   });
+
+  it('base do calendário vem ANTES do bloco mobile (cascata não inverte)', () => {
+    const baseIdx = norm.indexOf('.cal-filters, .cal-new-btns');
+    const mobileIdx = norm.indexOf('@media screen and (max-width: 768px)');
+    expect(baseIdx).toBeGreaterThan(-1);
+    expect(mobileIdx).toBeGreaterThan(-1);
+    expect(baseIdx).toBeLessThan(mobileIdx);
+  });
 });
