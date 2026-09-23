@@ -3308,6 +3308,89 @@ body.dark-theme .overdue-banner {
   #calendarContainer .fc .ag-chip { font-size:10.5px; }
 }
 
+/* ── VISITAS (redesign mobile: busca, KPIs, chips, cards, FAB, filtros) ── */
+.vis-wrap { max-width:720px; margin:0 auto; font-family:'Schibsted Grotesk','Inter',sans-serif; padding-bottom:96px; }
+.vis-searchrow { display:flex; align-items:center; gap:10px; }
+.vis-search { position:relative; flex:1; min-width:0; }
+.vis-search input {
+  width:100%; height:46px; border-radius:14px; border:1px solid var(--border);
+  background:var(--bg-surface); color:var(--text-primary);
+  padding:0 14px 0 42px; font:inherit;
+}
+.vis-search input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim2); }
+.vis-search svg { position:absolute; left:14px; top:13px; width:20px; height:20px; stroke:var(--text-muted); fill:none; stroke-width:2; stroke-linecap:round; }
+.vis-fbtn {
+  width:42px; height:42px; flex-shrink:0; border-radius:12px;
+  background:var(--bg-surface); border:1px solid var(--border); color:var(--text-primary);
+  display:grid; place-items:center; cursor:pointer; position:relative;
+  transition:border-color var(--transition), color var(--transition);
+}
+.vis-fbtn:hover { border-color:var(--accent); color:var(--accent); }
+.vis-fbtn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; }
+.vis-fbtn.on::after {
+  content:''; position:absolute; top:8px; right:8px; width:8px; height:8px;
+  border-radius:50%; background:var(--accent);
+}
+.vis-kpis { display:flex; gap:10px; overflow-x:auto; padding:14px 2px 4px; scrollbar-width:none; }
+.vis-kpis::-webkit-scrollbar { display:none; }
+.vis-kpi {
+  flex:0 0 auto; min-width:104px;
+  background:var(--bg-surface); border:1px solid var(--border); border-radius:16px;
+  padding:10px 14px; text-align:left;
+}
+.vis-kpi b { display:block; font-size:26px; font-weight:800; line-height:1.1; letter-spacing:-0.02em; color:var(--text-primary); }
+.vis-kpi span { font-size:12px; color:var(--text-muted); }
+.vis-chips { display:flex; gap:8px; overflow-x:auto; padding:12px 2px 4px; scrollbar-width:none; }
+.vis-chips::-webkit-scrollbar { display:none; }
+.vis-chip {
+  flex:0 0 auto; height:36px; padding:0 14px; border-radius:99px;
+  border:1px solid var(--border); background:var(--bg-surface);
+  font-size:14px; font-weight:500; color:var(--text-muted); cursor:pointer; font-family:inherit;
+  transition:background var(--transition), color var(--transition), border-color var(--transition);
+}
+.vis-chip:hover { border-color:var(--accent); color:var(--text-primary); }
+.vis-chip[aria-pressed="true"] { background:var(--text-primary); color:var(--bg-base); border-color:var(--text-primary); font-weight:700; }
+.vis-monthrow { display:flex; justify-content:space-between; align-items:center; padding:18px 2px 8px; }
+.vis-monthrow h2 { margin:0; font-size:13px; font-weight:700; color:var(--text-muted); }
+.vis-monthrow button { background:none; border:none; font-size:13px; font-weight:700; color:var(--accent); cursor:pointer; padding:4px 2px; font-family:inherit; }
+.vis-monthrow button:hover { text-decoration:underline; }
+.vis-list { display:grid; gap:10px; }
+.vis-card {
+  position:relative; width:100%; display:block; text-align:left;
+  background:var(--bg-surface); border:1px solid var(--border); border-radius:18px;
+  padding:14px 14px 12px 18px; overflow:hidden; cursor:pointer; font-family:inherit; color:var(--text-primary);
+  transition:border-color var(--transition), box-shadow var(--transition);
+}
+.vis-card:hover { border-color:var(--accent); box-shadow:var(--shadow); }
+.vis-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--st); }
+.vis-row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.vis-date { font-size:17px; font-weight:800; letter-spacing:-0.01em; color:var(--text-primary); }
+.vis-date small { font-weight:500; color:var(--text-muted); font-size:13px; margin-left:6px; }
+.vis-st { font-size:12px; font-weight:700; padding:3px 10px; border-radius:99px; color:var(--st); background:color-mix(in srgb, var(--st) 15%, transparent); white-space:nowrap; }
+.vis-cli { display:flex; align-items:center; gap:10px; margin:10px 0 2px; font-weight:700; color:var(--text-primary); }
+.vis-cli .client-logo-circle, .vis-cli .client-logo-square { width:32px; height:32px; }
+.vis-av { width:32px; height:32px; border-radius:10px; display:grid; place-items:center; font-size:13px; font-weight:800; color:#fff; background:var(--c); flex-shrink:0; }
+.vis-meta { display:flex; align-items:center; justify-content:space-between; margin-top:10px; color:var(--text-muted); font-size:13px; }
+.vis-meta .vis-who { display:flex; align-items:center; gap:6px; min-width:0; }
+.vis-meta .vis-who i {
+  width:20px; height:20px; border-radius:50%; background:var(--bg-hover);
+  display:grid; place-items:center; font-style:normal; font-size:10px; font-weight:800; color:var(--text-primary); flex-shrink:0;
+}
+.vis-empty { text-align:center; color:var(--text-muted); padding:40px 16px; }
+.vis-pager { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 4px; font-size:12px; color:var(--text-muted); }
+.vis-fab {
+  position:fixed; right:24px; bottom:24px; height:54px; padding:0 22px; border:none;
+  border-radius:99px; background:var(--accent); color:#fff; font-weight:700; font-size:14px; font-family:inherit;
+  box-shadow:0 8px 24px rgba(0,0,0,.35); display:flex; align-items:center; gap:8px; z-index:60; cursor:pointer;
+  transition:background var(--transition), transform .15s;
+}
+.vis-fab:hover { background:var(--accent-hover); }
+.vis-fab:active { transform:scale(.97); }
+@media (max-width:768px){
+  .vis-fab { right:16px; bottom:calc(20px + env(safe-area-inset-bottom, 0px)); }
+}
+body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f19; border-color:#f1f5f9; }
+
 /* ── CALENDAR (FullCalendar) ── */
 #calendarContainer {
   min-height: 500px;

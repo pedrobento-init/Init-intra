@@ -3,72 +3,144 @@
 const VISIT_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
 let _visitPage = 1;
 let _filteredVisits = [];
+// Filtros estruturados vivem em estado (a sheet edita rascunho e aplica de
+// uma vez); só a busca é instantânea. `status` vai nos chips.
+let _visitFilter = { client: '', operator: '', status: '', from: '', to: '' };
 
 function renderVisitas() {
   document.getElementById('pageTitle').textContent = 'Visitas Técnicas';
   setTopbarAction('Nova Visita', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>');
   window._topbarAction = () => openVisitForm();
 
-  const clients  = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
-  const team     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
-  const opNames  = getOperatorNames(team);
-
   const _nowRpt = new Date();
   window._visitReportDefaultMonth = `${_nowRpt.getFullYear()}-${String(_nowRpt.getMonth() + 1).padStart(2, '0')}`;
 
-  document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar" style="flex-wrap:wrap;gap:10px">
-      <div class="search-input-wrap" style="flex:1;min-width:180px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="visitSearch" placeholder="Buscar por cliente, motivo, relatório..." oninput="saveVisitFilters();debouncedRenderVisitView()" />
-      </div>
-      <select class="form-select" id="visitClient" style="width:180px" onchange="saveVisitFilters();renderVisitView()">
-        <option value="">Todos os clientes</option>
-        ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
-      </select>
-      <select class="form-select" id="visitOperator" style="width:200px" onchange="saveVisitFilters();renderVisitView()">
-        <option value="">Todos os operadores</option>
-        ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
-      </select>
-      <select class="form-select" id="visitStatus" style="width:160px" onchange="saveVisitFilters();renderVisitView()">
-        <option value="">Todos os status</option>
-        <option value="agendada">Agendada</option>
-        <option value="em_andamento">Em andamento</option>
-        <option value="concluida">Concluída</option>
-        <option value="cancelada">Cancelada</option>
-      </select>
-      <input type="date" class="form-input" id="visitFrom" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="De" />
-      <input type="date" class="form-input" id="visitTo" style="width:140px" onchange="saveVisitFilters();renderVisitView()" title="Até" />
-      <button type="button" class="btn btn-secondary btn-sm" onclick="openVisitMonthReportModal()" title="Relatório mensal exportável">
-        Relatório do mês
-      </button>
-    </div>
-    <div id="visitStats" style="margin-bottom:14px"></div>
-    <div id="visitViewArea"></div>`;
-
   const saved = loadFilterState('visitas', {});
-  if (saved.search)   document.getElementById('visitSearch').value   = saved.search;
-  if (saved.client)   document.getElementById('visitClient').value   = saved.client;
-  if (saved.operator) document.getElementById('visitOperator').value = saved.operator;
-  if (saved.status)   document.getElementById('visitStatus').value   = saved.status;
-  if (saved.from)     document.getElementById('visitFrom').value     = saved.from;
-  if (saved.to)       document.getElementById('visitTo').value       = saved.to;
+  _visitFilter = {
+    client:   saved.client || '',
+    operator: saved.operator || '',
+    status:   saved.status || '',
+    from:     saved.from || '',
+    to:       saved.to || '',
+  };
+
+  document.getElementById('contentArea').innerHTML = `
+    <div class="vis-wrap">
+      <div class="vis-searchrow">
+        <div class="vis-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="visitSearch" type="search" placeholder="Buscar cliente, motivo ou relatório" aria-label="Buscar" oninput="saveVisitFilters();debouncedRenderVisitView()" />
+        </div>
+        <button class="vis-fbtn" id="visitFilterBtn" onclick="openVisitFiltersSheet()" aria-label="Filtros" title="Filtros">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        </button>
+      </div>
+      <div class="vis-kpis" id="visitStats"></div>
+      <div class="vis-chips" id="visitChips" role="group" aria-label="Filtrar por status"></div>
+      <div class="vis-monthrow"><h2 id="visitCount"></h2><button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></div>
+      <div class="vis-list" id="visitViewArea"></div>
+      <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova visita">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Nova visita
+      </button>
+    </div>`;
+
+  if (saved.search) document.getElementById('visitSearch').value = saved.search;
   showSkeleton('visitViewArea', 6);
   renderVisitView();
 }
 
 window.debouncedRenderVisitView = debounce(() => renderVisitView(), 300);
 
+// Iniciais "Pedro Bento" → "PB" (avatar do operador / fallback de cliente).
+function visitInitials(name) {
+  return String(name || '').trim().split(/\s+/).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase() || '•';
+}
+
 function saveVisitFilters() {
   const state = {
     search:   document.getElementById('visitSearch')?.value || '',
-    client:   document.getElementById('visitClient')?.value || '',
-    operator: document.getElementById('visitOperator')?.value || '',
-    status:   document.getElementById('visitStatus')?.value || '',
-    from:     document.getElementById('visitFrom')?.value || '',
-    to:       document.getElementById('visitTo')?.value || '',
+    client:   _visitFilter.client,
+    operator: _visitFilter.operator,
+    status:   _visitFilter.status,
+    from:     _visitFilter.from,
+    to:       _visitFilter.to,
   };
   saveFilterState('visitas', state);
+}
+
+// Chips de status (mock: Todas + 3; "Todas" limpa; canceladas aparecem nela).
+const VISIT_STATUS_CHIPS = [
+  { value: '', label: 'Todas' },
+  { value: 'em_andamento', label: 'Em andamento' },
+  { value: 'concluida', label: 'Concluídas' },
+  { value: 'agendada', label: 'Agendadas' },
+];
+function setVisitStatusFilter(status) {
+  _visitFilter.status = status || '';
+  saveVisitFilters();
+  renderVisitView();
+}
+function renderVisitChips() {
+  const box = document.getElementById('visitChips');
+  if (!box) return;
+  box.innerHTML = VISIT_STATUS_CHIPS.map(function (c) {
+    return '<button type="button" class="vis-chip" data-s="' + c.value + '" aria-pressed="' + (_visitFilter.status === c.value) + '" onclick="setVisitStatusFilter(\'' + c.value + '\')">' + escapeHtml(c.label) + '</button>';
+  }).join('');
+}
+
+// Ponto no botão de filtros quando há filtro estruturado ativo (não conta
+// busca nem chip de status, como na mock).
+function updateVisitFilterDot() {
+  try {
+    const btn = document.getElementById('visitFilterBtn');
+    if (!btn) return;
+    const on = !!(_visitFilter.client || _visitFilter.operator || _visitFilter.from || _visitFilter.to);
+    btn.classList.toggle('on', on);
+  } catch (_) {}
+}
+
+// Bottom-sheet de filtros (rascunho; aplica ao confirmar).
+function openVisitFiltersSheet() {
+  const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
+  const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
+  const opNames = getOperatorNames(team);
+  openModal('Filtros', `
+    <div class="form-group"><label class="form-label" for="fVisitClient">Cliente</label>
+      <select class="form-select" id="fVisitClient">
+        <option value="">Todos os clientes</option>
+        ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${_visitFilter.client === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label" for="fVisitOperator">Operador</label>
+      <select class="form-select" id="fVisitOperator">
+        <option value="">Todos os operadores</option>
+        ${opNames.map(n => `<option ${_visitFilter.operator === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+      </select></div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr">
+      <div class="form-group"><label class="form-label" for="fVisitFrom">De</label>
+        <input type="date" class="form-input" id="fVisitFrom" value="${escapeHtml(_visitFilter.from)}" /></div>
+      <div class="form-group"><label class="form-label" for="fVisitTo">Até</label>
+        <input type="date" class="form-input" id="fVisitTo" value="${escapeHtml(_visitFilter.to)}" /></div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-danger btn-sm" onclick="clearVisitFiltersSheet()">Limpar</button>
+      <button type="button" class="btn btn-primary" onclick="applyVisitFiltersSheet()">Aplicar</button>
+    </div>`);
+}
+function applyVisitFiltersSheet() {
+  _visitFilter.client   = document.getElementById('fVisitClient')?.value || '';
+  _visitFilter.operator = document.getElementById('fVisitOperator')?.value || '';
+  _visitFilter.from     = document.getElementById('fVisitFrom')?.value || '';
+  _visitFilter.to       = document.getElementById('fVisitTo')?.value || '';
+  saveVisitFilters();
+  closeModal();
+  renderVisitView();
+}
+function clearVisitFiltersSheet() {
+  _visitFilter.client = _visitFilter.operator = _visitFilter.from = _visitFilter.to = '';
+  saveVisitFilters();
+  closeModal();
+  renderVisitView();
 }
 
 function getFilteredVisits() {
@@ -76,11 +148,11 @@ function getFilteredVisits() {
     ? getVisitsByTeam(_selectedTeam)
     : getMyVisits();
   const q   = (document.getElementById('visitSearch')?.value || '').toLowerCase();
-  const cid = document.getElementById('visitClient')?.value || '';
-  const op  = document.getElementById('visitOperator')?.value || '';
-  const st  = document.getElementById('visitStatus')?.value || '';
-  const fr  = document.getElementById('visitFrom')?.value || '';
-  const to  = document.getElementById('visitTo')?.value || '';
+  const cid = _visitFilter.client;
+  const op  = _visitFilter.operator;
+  const st  = _visitFilter.status;
+  const fr  = _visitFilter.from;
+  const to  = _visitFilter.to;
   return base.filter(v => {
     if (q && !(v.motivo || '').toLowerCase().includes(q)
          && !(v.clientName || '').toLowerCase().includes(q)
@@ -104,7 +176,9 @@ function renderVisitView(resetPage) {
     if (resetPage !== false) _visitPage = 1;
     _filteredVisits = getFilteredVisits();
     renderVisitStats();
+    renderVisitChips();
     renderVisitTable(area);
+    updateVisitFilterDot();
   }, 10);
 }
 
@@ -125,12 +199,10 @@ function renderVisitStats() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }).length;
   wrap.innerHTML = `
-    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-      <div class="stat-card"><div class="stat-label">Total de visitas</div><div class="stat-value">${total}</div></div>
-      <div class="stat-card"><div class="stat-label">Hoje</div><div class="stat-value" style="color:#0ea5e9">${todayN}</div></div>
-      <div class="stat-card"><div class="stat-label">Agendadas (futuras)</div><div class="stat-value" style="color:#f59e0b">${upcoming}</div></div>
-      <div class="stat-card"><div class="stat-label">Concluídas no mês</div><div class="stat-value" style="color:#16a34a">${doneMonth}</div></div>
-    </div>`;
+    <div class="vis-kpi"><b>${total}</b><span>Total</span></div>
+    <div class="vis-kpi"><b>${todayN}</b><span>Hoje</span></div>
+    <div class="vis-kpi"><b>${upcoming}</b><span>Agendadas</span></div>
+    <div class="vis-kpi"><b>${doneMonth}</b><span>Concluídas no mês</span></div>`;
 }
 
 function visitStatusTag(st) {
@@ -165,12 +237,33 @@ function visitMatchesNumero(v, q) {
   return getVisitNumero(v) === n;
 }
 
+// Card da lista (mock Visitas): data + nº, pill de status, cliente com
+// avatar, operador + horário. Toque abre o detalhe (excluir fica lá dentro).
+function visitCardHtml(v) {
+  const c = (typeof getClientById === 'function') ? getClientById(v.clientId) : null;
+  const m = (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[v.status]) || { label: v.status || '—', color: '#94a3b8' };
+  const avName = v.clientName || '—';
+  const avatar = c
+    ? clientAvatar(c, 32)
+    : '<span class="vis-av" style="--c:#555">' + escapeHtml(visitInitials(avName)) + '</span>';
+  const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : formatVisitTimeRange(v);
+  return '<button type="button" class="vis-card" style="--st:' + m.color + '" onclick="openVisitDetail(\'' + escapeHtml(v.id) + '\')">'
+    + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
+    + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
+    + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span></div>'
+    + '<div class="vis-meta"><span class="vis-who"><i>' + escapeHtml(visitInitials(v.operator)) + '</i>' + escapeHtml(v.operator || '—') + '</span>'
+    + '<span>' + escapeHtml(timeLabel) + '</span></div>'
+    + '</button>';
+}
+
 function renderVisitTable(area) {
   const wrap = area || document.getElementById('visitViewArea');
   if (!wrap) return;
   const visits = _filteredVisits;
+  const countEl = document.getElementById('visitCount');
+  if (countEl) countEl.textContent = visits.length + (visits.length === 1 ? ' visita' : ' visitas');
   if (!visits.length) {
-    wrap.innerHTML = `<div class="card"><div class="empty-state"><p>Nenhuma visita encontrada.</p><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div></div>`;
+    wrap.innerHTML = `<div class="vis-empty">Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.<br><br><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
     return;
   }
   const totalPages = Math.ceil(visits.length / VISIT_PAGE_SIZE);
@@ -179,68 +272,16 @@ function renderVisitTable(area) {
   const startIdx = (_visitPage - 1) * VISIT_PAGE_SIZE;
   const pageVisits = visits.slice(startIdx, startIdx + VISIT_PAGE_SIZE);
 
-  wrap.innerHTML = `<div class="table-wrapper"><table class="pen-table visit-table">
-    <thead><tr>
-      <th class="col-date">Data</th>
-      <th class="col-client">Cliente</th>
-      <th class="col-desc">Motivo & Relatório</th>
-      <th class="col-resp">Operador</th>
-      <th class="col-status">Status</th>
-      <th class="col-actions"></th>
-    </tr></thead>
-    <tbody>${pageVisits.map(v => {
-      const c = getClientById(v.clientId);
-      const color = c?.color || '#2563eb';
-      const hasReport = !!(v.relatorio && v.relatorio.trim());
-      return `<tr>
-        <td data-label="Data" class="col-date">
-          <div class="visit-date-cell">
-            <span class="visit-date-main">${v.date ? formatDate(v.date) : '—'}</span>
-            <span style="font-size:10px;color:var(--text-muted);font-weight:600">${escapeHtml(formatVisitNumero(v))}</span>
-            ${(v.allDay || v.time || v.timeEnd) ? `<span class="visit-date-time">${escapeHtml(formatVisitTimeRange(v))}</span>` : ''}
-          </div>
-        </td>
-        <td data-label="Cliente" class="col-client">
-          <div style="display:flex;align-items:center;gap:8px">
-            ${c ? clientAvatar(c, 24) : ''}
-            <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(v.clientName)||'—'}</span>
-          </div>
-        </td>
-        <td data-label="Motivo & Relatório" class="col-desc col-motivo">
-          <div class="col-desc-value col-motivo-value">
-            <span class="visit-motivo-text">${escapeHtml(v.motivo)||'—'}</span>
-            ${v.observacoes ? `<span class="visit-motivo-obs">${escapeHtml(v.observacoes)}</span>` : ''}
-            ${hasReport
-              ? `<div style="margin-top:4px;font-size:11px;color:#16a34a;display:inline-flex;align-items:center;gap:4px;font-weight:600;background:#16a34a15;padding:2px 8px;border-radius:4px;border:1px solid #16a34a30" title="Relatório de atendimento preenchido">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Relatório do que foi feito
-                </div>`
-              : v.status === 'concluida'
-                ? `<button type="button" class="btn btn-sm btn-secondary" onclick="openConcludeVisitModal('${escapeHtml(v.id)}')" style="margin-top:4px;font-size:10px;padding:2px 6px;color:#d97706;border-color:#f59e0b40;background:#f59e0b10">
-                    ⚠️ Adicionar relatório
-                  </button>`
-                : ''}
-          </div>
-        </td>
-        <td data-label="Operador" class="col-resp"><span class="resp-badge">${escapeHtml(v.operator)||'—'}</span></td>
-        <td data-label="Status" class="col-status">${visitStatusTag(v.status)}</td>
-        <td class="col-actions">
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-sm btn-secondary" onclick="openVisitDetail('${escapeHtml(v.id)}')">Abrir</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteVisitConfirm('${escapeHtml(v.id)}')">&#10005;</button>
-          </div>
-        </td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div>
-  ${totalPages > 1 ? `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length} visitas</div>
-      <div style="display:flex;gap:6px">
+  wrap.innerHTML = pageVisits.map(visitCardHtml).join('')
+  + (totalPages > 1 ? `
+    <div class="vis-pager">
+      <div>Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
+      <div style="display:flex;gap:6px;align-items:center">
         <button class="btn btn-sm btn-secondary" ${_visitPage===1?'disabled':''} onclick="_visitPage--;renderVisitView(false)">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_visitPage} / ${totalPages}</span>
+        <span>${_visitPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} onclick="_visitPage++;renderVisitView(false)">Próxima →</button>
       </div>
-    </div>` : ''}`;
+    </div>` : '');
 }
 
 function openVisitForm(id = null, preClientId = null, preDate = null) {
@@ -458,6 +499,7 @@ function openVisitDetail(id) {
         <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar Status</button>
         ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="openConcludeVisitModal('${escapeHtml(id)}')">✅ Concluir com Relatório</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar Tudo</button>
+        <button class="btn btn-sm btn-danger" onclick="closeModal();deleteVisitConfirm('${escapeHtml(id)}')" title="Excluir visita">Excluir</button>
       </div>
     </div>
   `);
