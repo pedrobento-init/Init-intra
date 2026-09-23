@@ -818,6 +818,61 @@ function setTopbarAction(text, iconSvg) {
   const ico = btn.querySelector('.topbar-action-icon');
   if (txt) txt.textContent = text;
   if (ico && iconSvg) ico.outerHTML = iconSvg;
+  _syncTopbarMoreAction(text);
+}
+
+// ── TOPBAR MORE MENU (mobile ≤768px: ações em menu suspenso) ─────────────────
+// Espelha o rótulo/visibilidade da ação principal no item do menu mobile.
+function _syncTopbarMoreAction(text) {
+  try {
+    const item = document.getElementById('topbarMoreAction');
+    if (!item) return;
+    const btn = document.getElementById('topbarActionBtn');
+    const hasAction = !!btn && btn.style.display !== 'none';
+    item.style.display = hasAction ? '' : 'none';
+    if (text) {
+      const label = item.querySelector('.topbar-more-action-text');
+      if (label) label.textContent = text;
+    }
+  } catch (_) {}
+}
+function toggleTopbarMoreMenu(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+  const menu = document.getElementById('topbarMoreMenu');
+  const btn = document.getElementById('topbarMoreBtn');
+  if (!menu || !btn) return;
+  _syncTopbarMoreAction();
+  const willOpen = menu.hidden || menu.dataset.open !== '1';
+  menu.hidden = !willOpen;
+  menu.dataset.open = willOpen ? '1' : '0';
+  btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+}
+function closeTopbarMoreMenu() {
+  try {
+    const menu = document.getElementById('topbarMoreMenu');
+    const btn = document.getElementById('topbarMoreBtn');
+    if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    menu.dataset.open = '0';
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  } catch (_) {}
+}
+if (typeof window !== 'undefined' && !window._topbarMoreBound && typeof document !== 'undefined' && document.addEventListener) {
+  window._topbarMoreBound = true;
+  document.addEventListener('click', function (e) {
+    try {
+      const menu = document.getElementById('topbarMoreMenu');
+      const btn = document.getElementById('topbarMoreBtn');
+      if (!menu || menu.hidden) return;
+      if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+      closeTopbarMoreMenu();
+    } catch (_) {}
+  });
+  document.addEventListener('keydown', function (e) {
+    try {
+      if (e && e.key === 'Escape') closeTopbarMoreMenu();
+    } catch (_) {}
+  });
 }
 
 function exportClientsCSV() {

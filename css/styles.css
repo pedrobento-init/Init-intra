@@ -235,6 +235,9 @@ body {
 }
 .page-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: var(--text-primary); }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
+/* Menu suspenso do topbar: só mobile (≤768px); no desktop fica oculto. */
+.topbar-more-wrap { display: none; }
+.topbar-more-menu[hidden] { display: none; }
 .user-quick {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 12px 5px 6px;
@@ -1610,9 +1613,11 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   /* ── Topbar ── */
   .hamburger-btn {
     display: inline-flex;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     padding: 0;
+    margin-right: 8px;
+    flex-shrink: 0;
   }
   .topbar {
     padding: 10px 12px;
@@ -1678,6 +1683,62 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     display: block;
     width: 22px;
     height: 22px;
+  }
+  /* ── Topbar mobile: ações agrupadas em menu suspenso (⋮) ── */
+  .topbar-right #notifSettingsBtn,
+  .topbar-right #refreshBtn,
+  .topbar-right #themeToggleBtn,
+  .topbar-right #topbarActionBtn {
+    display: none !important;
+  }
+  .topbar-more-wrap {
+    display: block;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .topbar-more-wrap .theme-toggle-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .topbar-more-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 220px;
+    padding: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .topbar-more-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13.5px;
+    font-weight: 500;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .topbar-more-item:hover {
+    background: var(--bg-hover);
+  }
+  .topbar-more-item--action {
+    color: var(--accent);
+    font-weight: 700;
   }
   .search-bar > .btn-primary,
   .search-bar > .btn-new-action,
@@ -1916,6 +1977,24 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   }
   .page-action-row .view-toggles {
     align-self: flex-start;
+  }
+  /* ── Pendências mobile: abas + contador em uma linha; sem carrossel ── */
+  .page-action-row.pen-scope-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .page-action-row.pen-scope-row .view-toggles {
+    align-self: center;
+    flex-shrink: 0;
+  }
+  .pen-scope-count {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #penSlaSummary {
+    display: none;
   }
   .page-action-row .btn-new-action,
   .page-action-row .btn-new-visit {
