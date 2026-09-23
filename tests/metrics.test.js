@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const metrics = require('../js/metrics.js');
 
-const { getSlaStatsForClient, getAllSlaStats, sortClientsBySla, calculateAvgResolutionHours, calculateHealthScore, getHealthForClient, getWorkloadByOperator, compareMeetings, getConsecutiveMeetingStreak, getMinhaFilaDoDia, getNoteSnippet, parseSearchShortcuts } = metrics;
+const { getSlaStatsForClient, getAllSlaStats, sortClientsBySla, calculateAvgResolutionHours, calculateHealthScore, getHealthForClient, getWorkloadByOperator, compareMeetings, getConsecutiveMeetingStreak, getMinhaFilaDoDia, getTodayVisitsForOperator, getNoteSnippet, parseSearchShortcuts } = metrics;
 
 function isClosed(s) { return ['concluido','resolvido','cancelado','fechado'].includes(s); }
 
@@ -132,6 +132,22 @@ describe('Minha fila do dia', () => {
     const queue = getMinhaFilaDoDia(pens, 'Ana', today, { tomorrowISO: tomorrow, isStaleFn: mkStale(['PEN-C']) });
     expect(queue[0].id).toBe('PEN-A');
     expect(queue[1].id).toBe('PEN-B');
+  });
+});
+
+describe('Visitas de hoje na fila do dia', () => {
+  it('só minhas, só hoje, sem concluídas/canceladas; dia inteiro primeiro', () => {
+    const today = '2024-05-10';
+    const visits = [
+      { id: 'V-1', operator: 'Ana', date: today, time: '14:00', status: 'agendada' },
+      { id: 'V-2', operator: 'Ana', date: today, time: '', allDay: true, status: 'em_andamento' },
+      { id: 'V-3', operator: 'Ana', date: today, time: '09:00', status: 'concluida' },
+      { id: 'V-4', operator: 'Ana', date: today, time: '10:00', status: 'cancelada' },
+      { id: 'V-5', operator: 'Bob', date: today, time: '08:00', status: 'agendada' },
+      { id: 'V-6', operator: 'Ana', date: '2024-05-11', time: '08:00', status: 'agendada' },
+    ];
+    const out = getTodayVisitsForOperator(visits, 'Ana', today);
+    expect(out.map(v => v.id)).toEqual(['V-2', 'V-1']);
   });
 });
 

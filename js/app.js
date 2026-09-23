@@ -577,6 +577,20 @@ function renderDashboard() {
     });
   }
 
+  // Visitas de hoje do operador no topo da fila (agendadas/em andamento)
+  let myTodayVisits = [];
+  if (typeof getTodayVisitsForOperator === 'function') {
+    try { myTodayVisits = getTodayVisitsForOperator(allVisits, currentUser, today); } catch (_) { myTodayVisits = []; }
+  } else {
+    myTodayVisits = (allVisits || []).filter(function (v) {
+      return v && v.date === today && (v.operator || '') === currentUser && v.status !== 'cancelada' && v.status !== 'concluida';
+    }).sort(function (a, b) {
+      const aT = a.allDay ? '' : (a.time || '99');
+      const bT = b.allDay ? '' : (b.time || '99');
+      return String(aT).localeCompare(String(bT));
+    });
+  }
+
   const visits       = allVisits.filter(v => itemInDashPeriod(v));
   const upcomingVisits = [...allVisits]
     .filter(v => v.date >= today && v.status !== 'cancelada' && v.status !== 'concluida')
@@ -929,8 +943,20 @@ function renderDashboard() {
     ${!_dashIsHidden('fila') ? `
     <div class="card dash-widget" style="margin-bottom:18px">
       ${_dashHideBtn('fila')}
-      <div class="section-header"><span class="section-title">Minha fila do dia</span><span style="font-size:11px;color:var(--text-muted)">${myQueue.length} ${myQueue.length===1?'item':'itens'}</span></div>
-      ${myQueue.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + myQueue.slice(0,8).map(function(p){
+      <div class="section-header"><span class="section-title">Minha fila do dia</span><span style="font-size:11px;color:var(--text-muted)">${myQueue.length + myTodayVisits.length} ${myQueue.length + myTodayVisits.length===1?'item':'itens'}</span></div>
+      ${myQueue.length + myTodayVisits.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + myTodayVisits.map(function(v){
+        const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
+        const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : escapeHtml(v.time + (v.timeEnd ? ' – ' + v.timeEnd : ''));
+        const vstTag = typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" onclick="openVisitDetail('${v.id}')">
+          ${c ? clientAvatar(c, 30) : '<span style="font-size:18px">🚗</span>'}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🚗 ${escapeHtml(v.clientName)||'—'}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${escapeHtml(v.motivo)||'Visita'} · ${timeLabel}</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">${vstTag}</div>
+        </div>`;
+      }).join('') + myQueue.slice(0,Math.max(0,8-myTodayVisits.length)).map(function(p){
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
         const _isClosedQ = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s || ''); };
         const isOverdue = p.deadline && p.deadline < today && !_isClosedQ(p.status);
@@ -945,7 +971,7 @@ function renderDashboard() {
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">${stTag}</div>
         </div>`;
-      }).join('') + `</div>` + (myQueue.length>8?`<div style="text-align:center;margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="navigateTo('pendencias')">Ver todas (${myQueue.length}) →</button></div>`:'') : `<div class="empty-state" style="padding:20px"><p>Nenhum item urgente 🎉</p></div>`}
+      }).join('') + `</div>` + (myQueue.length>Math.max(0,8-myTodayVisits.length)?`<div style="text-align:center;margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="navigateTo('pendencias')">Ver todas (${myQueue.length}) →</button></div>`:'') : `<div class="empty-state" style="padding:20px"><p>Nenhum item urgente 🎉</p></div>`}
     </div>` : ''}
 
     <div class="grid-2">

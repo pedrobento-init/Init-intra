@@ -193,6 +193,21 @@ function getMinhaFilaDoDia(pendencias, userName, todayISO, opts) {
   return filtered;
 }
 
+// ── Visitas de hoje na fila do dia (Dashboard, puro) ─────────────────────────
+// Minhas visitas de hoje (agendadas/em andamento), dia inteiro primeiro e
+// depois por horário. Concluídas e canceladas saem da fila.
+function getTodayVisitsForOperator(visits, operatorName, todayISO) {
+  return (visits || []).filter(function (v) {
+    if (!v || v.date !== todayISO) return false;
+    if ((v.operator || '') !== (operatorName || '')) return false;
+    return v.status !== 'cancelada' && v.status !== 'concluida';
+  }).sort(function (a, b) {
+    const aT = a.allDay ? '' : (a.time || '99');
+    const bT = b.allDay ? '' : (b.time || '99');
+    return String(aT).localeCompare(String(bT));
+  });
+}
+
 // ── Busca global helpers (puros) ────────────────────────────────────────────
 function _escapeForSnippet(str) {
   if (str == null) return '';
@@ -501,7 +516,7 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateAvgResolutionHours, calculateHealthScore, getHealthForClient,
     getWorkloadByOperator, getWorkloadInPeriod,
     compareMeetings, getConsecutiveMeetingStreak,
-    PRIORITY_WEIGHT, getMinhaFilaDoDia, getNoteSnippet, parseSearchShortcuts,
+    PRIORITY_WEIGHT, getMinhaFilaDoDia, getTodayVisitsForOperator, getNoteSnippet, parseSearchShortcuts,
     getPreviousDashRange, calcPeriodDelta, filterItemsByDateRange, calcPeriodStats,
     getClientLastContact, getSilentClients, getClientAnniversaries,
     getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
