@@ -19,13 +19,14 @@ function mkEl(id) {
   return el;
 }
 const _el = {};
+const _listeners = {};
 const sandbox = {
   console,
   Promise,
   window: { addEventListener() {}, location: { hash: '#calendario' }, innerWidth: 360 },
   navigator: { onLine: true },
   document: {
-    addEventListener() {},
+    addEventListener(type, fn) { (_listeners[type] = _listeners[type] || []).push(fn); },
     getElementById: (id) => _el[id] || (_el[id] = mkEl(id)),
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -46,7 +47,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/calendar.js', 'utf8'), sandbox, { filename: 'calendar.js' });
   vm.runInContext(
-    'globalThis.__t = { calendarPageTitle, agFcView, agDefaultView, agSetView, toggleCalFilters, initFullCalendar, agDayMonth, agOverdueItems, agNext7Items, agRecurringGroups, agChipHtml };',
+    'globalThis.__t = { calendarPageTitle, agFcView, agDefaultView, agSetView, toggleCalFilters, closeCalFilters, initFullCalendar, agDayMonth, agOverdueItems, agNext7Items, agRecurringGroups, agChipHtml };',
     sandbox
   );
 } finally {
@@ -163,7 +164,7 @@ describe('view-models puros da sidebar', () => {
   });
 });
 
-describe('toggle dos filtros (menu colapsável)', () => {
+describe('toggle dos filtros (dropdown ao lado do Hoje)', () => {
   it('alterna data-open e aria-expanded', () => {
     T.toggleCalFilters();
     expect(_el.calFilters.dataset.open).toBe('1');
@@ -171,6 +172,19 @@ describe('toggle dos filtros (menu colapsável)', () => {
     T.toggleCalFilters();
     expect(_el.calFilters.dataset.open).toBe('0');
     expect(_el.calFiltersToggle.attrs['aria-expanded']).toBe('false');
+  });
+
+  it('closeCalFilters fecha; clique fora e Escape fecham', () => {
+    T.toggleCalFilters();
+    expect(_el.calFilters.dataset.open).toBe('1');
+    T.closeCalFilters();
+    expect(_el.calFilters.dataset.open).toBe('0');
+    T.toggleCalFilters();
+    (_listeners.click || []).forEach((fn) => fn({ target: mkEl('fora') }));
+    expect(_el.calFilters.dataset.open).toBe('0');
+    T.toggleCalFilters();
+    (_listeners.keydown || []).forEach((fn) => fn({ key: 'Escape', target: { tagName: 'DIV' } }));
+    expect(_el.calFilters.dataset.open).toBe('0');
   });
 });
 
@@ -183,10 +197,17 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
     expect(src).toContain('class="cal-filters"');
   });
 
-  it('botões Novo envolvidos em .cal-new-btns', () => {
-    expect(src).toContain('class="cal-new-btns"');
+  it('botão Filtros fica no nav ao lado do Hoje; painel tem selects + ações', () => {
+    const navIdx = src.indexOf('agNav(\'next\')');
+    const toggleIdx = src.indexOf('id="calFiltersToggle"');
+    expect(navIdx).toBeGreaterThan(-1);
+    expect(toggleIdx).toBeGreaterThan(navIdx);
+    expect(src).toContain('class="cal-menu-actions"');
     expect(src).toContain('Nova Pendência');
     expect(src).toContain('Nova Visita');
+    expect(src).toContain('exportCalendarICS');
+    expect(src).not.toContain('cal-new-btns');
+    expect(src).not.toContain('<div class="search-bar">');
   });
 
   it('usa toolbar própria (sem headerToolbar nativa)', () => {
@@ -200,7 +221,12 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
     expect(src).toContain('<h1 class="ag-title">Agenda</h1>');
     expect(src).toContain('id="agendaSide"');
     expect(src).toContain('ag-legend');
-    expect(src).toContain('class="cal-new-btns"');
+  });
+
+  it('ações do menu fecham o dropdown', () => {
+    expect(src).toContain('closeCalFilters();openPendenciaForm()');
+    expect(src).toContain('closeCalFilters();openVisitForm()');
+    expect(src).toContain('closeCalFilters();exportCalendarICS()');
   });
 });
 
@@ -209,13 +235,11 @@ describe('contrato mobile no CSS', () => {
   const norm = css.replace(/\s+/g, ' ');
   const mobile = norm.split('@media screen and (max-width: 768px)')[1] || '';
 
-  it('toggle de filtros visível + filtros colapsáveis', () => {
-    expect(mobile).toContain('.cal-filters-toggle');
-    expect(mobile).toContain('.cal-filters[data-open="1"]');
-  });
-
-  it('botões Novo em 2 colunas', () => {
-    expect(mobile).toMatch(/\.cal-new-btns\s*\{[^}]*grid-template-columns:\s*1fr 1fr/);
+  it('dropdown de filtros ancorado no nav (desktop e mobile)', () => {
+    expect(norm).toMatch(/\.cal-filters\s*\{[^}]*position:\s*absolute/);
+    expect(norm).toMatch(/\.cal-filters\[data-open="1"\]\s*\{\s*display:\s*flex/);
+    expect(norm).toContain('.cal-menu-actions');
+    expect(norm).not.toContain('.cal-new-btns');
   });
 
   it('título do mês centralizado e com inicial maiúscula', () => {
@@ -223,9 +247,12 @@ describe('contrato mobile no CSS', () => {
     expect(mobile).toMatch(/\.fc-toolbar-title::first-letter\s*\{\s*text-transform:\s*uppercase/);
   });
 
-  it('desktop: wrappers transparentes, toggle oculto', () => {
-    expect(norm).toMatch(/\.cal-filters,\s*\.cal-new-btns\s*\{\s*display:\s*contents/);
-    expect(norm).toMatch(/\.cal-filters-toggle\s*\{\s*display:\s*none/);
+  it('base do dropdown vem ANTES do bloco mobile (cascata não inverte)', () => {
+    const baseIdx = norm.indexOf('.ag-filter-group { position:relative');
+    const mobileIdx = norm.indexOf('@media screen and (max-width: 768px)');
+    expect(baseIdx).toBeGreaterThan(-1);
+    expect(mobileIdx).toBeGreaterThan(-1);
+    expect(baseIdx).toBeLessThan(mobileIdx);
   });
 
   it('visual da mock: chips, grade 2 colunas e sidebar', () => {
@@ -241,11 +268,4 @@ describe('contrato mobile no CSS', () => {
     expect(fs.readFileSync('index.html', 'utf8')).toContain('family=Manrope');
   });
 
-  it('base do calendário vem ANTES do bloco mobile (cascata não inverte)', () => {
-    const baseIdx = norm.indexOf('.cal-filters, .cal-new-btns');
-    const mobileIdx = norm.indexOf('@media screen and (max-width: 768px)');
-    expect(baseIdx).toBeGreaterThan(-1);
-    expect(mobileIdx).toBeGreaterThan(-1);
-    expect(baseIdx).toBeLessThan(mobileIdx);
-  });
 });

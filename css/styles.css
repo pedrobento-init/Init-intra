@@ -238,11 +238,24 @@ body {
 /* Menu suspenso do topbar: só mobile (≤768px); no desktop fica oculto. */
 .topbar-more-wrap { display: none; }
 .topbar-more-menu[hidden] { display: none; }
-/* Calendário: wrappers transparentes no desktop (filtros/botões fluem na
-   barra como antes); no mobile viram menu colapsável e grade 2 colunas.
-   (Base ANTES do bloco mobile ≤768px para não sobrescrevê-lo.) */
-.cal-filters, .cal-new-btns { display: contents; }
-.cal-filters-toggle { display: none; }
+/* Calendário: Filtros em dropdown ao lado do Hoje (base ANTES do bloco
+   mobile ≤768px para não sobrescrevê-lo). */
+.ag-nav-group { display:flex; align-items:center; gap:10px; }
+.ag-filter-group { position:relative; }
+#calFiltersToggle { display:inline-flex; align-items:center; gap:8px; }
+.cal-filters {
+  display:none;
+  position:absolute; top:calc(100% + 8px); left:0; z-index:300;
+  min-width:270px; max-width:min(320px, 86vw); max-height:min(70vh, 560px); overflow-y:auto;
+  flex-direction:column; gap:8px;
+  padding:12px;
+  background:var(--bg-surface); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+}
+.cal-filters[data-open="1"] { display:flex; }
+.cal-filters .form-select { width:100%; }
+.cal-menu-actions { display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:10px; }
+.cal-menu-actions .btn { width:100%; justify-content:center; }
 .user-quick {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 12px 5px 6px;
@@ -2017,46 +2030,16 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   #penSlaSummary {
     display: none;
   }
-  /* ── Calendário mobile: filtros em menu + novos lado a lado ── */
-  .cal-filters-toggle {
-    display: inline-flex;
-    width: 100%;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    min-height: 44px;
-  }
+  /* ── Calendário mobile: dropdown de filtros + ações ── */
+  .ag-nav-group { gap:8px; }
+  #calFiltersToggle { min-height:40px; }
   .cal-filters {
-    display: none;
-    width: 100%;
-    flex-direction: column;
-    gap: 8px;
+    left:0; right:auto;
+    width:min(320px, calc(100vw - 24px));
+    min-width:0; max-width:none;
   }
-  .cal-filters[data-open="1"] {
-    display: flex;
-  }
-  .cal-filters .form-select {
-    width: 100%;
-  }
-  .cal-new-btns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    width: 100%;
-  }
-  .search-bar .cal-new-btns .btn {
-    width: 100%;
-    min-height: 44px;
-    padding: 10px 6px !important;
-    font-size: 12px !important;
-    justify-content: center;
-    white-space: nowrap;
-  }
-  .search-bar .cal-new-btns .btn svg {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-  }
+  .cal-filters .form-select { min-height:44px; font-size:14px; }
+  .cal-menu-actions .btn { min-height:44px; }
   .page-action-row .btn-new-action,
   .page-action-row .btn-new-visit {
     width: 100%;
