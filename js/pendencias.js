@@ -233,9 +233,9 @@ function renderPendencias() {
       </div>
     </div>
     <div class="page-action-row pen-scope-row">
-      <div class="view-toggles">
-        <button class="btn btn-sm ${penScope==='active'?'btn-primary':'btn-secondary'}" onclick="setPenScope('active')">Ativas</button>
-        <button class="btn btn-sm ${penScope==='archived'?'btn-primary':'btn-secondary'}" onclick="setPenScope('archived')">Arquivadas</button>
+      <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Escopo das pendências">
+        <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas</button>
+        <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas</button>
       </div>
       <span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>
     </div>
@@ -548,13 +548,12 @@ function renderPenKanban(area) {
     }
   }
   _applyPenCardMotion(area);
-  // Atualiza contador inline na linha das abas (evita espaço vazio após remoção do CTA duplicado)
+  // Número abaixo da aba ativa (só o total; o rótulo vive na própria aba)
   try{
     var cntEl=document.getElementById('penScopeCount');
     if(cntEl){
       var total = _penServerMode && _penTotal!=null ? _penTotal : pens.length;
-      var label = penScope==='archived' ? 'arquivadas' : 'ativas';
-      cntEl.textContent = total ? total + ' ' + label : '';
+      cntEl.textContent = total ? String(total) : '';
     }
   }catch(_){}
   } finally {

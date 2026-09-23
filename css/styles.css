@@ -408,8 +408,26 @@ tr:hover td { background: var(--bg-hover); }
   gap: 8px;
   margin-bottom: 24px;
 }
-.pen-scope-row { justify-content:flex-start; gap:12px; margin-bottom:14px; }
-.pen-scope-count { font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums; margin-left:4px; }
+.pen-scope-row { flex-direction:column; align-items:flex-start; gap:2px; margin-bottom:14px; }
+/* Abas de escopo: texto simples + sublinhado na ativa; o total vai embaixo. */
+.pen-scope-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); }
+.pen-scope-tab {
+  position:relative;
+  background:none; border:none; cursor:pointer;
+  padding:8px 12px;
+  font-size:13px; font-weight:600; font-family:inherit;
+  color:var(--text-muted);
+  transition:color var(--transition);
+}
+.pen-scope-tab:hover { color:var(--text-primary); }
+.pen-scope-tab.is-active { color:var(--text-primary); }
+.pen-scope-tab.is-active::after {
+  content:'';
+  position:absolute; left:8px; right:8px; bottom:-1px;
+  height:3px; border-radius:2px;
+  background:var(--accent);
+}
+.pen-scope-count { font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums; padding:2px 12px 0; }
 .pen-scope-count:empty { display:none; }
 
 /* ── TEMPLATES GRID ── */
@@ -1978,21 +1996,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   .page-action-row .view-toggles {
     align-self: flex-start;
   }
-  /* ── Pendências mobile: abas + contador em uma linha; sem carrossel ── */
-  .page-action-row.pen-scope-row {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
-  }
-  .page-action-row.pen-scope-row .view-toggles {
-    align-self: center;
-    flex-shrink: 0;
-  }
-  .pen-scope-count {
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
+  /* ── Pendências mobile: sem carrossel de clientes ── */
   #penSlaSummary {
     display: none;
   }

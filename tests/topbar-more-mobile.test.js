@@ -135,9 +135,15 @@ describe('contrato mobile no CSS e no HTML', () => {
     expect(mobile).toMatch(/#penSlaSummary\s*\{\s*display:\s*none/);
   });
 
-  it('abas Ativas/Arquivadas + contador em uma linha no mobile', () => {
-    expect(mobile).toContain('.page-action-row.pen-scope-row');
-    expect(mobile).toMatch(/\.page-action-row\.pen-scope-row\s*\{[^}]*flex-direction:\s*row/);
+  it('abas Ativas/Arquivadas com sublinhado + número embaixo (sem "15 ativas" inline)', () => {
+    // CSS: aba ativa com sublinhado e contador abaixo das abas
+    expect(norm).toContain('.pen-scope-tab.is-active::after');
+    expect(norm).toMatch(/\.pen-scope-row\s*\{[^}]*flex-direction:\s*column/);
+    // markup: abas sem btn-primary/btn-secondary, contador sem rótulo duplicado
+    const penJs = fs.readFileSync('js/pendencias.js', 'utf8');
+    expect(penJs).toContain('pen-scope-tab');
+    expect(penJs).not.toMatch(/setPenScope\('active'\)">Ativas<\/button>\s*<button class="btn/);
+    expect(penJs).toContain("cntEl.textContent = total ? String(total) : ''");
   });
 
   it('ações do topbar colapsadas no ⋮ só no mobile', () => {
