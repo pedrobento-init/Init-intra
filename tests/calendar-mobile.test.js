@@ -46,7 +46,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/calendar.js', 'utf8'), sandbox, { filename: 'calendar.js' });
   vm.runInContext(
-    'globalThis.__t = { calendarPageTitle, calInitialViewForWidth, toggleCalFilters, initFullCalendar };',
+    'globalThis.__t = { calendarPageTitle, agFcView, agDefaultView, agSetView, toggleCalFilters, initFullCalendar, agDayMonth, agOverdueItems, agNext7Items, agRecurringGroups, agChipHtml };',
     sandbox
   );
 } finally {
@@ -61,21 +61,33 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('título curto (sem truncar no topbar mobile)', () => {
-  it('é "Calendário"', () => {
-    expect(T.calendarPageTitle()).toBe('Calendário');
+describe('título da página', () => {
+  it('é "Agenda"', () => {
+    expect(T.calendarPageTitle()).toBe('Agenda');
   });
 });
 
-describe('view inicial por largura', () => {
-  it('celular (≤768px): lista mensal', () => {
-    expect(T.calInitialViewForWidth(360)).toBe('listMonth');
-    expect(T.calInitialViewForWidth(768)).toBe('listMonth');
+describe('views lógicas da Agenda', () => {
+  it('mobile abre em lista; desktop em mês', () => {
+    expect(T.agDefaultView()).toBe('list'); // sandbox: innerWidth 360
   });
 
-  it('desktop: grade mensal', () => {
-    expect(T.calInitialViewForWidth(1024)).toBe('dayGridMonth');
-    expect(T.calInitialViewForWidth(1920)).toBe('dayGridMonth');
+  it('mapeia Mês/Semana/Lista para o FullCalendar', () => {
+    expect(T.agFcView('month')).toBe('dayGridMonth');
+    expect(T.agFcView('week')).toBe('timeGridWeek');
+    expect(T.agFcView('list')).toBe('listMonth'); // sandbox mobile
+  });
+
+  it('agSetView troca a view do motor e ignora inválidas', () => {
+    vm.runInContext('_fcInstance = { v: null, changeView: function(v){ this.v = v; }, getDate: function(){ return new Date(2026, 8, 23); } };', sandbox);
+    try {
+      vm.runInContext("agSetView('week')", sandbox);
+      expect(vm.runInContext('_fcInstance.v', sandbox)).toBe('timeGridWeek');
+      vm.runInContext("agSetView('banana')", sandbox);
+      expect(vm.runInContext('_fcInstance.v', sandbox)).toBe('timeGridWeek');
+    } finally {
+      vm.runInContext('_fcInstance = null;', sandbox);
+    }
   });
 });
 
@@ -96,6 +108,58 @@ describe('primeiro acesso: loading imediato + erro com retry se o CDN falhar', (
     const src = fs.readFileSync('js/calendar.js', 'utf8');
     expect(src).toContain('_loadFullCalendarWithTimeout');
     expect(src).toMatch(/Promise\.race\(\[\s*loadFullCalendar\(\)/);
+  });
+});
+
+describe('view-models puros da sidebar', () => {
+  it('agDayMonth formata "25 set"', () => {
+    expect(T.agDayMonth('2026-09-25')).toBe('25 set');
+    expect(T.agDayMonth('')).toBe('—');
+  });
+
+  it('agOverdueItems: só vencidas, mais antigas primeiro', () => {
+    const pens = [
+      { id: 'a', title: 'A', deadline: '2026-09-20', priority: 'media' },
+      { id: 'b', title: 'B', deadline: '2026-09-18', priority: 'critica' },
+      { id: 'c', title: 'C', deadline: '2026-09-25', priority: 'baixa' },
+    ];
+    const out = T.agOverdueItems(pens, '2026-09-23');
+    expect(out.map((o) => o.id)).toEqual(['b', 'a']);
+    expect(out[0].meta).toBe('Venceu em 18 set');
+  });
+
+  it('agNext7Items: janela [hoje, +7d] com pendências e visitas', () => {
+    const pens = [
+      { id: 'hoje', title: 'H', deadline: '2026-09-23', priority: 'alta' },
+      { id: 'd7', title: 'S', deadline: '2026-09-30', priority: 'media' },
+      { id: 'd8', title: 'Fora', deadline: '2026-10-01', priority: 'media' },
+      { id: 'ontem', title: 'Passada', deadline: '2026-09-22', priority: 'media' },
+    ];
+    const visits = [{ id: 'v1', clientName: 'Panobianco', date: '2026-09-24' }];
+    const out = T.agNext7Items(pens, visits, '2026-09-23');
+    expect(out.map((o) => o.id)).toEqual(['hoje', 'v1', 'd7']);
+    expect(out[0].meta).toContain('hoje');
+    expect(out[1].title).toBe('Visita — Panobianco');
+  });
+
+  it('agRecurringGroups: agrupa por cliente com frequência e conta do mês', () => {
+    const visits = [
+      { id: 'v1', clientId: 'c1', clientName: 'Panobianco', date: '2026-09-02', recurrence: 'weekly' },
+      { id: 'v2', clientId: 'c1', clientName: 'Panobianco', date: '2026-09-09', recurrence: 'weekly' },
+      { id: 'v3', clientId: 'c2', clientName: 'Outro', date: '2026-09-05', recurrence: '' },
+    ];
+    const out = T.agRecurringGroups(visits, '2026-09');
+    expect(out).toHaveLength(1);
+    expect(out[0].clientName).toBe('Panobianco');
+    expect(out[0].meta).toBe('Semanal · 2 no mês');
+  });
+
+  it('agChipHtml: escapa título e marca vencida', () => {
+    const html = T.agChipHtml('pendencia', '<b>X</b>', '#dc2626', true);
+    expect(html).toContain('ag-chip overdue');
+    expect(html).not.toContain('<b>X</b>');
+    expect(html).toContain('--dot:#dc2626');
+    expect(T.agChipHtml('visit', 'Panobianco', '#0ea5e9', false)).toContain('ag-chip"');
   });
 });
 
@@ -125,9 +189,18 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
     expect(src).toContain('Nova Visita');
   });
 
-  it('mobile usa listMonth (grade não é forçada nas duas larguras)', () => {
-    expect(src).toContain("calInitialViewForWidth(window.innerWidth)");
-    expect(src).not.toContain("isMobile ? 'dayGridMonth' : 'dayGridMonth'");
+  it('usa toolbar própria (sem headerToolbar nativa)', () => {
+    expect(src).toContain('headerToolbar: false');
+    expect(src).toContain("agSetView('month')");
+    expect(src).toContain("agSetView('week')");
+    expect(src).toContain("agSetView('list')");
+  });
+
+  it('header da Agenda com título "Agenda" + legenda + layout grade/sidebar', () => {
+    expect(src).toContain('<h1 class="ag-title">Agenda</h1>');
+    expect(src).toContain('id="agendaSide"');
+    expect(src).toContain('ag-legend');
+    expect(src).toContain('class="cal-new-btns"');
   });
 });
 
@@ -153,6 +226,19 @@ describe('contrato mobile no CSS', () => {
   it('desktop: wrappers transparentes, toggle oculto', () => {
     expect(norm).toMatch(/\.cal-filters,\s*\.cal-new-btns\s*\{\s*display:\s*contents/);
     expect(norm).toMatch(/\.cal-filters-toggle\s*\{\s*display:\s*none/);
+  });
+
+  it('visual da mock: chips, grade 2 colunas e sidebar', () => {
+    expect(norm).toContain('.ag-chip');
+    expect(norm).toContain('.ag-chip.overdue');
+    expect(norm).toMatch(/\.ag-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*320px/);
+    expect(norm).toContain('.ag-side');
+    expect(norm).toContain('.plist');
+    expect(norm).toContain('.ag-card .badge.vencida');
+  });
+
+  it('index.html carrega Manrope (títulos da Agenda)', () => {
+    expect(fs.readFileSync('index.html', 'utf8')).toContain('family=Manrope');
   });
 
   it('base do calendário vem ANTES do bloco mobile (cascata não inverte)', () => {

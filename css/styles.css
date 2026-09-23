@@ -3247,6 +3247,84 @@ body.dark-theme .overdue-banner {
   color: #fca5a5;
 }
 
+/* ── AGENDA (visual mock: header + legenda + grade + sidebar) ── */
+.ag-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin:18px 0 16px; }
+.ag-title { font-family:'Manrope','Inter',sans-serif; font-size:26px; font-weight:800; letter-spacing:-0.01em; color:var(--text-primary); }
+.ag-sub { color:var(--text-muted); font-size:14px; margin-top:4px; }
+.ag-nav { display:flex; align-items:center; gap:10px; }
+.ag-nav button {
+  background:var(--bg-surface); border:1px solid var(--border); color:var(--text-primary);
+  border-radius:8px; padding:8px 14px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  transition:border-color var(--transition), background var(--transition);
+}
+.ag-nav button.ghost { background:transparent; padding:8px 10px; }
+.ag-nav button:hover { border-color:var(--accent); }
+.ag-nav button.is-active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.ag-nav-sep { width:12px; flex-shrink:0; }
+.ag-legend {
+  display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+  padding:12px 16px; margin-bottom:20px;
+  background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius);
+}
+.ag-legend .legend-item { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--text-muted); }
+.ag-legend .swatch { width:9px; height:9px; border-radius:50%; flex:none; }
+.ag-legend .legend-div { width:1px; align-self:stretch; background:var(--border); margin:0 2px; }
+.ag-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; }
+@media (max-width:980px){ .ag-layout { grid-template-columns:minmax(0,1fr); } }
+.ag-cal-card { padding:0; overflow:hidden; }
+.ag-cal-card #calendarContainer { padding:16px; }
+/* Grade mensal: células altas, número à direita, fim de semana suave, hoje em destaque. */
+#calendarContainer .fc .fc-daygrid-day { min-height:112px; cursor:pointer; }
+#calendarContainer .fc .fc-daygrid-day-number { font-size:13px; font-weight:600; color:var(--text-muted); padding:6px 8px 2px; }
+#calendarContainer .fc .fc-daygrid-day.fc-day-weekend { background:rgba(148,163,184,0.08); }
+#calendarContainer .fc .fc-day-today { background:rgba(26,86,219,0.08); }
+#calendarContainer .fc .fc-day-today .fc-daygrid-day-number { color:var(--accent); font-weight:800; }
+#calendarContainer .fc .fc-daygrid-day-frame { gap:5px; }
+/* Chips de evento (mock): fundo sutil, borda esquerda na cor, selo "atrasado". */
+#calendarContainer .fc .ag-chip {
+  display:flex; align-items:center; gap:6px;
+  padding:3px 7px 3px 6px; margin:0 2px;
+  background:var(--bg-hover); border:1px solid var(--border); border-left:3px solid var(--dot,#666);
+  border-radius:5px; font-size:11.5px; line-height:1.3; color:var(--text-primary);
+  overflow:hidden; cursor:pointer;
+}
+#calendarContainer .fc .ag-chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#calendarContainer .fc .ag-chip.overdue { background:rgba(220,38,38,0.14); border-left-color:#b3122a; }
+#calendarContainer .fc .ag-chip.overdue::after {
+  content:'atrasado'; margin-left:auto; padding-left:6px; flex:none;
+  font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#e5484d;
+}
+#calendarContainer .fc .fc-daygrid-more-link { font-size:11px; color:var(--text-muted); padding-left:6px; }
+#calendarContainer .fc .fc-daygrid-more-link:hover { color:var(--accent); }
+/* Sidebar da Agenda: Vencidas / Próximos 7 dias / Recorrentes. */
+.ag-side { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.ag-card h2 { font-size:14px; font-weight:700; color:var(--text-primary); }
+.ag-card h2 .count { color:var(--text-muted); font-weight:500; font-size:12.5px; }
+.ag-card h2.ag-card-danger { color:#e5484d; }
+.ag-card .plist { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.ag-card .plist li { display:flex; align-items:flex-start; gap:10px; cursor:pointer; border-radius:6px; }
+.ag-card .plist li:hover .ttitle { color:var(--accent); }
+.ag-card .pbar { width:3px; align-self:stretch; border-radius:2px; flex:none; }
+.ag-card .ptext { min-width:0; }
+.ag-card .ptext .ttitle { font-weight:600; font-size:13px; color:var(--text-primary); }
+.ag-card .ptext .tmeta { font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+.ag-card .badge { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:1px 6px; border-radius:99px; margin-left:6px; vertical-align:1px; }
+.ag-card .badge.vencida { background:rgba(179,18,42,.22); color:#ff8b98; }
+.ag-card .badge.critica { background:rgba(229,72,77,.18); color:#ff9498; }
+.ag-card .badge.alta { background:rgba(255,122,77,.18); color:#ffab84; }
+.ag-card .badge.media { background:rgba(224,165,44,.18); color:#e0a52c; }
+.ag-card .badge.baixa { background:rgba(63,191,127,.18); color:#3fbf7f; }
+@media (max-width:768px){
+  .ag-head { margin:12px 0; gap:12px; }
+  .ag-title { font-size:20px; }
+  .ag-nav { flex-wrap:wrap; gap:8px; }
+  .ag-nav button { min-height:40px; padding:8px 12px; }
+  .ag-nav-sep { display:none; }
+  .ag-cal-card #calendarContainer { padding:8px; }
+  #calendarContainer .fc .fc-daygrid-day { min-height:64px; }
+  #calendarContainer .fc .ag-chip { font-size:10.5px; }
+}
+
 /* ── CALENDAR (FullCalendar) ── */
 #calendarContainer {
   min-height: 500px;

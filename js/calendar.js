@@ -32,12 +32,119 @@ const VISIT_COLORS = {
   cancelada:    { bg: '#94a3b8', border: '#64748b' },
 };
 
-// Título curto: o topbar mobile trunca títulos longos ("Calendário...").
-function calendarPageTitle() { return 'Calendário'; }
+// ── Agenda: cor do ponto por tipo/prioridade (mesma legenda da grade) ────────
+function agDotFor(kind, priority) {
+  if (kind === 'visit') return '#0ea5e9';
+  return (PRIORITY_COLORS[priority] || PRIORITY_COLORS.media).bg;
+}
+// Escape local da Agenda (usa o global quando existe).
+function _agEsc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s);
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+// Chip de evento da grade (mock Agenda): ponto + título; vencida ganha selo.
+function agChipHtml(kind, title, dot, overdue) {
+  return '<div class="ag-chip' + (overdue ? ' overdue' : '') + '" style="--dot:' + dot + '"><span>' + _agEsc(title) + '</span></div>';
+}
 
-// View inicial: grade mensal no desktop, lista no celular (células de ~40px
-// cortam os títulos; a lista mostra tudo sem truncar).
-function calInitialViewForWidth(w) { return (w || 0) <= 768 ? 'listMonth' : 'dayGridMonth'; }
+// ── Agenda: view-models puros da sidebar (testáveis, sem DOM/storage) ───────
+var _AG_MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function _agParseDay(dateStr) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ''));
+  if (!m) return null;
+  return { y: +m[1], m: +m[2], d: +m[3] };
+}
+function agDayMonth(dateStr) {
+  var p = _agParseDay(dateStr);
+  if (!p) return '—';
+  return p.d + ' ' + (_AG_MONTHS_SHORT[p.m - 1] || '');
+}
+function _agDiffDays(aStr, bStr) {
+  var a = _agParseDay(aStr), b = _agParseDay(bStr);
+  if (!a || !b) return null;
+  var ms = Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d);
+  return Math.round(ms / 86400000);
+}
+// Pendências vencidas (abertas, deadline < hoje), mais antigas primeiro.
+function agOverdueItems(pens, todayStr) {
+  return (pens || [])
+    .filter(function (p) { return p && p.deadline && String(p.deadline) < String(todayStr); })
+    .sort(function (a, b) { return String(a.deadline).localeCompare(String(b.deadline)); })
+    .map(function (p) {
+      return { id: p.id, title: p.title || p.assunto || p.descricao || 'Sem título', date: p.deadline, meta: 'Venceu em ' + agDayMonth(p.deadline), dot: agDotFor('pendencia', p.priority), priority: p.priority || 'media', kind: 'pendencia' };
+    });
+}
+// Itens dos próximos 7 dias (pendências por deadline + visitas por data).
+function agNext7Items(pens, visits, todayStr) {
+  var out = [];
+  (pens || []).forEach(function (p) {
+    if (!p || !p.deadline) return;
+    var diff = _agDiffDays(todayStr, String(p.deadline).slice(0, 10));
+    if (diff == null || diff < 0 || diff > 7) return;
+    out.push({ id: p.id, title: p.title || p.assunto || p.descricao || 'Sem título', date: String(p.deadline).slice(0, 10), diff: diff, dot: agDotFor('pendencia', p.priority), priority: p.priority || 'media', kind: 'pendencia', meta: agDayMonth(p.deadline) + (diff === 0 ? ' · hoje' : '') });
+  });
+  (visits || []).forEach(function (v) {
+    if (!v || !v.date) return;
+    var diff = _agDiffDays(todayStr, String(v.date).slice(0, 10));
+    if (diff == null || diff < 0 || diff > 7) return;
+    out.push({ id: v.id, title: 'Visita — ' + (v.clientName || '—'), date: String(v.date).slice(0, 10), diff: diff, dot: agDotFor('visit'), priority: '', kind: 'visit', meta: agDayMonth(v.date) + (diff === 0 ? ' · hoje' : '') });
+  });
+  out.sort(function (a, b) { return a.diff - b.diff || String(a.title).localeCompare(String(b.title)); });
+  return out;
+}
+// Visitas recorrentes agrupadas por cliente: frequência + ocorrências no mês.
+function agRecurringGroups(visits, monthKey) {
+  var groups = {};
+  (visits || []).forEach(function (v) {
+    if (!v || !v.recurrence) return;
+    var key = v.clientId || v.clientName || '?';
+    if (!groups[key]) groups[key] = { clientId: v.clientId, clientName: v.clientName || '—', recurrence: v.recurrence, count: 0, visitId: v.id };
+    if (monthKey && String(v.date || '').slice(0, 7) === monthKey) groups[key].count++;
+    groups[key].visitId = v.id;
+  });
+  var labels = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal' };
+  return Object.values(groups).sort(function (a, b) { return String(a.clientName).localeCompare(String(b.clientName)); }).map(function (g) {
+    return { clientId: g.clientId, clientName: g.clientName, visitId: g.visitId, meta: (labels[g.recurrence] || 'Recorrente') + ' · ' + g.count + ' no mês' };
+  });
+}
+
+// Título da página (topbar + cabeçalho interno).
+function calendarPageTitle() { return 'Agenda'; }
+
+// Views lógicas da Agenda: month | week | list. O switcher próprio chama
+// agSetView; o FullCalendar é só o motor (sem toolbar nativa).
+let _agView = null;
+function agIsMobileWidth() {
+  try { return (typeof window !== 'undefined' ? window.innerWidth : 1024) <= 768; }
+  catch (_) { return false; }
+}
+function agDefaultView() { return agIsMobileWidth() ? 'list' : 'month'; }
+function agFcView(logical) {
+  if (logical === 'week') return 'timeGridWeek';
+  if (logical === 'list') return agIsMobileWidth() ? 'listMonth' : 'listWeek';
+  return 'dayGridMonth';
+}
+function agSetView(v) {
+  if (['month', 'week', 'list'].indexOf(v) === -1) return;
+  _agView = v;
+  try { if (_fcInstance) _fcInstance.changeView(agFcView(v)); } catch (_) {}
+  _paintAgNav();
+  renderAgendaSide();
+}
+function agNav(dir) {
+  try { if (_fcInstance) _fcInstance[dir === 'prev' ? 'prev' : 'next'](); } catch (_) {}
+}
+function agToday() {
+  try { if (_fcInstance) _fcInstance.today(); } catch (_) {}
+}
+function _paintAgNav() {
+  try {
+    var cur = _agView || agDefaultView();
+    document.querySelectorAll('.ag-nav [data-view]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-view') === cur);
+    });
+  } catch (_) {}
+}
 
 // Baixa o FullCalendar com timeout: sem isso, uma CDN lenta/travada no 1º
 // acesso deixava a grade vazia para sempre (promise pendente, sem erro).
@@ -116,17 +223,36 @@ function renderCalendar() {
         iCal
       </button>
     </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <div class="cal-legend" id="calLegend" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);font-size:11px;align-items:center;background:var(--bg-secondary)">
-        <span style="font-weight:700;color:var(--text-secondary)">Legenda:</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#0ea5e9;display:inline-block"></span> Visita</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#991b1b;display:inline-block"></span> Crítica</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block"></span> Alta</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;display:inline-block"></span> Média</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#16a34a;display:inline-block"></span> Baixa</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block;border:2px solid #991b1b"></span> Vencida</span>
+    <div class="ag-head">
+      <div>
+        <h1 class="ag-title">Agenda</h1>
+        <div class="ag-sub">Visitas, prazos e pendências administrativas</div>
       </div>
-      <div id="calendarContainer" style="padding:16px"></div>
+      <div class="nav ag-nav">
+        <button class="ghost" onclick="agNav('prev')" aria-label="Período anterior">‹</button>
+        <button onclick="agToday()">Hoje</button>
+        <button class="ghost" onclick="agNav('next')" aria-label="Próximo período">›</button>
+        <span class="ag-nav-sep"></span>
+        <button data-view="month" onclick="agSetView('month')">Mês</button>
+        <button data-view="week" onclick="agSetView('week')">Semana</button>
+        <button data-view="list" onclick="agSetView('list')">Lista</button>
+      </div>
+    </div>
+    <div class="legend ag-legend" id="calLegend">
+      <div class="legend-item"><span class="swatch" style="background:#0ea5e9"></span>Visita</div>
+      <div class="legend-div"></div>
+      <div class="legend-item"><span class="swatch" style="background:#991b1b"></span>Crítica</div>
+      <div class="legend-item"><span class="swatch" style="background:#dc2626"></span>Alta</div>
+      <div class="legend-item"><span class="swatch" style="background:#d97706"></span>Média</div>
+      <div class="legend-item"><span class="swatch" style="background:#16a34a"></span>Baixa</div>
+      <div class="legend-div"></div>
+      <div class="legend-item"><span class="swatch" style="background:#b3122a"></span>Vencida</div>
+    </div>
+    <div class="ag-layout">
+      <div class="card ag-cal-card">
+        <div id="calendarContainer"></div>
+      </div>
+      <div class="side ag-side" id="agendaSide"></div>
     </div>
   `;
 
@@ -252,30 +378,8 @@ function mapVisitsToEvents(visits) {
   });
 }
 
-// ── Heatmap: conta deadlines por dia ────────────────────────────────────────
-function getDeadlineHeatMap() {
-  const map = {};
-  try {
-    const pens = getFilteredCalendarPendencias();
-    pens.forEach(p => {
-      const d = p.deadline;
-      if (!d) return;
-      map[d] = (map[d] || 0) + 1;
-    });
-  } catch(_) {}
-  return map;
-}
-function getHeatLevel(count) {
-  if (!count) return 0;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  if (count >= 3) return 3;
-  return 0;
-}
-
 // ── Bottom-sheet do dia ─────────────────────────────────────────────────────
 function openCalendarDaySheet(dateStr) {
-  const heatMap = getDeadlineHeatMap();
   const type = document.getElementById('calType')?.value || 'all';
   const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
   const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
@@ -337,68 +441,25 @@ async function initFullCalendar() {
   }
 
   const events = getCalendarEvents();
-  const heatMap = getDeadlineHeatMap();
 
   const isDark = document.body.classList.contains('dark-theme');
-  const isMobile = window.innerWidth <= 768;
 
   if (_fcInstance) {
     _fcInstance.destroy();
     _fcInstance = null;
   }
+  if (!_agView) _agView = agDefaultView();
 
-  // Injeta CSS dedicado do calendário (heatmap, fim de semana, hoje, altura adaptativa)
-  let calStyle = document.getElementById('calCustomStyle');
-  if (!calStyle) {
-    calStyle = document.createElement('style');
-    calStyle.id = 'calCustomStyle';
-    document.head.appendChild(calStyle);
-  }
-  calStyle.textContent = `
-    .fc .fc-daygrid-day.fc-day-weekend { background: rgba(148,163,184,0.10) !important; }
-    .fc .fc-col-header-cell.fc-day-sat, .fc .fc-col-header-cell.fc-day-sun { background: rgba(148,163,184,0.18) !important; color:#475569 !important; }
-    .dark-theme .fc .fc-col-header-cell.fc-day-sat, .dark-theme .fc .fc-col-header-cell.fc-day-sun { color: var(--text-secondary) !important; }
-    .dark-theme .fc .fc-daygrid-day.fc-day-weekend { background: rgba(71,85,105,0.18) !important; }
-    .fc .fc-day-today { background: rgba(26,86,219,0.10) !important; border: 2px solid #1a56db !important; }
-    .fc .fc-day-today .fc-daygrid-day-number { background:#1a56db;color:#fff;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-weight:800; }
-    .fc .fc-button.fc-today-button { background:#1a56db !important;border-color:#1a56db !important;color:#fff !important;font-weight:700 !important;box-shadow:0 2px 8px rgba(26,86,219,0.35) !important; }
-    .fc .fc-button.fc-today-button:hover { background:#1444b8 !important; }
-    .fc-day-heat-1 { background: rgba(220,38,38,0.06) !important; }
-    .fc-day-heat-2 { background: rgba(220,38,38,0.12) !important; }
-    .fc-day-heat-3 { background: rgba(220,38,38,0.20) !important; }
-    .fc-daygrid-day.fc-day-no-events { min-height: 60px !important; }
-    .fc-daygrid-day.fc-day-no-events .fc-daygrid-day-frame { min-height: 60px !important; }
-    .fc-daygrid-day { cursor: pointer; }
-    @media (max-width:768px){
-      .fc .fc-daygrid-event { padding:1px 2px !important; }
-      .fc-event-compact .fc-event-title { display:none !important; }
-      .fc-event-compact .fc-event-badge { width:8px;height:8px;border-radius:50%;display:inline-block !important; }
-    }
-  `;
+  // Estilo da Agenda vive em css/styles.css (seção AGENDA); sem <style> injetado.
 
   _fcInstance = new FullCalendar.Calendar(container, {
     locale: 'pt-br',
-    initialView: calInitialViewForWidth(window.innerWidth),
-    headerToolbar: isMobile ? {
-      left: 'prev,next',
-      center: 'title',
-      right: 'today',
-    } : {
-      left: 'prev,next today',
-      center: 'title',
-      right: 'dayGridMonth,timeGridWeek,listWeek',
-    },
-    buttonText: {
-      today: 'Hoje',
-      month: 'Mês',
-      week: 'Semana',
-      list: 'Lista',
-      prev: '‹',
-      next: '›',
-    },
+    initialView: agFcView(_agView),
+    // Navegação própria no cabeçalho da Agenda (agNav/agToday/agSetView).
+    headerToolbar: false,
     events: events,
     eventDisplay: 'block',
-    dayMaxEvents: isMobile ? 3 : 4,
+    dayMaxEvents: 3,
     moreLinkContent: function(args){ return '+' + args.num + ' mais'; },
     nowIndicator: true,
     height: 'auto',
@@ -406,24 +467,12 @@ async function initFullCalendar() {
     showNonCurrentDates: true,
     eventContent: function(arg) {
       const props = arg.event.extendedProps;
-      // Mobile compacto (só na grade mensal): se coluna muito estreita,
-      // mostra só badge. Na lista (listMonth) mantém o título completo.
-      try {
-        const dayCell = arg.el.closest('.fc-daygrid-day');
-        const colWidth = dayCell?.offsetWidth || 0;
-        const isCompact = !!dayCell && (isMobile || colWidth < 90);
-        if (isCompact && props.kind === 'pendencia') {
-          // Mesma regra central (penEventColors), lida das props calculadas no mapa.
-          const fill = props.evFill || (PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media).bg;
-          const border = props.evBorder || (props.isOverdue ? '#991b1b' : fill);
-          return { html: '<span class="fc-event-badge" style="width:8px;height:8px;border-radius:50%;background:' + fill + ';border:2px solid ' + border + ';display:inline-block"></span>' };
-        }
-      } catch(_){}
-      if (props.kind !== 'visit') return true;
-      const client = typeof getClientById === 'function' ? getClientById(props.clientId) : null;
-      const avatar = client ? (typeof clientAvatar === 'function' ? clientAvatar(client, 20) : props.clientName) : props.clientName;
-      const name = props.clientName || '—';
-      return { html: '<div class="fc-visit-content"><span class="fc-visit-icon">🚗</span>' + avatar + '<span class="fc-visit-name">' + name + '</span></div>' };
+      if (props.kind === 'visit') {
+        return { html: agChipHtml('visit', props.clientName || 'Visita', agDotFor('visit'), false) };
+      }
+      // Mesma regra central (penEventColors), lida das props calculadas no mapa.
+      const fill = props.evFill || (PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media).bg;
+      return { html: agChipHtml('pendencia', arg.event.title, fill, !!props.isOverdue) };
     },
     eventClick: function(info) {
       info.jsEvent.preventDefault();
@@ -444,24 +493,12 @@ async function initFullCalendar() {
       return 'none';
     },
     dayCellDidMount: function(info){
-      const dateStr = info.date.toISOString().slice(0,10);
       const d = info.date;
-      // Fim de semana
+      // Fim de semana com fundo suave (visual da Agenda)
       const day = d.getDay();
       if (day === 0 || day === 6) {
         info.el.classList.add('fc-day-weekend');
       }
-      // Heatmap
-      const cnt = heatMap[dateStr] || 0;
-      const lvl = getHeatLevel(cnt);
-      if (lvl) info.el.classList.add('fc-day-heat-' + lvl);
-      if (lvl) info.el.title = cnt + ' pendência(s) com vencimento neste dia';
-      // Altura adaptativa: marca dias sem evento
-      const hasEvents = events.some(ev => {
-        const evDate = (ev.start || '').toString().slice(0,10);
-        return evDate === dateStr;
-      });
-      if (!hasEvents) info.el.classList.add('fc-day-no-events');
     },
     eventDidMount: function(info) {
       const props = info.event.extendedProps;
@@ -480,20 +517,71 @@ async function initFullCalendar() {
     },
     viewDidMount: function() {
       applyCalendarDarkMode(isDark);
-      // Reaplica altura adaptativa após view montar
-      setTimeout(()=> {
-        document.querySelectorAll('.fc-daygrid-day').forEach(el=>{
-          const dateStr = el.getAttribute('data-date');
-          if (!dateStr) return;
-          const has = events.some(ev => (ev.start||'').toString().slice(0,10)===dateStr);
-          if (!has) el.classList.add('fc-day-no-events');
-        });
-      }, 30);
+    },
+    datesSet: function() {
+      renderAgendaSide();
     },
   });
 
   _fcInstance.render();
   applyCalendarDarkMode(isDark);
+  _paintAgNav();
+  renderAgendaSide();
+}
+
+function _agMonthKey(d) {
+  try {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  } catch (_) { return ''; }
+}
+function _agPriBadge(priority) {
+  var label = (typeof PRIORITY_MAP !== 'undefined' && PRIORITY_MAP[priority]) ? PRIORITY_MAP[priority].label : (priority || '');
+  if (!label) return '';
+  return '<span class="badge ' + String(priority || '') + '">' + ((typeof escapeHtml === 'function') ? escapeHtml(label.toLowerCase()) : label) + '</span>';
+}
+// Sidebar da Agenda: Vencidas + Próximos 7 dias + Visitas recorrentes.
+function renderAgendaSide() {
+  var box = document.getElementById('agendaSide');
+  if (!box) return;
+  var esc = _agEsc;
+  var todayStr = (typeof localDateISO === 'function') ? localDateISO() : new Date().toISOString().slice(0, 10);
+  var pens = [], visits = [];
+  try { pens = getFilteredCalendarPendencias(); } catch (_) { pens = []; }
+  try { visits = getFilteredCalendarVisits(); } catch (_) { visits = []; }
+  var monthKey = todayStr.slice(0, 7);
+  try { if (_fcInstance && typeof _fcInstance.getDate === 'function') monthKey = _agMonthKey(_fcInstance.getDate()); } catch (_) {}
+  var isClosed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed : function () { return false; };
+  var openPens = pens.filter(function (p) { return !isClosed(p.status); });
+
+  var html = '';
+  var overdue = agOverdueItems(openPens, todayStr).slice(0, 5);
+  if (overdue.length) {
+    html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
+      overdue.map(function (o) {
+        return '<li onclick="openPendenciaDetail(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
+          '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
+      }).join('') + '</ul></div>';
+  }
+  var next7 = agNext7Items(openPens, visits, todayStr).slice(0, 6);
+  html += '<div class="card ag-card"><h2>Próximos 7 dias <span class="count">' + next7.length + (next7.length === 1 ? ' item' : ' itens') + '</span></h2>' +
+    (next7.length
+      ? '<ul class="plist">' + next7.map(function (o) {
+        var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaDetail';
+        var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
+        return '<li onclick="' + fn + '(\'' + esc(o.id) + '\')"><div class="pbar" style="background:' + o.dot + '"></div>' +
+          '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
+      }).join('') + '</ul>'
+      : '<div class="empty-state" style="padding:12px 4px 4px"><p>Nada nos próximos 7 dias 🎉</p></div>') +
+    '</div>';
+  var rec = agRecurringGroups(visits, monthKey);
+  if (rec.length) {
+    html += '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
+      rec.map(function (g) {
+        return '<li onclick="openVisitDetail(\'' + esc(g.visitId) + '\')"><div class="pbar" style="background:#0ea5e9"></div>' +
+          '<div class="ptext"><div class="ttitle">' + esc(g.clientName) + '</div><div class="tmeta">' + esc(g.meta) + '</div></div></li>';
+      }).join('') + '</ul></div>';
+  }
+  box.innerHTML = html;
 }
 
 function getCalendarEvents() {
@@ -517,24 +605,9 @@ function refreshCalendar() {
   const priority    = document.getElementById('calPriority')?.value || '';
   saveFilterState('calendar', {type, client, responsible, status, priority});
   const events = getCalendarEvents();
-  const heatMap = getDeadlineHeatMap();
   _fcInstance.removeAllEvents();
   _fcInstance.addEventSource(events);
-  // Reaplica heatmap e altura adaptativa
-  setTimeout(()=>{
-    document.querySelectorAll('.fc-daygrid-day').forEach(el=>{
-      const dateStr = el.getAttribute('data-date');
-      if (!dateStr) return;
-      el.classList.remove('fc-day-heat-1','fc-day-heat-2','fc-day-heat-3','fc-day-no-events');
-      const day = new Date(dateStr+'T12:00:00').getDay();
-      if (day===0||day===6) el.classList.add('fc-day-weekend');
-      const cnt = heatMap[dateStr]||0;
-      const lvl = getHeatLevel(cnt);
-      if (lvl) el.classList.add('fc-day-heat-'+lvl);
-      const has = events.some(ev => (ev.start||'').toString().slice(0,10)===dateStr);
-      if (!has) el.classList.add('fc-day-no-events');
-    });
-  }, 30);
+  renderAgendaSide();
 }
 
 function applyCalendarDarkMode(isDark) {
