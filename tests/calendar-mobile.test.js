@@ -124,6 +124,11 @@ describe('contrato mobile no CSS', () => {
     expect(mobile).toMatch(/\.cal-new-btns\s*\{[^}]*grid-template-columns:\s*1fr 1fr/);
   });
 
+  it('título do mês centralizado e com inicial maiúscula', () => {
+    expect(mobile).toMatch(/\.fc-header-toolbar \.fc-toolbar-chunk:nth-child\(2\)\s*\{[^}]*text-align:\s*center/);
+    expect(mobile).toMatch(/\.fc-toolbar-title::first-letter\s*\{\s*text-transform:\s*uppercase/);
+  });
+
   it('desktop: wrappers transparentes, toggle oculto', () => {
     expect(norm).toMatch(/\.cal-filters,\s*\.cal-new-btns\s*\{\s*display:\s*contents/);
     expect(norm).toMatch(/\.cal-filters-toggle\s*\{\s*display:\s*none/);

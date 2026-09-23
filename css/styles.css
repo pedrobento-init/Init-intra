@@ -2212,6 +2212,17 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     max-width: 100%;
     order: -1;
   }
+  /* Título do mês centralizado + inicial maiúscula no mobile
+     ("setembro de 2026" → "Setembro de 2026").
+     (FC6 usa .fc-header-toolbar; o seletor .fc-toolbar acima é inócuo.) */
+  #calendarContainer .fc .fc-header-toolbar .fc-toolbar-chunk:nth-child(2) {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+  }
+  #calendarContainer .fc .fc-toolbar-title::first-letter {
+    text-transform: uppercase;
+  }
   #calendarContainer .fc .fc-button {
     font-size: 11px !important;
   }
