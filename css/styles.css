@@ -1811,6 +1811,14 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
     justify-content: flex-start;
     padding: 10px 16px;
   }
+  /* Drawer mobile: links alinhados à esquerda (o modo só-ícones do
+     tablet ≤1024px centraliza via justify-content:center; aqui os
+     rótulos voltam a aparecer e o alinhamento volta ao padrão). */
+  .sidebar .sidebar-nav a {
+    justify-content: flex-start;
+    text-align: left;
+    padding: 10px 16px;
+  }
 
   /* ── Main Content ── */
   .main-content {

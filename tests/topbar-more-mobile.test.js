@@ -160,6 +160,10 @@ describe('contrato mobile no CSS e no HTML', () => {
     expect(mobile).toMatch(/\.hamburger-btn\s*\{[^}]*width:\s*40px[^}]*height:\s*40px/);
   });
 
+  it('drawer mobile: links da sidebar alinhados à esquerda', () => {
+    expect(mobile).toMatch(/\.sidebar \.sidebar-nav a\s*\{[^}]*justify-content:\s*flex-start/);
+  });
+
   it('HTML tem o menu suspenso com os 4 itens', () => {
     for (const id of ['topbarMoreBtn', 'topbarMoreMenu', 'topbarMoreAction', 'refreshBtn']) {
       expect(html).toContain(`id="${id}"`);
