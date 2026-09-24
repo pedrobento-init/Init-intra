@@ -243,6 +243,10 @@ function renderEquipamentos() {
           <input type="checkbox" id="equipOnlyOS" onchange="saveEquipFilters();renderEquipView();_equipUpdateMoreFiltersBadge()" /> Somente com OS
         </label>
       </div>
+      <button class="btn btn-secondary" onclick="exportEquipamentosPlanilha()" title="Exportar planilha de acerto (OS, cliente, serviço, valor)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Planilha
+      </button>
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Filtrar por status">
@@ -748,6 +752,100 @@ function deleteEquipFlow(id) {
   }
 }
 
+// ── Planilha de acerto (layout "OS | Cliente | Serviço | Saída | Valor | Devolvido | Obs") ──
+// Colunas espelham a planilha de acerto usada no dia a dia:
+// - OS: texto digitado; sem texto, cai para o número da pendência vinculada.
+// - Serviço: nome (+ nº de série).
+// - Saída/Devolvido: controle manual na planilha (sem campo no sistema).
+// - Total a Acertar: soma dos valores dos NÃO baixados (igual ao card de ativos).
+function equipOSExportLabel(e) {
+  const typed = (e && e.osVinculada) ? String(e.osVinculada).trim() : '';
+  if (typed) return typed;
+  const penId = getEquipPendenciaId(e);
+  if (penId) {
+    try {
+      if (typeof getPendenciaById === 'function' && typeof penDisplayNumber === 'function') {
+        const p = getPendenciaById(penId);
+        if (p) return penDisplayNumber(p);
+      }
+    } catch (_) {}
+    return penId;
+  }
+  return '';
+}
+
+function equipServicoExportLabel(e) {
+  const nome = (e && e.nome) ? String(e.nome).trim() : '—';
+  const serie = (e && e.numeroSerie) ? String(e.numeroSerie).trim() : '';
+  return serie ? `${nome} (${serie})` : nome;
+}
+
+// Pura e testável: monta cabeçalho + linhas + total (valores numéricos;
+// cada escritor — xlsx ou CSV — formata à sua maneira).
+function buildEquipAcertoSheet(list) {
+  const header = ['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações'];
+  const arr = list || [];
+  const rows = arr.map(e => ([
+    equipOSExportLabel(e),
+    (e && e.clientName) || '—',
+    equipServicoExportLabel(e),
+    '',
+    Number((e && e.valor) === '' || (e && e.valor) == null ? 0 : e.valor) || 0,
+    '☐',
+    (e && e.observacoes) || '',
+  ]));
+  let total = 0;
+  for (const e of arr) {
+    if (normEquipStatus(e && e.status) === 'baixado') continue;
+    const n = Number((e && e.valor) === '' || (e && e.valor) == null ? 0 : e.valor);
+    if (!isNaN(n)) total += n;
+  }
+  rows.push(['', '', '', 'Total a Acertar:', total, '', '']);
+  return { header, rows, total };
+}
+
+function exportEquipamentosPlanilha() {
+  try {
+    if (typeof canExport === 'function' && !canExport()) {
+      if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+      return;
+    }
+  } catch (_) {}
+  const list = (_filteredEquips && _filteredEquips.length) ? _filteredEquips : getFilteredEquipamentos();
+  if (!list.length) {
+    if (typeof showToast === 'function') showToast('Nada para exportar com os filtros atuais.', 'warning');
+    return;
+  }
+  const sheet = buildEquipAcertoSheet(list);
+  const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  // .xlsx real quando o SheetJS (CDN) está carregado; senão CSV (offline).
+  try {
+    if (typeof XLSX !== 'undefined' && XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
+      const ws = XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]);
+      ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
+      XLSX.writeFile(wb, `equipamentos_acerto_${stamp}.xlsx`);
+      if (typeof showToast === 'function') showToast('Planilha exportada com sucesso!', 'success');
+      return;
+    }
+  } catch (_) { /* cai para o CSV abaixo */ }
+  const fmtNum = n => (n == null || isNaN(Number(n))) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
+  const cell = v => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+  const lines = [
+    sheet.header.join(';'),
+    ...sheet.rows.map(r => [cell(r[0]), cell(r[1]), cell(r[2]), cell(r[3]), fmtNum(r[4]), cell(r[5]), cell(r[6])].join(';')),
+  ];
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `equipamentos_acerto_${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  if (typeof showToast === 'function') showToast('Planilha (CSV) exportada com sucesso!', 'success');
+}
+
 function exportEquipamentosCSV() {
   try {
     if (typeof canExport === 'function' && !canExport()) {
@@ -779,5 +877,6 @@ if (typeof module !== 'undefined' && module.exports) {
     EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS,
     normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS,
     formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine,
+    equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet,
   };
 }

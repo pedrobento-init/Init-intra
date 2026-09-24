@@ -26,7 +26,7 @@ function mkEl(id) {
 function loadEquip(sandbox) {
   vm.runInContext(fs.readFileSync('js/equipamentos.js', 'utf8'), sandbox, { filename: 'equipamentos.js' });
   vm.runInContext(
-    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell };',
+    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell, equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet };',
     sandbox
   );
   return sandbox.__t;
@@ -167,6 +167,45 @@ describe('equipamentos: filtros', () => {
     expect(plain).not.toContain('os-link');
     // Legado: id de pendência em osVinculada ainda resolve o vínculo.
     expect(T.getEquipPendenciaId({ osVinculada: 'PEN-1' })).toBe('PEN-1');
+  });
+});
+
+describe('equipamentos: planilha de acerto', () => {
+  it('monta cabeçalho e linhas no layout da planilha', () => {
+    const sb = baseSandbox({
+      getPendenciaById: (id) => (id === 'PEN-1' ? { id: 'PEN-1' } : null),
+      penDisplayNumber: () => '#010',
+    });
+    const T = loadEquip(sb);
+    const sheet = T.buildEquipAcertoSheet(FAKE);
+    expect(sheet.header).toEqual(['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações']);
+    // 4 equipamentos + linha de total
+    expect(sheet.rows).toHaveLength(5);
+    expect(sheet.rows[0].slice(0, 3)).toEqual(['010', 'MAM', 'Notebook Dell Latitude 5420 (DL5420-0091)']);
+    expect(sheet.rows[0][4]).toBe(4200);
+    expect(sheet.rows[0][5]).toBe('☐');
+    // OS digitada sem vínculo sai como texto puro
+    expect(sheet.rows[1][0]).toBe('006');
+    // Total exclui baixados (igual ao card de ativos)
+    expect(sheet.rows[4]).toEqual(['', '', '', 'Total a Acertar:', 4200 + 3150 + 3600, '', '']);
+    expect(sheet.total).toBe(4200 + 3150 + 3600);
+  });
+
+  it('usa o número da pendência quando não há OS digitada', () => {
+    const sb = baseSandbox({
+      getPendenciaById: (id) => (id === 'PEN-9' ? { id: 'PEN-9' } : null),
+      penDisplayNumber: () => '#009',
+    });
+    const T = loadEquip(sb);
+    expect(T.equipOSExportLabel({ osVinculada: '', pendenciaId: 'PEN-9' })).toBe('#009');
+    expect(T.equipOSExportLabel({ osVinculada: null, pendenciaId: null })).toBe('');
+    expect(T.equipServicoExportLabel({ nome: 'Mouse', numeroSerie: '' })).toBe('Mouse');
+  });
+
+  it('expõe o botão Planilha na barra de filtros', () => {
+    const src = fs.readFileSync('js/equipamentos.js', 'utf8');
+    expect(src).toContain('exportEquipamentosPlanilha');
+    expect(src).toContain('Planilha');
   });
 });
 
