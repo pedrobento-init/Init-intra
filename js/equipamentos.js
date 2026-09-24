@@ -780,9 +780,15 @@ function equipServicoExportLabel(e) {
   return serie ? `${nome} (${serie})` : nome;
 }
 
-// Pura e testável: monta cabeçalho + linhas + total (valores numéricos;
-// cada escritor — xlsx ou CSV — formata à sua maneira).
-function buildEquipAcertoSheet(list) {
+// Pura e testável: monta título + cabeçalho + linhas + total (valores
+// numéricos; cada escritor — xlsx ou CSV — formata à sua maneira).
+function buildEquipAcertoSheet(list, dateLabel) {
+  const stamp = dateLabel || (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  let titleDate = stamp;
+  try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(stamp) && typeof formatDate === 'function') titleDate = formatDate(stamp);
+  } catch (_) {}
+  const title = `Equipamentos — Acerto (${titleDate})`;
   const header = ['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações'];
   const arr = list || [];
   const rows = arr.map(e => ([
@@ -801,7 +807,71 @@ function buildEquipAcertoSheet(list) {
     if (!isNaN(n)) total += n;
   }
   rows.push(['', '', '', 'Total a Acertar:', total, '', '']);
-  return { header, rows, total };
+  return { title, header, rows, total };
+}
+
+// ── Design da planilha (puro: só manipula o objeto ws, sem depender do XLSX) ──
+const ACERTO_NCOLS = 7;
+function _acertoAddr(r, c) {
+  let s = '';
+  let n = c;
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return s + (r + 1);
+}
+function _acertoCell(ws, r, c) {
+  const a = _acertoAddr(r, c);
+  if (!ws[a]) ws[a] = { t: 's', v: '' };
+  if (!ws[a].s) ws[a].s = {};
+  return ws[a];
+}
+function _acertoBorder(color) {
+  const b = { style: 'thin', color: { rgb: color } };
+  return { top: b, bottom: b, left: b, right: b };
+}
+// meta: { dataCount } (nº de linhas de dados, sem o total).
+// Layout: linha 1 título mesclado, linha 2 cabeçalho, dados, linha de total.
+function applyAcertoDesign(ws, meta) {
+  const n = Math.max(0, (meta && meta.dataCount) || 0);
+  const TITLE = 0, HEADER = 1, FIRST = 2, LAST = FIRST + n - 1, TOTAL = FIRST + n;
+  const GRID = 'D9D9D9';
+
+  ws['!merges'] = [{ s: { r: TITLE, c: 0 }, e: { r: TITLE, c: ACERTO_NCOLS - 1 } }];
+  ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }];
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 20 }];
+  ws['!autofilter'] = { ref: `A${HEADER + 1}:G${LAST + 1}` };
+  try { ws['!views'] = [{ state: 'frozen', ySplit: HEADER + 1 }]; } catch (_) {}
+
+  // Título
+  const t = _acertoCell(ws, TITLE, 0);
+  t.s.font = { name: 'Calibri', sz: 14, bold: true, color: { rgb: 'FFFFFF' } };
+  t.s.fill = { patternType: 'solid', fgColor: { rgb: '1F4E79' } };
+  t.s.alignment = { horizontal: 'center', vertical: 'center' };
+
+  // Cabeçalho
+  for (let c = 0; c < ACERTO_NCOLS; c++) {
+    const cell = _acertoCell(ws, HEADER, c);
+    cell.s.font = { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } };
+    cell.s.fill = { patternType: 'solid', fgColor: { rgb: '2E75B6' } };
+    cell.s.alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+    cell.s.border = _acertoBorder('1F4E79');
+  }
+
+  // Dados (zebrado) + total em destaque
+  for (let r = FIRST; r <= TOTAL; r++) {
+    const isTotal = r === TOTAL;
+    for (let c = 0; c < ACERTO_NCOLS; c++) {
+      const cell = _acertoCell(ws, r, c);
+      cell.s.font = { name: 'Calibri', sz: 11, bold: isTotal, color: { rgb: isTotal ? '1F4E79' : '262626' } };
+      cell.s.fill = { patternType: 'solid', fgColor: { rgb: isTotal ? 'FFF2CC' : ((r - FIRST) % 2 ? 'F2F2F2' : 'FFFFFF') } };
+      cell.s.border = _acertoBorder(GRID);
+      cell.s.alignment = { vertical: 'center' };
+      if (c === 4) cell.s.alignment.horizontal = 'right';
+      else if (c === 0 || c === 3 || c === 5) cell.s.alignment.horizontal = 'center';
+      if (c === 2 || c === 6) cell.s.alignment.wrapText = true;
+      if (c === 4 && typeof cell.v === 'number') { cell.t = 'n'; cell.z = '"R$" #,##0.00'; }
+    }
+  }
+  return ws;
 }
 
 function exportEquipamentosPlanilha() {
@@ -821,11 +891,11 @@ function exportEquipamentosPlanilha() {
   // .xlsx real quando o SheetJS (CDN) está carregado; senão CSV (offline).
   try {
     if (typeof XLSX !== 'undefined' && XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
-      const ws = XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]);
-      ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }];
+      const ws = XLSX.utils.aoa_to_sheet([[sheet.title], sheet.header, ...sheet.rows]);
+      applyAcertoDesign(ws, { dataCount: sheet.rows.length - 1 });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
-      XLSX.writeFile(wb, `equipamentos_acerto_${stamp}.xlsx`);
+      XLSX.writeFile(wb, `equipamentos_acerto_${stamp}.xlsx`, { cellStyles: true });
       if (typeof showToast === 'function') showToast('Planilha exportada com sucesso!', 'success');
       return;
     }
@@ -833,6 +903,7 @@ function exportEquipamentosPlanilha() {
   const fmtNum = n => (n == null || isNaN(Number(n))) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
   const cell = v => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
   const lines = [
+    cell(sheet.title),
     sheet.header.join(';'),
     ...sheet.rows.map(r => [cell(r[0]), cell(r[1]), cell(r[2]), cell(r[3]), fmtNum(r[4]), cell(r[5]), cell(r[6])].join(';')),
   ];
@@ -877,6 +948,6 @@ if (typeof module !== 'undefined' && module.exports) {
     EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS,
     normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS,
     formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine,
-    equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet,
+    equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet, applyAcertoDesign,
   };
 }

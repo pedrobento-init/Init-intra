@@ -26,7 +26,7 @@ function mkEl(id) {
 function loadEquip(sandbox) {
   vm.runInContext(fs.readFileSync('js/equipamentos.js', 'utf8'), sandbox, { filename: 'equipamentos.js' });
   vm.runInContext(
-    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell, equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet };',
+    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell, equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet, applyAcertoDesign };',
     sandbox
   );
   return sandbox.__t;
@@ -178,6 +178,7 @@ describe('equipamentos: planilha de acerto', () => {
     });
     const T = loadEquip(sb);
     const sheet = T.buildEquipAcertoSheet(FAKE);
+    expect(sheet.title).toContain('Acerto');
     expect(sheet.header).toEqual(['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações']);
     // 4 equipamentos + linha de total
     expect(sheet.rows).toHaveLength(5);
@@ -206,6 +207,38 @@ describe('equipamentos: planilha de acerto', () => {
     const src = fs.readFileSync('js/equipamentos.js', 'utf8');
     expect(src).toContain('exportEquipamentosPlanilha');
     expect(src).toContain('Planilha');
+  });
+
+  it('aplica design: título mesclado, cabeçalho, zebra, moeda e total', () => {
+    const T = loadEquip(baseSandbox());
+    const ws = {
+      A1: { t: 's', v: 'Titulo' },
+      A2: { t: 's', v: 'Ordem de Serviço' },
+      A3: { t: 's', v: '010' },
+      E3: { t: 'n', v: 4200 },
+      A4: { t: 's', v: '006' },
+      E5: { t: 'n', v: 7355 },
+    };
+    T.applyAcertoDesign(ws, { dataCount: 2 });
+    // Título mesclado A1:G1 com fundo escuro
+    expect(ws['!merges']).toEqual([{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }]);
+    expect(ws.A1.s.fill.fgColor.rgb).toBe('1F4E79');
+    expect(ws.A1.s.font.bold).toBe(true);
+    // Cabeçalho azul com texto branco
+    expect(ws.A2.s.fill.fgColor.rgb).toBe('2E75B6');
+    expect(ws.A2.s.font.color.rgb).toBe('FFFFFF');
+    // Autofilter cobre o cabeçalho + dados (A2:G4)
+    expect(ws['!autofilter']).toEqual({ ref: 'A2:G4' });
+    // Zebrado alterna as linhas de dados
+    expect(ws.A3.s.fill.fgColor.rgb).not.toBe(ws.A4.s.fill.fgColor.rgb);
+    // Valor com formato moeda
+    expect(ws.E3.z).toContain('R$');
+    // Total em destaque (linha 5): negrito + fundo
+    expect(ws.A5.s.font.bold).toBe(true);
+    expect(ws.A5.s.fill.fgColor.rgb).toBe('FFF2CC');
+    expect(ws.E5.z).toContain('R$');
+    // Larguras de coluna
+    expect(ws['!cols']).toHaveLength(7);
   });
 });
 
