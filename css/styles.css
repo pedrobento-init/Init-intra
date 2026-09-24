@@ -566,8 +566,9 @@ body.dark-theme .template-suggestion {
   cursor: pointer;
   transition: border-color var(--transition), box-shadow var(--transition), transform 0.2s ease-out;
   box-shadow: var(--shadow-sm);
-  will-change: transform;
-  transform: translateY(0);
+  /* Sem will-change/translateY base: promoviam todo card a camada da GPU e
+     o texto rasterizava borrado (pior com escala do Windows em 125%/150%).
+     O lift de hover continua via :hover abaixo. */
 }
 .kanban-card:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-3px); }
 .kanban-card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); line-height: 1.35; }
