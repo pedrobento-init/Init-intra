@@ -941,9 +941,9 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Alt + 1..8 -> Navegar entre abas
+  // Alt + 1..9 -> Navegar entre abas
   if (e.altKey && !e.ctrlKey && !e.metaKey) {
-    var tabMap = { '1':'dashboard','2':'pendencias','3':'calendario','4':'clientes','5':'templates','6':'operadores','7':'visitas','8':'historico' };
+    var tabMap = { '1':'dashboard','2':'pendencias','3':'calendario','4':'clientes','5':'templates','6':'operadores','7':'visitas','8':'equipamentos','9':'historico' };
     var page = tabMap[e.key];
     if (page === 'historico' && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) return;
     if (page && typeof navigateTo === 'function') { e.preventDefault(); navigateTo(page); }
@@ -957,6 +957,7 @@ document.addEventListener('keydown', e => {
     else if (page === 'pendencias' && typeof openPendenciaForm === 'function') openPendenciaForm();
     else if (page === 'calendario' && typeof openPendenciaForm === 'function') openPendenciaForm();
     else if (page === 'operadores' && typeof openOperadorForm === 'function') openOperadorForm();
+    else if (page === 'equipamentos' && typeof openEquipForm === 'function') openEquipForm();
     else if (typeof openPendenciaForm === 'function') openPendenciaForm();
   }
 });

@@ -284,6 +284,7 @@ function exportData() {
     visits:     getVisits(),
     tickets:    getTickets(),
     reunioes:   getReunioes(),
+    equipamentos: (typeof getEquipamentos === 'function' ? getEquipamentos() : []),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -337,6 +338,7 @@ async function _runImportBackup(data) {
       if (data.visits)     dbSet('intra_visits',     data.visits);
       if (data.tickets)    dbSet('intra_tickets',    data.tickets);
       if (data.reunioes)   dbSet('intra_reunioes',   data.reunioes);
+      if (data.equipamentos) dbSet('intra_equipamentos', data.equipamentos);
     } finally {
       if (typeof window !== 'undefined') window._suppressPendingSync = false;
     }
@@ -455,6 +457,17 @@ async function _pushImportToSupabase(data) {
     })));
   } catch (e) { errors.push('reunioes: ' + e.message); }
 
+  try {
+    await chunk('equipamentos', (data.equipamentos || []).map(e => ({
+      id: e.id, nome: e.nome || '', numero_serie: e.numeroSerie || '', tipo: e.tipo || 'outro',
+      client_id: e.clientId || null, client_name: e.clientName || 'Estoque Initnet',
+      os_vinculada: e.osVinculada || null, status: e.status || 'estoque',
+      valor: (e.valor === '' || e.valor == null) ? null : Number(e.valor) || 0,
+      data_aquisicao: e.dataAquisicao || null, observacoes: e.observacoes || '',
+      team: e.team || 'init', created_at: e.createdAt || now, updated_at: e.updatedAt || now
+    })));
+  } catch (e) { errors.push('equipamentos: ' + e.message); }
+
   return errors;
 }
 
@@ -504,6 +517,7 @@ function navigateTo(page) {
   else if (page === 'reuniao')     renderReuniao();
   else if (page === 'operadores')  renderOperadores();
   else if (page === 'relatorios')  { if(typeof renderRelatorios==='function') renderRelatorios(); else document.getElementById('contentArea').innerHTML='<p>Relatórios em carregamento...</p>'; }
+  else if (page === 'equipamentos') renderEquipamentos();
   else if (page === 'mapeamento-milvus') renderMapeamentoMilvus();
   else if (page === 'historico')   renderLogs();
 
@@ -1274,6 +1288,17 @@ function updateBadges() {
   var vbadge = document.getElementById('badge-visitas');
   if (vbadge) { vbadge.textContent = upcoming; vbadge.classList.toggle('hidden', upcoming === 0); }
 
+  try {
+    var equips = (typeof getMyEquipamentos === 'function') ? getMyEquipamentos()
+      : (typeof getEquipamentos === 'function' ? getEquipamentos() : []);
+    if (isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam && typeof getEquipamentosByTeam === 'function') {
+      equips = getEquipamentosByTeam(_selectedTeam);
+    }
+    var inMaint = equips.filter(function(eq) { return eq && eq.status === 'em_manutencao'; }).length;
+    var ebadge = document.getElementById('badge-equipamentos');
+    if (ebadge) { ebadge.textContent = inMaint; ebadge.classList.toggle('hidden', inMaint === 0); }
+  } catch (_) {}
+
   // badge-chamados removido (módulo descontinuado na interface)
 }
 
@@ -1354,7 +1379,7 @@ function _startApp() {
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
   // Números amigáveis antes da primeira pintura (local, sem rede): evita
   // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
   try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}

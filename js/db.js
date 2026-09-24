@@ -35,6 +35,10 @@ idb.version(6).stores({
   client_milvus_tickets: 'id, client_id, codigo'
 });
 
+idb.version(7).stores({
+  equipamentos: 'id, clientId, status, tipo'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -44,6 +48,7 @@ const _dbCache = {
   operators: [],
   visits: [],
   reunioes: [],
+  equipamentos: [],
   client_devices: [],
   client_milvus_tickets: [],
   keyvalue: {},
@@ -134,6 +139,8 @@ async function initIndexedDB() {
     _dbCache.operators = await idb.operators.toArray();
     _dbCache.visits = await idb.visits.toArray();
     _dbCache.reunioes = await idb.reunioes.toArray();
+    try { _dbCache.equipamentos = await idb.equipamentos.toArray(); }
+    catch (_) { _dbCache.equipamentos = []; }
     try { _dbCache.client_devices = await idb.client_devices.toArray(); }
     catch (_) { _dbCache.client_devices = []; }
     try { _dbCache.client_milvus_tickets = await idb.client_milvus_tickets.toArray(); }

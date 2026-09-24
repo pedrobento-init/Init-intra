@@ -125,6 +125,8 @@ function _renderSearchResults(query) {
                   : (typeof getClients === 'function')     ? getClients()   : [];
   const pendencias = (typeof getMyPendencias === 'function') ? getMyPendencias()
                    : (typeof getPendencias === 'function')   ? getPendencias() : [];
+  const equipamentos = (typeof getMyEquipamentos === 'function') ? getMyEquipamentos()
+                   : (typeof getEquipamentos === 'function')     ? getEquipamentos() : [];
 
   const clienteFilter = filters.cliente || filters.clientes || filters.client || null;
   const statusFilter = filters.status || null;
@@ -155,9 +157,25 @@ function _renderSearchResults(query) {
     return inAssunto || inDescricao || inClient || inResp || inNotes;
   }).slice(0, 5);
 
+  const matchEquips = equipamentos.filter(eq => {
+    if (!q) return false;
+    if (statusFilter) {
+      const meta = (typeof getEquipStatusMeta === 'function') ? getEquipStatusMeta(eq.status).label : eq.status;
+      if (String(eq.status || '').toLowerCase() !== String(statusFilter).toLowerCase()
+        && String(meta || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
+    }
+    if (clienteFilter && !(eq.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
+    if (!q) return true;
+    return (eq.nome || '').toLowerCase().includes(q) ||
+           (eq.numeroSerie || '').toLowerCase().includes(q) ||
+           (eq.clientName || '').toLowerCase().includes(q) ||
+           (eq.tipo || '').toLowerCase().includes(q);
+  }).slice(0, 5);
+
   _searchResults = [
     ...matchClients.map(c => ({ type: 'client', data: c })),
-    ...matchPens.map(p => ({ type: 'pendencia', data: p }))
+    ...matchPens.map(p => ({ type: 'pendencia', data: p })),
+    ...matchEquips.map(eq => ({ type: 'equipamento', data: eq }))
   ];
 
   if (_searchResults.length === 0) {
@@ -200,6 +218,7 @@ function _renderSearchResults(query) {
   }
 
   const clientOffset = matchClients.length;
+  const penOffset = clientOffset + matchPens.length;
   if (matchPens.length) {
     html += `<div class="search-group-label">Pendências</div>`;
     html += matchPens.map((p, i) => {
@@ -228,6 +247,24 @@ function _renderSearchResults(query) {
     }).join('');
   }
 
+  if (matchEquips.length) {
+    html += `<div class="search-group-label">Equipamentos</div>`;
+    html += matchEquips.map((eq, i) => {
+      const idx = penOffset + i;
+      return `
+      <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
+        <div class="search-result-icon" style="background:#f5f3ff">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div style="min-width:0;flex:1">
+          <div class="search-result-title">${escapeHtml(eq.nome || '—')}</div>
+          <div class="search-result-sub">${escapeHtml(eq.clientName || '—')} · ${escapeHtml(eq.numeroSerie || eq.tipo || '—')}</div>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    }).join('');
+  }
+
   container.innerHTML = html;
 }
 
@@ -246,6 +283,9 @@ function selectSearchResult(idx) {
     case 'pendencia':
       navigateTo('pendencias');
       _openSearchDetailWhenReady('pendencia', result.data.id);
+      break;
+    case 'equipamento':
+      navigateTo('equipamentos');
       break;
   }
 }

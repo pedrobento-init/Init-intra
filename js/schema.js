@@ -202,6 +202,27 @@ const ENTITIES = [
     }
   },
   {
+    table: 'equipamentos',
+    dbKey: 'intra_equipamentos',
+    label: 'Equipamentos',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true,
+    fields: {
+      id: 'id', nome: 'nome', numero_serie: 'numeroSerie', tipo: 'tipo',
+      client_id: 'clientId', client_name: 'clientName', os_vinculada: 'osVinculada',
+      status: 'status', valor: 'valor', data_aquisicao: 'dataAquisicao',
+      observacoes: 'observacoes', team: 'team',
+      created_at: 'createdAt', updated_at: 'updatedAt'
+    },
+    onChange: () => {
+      const h = window.location.hash.replace('#', '') || '';
+      if (h === 'equipamentos' && document.getElementById('equipViewArea') && typeof renderEquipView === 'function') renderEquipView(false);
+      if (typeof updateBadges === 'function') updateBadges();
+    }
+  },
+  {
     table: 'procedure_templates',
     dbKey: 'intra_procedure_templates',
     label: 'Modelos',

@@ -9,6 +9,7 @@ const DB = {
   TICKETS: 'intra_tickets',
   VISITS: 'intra_visits',
   REUNIOES: 'intra_reunioes',
+  EQUIPAMENTOS: 'intra_equipamentos',
   USER: 'intra_user',
   COUNTER: 'intra_counter',
   SESSION: 'intra_session',
@@ -292,7 +293,7 @@ async function _migratePoiesisTeamsLocal(){
       if (typeof localStorage !== 'undefined' && localStorage.getItem(_POIESIS_MIG_FLAG) === '1') return;
     } catch (_) {}
     if(typeof getCacheStore!=='function' || typeof setCacheStore!=='function') return;
-    var tables=['clients','pendencias','operators','visits','reunioes','tickets','client_devices','client_milvus_tickets'];
+    var tables=['clients','pendencias','operators','visits','reunioes','equipamentos','tickets','client_devices','client_milvus_tickets'];
     var anyChanged=false;
     for(var ti=0; ti<tables.length; ti++){
       var t=tables[ti];
@@ -399,7 +400,8 @@ const KEY_TO_TABLE = {
   [DB.OPERATORS]: 'operators',
   [DB.TICKETS]: 'tickets',
   [DB.VISITS]: 'visits',
-  [DB.REUNIOES]: 'reunioes'
+  [DB.REUNIOES]: 'reunioes',
+  [DB.EQUIPAMENTOS]: 'equipamentos'
 };
 
 const KV_TO_V2TABLE = {
@@ -457,7 +459,7 @@ function dbSet(key, value) {
     }
     try{
       if(!_isPendingSuppressed() && typeof window!=='undefined' && typeof window.emitDataChanged==='function'){
-        var _map={}; _map[DB.CLIENTS]='clientes'; _map[DB.PENDENCIAS]='pendencias'; _map[DB.OPERATORS]='operadores'; _map[DB.VISITS]='visitas'; _map[DB.REUNIOES]='reunioes'; _map[DB.PROCEDURES]='procedimentos'; _map[DB.PROCEDURE_TEMPLATES]='templates';
+        var _map={}; _map[DB.CLIENTS]='clientes'; _map[DB.PENDENCIAS]='pendencias'; _map[DB.OPERATORS]='operadores'; _map[DB.VISITS]='visitas'; _map[DB.REUNIOES]='reunioes'; _map[DB.EQUIPAMENTOS]='equipamentos'; _map[DB.PROCEDURES]='procedimentos'; _map[DB.PROCEDURE_TEMPLATES]='templates';
         var _ent=_map[key];
         if(_ent) window.emitDataChanged(_ent, {key:key, via:'dbSet'});
       }
@@ -2248,6 +2250,94 @@ function deleteReuniao(id) {
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir reunião:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  }
+}
+
+// ── EQUIPAMENTOS ──
+function getEquipamentos() { return dbGet(DB.EQUIPAMENTOS); }
+function getEquipamentosByTeam(team) {
+  const all = getEquipamentos();
+  if (!team) return all;
+  return all.filter(e => (e.team || 'init') === team);
+}
+function getMyEquipamentos() { return filterByTeam(getEquipamentos()); }
+function getEquipamentoById(id) { return getEquipamentos().find(e => e.id === id) || null; }
+function getEquipamentosByClient(clientId) {
+  return getEquipamentos().filter(e => e.clientId === clientId)
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' }));
+}
+function saveEquipamento(data) {
+  const list = getEquipamentos();
+  const isEdit = !!data.id;
+  const now = new Date().toISOString();
+  if (!data.team && data.clientId && data.clientId !== '__estoque__') {
+    const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
+    if (client) data.team = client.team || 'init';
+  }
+  if (!data.team) data.team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init';
+  // Estoque Initnet é valor interno: sem vínculo de cliente.
+  if (data.clientId === '__estoque__' || data.clientId === 'estoque-initnet') {
+    data.clientId = null;
+    data.clientName = 'Estoque Initnet';
+  }
+  if (!data.clientName && data.clientId) {
+    const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
+    if (client) data.clientName = client.name;
+  }
+  if (isEdit) {
+    const i = list.findIndex(e => e.id === data.id);
+    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    else list.push({ ...data, createdAt: data.createdAt || now, updatedAt: now });
+  } else {
+    data.id = nextId('EQP');
+    data.createdAt = now;
+    data.updatedAt = now;
+    list.push(data);
+  }
+  dbSet(DB.EQUIPAMENTOS, list);
+  if (typeof addLog === 'function') addLog(isEdit ? 'Editou' : 'Criou', 'Equipamento', data.id, data.nome || '');
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
+    try {
+      supabaseClient.from('equipamentos').upsert({
+        id: data.id,
+        nome: data.nome || '',
+        numero_serie: data.numeroSerie || '',
+        tipo: data.tipo || 'outro',
+        client_id: data.clientId || null,
+        client_name: data.clientName || 'Estoque Initnet',
+        os_vinculada: data.osVinculada || null,
+        status: data.status || 'estoque',
+        valor: (data.valor === '' || data.valor == null) ? null : Number(data.valor) || 0,
+        data_aquisicao: data.dataAquisicao || null,
+        observacoes: data.observacoes || '',
+        team: data.team || 'init',
+        created_at: data.createdAt || now,
+        updated_at: now
+      }).then(res => { if (res.error) { console.warn('⚠️ Supabase equipamento:', res.error.message); markSyncPushFailed(); } })
+        .catch(() => markSyncPushFailed());
+    } catch (_) { /* tabela pode não existir ainda — sync genérico cobre quando existir */ }
+  }
+
+  return data;
+}
+function deleteEquipamento(id) {
+  if (typeof canDelete === 'function' && !canDelete()) {
+    if (typeof showToast === 'function') showToast('Permissão negada para excluir equipamentos.', 'error');
+    return false;
+  }
+  const eq = getEquipamentoById(id);
+  const desc = eq ? (eq.nome || 'Desconhecido') : 'Desconhecido';
+  dbSet(DB.EQUIPAMENTOS, getEquipamentos().filter(e => e.id !== id));
+  _addTombstone(DB.EQUIPAMENTOS, id);
+  if (typeof addLog === 'function') addLog('Excluiu', 'Equipamento', id, desc);
+
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
+    try {
+      supabaseClient.from('equipamentos').delete().eq('id', id)
+        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir equipamento:', res.error.message); markSyncPushFailed(); } })
+        .catch(() => markSyncPushFailed());
+    } catch (_) {}
   }
 }
 
