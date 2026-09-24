@@ -169,6 +169,7 @@ function _renderSearchResults(query) {
     return (eq.nome || '').toLowerCase().includes(q) ||
            (eq.numeroSerie || '').toLowerCase().includes(q) ||
            (eq.clientName || '').toLowerCase().includes(q) ||
+           (eq.osVinculada || '').toLowerCase().includes(q) ||
            (eq.tipo || '').toLowerCase().includes(q);
   }).slice(0, 5);
 

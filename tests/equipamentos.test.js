@@ -26,7 +26,7 @@ function mkEl(id) {
 function loadEquip(sandbox) {
   vm.runInContext(fs.readFileSync('js/equipamentos.js', 'utf8'), sandbox, { filename: 'equipamentos.js' });
   vm.runInContext(
-    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, getEquipStatusMeta, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag };',
+    'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell };',
     sandbox
   );
   return sandbox.__t;
@@ -63,20 +63,29 @@ function baseSandbox(extra) {
 }
 
 const FAKE = [
-  { id: 'EQP-1', nome: 'Notebook Dell Latitude 5420', numeroSerie: 'DL5420-0091', tipo: 'notebook', clientId: 'c1', clientName: 'MAM', osVinculada: 'PEN-1', status: 'em_uso', valor: 4200, dataAquisicao: '2026-01-10', updatedAt: '2026-09-27T00:00:00.000Z' },
-  { id: 'EQP-2', nome: 'Roteador Ubiquiti UDM Pro', numeroSerie: 'UDM-3391', tipo: 'roteador', clientId: 'c2', clientName: 'Lira', osVinculada: 'PEN-2', status: 'em_manutencao', valor: 3150, dataAquisicao: '2026-02-01', updatedAt: '2026-09-07T00:00:00.000Z' },
-  { id: 'EQP-3', nome: 'Notebook Lenovo T14', numeroSerie: 'TP-T14-0532', tipo: 'notebook', clientId: null, clientName: 'Estoque Initnet', osVinculada: null, status: 'estoque', valor: 3600, dataAquisicao: '2026-03-01', updatedAt: '2026-09-10T00:00:00.000Z' },
-  { id: 'EQP-4', nome: 'Switch TP-Link 24p', numeroSerie: 'TPL-SW24-08', tipo: 'switch', clientId: 'c3', clientName: 'Podval', osVinculada: null, status: 'baixado', valor: 480, dataAquisicao: '2025-05-01', updatedAt: '2026-08-02T00:00:00.000Z' },
+  { id: 'EQP-1', nome: 'Notebook Dell Latitude 5420', numeroSerie: 'DL5420-0091', tipo: 'notebook', clientId: 'c1', clientName: 'MAM', osVinculada: '010', pendenciaId: 'PEN-1', status: 'entregue', valor: 4200, dataAquisicao: '2026-01-10', updatedAt: '2026-09-27T00:00:00.000Z' },
+  { id: 'EQP-2', nome: 'Roteador Ubiquiti UDM Pro', numeroSerie: 'UDM-3391', tipo: 'roteador', clientId: 'c2', clientName: 'Lira', osVinculada: '006', pendenciaId: null, status: 'em_manutencao', valor: 3150, dataAquisicao: '2026-02-01', updatedAt: '2026-09-07T00:00:00.000Z' },
+  { id: 'EQP-3', nome: 'Notebook Lenovo T14', numeroSerie: 'TP-T14-0532', tipo: 'notebook', clientId: null, clientName: 'Estoque Initnet', osVinculada: null, pendenciaId: null, status: 'estoque', valor: 3600, dataAquisicao: '2026-03-01', updatedAt: '2026-09-10T00:00:00.000Z' },
+  { id: 'EQP-4', nome: 'Switch TP-Link 24p', numeroSerie: 'TPL-SW24-08', tipo: 'switch', clientId: 'c3', clientName: 'Podval', osVinculada: null, pendenciaId: null, status: 'baixado', valor: 480, dataAquisicao: '2025-05-01', updatedAt: '2026-08-02T00:00:00.000Z' },
 ];
 
 describe('equipamentos: status/valor/stats', () => {
   it('mapeia os 4 status com a paleta do sistema', () => {
     const T = loadEquip(baseSandbox());
-    expect(T.getEquipStatusMeta('em_uso')).toMatchObject({ label: 'Em uso', cls: 'tag-green' });
+    expect(T.getEquipStatusMeta('entregue')).toMatchObject({ label: 'Entregue', cls: 'tag-green' });
     expect(T.getEquipStatusMeta('em_manutencao')).toMatchObject({ cls: 'tag-yellow' });
     expect(T.getEquipStatusMeta('estoque')).toMatchObject({ cls: 'tag-blue' });
     expect(T.getEquipStatusMeta('baixado')).toMatchObject({ cls: 'tag-red' });
     expect(T.getEquipStatusMeta('x')).toMatchObject({ cls: 'tag-gray' });
+  });
+
+  it('mantém alias legado em_uso → entregue', () => {
+    const T = loadEquip(baseSandbox());
+    expect(T.normEquipStatus('em_uso')).toBe('entregue');
+    expect(T.getEquipStatusMeta('em_uso')).toMatchObject({ label: 'Entregue', cls: 'tag-green' });
+    const s = T.calcEquipStats([{ status: 'em_uso', valor: 10 }]);
+    expect(s.byStatus.entregue).toBe(1);
+    expect(T.filterEquipamentos([{ status: 'em_uso' }], { status: 'entregue' })).toHaveLength(1);
   });
 
   it('formata valor em BRL e trata vazio', () => {
@@ -90,7 +99,7 @@ describe('equipamentos: status/valor/stats', () => {
     const T = loadEquip(baseSandbox());
     const s = T.calcEquipStats(FAKE);
     expect(s.total).toBe(4);
-    expect(s.byStatus).toMatchObject({ em_uso: 1, em_manutencao: 1, estoque: 1, baixado: 1 });
+    expect(s.byStatus).toMatchObject({ entregue: 1, em_manutencao: 1, estoque: 1, baixado: 1 });
     expect(s.totalValor).toBe(4200 + 3150 + 3600);
   });
 
@@ -99,14 +108,14 @@ describe('equipamentos: status/valor/stats', () => {
     const s = T.calcEquipStats(FAKE);
     const line = T.equipSummaryLine(s);
     expect(line).toContain('4 equipamentos');
-    expect(line).toContain('1</b> em uso');
+    expect(line).toContain('1</b> entregues');
   });
 });
 
 describe('equipamentos: filtros', () => {
   it('filtra por aba de status', () => {
     const T = loadEquip(baseSandbox());
-    expect(T.filterEquipamentos(FAKE, { status: 'em_uso' }).map(e => e.id)).toEqual(['EQP-1']);
+    expect(T.filterEquipamentos(FAKE, { status: 'entregue' }).map(e => e.id)).toEqual(['EQP-1']);
     expect(T.filterEquipamentos(FAKE, { status: '' })).toHaveLength(4);
   });
 
@@ -114,7 +123,8 @@ describe('equipamentos: filtros', () => {
     const T = loadEquip(baseSandbox());
     expect(T.filterEquipamentos(FAKE, { search: 'dell latitude' })).toHaveLength(1);
     expect(T.filterEquipamentos(FAKE, { search: 'udm-3391' })).toHaveLength(1);
-    expect(T.filterEquipamentos(FAKE, { search: 'pen-2' })).toHaveLength(1);
+    expect(T.filterEquipamentos(FAKE, { search: '010' })).toContainEqual(expect.objectContaining({ id: 'EQP-1' }));
+    expect(T.filterEquipamentos(FAKE, { search: 'pen-1' })).toContainEqual(expect.objectContaining({ id: 'EQP-1' }));
     expect(T.filterEquipamentos(FAKE, { search: 'podval' })).toHaveLength(1);
   });
 
@@ -137,6 +147,27 @@ describe('equipamentos: filtros', () => {
     expect(html).toContain('tag-yellow');
     expect(html).toContain('Em manutenção');
   });
+
+  it('separa OS digitada do vínculo com pendência', () => {
+    const sb = baseSandbox({
+      getPendenciaById: (id) => (id === 'PEN-1' ? { id: 'PEN-1' } : null),
+      penDisplayNumber: () => '#010',
+    });
+    const T = loadEquip(sb);
+    // Com vínculo: texto da OS vira link para a pendência.
+    expect(T.getEquipPendenciaId(FAKE[0])).toBe('PEN-1');
+    expect(T.hasEquipOS(FAKE[0])).toBe(true);
+    expect(T.hasEquipOS(FAKE[2])).toBe(false);
+    const linked = T.equipOSCell(FAKE[0]);
+    expect(linked).toContain('os-link');
+    expect(linked).toContain('010');
+    // Só texto, sem vínculo: sem link.
+    const plain = T.equipOSCell(FAKE[1]);
+    expect(plain).toContain('006');
+    expect(plain).not.toContain('os-link');
+    // Legado: id de pendência em osVinculada ainda resolve o vínculo.
+    expect(T.getEquipPendenciaId({ osVinculada: 'PEN-1' })).toBe('PEN-1');
+  });
 });
 
 describe('equipamentos: schema/sync', () => {
@@ -155,5 +186,8 @@ describe('equipamentos: schema/sync', () => {
     for (const fn of ['getEquipamentos', 'getMyEquipamentos', 'getEquipamentoById', 'saveEquipamento', 'deleteEquipamento']) {
       expect(stSrc).toContain('function ' + fn);
     }
+    expect(stSrc).toContain('pendencia_id');
+    const schemaSrc = fs.readFileSync('js/schema.js', 'utf8');
+    expect(schemaSrc).toContain('pendencia_id');
   });
 });

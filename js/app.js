@@ -461,7 +461,8 @@ async function _pushImportToSupabase(data) {
     await chunk('equipamentos', (data.equipamentos || []).map(e => ({
       id: e.id, nome: e.nome || '', numero_serie: e.numeroSerie || '', tipo: e.tipo || 'outro',
       client_id: e.clientId || null, client_name: e.clientName || 'Estoque Initnet',
-      os_vinculada: e.osVinculada || null, status: e.status || 'estoque',
+      os_vinculada: e.osVinculada || null, pendencia_id: e.pendenciaId || null,
+      status: (e.status === 'em_uso' ? 'entregue' : (e.status || 'estoque')),
       valor: (e.valor === '' || e.valor == null) ? null : Number(e.valor) || 0,
       data_aquisicao: e.dataAquisicao || null, observacoes: e.observacoes || '',
       team: e.team || 'init', created_at: e.createdAt || now, updated_at: e.updatedAt || now

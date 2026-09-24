@@ -3,11 +3,18 @@
 // UI segue Pendências: search-bar, abas de status, tabela, modal, tags.
 
 const EQUIP_STATUS_MAP = {
-  em_uso:        { label: 'Em uso',        cls: 'tag-green',  dot: '#16a34a' },
+  entregue:      { label: 'Entregue',      cls: 'tag-green',  dot: '#16a34a' },
   em_manutencao: { label: 'Em manutenção', cls: 'tag-yellow', dot: '#d97706' },
   estoque:       { label: 'Estoque',       cls: 'tag-blue',   dot: '#1a56db' },
   baixado:       { label: 'Baixado',       cls: 'tag-red',    dot: '#dc2626' },
 };
+
+// Alias legado: antes o status "entregue" se chamava "em_uso". Registros
+// antigos (locais ou remotos) ainda podem trazer 'em_uso' — normaliza para
+// o valor atual sem perder o registro.
+function normEquipStatus(status) {
+  return status === 'em_uso' ? 'entregue' : (status || '');
+}
 
 const EQUIP_TIPO_OPTIONS = [
   'notebook', 'desktop', 'monitor', 'celular', 'roteador',
@@ -16,7 +23,7 @@ const EQUIP_TIPO_OPTIONS = [
 
 const EQUIP_TABS = [
   { value: '', label: 'Todos' },
-  { value: 'em_uso', label: 'Em uso' },
+  { value: 'entregue', label: 'Entregue' },
   { value: 'em_manutencao', label: 'Em manutenção' },
   { value: 'estoque', label: 'Estoque' },
   { value: 'baixado', label: 'Baixados' },
@@ -31,7 +38,27 @@ let _filteredEquips = [];
 
 // ── Helpers puros (testáveis) ─────────────────────────────────────────────
 function getEquipStatusMeta(status) {
-  return EQUIP_STATUS_MAP[status] || { label: status || '—', cls: 'tag-gray', dot: '#94a3b8' };
+  const s = normEquipStatus(status);
+  return EQUIP_STATUS_MAP[s] || { label: status || '—', cls: 'tag-gray', dot: '#94a3b8' };
+}
+
+// Pendência vinculada ao equipamento (novo campo `pendenciaId` + legado:
+// antes o id da pendência era guardado direto em `osVinculada`).
+function getEquipPendenciaId(e) {
+  if (!e) return null;
+  if (e.pendenciaId) return e.pendenciaId;
+  const os = String(e.osVinculada || '').trim();
+  if (!os) return null;
+  try {
+    if (typeof getPendenciaById === 'function' && getPendenciaById(os)) return os;
+  } catch (_) {}
+  return null;
+}
+
+function hasEquipOS(e) {
+  if (!e) return false;
+  if (e.osVinculada && String(e.osVinculada).trim()) return true;
+  return !!getEquipPendenciaId(e);
 }
 
 function formatEquipValor(v) {
@@ -46,11 +73,12 @@ function formatEquipValor(v) {
 
 function calcEquipStats(list) {
   const arr = list || [];
-  const byStatus = { em_uso: 0, em_manutencao: 0, estoque: 0, baixado: 0 };
+  const byStatus = { entregue: 0, em_manutencao: 0, estoque: 0, baixado: 0 };
   let totalValor = 0;
   for (const e of arr) {
-    if (e && byStatus[e.status] !== undefined) byStatus[e.status]++;
-    if (e && e.status !== 'baixado') {
+    const s = normEquipStatus(e && e.status);
+    if (s && byStatus[s] !== undefined) byStatus[s]++;
+    if (e && s !== 'baixado') {
       const n = Number(e.valor);
       if (!isNaN(n)) totalValor += n;
     }
@@ -63,19 +91,19 @@ function filterEquipamentos(list, f) {
   const q = String(o.search || '').trim().toLowerCase();
   return (list || []).filter(e => {
     if (!e) return false;
-    if (o.status && e.status !== o.status) return false;
+    if (o.status && normEquipStatus(e.status) !== normEquipStatus(o.status)) return false;
     if (o.client) {
       if (o.client === '__estoque__') {
         if (e.clientId) return false;
       } else if (e.clientId !== o.client) return false;
     }
     if (o.tipo && e.tipo !== o.tipo) return false;
-    if (o.onlyWithOS && !e.osVinculada) return false;
+    if (o.onlyWithOS && !hasEquipOS(e)) return false;
     if (o.from && (e.dataAquisicao || '') < o.from) return false;
     if (o.to && (e.dataAquisicao || '') > o.to) return false;
     if (q) {
       const hay = [
-        e.nome, e.numeroSerie, e.clientName, e.osVinculada, e.tipo, e.observacoes,
+        e.nome, e.numeroSerie, e.clientName, e.osVinculada, e.pendenciaId, e.tipo, e.observacoes,
       ].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
@@ -86,7 +114,7 @@ function filterEquipamentos(list, f) {
 function equipSummaryLine(stats) {
   const b = (stats && stats.byStatus) || {};
   return `${stats ? stats.total : 0} equipamentos · ` +
-    `<b>${b.em_uso || 0}</b> em uso · ` +
+    `<b>${b.entregue || b.em_uso || 0}</b> entregues · ` +
     `<b>${b.em_manutencao || 0}</b> em manutenção · ` +
     `<b>${b.estoque || 0}</b> em estoque · ` +
     `<b>${b.baixado || 0}</b> baixados`;
@@ -123,6 +151,39 @@ function _equipClients() {
   return [];
 }
 
+// Migra registros locais legados (idempotente, silenciosa): status
+// 'em_uso' vira 'entregue'; osVinculada que era id de pendência gera o
+// pendenciaId (mantendo o texto original em osVinculada).
+function _migrateEquipLocalAliases() {
+  let list = [];
+  try {
+    list = (typeof getEquipamentos === 'function') ? getEquipamentos() : [];
+  } catch (_) { return; }
+  if (!Array.isArray(list) || !list.length) return;
+  let changed = false;
+  const now = new Date().toISOString();
+  for (const e of list) {
+    if (!e) continue;
+    // updatedAt acompanha a troca: sem o bump o remoto (antigo) venceria o
+    // merge e o status legado voltaria (mesmo padrão da migração de visitas).
+    if (e.status === 'em_uso') { e.status = 'entregue'; e.updatedAt = now; changed = true; }
+    if (!e.pendenciaId && e.osVinculada) {
+      try {
+        if (typeof getPendenciaById === 'function' && getPendenciaById(String(e.osVinculada).trim())) {
+          e.pendenciaId = String(e.osVinculada).trim();
+          e.updatedAt = e.updatedAt || now;
+          changed = true;
+        }
+      } catch (_) {}
+    }
+  }
+  if (changed) {
+    try {
+      if (typeof dbSet !== 'undefined' && typeof DB !== 'undefined') dbSet(DB.EQUIPAMENTOS, list);
+    } catch (_) {}
+  }
+}
+
 // ── Render principal ──────────────────────────────────────────────────────
 function renderEquipamentos() {
   if (typeof document === 'undefined') return;
@@ -134,7 +195,11 @@ function renderEquipamentos() {
 
   let saved = {};
   try { saved = loadFilterState('equipamentos', {}); } catch (_) {}
-  _equipTab = saved.status || '';
+  _equipTab = normEquipStatus(saved.status || '');
+
+  // Migração local one-shot: 'em_uso' → 'entregue' + resgata vínculo legado
+  // (id de pendência guardado em osVinculada) para o campo pendenciaId.
+  try { _migrateEquipLocalAliases(); } catch (_) {}
   _equipFilter = {
     client: saved.client || '',
     tipo: saved.tipo || '',
@@ -326,7 +391,7 @@ function renderEquipStats() {
       <div class="stat-icon" style="background:#ecfdf5">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="16 8 10 16 7 13"/></svg>
       </div>
-      <div><div class="stat-value" style="color:#16a34a">${b.em_uso}</div><div class="stat-label">Em uso</div></div>
+      <div><div class="stat-value" style="color:#16a34a">${b.entregue}</div><div class="stat-label">Entregues</div></div>
     </div>
     <div class="stat-card">
       <div class="stat-icon" style="background:#fff7ed">
@@ -371,15 +436,40 @@ function equipClientCell(e) {
 
 function equipOSCell(e) {
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-  if (!e.osVinculada) return '<span style="color:var(--text-muted)">—</span>';
-  let label = String(e.osVinculada);
+  const osText = e && e.osVinculada ? String(e.osVinculada).trim() : '';
+  const penId = getEquipPendenciaId(e);
+  if (!osText && !penId) return '<span style="color:var(--text-muted)">—</span>';
+  // Com pendência vinculada, o texto da OS vira link para o card.
+  if (penId) {
+    let penLabel = '';
+    try {
+      if (typeof getPendenciaById === 'function') {
+        const p = getPendenciaById(penId);
+        if (p && typeof penDisplayNumber === 'function') penLabel = penDisplayNumber(p);
+      }
+    } catch (_) {}
+    const shown = osText || penLabel || penId;
+    const title = penLabel && osText && penLabel !== osText ? `Pendência ${penLabel}` : 'Abrir pendência vinculada';
+    return `<a href="#" class="os-link" title="${esc(title)}" onclick="event.preventDefault();goToEquipOS('${esc(penId)}')">${esc(shown)} 🔗</a>`;
+  }
+  return esc(osText);
+}
+
+// Rótulo amigável da pendência vinculada (para o form/menu).
+function _equipPenLabel(p) {
+  let num = p.id;
+  try { if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p); } catch (_) {}
+  const title = (p.assunto || p.descricao || '').toString().slice(0, 40);
+  return `${num} · ${p.clientName || ''} · ${title}`;
+}
+
+function _equipActivePens() {
   try {
-    if (typeof getPendenciaById === 'function') {
-      const p = getPendenciaById(e.osVinculada);
-      if (p && typeof penDisplayNumber === 'function') label = penDisplayNumber(p);
-    }
-  } catch (_) {}
-  return `<a href="#" class="os-link" onclick="event.preventDefault();goToEquipOS('${esc(e.osVinculada)}')">${esc(label)}</a>`;
+    const all = (typeof getMyPendencias === 'function' ? getMyPendencias() : (typeof getPendencias === 'function' ? getPendencias() : []));
+    return all
+      .filter(p => { try { return typeof isPendenciaClosed === 'function' ? !isPendenciaClosed(p.status) : true; } catch (_) { return true; } })
+      .slice(0, 200);
+  } catch (_) { return []; }
 }
 
 function renderEquipTable(area) {
@@ -440,10 +530,12 @@ function toggleEquipMenu(e, id) {
   const menu = document.createElement('div');
   menu.id = 'equipRowMenu';
   menu.className = 'equip-row-menu';
+  const q = s => String(s).replace(/'/g, "\\'");
   menu.innerHTML = `
-    <button onclick="closeEquipMenu();openEquipForm('${String(id).replace(/'/g, "\\'")}')">✏️ Editar</button>
-    ${(() => { try { const eq = getEquipamentoById(id); return eq && eq.osVinculada ? `<button onclick="closeEquipMenu();goToEquipOS('${String(eq.osVinculada).replace(/'/g, "\\'")}')">🔗 Ver OS</button>` : ''; } catch (_) { return ''; } })()}
-    <button class="danger" onclick="closeEquipMenu();deleteEquipFlow('${String(id).replace(/'/g, "\\'")}')">🗑️ Excluir</button>`;
+    <button onclick="closeEquipMenu();openEquipForm('${q(id)}')">✏️ Editar</button>
+    <button onclick="closeEquipMenu();openEquipLinkModal('${q(id)}')">🔗 Vincular pendência</button>
+    ${(() => { try { const eq = getEquipamentoById(id); const penId = getEquipPendenciaId(eq); return penId ? `<button onclick="closeEquipMenu();goToEquipOS('${q(penId)}')">↗ Ver pendência</button>` : ''; } catch (_) { return ''; } })()}
+    <button class="danger" onclick="closeEquipMenu();deleteEquipFlow('${q(id)}')">🗑️ Excluir</button>`;
   menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
   menu.style.left = Math.max(8, (rect.right + window.scrollX - 170)) + 'px';
   document.body.appendChild(menu);
@@ -478,23 +570,51 @@ function goToEquipOS(osId) {
   tick();
 }
 
+// ── Menu separado: vincular/desvincular pendência ───────────────────────────
+function openEquipLinkModal(id) {
+  const eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null;
+  if (!eq) return;
+  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const pens = _equipActivePens();
+  const cur = getEquipPendenciaId(eq);
+  openModal('Vincular pendência', `
+    <form onsubmit="submitEquipLink(event,'${esc(eq.id)}')">
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Equipamento: <strong style="color:var(--text-primary)">${esc(eq.nome || '—')}</strong>${eq.osVinculada ? ` · OS <strong style="color:var(--text-primary)">${esc(eq.osVinculada)}</strong>` : ''}</p>
+      <div class="form-group"><label class="form-label" for="eqLinkPen">Pendência</label>
+        <select class="form-select" id="eqLinkPen">
+          <option value="">— Nenhuma (desvincular) —</option>
+          ${pens.map(p => `<option value="${esc(p.id)}" ${cur === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
+        </select></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Vincular</button>
+      </div>
+    </form>`);
+}
+
+function submitEquipLink(e, id) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null;
+  if (!eq) return;
+  const penId = document.getElementById('eqLinkPen')?.value || null;
+  try {
+    if (typeof saveEquipamento === 'function') saveEquipamento({ ...eq, pendenciaId: penId });
+  } catch (err) {
+    if (typeof showToast === 'function') showToast('Erro ao vincular: ' + (err && err.message ? err.message : err), 'error');
+    return;
+  }
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof showToast === 'function') showToast(penId ? 'Pendência vinculada!' : 'Pendência desvinculada.', 'success');
+  renderEquipView(false);
+}
+
 // ── Form (modal) ────────────────────────────────────────────────────────────
 function openEquipForm(id) {
   const eq = id && typeof getEquipamentoById === 'function' ? getEquipamentoById(id) : null;
   const clients = _equipClients();
-  let pens = [];
-  try {
-    pens = (typeof getMyPendencias === 'function' ? getMyPendencias() : (typeof getPendencias === 'function' ? getPendencias() : []))
-      .filter(p => { try { return typeof isPendenciaClosed === 'function' ? !isPendenciaClosed(p.status) : true; } catch (_) { return true; } })
-      .slice(0, 200);
-  } catch (_) { pens = []; }
+  const pens = _equipActivePens();
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-  const penLabel = (p) => {
-    let num = p.id;
-    try { if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p); } catch (_) {}
-    const title = (p.assunto || p.descricao || '').toString().slice(0, 40);
-    return `${num} · ${p.clientName || ''} · ${title}`;
-  };
+  const curPen = getEquipPendenciaId(eq);
   openModal(eq ? 'Editar Equipamento' : 'Novo Equipamento', `
     <form onsubmit="submitEquipForm(event,'${esc(eq?.id || '')}')">
       <div class="form-group"><label class="form-label" for="eqNome">Nome *</label>
@@ -514,11 +634,13 @@ function openEquipForm(id) {
             ${clients.map(c => `<option value="${esc(c.id)}" ${eq?.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label class="form-label" for="eqOS">OS vinculada</label>
-          <select class="form-select" id="eqOS">
-            <option value="">— Nenhuma —</option>
-            ${pens.map(p => `<option value="${esc(p.id)}" ${eq?.osVinculada === p.id ? 'selected' : ''}>${esc(penLabel(p))}</option>`).join('')}
-          </select></div>
+          <input class="form-input" id="eqOS" maxlength="60" placeholder="Ex: 010, OS-123..." value="${esc(eq?.osVinculada || '')}" /></div>
       </div>
+      <div class="form-group"><label class="form-label" for="eqPendencia">Vincular pendência <span style="text-transform:none;letter-spacing:0;font-weight:400">(menu separado — opcional)</span></label>
+        <select class="form-select" id="eqPendencia">
+          <option value="">— Nenhuma —</option>
+          ${pens.map(p => `<option value="${esc(p.id)}" ${curPen === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
+        </select></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="eqStatus">Status *</label>
           <select class="form-select" id="eqStatus" required>
@@ -555,6 +677,7 @@ function submitEquipForm(e, id) {
     } catch (_) {}
   }
   const rawValor = document.getElementById('eqValor')?.value;
+  const rawStatus = normEquipStatus(document.getElementById('eqStatus')?.value || 'estoque') || 'estoque';
   const data = {
     id: id || undefined,
     nome,
@@ -562,8 +685,9 @@ function submitEquipForm(e, id) {
     tipo: document.getElementById('eqTipo')?.value || 'outro',
     clientId: clientSel === '__estoque__' ? null : (clientSel || null),
     clientName,
-    osVinculada: document.getElementById('eqOS')?.value || null,
-    status: document.getElementById('eqStatus')?.value || 'estoque',
+    osVinculada: val('eqOS') || null,
+    pendenciaId: document.getElementById('eqPendencia')?.value || null,
+    status: rawStatus,
     valor: (rawValor === '' || rawValor == null) ? '' : Number(rawValor),
     dataAquisicao: document.getElementById('eqDataAq')?.value || '',
     observacoes: document.getElementById('eqObs')?.value || '',
@@ -632,13 +756,14 @@ function exportEquipamentosCSV() {
     }
   } catch (_) {}
   const list = _filteredEquips && _filteredEquips.length ? _filteredEquips : getFilteredEquipamentos();
-  const headers = ['Nome', 'Nº Série', 'Tipo', 'Cliente', 'OS', 'Status', 'Valor', 'Aquisição', 'Atualizado em'];
+  const headers = ['Nome', 'Nº Série', 'Tipo', 'Cliente', 'OS', 'Pendência vinculada', 'Status', 'Valor', 'Aquisição', 'Atualizado em'];
   const rows = list.map(eq => [
     (eq.nome || '').replace(/;/g, ','),
     (eq.numeroSerie || '').replace(/;/g, ','),
     eq.tipo || '',
     (eq.clientName || '').replace(/;/g, ','),
-    eq.osVinculada || '',
+    (eq.osVinculada || '').replace(/;/g, ','),
+    getEquipPendenciaId(eq) || '',
     (getEquipStatusMeta(eq.status).label || eq.status || ''),
     (eq.valor === '' || eq.valor == null) ? '' : String(eq.valor).replace('.', ','),
     eq.dataAquisicao || '',
@@ -652,6 +777,7 @@ function exportEquipamentosCSV() {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS,
-    getEquipStatusMeta, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine,
+    normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS,
+    formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine,
   };
 }

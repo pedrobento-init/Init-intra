@@ -2270,6 +2270,15 @@ function saveEquipamento(data) {
   const list = getEquipamentos();
   const isEdit = !!data.id;
   const now = new Date().toISOString();
+  // Alias legado: 'em_uso' → 'entregue'.
+  if (data.status === 'em_uso') data.status = 'entregue';
+  // Resgata vínculo legado (id de pendência digitado em osVinculada).
+  if (!data.pendenciaId && data.osVinculada) {
+    try {
+      const maybe = String(data.osVinculada).trim();
+      if (maybe && typeof getPendenciaById === 'function' && getPendenciaById(maybe)) data.pendenciaId = maybe;
+    } catch (_) {}
+  }
   if (!data.team && data.clientId && data.clientId !== '__estoque__') {
     const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
     if (client) data.team = client.team || 'init';
@@ -2307,6 +2316,7 @@ function saveEquipamento(data) {
         client_id: data.clientId || null,
         client_name: data.clientName || 'Estoque Initnet',
         os_vinculada: data.osVinculada || null,
+        pendencia_id: data.pendenciaId || null,
         status: data.status || 'estoque',
         valor: (data.valor === '' || data.valor == null) ? null : Number(data.valor) || 0,
         data_aquisicao: data.dataAquisicao || null,

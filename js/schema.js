@@ -212,6 +212,7 @@ const ENTITIES = [
     fields: {
       id: 'id', nome: 'nome', numero_serie: 'numeroSerie', tipo: 'tipo',
       client_id: 'clientId', client_name: 'clientName', os_vinculada: 'osVinculada',
+      pendencia_id: 'pendenciaId',
       status: 'status', valor: 'valor', data_aquisicao: 'dataAquisicao',
       observacoes: 'observacoes', team: 'team',
       created_at: 'createdAt', updated_at: 'updatedAt'
