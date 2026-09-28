@@ -4102,8 +4102,14 @@ body.dark-theme .pen-chip-counts, body.dark-theme .pen-pager-info { color:#cbd5e
   .pen-prop { grid-template-columns: 108px 1fr; }
   .pen-header-btns { margin-left: 0; }
   .pen-status-select { max-width: 100%; flex: 1; min-width: 140px; }
+  /* iPhone/telas estreitas: o bloco "Trabalhando agora" NÃO cabe lado a lado.
+     O .pen-work-side é flex-shrink:0 + .pen-time nowrap (~180px p/ "Nenhum
+     tempo registrado"), o que espreme o texto em ~100px e quebra
+     "Ninguém · Disponível". O lado desce p/ linha cheia (space-between). */
   .pen-work { flex-wrap: wrap; }
-  .pen-work-side { flex-direction: row; align-items: baseline; gap: 8px; }
+  .pen-work-side { flex-basis: 100%; flex-shrink: 1; min-width: 0; flex-direction: row; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; }
+  .pen-work-side .pen-work-label { flex-shrink: 0; }
+  .pen-time { white-space: normal; }
 }
 
 /* ── MILVUS (Chamados + Inventário — refinamento visual, mesmos tokens) ── */
