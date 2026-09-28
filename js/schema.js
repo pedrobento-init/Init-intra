@@ -72,7 +72,7 @@ const ENTITIES = [
     realtime: true,
     fields: {
       id: 'id', name: 'name', initials: 'initials', color: 'color', role: 'role', phone: 'phone',
-      email: 'email', is_admin: 'isAdmin', active: 'active', team: 'team', auth_user_id: 'auth_user_id',
+      email: 'email', is_admin: 'isAdmin', is_gestao: 'isGestao', active: 'active', team: 'team', auth_user_id: 'auth_user_id',
       on_leave: 'onLeave',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
@@ -98,13 +98,13 @@ const ENTITIES = [
     buildUpsert: o => ({
       id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone,
       email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null,
-      is_admin: o.isAdmin === true, active: o.active !== false, team: o.team || 'init',
+      is_admin: o.isAdmin === true, is_gestao: o.isGestao === true, active: o.active !== false, team: o.team || 'init',
       auth_user_id: o.auth_user_id || null, on_leave: o.onLeave === true,
       created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
     }),
     mapRow: r => ({
       id: r.id, name: r.name, initials: r.initials, color: r.color, role: r.role, phone: r.phone,
-      email: r.email, isAdmin: r.is_admin === true, active: r.active !== false, team: r.team || 'init',
+      email: r.email, isAdmin: r.is_admin === true, isGestao: r.is_gestao === true, active: r.active !== false, team: r.team || 'init',
       auth_user_id: r.auth_user_id, onLeave: r.on_leave === true, createdAt: r.created_at, updatedAt: r.updated_at
     }),
     onChange: () => {

@@ -309,6 +309,7 @@ function getFilteredCalendarPendencias() {
     : (typeof getMyPendencias === 'function' ? getMyPendencias()
       : (typeof getPendencias === 'function' ? getPendencias() : []));
   return scoped.filter(p => {
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
     if (!p.deadline) return false;
     if (!st && isPendenciaClosed(p.status)) return false;
     if (cid  && p.clientId   !== cid)   return false;

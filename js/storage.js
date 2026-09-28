@@ -249,6 +249,7 @@ function setSession(opId) {
     color:    op.color || '#1a56db',
     role:     op.role || 'Técnico',
     isAdmin:  op.isAdmin === true,
+    isGestao: (typeof isGestaoOperator === 'function') ? isGestaoOperator(op) : false,
     team:     op.team || 'init',
     ts: Date.now(),
   };
@@ -279,6 +280,59 @@ function filterByTeam(items) {
   if (isTeamAdmin()) return items;
   const myTeam = normalizeTeam(getCurrentTeam());
   return items.filter(i => normalizeTeam(i.team || 'init') === myTeam);
+}
+
+// ── GESTÃO (tipo de ação restrito: só Felipe e Joarli) ──────────────────────
+// Regra: pendências com tipo Gestão/Gestao são invisíveis para quem não é
+// Gestão — em TODAS as telas (lista, busca, calendário, dashboard, contadores).
+// Identidade: flag operators.is_gestao (migration 037) + fallback por nome
+// (pré-migration / offline / seed), para não travar se a coluna ainda não
+// sincronizou. Pedro fica de fora por definição (só Felipe e Joarli).
+function _normGestaoText(s) {
+  try {
+    return String(s || '').trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  } catch (_) {
+    return String(s || '').trim().toLowerCase();
+  }
+}
+function isPendenciaGestao(p) {
+  if (!p) return false;
+  const t = _normGestaoText(p.tipo);
+  return t === 'gestao';
+}
+function _isGestaoName(name) {
+  const n = _normGestaoText(name);
+  if (!n) return false;
+  return n.indexOf('felipe') !== -1 || n.indexOf('joarli') !== -1;
+}
+function isGestaoOperator(op) {
+  if (!op) return false;
+  if (op.isGestao === true || op.is_gestao === true) return true;
+  if (op.active === false) return false;
+  return _isGestaoName(op.name);
+}
+function canViewGestao() {
+  try {
+    if (typeof getSession !== 'function') return false;
+    const session = getSession();
+    if (!session) return false;
+    if (session.isGestao === true) return true;
+    if (typeof getOperatorById !== 'function') return _isGestaoName(session.name);
+    const op = getOperatorById(session.opId);
+    if (!op) return _isGestaoName(session.name);
+    return isGestaoOperator(op);
+  } catch (_) { return false; }
+}
+function canViewPendencia(p) {
+  if (!p) return false;
+  if (!isPendenciaGestao(p)) return true;
+  return canViewGestao();
+}
+function filterGestaoPendencias(list) {
+  const arr = Array.isArray(list) ? list : [];
+  if (canViewGestao()) return arr;
+  return arr.filter(p => !isPendenciaGestao(p));
 }
 
 // Migra registros locais legados poiesis_1..6 -> poiesis (idempotente).
@@ -1423,11 +1477,11 @@ function deleteClient(id) {
 function getPendencias() { return dbGet(DB.PENDENCIAS); }
 function getPendenciasByTeam(team) {
   const all = getPendencias();
-  if (!team) return all;
-  return all.filter(p => (p.team || 'init') === team);
+  const scoped = !team ? all : all.filter(p => (p.team || 'init') === team);
+  return filterGestaoPendencias(scoped);
 }
 function getMyPendencias() {
-  return filterByTeam(getPendencias());
+  return filterGestaoPendencias(filterByTeam(getPendencias()));
 }
 
 // ── FASE 3: paginação server-side por escopo ────────────────────────────────
@@ -1452,17 +1506,19 @@ function _penServerAvailable() {
 }
 
 function _penPageScope() {
-  // Retorna { team: string|null, adminSeeAll: boolean }.
+  // Retorna { team: string|null, adminSeeAll: boolean, canSeeGestao: boolean }.
+  var canSeeGestao = false;
+  try { canSeeGestao = (typeof canViewGestao === 'function') ? !!canViewGestao() : false; } catch (_) {}
   try {
     const admin = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
     const sel = (typeof _selectedTeam !== 'undefined') ? _selectedTeam : '';
-    if (admin && sel) return { team: sel, adminSeeAll: false };
-    if (admin) return { team: null, adminSeeAll: true };
+    if (admin && sel) return { team: sel, adminSeeAll: false, canSeeGestao: canSeeGestao };
+    if (admin) return { team: null, adminSeeAll: true, canSeeGestao: canSeeGestao };
   } catch (_) {}
   try {
-    if (typeof getCurrentTeam === 'function') return { team: getCurrentTeam(), adminSeeAll: false };
+    if (typeof getCurrentTeam === 'function') return { team: getCurrentTeam(), adminSeeAll: false, canSeeGestao: canSeeGestao };
   } catch (_) {}
-  return { team: 'init', adminSeeAll: false };
+  return { team: 'init', adminSeeAll: false, canSeeGestao: canSeeGestao };
 }
 
 function _sanitizeIlike(s) {
@@ -1475,6 +1531,12 @@ function applyPendenciaPageFilters(q, opts) {
   if (!o.adminSeeAll && o.team) q = q.eq('team', o.team);
   if (o.scope === 'archived') q = q.in('status', PEN_CLOSED_LIST);
   else q = q.not('status', 'in', '(' + PEN_CLOSED_LIST.join(',') + ')');
+  // Gestão: quem não é Gestão nunca recebe linhas Gestão do servidor
+  // (defesa em profundidade junto ao RLS; Gestão vê tudo do seu escopo).
+  var _canSeeGestao = (typeof o.canSeeGestao === 'boolean')
+    ? o.canSeeGestao
+    : ((typeof canViewGestao === 'function') ? !!canViewGestao() : true);
+  if (!_canSeeGestao) q = q.not('tipo', 'in', '(Gestão,Gestao)');
   if (o.clientId) q = q.eq('client_id', o.clientId);
   if (o.responsible) q = q.eq('responsible', o.responsible);
   if (o.status) q = q.eq('status', o.status);
@@ -1508,7 +1570,7 @@ async function fetchPendenciasPage(opts) {
   let q = supabaseClient.from('pendencias').select('*', { count: 'exact' });
   q = applyPendenciaPageFilters(q, {
     scope: o.scope === 'archived' ? 'archived' : 'active',
-    team: sc.team, adminSeeAll: sc.adminSeeAll,
+    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao,
     clientId: o.clientId || '', responsible: o.responsible || '',
     status: o.status || '', priority: o.priority || '', search: o.search || ''
   });
@@ -1541,7 +1603,7 @@ async function fetchPendenciaStatusCounts(scope) {
   let q = supabaseClient.from('pendencias').select('status');
   q = applyPendenciaPageFilters(q, {
     scope: scope === 'archived' ? 'archived' : 'active',
-    team: sc.team, adminSeeAll: sc.adminSeeAll
+    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao
   });
   const res = await q;
   if (res.error) throw new Error(res.error.message || 'Falha na contagem');
@@ -1556,6 +1618,19 @@ function uniquePendenciaId(list) {
   return id;
 }
 function savePendencia(data) {
+  // Gestão: só Felipe/Joarli criam ou convertem para Gestão.
+  try {
+    var _isGest = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(data) : false;
+    var _canG = (typeof canViewGestao === 'function') ? canViewGestao() : true;
+    if (_isGest && !_canG) throw new Error('Apenas Gestão (Felipe e Joarli) pode criar pendências do tipo Gestão.');
+    if (!!data.id && typeof getPendenciaById === 'function') {
+      var _old = getPendenciaById(data.id);
+      var _wasGest = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(_old) : false;
+      if ((_wasGest || _isGest) && !_canG) throw new Error('Apenas Gestão (Felipe e Joarli) pode editar pendências do tipo Gestão.');
+    }
+  } catch (e) {
+    if (e && e.message && e.message.indexOf('Apenas Gestão') === 0) throw e;
+  }
   const list = getPendencias();
   const isEdit = !!data.id;
   var now = new Date().toISOString();
@@ -2548,6 +2623,13 @@ async function saveOperator(data) {
   }
   // ensure boolean normalization for onLeave
   if (savedOp) savedOp.onLeave = savedOp.onLeave === true;
+  // Gestão: preserva flag isGestao local (migration 037); fallback por nome
+  // garante Felipe/Joarli mesmo antes da coluna sincronizar.
+  try {
+    if (savedOp && typeof isGestaoOperator === 'function' && savedOp.isGestao !== true) {
+      if (isGestaoOperator(Object.assign({}, savedOp, { isGestao: false }))) savedOp.isGestao = true;
+    }
+  } catch (_) {}
   dbSet(DB.OPERATORS, list);
   
   // Sync the current session if this operator is the one logged in
@@ -2573,6 +2655,7 @@ async function saveOperator(data) {
        pin_hash: savedOp.pinHash || null,
       pin_salt: savedOp.pinSalt || null,
       is_admin: savedOp.isAdmin === true,
+      is_gestao: savedOp.isGestao === true,
        active: savedOp.active !== false,
        team: savedOp.team || 'init',
       on_leave: savedOp.onLeave === true,
@@ -2933,5 +3016,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia };
 }

@@ -1,6 +1,6 @@
 // pendencias.js
 
-const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro'];
+const TIPOS = ['Projeto','Operacional / Interno','Manutenção','Suporte','Gestão','Outro'];
 
 const PEN_KANBAN_COLS = typeof STATUS_PEN_MAP !== 'undefined' ? Object.entries(STATUS_PEN_MAP).map(([id, v]) => ({ id, label: v.label, color: v.dot })) : [];
 
@@ -790,6 +790,12 @@ function getFilteredPendencias() {
   const st   = document.getElementById('penStatus')?.value||'';
   const pr   = document.getElementById('penPriority')?.value||'';
   var base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
+  // Defesa em profundidade: getters já filtram Gestão, mas garante que nenhum
+  // caminho (cache/otimista) vaze Gestão para não-Gestão.
+  try {
+    if (typeof filterGestaoPendencias === 'function') base = filterGestaoPendencias(base);
+    else if (typeof canViewPendencia === 'function') base = base.filter(canViewPendencia);
+  } catch (_) {}
   return base.filter(p => {
     if (q && !p.assunto?.toLowerCase().includes(q) && !p.descricao?.toLowerCase().includes(q) && !p.clientName?.toLowerCase().includes(q) && !p.responsible?.toLowerCase().includes(q)) return false;
     if (cid  && p.clientId   !== cid)  return false;
@@ -946,6 +952,12 @@ function quickUpdatePendenciaField(id, field, value) {
 function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
+  try {
+    if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) {
+      if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
+      return;
+    }
+  } catch (_) {}
   const c = getClientById(p.clientId);
   const _worker = (typeof getCurrentWorker === 'function') ? getCurrentWorker(p) : null;
   const _ft = _penFriendlyTime(p);
@@ -1111,9 +1123,23 @@ function submitPenNote(id) {
 
 function openPendenciaForm(id = null, preClientId = null, preDate = null) {
   const p           = id ? getPendenciaById(id) : {};
+  // Gestão: quem não é Gestão não abre edição de Gestão (link direto/ID).
+  try {
+    if (id && typeof canViewPendencia === 'function' && p && !canViewPendencia(p)) {
+      if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
+      return;
+    }
+  } catch (_) {}
   const clients     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   const opNames     = getOperatorNames(isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam());
   const currentResp = p.responsible || getUser().name;
+  // Gestão: esconde a opção Gestão de quem não é Gestão (Felipe/Joarli).
+  var _canGest = true;
+  try { _canGest = (typeof canViewGestao === 'function') ? canViewGestao() : true; } catch (_) {}
+  var _tiposVisiveis = Array.isArray(typeof TIPOS !== 'undefined' ? TIPOS : []) ? TIPOS.filter(function(t){
+    try { if (typeof isPendenciaGestao === 'function' && isPendenciaGestao({ tipo: t }) && !_canGest) return false; } catch (_) {}
+    return true;
+  }) : [];
 
   openModal(id ? 'Editar Pendência' : 'Nova Pendência', `
     <form onsubmit="submitPendenciaForm(event,'${escapeHtml(id||'')}')">
@@ -1125,7 +1151,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
           </select></div>
         <div class="form-group"><label class="form-label">Tipo de Ação</label>
           <select class="form-select" name="tipo">
-            ${TIPOS.map(t=>`<option ${p.tipo===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
+            ${_tiposVisiveis.map(t=>`<option ${p.tipo===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-group"><label class="form-label">Assunto *</label>
@@ -1206,8 +1232,15 @@ function submitPendenciaForm(e, id) {
       return;
     }
     const tagsRaw = g('tags').split(',').map(function(t){return t.trim();}).filter(Boolean);
+    const tipoVal = g('tipo');
+    // Gestão: bloqueio no form (savePendencia também bloqueia + RLS no banco).
+    try {
+      var _isGestForm = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao({ tipo: tipoVal }) : false;
+      var _canGestForm = (typeof canViewGestao === 'function') ? canViewGestao() : true;
+      if (_isGestForm && !_canGestForm) { showToast('Apenas Gestão (Felipe e Joarli) pode usar o tipo Gestão.', 'error'); return; }
+    } catch (_) {}
     const data = {
-      id: id||null, clientId, clientName: client?.name||'', tipo: g('tipo'),
+      id: id||null, clientId, clientName: client?.name||'', tipo: tipoVal,
       assunto, descricao, responsible: g('responsible'), status: g('status'),
       priority: g('priority'), deadline: g('deadline'),
       linkUtil: safeUrl(linkUtil) !== '#' ? linkUtil : '',

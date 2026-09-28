@@ -358,7 +358,7 @@ function _meetingInlineFormInnerHtml(cid) {
         <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Descrição detalhada..."></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
-            ${(typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Outro']).map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
+            ${(() => { var _t = (typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Gestão','Outro']); try { if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isPendenciaGestao === 'function') _t = _t.filter(function(x){ return !isPendenciaGestao({ tipo: x }); }); } catch (_) {} return _t; })().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
           </select>
           <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
             ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}

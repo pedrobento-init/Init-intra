@@ -344,13 +344,14 @@ function checkDeadlineReminders() {
   const prefs = getNotifPrefs();
   if (!prefs.onDeadlineReminder) return;
 
-  const pens = getPendencias();
+  const pens = (typeof getMyPendencias === 'function') ? getMyPendencias() : getPendencias();
   const today = new Date();
     const todayStr = localDateISO(today);
 
   const reminderDays = prefs.reminderDaysBefore || 2;
 
   pens.forEach(p => {
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return; } catch (_) {}
     if (!p.deadline || isPendenciaClosed(p.status)) return;
 
     const deadline = parseDeadline(p.deadline);
@@ -398,6 +399,7 @@ function checkStalePendencias() {
   const prefs = getNotifPrefs();
   if (!prefs.onDeadlineReminder) return;
   getPendencias().forEach(p => {
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return; } catch (_) {}
     if (isPendenciaClosed(p.status)) return;
     const ref = p.updatedAt || p.createdAt;
     if (!ref) return;

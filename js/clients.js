@@ -5,7 +5,7 @@ let _clientPage = 1;
 let _filteredClients = [];
 const CLIENT_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
 
-function _getPendenciasList(){ if(typeof getPendencias==='function') return getPendencias(); if(typeof globalThis!=='undefined' && typeof globalThis.getPendencias==='function') return globalThis.getPendencias(); return []; }
+function _getPendenciasList(){ if(typeof getMyPendencias==='function') return getMyPendencias(); if(typeof getPendencias==='function') return getPendencias(); if(typeof globalThis!=='undefined' && typeof globalThis.getMyPendencias==='function') return globalThis.getMyPendencias(); if(typeof globalThis!=='undefined' && typeof globalThis.getPendencias==='function') return globalThis.getPendencias(); return []; }
 function _getHealthForClientProxy(pens,cid,today){ if(typeof getHealthForClient==='function') return getHealthForClient(pens,cid,today); if(typeof globalThis!=='undefined' && typeof globalThis.getHealthForClient==='function') return globalThis.getHealthForClient(pens,cid,today); return null; }
 function _calcAvgProxy(arr){ if(typeof calculateAvgResolutionHours==='function') return calculateAvgResolutionHours(arr); if(typeof globalThis!=='undefined' && typeof globalThis.calculateAvgResolutionHours==='function') return globalThis.calculateAvgResolutionHours(arr); return null; }
 function _formatDateProxy(d){ if(typeof formatDate==='function') return formatDate(d); if(typeof globalThis!=='undefined' && typeof globalThis.formatDate==='function') return globalThis.formatDate(d); return new Date(d).toLocaleDateString('pt-BR'); }

@@ -146,6 +146,7 @@ function _renderSearchResults(query) {
   }).slice(0, 5);
 
   const matchPens = pendencias.filter(p => {
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
     if (statusFilter && String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
     if (clienteFilter && !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
     if (!q) return true;
