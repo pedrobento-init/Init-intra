@@ -90,9 +90,9 @@ function renderClientGrid() {
 
     grid.innerHTML = pageClients.map(c => {
       const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
-      const sla = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(getPendencias(), c.id, today) : { totalAbertas: getPendencias().filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length, vencidas: 0, dentroPrazo: 0 };
+      const sla = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(_getPendenciasList(), c.id, today) : { totalAbertas: _getPendenciasList().filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length, vencidas: 0, dentroPrazo: 0 };
       if (!sla.dentroPrazo && sla.totalAbertas) sla.dentroPrazo = sla.totalAbertas - sla.vencidas;
-      const health = typeof getHealthForClient === 'function' ? getHealthForClient(getPendencias(), c.id, today) : null;
+      const health = typeof getHealthForClient === 'function' ? getHealthForClient(_getPendenciasList(), c.id, today) : null;
       const pending = sla.totalAbertas;
       const vencidas = sla.vencidas;
       const dentro = sla.dentroPrazo;
@@ -155,8 +155,8 @@ function renderClientTab(tab, id) {
   if (tab === 'ficha') {
     const ir = (label, val) => `<div class="info-item"><div class="info-key">${label}</div><div class="info-value ${val?'':'empty'}">${val||'Não informado'}</div></div>`;
     const todayF = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
-    const slaF = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(getPendencias(), id, todayF) : { totalAbertas: 0, vencidas: 0, dentroPrazo: 0 };
-    const healthF = typeof getHealthForClient === 'function' ? getHealthForClient(getPendencias(), id, todayF) : null;
+    const slaF = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(_getPendenciasList(), id, todayF) : { totalAbertas: 0, vencidas: 0, dentroPrazo: 0 };
+    const healthF = typeof getHealthForClient === 'function' ? getHealthForClient(_getPendenciasList(), id, todayF) : null;
     const healthCard = healthF ? `
       <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;border:1px solid ${healthF.color}30;background:${healthF.color}10;margin-bottom:16px">
         <span style="font-size:28px">${healthF.emoji}</span>
@@ -277,9 +277,17 @@ function renderClientTab(tab, id) {
   } else if (tab === 'historico') {
     const client = getClientById(id);
     const clientName = client ? client.name : '';
-    const pensIds = new Set(getPendencias().filter(p => p.clientId === id).map(p => p.id));
+    const pensIds = new Set(_getPendenciasList().filter(p => {
+      if (p.clientId !== id) return false;
+      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+      return true;
+    }).map(p => p.id));
     const visitIds = new Set(getVisits().filter(v => v.clientId === id).map(v => v.id));
-    const logs = typeof getLogs === 'function' ? getLogs() : [];
+    const logs = (function(){
+      var _l = typeof getLogs === 'function' ? getLogs() : [];
+      try { if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l); } catch (_) {}
+      return _l;
+    })();
     const filtered = logs.filter(l => {
       if (l.targetId === id) return true;
       if (pensIds.has(l.targetId)) return true;
@@ -299,7 +307,11 @@ function renderClientTab(tab, id) {
         }).join('')}</div>`;
     }
   } else {
-    const pens = getPendencias().filter(p => p.clientId === id);
+    const pens = _getPendenciasList().filter(p => {
+      if (p.clientId !== id) return false;
+      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+      return true;
+    });
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
       ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th></tr></thead><tbody>${pens.map(p=>`<tr><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
   }

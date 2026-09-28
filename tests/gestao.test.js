@@ -129,4 +129,33 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
     expect(() => storage.savePendencia({ tipo: 'Gestão', assunto: 'x', descricao: 'y', status: 'aberto' })).not.toThrow();
     expect(_stores.pendencias.length).toBe(1);
   });
+
+  it('isGestaoLog identifica log de pendência Gestão pelo targetId', () => {
+    _stores.pendencias = [
+      { id: 'PEN-1', tipo: 'Projeto', team: 'init' },
+      { id: 'PEN-2', tipo: 'Gestão', team: 'init' },
+    ];
+    expect(storage.isGestaoLog({ type: 'Pendência', targetId: 'PEN-2' })).toBe(true);
+    expect(storage.isGestaoLog({ type: 'Pendencia', targetId: 'PEN-2' })).toBe(true);
+    expect(storage.isGestaoLog({ type: 'Pendência', targetId: 'PEN-1' })).toBe(false);
+    expect(storage.isGestaoLog({ type: 'Cliente', targetId: 'PEN-2' })).toBe(false);
+    expect(storage.isGestaoLog({ type: 'Pendência', targetId: 'PEN-X' })).toBe(false);
+    expect(storage.isGestaoLog(null)).toBe(false);
+  });
+
+  it('filterGestaoLogs esconde logs Gestão de Pedro e mostra para Joarli', () => {
+    _stores.pendencias = [
+      { id: 'PEN-1', tipo: 'Projeto', team: 'init' },
+      { id: 'PEN-2', tipo: 'Gestão', team: 'init' },
+    ];
+    const logs = [
+      { id: 'LOG-1', type: 'Pendência', targetId: 'PEN-1', details: 'projeto x' },
+      { id: 'LOG-2', type: 'Pendência', targetId: 'PEN-2', details: '[Gestão – restrito]' },
+      { id: 'LOG-3', type: 'Cliente', targetId: 'CLI-1', details: 'cliente y' },
+    ];
+    _session = { opId: 'OP-1', name: 'Pedro', team: 'init', isAdmin: true };
+    expect(storage.filterGestaoLogs(logs).map(l => l.id).sort()).toEqual(['LOG-1', 'LOG-3']);
+    _session = { opId: 'OP-4', name: 'Joarli', team: 'init', isAdmin: true };
+    expect(storage.filterGestaoLogs(logs).map(l => l.id).sort()).toEqual(['LOG-1', 'LOG-2', 'LOG-3']);
+  });
 });

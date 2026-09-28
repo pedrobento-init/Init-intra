@@ -334,6 +334,30 @@ function filterGestaoPendencias(list) {
   if (canViewGestao()) return arr;
   return arr.filter(p => !isPendenciaGestao(p));
 }
+// Log de pendência Gestão: esconder por completo de quem não é Gestão
+// (Histórico global, histórico do cliente, export CSV). Usa o vínculo
+// targetId → pendência; se a pendência foi excluída, o detalhe já foi
+// redigido na escrita ([Gestão – restrito]) e o marcador sozinho não
+// identifica conteúdo — mas ainda ocultamos quando dá para vincular.
+function isGestaoLog(log) {
+  try {
+    if (!log) return false;
+    var _t = String(log.type || '').trim().toLowerCase();
+    try { _t = _t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (_) {}
+    if (_t !== 'pendencia') return false;
+    if (typeof getPendenciaById !== 'function' || typeof isPendenciaGestao !== 'function') return false;
+    var _p = log.targetId ? getPendenciaById(log.targetId) : null;
+    return !!(_p && isPendenciaGestao(_p));
+  } catch (_) { return false; }
+}
+function filterGestaoLogs(logs) {
+  try {
+    const arr = Array.isArray(logs) ? logs : [];
+    if (typeof canViewGestao === 'function' && canViewGestao()) return arr;
+    if (typeof isGestaoLog !== 'function') return arr;
+    return arr.filter(l => !isGestaoLog(l));
+  } catch (_) { return Array.isArray(logs) ? logs : []; }
+}
 
 // Migra registros locais legados poiesis_1..6 -> poiesis (idempotente).
 // Resquício pós-migração 031: após a primeira varredura sem nada a migrar,
@@ -989,6 +1013,18 @@ function getLogs() {
 function addLog(action, type, targetId, details) {
   const session = getSession();
   const operatorName = session ? session.name : 'Sistema';
+  // Gestão: nunca persiste assunto/descrição de Gestão no histórico.
+  // O log guarda só o marcador restrito; a leitura (renderLogs/export)
+  // ainda filtra por canViewGestao() como defesa em profundidade.
+  var safeDetails = details || '';
+  try {
+    var _t = String(type || '').trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (_t === 'pendencia' && typeof isPendenciaGestao === 'function' && typeof getPendenciaById === 'function') {
+      var _lp = getPendenciaById(targetId);
+      if (isPendenciaGestao(_lp)) safeDetails = '[Gestão – restrito]';
+    }
+  } catch (_) {}
   const log = {
     id: nextId('LOG'),
     timestamp: new Date().toISOString(),
@@ -996,7 +1032,7 @@ function addLog(action, type, targetId, details) {
     action,
     type,
     targetId,
-    details: details || '',
+    details: safeDetails,
     operatorId: session?.opId || null
   };
 
@@ -1685,7 +1721,12 @@ function savePendencia(data) {
     if (idx !== -1) list[idx].completedAt = data.completedAt;
   }
   dbSet(DB.PENDENCIAS, list);
-  addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, (data.assunto || '').trim() || data.descricao);
+  // Gestão: histórico nunca recebe assunto/descrição (só marcador restrito).
+  var _logDetails = (data.assunto || '').trim() || data.descricao;
+  try {
+    if (typeof isPendenciaGestao === 'function' && isPendenciaGestao(data)) _logDetails = '[Gestão – restrito]';
+  } catch (_) {}
+  addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, _logDetails);
 
   if (justConcluded && data.recurrence) {
     try {
@@ -1779,7 +1820,12 @@ function deletePendencia(id) {
   if (remaining.length === getPendencias().length) return false;
   dbSet(DB.PENDENCIAS, remaining);
   _addTombstone(DB.PENDENCIAS, id);
-  addLog('Excluiu', 'Pendência', id, desc);
+  // Gestão: addLog central já não encontraria o registro (deletado) — redige aqui.
+  var _delDesc = desc;
+  try {
+    if (typeof isPendenciaGestao === 'function' && pen && isPendenciaGestao(pen)) _delDesc = '[Gestão – restrito]';
+  } catch (_) {}
+  addLog('Excluiu', 'Pendência', id, _delDesc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
@@ -3016,5 +3062,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia };
 }

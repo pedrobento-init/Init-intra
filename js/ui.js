@@ -658,6 +658,11 @@ function renderLogs() {
     const dateFrom = document.getElementById('logDateFrom').value;
     const dateTo = document.getElementById('logDateTo').value;
     let logs = typeof getLogs === 'function' ? getLogs() : [];
+    // Gestão: esconde logs de pendência Gestão de quem não é Gestão.
+    try {
+      if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
+      else if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') logs = logs.filter(l => !isGestaoLog(l));
+    } catch (_) {}
     
     if (term) {
       logs = logs.filter(l => 
@@ -901,7 +906,8 @@ function exportPendenciasCSV() {
     if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
     return;
   }
-  const pens = typeof getPendencias === 'function' ? getPendencias() : [];
+  const pens = (typeof getMyPendencias === 'function') ? getMyPendencias()
+    : (typeof filterGestaoPendencias === 'function' && typeof getPendencias === 'function' ? filterGestaoPendencias(getPendencias()) : (typeof getPendencias === 'function' ? getPendencias() : []));
   const headers = ['ID', 'Cliente', 'Assunto', 'Descrição', 'Status', 'Prioridade', 'Responsável', 'Criado Em', 'Prazo'];
   const rows = pens.map(p => [
     p.id,
@@ -922,7 +928,14 @@ function exportLogsCSV() {
     showToast('Apenas administradores podem exportar o histórico.', 'error');
     return;
   }
-  const logs = typeof getLogs === 'function' ? getLogs() : [];
+  const logs = (function(){
+    var _l = typeof getLogs === 'function' ? getLogs() : [];
+    try {
+      if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l);
+      if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') return _l.filter(l => !isGestaoLog(l));
+    } catch (_) {}
+    return _l;
+  })();
   const headers = ['Data/Hora', 'Ação', 'Tipo', 'Detalhes', 'Operador'];
   const rows = logs.map(l => [
     formatDateTime(l.timestamp),

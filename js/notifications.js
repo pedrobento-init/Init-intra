@@ -161,13 +161,51 @@ function collectRecipients(responsibleName, includeAdmins = true) {
   return emails;
 }
 
+// Gestão: e-mail de pendência Gestão vai SÓ para Gestão (Felipe e Joarli).
+// Sem isso, collectRecipients() incluiria todos os admins (ex.: Pedro) e
+// o título/assunto vazaria por e-mail. Retorna [] para não-Gestão fora.
+function getGestaoEmails() {
+  try {
+    if (typeof getOperators !== 'function') return [];
+    const isG = (typeof isGestaoOperator === 'function') ? isGestaoOperator
+      : (typeof globalThis !== 'undefined' && typeof globalThis.isGestaoOperator === 'function' ? globalThis.isGestaoOperator : null);
+    return getOperators()
+      .filter(o => {
+        if (!o || !o.email || o.active === false) return false;
+        try { return isG ? !!isG(o) : false; } catch (_) { return false; }
+      })
+      .map(o => o.email);
+  } catch (_) { return []; }
+}
+function collectPendenciaRecipients(pendencia) {
+  try {
+    var _isG = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(pendencia)
+      : (typeof globalThis !== 'undefined' && typeof globalThis.isPendenciaGestao === 'function' ? globalThis.isPendenciaGestao(pendencia) : false);
+    if (_isG) {
+      var gestaoMails = getGestaoEmails();
+      // Responsável só recebe se ele próprio for Gestão.
+      try {
+        var rop = (typeof getOperators === 'function' ? getOperators() : []).find(o => o && o.name === pendencia.responsible && o.email);
+        var isRopG = false;
+        try {
+          var _isGop = (typeof isGestaoOperator === 'function') ? isGestaoOperator : (typeof globalThis !== 'undefined' ? globalThis.isGestaoOperator : null);
+          isRopG = _isGop ? !!_isGop(rop) : false;
+        } catch (_) {}
+        if (rop && isRopG && !gestaoMails.includes(rop.email)) gestaoMails.push(rop.email);
+      } catch (_) {}
+      return gestaoMails;
+    }
+  } catch (_) {}
+  return collectRecipients(pendencia.responsible);
+}
+
 // ── Templates de E-mail ──
 
 function notifyPendenciaCreated(pendencia) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaCreate) return;
 
-  const recipients = collectRecipients(pendencia.responsible);
+  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const deadlineText = pendencia.deadline
@@ -217,7 +255,7 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaUpdate) return;
 
-  const recipients = collectRecipients(pendencia.responsible);
+  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const statusChanged = oldStatus && oldStatus !== pendencia.status;
@@ -268,7 +306,7 @@ function notifyPendenciaNote(pendencia, note) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaNote) return;
 
-  const recipients = collectRecipients(pendencia.responsible);
+  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const html = emailBody(`
@@ -296,7 +334,7 @@ function notifyPendenciaNote(pendencia, note) {
 
 // ── Lembrete de Prazo (chamado pelo cron job ou manualmente) ──
 function notifyDeadlineReminder(pendencia, daysLeft) {
-  const recipients = collectRecipients(pendencia.responsible);
+  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const urgency = daysLeft <= 0 ? 'VENCIDA' : daysLeft === 1 ? 'vence AMANHÃ' : `vence em ${daysLeft} dias`;
@@ -369,7 +407,7 @@ function checkDeadlineReminders() {
 }
 
 function notifyStalePendencia(p, days) {
-  const recipients = collectRecipients(p.responsible);
+  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(p) : collectRecipients(p.responsible);
   if (!recipients.length) return;
   const status = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.label) || p.status;
   const html = emailBody(`
