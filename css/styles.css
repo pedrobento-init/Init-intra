@@ -4278,3 +4278,82 @@ body.dark-theme .ov-wrap {
   .ov-bar { gap: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .ov-wrap *, .ov-wrap *::before, .ov-wrap *::after { transition: none !important; animation: none !important; } }
+
+/* ── DASHBOARD: INDICADORES + MEU DIA (somente apresentação, escopo .ov-*) ── */
+.ov-wrap {
+  --ov-crit: #8C1526;
+  --ov-cyan: #0E86B0;
+  --ov-violet: #6B46D9;
+}
+body.dark-theme .ov-wrap {
+  --ov-crit: #C81E3A;
+  --ov-cyan: #35C3EE;
+  --ov-violet: #A98BFF;
+}
+.ov-sec-t { font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin: 8px 0 0; color: var(--ov-text); }
+.ov-i { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+/* Faixa de KPIs */
+.ov-kpis { display: grid; grid-template-columns: repeat(9, 1fr); gap: 1px; background: var(--ov-line); border: 1px solid var(--ov-line); border-radius: 14px; overflow: hidden; }
+.ov-k { background: var(--ov-panel); padding: 14px 16px; min-width: 0; cursor: pointer; transition: background .15s; }
+.ov-k:hover { background: var(--ov-raised); }
+.ov-k.ov-k-static { cursor: default; }
+.ov-k.ov-k-static:hover { background: var(--ov-panel); }
+.ov-k b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; color: var(--ov-text); font-variant-numeric: tabular-nums; }
+.ov-k span { color: var(--ov-muted); font-size: 12.5px; line-height: 1.3; display: block; margin-top: 2px; }
+.ov-k.red b { color: var(--ov-red); }
+.ov-k.amber b { color: var(--ov-amber); }
+/* Grades */
+.ov-g { display: grid; gap: 16px; margin-top: 16px; }
+.ov-g-a { grid-template-columns: 1fr 1fr; }
+.ov-g-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+.ov-g-c { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+/* Figuras da evolução */
+.ov-fig { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; }
+.ov-fig b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; color: var(--ov-text); font-variant-numeric: tabular-nums; }
+.ov-fig span { color: var(--ov-muted); font-size: 13px; }
+/* Barras horizontais */
+.ov-hb { display: grid; grid-template-columns: 104px minmax(0, 1fr) 48px; align-items: center; gap: 12px; padding: 6px 0; }
+.ov-hb .n { font-weight: 600; font-size: 13px; color: var(--ov-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-bt { display: flex; height: 8px; background: var(--ov-raised); border-radius: 99px; overflow: hidden; }
+.ov-bt i { width: var(--w); background: var(--c, var(--ov-accent)); border-radius: inherit; }
+.ov-v { text-align: right; font-weight: 700; font-size: 13px; color: var(--ov-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ov-v.z { color: var(--ov-muted); font-weight: 500; }
+/* Painéis de gráfico */
+.ov-cv { flex: 1; position: relative; min-height: 240px; }
+.ov-lg { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ov-muted); font-size: 12.5px; margin-bottom: 8px; }
+.ov-lg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 7px; }
+.ov-sel { border-radius: 8px; font-family: Manrope, system-ui, sans-serif; }
+/* Meu dia */
+.ov-focus { border-left: 4px solid var(--ov-accent); }
+.ov-ls { list-style: none; margin: 0; padding: 0; }
+.ov-it { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px; border-radius: 8px; cursor: pointer; transition: background .15s; }
+.ov-it + .ov-it { border-top: 1px solid var(--ov-line); border-radius: 0; }
+.ov-it + .ov-it:hover { border-radius: 8px; }
+.ov-it:hover { background: var(--ov-raised); }
+.ov-av { width: 34px; height: 34px; border-radius: 50%; background: var(--ov-raised); border: 1px solid var(--ov-line); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--ov-muted); flex: none; overflow: hidden; }
+.ov-av img { width: 100%; height: 100%; object-fit: cover; }
+.ov-tt { font-weight: 700; font-size: 14px; color: var(--ov-text); overflow: hidden; text-overflow: ellipsis; }
+.ov-mt { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; color: var(--ov-muted); font-size: 12.5px; }
+.ov-warn { display: inline-flex; align-items: center; gap: 5px; color: var(--ov-red); font-weight: 700; }
+.ov-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); white-space: nowrap; }
+.ov-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.ov-when { text-align: right; display: grid; gap: 2px; justify-items: end; font-size: 12.5px; }
+.ov-when small { color: var(--ov-muted); font-size: 12px; }
+.ov-when b { font-weight: 700; color: var(--ov-text); font-variant-numeric: tabular-nums; }
+.ov-g-day { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+.ov-g-day > .ov-col { padding: 0; }
+.ov-g-day > .ov-col:first-child { padding: 0; }
+.ov-col { display: grid; gap: 16px; align-content: start; }
+.ov-col + .ov-col { border-left: 0; }
+.ov-acts-big { display: grid; gap: 10px; }
+.ov-wrap .btn.ov-big { width: 100%; padding: 12px 14px; font-size: 14px; justify-content: center; }
+@media (max-width: 1100px) { .ov-kpis { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px) { .ov-g-a, .ov-g-b, .ov-g-c, .ov-g-day { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .ov-it { grid-template-columns: 34px minmax(0, 1fr); }
+  .ov-it > .ov-pill, .ov-it > .ov-when { grid-column: 2; justify-self: start; text-align: left; justify-items: start; }
+}
+@media (max-width: 480px) {
+  .ov-k { padding: 12px; }
+  .ov-hb { grid-template-columns: 88px minmax(0, 1fr) 44px; }
+}
