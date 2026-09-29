@@ -105,7 +105,11 @@ function _parseItemDate(item) {
 
 function setDashPeriod(period) {
   _dashPeriod = period;
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+  document.querySelectorAll('.period-btn').forEach(b => {
+    const _on = b.dataset.period === period;
+    b.classList.toggle('active', _on);
+    b.setAttribute('aria-pressed', String(_on));
+  });
   document.getElementById('customDateRange').style.display = period === 'custom' ? 'flex' : 'none';
   renderDashboard();
 }
@@ -715,77 +719,124 @@ function renderDashboard() {
 
   const periodLabel = {all:'Todos',week:'Esta Semana',month:'Este Mês',quarter:'Este Trimestre',custom:'Personalizado'}[_dashPeriod] || 'Todos';
 
+  // ── Visão geral (redesign): derivados só de apresentação, mesmos dados ──
+  const _ovIsOnline = (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) ? true : false;
+  const _ovOverTop = (_dashCanManage && _overloaded.length) ? _overloaded[0] : null;
+  const _ovOverExtra = (_dashCanManage && _overloaded.length > 1) ? (_overloaded.length - 1) : 0;
+  const _ovOverTitle = (_dashCanManage && _overloaded.length) ? _overloaded.map(o => `${o.name} (${o.count})`).join(', ') : '';
+  let _ovNeutralCount = 0;
+  let _ovNeutralLabel = 'pendências ativas';
+  if (!_ovOverTop) {
+    if (!_dashCanManage) {
+      _ovNeutralCount = activePens.filter(p => p.responsible === currentUser).length;
+      _ovNeutralLabel = 'suas pendências ativas';
+    } else {
+      let _mx = 0;
+      Object.entries(_loadByResp).forEach(([k, v]) => { if (k !== 'Sem responsável' && v > _mx) _mx = v; });
+      _ovNeutralCount = _mx;
+      _ovNeutralLabel = activePens.length ? 'pendências ativas (maior carga)' : 'pendências ativas';
+    }
+  }
+  const _ovRiskLabel = { red: 'Crítico', yellow: 'Atenção', green: 'Saudável' };
+  const _ovInitials = (name) => {
+    const _n = String(name || '?').trim();
+    if (!_n) return '?';
+    const _parts = _n.split(/\s+/).filter(Boolean);
+    if (_parts.length === 1) return _n.slice(0, 2).toUpperCase();
+    return (_parts[0][0] + _parts[1][0]).toUpperCase();
+  };
+
   document.getElementById('contentArea').innerHTML = `
-    <div class="dash-top-row">
-      <div class="period-filter">
-        <span class="period-label">Período:</span>
-        <button class="period-btn${_dashPeriod==='all'?' active':''}" data-period="all" onclick="setDashPeriod('all')">Todos</button>
-        <button class="period-btn${_dashPeriod==='week'?' active':''}" data-period="week" onclick="setDashPeriod('week')">Semana</button>
-        <button class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" onclick="setDashPeriod('month')">Mês</button>
-        <button class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" onclick="setDashPeriod('quarter')">Trimestre</button>
-        <button class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" onclick="setDashPeriod('custom')">Personalizado</button>
-        <div id="customDateRange" class="custom-date-range" style="display:${_dashPeriod==='custom'?'flex':'none'}">
-          <input type="date" id="dashCustomStart" value="${_dashCustomStart}" onchange="setDashCustomDates()" class="date-input" />
-          <span style="color:var(--text-muted);font-size:12px">até</span>
-          <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" onchange="setDashCustomDates()" class="date-input" />
+    <div class="ov-wrap">
+    <header class="ov-head">
+      <h1 class="ov-h1">Visão geral</h1>
+      <div class="dash-sync-status ov-sync" title="Fonte dos dados do dashboard">
+        <span class="dash-sync-dot ov-dot ${_ovIsOnline ? 'is-online' : ''}"></span>
+        <span>${_ovIsOnline ? 'Dados sincronizados' : 'Dados locais'}</span>
+      </div>
+    </header>
+    <div class="ov-bar">
+      <div class="period-filter ov-seg" role="group" aria-label="Período">
+        <button type="button" class="period-btn${_dashPeriod==='all'?' active':''}" data-period="all" aria-pressed="${_dashPeriod==='all'}" onclick="setDashPeriod('all')">Todos</button>
+        <button type="button" class="period-btn${_dashPeriod==='week'?' active':''}" data-period="week" aria-pressed="${_dashPeriod==='week'}" onclick="setDashPeriod('week')">Semana</button>
+        <button type="button" class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" aria-pressed="${_dashPeriod==='month'}" onclick="setDashPeriod('month')">Mês</button>
+        <button type="button" class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" aria-pressed="${_dashPeriod==='quarter'}" onclick="setDashPeriod('quarter')">Trimestre</button>
+        <button type="button" class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" aria-pressed="${_dashPeriod==='custom'}" onclick="setDashPeriod('custom')">Personalizado</button>
+        <div id="customDateRange" class="custom-date-range ov-custom" style="display:${_dashPeriod==='custom'?'flex':'none'}">
+          <input type="date" id="dashCustomStart" value="${_dashCustomStart}" onchange="setDashCustomDates()" class="date-input" aria-label="Data inicial" />
+          <span class="ov-until">até</span>
+          <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" onchange="setDashCustomDates()" class="date-input" aria-label="Data final" />
         </div>
       </div>
-      <div class="dash-sync-status" title="Fonte dos dados do dashboard">
-        <span class="dash-sync-dot ${typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive ? 'is-online' : ''}"></span>
-        ${typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive ? 'Dados sincronizados' : 'Dados locais'}
-      </div>
-      <div class="dash-export-btns">
-        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="exportClientsCSV()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <div class="dash-export-btns ov-acts">
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="exportClientsCSV()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
           CSV Clientes
         </button>` : ''}
-        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="exportPendenciasCSV()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="exportPendenciasCSV()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
           CSV Pendências
         </button>` : ''}
-        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" onclick="openHoursReport()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="openHoursReport()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
           Horas
         </button>` : ''}
-        <button class="btn btn-secondary btn-sm" onclick="window.print()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="window.print()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M7 14h10v7H7z"/></svg>
           PDF
         </button>
-        ${_dashCanManage ? `<button class="btn btn-primary btn-sm" onclick="generateMonthlyReport()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        ${_dashCanManage ? `<button type="button" class="btn btn-primary btn-sm ov-btn" onclick="generateMonthlyReport()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7zM14 3v4h4M9 13h6M9 17h6"/></svg>
           Relatório Mensal
         </button>` : ''}
-        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">🖥️ Apresentar</button>` : ''}
-        ${_dashCanManage ? `<button class="btn btn-secondary btn-sm" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">⚙️ Widgets</button>` : ''}
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
+          Apresentar</button>` : ''}
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+          Widgets</button>` : ''}
       </div>
     </div>
 
     ${!_dashIsHidden('resumo-dia') ? `
-    <div class="card dash-widget" style="margin-bottom:18px">
+    <section class="card dash-widget ov-panel" aria-labelledby="ov-dia">
       ${_dashHideBtn('resumo-dia')}
-      <div class="section-header"><span class="section-title">📌 Resumo do dia</span></div>
-      <p class="dash-day-summary">${escapeHtml(_daySummary)}</p>
-    </div>` : ''}
-
-    ${(_dashCanManage && !_dashIsHidden('reuniao')) ? `
-    <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #7c3aed">
-      ${_dashHideBtn('reuniao')}
-      <div class="section-header">
-        <span class="section-title">👥 Reunião Mensal — ${escapeHtml(_meetingLabel)}${_nextMeeting ? ` <span class="tag ${String(_nextMeeting.status) === 'aberta' ? 'tag-green' : 'tag-gray'}">${escapeHtml(_nextMeeting.status || '—')}</span>` : ''}</span>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-secondary btn-sm" onclick="dashGoPresentation()">🖥️ Apresentar</button>
-          <button class="btn btn-primary btn-sm" onclick="navigateTo('reuniao')">${_nextMeeting && _nextMeeting.status === 'aberta' ? 'Continuar Reunião' : 'Iniciar/Continuar Reunião'}</button>
+      <div class="ov-ph"><h2 class="ov-h2" id="ov-dia">Resumo do dia</h2></div>
+      <div class="ov-sum">
+        <div class="ov-col"><div class="ov-n">${dueToday.length}</div><div class="ov-l">pendências vencem hoje</div></div>
+        <div class="ov-col"><div class="ov-n">${todayVisits.length}</div><div class="ov-l">visitas agendadas</div></div>
+        <div class="ov-col">${_ovOverTop ? `
+          <div class="ov-n" title="${escapeHtml(_ovOverTitle)}">${_ovOverTop.count} <span class="ov-tag">Sobrecarregado</span></div>
+          <div class="ov-l">pendências ativas com ${escapeHtml(_ovOverTop.name)}${_ovOverExtra ? ` +${_ovOverExtra}` : ''}</div>` : `
+          <div class="ov-n">${_ovNeutralCount}</div>
+          <div class="ov-l">${escapeHtml(_ovNeutralLabel)}</div>`}
         </div>
       </div>
-      ${_nextMeeting
-        ? `<div style="font-size:13px;color:var(--text-secondary)">${activePens.length} pendência(s) aberta(s) aguardando revisão · ${allClients.length} cliente(s) no escopo${_effTeam ? ` · equipe ${escapeHtml(_effTeam)}` : ''}</div>`
-        : `<div style="font-size:13px;color:var(--text-muted)">Nenhuma reunião encontrada no escopo. Acesse o módulo para criar.</div>`}
-    </div>` : ''}
+    </section>` : ''}
+
+    ${(_dashCanManage && !_dashIsHidden('reuniao')) ? `
+    <section class="card dash-widget ov-panel ov-meet" aria-labelledby="ov-reuniao">
+      ${_dashHideBtn('reuniao')}
+      <div class="ov-meet-main">
+        <div class="ov-meet-title-row">
+          <h2 class="ov-h2" id="ov-reuniao">Reunião mensal — ${escapeHtml(_meetingLabel)}</h2>${_nextMeeting ? `<span class="ov-chip">${escapeHtml(_nextMeeting.status || '—')}</span>` : ''}
+        </div>
+        ${_nextMeeting
+        ? `<div class="ov-stats"><span><b>${activePens.length}</b> pendências abertas aguardando revisão</span><span><b>${allClients.length}</b> clientes no escopo</span></div>`
+        : `<p class="ov-muted">Nenhuma reunião encontrada no escopo. Acesse o módulo para criar.</p>`}
+      </div>
+      <div class="dash-export-btns ov-acts ov-meet-acts">
+        <button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="dashGoPresentation()">
+          <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
+          Apresentar</button>
+        <button type="button" class="btn btn-primary btn-sm ov-btn" onclick="navigateTo('reuniao')">${_nextMeeting && _nextMeeting.status === 'aberta' ? 'Continuar Reunião' : 'Iniciar/Continuar Reunião'}</button>
+      </div>
+    </section>` : ''}
 
     ${(_dashCanManage && !_dashIsHidden('afastados') && _onLeaveWithCount.length) ? `
     <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #d97706">
       ${_dashHideBtn('afastados')}
-      <div class="section-header"><span class="section-title">🏖️ Operadores afastados</span></div>
+      <div class="section-header"><span class="section-title">Operadores afastados</span></div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${_onLeaveWithCount.map(o => `
           <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--bg-secondary)">
@@ -795,48 +846,57 @@ function renderDashboard() {
       </div>
     </div>` : ''}
 
-    <div class="grid-2" style="margin-bottom:18px">
-      ${!_dashIsHidden('recorrentes') ? `
-      <div class="card dash-widget">
-        ${_dashHideBtn('recorrentes')}
-        <div class="section-header"><span class="section-title">🔁 Pendência recorrente (top 5)</span></div>
-        ${_recurrent.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _recurrent.map(r => `
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(r.clientId)}')">
-            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.clientName)}</span>
-            <span class="tag" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px">🔁 ${r.streak} meses seguidos</span>
-          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Nenhum cliente recorrente 🎉</p></div>`}
-      </div>` : ''}
+    <div class="ov-grid">
       ${!_dashIsHidden('riscos') ? `
-      <div class="card dash-widget">
+      <section class="card dash-widget ov-panel" aria-labelledby="ov-risco">
         ${_dashHideBtn('riscos')}
-        <div class="section-header"><span class="section-title">🔴 Clientes em risco (score de saúde)</span></div>
-        ${_risk.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _risk.map(r => `
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(r.clientId)}')">
-            <span style="font-size:14px">${r.health.emoji}</span>
-            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.clientName)}</span>
-            <span style="font-size:11px;color:var(--text-muted)">${r.health.totalAbertas} abertas · ${r.health.vencidas} vencidas</span>
-          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Sem risco mapeado 🎉</p></div>`}
-      </div>` : ''}
+        <div class="ov-ph"><h2 class="ov-h2" id="ov-risco">Clientes em risco</h2><span class="ov-sub">Pontuação de saúde</span></div>
+        <div class="ov-risk-head" aria-hidden="true"><span>Cliente</span><span></span><span class="ov-num-h">Abertas</span><span class="ov-num-h">Vencidas</span></div>
+        ${_risk.length ? _risk.map(r => {
+          const _lvl = (r.health && r.health.level === 'yellow') ? 'amber' : (r.health && r.health.level === 'green') ? 'green' : 'red';
+          const _lbl = _ovRiskLabel[r.health && r.health.level] || (r.health && r.health.label) || '—';
+          const _pct = (r.health && r.health.totalAbertas) ? Math.min(100, Math.round((r.health.vencidas / r.health.totalAbertas) * 100)) : 0;
+          return `
+          <div class="ov-row" onclick="viewClient('${escapeHtml(r.clientId)}')">
+            <div class="ov-client"><div class="ov-name">${escapeHtml(r.clientName)}</div><div class="ov-st ov-${_lvl}">${escapeHtml(_lbl)}</div></div>
+            <div class="ov-track ov-${_lvl}" aria-hidden="true"><i style="width:${_pct}%"></i></div>
+            <div class="ov-num">${r.health.totalAbertas}</div>
+            <div class="ov-num${r.health.vencidas > 0 ? ` ov-${_lvl} is-over` : ''}">${r.health.vencidas}</div>
+          </div>`;
+        }).join('') : `<p class="ov-empty">Sem risco mapeado.</p>`}
+      </section>` : ''}
       ${!_dashIsHidden('silencio') ? `
-      <div class="card dash-widget">
+      <section class="card dash-widget ov-panel" aria-labelledby="ov-silencio">
         ${_dashHideBtn('silencio')}
-        <div class="section-header"><span class="section-title">🔇 Silêncio do cliente (30+ dias)</span></div>
-        ${_silent.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _silent.map(s => `
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(s.clientId)}')">
-            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(s.clientName)}</span>
-            <span style="font-size:11px;color:var(--text-muted)">${s.daysSince >= 9999 ? 'sem contato registrado' : `há ${s.daysSince}d`}</span>
-          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Todos os clientes ativos recentemente 🎉</p></div>`}
-      </div>` : ''}
+        <div class="ov-ph"><h2 class="ov-h2" id="ov-silencio">Silêncio do cliente</h2><span class="ov-sub">Mais de 30 dias</span></div>
+        ${_silent.length ? _silent.map(s => `
+          <div class="ov-li" onclick="viewClient('${escapeHtml(s.clientId)}')">
+            <span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(s.clientName))}</span>
+            <span class="ov-name">${escapeHtml(s.clientName)}</span>
+            <small>${s.daysSince >= 9999 ? 'Sem contato registrado' : `há ${s.daysSince} dias`}</small>
+          </div>`).join('') : `<p class="ov-empty">Todos os clientes ativos recentemente.</p>`}
+      </section>` : ''}
+      ${!_dashIsHidden('recorrentes') ? `
+      <section class="card dash-widget ov-panel" aria-labelledby="ov-rec">
+        ${_dashHideBtn('recorrentes')}
+        <div class="ov-ph"><h2 class="ov-h2" id="ov-rec">Pendência recorrente</h2><span class="ov-sub">Top 5</span></div>
+        ${_recurrent.length ? _recurrent.map(r => `
+          <div class="ov-li" onclick="viewClient('${escapeHtml(r.clientId)}')">
+            <span class="ov-name">${escapeHtml(r.clientName)}</span>
+            <small>${r.streak} meses seguidos</small>
+          </div>`).join('') : `<p class="ov-empty">Nenhum cliente recorrente.</p>`}
+      </section>` : ''}
       ${!_dashIsHidden('aniversarios') ? `
-      <div class="card dash-widget">
+      <section class="card dash-widget ov-panel" aria-labelledby="ov-aniv">
         ${_dashHideBtn('aniversarios')}
-        <div class="section-header"><span class="section-title">🎂 Aniversários de cliente (mês atual)</span></div>
-        ${_anniv.length ? `<div style="display:flex;flex-direction:column;gap:6px">` + _anniv.map(a => `
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;cursor:pointer" onclick="viewClient('${escapeHtml(a.clientId)}')">
-            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(a.clientName)}</span>
-            <span class="tag tag-green">${a.years} ano(s)</span>
-          </div>`).join('') + `</div>` : `<div class="empty-state" style="padding:16px"><p>Nenhum aniversário neste mês</p></div>`}
-      </div>` : ''}
+        <div class="ov-ph"><h2 class="ov-h2" id="ov-aniv">Aniversários de clientes</h2><span class="ov-sub">Mês atual</span></div>
+        ${_anniv.length ? _anniv.map(a => `
+          <div class="ov-li" onclick="viewClient('${escapeHtml(a.clientId)}')">
+            <span class="ov-name">${escapeHtml(a.clientName)}</span>
+            <small>${a.years} ${a.years === 1 ? 'ano' : 'anos'}</small>
+          </div>`).join('') : `<p class="ov-empty">Nenhum aniversário neste mês.</p>`}
+      </section>` : ''}
+    </div>
     </div>
     
     ${!_dashIsHidden('stats') ? `<div class="dash-widget" style="position:relative">${_dashHideBtn('stats')}<div class="stats-grid">` : '<div style="display:none"><div>'}
