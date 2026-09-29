@@ -306,6 +306,12 @@ function _ensurePresentationStyle(){
 }
 function enterPresentationMode(){
   _ensurePresentationStyle();
+  // Já apresentando: não sobrescreve _presentationPrev, senão o "sair"
+  // restauraria o estado oculto (ex.: 2 cliques em Apresentar).
+  if (document.body.classList.contains('presentation-mode') || document.getElementById('exitPresentationBtn')) {
+    _ensureExitPresentationBtn();
+    return;
+  }
   var sidebar=document.getElementById('sidebar');
   var main=document.getElementById('mainContent');
   var topbar=document.querySelector('.topbar');
@@ -319,32 +325,43 @@ function enterPresentationMode(){
   if(main) main.style.marginLeft='0';
   if(topbar) topbar.style.display='none';
   document.body.classList.add('presentation-mode');
+  _ensureExitPresentationBtn();
+}
+function _ensureExitPresentationBtn(){
   var existing=document.getElementById('exitPresentationBtn');
-  if(!existing){
-    var btn=document.createElement('button');
-    btn.id='exitPresentationBtn';
-    btn.textContent='Sair do modo';
-    btn.className='btn btn-secondary';
-    btn.style.cssText='position:fixed;top:12px;right:12px;z-index:9999';
-    btn.onclick=exitPresentationMode;
-    document.body.appendChild(btn);
-  }
+  if(existing) return existing;
+  var btn=document.createElement('button');
+  btn.id='exitPresentationBtn';
+  btn.type='button';
+  btn.textContent='Sair do modo';
+  btn.className='btn btn-secondary';
+  btn.style.cssText='position:fixed;top:12px;right:12px;z-index:9999';
+  btn.onclick=exitPresentationMode;
+  document.body.appendChild(btn);
+  return btn;
 }
 function exitPresentationMode(){
   var sidebar=document.getElementById('sidebar');
   var main=document.getElementById('mainContent');
   var topbar=document.querySelector('.topbar');
-  if(_presentationPrev){
-    if(sidebar) sidebar.style.display=_presentationPrev.sidebarDisplay;
-    if(main) main.style.marginLeft=_presentationPrev.mainMargin;
-    if(topbar) topbar.style.display=_presentationPrev.topbarDisplay;
-    document.body.className=_presentationPrev.bodyClass;
+  // Estado salvo corrompido (capturado já apresentando): volta ao padrão
+  // em vez de restaurar o modo oculto.
+  var corrupt = _presentationPrev && (
+    String(_presentationPrev.bodyClass || '').split(/\s+/).indexOf('presentation-mode') !== -1 ||
+    _presentationPrev.sidebarDisplay === 'none'
+  );
+  if(_presentationPrev && !corrupt){
+    if(sidebar) sidebar.style.display=_presentationPrev.sidebarDisplay || '';
+    if(main) main.style.marginLeft=_presentationPrev.mainMargin || '';
+    if(topbar) topbar.style.display=_presentationPrev.topbarDisplay || '';
   } else {
     if(sidebar) sidebar.style.display='';
     if(main) main.style.marginLeft='';
     if(topbar) topbar.style.display='';
-    document.body.classList.remove('presentation-mode');
   }
+  // Remove só a classe do modo: preserva as demais (ex.: tema, modal).
+  document.body.classList.remove('presentation-mode');
+  _presentationPrev=null;
   var btn=document.getElementById('exitPresentationBtn');
   if(btn) btn.remove();
 }
