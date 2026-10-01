@@ -284,6 +284,9 @@ describe('ETAPA 2 — estado e retry puros', () => {
     const np = classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS' } });
     expect(np.outcome).toBe('permanent');
     expect(np.detail).toMatch(/play/i);
+    const npMsg = classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS', message: 'Dê play manualmente no Milvus' } });
+    expect(npMsg.outcome).toBe('permanent');
+    expect(npMsg.detail).toBe('Dê play manualmente no Milvus');
     expect(classifyMilvusFinalizarResult(null, new TypeError('Failed to fetch')).outcome).toBe('transient');
     expect(classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_UNAVAILABLE' } }).outcome).toBe('transient');
   });

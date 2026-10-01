@@ -134,7 +134,7 @@ function classifyMilvusFinalizarResult(res, invokeError) {
   }
   const code = String(data.code || '');
   if (code === 'MILVUS_CHAMADO_NOT_IN_PROGRESS') {
-    return { outcome: 'permanent', detail: 'Chamado ainda não está em atendimento no Milvus — dê play e tente novamente' };
+    return { outcome: 'permanent', detail: String(data.message || 'Chamado ainda não está em atendimento no Milvus — dê play e tente novamente') };
   }
   if (code === 'MILVUS_VISIT_WITHOUT_CODIGO' || code === 'MILVUS_VISIT_WITHOUT_CLIENT' ||
       code === 'MILVUS_VALIDATION_ERROR' || code === 'MILVUS_INVALID_TOKEN') {

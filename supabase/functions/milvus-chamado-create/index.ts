@@ -27,14 +27,19 @@
 // FLUXO finalizar (visita concluída → chamado finalizado):
 // - Frontend envia SOMENTE { visitId, action:"finalizar" }. O token e o
 //   payload ficam aqui — o frontend NUNCA vê o MILVUS_API_TOKEN.
+// - Consulta de estado (listagem por codigo) antes de agir:
+//   já "Finalizado" no Milvus (resposta perdida antes)? adota sem PUT.
+//   Ainda Novo/"a fazer"? tenta o play ANTES de desistir: play → espera ~4s
+//   → reconsulta; confirmado "Em atendimento", segue p/ o PUT; senão,
+//   MILVUS_CHAMADO_NOT_IN_PROGRESS com mensagem amigável (play manual).
+//   Falha na consulta? segue para o fluxo normal (o PUT decide).
 // - Pré-passo "play" (best-effort): POST /api/chamado/atualizar atribuindo
 //   o técnico default. Atribuir técnico costuma mover Novo → Em atendimento,
-//   que é o pré-requisito do Milvus p/ finalizar. Falha aqui NÃO bloqueia o
-//   PUT seguinte (o chamado pode já estar em atendimento). Fase 2: trocar o
-//   técnico default pelo e-mail do operador da visita (ver abaixo).
-// - Consulta de estado (listagem por codigo) antes de agir: já "Finalizado"
-//   no Milvus (resposta perdida antes)? adota sem PUT. Ainda "a fazer"?
-//   MILVUS_CHAMADO_NOT_IN_PROGRESS sem PUT inútil (play pendente).
+//   que é o pré-requisito do Milvus p/ finalizar. Fase 2: trocar o técnico
+//   default pelo e-mail do operador da visita (ver abaixo).
+// - Rate limit da doc oficial (>1min entre requisições, máx 1000/página):
+//   na prática o fluxo já encadeia chamadas; a reconsulta extra só roda no
+//   caminho Novo, e sua falha NÃO bloqueia (o PUT decide em seguida).
 // - Fast-path: visits.milvus_finalizar_status já "finalizado" → devolve o
 //   código SEM chamar o Milvus (reload/retry não repetem a operação).
 // - Sem milvus_chamado_codigo → MILVUS_VISIT_WITHOUT_CODIGO (permanente:
@@ -134,6 +139,33 @@ const _fmtDate = (iso: string): string => {
 // Marcador de idempotência da CRIAÇÃO: identifica o chamado desta visita
 // mesmo se a resposta da criação se perdeu (cenário timeout → retry).
 const _markerFor = (visitId: string): string => `[ref:${visitId}]`;
+
+const _sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+// Pré-passo "play": atribui o técnico default via /api/chamado/atualizar.
+// Atribuir técnico costuma mover Novo → Em atendimento (pré-requisito do
+// finalizar). Retorna true se o Milvus aceitou (HTTP 2xx); false caso
+// contrário (sem técnico configurado, rede/timeout ou 4xx/5xx). Best-effort:
+// quem chama decide o próximo passo. Nunca lança.
+async function _playChamado(codigo: number, visitId: string): Promise<boolean> {
+  if (!MILVUS_DEFAULTS.tecnico) {
+    console.log(`milvus-chamado-create: play impossível visit_id=${visitId} (sem técnico default configurado)`);
+    return false;
+  }
+  try {
+    const upd = await _fetchMilvus(ATUALIZAR_URL, {
+      chamado_ids: String(codigo),
+      chamado_tecnico: MILVUS_DEFAULTS.tecnico,
+    });
+    const updBody = await upd.text().catch(() => "");
+    console.log(`milvus-chamado-create: play visit_id=${visitId} codigo=${codigo} http=${upd.status} body=${updBody.slice(0, 200)}`);
+    return upd.ok;
+  } catch (e) {
+    console.warn(`milvus-chamado-create: play falhou visit_id=${visitId} codigo=${codigo} (${(e as Error)?.name ?? "erro"})`);
+    return false;
+  }
+}
 
 async function _fetchMilvus(url: string, body: unknown, method = "POST"): Promise<Response> {
   const ctrl = new AbortController();
@@ -375,9 +407,9 @@ async function _handleFinalizar(
   console.log(`milvus-chamado-create: finalizar início visit_id=${visitId} codigo=${codigo}`);
 
   // Estado real antes de agir: já finalizado (resposta perdida antes)?
-  // adota sem PUT. Ainda "a fazer"? play pendente — retorna código próprio
-  // sem PUT inútil (o PUT falharia). Falha na consulta ou em atendimento?
-  // segue para o fluxo normal (o PUT decide).
+  // adota sem PUT. Ainda Novo/"a fazer"? tenta o play ANTES de desistir
+  // (play → espera → reconsulta); só desiste se continuar fora de
+  // atendimento. Falha na consulta? segue para o fluxo normal (o PUT decide).
   const estado = await findChamadoStatus(String(codigo));
   if (estado === "finalizado") {
     await admin.from("visits").update({
@@ -388,27 +420,65 @@ async function _handleFinalizar(
     console.log(`milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status)`);
     return json({ success: true, recovered: true, codigo, visitId });
   }
+  let playJaFeito = false;
   if (estado === "aguardando") {
-    console.log(`milvus-chamado-create: finalizar bloqueado visit_id=${visitId} codigo=${codigo} (chamado ainda não está em atendimento)`);
-    return json({ success: false, code: "MILVUS_CHAMADO_NOT_IN_PROGRESS", visitId });
+    console.log(`milvus-chamado-create: finalizar estado antes=Novo visit_id=${visitId} codigo=${codigo} (tentando play)`);
+    const okPlay = await _playChamado(codigo, visitId);
+    if (!okPlay) {
+      console.log(`milvus-chamado-create: finalizar play não aplicado visit_id=${visitId} codigo=${codigo}`);
+      return json({
+        success: false,
+        code: "MILVUS_CHAMADO_NOT_IN_PROGRESS",
+        message: `O chamado ${codigo} ainda está Novo no Milvus e o play automático não pôde ser executado. Dê play manualmente no Milvus (coloque o chamado Em atendimento) e tente concluir de novo.`,
+        codigo,
+        visitId,
+      });
+    }
+    playJaFeito = true;
+    // Best-effort: dá tempo do Milvus transicionar antes de reconsultar.
+    await _sleep(4000);
+    const depois = await findChamadoStatus(String(codigo));
+    console.log(`milvus-chamado-create: finalizar estado depois=${depois ?? "desconhecido"} visit_id=${visitId} codigo=${codigo}`);
+    if (depois === "finalizado") {
+      await admin.from("visits").update({
+        milvus_finalizar_status: "finalizado",
+        milvus_finalizar_erro: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", visitId);
+      console.log(`milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status na reconsulta)`);
+      return json({ success: true, recovered: true, codigo, visitId });
+    }
+    if (depois !== "emandamento" && depois !== null) {
+      console.log(`milvus-chamado-create: finalizar bloqueado visit_id=${visitId} codigo=${codigo} (play não moveu para atendimento)`);
+      return json({
+        success: false,
+        code: "MILVUS_CHAMADO_NOT_IN_PROGRESS",
+        message: `O chamado ${codigo} continua fora de atendimento no Milvus mesmo após o play. Dê play manualmente no Milvus (coloque o chamado Em atendimento) e tente concluir de novo.`,
+        codigo,
+        visitId,
+      });
+    }
+    console.log(`milvus-chamado-create: finalizar play confirmado em atendimento visit_id=${visitId} codigo=${codigo} (segue p/ finalizar)`);
   }
 
-  // Pré-passo "play": atribui o técnico default (fase 1). Fase 2 = e-mail
-  // do operador da visita (buscar em operators pelo nome e usar aqui).
-  // Best-effort com corpo logado em falha (diagnóstico do 404).
-  if (MILVUS_DEFAULTS.tecnico) {
-    try {
-      const upd = await _fetchMilvus(ATUALIZAR_URL, {
-        chamado_ids: String(codigo),
-        chamado_tecnico: MILVUS_DEFAULTS.tecnico,
-      });
-      const updBody = await upd.text().catch(() => "");
-      console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status} body=${updBody.slice(0, 200)}`);
-    } catch (e) {
-      console.warn(`milvus-chamado-create: finalizar pré-atualizar falhou visit_id=${visitId} (segue p/ finalizar): ${(e as Error)?.name ?? "erro"}`);
+  // Pré-passo "play" best-effort para os demais casos (chamado já em
+  // atendimento ou consulta inicial falhou). Idempotente; pulado quando o
+  // play acima já rodou, para economizar chamadas à API.
+  if (!playJaFeito) {
+    if (MILVUS_DEFAULTS.tecnico) {
+      try {
+        const upd = await _fetchMilvus(ATUALIZAR_URL, {
+          chamado_ids: String(codigo),
+          chamado_tecnico: MILVUS_DEFAULTS.tecnico,
+        });
+        const updBody = await upd.text().catch(() => "");
+        console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status} body=${updBody.slice(0, 200)}`);
+      } catch (e) {
+        console.warn(`milvus-chamado-create: finalizar pré-atualizar falhou visit_id=${visitId} (segue p/ finalizar): ${(e as Error)?.name ?? "erro"}`);
+      }
+    } else {
+      console.log(`milvus-chamado-create: finalizar sem técnico default — pulando pré-atualizar visit_id=${visitId}`);
     }
-  } else {
-    console.log(`milvus-chamado-create: finalizar sem técnico default — pulando pré-atualizar visit_id=${visitId}`);
   }
 
   const payload = buildFinalizePayload(
