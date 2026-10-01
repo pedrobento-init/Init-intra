@@ -422,12 +422,33 @@ function toggleMeetingInlineForm(clientId) {
   }
 }
 
+// ── Descrição no card da reunião (puro, testável) ───────────────────────────
+// Retorna null quando não há o que exibir: sem descrição, ou sem assunto
+// (nesse caso o título do card já é a própria descrição). `long` indica
+// texto além do preview → clamp de 3 linhas + botão "ver mais".
+const MEETING_DESC_PREVIEW_CHARS = 160;
+function getMeetingDescView(p) {
+  const assunto = String((p && p.assunto) || '').trim();
+  const text = String((p && p.descricao) || '').trim();
+  if (!assunto || !text) return null;
+  return { text, long: text.length > MEETING_DESC_PREVIEW_CHARS };
+}
+
+function meetingToggleDesc(penId) {
+  const box = document.getElementById('meeting-desc-' + penId);
+  if (!box) return;
+  const clamped = box.classList.toggle('is-clamped');
+  const btn = document.getElementById('meeting-desc-toggle-' + penId);
+  if (btn) btn.textContent = clamped ? 'ver mais' : 'ver menos';
+}
+
 function _meetingPenCard(p) {
   const isReviewed = _meetingState && _meetingState.reviewedIds.has(p.id);
   const isResolved = _meetingState && _meetingState.resolvedIds.includes(p.id);
   const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
   const onLeaveBadge = onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : '';
   const reassignBtn = onLeave ? `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')">Reatribuir</button>` : '';
+  const descView = getMeetingDescView(p);
 
   return `
     <div class="card" id="meeting-card-${escapeHtml(p.id)}" style="border-left:4px solid ${
@@ -450,6 +471,10 @@ function _meetingPenCard(p) {
           </button>
         </div>
       </div>
+
+      ${descView ? `
+      <div class="meet-desc${descView.long ? ' is-clamped' : ''}" id="meeting-desc-${escapeHtml(p.id)}">${escapeHtml(descView.text)}</div>
+      ${descView.long ? `<button type="button" class="meet-desc-toggle" id="meeting-desc-toggle-${escapeHtml(p.id)}" onclick="meetingToggleDesc('${escapeHtml(p.id)}')">ver mais</button>` : ''}` : ''}
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <select class="form-select" id="meeting-status-${escapeHtml(p.id)}" style="width:160px;font-size:12px">
