@@ -80,7 +80,7 @@ Wait-RateLimit 65 'antes do play'
 Write-Host '== 2/3 play (atualizar com técnico) =='
 $play = Invoke-Milvus 'POST' '/api/chamado/atualizar' @{ chamado_ids = [string]$Codigo; chamado_tecnico = $Tecnico }
 $playRaw = if ($play.body -is [string]) { $play.body } else { ($play.body | ConvertTo-Json -Depth 4 -Compress) }
-Write-Host ("HTTP={0} ok={1} body={2}" -f $play.status, $play.ok, $playRaw.Substring(0, [Math]::Min(300, $playRaw.Length))))
+Write-Host ("HTTP={0} ok={1} body={2}" -f $play.status, $play.ok, $playRaw.Substring(0, [Math]::Min(300, $playRaw.Length)))
 Wait-RateLimit 65 'antes da reconsulta'
 
 Write-Host '== 3/3 estado DEPOIS (listagem) =='

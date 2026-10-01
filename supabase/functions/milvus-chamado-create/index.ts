@@ -37,6 +37,14 @@
 //   o técnico default. Atribuir técnico costuma mover Novo → Em atendimento,
 //   que é o pré-requisito do Milvus p/ finalizar. Fase 2: trocar o técnico
 //   default pelo e-mail do operador da visita (ver abaixo).
+// - EVIDÊNCIA DE CAMPO (chamado real Novo 26030, matriz tools/milvus-play-matrix.ps1):
+//   atualizar com codigo → 404 "não encontrado"; com id interno + tecnico
+//   (nome e e-mail) ou prioridade → 500 "Campo inválido" em todas as variantes;
+//   acompanhamento cria (204, inclusive privado) mas NÃO move o status.
+//   Ou seja, nenhum caminho via API move Novo → atendimento nesses chamados;
+//   o play manual no portal segue como saída oficial (a mensagem de erro já
+//   orienta). Se futuros chamados responderem diferente, remover o bloco do
+//   play economiza ~5s + 2 chamadas por finalização.
 // - Rate limit da doc oficial (>1min entre requisições, máx 1000/página):
 //   na prática o fluxo já encadeia chamadas; a reconsulta extra só roda no
 //   caminho Novo, e sua falha NÃO bloqueia (o PUT decide em seguida).
