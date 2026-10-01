@@ -442,13 +442,48 @@ function meetingToggleDesc(penId) {
   if (btn) btn.textContent = clamped ? 'ver mais' : 'ver menos';
 }
 
+function _fmtMeetingDateTime(v) {
+  try {
+    if (!v) return '—';
+    if (typeof formatDateTime === 'function') return formatDateTime(v);
+  } catch (_) {}
+  return String(v || '—');
+}
+
+// Últimas movimentações de responsável/conclusão da pendência (discreto).
+// Reaproveita audit_logs (mesma fonte do Histórico); sem tabela nova.
+function _meetingPenHistoryHtml(penId) {
+  let logs = [];
+  try {
+    if (typeof getLogs !== 'function') return '';
+    logs = getLogs() || [];
+    if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
+  } catch (_) { return ''; }
+  const rows = logs.filter(l => {
+    try {
+      const t = String(l.type || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return t === 'pendencia' && l.targetId === penId &&
+        (l.action === 'Reatribuiu' || l.action === 'Corrigiu conclusão');
+    } catch (_) { return false; }
+  }).sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || ''))).slice(0, 2);
+  if (!rows.length) return '';
+  return `<div class="meet-hist">` + rows.map(l => {
+    const label = l.action === 'Reatribuiu' ? 'Reatribuída de' : 'Conclusão corrigida de';
+    return `<div>${label} ${escapeHtml(l.details || '—')} · ${escapeHtml(l.operatorName || 'Sistema')} · ${escapeHtml(_fmtMeetingDateTime(l.timestamp))}</div>`;
+  }).join('') + `</div>`;
+}
+
 function _meetingPenCard(p) {
   const isReviewed = _meetingState && _meetingState.reviewedIds.has(p.id);
   const isResolved = _meetingState && _meetingState.resolvedIds.includes(p.id);
   const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
   const onLeaveBadge = onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : '';
-  const reassignBtn = onLeave ? `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')">Reatribuir</button>` : '';
+  const reassignBtn = `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')" aria-label="Reatribuir responsável">Reatribuir</button>`;
   const descView = getMeetingDescView(p);
+  let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  const isDone = _isResolvida(p.status);
 
   return `
     <div class="card" id="meeting-card-${escapeHtml(p.id)}" style="border-left:4px solid ${
@@ -475,6 +510,10 @@ function _meetingPenCard(p) {
       ${descView ? `
       <div class="meet-desc${descView.long ? ' is-clamped' : ''}" id="meeting-desc-${escapeHtml(p.id)}">${escapeHtml(descView.text)}</div>
       ${descView.long ? `<button type="button" class="meet-desc-toggle" id="meeting-desc-toggle-${escapeHtml(p.id)}" onclick="meetingToggleDesc('${escapeHtml(p.id)}')">ver mais</button>` : ''}` : ''}
+
+      ${isDone ? `
+      <div class="meet-done" id="meeting-done-${escapeHtml(p.id)}">Concluída por <strong>${escapeHtml(p.completedBy || '—')}</strong>${p.completedAt ? ` em ${escapeHtml(_fmtMeetingDateTime(p.completedAt))}` : ''} <button type="button" class="btn btn-sm btn-secondary" onclick="openCorrectCompletion('${escapeHtml(p.id)}')" aria-label="Corrigir quem concluiu">Corrigir</button></div>` : ''}
+      ${_meetingPenHistoryHtml(p.id)}
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <select class="form-select" id="meeting-status-${escapeHtml(p.id)}" style="width:160px;font-size:12px">

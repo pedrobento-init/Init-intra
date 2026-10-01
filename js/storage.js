@@ -1719,6 +1719,15 @@ function savePendencia(data) {
     data.completedAt = now;
     const idx = list.findIndex(p => p.id === data.id);
     if (idx !== -1) list[idx].completedAt = data.completedAt;
+    // Quem concluiu: responsável atual (ou usuário da sessão). Correções
+    // posteriores usam updatePendenciaAssignee; legados ficam sem valor.
+    if (!data.completedBy) {
+      try {
+        data.completedBy = data.responsible || (typeof getUser === 'function' ? (getUser().name || '') : '') || '';
+      } catch (_) { data.completedBy = data.completedBy || data.responsible || ''; }
+      if (!data.completedBy) delete data.completedBy;
+      else if (idx !== -1) list[idx].completedBy = data.completedBy;
+    }
   }
   dbSet(DB.PENDENCIAS, list);
   // Gestão: histórico nunca recebe assunto/descrição (só marcador restrito).
@@ -1797,6 +1806,7 @@ function savePendencia(data) {
       timer_total_seconds: data.timerTotalSeconds || 0,
       timer_operator: data.timerOperator || null,
       completed_at: data.completedAt || null,
+      completed_by: data.completedBy || null,
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
@@ -1808,6 +1818,83 @@ function savePendencia(data) {
   }
 
   return data;
+}
+
+// ── Assignee / quem concluiu da pendência ("API" da camada de dados) ───────
+// Regra de permissão (simples e documentada): quem pode VER a pendência
+// (canViewPendencia — inclui a trava Gestão) pode reatribuir/corrigir; toda
+// mudança vai para a auditoria (addLog). O vínculo com a reunião é garantido
+// pelo contexto da UI (só há botão nas pendências exibidas).
+// patch: { responsible?, completedBy? } — undefined = não toca; '' = limpa.
+// Retorna { pen, changed }. Erros (throw, mensagens claras):
+// - 'Pendência não encontrada.' (404) | 'Operador "X" não encontrado ou
+//   indisponível.' (400) | 'Acesso negado a esta pendência.' (403).
+function _findAnyOperator(name) {
+  const nm = String(name || '').trim();
+  if (!nm) return null;
+  let ops = [];
+  try { ops = (typeof getOperators === 'function' ? getOperators() : []) || []; } catch (_) { ops = []; }
+  if (!ops.length) return { name: nm, _unverified: true };
+  return ops.find(o => o && String(o.name || '') === nm) || null;
+}
+
+function updatePendenciaAssignee(penId, patch) {
+  const pen = (typeof getPendenciaById === 'function') ? getPendenciaById(penId) : null;
+  if (!pen) throw new Error('Pendência não encontrada.');
+  try {
+    if (typeof canViewPendencia === 'function' && !canViewPendencia(pen)) {
+      throw new Error('Acesso negado a esta pendência.');
+    }
+  } catch (e) { if (e && /negado/i.test(e.message || '')) throw e; }
+  const p = patch || {};
+  const changed = { responsible: false, completedBy: false };
+  let nextResponsible = pen.responsible;
+  let nextCompletedBy = pen.completedBy;
+
+  if (Object.prototype.hasOwnProperty.call(p, 'responsible')) {
+    const v = (p.responsible === null || p.responsible === undefined) ? '' : String(p.responsible).trim();
+    if (v === (pen.responsible || '')) { /* igual: sem mudança, sem log */ }
+    else {
+      if (v) {
+        const any = _findAnyOperator(v);
+        if (any && !any._unverified) {
+          if (any.active === false) throw new Error('Operador "' + v + '" está inativo.');
+          if (any.onLeave === true) throw new Error('Operador "' + v + '" está afastado.');
+        } else if (!any) {
+          throw new Error('Operador "' + v + '" não encontrado ou indisponível.');
+        }
+      }
+      nextResponsible = v;
+      changed.responsible = true;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'completedBy')) {
+    let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
+    try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+    if (!_isResolvida(pen.status)) throw new Error('Só é possível informar quem concluiu em pendência concluída.');
+    const v = (p.completedBy === null || p.completedBy === undefined) ? '' : String(p.completedBy).trim();
+    if (v === (pen.completedBy || '')) { /* igual: sem mudança, sem log */ }
+    else {
+      if (v) {
+        // Quem concluiu é fato passado: basta o operador existir (vale
+        // afastado/inativo); só barra nome inexistente.
+        if (!_findAnyOperator(v)) throw new Error('Operador "' + v + '" não encontrado.');
+      }
+      nextCompletedBy = v;
+      changed.completedBy = true;
+    }
+  }
+  if (!changed.responsible && !changed.completedBy) {
+    return { pen: getPendenciaById(penId), changed };
+  }
+  const saved = savePendencia({ ...pen, responsible: nextResponsible, completedBy: nextCompletedBy });
+  try {
+    if (typeof addLog === 'function') {
+      if (changed.responsible) addLog('Reatribuiu', 'Pendência', penId, (pen.responsible || '—') + ' → ' + (nextResponsible || '—'));
+      if (changed.completedBy) addLog('Corrigiu conclusão', 'Pendência', penId, (pen.completedBy || '—') + ' → ' + (nextCompletedBy || '—'));
+    }
+  } catch (_) {}
+  return { pen: saved, changed };
 }
 function deletePendencia(id) {
   if (!canDelete()) {
@@ -3062,5 +3149,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia, updatePendenciaAssignee };
 }

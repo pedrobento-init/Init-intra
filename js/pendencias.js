@@ -1412,33 +1412,100 @@ function openReassignPendencia(penId) {
   openModal('Reatribuir pendência', `
     <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : ''}</p>
     <div class="form-group">
-      <label class="form-label">Novo responsável *</label>
-      <select class="form-select" id="reassignSelect">
+      <label class="form-label" for="reassignSelect">Novo responsável</label>
+      <select class="form-select" id="reassignSelect" aria-label="Novo responsável">
+        <option value="">— Sem responsável —</option>
         ${options.map(o => `<option value="${escapeHtml(o.name)}" ${o.name===current?'selected':''}>${escapeHtml(o.name)}</option>`).join('')}
       </select>
     </div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitReassignPendencia('${escapeHtml(penId)}')">Salvar</button>
+      <button class="btn btn-primary" onclick="this.disabled=true;submitReassignPendencia('${escapeHtml(penId)}',this)">Salvar</button>
     </div>
   `);
 }
 
-function submitReassignPendencia(penId) {
+function submitReassignPendencia(penId, btn) {
+  const enable = () => { try { if (btn) btn.disabled = false; } catch (_) {} };
   const pen = getPendenciaById(penId);
-  if (!pen) return;
+  if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); enable(); return; }
   const sel = document.getElementById('reassignSelect');
   const novo = sel ? sel.value : '';
-  if (!novo) { if (typeof showToast === 'function') showToast('Selecione um operador.', 'error'); return; }
-  if (novo === pen.responsible) { if (typeof showToast === 'function') showToast('Selecione um responsável diferente.', 'error'); return; }
-  const old = pen.responsible;
-  pen.responsible = novo;
-  savePendencia(pen);
-  if (typeof addLog === 'function') addLog('Reatribuiu', 'Pendência', pen.id, old + ' → ' + novo);
-  closeModal();
-  if (typeof showToast === 'function') showToast('Pendência reatribuída para ' + novo + '!', 'success');
-  try { _optimisticPenUpsert({ ...pen }); } catch (_) {} // reflete na lista na hora
+  if (novo === (pen.responsible || '')) {
+    if (typeof showToast === 'function') showToast(novo ? 'Selecione um responsável diferente.' : 'A pendência já está sem responsável.', 'error');
+    enable();
+    return;
+  }
+  try {
+    const res = updatePendenciaAssignee(penId, { responsible: novo });
+    closeModal();
+    if (typeof showToast === 'function') showToast(novo ? 'Pendência reatribuída para ' + novo + '!' : 'Responsável removido.', 'success');
+    try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {} // reflete na lista na hora
+  } catch (err) {
+    if (typeof showToast === 'function') showToast(err.message || 'Não foi possível reatribuir.', 'error');
+    enable();
+    return;
+  }
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
+  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
+function _correctCompletionOptions(current) {
+  let ops = [];
+  try { ops = (typeof getOperators === 'function' ? getOperators() : []) || []; } catch (_) { ops = []; }
+  try {
+    const team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
+    if (team && typeof isTeamAdmin === 'function' && !isTeamAdmin()) {
+      const filtered = ops.filter(o => (o.team || 'init') === team);
+      if (filtered.length) ops = filtered;
+    }
+  } catch (_) {}
+  // Quem concluiu é fato passado: lista todos (vale afastado/inativo).
+  return `<option value="">— Não informado —</option>` +
+    ops.map(o => `<option value="${escapeHtml(o.name)}" ${o.name===current?'selected':''}>${escapeHtml(o.name)}</option>`).join('');
+}
+
+function openCorrectCompletion(penId) {
+  const pen = getPendenciaById(penId);
+  if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); return; }
+  let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  if (!_isResolvida(pen.status)) { if (typeof showToast === 'function') showToast('Só é possível informar quem concluiu em pendência concluída.', 'error'); return; }
+  const current = pen.completedBy || '';
+  let quando = '—';
+  try { quando = (typeof formatDateTime === 'function' ? formatDateTime(pen.completedAt) : String(pen.completedAt || '—')); } catch (_) { quando = String(pen.completedAt || '—'); }
+  openModal('Corrigir quem concluiu', `
+    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Concluída em: <strong>${escapeHtml(quando)}</strong></p>
+    <div class="form-group">
+      <label class="form-label" for="correctCompletedBySelect">Quem concluiu</label>
+      <select class="form-select" id="correctCompletedBySelect" aria-label="Quem concluiu">
+        ${_correctCompletionOptions(current)}
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="this.disabled=true;submitCorrectCompletion('${escapeHtml(penId)}',this)">Salvar</button>
+    </div>
+  `);
+}
+
+function submitCorrectCompletion(penId, btn) {
+  const enable = () => { try { if (btn) btn.disabled = false; } catch (_) {} };
+  const pen = getPendenciaById(penId);
+  if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); enable(); return; }
+  const sel = document.getElementById('correctCompletedBySelect');
+  const novo = sel ? sel.value : '';
+  if (novo === (pen.completedBy || '')) { if (typeof showToast === 'function') showToast('Nenhuma alteração a salvar.', 'error'); enable(); return; }
+  try {
+    updatePendenciaAssignee(penId, { completedBy: novo });
+    closeModal();
+    if (typeof showToast === 'function') showToast(novo ? 'Quem concluiu atualizado para ' + novo + '.' : 'Quem concluiu removido.', 'success');
+  } catch (err) {
+    if (typeof showToast === 'function') showToast(err.message || 'Não foi possível salvar.', 'error');
+    enable();
+    return;
+  }
   if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
   if (typeof updateBadges === 'function') updateBadges();
 }

@@ -1,0 +1,25 @@
+-- ============================================================
+-- 038: Pendências — quem concluiu (completed_by)
+-- ============================================================
+-- OBJETIVO: guardar quem concluiu cada pendência (completed_by TEXT),
+-- ao lado do já existente completed_at, permitindo corrigir depois
+-- (ex.: outra pessoa marcou ou fez a tarefa).
+--
+-- O QUE MUDA:
+-- - pendencias: ADD COLUMN completed_by TEXT (nulo por padrão).
+-- - Nada mais: sem backfill automático. Registros já concluídos
+--   mantêm completed_by NULL (a UI exibe "—"), sem inventar autoria.
+--   A partir desta versão, concluir carimba responsible-atual||usuário.
+-- - RLS: políticas existentes são por linha; a nova coluna é herdada
+--   sem policy nova (mesmo regime das demais colunas).
+--
+-- COMO APLICAR (Supabase SQL Editor, como postgres/service_role):
+-- 1. Backup/snapshot.
+-- 2. Rode este arquivo inteiro.
+-- 3. Confira: SELECT column_name FROM information_schema.columns
+--    WHERE table_name = 'pendencias' AND column_name = 'completed_by';
+-- ROLLBACK: ALTER TABLE public.pendencias DROP COLUMN IF EXISTS completed_by;
+-- (apaga o "quem concluiu" preenchido depois da migração).
+-- ============================================================
+
+ALTER TABLE public.pendencias ADD COLUMN IF NOT EXISTS completed_by TEXT;

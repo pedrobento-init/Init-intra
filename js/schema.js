@@ -40,7 +40,7 @@ const ENTITIES = [
       checklist: 'checklist', tags: 'tags', recurrence: 'recurrence', visit_id: 'visitId',
       reviewed_in_meeting: 'reviewedInMeeting',
       timer_running: 'timerRunning', timer_started_at: 'timerStartedAt', timer_total_seconds: 'timerTotalSeconds',
-      timer_operator: 'timerOperator', completed_at: 'completedAt', created_at: 'createdAt', updated_at: 'updatedAt'
+      timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt'
     },
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();

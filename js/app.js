@@ -401,7 +401,8 @@ async function _pushImportToSupabase(data) {
       attachments: p.attachments || [], checklist: p.checklist || [], tags: p.tags || [],
       recurrence: p.recurrence || null, visit_id: p.visitId || null,
       reviewed_in_meeting: p.reviewedInMeeting || null,
-      completed_at: p.completedAt || null, created_at: p.createdAt || now, updated_at: p.updatedAt || now
+      completed_at: p.completedAt || null, completed_by: p.completedBy || null,
+      created_at: p.createdAt || now, updated_at: p.updatedAt || now
     })));
   } catch (e) { errors.push('pendencias: ' + e.message); }
 
