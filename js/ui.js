@@ -152,6 +152,24 @@ function closeModal() {
     hide();
   }
   if (_prevFocus && _prevFocus.focus) { _prevFocus.focus(); _prevFocus = null; }
+  // Volta à aba Pendências do cliente (abertura via openClientPendencia).
+  // Adiado: fluxos que fecham e reabrem o modal no mesmo tick (ex.: Editar)
+  // mantêm o overlay visível e o retorno é ignorado.
+  try {
+    if (typeof _clientPenReturn !== 'undefined' && _clientPenReturn && _clientPenReturn.clientId) {
+      const _ret = _clientPenReturn;
+      _clientPenReturn = null;
+      try { if (typeof _clientPenOrigin !== 'undefined') _clientPenOrigin = null; } catch (_) {}
+      setTimeout(() => {
+        try {
+          if (document.getElementById('modalOverlay').style.display !== 'none') return;
+          if (typeof getClientById === 'function' && !getClientById(_ret.clientId)) return;
+          if (typeof viewClient === 'function') viewClient(_ret.clientId);
+          if (typeof switchClientTab === 'function') switchClientTab('pendencias', _ret.clientId);
+        } catch (_) {}
+      }, 220);
+    }
+  } catch (_) {}
 }
 
 function showToast(message, type = 'info') {

@@ -313,7 +313,40 @@ function renderClientTab(tab, id) {
       return true;
     });
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
-      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th></tr></thead><tbody>${pens.map(p=>`<tr><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th><th></th></tr></thead><tbody>${pens.map(p=>`<tr class="cli-pen-row" tabindex="0" onclick="openClientPenRow(event,'${escapeHtml(id)}','${escapeHtml(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openClientPenRow(event,'${escapeHtml(id)}','${escapeHtml(p.id)}')}"><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td><td style="text-align:right"><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientPendencia('${escapeHtml(id)}','${escapeHtml(p.id)}')" aria-label="Abrir pendência: ${escapeHtml(getPendenciaTitulo(p))}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+  }
+}
+
+// ── Aba Pendências do cliente: abrir detalhe com volta à aba ────────────────
+// Contexto de retorno (devolve à aba após fechar) e de origem (reabre a aba
+// após salvar na edição). Limpos ao consumir para não vazar entre fluxos.
+let _clientPenReturn = null;
+let _clientPenOrigin = null;
+
+function openClientPenRow(e, clientId, penId) {
+  try {
+    if (e && e.target && e.target.closest && e.target.closest('button,select,a,input,textarea,label')) return;
+  } catch (_) {}
+  openClientPendencia(clientId, penId);
+}
+
+function openClientPendencia(clientId, penId) {
+  let p = null;
+  try { p = (typeof getPendenciaById === 'function') ? getPendenciaById(penId) : null; } catch (_) { p = null; }
+  if (!p) {
+    _clientPenReturn = null;
+    _clientPenOrigin = null;
+    if (typeof showToast === 'function') showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
+    return;
+  }
+  _clientPenReturn = { clientId };
+  _clientPenOrigin = { clientId, penId };
+  try {
+    openPendenciaDetail(penId);
+  } catch (_) {
+    _clientPenReturn = null;
+    _clientPenOrigin = null;
+    if (typeof showToast === 'function') showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
   }
 }
 

@@ -1250,6 +1250,17 @@ function submitPendenciaForm(e, id) {
     const errors = validatePendencia(data);
     if (errors.length) { showToast(errors[0], 'error'); return; }
     const isNew = !id;
+    // Volta à aba Pendências do cliente quando a edição partiu dela (mesma
+    // pendência): reabre a aba já com a linha atualizada. Criação e demais
+    // fluxos seguem inalterados.
+    let _backToClient = null;
+    try {
+      if (!isNew && id && typeof _clientPenOrigin !== 'undefined' && _clientPenOrigin
+        && _clientPenOrigin.clientId && _clientPenOrigin.penId === id) {
+        _backToClient = { clientId: _clientPenOrigin.clientId };
+      }
+    } catch (_) {}
+    try { _clientPenReturn = null; _clientPenOrigin = null; } catch (_) {}
     savePendencia(data); // preenche data.id/data.createdAt/data.updatedAt no create
     closeModal();
     if (isNew) {
@@ -1263,6 +1274,17 @@ function submitPendenciaForm(e, id) {
     }
     updateBadges();
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
+    if (_backToClient) {
+      try {
+        if (typeof getClientById === 'function' && !getClientById(_backToClient.clientId)) _backToClient = null;
+      } catch (_) { _backToClient = null; }
+    }
+    if (_backToClient) {
+      try {
+        if (typeof viewClient === 'function') viewClient(_backToClient.clientId);
+        if (typeof switchClientTab === 'function') switchClientTab('pendencias', _backToClient.clientId);
+      } catch (_) {}
+    }
   } catch (err) { showToast('Erro ao salvar pendência: ' + err.message, 'error'); }
 }
 

@@ -4397,3 +4397,7 @@ body.dark-theme .ov-wrap {
   overflow: visible;
 }
 .presentation-mode .meet-desc-toggle { display: none; }
+
+/* ── CLIENTE: linha clicável na aba Pendências ── */
+.cli-pen-row { cursor: pointer; }
+.cli-pen-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
