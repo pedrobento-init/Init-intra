@@ -43,10 +43,10 @@ function normalizeMilvusDevice(raw, clientId, team) {
     ip_interno: txt(raw.ip_interno),
     ip_externo: txt(raw.ip_externo),
     mac_address: txt(raw.macaddres !== undefined ? raw.macaddres : raw.mac_address),
-    // marca ← fabricante quando a API omite (mesma família; placa_mae só
-    // entra como último recurso na exibição, via mapMilvusRowToLocal).
-    marca: txt(raw.marca) || txt(raw.fabricante),
-    fabricante: txt(raw.fabricante),
+    // `fabricante` não é puxado (decisão de produto): gravamos '' para
+    // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
+    marca: txt(raw.marca),
+    fabricante: '',
     is_ativo: raw.is_ativo === undefined || raw.is_ativo === null
       ? true
       : raw.is_ativo === true || raw.is_ativo === 1 || raw.is_ativo === '1',
@@ -190,10 +190,10 @@ function mapMilvusRowToLocal(r) {
     milvus_device_id: r.milvus_device_id,
     hostname: r.hostname || '',
     apelido: r.apelido || '',
-    fabricante: r.fabricante || '',
-    // A API raramente preenche marca/fabricante (vem null); para notebook,
-    // placa_mae (ex.: LENOVO) é o melhor sinal disponível — só exibição.
-    marca: r.marca || r.fabricante || r.placa_mae || '',
+    // `processador` é a coluna de hardware exibida; `fabricante` não é puxado.
+    processador: r.processador || '',
+    // Sem fabricante: placa_mae (ex.: LENOVO) segue como último recurso da marca.
+    marca: r.marca || r.placa_mae || '',
     modelo_notebook: r.modelo_notebook || '',
     sistema_operacional: r.sistema_operacional || '',
     numero_serial: r.numero_serial || '',

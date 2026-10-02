@@ -128,17 +128,21 @@ describe('formatMilvusSyncResult', () => {
   });
 });
 
-describe('marca (fallback sem inventar dado)', () => {
-  it('normalize: marca ← fabricante quando a API omite', () => {
-    expect(milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: 'Dell' }, 'C', 't').marca).toBe('Dell');
+describe('fabricante fora / processador dentro', () => {
+  it('normalize: não puxa fabricante; processador passa direto', () => {
+    const r = milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: 'Dell', processador: 'i5-1235U' }, 'C', 't');
+    expect(r.fabricante).toBe('');
+    expect(r.marca).toBe('');
+    expect(r.processador).toBe('i5-1235U');
     expect(milvus.normalizeMilvusDevice({ id: 1, marca: 'Lenovo', fabricante: 'X' }, 'C', 't').marca).toBe('Lenovo');
-    expect(milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: null }, 'C', 't').marca).toBe('');
   });
-  it('exibição: marca || fabricante || placa_mae (caso PB-27 → LENOVO)', () => {
-    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: '', placa_mae: 'LENOVO' }).marca).toBe('LENOVO');
-    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: 'Acer', placa_mae: 'X' }).marca).toBe('Acer');
-    expect(milvus.mapMilvusRowToLocal({ marca: 'Dell', fabricante: '', placa_mae: '' }).marca).toBe('Dell');
-    expect(milvus.mapMilvusRowToLocal({ marca: '', fabricante: '', placa_mae: '' }).marca).toBe('');
+  it('exibição: marca || placa_mae; processador passa direto', () => {
+    expect(milvus.mapMilvusRowToLocal({ marca: '', placa_mae: 'LENOVO' }).marca).toBe('LENOVO');
+    expect(milvus.mapMilvusRowToLocal({ marca: 'Dell', placa_mae: '' }).marca).toBe('Dell');
+    expect(milvus.mapMilvusRowToLocal({ marca: '', placa_mae: '' }).marca).toBe('');
+    expect(milvus.mapMilvusRowToLocal({ processador: 'i5' }).processador).toBe('i5');
+    expect(milvus.mapMilvusRowToLocal({}).processador).toBe('');
+    expect(milvus.mapMilvusRowToLocal({}).fabricante).toBeUndefined();
   });
 });
 

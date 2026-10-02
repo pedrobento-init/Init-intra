@@ -94,10 +94,10 @@ function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: s
     ip_interno: _toText(raw["ip_interno"]),
     ip_externo: _toText(raw["ip_externo"]),
     mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
-    // marca ← fabricante quando a API omite (mesma família; placa_mae só
-    // entra como último recurso na exibição, no frontend).
-    marca: _toText(raw["marca"]) || _toText(raw["fabricante"]),
-    fabricante: _toText(raw["fabricante"]),
+    // `fabricante` não é puxado (decisão de produto): gravamos '' para
+    // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
+    marca: _toText(raw["marca"]),
+    fabricante: "",
     is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
       ? true
       : raw["is_ativo"] === true || raw["is_ativo"] === 1 || raw["is_ativo"] === "1",
@@ -239,10 +239,10 @@ function normalizeBuscarDevice(
     ip_interno: _toText(raw["ip_interno"]),
     ip_externo: _toText(raw["ip_externo"]),
     mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
-    // marca ← fabricante quando a API omite (mesma família; placa_mae só
-    // entra como último recurso na exibição, no frontend).
-    marca: _toText(raw["marca"]) || _toText(raw["fabricante"]),
-    fabricante: _toText(raw["fabricante"]),
+    // `fabricante` não é puxado (decisão de produto): gravamos '' para
+    // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
+    marca: _toText(raw["marca"]),
+    fabricante: "",
     is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
       ? true
       : raw["is_ativo"] === true || raw["is_ativo"] === 1 || raw["is_ativo"] === "1",
