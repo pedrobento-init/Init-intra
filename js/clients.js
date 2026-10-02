@@ -575,6 +575,7 @@ function renderClientInventoryTab(clientId) {
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="milvusSyncBtn" onclick="syncClientInventoryUI('${escapeHtml(clientId)}')">↻ Sincronizar inventário</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportClientInventory('${escapeHtml(clientId)}')" title="Exportar inventário (.xlsx)">Exportar planilha</button>
       <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Importar export Excel do Milvus (.xlsx)">
         📥 Importar planilha
         <input type="file" id="milvusImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientInventoryUI('${escapeHtml(clientId)}',this)" />

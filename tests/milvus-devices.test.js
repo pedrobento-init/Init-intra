@@ -163,3 +163,28 @@ describe('diffMilvusUpsert + idempotência (dupla sincronização)', () => {
     expect(milvus.diffMilvusUpsert([], [{ milvus_device_id: 9 }])).toEqual({ created: 1, updated: 0 });
   });
 });
+
+describe('buildInventoryExportSheet (mesmas colunas da tabela)', () => {
+  it('cabeçalho na ordem exibida, com Processador e sem Fabricante', () => {
+    const sheet = milvus.buildInventoryExportSheet([]);
+    expect(sheet.header).toEqual(['Hostname', 'Apelido', 'Processador', 'Marca', 'Modelo',
+      'Sistema operacional', 'Nº serial', 'Usuário logado', 'Tipo', 'IP interno',
+      'Status', 'Atualizado em']);
+    expect(sheet.rows).toEqual([]);
+  });
+  it('mapeia valores, status e vazios como string vazia', () => {
+    const sheet = milvus.buildInventoryExportSheet([{
+      hostname: 'GMAR-01', apelido: '', processador: 'i5-1235U', marca: 'Dell Inc.',
+      modelo_notebook: '', sistema_operacional: 'Win 11', numero_serial: 'ABC123',
+      usuario_logado: 'Diego', tipo_dispositivo_text: 'Notebook', ip_interno: '10.0.0.5',
+      is_ativo: true, data_ultima_atualizacao: null, updatedAt: null,
+    }, {
+      hostname: 'OLD', is_ativo: false,
+    }]);
+    expect(sheet.rows[0][0]).toBe('GMAR-01');
+    expect(sheet.rows[0][2]).toBe('i5-1235U');
+    expect(sheet.rows[0][1]).toBe('');
+    expect(sheet.rows[0][10]).toBe('Ativo');
+    expect(sheet.rows[1][10]).toBe('Inativo');
+  });
+});

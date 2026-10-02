@@ -456,6 +456,82 @@ function mergeImportWithExisting(clientId, team, drafts, existing) {
   return { rows: rows, created: created, updated: updated };
 }
 
+// ── EXPORTAÇÃO DA PLANILHA (mesmas colunas da tabela) ─────────────────────
+// Puro, testável: cabeçalho + linhas a partir dos dispositivos já mapeados.
+function buildInventoryExportSheet(devices) {
+  const header = ['Hostname', 'Apelido', 'Processador', 'Marca', 'Modelo',
+    'Sistema operacional', 'Nº serial', 'Usuário logado', 'Tipo', 'IP interno',
+    'Status', 'Atualizado em'];
+  const rows = (devices || []).map((d) => {
+    const upd = d.data_ultima_atualizacao || d.updatedAt;
+    let updTxt = '';
+    try {
+      updTxt = upd
+        ? (typeof formatDateTime === 'function' ? formatDateTime(upd) : new Date(upd).toLocaleString('pt-BR'))
+        : '';
+    } catch (_) { updTxt = String(upd || ''); }
+    return [
+      d.hostname || '', d.apelido || '', d.processador || '', d.marca || '',
+      d.modelo_notebook || '', d.sistema_operacional || '', d.numero_serial || '',
+      d.usuario_logado || '', d.tipo_dispositivo_text || '', d.ip_interno || '',
+      d.is_ativo !== false ? 'Ativo' : 'Inativo', updTxt,
+    ];
+  });
+  return { header: header, rows: rows };
+}
+
+function _inventoryExportSlug(name) {
+  return String(name || 'inventario')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    || 'inventario';
+}
+
+// Espelha exportEquipamentosPlanilha: .xlsx real com SheetJS, senão CSV.
+async function exportClientInventory(clientId) {
+  const client = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  if (!client) {
+    if (typeof showToast === 'function') showToast('Cliente não encontrado.', 'error');
+    return;
+  }
+  let devices = [];
+  try {
+    devices = typeof getClientDevices === 'function' ? await getClientDevices(clientId) : [];
+  } catch (_) { devices = []; }
+  if (!devices.length) {
+    if (typeof showToast === 'function') showToast('Nada para exportar.', 'warning');
+    return;
+  }
+  const sheet = buildInventoryExportSheet(devices);
+  const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  const base = `inventario_${_inventoryExportSlug(client.name)}_${stamp}`;
+  try {
+    if (typeof XLSX !== 'undefined' && XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
+      const ws = XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventário');
+      XLSX.writeFile(wb, `${base}.xlsx`);
+      if (typeof showToast === 'function') showToast('Planilha exportada com sucesso!', 'success');
+    } else {
+      throw new Error('xlsx indisponível');
+    }
+  } catch (_) {
+    const cell = (v) => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+    const lines = [sheet.header.join(';'), ...sheet.rows.map((r) => r.map(cell).join(';'))];
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${base}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    if (typeof showToast === 'function') showToast('Planilha (CSV) exportada com sucesso!', 'success');
+  }
+  try {
+    if (typeof addLog === 'function') addLog('Exportou planilha', 'Inventário', clientId, `${sheet.rows.length} dispositivos`);
+  } catch (_) {}
+}
+
 // Lê o .xlsx no navegador (SheetJS via CDN) → linhas (objetos por cabeçalho).
 function readMilvusExportFile(file) {
   return new Promise((resolve, reject) => {
@@ -552,6 +628,8 @@ if (typeof module !== 'undefined' && module.exports) {
     matchDraftToClient: matchDraftToClient,
     mergeImportWithExisting: mergeImportWithExisting,
     importClientDevicesFromRows: importClientDevicesFromRows,
+    buildInventoryExportSheet: buildInventoryExportSheet,
+    exportClientInventory: exportClientInventory,
     formatMilvusSyncResult: formatMilvusSyncResult,
     mapMilvusRowToLocal: mapMilvusRowToLocal,
   };
