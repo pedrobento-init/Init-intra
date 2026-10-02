@@ -33,10 +33,10 @@
 //   → reconsulta; confirmado "Em atendimento", segue p/ o PUT; senão,
 //   MILVUS_CHAMADO_NOT_IN_PROGRESS com mensagem amigável (play manual).
 //   Falha na consulta? segue para o fluxo normal (o PUT decide).
-// - Pré-passo "play" (best-effort): POST /api/chamado/atualizar atribuindo
-//   o técnico default. Atribuir técnico costuma mover Novo → Em atendimento,
-//   que é o pré-requisito do Milvus p/ finalizar. Fase 2: trocar o técnico
-//   default pelo e-mail do operador da visita (ver abaixo).
+// - Pré-passo "play": POST /api/chamado/atualizar com o E-MAIL do operador
+//   da visita (o mesmo da Intra, tabela operators); sem e-mail, cai no
+//   técnico default (MILVUS_DEFAULT_TECNICO). Atribuir técnico costuma mover
+//   Novo → Em atendimento, que é o pré-requisito do Milvus p/ finalizar.
 // - EVIDÊNCIA DE CAMPO (chamado real Novo 26030, matriz tools/milvus-play-matrix.ps1):
 //   atualizar com codigo → 404 "não encontrado"; com id interno + tecnico
 //   (nome e e-mail) ou prioridade → 500 "Campo inválido" em todas as variantes;
@@ -151,20 +151,67 @@ const _markerFor = (visitId: string): string => `[ref:${visitId}]`;
 const _sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-// Pré-passo "play": atribui o técnico default via /api/chamado/atualizar.
-// Atribuir técnico costuma mover Novo → Em atendimento (pré-requisito do
-// finalizar). Retorna true se o Milvus aceitou (HTTP 2xx); false caso
-// contrário (sem técnico configurado, rede/timeout ou 4xx/5xx). Best-effort:
-// quem chama decide o próximo passo. Nunca lança.
-async function _playChamado(codigo: number, visitId: string): Promise<boolean> {
-  if (!MILVUS_DEFAULTS.tecnico) {
-    console.log(`milvus-chamado-create: play impossível visit_id=${visitId} (sem técnico default configurado)`);
+// E-mail do operador da visita (o mesmo da Intra, tabela operators).
+// '' se não houver operador/e-mail. Nunca lança.
+async function _resolveOperatorEmail(
+  admin: ReturnType<typeof createClient>,
+  visitOperator: string | null,
+): Promise<string> {
+  const name = _txt(visitOperator);
+  if (!name) return "";
+  try {
+    const { data } = await admin.from("operators")
+      .select("name,email,active")
+      .eq("name", name)
+      .limit(1)
+      .maybeSingle();
+    return _txt((data as { email?: unknown } | null)?.email);
+  } catch {
+    return "";
+  }
+}
+
+// Fase 2: o técnico do play é o E-MAIL do operador da visita (o mesmo que
+// ele usa na Intra, tabela operators); sem e-mail, cai no default abaixo.
+async function _resolvePlayTecnico(
+  admin: ReturnType<typeof createClient>,
+  visitOperator: string | null,
+): Promise<string> {
+  const fallback = MILVUS_DEFAULTS.tecnico;
+  const name = _txt(visitOperator);
+  if (!name) {
+    console.log(`milvus-chamado-create: play sem operador na visita — usando técnico default`);
+    return fallback;
+  }
+  const email = await _resolveOperatorEmail(admin, name);
+  if (email) {
+    console.log(`milvus-chamado-create: play com e-mail do operador da visita (${name})`);
+    return email;
+  }
+  console.log(`milvus-chamado-create: operador da visita sem e-mail (${name}) — usando técnico default`);
+  return fallback;
+}
+
+// Pré-passo "play": atribui o técnico (e-mail do operador da visita, ou o
+// default) via /api/chamado/atualizar. Atribuir técnico costuma mover Novo →
+// Em atendimento (pré-requisito do finalizar). Retorna true se o Milvus
+// aceitou (HTTP 2xx); false caso contrário. Best-effort: quem chama decide
+// o próximo passo. Nunca lança.
+async function _playChamado(
+  admin: ReturnType<typeof createClient>,
+  codigo: number,
+  visitId: string,
+  visitOperator: string | null,
+): Promise<boolean> {
+  const tecnico = await _resolvePlayTecnico(admin, visitOperator);
+  if (!tecnico) {
+    console.log(`milvus-chamado-create: play impossível visit_id=${visitId} (sem técnico default nem e-mail do operador)`);
     return false;
   }
   try {
     const upd = await _fetchMilvus(ATUALIZAR_URL, {
       chamado_ids: String(codigo),
-      chamado_tecnico: MILVUS_DEFAULTS.tecnico,
+      chamado_tecnico: tecnico,
     });
     const updBody = await upd.text().catch(() => "");
     console.log(`milvus-chamado-create: play visit_id=${visitId} codigo=${codigo} http=${upd.status} body=${updBody.slice(0, 200)}`);
@@ -244,6 +291,8 @@ function buildCreatePayload(
   v: Visit,
   c: Client,
   clienteId: string | number,
+  tecnicoEmail: string,
+  operatorEmail: string,
 ): Record<string, unknown> {
   const marker = _markerFor(v.id);
   const assunto = `Visita técnica — ${_txt(v.client_name) || _txt(c.name) || "cliente"} — ${_fmtDate(_txt(v.date))}`;
@@ -262,11 +311,17 @@ function buildCreatePayload(
     chamado_assunto: assunto,
     chamado_descricao: descricao,
     chamado_descricao_html: descricaoHtml,
-    chamado_email: _firstEmail(c.emails),
+    // Contato/e-mail = operador da visita (não o responsável do cliente):
+    // é o nome que aparece no cabeçalho do chamado no portal.
+    chamado_email: operatorEmail || _firstEmail(c.emails),
     chamado_telefone: _txt(c.responsible_phone) || _txt(c.owner_phone),
-    chamado_contato: _txt(c.responsible) || _txt(c.owner) || _txt(c.name),
+    chamado_contato: _txt(v.operator) || _txt(c.responsible) || _txt(c.owner) || _txt(c.name),
     is_b2c: false,
-    chamado_tecnico: MILVUS_DEFAULTS.tecnico,
+    // Técnico = e-mail do operador da visita (o mesmo da Intra); sem e-mail,
+    // cai no default. O AUTOR exibido no portal ("Pedro • há 13 minutos")
+    // continua sendo o dono do token da API — para trocar o autor, gere o
+    // token a partir de um usuário neutro no Milvus (ex.: "Integração").
+    chamado_tecnico: tecnicoEmail || MILVUS_DEFAULTS.tecnico,
     chamado_mesa: MILVUS_DEFAULTS.mesa,
     chamado_setor: MILVUS_DEFAULTS.setor,
     chamado_categoria_primaria: MILVUS_DEFAULTS.categoria_primaria,
@@ -382,10 +437,10 @@ async function _handleFinalizar(
 ): Promise<Response> {
   const { data: visit } = await admin
     .from("visits")
-    .select("id, client_id, relatorio, status, milvus_chamado_codigo, milvus_finalizar_status")
+    .select("id, client_id, operator, relatorio, status, milvus_chamado_codigo, milvus_finalizar_status")
     .eq("id", visitId)
     .maybeSingle();
-  const v = visit as (Pick<Visit, "id" | "client_id" | "relatorio" | "status" | "milvus_chamado_codigo" | "milvus_finalizar_status">) | null;
+  const v = visit as (Pick<Visit, "id" | "client_id" | "operator" | "relatorio" | "status" | "milvus_chamado_codigo" | "milvus_finalizar_status">) | null;
   if (!v) return json({ error: "Visita não encontrada" }, 404);
 
   // Idempotência rápida: já finalizado → devolve sem tocar o Milvus.
@@ -431,7 +486,7 @@ async function _handleFinalizar(
   let playJaFeito = false;
   if (estado === "aguardando") {
     console.log(`milvus-chamado-create: finalizar estado antes=Novo visit_id=${visitId} codigo=${codigo} (tentando play)`);
-    const okPlay = await _playChamado(codigo, visitId);
+    const okPlay = await _playChamado(admin, codigo, visitId, v.operator);
     if (!okPlay) {
       console.log(`milvus-chamado-create: finalizar play não aplicado visit_id=${visitId} codigo=${codigo}`);
       return json({
@@ -473,20 +528,7 @@ async function _handleFinalizar(
   // atendimento ou consulta inicial falhou). Idempotente; pulado quando o
   // play acima já rodou, para economizar chamadas à API.
   if (!playJaFeito) {
-    if (MILVUS_DEFAULTS.tecnico) {
-      try {
-        const upd = await _fetchMilvus(ATUALIZAR_URL, {
-          chamado_ids: String(codigo),
-          chamado_tecnico: MILVUS_DEFAULTS.tecnico,
-        });
-        const updBody = await upd.text().catch(() => "");
-        console.log(`milvus-chamado-create: finalizar pré-atualizar visit_id=${visitId} http=${upd.status} body=${updBody.slice(0, 200)}`);
-      } catch (e) {
-        console.warn(`milvus-chamado-create: finalizar pré-atualizar falhou visit_id=${visitId} (segue p/ finalizar): ${(e as Error)?.name ?? "erro"}`);
-      }
-    } else {
-      console.log(`milvus-chamado-create: finalizar sem técnico default — pulando pré-atualizar visit_id=${visitId}`);
-    }
+    await _playChamado(admin, codigo, visitId, v.operator);
   }
 
   const payload = buildFinalizePayload(
@@ -640,7 +682,9 @@ serve(async (req: Request) => {
 
   // 8) Criação (tentativa única: resultado incerto volta como pendente e
   // a próxima execução recupera pelo marcador — sem duplicar).
-  const payload = buildCreatePayload(v, c, clienteId);
+  const operatorEmail = await _resolveOperatorEmail(admin, v.operator);
+  const tecnicoCreate = operatorEmail || MILVUS_DEFAULTS.tecnico;
+  const payload = buildCreatePayload(v, c, clienteId, tecnicoCreate, operatorEmail);
   let res: Response;
   try {
     res = await _fetchMilvus(CREATE_URL, payload);
