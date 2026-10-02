@@ -484,10 +484,14 @@ function navigateTo(page) {
   const contentArea = document.getElementById('contentArea');
   const currentHash = window.location.hash.replace('#', '') || 'dashboard';
 
+  if (page === 'mapeamento-milvus') {
+    // Módulo oculto para todos (decisão de produto): acesso direto redireciona.
+    if (typeof showToast === 'function') showToast('Módulo desativado.', 'error');
+    page = 'dashboard';
+  }
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    if (page === 'historico' || page === 'mapeamento-milvus') {
-      if (page === 'historico') showToast('Apenas administradores podem ver o histórico.', 'error');
-      if (page === 'mapeamento-milvus') showToast('Somente administradores podem acessar o mapeamento.', 'error');
+    if (page === 'historico') {
+      if (typeof showToast === 'function') showToast('Apenas administradores podem ver o histórico.', 'error');
       page = 'pendencias';
     }
     // Dashboard liberado p/ todos os perfis (blocos de gestão filtrados em renderDashboard).
@@ -1396,12 +1400,14 @@ function _startApp() {
   var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
   if (!isAdmin) {
     // Dashboard visível p/ todos (blocos de gestão filtrados no render);
-    // histórico e mapeamento seguem restritos.
+    // histórico segue restrito.
     var histNav = document.getElementById('nav-historico');
     if (histNav) histNav.style.display = 'none';
-    var mapNav = document.getElementById('nav-mapeamento-milvus');
-    if (mapNav) mapNav.style.display = 'none';
   }
+  // Mapeamento Milvus × Clientes oculto para todos (decisão de produto):
+  // a rota segue funcional via #mapeamento-milvus, só sai do menu.
+  var mapNav = document.getElementById('nav-mapeamento-milvus');
+  if (mapNav) mapNav.style.display = 'none';
   if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
   document.querySelectorAll('.btn-export').forEach(function (btn) {
     btn.style.display = isAdmin ? '' : 'none';
