@@ -208,6 +208,9 @@ function renderPendencias() {
         Mais filtros
         <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
       </button>
+      <button class="btn btn-secondary pen-more-btn" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
+        ✕ Limpar
+      </button>
       <div class="pen-more-panel" id="penMoreFiltersPanel" data-open="0" style="display:none">
         <select class="form-select filter-select-md" id="penResponsible" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
           <option value="">Todos os responsáveis</option>
@@ -845,28 +848,69 @@ function saveCurrentPenFilter() {
   const idx = list.findIndex(f => f.name === filter.name);
   if (idx !== -1) list[idx] = filter; else list.push(filter);
   if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
+  try {
+    if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = filter.name;
+  } catch (_) {}
+  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
   renderPendencias();
   showToast('Filtro salvo!', 'success');
 }
 
 function applySavedPenFilter() {
-  const name = document.getElementById('penSavedFilter')?.value;
+  const sel = document.getElementById('penSavedFilter');
+  const name = sel?.value;
   if (!name) return;
   const f = getSavedPenFilters().find(x => x.name === name);
   if (!f) return;
-  if (f.search) document.getElementById('penSearch').value = f.search;
-  if (f.client) document.getElementById('penClient').value = f.client;
-  if (f.resp) document.getElementById('penResponsible').value = f.resp;
-  if (f.status) document.getElementById('penStatus').value = f.status;
-  if (f.priority) document.getElementById('penPriority').value = f.priority;
-  renderPenView(false);
+  // Aplica TODOS os campos (inclusive vazios): sem isso, trocar de um filtro
+  // com busca/cliente para um filtro salvo sem esses campos mantinha os valores
+  // antigos "grudados", parecendo que o filtro não foi aplicado/limpo.
+  if (document.getElementById('penSearch')) document.getElementById('penSearch').value = f.search || '';
+  if (document.getElementById('penClient')) document.getElementById('penClient').value = f.client || '';
+  if (document.getElementById('penResponsible')) document.getElementById('penResponsible').value = f.resp || '';
+  if (document.getElementById('penStatus')) document.getElementById('penStatus').value = f.status || '';
+  if (document.getElementById('penPriority')) document.getElementById('penPriority').value = f.priority || '';
+  if (typeof savePenFilters === 'function') savePenFilters();
+  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
+  if (typeof renderPenView === 'function') renderPenView(false);
+}
+
+function clearPenFilters() {
+  // Limpa todos os filtros ativos (busca, selects e filtro salvo) + estado
+  // persistido, e re-renderiza. O botão ✕ Limpar sempre faz algo visível,
+  // mesmo sem filtro salvo selecionado.
+  try {
+    if (document.getElementById('penSearch')) document.getElementById('penSearch').value = '';
+    if (document.getElementById('penClient')) document.getElementById('penClient').value = '';
+    if (document.getElementById('penResponsible')) document.getElementById('penResponsible').value = '';
+    if (document.getElementById('penStatus')) document.getElementById('penStatus').value = '';
+    if (document.getElementById('penPriority')) document.getElementById('penPriority').value = '';
+    if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = '';
+  } catch (_) {}
+  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
+  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
+  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
 }
 
 function deleteSavedPenFilter() {
-  const name = document.getElementById('penSavedFilter')?.value;
-  if (!name) return;
+  const sel = document.getElementById('penSavedFilter');
+  const name = sel?.value;
+  // Sem filtro salvo selecionado, o ✕ age como "limpar filtros ativos" para
+  // nunca parecer que "não funciona" (antes era early-return silencioso).
+  if (!name) { clearPenFilters(); return; }
   const list = getSavedPenFilters().filter(f => f.name !== name);
   if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
+  // Se o estado persistido apontava para o filtro excluído, limpa a referência
+  // para o select não tentar restaurar um valor inexistente após o re-render.
+  try {
+    if (typeof loadFilterState === 'function' && typeof saveFilterState === 'function') {
+      const st = loadFilterState('pendencias', {}) || {};
+      if (st.savedFilterName === name) {
+        st.savedFilterName = '';
+        saveFilterState('pendencias', st);
+      }
+    }
+  } catch (_) {}
   renderPendencias();
   showToast('Filtro removido.', 'info');
 }
