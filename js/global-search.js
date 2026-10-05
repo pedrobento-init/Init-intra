@@ -383,55 +383,19 @@ if (typeof document !== 'undefined') {
 // ══════════════════════════════════════════════
 
 let _wasOffline = false;
-let _onlineTimeout = null;
 
+// Transições online/offline. A UI era o banner "offlineBanner" + dot de
+// conexão (removidos — o chip #syncStatus é o único indicador agora); resta
+// apenas o comportamento: ao voltar a ficar online, sincroniza em background.
 function _updateConnectionStatus(isOnline) {
-  const banner  = document.getElementById('offlineBanner');
-  const dot     = document.getElementById('connStatusDot');
-  const msg     = document.getElementById('offlineBannerMsg');
-  const syncBtn = document.getElementById('syncNowBtn');
-
-  if (!banner) return;
-
-  const pendingText = _getPendingSyncText();
-  const pendingCount = _getPendingSyncCountSafe();
-
   if (!isOnline) {
     _wasOffline = true;
-    banner.className = 'offline-banner offline visible';
-    if (msg) msg.textContent = pendingCount > 0 ? pendingText : 'Sem conexão – modo offline ativo';
-    if (syncBtn) syncBtn.style.display = 'none';
-    if (dot) { dot.classList.add('offline'); dot.title = 'Offline'; }
-  } else {
-    if (dot) { dot.classList.remove('offline'); dot.title = 'Online'; }
-    if (pendingCount > 0) {
-      banner.className = 'offline-banner offline visible';
-      if (msg) msg.textContent = pendingText;
-      if (syncBtn) syncBtn.style.display = 'inline-block';
-      if (_wasOffline) {
-        _wasOffline = false;
-        if (window._supabaseAuthActive) {
-          _triggerBackgroundSync('Sincronização após reconexão:');
-        }
-      }
-      return;
-    }
-    if (_wasOffline) {
-      // Just came back online
-      _wasOffline = false;
-      banner.className = 'offline-banner online visible';
-      if (msg) msg.textContent = '✓ Conexão restaurada';
-      if (syncBtn) syncBtn.style.display = 'inline-block';
-      if (window._supabaseAuthActive) {
-        _triggerBackgroundSync('Sincronização após reconexão:');
-      }
-      // Auto-hide after 5s
-      clearTimeout(_onlineTimeout);
-      _onlineTimeout = setTimeout(() => {
-        banner.classList.remove('visible');
-      }, 5000);
-    } else {
-      banner.classList.remove('visible');
+    return;
+  }
+  if (_wasOffline) {
+    _wasOffline = false;
+    if (window._supabaseAuthActive) {
+      _triggerBackgroundSync('Sincronização após reconexão:');
     }
   }
 }

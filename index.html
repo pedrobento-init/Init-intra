@@ -18,12 +18,6 @@
 </head>
 <body>
   <a href="#contentArea" class="skip-link" onclick="document.getElementById('contentArea').focus();">Pular para o conteúdo</a>
-  <!-- Offline/Online Banner (Sprint 9) -->
-  <div id="offlineBanner" class="offline-banner">
-    <div class="offline-indicator" id="offlineIndicatorDot"></div>
-    <span id="offlineBannerMsg">Sem conexão – modo offline ativo</span>
-    <button id="syncNowBtn" onclick="syncNow()" style="display:none" aria-label="Sincronizar dados com nuvem">↻ Sincronizar</button>
-  </div>
 
   <!-- Busca Global Modal (Sprint 7) -->
   <div id="globalSearchModal" class="global-search-modal" style="display:none" onclick="closeGlobalSearch(event)">
@@ -164,9 +158,8 @@
               <span class="kbd">Ctrl+K</span>
             </button>
           </div>
-          <!-- Status de conexão -->
-          <div class="conn-status-dot" id="connStatusDot" title="Online"></div>
-          <span class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização">🟡 Sincronizando...</span>
+          <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
+          <span class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" onclick="syncNow()" role="status">🟡 Sincronizando...</span>
           <button class="theme-toggle-btn" id="notifSettingsBtn" title="Configurar notificações" onclick="openNotifSettings()" aria-label="Configurar notificações">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </button>

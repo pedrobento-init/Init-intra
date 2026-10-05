@@ -34,6 +34,9 @@ function getPendingSyncCount() {
   return 0;
 }
 // Centraliza a UI do banner a partir do contador real (evita texto travado).
+// Nota: o banner #offlineBanner saiu do index.html (o chip #syncStatus é o
+// único indicador agora) — sem os elementos, aqui vira no-op. Mantido porque
+// o contrato (contador + efeitos) é coberto por tests/sync-counter.test.js.
 function _refreshSyncBanner() {
   if (typeof window === 'undefined') return;
   try {
