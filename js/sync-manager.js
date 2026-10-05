@@ -259,38 +259,79 @@ function subscribeLive(entity, render) {
 
 // Feedback visual 🟢🟡🔴 (topbar). Usa online/offline + status do socket +
 // pendências (contador sync + outbox persistente).
+// Anti-pisca (3 camadas, somente apresentação):
+//  1) pinta UMA vez por evento — a outbox (IndexedDB, assíncrona) resolve
+//     antes de escrever; antes, o par "pintura síncrona + repintura async"
+//     alternava 🟢/🟡 dentro do mesmo evento quando o contador legado e a
+//     outbox divergiam (reset de um vs. fila do outro).
+//  2) dedupe de escrita — o DOM só muda quando o estado (cor + contador)
+//     muda de verdade; reescrever innerHTML idêntico a cada sync:update
+//     re-renderizava o texto e piscava o chip.
+//  3) grace live↔pending (3s) — 🟢↔🟡 só troca se o novo estado persistir,
+//     então o flap do socket (error→connecting→live no reconnect, ~1-1.5s)
+//     e ciclos edição→drain nunca chegam a piscar. Offline entra/sai na hora.
 function mountSyncStatus(el) {
   if (!el) return function () {};
-  function paintSync() {
+  var STABLE_MS = 3000;
+  var _paintedSync = null; // 'live'|'pending'|'offline'|null (null = 1ª pintura)
+  var _paintedKey = null;
+  var _graceTimer = null;
+
+  function _read() {
     var pend = 0;
     try { if (typeof getPendingSyncCount === 'function') pend = Number(getPendingSyncCount()) || 0; } catch (_) {}
     var off = false;
     try { off = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_) {}
     var st = 'idle';
     try { st = (typeof SyncManager !== 'undefined' && SyncManager) ? SyncManager.getStatus() : 'idle'; } catch (_) {}
-    function render(total) {
-      var n = Math.max(pend, Number(total) || 0);
-      if (off) {
-        el.innerHTML = '🔴 Offline' + (n ? ' (' + n + ' pendente' + (n > 1 ? 's' : '') + ')' : '');
-        el.setAttribute('data-sync', 'offline');
-        el.title = 'Sem conexão — as alterações ficam na fila e enviam ao reconectar';
-      } else if (st === 'live' && !n) {
-        el.innerHTML = '🟢 Sincronizado';
-        el.setAttribute('data-sync', 'live');
-        el.title = 'Tempo real ativo';
-      } else {
-        el.innerHTML = '🟡 Sincronizando...' + (n ? ' (' + n + ')' : '');
-        el.setAttribute('data-sync', 'pending');
-        el.title = 'Sincronizando com o servidor';
+    return { pend: pend, off: off, st: st };
+  }
+  function _desired(r, n) {
+    var total = Math.max(r.pend, Number(n) || 0);
+    if (r.off) return { sync: 'offline', key: 'offline|' + total, html: '🔴 Offline' + (total ? ' (' + total + ' pendente' + (total > 1 ? 's' : '') + ')' : ''), title: 'Sem conexão — as alterações ficam na fila e enviam ao reconectar' };
+    if (r.st === 'live' && !total) return { sync: 'live', key: 'live', html: '🟢 Sincronizado', title: 'Tempo real ativo' };
+    return { sync: 'pending', key: 'pending|' + total, html: '🟡 Sincronizando...' + (total ? ' (' + total + ')' : ''), title: 'Sincronizando com o servidor' };
+  }
+  function _clearGrace() { try { if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null; } } catch (_) {} }
+  function _commit(d) {
+    _paintedSync = d.sync;
+    _paintedKey = d.key;
+    el.innerHTML = d.html;
+    el.setAttribute('data-sync', d.sync);
+    el.title = d.title;
+  }
+  function _write(d) {
+    if (d.key === _paintedKey) { _clearGrace(); return; } // nada mudou: não toca no DOM
+    var canFlap = _paintedSync !== null && _paintedSync !== 'offline' && d.sync !== 'offline';
+    if (canFlap && d.sync !== _paintedSync) {
+      // Troca 🟢↔🟡: só comete se o novo estado persistir (anti-flap).
+      if (!_graceTimer) {
+        _graceTimer = setTimeout(function () {
+          _graceTimer = null;
+          try {
+            paintSync(function (x) { if (x.sync !== _paintedSync) _commit(x); });
+          } catch (_) {}
+        }, STABLE_MS);
       }
+      return;
     }
-    render(pend);
+    _clearGrace();
+    _commit(d);
+  }
+  function paintSync(cb) {
+    if (typeof cb !== 'function') cb = null;
+    var r = _read();
+    function done(n) {
+      var d = _desired(r, n);
+      if (cb) cb(d); else _write(d);
+    }
     try {
       var p = null;
       if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.count === 'function') p = Outbox.count();
       else if (typeof outboxCount === 'function') p = outboxCount();
-      if (p && typeof p.then === 'function') p.then(function (c) { render(c); }).catch(function () {});
+      if (p && typeof p.then === 'function') { p.then(function (c) { done(c); }).catch(function () { done(r.pend); }); return; }
     } catch (_) {}
+    done(r.pend);
   }
   paintSync();
   var off1 = function () { paintSync(); };
