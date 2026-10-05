@@ -39,6 +39,12 @@ idb.version(7).stores({
   equipamentos: 'id, clientId, status, tipo'
 });
 
+// v8 (offline-first): fila persistente de operações (outbox pattern).
+// Aditiva — não toca nas tabelas existentes, upgrade seguro.
+idb.version(8).stores({
+  outbox: '++seq, entity, targetId, createdAt'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],

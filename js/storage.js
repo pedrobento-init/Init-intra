@@ -1780,42 +1780,63 @@ function savePendencia(data) {
     } catch (e) { console.warn('📧 Erro na notificação de pendência:', e); }
   }, 100);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('pendencias').upsert({
-      id: data.id,
-      client_id: data.clientId,
-      client_name: data.clientName,
-      tipo: data.tipo,
-      assunto: data.assunto || '',
-      descricao: data.descricao,
-      responsible: data.responsible,
-      status: data.status,
-      priority: data.priority,
-      deadline: data.deadline || null,
-      notes: data.notes || [],
-      link_util: data.linkUtil || '',
-      team: data.team || 'init',
-      attachments: data.attachments || [],
-      checklist: data.checklist || [],
-      tags: data.tags || [],
-      recurrence: data.recurrence || null,
-      visit_id: data.visitId || null,
-      reviewed_in_meeting: data.reviewedInMeeting || null,
-      timer_running: data.timerRunning === true,
-      timer_started_at: data.timerStartedAt || null,
-      timer_total_seconds: data.timerTotalSeconds || 0,
-      timer_operator: data.timerOperator || null,
-      completed_at: data.completedAt || null,
-      completed_by: data.completedBy || null,
-      created_at: data.createdAt || now,
-      updated_at: now
-    }).then(res => {
-      if (res.error) { console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); }
-    }).catch(err => {
-      console.warn('⚠️ Erro de rede Supabase pendência:', err.message);
-      markSyncPushFailed();
-    });
+  // Push fire-and-forget + outbox: offline ou falha de conectividade
+  // enfileira a operação (drain no `online`); erro de dados (4xx/schema)
+  // NÃO enfileira para não repetir escrita inválida em loop.
+  var _remotePen = {
+    id: data.id,
+    client_id: data.clientId,
+    client_name: data.clientName,
+    tipo: data.tipo,
+    assunto: data.assunto || '',
+    descricao: data.descricao,
+    responsible: data.responsible,
+    status: data.status,
+    priority: data.priority,
+    deadline: data.deadline || null,
+    notes: data.notes || [],
+    link_util: data.linkUtil || '',
+    team: data.team || 'init',
+    attachments: data.attachments || [],
+    checklist: data.checklist || [],
+    tags: data.tags || [],
+    recurrence: data.recurrence || null,
+    visit_id: data.visitId || null,
+    reviewed_in_meeting: data.reviewedInMeeting || null,
+    timer_running: data.timerRunning === true,
+    timer_started_at: data.timerStartedAt || null,
+    timer_total_seconds: data.timerTotalSeconds || 0,
+    timer_operator: data.timerOperator || null,
+    completed_at: data.completedAt || null,
+    completed_by: data.completedBy || null,
+    created_at: data.createdAt || now,
+    updated_at: now
+  };
+  function _enqueuePen(reason) {
+    try {
+      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', data);
+      else if (typeof outboxEnqueue === 'function') outboxEnqueue('pendencias', 'upsert', data);
+    } catch (_) {}
+    try { if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted') markSyncPushFailed(); } catch (_) {}
   }
+  try {
+    var _penOnline = !(typeof navigator !== 'undefined' && navigator.onLine === false);
+    var _penConn = !(typeof isSupabaseConnected === 'function' && (!isSupabaseConnected() || !window._supabaseAuthActive));
+    if (!_penOnline || !_penConn) {
+      _enqueuePen('offline-counted'); // dbSet acima já contou 1 pendência
+    } else if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+      supabaseClient.from('pendencias').upsert(_remotePen).then(res => {
+        if (res.error) {
+          console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message);
+          if (typeof _isConnectivityError === 'function' && _isConnectivityError(res.error)) _enqueuePen('push-failed');
+          else if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
+        }
+      }).catch(err => {
+        console.warn('⚠️ Erro de rede Supabase pendência:', err.message);
+        _enqueuePen('push-failed');
+      });
+    }
+  } catch (_) {}
 
   return data;
 }
