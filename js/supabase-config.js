@@ -154,13 +154,23 @@ function initSupabaseRealtime() {
 }
 
 if (typeof window !== 'undefined') {
+    // `_realtimeChannel` nunca é mais atribuído (initSupabaseRealtime foi
+    // substituído pelo SyncManager em sync-manager.js), então a condição
+    // `!_realtimeChannel` é SEMPRE verdadeira: sem este guard, cada volta
+    // para a aba recriava o canal inteiro (status connecting→live → repintava
+    // o chip e piscava o "atualizando..." do header sem necessidade).
+    // O SyncManager já cuida de reconnect (backoff) e do canal ativo.
+    const _supersededBySyncManager = () =>
+        typeof SyncManager !== 'undefined' && SyncManager && typeof SyncManager.connect === 'function';
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && supabaseClient && window._supabaseAuthActive && !_realtimeChannel) {
+            if (_supersededBySyncManager()) return;
             initSupabaseRealtime();
         }
     });
     window.addEventListener('pageshow', (e) => {
         if (e.persisted && supabaseClient && window._supabaseAuthActive) {
+            if (_supersededBySyncManager()) return;
             initSupabaseRealtime();
         }
     });

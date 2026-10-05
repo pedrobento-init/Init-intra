@@ -51,6 +51,11 @@ var SyncManager = (function () {
   var _lastFallbackAt = 0;
 
   function _emit(s, extra) {
+    // Dedupe: supabase-js re-fira 'SUBSCRIBED' a cada rejoin/heartbeat do
+    // mesmo canal (e 'connecting' a cada connect() redundante). Reemitir o
+    // mesmo status repaintava o chip e, pior, piscava o spinner
+    // "atualizando..." do header sem motivo (status não mudou de verdade).
+    if (s === _status && !extra) return;
     _status = s;
     var detail = { status: s };
     if (extra && typeof extra === 'object') {

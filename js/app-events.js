@@ -27,6 +27,10 @@ function offDataChanged(entity, cb){
 }
 function _showRefreshIndicator(entity){
   try{
+    // 'sync-status' é estado de canal/fila — já representado pelo chip
+    // 🟢/🟡 do topbar. Mostrar também o spinner "atualizando..." faz o
+    // header piscar a cada rejoin do realtime (sem mudança de dados).
+    if(entity==='sync-status') return;
     var btn=document.getElementById('refreshBtn') || document.querySelector('.theme-toggle-btn[onclick*="refreshPage"]') || document.getElementById('topbarActionBtn');
     // fallback: usa o próprio botão de refresh do header se existir
     var rBtn=document.querySelector('[onclick="refreshPage()"]') || document.getElementById('notifSettingsBtn')?.nextElementSibling;
@@ -42,6 +46,8 @@ function _showRefreshIndicator(entity){
     }
     if(ind){
       ind.style.opacity='1';
+      // Origem da atualização no tooltip (diagnóstico: quem está emitindo).
+      try{ ind.dataset.src=entity||''; ind.title='Atualizando: '+(entity||'?')+' · '+new Date().toLocaleTimeString(); }catch(_){}
       clearTimeout(ind._hideTimer);
       ind._hideTimer=setTimeout(function(){ ind.style.opacity='0'; }, 900);
     }
