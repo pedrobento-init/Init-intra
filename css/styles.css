@@ -4451,12 +4451,15 @@ body.dark-theme .ov-wrap {
 .pen-cmd-top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
 /* Timer como ação primária verde */
 .pen-cmd-timer .timer-widget { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Esconde o "Ninguém" do widget no cabeçalho (a info vive na linha compacta abaixo) */
+.pen-cmd-timer .timer-widget > span:not(.worker-badge):not(.timer-display) { display: none; }
 .pen-cmd-timer .timer-btn {
   display: inline-flex; align-items: center; gap: 8px;
+  width: auto; height: auto; min-height: 36px;
   background: var(--green); color: #fff; border: none; border-radius: 10px;
   padding: 10px 16px; font-size: 13px; font-weight: 700; font-family: inherit;
   cursor: pointer; transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
-  box-shadow: 0 4px 14px rgba(22,163,74,.3); line-height: 1;
+  box-shadow: 0 4px 14px rgba(22,163,74,.3); line-height: 1; white-space: nowrap;
 }
 .pen-cmd-timer .timer-btn::after { content: 'Iniciar Timer'; }
 .pen-cmd-timer .timer-btn.running { background: transparent; color: var(--green); border: 1px solid var(--green); box-shadow: none; }
