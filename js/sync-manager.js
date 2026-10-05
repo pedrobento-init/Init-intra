@@ -41,11 +41,14 @@ function _syncTeamFilter() {
   } catch (_) { return null; }
 }
 
+var SYNC_FALLBACK_MIN_MS = 60000;
+
 var SyncManager = (function () {
   var _channel = null;
   var _retryN = 0;
   var _status = 'idle'; // idle|connecting|live|error|offline
   var _listeners = [];
+  var _lastFallbackAt = 0;
 
   function _emit(s, extra) {
     _status = s;
@@ -173,8 +176,17 @@ var SyncManager = (function () {
         if (st === 'SUBSCRIBED') { _retryN = 0; _emit('live'); }
         else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
           _emit('error');
+          // Anti-storm: o fallback completo (8 entidades) roda no máximo 1×
+          // a cada 60s e nunca com aba oculta. Sem isso, token expirado gera
+          // erro → sync → reconnect → erro em loop, cada sync logando os
+          // mesmos ~156 "conflitos". O reconnect barato segue o backoff.
           try {
-            if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal({ reason: 'realtime-fallback' }).catch(function () {});
+            var _nowFb = Date.now();
+            var _hiddenFb = (typeof document !== 'undefined' && document.visibilityState === 'hidden');
+            if (!_hiddenFb && (_nowFb - _lastFallbackAt) >= SYNC_FALLBACK_MIN_MS && typeof syncSupabaseToLocal === 'function') {
+              _lastFallbackAt = _nowFb;
+              syncSupabaseToLocal({ reason: 'realtime-fallback' }).catch(function () {});
+            }
           } catch (_) {}
           var d = _syncBackoffDelay(_retryN++);
           setTimeout(function () {

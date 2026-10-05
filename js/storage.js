@@ -621,6 +621,29 @@ function _isConnectivityError(err) {
   return /timeout|timed out|failed to fetch|fetch failed|networkerror|network request failed|failed to load|load failed|offline|econn|enotfound|eai_again|ehostunreach|enetunreach|socket|dns|abort|aborted|connection|internet|503|502|504|temporar|unavailable|indispon/.test(msg);
 }
 
+// Erro de AUTENTICAÇÃO (401/JWT expirado): não é rede nem dado inválido —
+// é sessão. Tratar como dado ("pulado" por item) martela o backend com um
+// 401 por registro; tratar como conectividade agenda retries inúteis.
+// Caminho certo: refresh da sessão uma vez e short-circuit das entidades.
+function _isAuthError(err) {
+  if (!err) return false;
+  const msg = String((err && err.message) || err || '').toLowerCase();
+  // Assinatura de SESSÃO expirada/inválida (log real: "JWT expired").
+  // 401 puro com mensagem genérica (ex: RLS "permissão") é erro de DADOS,
+  // não de sessão — mantém o legado (reachable na checagem, "pulado" no item).
+  return /jwt expired|invalid jwt|token expired|expired token|session expired|expired session|unauthorized|invalid token|missing[^a-z]*token|token[^a-z]*missing|refresh token/.test(msg);
+}
+
+// Tenta renovar a sessão Supabase (uma vez). Retorna true se há sessão válida.
+async function _refreshSupabaseSession() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth) return false;
+    const { data, error } = await supabaseClient.auth.refreshSession();
+    if (error || !data || !data.session) return false;
+    return true;
+  } catch (_) { return false; }
+}
+
 // Verificação REAL do backend (não só navigator.onLine): leitura barata com
 // timeout. Nunca lança exceção; retorna { ok, reason, detail }.
 async function checkBackendConnectivity(opts) {
@@ -640,6 +663,21 @@ async function checkBackendConnectivity(opts) {
       timeoutMs,
       'backend-check'
     );
+    if (res && res.error && _isAuthError(res.error)) {
+      // Sessão expirada: tenta renovar uma vez antes de desistir do sync.
+      // Sem isso cada entidade do sync falharia com 401 individual.
+      if (await _refreshSupabaseSession()) {
+        const retry = await _withSyncTimeout(
+          supabaseClient.from('operators').select('id').limit(1),
+          timeoutMs,
+          'backend-check-retry'
+        );
+        if (!retry || !retry.error) {
+          return { ok: true, reason: 'reachable', latencyMs: Date.now() - t0, refreshed: true };
+        }
+      }
+      return { ok: false, reason: 'not-authenticated', detail: 'sessão Supabase expirada e refresh falhou' };
+    }
     if (res && res.error && _isConnectivityError(res.error)) {
       return { ok: false, reason: 'connectivity', detail: String(res.error.message || res.error) };
     }
@@ -755,7 +793,22 @@ async function _runSupabaseSync(reason, opts) {
   let totalConflicts = 0;
   let allConflictDetails = [];
   let connectivityFailed = false;
+  let authFailed = false;
+  let _authWarned = false;
   const timed = (promise, what) => _withSyncTimeout(promise, opTimeoutMs, what);
+  // Sessão expirada no meio do sync: renova uma vez e pula o restante do
+  // ciclo (cada item daria 401). Sem short-circuit seriam dezenas de 401s.
+  function _noteAuthFailure(where) {
+    authFailed = true;
+    if (!_authWarned) {
+      _authWarned = true;
+      console.warn('[sync] sessão expirada (' + where + ') — renovando e pulando o restante deste ciclo; dados locais preservados.');
+      try {
+        const r = _refreshSupabaseSession();
+        if (r && typeof r.catch === 'function') r.catch(function () {});
+      } catch (_) {}
+    }
+  }
 
   // Ordem segura anti-perda (C1): push-deletes → pull → push-criados →
   // merge → dbSet → push-updates. Falhas de item não abortam as demais
@@ -767,6 +820,10 @@ async function _runSupabaseSync(reason, opts) {
     // (evita N timeouts em sequência); o local fica intacto e pendente.
     if (connectivityFailed) {
       console.info('[sync] ' + e.table + ' pulada: conectividade perdida nesta sincronização — dados locais preservados.');
+      return false;
+    }
+    // Sessão expirada: pula as demais entidades de imediato (evita N 401s).
+    if (authFailed) {
       return false;
     }
     let pull;
@@ -787,6 +844,10 @@ async function _runSupabaseSync(reason, opts) {
     }
     const { data: remoteRaw, error } = pull || {};
     if (error) {
+      if (_isAuthError(error)) {
+        _noteAuthFailure('pull:' + e.table);
+        return false;
+      }
       if (_isConnectivityError(error)) {
         connectivityFailed = true;
         console.warn(`[sync] ${e.table} (conectividade):`, error.message || error, '— mantendo dados locais.');
@@ -809,7 +870,9 @@ async function _runSupabaseSync(reason, opts) {
         const res = await timed(supabaseClient.from(e.table).delete().eq('id', tid), 'push-delete:' + e.table);
         if (res && res.error) throw new Error(res.error.message || 'delete falhou');
       } catch (err) {
-        if (_isConnectivityError(err)) {
+        if (_isAuthError(err)) {
+          _noteAuthFailure('push-delete:' + e.table);
+        } else if (_isConnectivityError(err)) {
           connectivityFailed = true;
           console.warn(`[sync] ${e.table} (delete ${tid}): sem conectividade — exclusão segue pendente.`);
         } else {
@@ -852,7 +915,9 @@ async function _runSupabaseSync(reason, opts) {
           synthRemote.push({ id: rec.id, updated_at: rec.updatedAt || nowIso });
         }
       } catch (err) {
-        if (_isConnectivityError(err)) {
+        if (_isAuthError(err)) {
+          _noteAuthFailure('push-create:' + e.table);
+        } else if (_isConnectivityError(err)) {
           connectivityFailed = true;
           console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — registro segue pendente, sem perda local.`);
         } else {
@@ -887,7 +952,9 @@ async function _runSupabaseSync(reason, opts) {
           const res = await timed(supabaseClient.from(e.table).upsert(mapPayload(rec)), 'push-update:' + e.table);
           if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
         } catch (err) {
-          if (_isConnectivityError(err)) {
+          if (_isAuthError(err)) {
+            _noteAuthFailure('push-update:' + e.table);
+          } else if (_isConnectivityError(err)) {
             connectivityFailed = true;
             console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — alteração segue pendente, sem perda local.`);
           } else {
@@ -932,12 +999,16 @@ async function _runSupabaseSync(reason, opts) {
     }
 
     if (connectivityFailed) syncHadErrors = true;
+    if (authFailed) syncHadErrors = true;
 
     // LOGS — merge remote with local (don't wipe local logs). Com timeout:
     // um hang aqui nunca trava o fim do sync nem ameaça os dados locais.
+    // Pulado direto se a sessão expirou (evita mais um 401).
     try {
+      if (authFailed) throw { status: 401, message: 'skipped: sessão expirada neste ciclo' };
       const logsRes = await timed(supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500), 'pull:audit_logs');
       const { data: remoteLogs, error: logErr } = logsRes || {};
+      if (logErr && _isAuthError(logErr)) throw logErr;
       if (logErr) console.warn('Supabase logs error:', logErr);
       if (remoteLogs && remoteLogs.length > 0) {
         const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
@@ -970,14 +1041,16 @@ async function _runSupabaseSync(reason, opts) {
       resetPendingSyncCount();
       return { ok: true, reason: 'synced', conflicts: totalConflicts };
     }
-    if (connectivityFailed) {
+    if (authFailed) {
+      console.warn('[sync] interrompida por sessão expirada (motivo: ' + label + ') — sessão renovada em background; dados locais preservados.');
+    } else if (connectivityFailed) {
       console.warn('[sync] interrompida por falha de conectividade (motivo: ' + label + ') — dados locais preservados; pendências mantidas para a próxima tentativa.');
     } else {
       console.warn('[sync] concluída com erros parciais de dados (motivo: ' + label + ') — itens não confirmados seguem pendentes.');
     }
     try { _refreshSyncBanner(); } catch (_) {}
     if (allowRetry) _scheduleSyncRetry(label);
-    return { ok: false, reason: connectivityFailed ? 'connectivity' : 'partial', conflicts: totalConflicts };
+    return { ok: false, reason: authFailed ? 'not-authenticated' : (connectivityFailed ? 'connectivity' : 'partial'), conflicts: totalConflicts };
   } catch (err) {
     console.warn('[sync] falhou (erro inesperado, motivo: ' + label + '):', (err && err.message) || err, '— dados locais preservados.');
     // Sync falhou: mantém a contagem real e reflete no banner (sem zerar).
@@ -3170,5 +3243,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia, updatePendenciaAssignee };
+  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, _isAuthError, _refreshSupabaseSession, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia, updatePendenciaAssignee };
 }

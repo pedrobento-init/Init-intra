@@ -44,6 +44,30 @@ describe('SyncManager — backoff exponencial', () => {
   });
 });
 
+describe('Sync — detecção de sessão expirada (_isAuthError)', () => {
+  const storage = require('../js/storage.js');
+  const { _isAuthError } = storage;
+
+  it('401 é auth (short-circuit + refresh, não retry de rede)', () => {
+    expect(_isAuthError({ status: 401, message: 'Unauthorized' })).toBe(true);
+  });
+  it('JWT expired por mensagem é auth', () => {
+    expect(_isAuthError(new Error('JWT expired'))).toBe(true);
+    expect(_isAuthError({ message: 'invalid jwt: token expired' })).toBe(true);
+  });
+  it('timeout/rede NÃO é auth (segue como conectividade)', () => {
+    expect(_isAuthError(new Error('failed to fetch'))).toBe(false);
+    expect(_isAuthError({ code: 'SYNC_TIMEOUT', message: 'timeout após 5000ms' })).toBe(false);
+  });
+  it('403 RLS sem marca de token NÃO é auth (segue como erro de dados)', () => {
+    expect(_isAuthError({ status: 403, message: 'new row violates row-level security' })).toBe(false);
+  });
+  it('nulo/vazio NÃO é auth', () => {
+    expect(_isAuthError(null)).toBe(false);
+    expect(_isAuthError(undefined)).toBe(false);
+  });
+});
+
 describe('Outbox — construção da entrada', () => {
   it('monta entrada persistente com alvo e payload', () => {
     const e = buildOutboxEntry('pendencias', 'upsert', { id: 'PEN-1', assunto: 'X' });
