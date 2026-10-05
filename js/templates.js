@@ -10,20 +10,24 @@ function renderTemplates() {
   const templates = getProcedureTemplates();
   const categories = Array.from(new Set(templates.map(t => t.category).filter(Boolean)));
 
+  // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar">
-      <div class="search-input-wrap filter-grow">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." oninput="debouncedFilterTemplatesGrid()" />
+    <div class="ov-wrap">
+      <header class="ov-head"><h1 class="ov-h1">Modelos de Procedimentos</h1></header>
+      <div class="search-bar">
+        <div class="search-input-wrap filter-grow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." oninput="debouncedFilterTemplatesGrid()" />
+        </div>
+        <div class="filter-field">
+          <select class="form-select" id="templateCategorySelect" onchange="filterTemplatesGrid()">
+            <option value="">Todas as categorias</option>
+            ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      <div class="filter-field">
-        <select class="form-select" id="templateCategorySelect" onchange="filterTemplatesGrid()">
-          <option value="">Todas as categorias</option>
-          ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
-        </select>
-      </div>
+      <div id="templatesGridWrap"></div>
     </div>
-    <div id="templatesGridWrap"></div>
   `;
 
   const savedFilters = loadFilterState('templates', {});
@@ -90,18 +94,19 @@ function renderTemplatesGrid() {
   }
 
   container.innerHTML = templates.map(t => `
-    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;padding:16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);box-shadow:var(--shadow-sm)">
+    <!-- [UI] card no padrão Dashboard: bg/borda/radius vêm do CSS ov (#templatesGridWrap > .card) -->
+    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;gap:14px">
       <div>
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-          <h3 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0">${escapeHtml(t.title)}</h3>
+          <h3 style="font-size:16px;font-weight:600;color:var(--ov-text);margin:0">${escapeHtml(t.title)}</h3>
           ${t.category ? `<span class="tag tag-blue">${escapeHtml(t.category)}</span>` : ''}
         </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+        <div style="font-size:12px;color:var(--ov-muted);margin-bottom:12px">
           Criado por: <strong>${escapeHtml(t.createdBy || 'Suporte TI')}</strong>
         </div>
-        <pre class="proc-content" style="max-height:160px;overflow-y:auto;background:var(--bg-base);padding:10px;border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border)">${escapeHtml(t.content || 'Sem conteúdo cadastrado.')}</pre>
+        <pre class="proc-content" style="max-height:160px;overflow-y:auto;background:var(--ov-raised);padding:10px;border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-word;border:1px solid var(--ov-line);color:var(--ov-text)">${escapeHtml(t.content || 'Sem conteúdo cadastrado.')}</pre>
       </div>
-      <div style="display:flex;gap:8px;margin-top:14px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <div style="display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--ov-line);flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="openApplyTemplateModal('${escapeHtml(t.id)}')" title="Aplicar este modelo a um ou mais clientes">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Aplicar a Clientes
         </button>
@@ -120,7 +125,7 @@ function renderTemplatesGrid() {
 function openTemplateForm(id = null) {
   const t = id ? getProcedureTemplateById(id) : {};
   openModal(id ? 'Editar Modelo de Procedimento' : 'Novo Modelo de Procedimento', `
-    <form onsubmit="submitTemplateForm(event, '${id || ''}')">
+    <form class="ov-form" onsubmit="submitTemplateForm(event, '${id || ''}')">
       <div class="form-group">
         <label class="form-label">Título do Modelo *</label>
         <input class="form-input" name="title" value="${escapeHtml(t.title || '')}" placeholder="Ex: Checklist de Backup Semanal" required />
@@ -191,7 +196,7 @@ function openApplyTemplateModal(templateId) {
   }
 
   openModal(`Aplicar Modelo: ${escapeHtml(tpl.title)}`, `
-    <form onsubmit="submitApplyTemplate(event, '${templateId}')">
+    <form class="ov-form" onsubmit="submitApplyTemplate(event, '${templateId}')">
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
         Selecione os clientes que receberão uma cópia deste procedimento:
       </p>

@@ -89,35 +89,40 @@ function _buildOperadoresPage(savedFilters = {}) {
   _filteredOps = ops;
   _opPage = 1;
 
+  // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
+  // (stats/search/grid idênticos por classe — só containers/classes visuais).
   document.getElementById('contentArea').innerHTML = `
-    <div class="op-stats-row">
-      <div class="op-stat">
-        <span class="op-stat-value">${ops.length}</span>
-        <span class="op-stat-label">Total</span>
+    <div class="ov-wrap">
+      <header class="ov-head"><h1 class="ov-h1">Operadores</h1></header>
+      <div class="op-stats-row">
+        <div class="op-stat">
+          <span class="op-stat-value">${ops.length}</span>
+          <span class="op-stat-label">Total</span>
+        </div>
+        <div class="op-stat">
+          <span class="op-stat-value" style="color:var(--ov-green)">${ativos.length}</span>
+          <span class="op-stat-label">Ativos</span>
+        </div>
+        <div class="op-stat">
+          <span class="op-stat-value" style="color:var(--ov-muted)">${inativos.length}</span>
+          <span class="op-stat-label">Inativos</span>
+        </div>
       </div>
-      <div class="op-stat">
-        <span class="op-stat-value" style="color:var(--green)">${ativos.length}</span>
-        <span class="op-stat-label">Ativos</span>
-      </div>
-      <div class="op-stat">
-        <span class="op-stat-value" style="color:var(--text-muted)">${inativos.length}</span>
-        <span class="op-stat-label">Inativos</span>
-      </div>
-    </div>
 
-    <div class="search-bar">
-      <div class="search-input-wrap" style="flex:1">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="opSearch" placeholder="Buscar operador..." oninput="debouncedFilterOperadores()" />
+      <div class="search-bar">
+        <div class="search-input-wrap" style="flex:1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="form-input" id="opSearch" placeholder="Buscar operador..." oninput="debouncedFilterOperadores()" />
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm op-filter-btn active" data-filter="todos" onclick="setOpFilter(this,'todos')">Todos</button>
+          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="ativos" onclick="setOpFilter(this,'ativos')">Ativos</button>
+          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="inativos" onclick="setOpFilter(this,'inativos')">Inativos</button>
+        </div>
       </div>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-secondary btn-sm op-filter-btn active" data-filter="todos" onclick="setOpFilter(this,'todos')">Todos</button>
-        <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="ativos" onclick="setOpFilter(this,'ativos')">Ativos</button>
-        <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="inativos" onclick="setOpFilter(this,'inativos')">Inativos</button>
-      </div>
-    </div>
 
-    <div class="op-grid" id="opGridWrap"></div>`;
+      <div class="op-grid" id="opGridWrap"></div>
+    </div>`;
 
   if (savedFilters.search) document.getElementById('opSearch').value = savedFilters.search;
   if (savedFilters.filter) {
@@ -238,8 +243,8 @@ function _renderOpGrid() {
         ${actionsHtml ? `<div class="op-card-actions">${actionsHtml}</div>` : ''}
       </div>`;
   }).join('') + (totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
+    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
+      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-secondary" ${_opPage===1?'disabled':''} onclick="_opPage--;_renderOpGrid()">← Anterior</button>
         <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_opPage} / ${totalPages}</span>
@@ -382,7 +387,7 @@ function openOperadorForm(id = null) {
     : '';
 
   openModal(id ? 'Editar Operador' : 'Novo Operador', `
-    <form id="opForm" onsubmit="submitOperadorForm(event,'${id||''}')">
+    <form id="opForm" class="ov-form" onsubmit="submitOperadorForm(event,'${id||''}')">
       ${adminBanner}
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;padding:16px;background:var(--bg-base);border-radius:var(--radius)">
         <div id="opAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">

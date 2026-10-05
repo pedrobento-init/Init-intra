@@ -49,16 +49,21 @@ function renderClients() {
 
   const clients  = typeof getMyClients === 'function' ? getMyClients() : getClients();
   _filteredClients = clients;
+  // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
+  // (apenas containers/classes visuais; IDs e handlers intactos).
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar">
-      <div class="search-input-wrap" style="flex:1">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
+    <div class="ov-wrap">
+      <header class="ov-head"><h1 class="ov-h1">Clientes</h1></header>
+      <div class="search-bar">
+        <div class="search-input-wrap" style="flex:1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
+        </div>
+        <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
+        ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)">📥 Milvus</button>` : ''}
       </div>
-      <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
-      ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)">📥 Milvus</button>` : ''}
-    </div>
-    <div class="client-cards-grid" id="clientGrid"></div>`;
+      <div class="client-cards-grid" id="clientGrid"></div>
+    </div>`;
   showSkeleton('clientGrid', 8);
   renderClientGrid();
 }
@@ -100,10 +105,10 @@ function renderClientGrid() {
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
       <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${health.totalAbertas} abertas, ${health.vencidas} vencidas, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" style="font-size:14px">${health.emoji}</span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin:4px 0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+      <div style="font-size:11px;color:var(--ov-muted);margin:4px 0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
         <span>${pending} abertas</span>
-        <span style="color:${vencidas? '#dc2626':'var(--text-muted)'}">${vencidas} vencidas</span>
-        <span style="color:#16a34a">${dentro} no prazo</span>
+        <span style="color:${vencidas? 'var(--ov-red)':'var(--ov-muted)'}">${vencidas} vencidas</span>
+        <span style="color:var(--ov-green)">${dentro} no prazo</span>
       </div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
@@ -114,8 +119,8 @@ function renderClientGrid() {
       </div>
     </div>`;
     }).join('') + (totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
+    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
+      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} onclick="_clientPage--;renderClientGrid()">← Anterior</button>
         <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
@@ -665,7 +670,7 @@ function openProcedureForm(clientId, procId = null) {
   const templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
 
   openModal(procId ? 'Editar Procedimento' : 'Novo Procedimento', `
-    <form onsubmit="submitProcedureForm(event,'${clientId}','${procId||''}')">
+    <form class="ov-form" onsubmit="submitProcedureForm(event,'${clientId}','${procId||''}')">
       ${templates.length ? `
         <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div>
@@ -856,7 +861,7 @@ function openClientForm(id = null) {
   const lics = c.licenses || [];
   const esc = v => escapeHtml(v || '');
   openModal(id ? 'Editar Cliente' : 'Novo Cliente', `
-    <form id="cliForm" onsubmit="submitClientForm(event,'${id||''}')">
+    <form id="cliForm" class="ov-form" onsubmit="submitClientForm(event,'${id||''}')">
       <div class="form-section">
         <div class="form-section-title">Ícone do Cliente</div>
         <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:12px">
