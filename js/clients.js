@@ -142,6 +142,7 @@ function viewClient(id) {
       <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
       <div class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</div>
       <div class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</div>
+      <div class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</div>
       <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
       <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
     </div>
@@ -156,7 +157,7 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','documentos','historico'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','checklist','documentos','historico'][i]===tab));
   renderClientTab(tab, id);
 }
 
@@ -857,6 +858,8 @@ function renderClientTab(tab, id) {
     renderClientInventoryTab(id);
   } else if (tab === 'chamados') {
     renderClientMilvusTicketsTab(id);
+  } else if (tab === 'checklist') {
+    renderClientChecklistTab(id);
   } else if (tab === 'atendimentos') {
     // Aba removida (unificada em "chamados"): alias defensivo para não quebrar
     // chamadas antigas — renderiza a aba unificada.

@@ -576,6 +576,14 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
 // Esc fecha modais
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  // Modal filho (Checklist → "Ver procedimento") tem prioridade: fecha só ele.
+  try {
+    const ck = document.getElementById('ckProcOverlay');
+    if (ck && ck.style.display !== 'none' && typeof closeChecklistProc === 'function') {
+      closeChecklistProc();
+      return;
+    }
+  } catch (_) {}
   if (document.getElementById('modalOverlay').style.display !== 'none') closeModal();
   if (document.getElementById('userModalOverlay').style.display !== 'none')
     document.getElementById('userModalOverlay').style.display = 'none';

@@ -45,6 +45,13 @@ idb.version(8).stores({
   outbox: '++seq, entity, targetId, createdAt'
 });
 
+// v9: checklist do cliente — modelo global (por tipo) + marcações
+// por cliente. Aditiva, mesmo padrão das versões anteriores.
+idb.version(9).stores({
+  checklist_modelo_itens: 'id, tipo, ordem',
+  checklist_marcacoes: 'id, clientId, itemId'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -57,6 +64,8 @@ const _dbCache = {
   equipamentos: [],
   client_devices: [],
   client_milvus_tickets: [],
+  checklist_modelo_itens: [],
+  checklist_marcacoes: [],
   keyvalue: {},
   user_profile: {},
   counters: {},
@@ -151,6 +160,10 @@ async function initIndexedDB() {
     catch (_) { _dbCache.client_devices = []; }
     try { _dbCache.client_milvus_tickets = await idb.client_milvus_tickets.toArray(); }
     catch (_) { _dbCache.client_milvus_tickets = []; }
+    try { _dbCache.checklist_modelo_itens = await idb.checklist_modelo_itens.toArray(); }
+    catch (_) { _dbCache.checklist_modelo_itens = []; }
+    try { _dbCache.checklist_marcacoes = await idb.checklist_marcacoes.toArray(); }
+    catch (_) { _dbCache.checklist_marcacoes = []; }
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {

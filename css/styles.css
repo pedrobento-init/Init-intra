@@ -4905,3 +4905,112 @@ select.cf-input { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .cf-chev, .cf-track i { transition: none !important; }
 }
+
+/* ------------------------------------------------------------------
+   CHECKLIST - aba "Checklist" do modal de cliente (js/checklist.js)
+   Lista simples de confirmacao: seletor de tipo, barra de progresso,
+   grupos por categoria, item = linha inteira clicavel. Tema claro/escuro.
+   ------------------------------------------------------------------ */
+
+.ck-seg { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.ck-seg-btn {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg-surface);
+  color: var(--text-secondary); transition: var(--transition);
+}
+.ck-seg-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ck-seg-btn.is-on {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.ck-prog { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ck-prog-main { flex: 1 1 auto; min-width: 0; }
+.ck-prog-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;
+}
+.ck-prog-top b { font-size: 13px; font-weight: 700; color: var(--accent); }
+.ck-track {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+}
+.ck-track i {
+  display: block; height: 100%; border-radius: 999px;
+  background: var(--accent); transition: width var(--transition);
+}
+.ck-track i.is-done { background: var(--green); }
+
+.ck-ok {
+  display: none; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding: 9px 12px; border-radius: 8px;
+  background: var(--green-dim); border: 1px solid rgba(22,163,74,0.35);
+  color: var(--green); font-size: 13px; font-weight: 600;
+}
+.ck-ok::before { content: '\2713'; font-weight: 800; }
+.ck-ok.is-on { display: flex; }
+
+.ck-groups { display: flex; flex-direction: column; gap: 12px; }
+.ck-group {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-card); overflow: hidden; box-shadow: var(--shadow-sm);
+}
+.ck-group-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.ck-group-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.ck-count {
+  font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-dim2); color: var(--accent);
+}
+.ck-sp { flex: 1 1 auto; }
+.ck-proc-btn {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg-surface);
+  color: var(--text-secondary); transition: var(--transition);
+}
+.ck-proc-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.ck-list { display: flex; flex-direction: column; }
+.ck-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid var(--border); transition: var(--transition);
+}
+.ck-item:last-child { border-bottom: 0; }
+.ck-item:hover { background: var(--bg-hover); }
+.ck-item:focus-within { background: var(--accent-dim); }
+.ck-box {
+  flex: 0 0 auto; width: 20px; height: 20px; cursor: pointer;
+  accent-color: var(--accent);
+}
+.ck-box:disabled { cursor: wait; }
+.ck-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.45; }
+.ck-item.is-done .ck-text { text-decoration: line-through; color: var(--text-muted); }
+
+.ck-hint { margin: 14px 0 0; font-size: 12.5px; color: var(--text-muted); }
+
+/* Modal filho "Ver procedimento" */
+.ck-proc-text {
+  font: inherit; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap;
+  word-break: break-word; color: var(--text-primary);
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; margin: 0 0 10px;
+}
+.ck-proc-text:last-child { margin-bottom: 0; }
+.ck-proc-name { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin: 12px 0 6px; }
+.ck-proc-name:first-child { margin-top: 0; }
+.ck-proc-empty { font-size: 13.5px; color: var(--text-muted); margin: 0; }
+
+@media (max-width: 560px) {
+  .ck-prog { flex-wrap: wrap; }
+  .ck-prog .btn { width: 100%; }
+  .ck-item { padding: 9px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ck-track i, .ck-item, .ck-seg-btn, .ck-proc-btn { transition: none !important; }
+}

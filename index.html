@@ -270,6 +270,18 @@
     <div id="loginContent" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px"></div>
   </div>
 
+  <!-- Modal filho do Checklist: "Ver procedimento" (fica DEPOIS do #modalOverlay
+       principal para vencer no z-index e abrir por cima dele) -->
+  <div class="modal-overlay" id="ckProcOverlay" style="display:none">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ckProcTitle">
+      <div class="modal-header">
+        <h2 class="modal-title">Procedimento — <span id="ckProcTitle"></span></h2>
+        <button class="modal-close" id="ckProcClose" aria-label="Fechar procedimento">&times;</button>
+      </div>
+      <div class="modal-body" id="ckProcBody"></div>
+    </div>
+  </div>
+
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js"
     integrity="sha384-nH2beB85991GFOe5+WLnL1JpeSyR8ncwd7HZXPJppzmxyfWS9WgftZQQAeQjyIai"
     crossorigin="anonymous"></script>
@@ -313,6 +325,7 @@
   <script defer src="js/mapeamento-milvus.js"></script>
   <script defer src="js/milvus-atendimentos.js"></script>
   <script defer src="js/milvus-chamado.js"></script>
+  <script defer src="js/checklist.js"></script>
   <script defer src="js/app.js"></script>
   <script defer src="js/sw-register.js"></script>
 </body>
