@@ -20,7 +20,7 @@ const ENTITIES = [
       owner_phone: 'ownerPhone', responsible: 'responsible', responsible_phone: 'responsiblePhone',
       technician: 'technician', server: 'server', hosting: 'hosting', backup: 'backup',
       licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', milvus_client_token: 'milvusClientToken', team: 'team',
-      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_at: 'updatedAt'
+      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_by: 'updatedBy', updated_at: 'updatedAt'
     },
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();

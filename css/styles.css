@@ -4742,3 +4742,166 @@ body.dark-theme {
   .ov-wrap .op-stats-row,
   .ov-wrap .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FICHA TI — aba "Ficha TI" do modal de cliente (escopo .cf-*).
+   Só apresentação: mesmos tokens do tema (light + dark), sem novas
+   dependências, ícones SVG inline. Responsivo até ~380px e respeita
+   prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Subtítulo do cabeçalho: "Atualizada em DD/MM/AAAA por <usuário>" */
+.modal-title .cf-title-main { display: block; }
+.modal-title .cf-title-sub {
+  display: block; margin-top: 2px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+/* Barra de ações */
+.cf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.cf-bar-sp { flex: 1 1 auto; }
+.cf-bar .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Faixa de saúde unificada + progresso da ficha */
+.cf-health {
+  --cf-h: var(--green);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 11px 14px; margin-bottom: 14px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cf-h) 35%, var(--border));
+  background: color-mix(in srgb, var(--cf-h) 9%, transparent);
+}
+.cf-health-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--cf-h);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-h) 22%, transparent);
+}
+.cf-health-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; flex: 1 1 240px; }
+.cf-health-status { font-size: 14px; font-weight: 700; color: var(--cf-h); }
+.cf-health-stats { font-size: 12.5px; color: var(--text-secondary); }
+.cf-progress { flex: 1 1 170px; min-width: 150px; max-width: 260px; }
+.cf-progress-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.cf-progress-top b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.cf-track { height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--cf-h) 18%, var(--bg-base)); overflow: hidden; margin-top: 4px; }
+.cf-track i { display: block; height: 100%; border-radius: inherit; background: var(--cf-h); transition: width .25s ease; }
+
+/* Ícone "i" + tooltip dos limiares */
+.cf-info {
+  position: relative; width: 20px; height: 20px; padding: 0; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: transparent; color: var(--text-secondary); cursor: help;
+}
+.cf-info:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.cf-tip {
+  display: none; position: absolute; left: 50%; bottom: calc(100% + 8px);
+  transform: translateX(-50%); width: 235px; padding: 8px 10px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow); color: var(--text-primary);
+  font-size: 12px; font-weight: 400; line-height: 1.5; text-align: left; z-index: 6;
+}
+.cf-info:hover .cf-tip,
+.cf-info:focus-visible .cf-tip { display: block; }
+
+/* Bloco Acesso rápido */
+.cf-quick {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-secondary); padding: 12px 14px; margin-bottom: 16px;
+}
+.cf-quick-head { display: flex; align-items: center; gap: 7px; color: var(--text-primary); }
+.cf-quick-head .cf-ico { color: var(--accent); }
+.cf-quick-title { margin: 0; font-size: 14px; font-weight: 700; }
+.cf-quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+
+/* Seções (acordeões) */
+.cf-sections { display: flex; flex-direction: column; gap: 10px; }
+.cf-sec { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cf-sec-head {
+  display: flex; width: 100%; align-items: center; gap: 8px;
+  padding: 11px 14px; border: 0; border-radius: 0; cursor: pointer;
+  background: var(--bg-secondary); text-align: left; font: inherit; color: var(--text-primary);
+}
+.cf-sec-head:hover { background: var(--bg-hover); }
+.cf-chev { display: inline-flex; color: var(--text-muted); transition: transform .18s ease; }
+.cf-sec.open .cf-chev { transform: rotate(90deg); }
+.cf-sec-ico { display: inline-flex; color: var(--accent); }
+.cf-sec-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+.cf-sec-count { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--text-muted); text-align: right; }
+.cf-sec-body { display: none; padding: 12px 14px; border-top: 1px solid var(--border); background: var(--bg-surface); }
+.cf-sec.open .cf-sec-body { display: block; }
+
+/* Grid responsivo de campos (OBS ocupa a linha inteira) */
+.cf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.cf-field { background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.cf-field.cf-wide { grid-column: 1 / -1; }
+.cf-quick-grid .cf-field--sm { padding: 7px 9px; }
+.cf-quick-grid .cf-label { font-size: 12px; }
+.cf-label {
+  font-size: 12.5px; font-weight: 600; line-height: 1.3;
+  color: var(--text-secondary); margin-bottom: 4px;
+}
+.cf-value { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+.cf-text {
+  flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 600;
+  color: var(--text-primary); word-break: break-word;
+  border-radius: 4px; padding: 1px 3px; margin: -1px -3px; cursor: pointer;
+}
+.cf-text:hover { background: var(--accent-dim); }
+.cf-text.is-empty { color: var(--text-muted); font-weight: 400; }
+.cf-text--badge[data-badge="ok"] { color: var(--green); }
+.cf-text--badge[data-badge="bad"] { color: var(--red); }
+.cf-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.cf-value.is-editing .cf-actions { display: none; }
+.cf-act {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-surface); color: var(--text-secondary);
+  font-family: inherit; font-size: 11.5px; font-weight: 600; line-height: 1.35;
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.cf-act:hover { border-color: var(--accent); color: var(--accent); }
+.cf-input {
+  flex: 1 1 120px; min-width: 0; font: inherit; font-size: 13.5px;
+  background: var(--bg-surface); color: var(--text-primary);
+  border: 1px solid var(--accent); border-radius: 6px; padding: 4px 7px;
+}
+textarea.cf-input { flex-basis: 100%; resize: vertical; line-height: 1.5; }
+select.cf-input { cursor: pointer; }
+
+/* Badges e licenças */
+.cf-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.cf-badge--warn { background: var(--yellow-dim); color: var(--yellow); }
+.cf-lics { display: flex; flex-direction: column; gap: 8px; }
+.cf-lic {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-base);
+}
+.cf-lic-name { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.cf-lic-key { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; word-break: break-all; }
+.cf-empty { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+/* Dica de edição inline */
+.cf-hint {
+  display: flex; align-items: center; gap: 6px; margin: 14px 0 0;
+  font-size: 12.5px; color: var(--text-muted);
+}
+
+/* Responsivo (ok até ~380px) */
+@media (max-width: 560px) {
+  .cf-health { align-items: flex-start; }
+  .cf-progress { max-width: none; flex-basis: 100%; }
+  .cf-sec-count { font-size: 11.5px; max-width: 45%; }
+  .cf-quick-grid { grid-template-columns: 1fr; }
+  .cf-bar-sp { flex-basis: 100%; }
+}
+@media (max-width: 420px) {
+  .cf-grid { grid-template-columns: 1fr; }
+  .cf-sec-head { padding: 10px 12px; }
+  .cf-sec-body, .cf-quick, .cf-health { padding-left: 12px; padding-right: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-chev, .cf-track i { transition: none !important; }
+}

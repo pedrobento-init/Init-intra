@@ -1506,6 +1506,11 @@ function saveClient(data) {
   const clients = getClients();
   const isEdit = !!data.id;
   var now = new Date().toISOString();
+  // Autor da edição (exibido no cabeçalho do modal: "Atualizada em ... por ...").
+  try {
+    var _edSession = typeof getSession === 'function' ? getSession() : null;
+    data.updatedBy = (_edSession && _edSession.name) || data.updatedBy || '';
+  } catch (_) { data.updatedBy = data.updatedBy || ''; }
   // Criação restrita a admin (backstop além da UI — edição e undo passam).
   if (!isEdit && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
     if (typeof showToast === 'function') showToast('Apenas administradores podem cadastrar clientes.', 'error');
@@ -1558,6 +1563,7 @@ function saveClient(data) {
       attachments: data.attachments || [],
       documents: data.documents || [],
       created_at: data.createdAt || now,
+      updated_by: data.updatedBy || null,
       updated_at: now
     }).then(res => {
       if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); }
