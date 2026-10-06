@@ -12,14 +12,16 @@ describe('Checklist (aba do cliente)', () => {
 
   it('expõe as funções puras usadas pela UI', () => {
     ['checklistNormCat', 'groupChecklistItens', 'checklistProgress',
-     'findProceduresByCategoria', 'checklistTipoLabel', 'checklistTipoDeItem']
+     'findProceduresByCategoria', 'orderChecklists', 'groupsToFlat',
+     'renumberGroups', 'moveItemDir', 'moveItemBefore', 'countItemsByChecklist',
+     'checklistCategoriaOptions']
       .forEach(k => expect(typeof mod[k]).toBe('function'));
-    expect(mod.CHECKLIST_TIPOS.map(t => t.id))
-      .toEqual(['instalacao', 'troca', 'saida']);
     expect(mod.CHECKLIST_SEM_PROC).toBe('Geral');
+    expect(mod.CHECKLIST_CATEGORIAS)
+      .toEqual(['Estações', 'Servidor(es)', 'E-mails', 'Impressora', 'Sistemas', 'Firewall', 'Geral']);
   });
 
-  it('modelo padrão tem 14/9/14 itens, ids únicos e ordem sequencial por tipo', () => {
+  it('modelo padrão tem 14/9/14 itens, ids únicos e ordem sequencial por checklist', () => {
     const ids = mod.CHECKLIST_MODELO_DEFAULT.map(i => i.id);
     expect(new Set(ids).size).toBe(ids.length);
 
@@ -30,19 +32,34 @@ describe('Checklist (aba do cliente)', () => {
       expect(itens.every(i => i.texto && i.categoria)).toBe(true);
       expect(itens.map(i => i.ordem)).toEqual(itens.map((_, n) => n + 1));
     });
+
+    // todos os itens apontam para um checklist existente
+    const cks = new Set(mod.CHECKLISTS_DEFAULT.map(c => c.id));
+    expect(mod.CHECKLIST_MODELO_DEFAULT.every(i => cks.has(i.tipo))).toBe(true);
+    expect(mod.CHECKLISTS_DEFAULT.every(c => c.ativo === true)).toBe(true);
+  });
+
+  it('ordena os checklists por ordem e depois nome', () => {
+    const l = [
+      { id: 'b', nome: 'Zebra', ordem: 1 },
+      { id: 'a', nome: 'Alpha', ordem: 2 },
+      { id: 'c', nome: 'Casca', ordem: 0 },
+      null,
+    ];
+    expect(mod.orderChecklists(l).map(x => x.id)).toEqual(['c', 'b', 'a']);
+    expect(mod.orderChecklists(null)).toEqual([]);
   });
 
   it('agrupa por categoria preservando a ordem do modelo', () => {
     const itens = [
-      { id: 'a', tipo: 'instalacao', categoria: 'Servidor(es)', texto: 'Um', ordem: 1, ativo: true },
-      { id: 'b', tipo: 'instalacao', categoria: 'Estações', texto: 'Dois', ordem: 2, ativo: true },
-      { id: 'c', tipo: 'instalacao', categoria: 'Servidor(es)', texto: 'Três', ordem: 3, ativo: true },
-      { id: 'd', tipo: 'instalacao', categoria: 'Estações', texto: 'Fora', ordem: 4, ativo: false },
+      { id: 'a', categoria: 'Servidor(es)', texto: 'Um', ordem: 1, ativo: true },
+      { id: 'b', categoria: 'Estações', texto: 'Dois', ordem: 2, ativo: true },
+      { id: 'c', categoria: 'Servidor(es)', texto: 'Três', ordem: 3, ativo: true },
+      { id: 'd', categoria: 'Estações', texto: 'Fora', ordem: 4, ativo: false },
     ];
     const grupos = mod.groupChecklistItens(itens);
     expect(grupos.map(g => g.categoria)).toEqual(['Servidor(es)', 'Estações']);
     expect(grupos[0].itens.map(i => i.id)).toEqual(['a', 'c']);
-    // item inativo some do cálculo e da tela
     expect(grupos[1].itens.map(i => i.id)).toEqual(['b']);
     expect(mod.groupChecklistItens(null)).toEqual([]);
   });
@@ -67,34 +84,77 @@ describe('Checklist (aba do cliente)', () => {
     ];
     expect(mod.findProceduresByCategoria(procs, 'ACESSO').map(p => p.id)).toEqual(['p1']);
     expect(mod.findProceduresByCategoria(procs, 'Rede').map(p => p.id)).toEqual(['p2']);
-    // categoria que não existe → botão "Ver procedimento" não aparece
     expect(mod.findProceduresByCategoria(procs, 'Geral')).toEqual([]);
     expect(mod.findProceduresByCategoria(procs, '')).toEqual([]);
     expect(mod.findProceduresByCategoria(null, 'Acesso')).toEqual([]);
-    // categoria cadastrada mas sem texto → abre o modal com o aviso de vazio
+    // categoria cadastrada mas sem texto -> abre o modal com o aviso de vazio
     expect(mod.findProceduresByCategoria(procs, 'Backup').map(p => p.id)).toEqual(['p3']);
   });
 
-  it('resolve tipo do item e rótulo do tipo', () => {
-    expect(mod.checklistTipoLabel('instalacao')).toBe('Instalação');
-    expect(mod.checklistTipoLabel('troca')).toBe('Troca de usuário');
-    expect(mod.checklistTipoLabel('saida')).toBe('Saída de colaborador');
-    expect(mod.checklistTipoLabel('x')).toBe('x');
-    expect(mod.checklistTipoDeItem('inst-01')).toBe('instalacao');
-    expect(mod.checklistTipoDeItem('troca-09')).toBe('troca');
-    expect(mod.checklistTipoDeItem('desconhecido')).toBe('');
-    expect(mod.checklistTipoDeItem('saida-14', [{ id: 'saida-14', tipo: 'saida' }])).toBe('saida');
+  it('renumberGroups renumera 1..n na ordem de exibição', () => {
+    const flat = mod.groupsToFlat(mod.groupChecklistItens([
+      { id: 'a', categoria: 'X', ordem: 5, ativo: true },
+      { id: 'b', categoria: 'Y', ordem: 9, ativo: true },
+      { id: 'c', categoria: 'X', ordem: 1, ativo: true },
+    ]));
+    // ordem 1 (c) abre o grupo X; grupo Y vem depois; dentro de X: c(1) antes de a(5)
+    expect(flat.map(i => i.id)).toEqual(['c', 'a', 'b']);
+    const ren = mod.renumberGroups(mod.groupChecklistItens([
+      { id: 'a', categoria: 'X', ordem: 5, ativo: true },
+      { id: 'b', categoria: 'Y', ordem: 9, ativo: true },
+      { id: 'c', categoria: 'X', ordem: 1, ativo: true },
+    ]));
+    expect(ren.map(i => [i.id, i.ordem])).toEqual([['c', 1], ['a', 2], ['b', 3]]);
   });
 
-  it('itens de instalação cobrem as categorias esperadas (Geral incluída)', () => {
-    const cats = new Set(mod.CHECKLIST_MODELO_DEFAULT
-      .filter(i => i.tipo === 'instalacao').map(i => i.categoria));
-    ['Estações', 'Servidor(es)', 'E-mails', 'Impressora', 'Sistemas', 'Geral']
-      .forEach(c => expect(cats.has(c)).toBe(true));
-    const catsSaida = new Set(mod.CHECKLIST_MODELO_DEFAULT
-      .filter(i => i.tipo === 'saida').map(i => i.categoria));
-    ['Firewall', 'E-mails', 'Sistemas', 'Estações', 'Geral', 'Servidor(es)']
-      .forEach(c => expect(catsSaida.has(c)).toBe(true));
+  it('sobe/desce item dentro da categoria e recusa fora dos limites', () => {
+    const g = mod.groupChecklistItens([
+      { id: 'a', categoria: 'X', ordem: 1, ativo: true },
+      { id: 'b', categoria: 'X', ordem: 2, ativo: true },
+      { id: 'c', categoria: 'Y', ordem: 3, ativo: true },
+    ]);
+    expect(mod.moveItemDir(g, 'b', -1)[0].itens.map(i => i.id)).toEqual(['b', 'a']);
+    expect(mod.moveItemDir(g, 'a', -1)).toBeNull();      // já é o primeiro
+    expect(mod.moveItemDir(g, 'c', 1)).toBeNull();       // categoria com 1 item
+    expect(mod.moveItemDir(g, 'inexistente', 1)).toBeNull();
+    expect(g[0].itens.map(i => i.id)).toEqual(['a', 'b']); // original intocado
+  });
+
+  it('moveItemBefore reinserte antes do alvo e troca de categoria', () => {
+    const g = mod.groupChecklistItens([
+      { id: 'a', categoria: 'X', ordem: 1, ativo: true },
+      { id: 'b', categoria: 'X', ordem: 2, ativo: true },
+      { id: 'c', categoria: 'Y', ordem: 3, ativo: true },
+    ]);
+    const antes = mod.moveItemBefore(g, 'c', 'X', 'a');
+    expect(antes.map(x => x.categoria)).toEqual(['X']);
+    expect(antes[0].itens.map(i => i.id)).toEqual(['c', 'a', 'b']);
+    expect(antes[0].itens[0].categoria).toBe('X'); // item trocou de categoria
+
+    const noFim = mod.moveItemBefore(g, 'a', 'Y', null);
+    expect(noFim[1].itens.map(i => i.id)).toEqual(['c', 'a']);
+
+    expect(mod.moveItemBefore(g, 'a', 'X', 'a')).toBeNull();  // drop em cima de si
+    expect(mod.moveItemBefore(g, 'inexistente', 'X', 'b')).toBeNull();
+  });
+
+  it('conta itens ativos/inativos por checklist', () => {
+    const itens = [
+      { id: 'a', tipo: 'ck1', ativo: true },
+      { id: 'b', tipo: 'ck1', ativo: false },
+      { id: 'c', tipo: 'ck1', ativo: true },
+      { id: 'd', tipo: 'ck2', ativo: true },
+    ];
+    expect(mod.countItemsByChecklist(itens, 'ck1')).toEqual({ ativos: 2, inativos: 1 });
+    expect(mod.countItemsByChecklist(itens, 'ck2')).toEqual({ ativos: 1, inativos: 0 });
+    expect(mod.countItemsByChecklist(itens, 'x')).toEqual({ ativos: 0, inativos: 0 });
+    expect(mod.countItemsByChecklist(null, 'ck1')).toEqual({ ativos: 0, inativos: 0 });
+  });
+
+  it('seletor de categoria sempre traz a atual mesmo fora da lista fixa', () => {
+    expect(mod.checklistCategoriaOptions('Estações')).toContain('Estações');
+    expect(mod.checklistCategoriaOptions('Hack')).toEqual(['Hack', ...mod.CHECKLIST_CATEGORIAS]);
+    expect(mod.checklistCategoriaOptions(null)).toEqual(mod.CHECKLIST_CATEGORIAS);
   });
 
   it('normaliza categoria para comparação', () => {

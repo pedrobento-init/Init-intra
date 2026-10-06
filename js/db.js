@@ -52,6 +52,12 @@ idb.version(9).stores({
   checklist_marcacoes: 'id, clientId, itemId'
 });
 
+// v10: entidade "checklists" (nome/ativo/ordem) — os itens passam a
+// apontar para ela pelo campo `tipo` (id do checklist).
+idb.version(10).stores({
+  checklists: 'id, ativo, ordem'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -64,6 +70,7 @@ const _dbCache = {
   equipamentos: [],
   client_devices: [],
   client_milvus_tickets: [],
+  checklists: [],
   checklist_modelo_itens: [],
   checklist_marcacoes: [],
   keyvalue: {},
@@ -164,6 +171,8 @@ async function initIndexedDB() {
     catch (_) { _dbCache.checklist_modelo_itens = []; }
     try { _dbCache.checklist_marcacoes = await idb.checklist_marcacoes.toArray(); }
     catch (_) { _dbCache.checklist_marcacoes = []; }
+    try { _dbCache.checklists = await idb.checklists.toArray(); }
+    catch (_) { _dbCache.checklists = []; }
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {
