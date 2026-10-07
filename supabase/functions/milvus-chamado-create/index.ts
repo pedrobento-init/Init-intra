@@ -16,6 +16,7 @@
 //   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxx
 //   # Defaults do payload de CRIAÇÃO (sem eles usa "" e o Milvus pode
 //   # recusar com 4xx):
+//   supabase secrets set MILVUS_DEFAULT_CONTATO="Init Net"
 //   supabase secrets set MILVUS_DEFAULT_TECNICO="tecnico@empresa.com.br"
 //   supabase secrets set MILVUS_DEFAULT_MESA="Mesa padrão"
 //   supabase secrets set MILVUS_DEFAULT_SETOR="Setor padrão"
@@ -79,6 +80,8 @@ const MILVUS_API_URL =
 const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
 
 const MILVUS_DEFAULTS = {
+  // Nome exibido no CABEÇALHO do chamado no portal (campo contato).
+  contato: Deno.env.get("MILVUS_DEFAULT_CONTATO") ?? "Init Net",
   tecnico: Deno.env.get("MILVUS_DEFAULT_TECNICO") ?? "",
   mesa: Deno.env.get("MILVUS_DEFAULT_MESA") ?? "",
   setor: Deno.env.get("MILVUS_DEFAULT_SETOR") ?? "",
@@ -311,16 +314,16 @@ function buildCreatePayload(
     chamado_assunto: assunto,
     chamado_descricao: descricao,
     chamado_descricao_html: descricaoHtml,
-    // Contato/e-mail = operador da visita (não o responsável do cliente):
-    // é o nome que aparece no cabeçalho do chamado no portal.
+    // Contato = nome fixo da integração (aparece no cabeçalho do chamado no
+    // portal). O operador da visita continua no corpo ("Operador: ...").
+    chamado_contato: MILVUS_DEFAULTS.contato,
+    // E-mail = operador da visita (não o responsável do cliente).
     chamado_email: operatorEmail || _firstEmail(c.emails),
     chamado_telefone: _txt(c.responsible_phone) || _txt(c.owner_phone),
-    chamado_contato: _txt(v.operator) || _txt(c.responsible) || _txt(c.owner) || _txt(c.name),
     is_b2c: false,
     // Técnico = e-mail do operador da visita (o mesmo da Intra); sem e-mail,
-    // cai no default. O AUTOR exibido no portal ("Pedro • há 13 minutos")
-    // continua sendo o dono do token da API — para trocar o autor, gere o
-    // token a partir de um usuário neutro no Milvus (ex.: "Integração").
+    // cai no default. O "CRIADO POR"/autor do portal vem do dono do token
+    // (MILVUS_API_TOKEN) — não deste payload.
     chamado_tecnico: tecnicoEmail || MILVUS_DEFAULTS.tecnico,
     chamado_mesa: MILVUS_DEFAULTS.mesa,
     chamado_setor: MILVUS_DEFAULTS.setor,
