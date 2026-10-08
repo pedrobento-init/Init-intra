@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-// ── Ajustes visuais do print (kanban Pendências): faixa lateral de cor nos
-// cards + remoção da barra redundante "N pendências" (página única) ──────────
+// ── Quadro Kanban de Pendências no design system "Meu dia":
+// faixa lateral de 4px na cor da coluna + linha-resumo com vencidas ─────────
 const _dummyEl = {
   addEventListener() {}, removeEventListener() {}, style: {},
   classList: { add() {}, remove() {}, toggle() {} },
@@ -27,7 +27,7 @@ const sandbox = {
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   setTimeout: (fn) => 0,
   clearTimeout: () => {},
-  // penKanbanCard chama timerWidget sem guard — stub vazio p/ teste
+  // penTimerCell chama o timer.js sem guard — stub vazio p/ teste
   timerWidget: () => '',
 };
 sandbox.globalThis = sandbox;
@@ -39,7 +39,7 @@ try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(fs.readFileSync('js/pendencias.js', 'utf8'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
-    'globalThis.__t = { penKanbanCard, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
+    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
     sandbox
   );
 } finally {
@@ -84,19 +84,76 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('kanban desktop: faixa lateral com a cor do status', () => {
-  it('em_andamento usa o dot do STATUS_PEN_MAP (#6366f1)', () => {
+describe('kanban desktop: faixa lateral com a cor da coluna', () => {
+  it('em_andamento usa a cor Em andamento (cyan)', () => {
     const html = T.penKanbanCard(basePen({ status: 'em_andamento' }));
-    expect(html).toContain('border-left:3px solid #6366f1');
+    expect(html).toContain('border-left:4px solid var(--kb-cyan)');
   });
 
-  it('aberto usa #3b82f6; pausado usa #f59e0b', () => {
-    expect(T.penKanbanCard(basePen({ status: 'aberto' }))).toContain('border-left:3px solid #3b82f6');
-    expect(T.penKanbanCard(basePen({ status: 'pausado' }))).toContain('border-left:3px solid #f59e0b');
+  it('aberto usa accent; pausado usa amber', () => {
+    expect(T.penKanbanCard(basePen({ status: 'aberto' }))).toContain('border-left:4px solid var(--kb-accent)');
+    expect(T.penKanbanCard(basePen({ status: 'pausado' }))).toContain('border-left:4px solid var(--kb-amber)');
   });
 
-  it('status desconhecido cai no cinza neutro #94a3b8', () => {
-    expect(T.penKanbanCard(basePen({ status: 'xpto' }))).toContain('border-left:3px solid #94a3b8');
+  it('status desconhecido cai no cinza neutro (kb-muted)', () => {
+    expect(T.penKanbanCard(basePen({ status: 'xpto' }))).toContain('border-left:4px solid var(--kb-muted)');
+  });
+
+  it('cores das 5 colunas do quadro (ordem/semântica do protótipo)', () => {
+    expect(T.penColColor('aberto')).toBe('var(--kb-accent)');
+    expect(T.penColColor('em_andamento')).toBe('var(--kb-cyan)');
+    expect(T.penColColor('pausado')).toBe('var(--kb-amber)');
+    expect(T.penColColor('aguardando')).toBe('var(--kb-violet)');
+    expect(T.penColColor('aguardando_cliente')).toBe('var(--kb-green)');
+  });
+});
+
+describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
+  it('avatar com iniciais do cliente + nome em negrito', () => {
+    const html = T.penKanbanCard(basePen({ clientName: 'Galvão e Raça' }));
+    expect(html).toContain('class="kc-av"');
+    expect(html).toContain('>GR<');
+    expect(html).toMatch(/kc-client-name[^>]*>Galvão e Raça/);
+  });
+
+  it('pill de prioridade na cor certa (Crítica=red, Baixa=green)', () => {
+    expect(T.penKanbanCard(basePen({ priority: 'critica' }))).toContain('--c:var(--kb-red)');
+    expect(T.penKanbanCard(basePen({ priority: 'baixa' }))).toContain('--c:var(--kb-green)');
+    expect(T.penKanbanCard(basePen({ priority: 'media' }))).toContain('--c:var(--kb-muted)');
+  });
+
+  it('prazo vencido mostra alerta + data em vermelho; sem prazo mostra "Sem prazo"', () => {
+    const late = T.penKanbanCard(basePen({ deadline: '2020-01-01' }));
+    expect(late).toContain('Vencida');
+    expect(late).toContain('kc-deadline is-overdue');
+    expect(T.penKanbanCard(basePen({ deadline: null }))).toContain('Sem prazo');
+  });
+
+  it('sem cronômetro ativo, o rodapé traz o botão "Iniciar"', () => {
+    const html = T.penKanbanCard(basePen({ status: 'aberto', timerRunning: false }));
+    expect(html).toContain('class="kb-go"');
+    expect(html).toContain('Iniciar');
+    expect(html).toContain('kb-play');
+  });
+});
+
+describe('linha-resumo do quadro', () => {
+  it('total + colunas + vencidas', () => {
+    const html = T.penStatusSummary([
+      basePen({ id: 'PEN-1', status: 'aberto', deadline: '2020-01-01' }),
+      basePen({ id: 'PEN-2', status: 'em_andamento', deadline: '2099-01-01' }),
+    ]);
+    expect(html).toContain('<strong>2</strong>&nbsp;pendências ativas');
+    expect(html).toContain('<strong>1</strong> aberto');
+    expect(html).toContain('<strong>1</strong> em andamento');
+    expect(html).toContain('pen-sum-over');
+    expect(html).toContain('<strong>1</strong> vencida');
+  });
+
+  it('sem pendências o resumo não tem contagem de colunas', () => {
+    const html = T.penStatusSummary([]);
+    expect(html).toContain('<strong>0</strong>&nbsp;pendências ativas');
+    expect(html).toContain('0</strong> vencidas');
   });
 });
 

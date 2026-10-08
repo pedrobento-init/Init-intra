@@ -5125,3 +5125,242 @@ select.cf-input { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .ck-track i, .ck-item, .ck-seg-btn, .ck-proc-btn, .ck-adm-item { transition: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   [UI] PENDÊNCIAS · QUADRO KANBAN — design system "Meu dia"
+   Fonte de verdade: referencia/Meu_dia.html (tokens, tipografia, pills,
+   botões, painéis) e referencia/pendencias-kanban.html (protótipo do
+   quadro). Escopo: .pen-board (resumo + quadro da rota Pendências).
+   Reaproveita o shell já existente (topbar = título "Pendências",
+   botão de tema e ação primária "Nova Pendência"), os .btn do app e o
+   CSS base .kanban-*; aqui só se sobrescreve apresentação — ids/classes
+   usados pela lógica (kanban-board, kanban-col, kanban-card, pen-summary)
+   continuam intactos.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens (mesmos valores do "Meu dia"; dark via body.dark-theme) ── */
+.pen-board {
+  --kb-panel: #FFFFFF;
+  --kb-raised: #F1F4FA;
+  --kb-line: #DFE4EF;
+  --kb-text: #141A2A;
+  --kb-muted: #5C6784;
+  --kb-accent: #2957F5;
+  --kb-on-accent: #FFFFFF;
+  --kb-red: #C92F44;
+  --kb-amber: #A86A12;
+  --kb-violet: #6B46D9;
+  --kb-cyan: #0E86B0;
+  --kb-green: #16845B;
+  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--kb-text);
+}
+body.dark-theme .pen-board {
+  --kb-panel: #121929;
+  --kb-raised: #1A2340;
+  --kb-line: #242F4A;
+  --kb-text: #E8ECF6;
+  --kb-muted: #8F9AB5;
+  --kb-accent: #4C7BFF;
+  --kb-on-accent: #FFFFFF;
+  --kb-red: #F26D7D;
+  --kb-amber: #F2B94B;
+  --kb-violet: #A98BFF;
+  --kb-cyan: #35C3EE;
+  --kb-green: #4ED39A;
+}
+.pen-board :focus-visible { outline: 2px solid var(--kb-accent); outline-offset: 2px; }
+.pen-board .kb-ico {
+  width: 14px; height: 14px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.pen-board .kb-ico--fill { fill: currentColor; stroke: none; }
+
+/* ── Cabeçalho do quadro: resumo + ações (tema e nova pendência) ── */
+.pen-board-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.pen-board-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.pen-board .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 8px; font-family: Manrope, system-ui, sans-serif;
+  font-weight: 600; font-size: 13px; box-shadow: none;
+  padding: 7px 12px; min-height: 34px;
+}
+.pen-board .btn-secondary { background: var(--kb-panel); border: 1px solid var(--kb-line); color: var(--kb-text); }
+.pen-board .btn-secondary:hover { background: var(--kb-raised); border-color: var(--kb-line); color: var(--kb-text); }
+.pen-board .btn-primary { background: var(--kb-accent); border: 1px solid var(--kb-accent); color: var(--kb-on-accent); }
+.pen-board .btn-primary:hover { background: var(--kb-accent); border-color: var(--kb-accent); color: var(--kb-on-accent); filter: brightness(1.1); }
+
+/* ── Linha-resumo ── */
+.pen-board .pen-summary {
+  margin: 0; font-size: 12.5px; color: var(--kb-muted);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; line-height: 1.5;
+}
+.pen-board .pen-summary strong { color: var(--kb-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pen-sum-over { display: inline-flex; align-items: center; gap: 4px; color: var(--kb-red); font-weight: 700; }
+.pen-board .pen-summary .pen-sum-over strong { color: inherit; font-weight: 800; }
+
+/* ── Quadro: 5 colunas, rolagem horizontal só dentro do container ── */
+.pen-board .kanban-board {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-inline: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.pen-board .kanban-col {
+  flex: 1 1 260px;
+  min-width: 260px;
+  max-width: none;
+  background: var(--kb-panel);
+  border: 1px solid var(--kb-line);
+  border-radius: 14px;
+  padding: 14px;
+  gap: 10px;
+  max-height: calc(100vh - 230px);
+}
+.pen-board .kanban-col-header {
+  padding: 0; margin: 0;
+  background: transparent;
+  border-bottom: 0;
+  border-radius: 0;
+}
+.pen-board .kanban-col-title {
+  margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .01em;
+  text-transform: none; color: var(--kb-text);
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+.pen-board .kanban-col-title .kb-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none;
+}
+.pen-board .kanban-col-count {
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c);
+  font-size: 12px; font-weight: 800; padding: 1px 9px;
+  border-radius: 999px; min-width: 0; min-height: 0;
+  font-variant-numeric: tabular-nums;
+}
+.pen-board .kanban-col-sort {
+  border-radius: 6px; color: var(--kb-muted); border-color: transparent; background: transparent;
+}
+.pen-board .kanban-col-sort:hover {
+  border-color: var(--kb-line); background: var(--kb-raised); color: var(--kb-text);
+}
+.pen-board .kanban-cards { padding: 0; gap: 10px; background: transparent; }
+.pen-board .kanban-cards .empty-state p { color: var(--kb-muted); font-size: 13px; margin-bottom: 8px; }
+
+/* ── Card da pendência ── */
+.pen-board .kanban-card {
+  background: var(--kb-raised);
+  border: 1px solid var(--kb-line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  display: grid;
+  gap: 8px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pen-board .kanban-card:hover {
+  border-color: var(--c, var(--kb-accent));
+  box-shadow: none;
+  transform: none;
+}
+.pen-board .kanban-card-title {
+  margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.35;
+  color: var(--kb-text); min-width: 0;
+}
+.pen-board .pen-display-num {
+  font-size: 11px; font-weight: 600; color: var(--kb-muted);
+  margin-right: 6px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.pen-board .kanban-card-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  font-size: 12.5px; color: var(--kb-muted); margin-top: 0; line-height: 1.4;
+}
+.pen-board .kc-client {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--kb-text); font-weight: 700; font-size: 12.5px;
+  max-width: 100%; min-width: 0;
+}
+.kc-av {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: var(--kb-panel); border: 1px solid var(--kb-line);
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: 800; color: var(--kb-muted);
+}
+.pen-board .kb-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 700; padding: 1px 9px;
+  border-radius: 999px; white-space: nowrap;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.pen-board .kb-pill::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+}
+.pen-board .kc-resp { font-size: 12.5px; color: var(--kb-muted); max-width: 100%; }
+.pen-board .kc-resp--empty { font-style: italic; }
+.pen-board .kc-stale {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
+}
+.pen-board .kc-overdue {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; color: var(--kb-red); white-space: nowrap;
+}
+
+/* ── Rodapé do card: prazo (linha tracejada) + Iniciar/cronômetro ── */
+.pen-board .kanban-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; border-top: 1px dashed var(--kb-line); padding-top: 8px;
+  font-size: 12.5px; color: var(--kb-muted); margin-top: 0;
+}
+.pen-board .kc-deadline { display: inline-flex; align-items: center; gap: 6px; color: var(--kb-muted); min-width: 0; }
+.pen-board .kc-deadline.is-empty { color: var(--kb-muted); }
+.pen-board .kc-deadline.is-overdue { color: var(--kb-red); font-weight: 700; }
+.pen-board .kb-go {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none; color: var(--kb-muted);
+  font: 600 12.5px Manrope, system-ui, sans-serif;
+  cursor: pointer; padding: 2px 4px; border-radius: 6px; flex: none;
+}
+.pen-board .kb-go:hover { background: var(--kb-panel); color: var(--kb-text); }
+.pen-board .kb-play {
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--kb-green) 16%, transparent); color: var(--kb-green);
+}
+.pen-board .kb-play .kb-ico { width: 10px; height: 10px; }
+.pen-board .kb-timer {
+  color: var(--kb-green); font-weight: 700; font-size: 12.5px;
+  font-variant-numeric: tabular-nums; flex: none; white-space: nowrap;
+}
+
+/* ── Drag & drop ── */
+.pen-board .kanban-col.drag-over {
+  border-color: var(--c, var(--kb-accent));
+  background: color-mix(in srgb, var(--c, var(--kb-accent)) 7%, var(--kb-panel));
+}
+.pen-board .kanban-col.drag-over .kanban-cards { background: transparent; }
+.pen-board .kanban-card.dragging { opacity: .5; }
+
+/* ── Celular: colunas de ~82vw, rolagem com snap ── */
+@media (max-width: 560px) {
+  .pen-board .kanban-board { gap: 10px; scroll-snap-type: x proximity; }
+  .pen-board .kanban-col { flex: 0 0 82vw; min-width: 82vw; max-height: none; scroll-snap-align: start; }
+  .pen-board-head { flex-direction: column; align-items: stretch; }
+  .pen-board-acts .btn { flex: 1 1 auto; }
+}
+
+/* ── Movimento reduzido ── */
+@media (prefers-reduced-motion: reduce) {
+  .pen-board *,
+  .pen-board *::before,
+  .pen-board *::after { transition: none !important; animation: none !important; }
+}

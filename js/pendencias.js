@@ -21,26 +21,71 @@ function penBoardCols() {
   return cols.filter(penColVisible);
 }
 
+// ── Quadro Kanban · design system "Meu dia" ────────────────────────────────
+// Tokens --kb-* e regras .pen-board vivem em css/styles.css (seção
+// "[UI] PENDÊNCIAS · QUADRO KANBAN"); referência visual em
+// referencia/pendencias-kanban.html. Cores das colunas são as do protótipo
+// (Aberto=accent, Em andamento=cyan, Pausado=amber, Aguard.terceiro=violet,
+// Aguard.cliente=green) — STATUS_PEN_MAP continua sendo a referência de
+// rótulo/badge no resto do app.
+const PEN_COL_COLOR = {
+  aberto: 'var(--kb-accent)',
+  em_andamento: 'var(--kb-cyan)',
+  pausado: 'var(--kb-amber)',
+  aguardando: 'var(--kb-violet)',
+  aguardando_cliente: 'var(--kb-green)',
+  resolvido: 'var(--kb-green)',
+  cancelado: 'var(--kb-muted)'
+};
+function penColColor(statusId) { return PEN_COL_COLOR[statusId] || 'var(--kb-muted)'; }
+
+const PEN_PRI_COLOR = {
+  critica: 'var(--kb-red)',
+  alta: 'var(--kb-amber)',
+  media: 'var(--kb-muted)',
+  baixa: 'var(--kb-green)'
+};
+function penPriColor(priority) { return PEN_PRI_COLOR[priority] || 'var(--kb-muted)'; }
+function penPriLabel(priority) {
+  if (typeof PRIORITY_MAP !== 'undefined' && PRIORITY_MAP[priority]) return PRIORITY_MAP[priority].label;
+  return priority || '—';
+}
+
+// Vencida = prazo anterior a hoje e status ainda aberto (calculado, não salvo).
+function penIsOverdue(p) {
+  if (!p || !p.deadline) return false;
+  try { if (typeof isPendenciaClosed === 'function' && isPendenciaClosed(p.status)) return false; }
+  catch (_) { if (['concluido','resolvido','cancelado','fechado'].indexOf(p.status) !== -1) return false; }
+  var today = (typeof localDateISO === 'function') ? localDateISO() : new Date().toISOString().slice(0, 10);
+  return String(p.deadline) < today;
+}
+
+// Iniciais do cliente p/ avatar do card (mesmo formato do protótipo:
+// "Galvão e Raça" → GR, "Battaglia & Vidilli" → BV — conectores curtos são
+// pulados para não virar "GE"/"BV" errado).
+const PEN_INITIALS_STOP = { e: 1, a: 1, o: 1, de: 1, da: 1, do: 1, das: 1, dos: 1, em: 1, no: 1, na: 1, nos: 1, nas: 1, and: 1, for: 1, of: 1 };
+function penInitials(name) {
+  var parts = String(name || '').replace(/&/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  var second = '';
+  for (var i = 1; i < parts.length; i++) {
+    if (!PEN_INITIALS_STOP[parts[i].toLowerCase()]) { second = parts[i].charAt(0); break; }
+  }
+  var a = parts[0].charAt(0) || '';
+  var b = second || parts[0].charAt(1) || '';
+  return (a + b).toUpperCase();
+}
+
+// Ícones de traço (stroke 1.8) reutilizados pelos cards/resumo.
+const PEN_ICO_WARN = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>';
+const PEN_ICO_CAL = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+const PEN_ICO_PLAY = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
+const PEN_ICO_PLUS = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const PEN_ICO_MOON = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
 let penView = 'kanban';
 let penScope = 'active';
 let _filteredPens = [];
-
-// ── 1. HIERARQUIA SLA/Vencido ───────────────────────────────────────────────
-// Vermelho só para críticos (aberto/em_andamento). Aguard.* usa âmbar neutro.
-const _PEN_SLA_CRITICAL = ['aberto','em_andamento'];
-function _slaVisualFor(p, sla){
-  if(!sla) return null;
-  var isCritical = _PEN_SLA_CRITICAL.indexOf(p.status) !== -1;
-  if(sla.expired && !isCritical){
-    // Aguardando Terceiro/Cliente/pausado: atraso pode ser esperado → âmbar suave
-    return { label: sla.label, color: '#92400e', bg: '#fef3c7', muted: true, expired: true };
-  }
-  return { label: sla.label, color: sla.color, muted: false, expired: sla.expired };
-}
-function _overdueVisualFor(p){
-  var critical = _PEN_SLA_CRITICAL.indexOf(p.status) !== -1;
-  return critical ? { color:'#dc2626', label:'⚠️ Vencida' } : { color:'#92400e', label:'⚠️ Vencida' };
-}
 
 // ── 6. ORDENAÇÃO POR COLUNA ────────────────────────────────────────────────
 var _penColSort = {}; // colId -> 'criacao'|'prazo'|'prioridade'
@@ -369,17 +414,28 @@ const PEN_UI_PAGE_SIZE = 50;
 let _penTotal = null;
 let _penServerMode = false;
 let _penLastSig = '';
-let _penCounts = null; // FASE 6: { byStatus, total } do banco (modo servidor)
+let _penCounts = null; // FASE 6: { byStatus, total, vencidas } do banco (modo servidor)
 // FASE 6: resumo idêntico ao penStatusSummary, mas dos totais do banco.
-function _penServerSummary() {
-  var counts = _penCounts || { byStatus: {}, total: 0 };
-  var cols = penBoardCols();
-  var parts = cols.map(function(col) {
-    var n = counts.byStatus[col.id] || 0;
+function _penSummaryHtml(total, parts, vencidas, scopeLabel) {
+  var venc = Number(vencidas) || 0;
+  return '<div class="pen-summary" role="status">' +
+    '<strong>' + total + '</strong>&nbsp;pendências ' + scopeLabel +
+    (parts.length ? ' · ' + parts.join(' · ') : '') +
+    ' · <span class="pen-sum-over">' + PEN_ICO_WARN +
+    '<strong>' + venc + '</strong> vencida' + (venc === 1 ? '' : 's') +
+    '</span></div>';
+}
+function _penSummaryParts(countFor) {
+  return penBoardCols().map(function(col) {
+    var n = countFor(col);
     return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
   }).filter(Boolean);
-  var scopeLabel = penScope === 'archived' ? 'arquivadas' : 'ativas';
-  return '<div class="pen-summary" role="status"><strong>' + counts.total + '</strong>&nbsp;pendências ' + scopeLabel + (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>';
+}
+function _penScopeLabel() { return penScope === 'archived' ? 'arquivadas' : 'ativas'; }
+function _penServerSummary() {
+  var counts = _penCounts || { byStatus: {}, total: 0, vencidas: 0 };
+  var parts = _penSummaryParts(function(col) { return counts.byStatus[col.id] || 0; });
+  return _penSummaryHtml(counts.total || 0, parts, counts.vencidas || 0, _penScopeLabel());
 }
 function _penViewSig() {
   var team = '';
@@ -498,21 +554,15 @@ function _applyOptimisticPens(rows) {
 }
 
 // ── Kanban drag-and-drop de pendências ───────────────────────────────────────
-function isPenMobile() {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
-}
-
 // Resumo compacto da situação (usa os mesmos dados filtrados do kanban;
 // não cria contagens novas: total + breakdown por status do escopo atual).
 function penStatusSummary(pens) {
   var list = pens || [];
-  var cols = penBoardCols();
-  var parts = cols.map(function(col) {
-    var n = list.filter(function(p) { return p.status === col.id; }).length;
-    return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
-  }).filter(Boolean);
-  var scopeLabel = penScope === 'archived' ? 'arquivadas' : 'ativas';
-  return '<div class="pen-summary" role="status"><strong>' + list.length + '</strong>&nbsp;pendências ' + scopeLabel + (parts.length ? ' · ' + parts.join(' · ') : '') + '</div>';
+  var parts = _penSummaryParts(function(col) {
+    return list.filter(function(p) { return p.status === col.id; }).length;
+  });
+  var vencidas = list.filter(penIsOverdue).length;
+  return _penSummaryHtml(list.length, parts, vencidas, _penScopeLabel());
 }
 
 function renderPenKanban(area) {
@@ -522,48 +572,56 @@ function renderPenKanban(area) {
   // FASE 3: no modo servidor o resumo por status refletiria só a página;
   // FASE 6 usa os totais do banco (mesmo markup do resumo local).
   var summaryHtml = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
-  if (isPenMobile()) {
-    area.innerHTML = _penPagerBar() + summaryHtml + renderPenMobileGrid(pens);
-  } else {
-    var cols = penBoardCols();
-    area.innerHTML = _penPagerBar() + summaryHtml + '<div class="kanban-board">' +
-      cols.map(function(col) {
-        var rawCards = pens.filter(function(p) { return p.status === col.id; });
-        var cards = _penSortCards(rawCards, col.id);
-        var sortMode = _penColSort[col.id] || 'criacao';
-        var sortIcon = sortMode==='prazo' ? '📅' : sortMode==='prioridade' ? '⚡' : '🕒';
-        var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : 'Ordenado por criação';
-        return '<div class="kanban-col"' +
-          ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
-          ' ondragleave="this.classList.remove(\'drag-over\')"' +
-          ' ondrop="onPenKanbanDrop(event,\'' + col.id + '\')">' +
-          '<div class="kanban-col-header">' +
-            '<div class="kanban-col-title">' +
-              '<span style="width:10px;height:10px;border-radius:50%;background:' + col.color + ';display:inline-block"></span> ' +
-              escapeHtml(col.label) +
-            '</div>' +
-            '<div style="display:flex;align-items:center;gap:6px">' +
-              '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
-              '<span class="kanban-col-count">' + cards.length + '</span>' +
-            '</div>' +
+  var cols = penBoardCols();
+  var boardHtml = '<section class="kanban-board" role="region" aria-label="Quadro de pendências">' +
+    cols.map(function(col) {
+      var rawCards = pens.filter(function(p) { return p.status === col.id; });
+      var cards = _penSortCards(rawCards, col.id);
+      var sortMode = _penColSort[col.id] || 'criacao';
+      var sortIcon = sortMode==='prazo' ? '📅' : sortMode==='prioridade' ? '⚡' : '🕒';
+      var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : 'Ordenado por criação';
+      return '<section class="kanban-col" style="--c:' + penColColor(col.id) + '"' +
+        ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
+        ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+        ' ondragleave="this.classList.remove(\'drag-over\')"' +
+        ' ondrop="onPenKanbanDrop(event,\'' + col.id + '\')">' +
+        '<div class="kanban-col-header">' +
+          '<h2 class="kanban-col-title">' +
+            '<span class="kb-dot" aria-hidden="true"></span>' +
+            escapeHtml(col.label) +
+          '</h2>' +
+          '<div style="display:flex;align-items:center;gap:6px">' +
+            '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
+            '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
           '</div>' +
-          '<div class="kanban-cards">' +
-            (cards.length
-              ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-              : '<div class="empty-state" style="padding:18px 10px"><p>Nenhuma pendência</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
-          '</div>' +
-        '</div>';
-      }).join('') +
+        '</div>' +
+        '<div class="kanban-cards">' +
+          (cards.length
+            ? cards.map(function(p) { return penKanbanCard(p); }).join('')
+            : '<div class="empty-state" style="padding:18px 10px"><p>Nenhuma pendência</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
+        '</div>' +
+      '</section>';
+    }).join('') +
+  '</section>';
+  area.innerHTML = _penPagerBar() +
+    '<div class="pen-board">' +
+      '<div class="pen-board-head">' +
+        summaryHtml +
+        '<div class="pen-board-acts">' +
+          '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'themeToggleBtn\').click()" aria-label="Alternar tema claro/escuro">' + PEN_ICO_MOON + 'Alternar tema</button>' +
+          '<button type="button" class="btn btn-primary" onclick="openPendenciaForm()">' + PEN_ICO_PLUS + 'Nova pendência</button>' +
+        '</div>' +
+      '</div>' +
+      boardHtml +
     '</div>';
-    var board = area.querySelector('.kanban-board');
-    if (board) {
-      _updateKanbanScrollShadows(board);
-      board.onscroll = function() { _updateKanbanScrollShadows(board); };
-      if (typeof window !== 'undefined') {
-        if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
-        window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
-        window.addEventListener('resize', window._kanbanResizeHandler);
-      }
+  var board = area.querySelector('.kanban-board');
+  if (board) {
+    _updateKanbanScrollShadows(board);
+    board.onscroll = function() { _updateKanbanScrollShadows(board); };
+    if (typeof window !== 'undefined') {
+      if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
+      window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
+      window.addEventListener('resize', window._kanbanResizeHandler);
     }
   }
   _applyPenCardMotion(area);
@@ -590,14 +648,16 @@ function _updateKanbanScrollShadows(board) {
   } catch (_) {}
 }
 
+function _penReducedMotion() {
+  try {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (_) { return false; }
+}
+
 function _applyPenCardMotion(area) {
   if (typeof Motion === 'undefined') return;
-  area.querySelectorAll('.pen-mobile-card').forEach(function(card) {
-    Motion.press(card,
-      function() { Motion.animate(card, { scale: 0.97 }, { duration: 0.1 }); },
-      function() { Motion.animate(card, { scale: 1 }, { duration: 0.25, ease: 'easeOut' }); }
-    );
-  });
+  if (_penReducedMotion()) return;
   area.querySelectorAll('.kanban-card').forEach(function(card) {
     if (card.dataset.motionHoverBound) return;
     card.dataset.motionHoverBound = '1';
@@ -622,7 +682,7 @@ function _applyPenCardMotion(area) {
 }
 
 // ── Cache por render (FASE 1 — memoização) ─────────────────────────────────
-// penKanbanCard/penMobileCard rodam 1× por card; sem cache cada card reordenava
+// penKanbanCard roda 1× por card; sem cache cada card reordenava
 // a lista inteira (getPendenciaDisplayNumber) e varria clientes com find
 // (getClientById) → O(n² log n) por render. O cache é primado 1× em
 // renderPenKanban (único ponto de render da lista) e limpo ao fim.
@@ -661,101 +721,69 @@ function penDisplayNumber(p) {
   return '#---';
 }
 
+// Rodapé do card: cronômetro ativo → tempo decorrido em verde; senão o
+// botão "Iniciar" (play em círculo verde). toggleTimer() já cuida de mover
+// a pendência para Em andamento e de pausar/retomar.
+function penTimerCell(p) {
+  var closed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(p.status) : false;
+  var worker = null;
+  try { if (typeof getCurrentWorker === 'function') worker = getCurrentWorker(p); } catch (_) {}
+  var running = !!(p && p.timerRunning) || !!worker;
+  var secs = 0;
+  try { if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p); } catch (_) {}
+  var fmt = (typeof formatTimer === 'function') ? formatTimer(secs) : '';
+  if (running || (closed && secs > 0)) {
+    if (!fmt) return '';
+    return '<span class="kb-timer timer-display" data-timer-id="' + escapeHtml(p.id) + '" data-running="' + (running ? 'true' : 'false') + '"' +
+      ' title="' + (running ? 'Cronômetro ativo' : 'Tempo total trabalhado') + '">' + fmt + '</span>';
+  }
+  if (closed) return '';
+  var label = 'Iniciar cronômetro de ' + penDisplayNumber(p);
+  return '<button class="kb-go" type="button" onclick="event.stopPropagation();toggleTimer(\'pendencia\',\'' + escapeHtml(p.id) + '\',this)"' +
+    ' aria-label="' + escapeHtml(label) + '">' +
+    '<span class="kb-play" aria-hidden="true">' + PEN_ICO_PLAY + '</span>Iniciar</button>';
+}
+
 function penKanbanCard(p) {
   var c = _penRenderClient(p.clientId);
-  var isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
+  var clientName = p.clientName || (c && c.name) || '—';
+  var isOverdue = penIsOverdue(p);
   var isStale = isStalePendencia(p);
-  var rawSla = slaCountdown(p, 48);
-  var sla = _slaVisualFor(p, rawSla);
-  var overdueVis = isOverdue ? _overdueVisualFor(p) : null;
-  var onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
-  var onLeaveBadge = onLeave ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : '';
-  var reassignBtn = onLeave ? '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
-  var pri = priorityTag(p.priority);
-  var respHtml = p.responsible
-    ? '<span class="kc-resp" title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
-    : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>';
-  var slaHtml = '';
-  if(sla){
-    var slaCls = sla.muted ? 'kc-sla kc-sla--muted' : 'kc-sla';
-    slaHtml = '<span class="'+slaCls+'" style="color:'+sla.color+';font-weight:600" title="'+(sla.expired?'SLA vencido (48h)':'SLA restante (48h)')+'">⏱ '+sla.label+'</span>';
-  }
-  var overdueHtml = isOverdue ? '<span class="kc-overdue" style="color:'+overdueVis.color+';font-weight:600" title="Prazo vencido">'+overdueVis.label+'</span>' : '';
-  var staleHtml = (isStale && !isOverdue) ? '<span class="kc-stale" title="Sem atualização há 7+ dias">🕓 Parada</span>' : '';
+  var title = getPendenciaTitulo(p);
+  var num = penDisplayNumber(p);
+
   var deadlineHtml = p.deadline
-    ? '<span class="kc-deadline'+(isOverdue?' is-overdue':'')+'" title="'+(isOverdue?'Prazo vencido':'Prazo')+'">📅 '+formatDate(parseDeadline(p.deadline))+'</span>'
-    : '<span class="kc-deadline is-empty" title="Sem prazo">📅 Sem prazo</span>';
-  // Faixa lateral com a cor do status (mesmo padrão do card mobile):
-  // identifica a coluna de relance sem depender só do cabeçalho.
-  var _stDot = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]) ? STATUS_PEN_MAP[p.status].dot : '#94a3b8';
-  return '<div class="kanban-card"' +
-    ' style="border-left:3px solid '+_stDot+'"' +
+    ? '<span class="kc-deadline' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Prazo vencido' : 'Prazo') + '">' +
+        PEN_ICO_CAL + formatDate(parseDeadline(p.deadline)) + '</span>'
+    : '<span class="kc-deadline is-empty" title="Sem prazo">' + PEN_ICO_CAL + 'Sem prazo</span>';
+
+  return '<article class="kanban-card"' +
+    ' style="border-left:4px solid ' + penColColor(p.status) + '"' +
     ' draggable="true"' +
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
-    ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
-    '<div class="kanban-card-title" title="' + escapeHtml(getPendenciaTitulo(p)) + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(getPendenciaTitulo(p)) + '</div>' +
-    '<div class="kanban-card-compact">' +
-      '<span class="kc-client" title="'+escapeHtml(p.clientName||'—')+'">' + (c?clientAvatar(c,16):'') + '<span class="kc-client-name">' + escapeHtml(p.clientName||'—') + '</span></span>' +
-      '<span class="kc-pri">'+pri+'</span>' +
-      respHtml +
-      overdueHtml + staleHtml + slaHtml +
-      onLeaveBadge + reassignBtn +
+    ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')"' +
+    ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
+    '<div class="kanban-card-title" title="' + escapeHtml(title) + '">' +
+      '<span class="pen-display-num">' + num + '</span>' + escapeHtml(title) +
     '</div>' +
-    '<div class="kanban-card-compact kanban-card-compact--bottom">' +
-      deadlineHtml +
-      '<span class="kc-timer">'+timerWidget(p,"pendencia")+'</span>' +
-    '</div>' +
-  '</div>';
-}
-
-function renderPenMobileGrid(pens) {
-  var visible = (pens || []).filter(function(p) { return penColVisible(p.status); });
-  if (!visible.length) {
-    return '<div class="card"><div class="empty-state"><p>Nenhuma pendência encontrada.</p><button class="btn btn-primary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div></div>';
-  }
-  return '<div class="pen-mobile-grid">' + visible.map(penMobileCard).join('') + '</div>';
-}
-
-function penMobileCard(p) {
-  const c = _penRenderClient(p.clientId);
-  const st = STATUS_PEN_MAP[p.status] || { label: p.status || '—', dot: '#94a3b8' };
-  const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
-  const isStale = isStalePendencia(p);
-  const rawSla = slaCountdown(p, 48);
-  const sla = _slaVisualFor(p, rawSla);
-  const overdueVis = isOverdue ? _overdueVisualFor(p) : null;
-  const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
-  const onLeaveBadge = onLeave ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : '';
-  const reassignBtn = onLeave ? '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openReassignPendencia(\'' + escapeHtml(p.id) + '\')">Reatribuir</button>' : '';
-  var slaHtml = sla ? '<span style="color:'+sla.color+';font-weight:600" title="'+(sla.expired?'SLA vencido':'SLA restante')+'">⏱ SLA '+sla.label+'</span>' : '';
-  var overdueHtml = isOverdue ? '<span style="color:'+overdueVis.color+';font-weight:600" title="Prazo vencido">'+overdueVis.label+'</span>' : '';
-  return '<div class="pen-mobile-card" style="border-left-color:' + st.dot + '" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
-    '<div class="pen-mobile-card-top">' +
-      '<div class="pen-mobile-card-client">' +
-        (c ? clientAvatar(c, 22) : '') +
-        '<span>' + escapeHtml(p.clientName || '—') + '</span>' +
-      '</div>' +
-      statusTag(p.status) +
-    '</div>' +
-    '<div class="pen-mobile-card-desc" title="' + escapeHtml(getPendenciaTitulo(p)) + '"><span class="pen-display-num">' + penDisplayNumber(p) + '</span>' + escapeHtml(getPendenciaTitulo(p)) + '</div>' +
-    '<div class="pen-mobile-card-meta">' +
-      priorityTag(p.priority) +
+    '<div class="kanban-card-meta">' +
+      '<span class="kc-client" title="' + escapeHtml(clientName) + '">' +
+        '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>' +
+        '<span class="kc-client-name">' + escapeHtml(clientName) + '</span>' +
+      '</span>' +
+      '<span class="kb-pill" style="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
       (p.responsible
-        ? '<span title="Responsável">👤 ' + escapeHtml(p.responsible) + '</span>'
-        : '<span style="color:var(--text-muted)" title="Sem responsável definido">○ Sem responsável</span>') +
-      onLeaveBadge + reassignBtn +
-      overdueHtml +
-      (isStale && !isOverdue ? '<span style="color:#d97706;font-weight:600" title="Sem atualização há 7+ dias">🕓 Parada</span>' : '') +
-      slaHtml +
+        ? '<span class="kc-resp" title="Responsável">' + escapeHtml(p.responsible) + '</span>'
+        : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
+      (isStale ? '<span class="kc-stale" title="Sem atualização há 7+ dias">Parada</span>' : '') +
+      (isOverdue ? '<span class="kc-overdue" title="Prazo vencido">' + PEN_ICO_WARN + 'Vencida</span>' : '') +
     '</div>' +
-    '<div class="pen-mobile-card-footer">' +
-      (p.deadline
-        ? '<span' + (isOverdue ? ' style="color:'+overdueVis.color+';font-weight:600" title="Prazo vencido"' : ' title="Prazo"') + '>📅 ' + formatDate(parseDeadline(p.deadline)) + '</span>'
-        : '<span style="color:var(--text-muted)" title="Sem prazo">📅 Sem prazo</span>') +
-      timerWidget(p, 'pendencia') +
+    '<div class="kanban-card-foot">' +
+      deadlineHtml +
+      penTimerCell(p) +
     '</div>' +
-  '</div>';
+  '</article>';
 }
 
 function onPenKanbanDragStart(e, id) {
@@ -916,17 +944,6 @@ function deleteSavedPenFilter() {
 }
 
 if (typeof window !== 'undefined') window.debouncedRenderPenView = debounce(renderPenView, 300);
-
-let _penMobileState = null;
-if (typeof window !== 'undefined') window.addEventListener('resize', debounce(function() {
-  const area = document.getElementById('penViewArea');
-  if (!area || penView !== 'kanban') return;
-  const nowMobile = isPenMobile();
-  if (_penMobileState === null) _penMobileState = nowMobile;
-  if (nowMobile === _penMobileState) return;
-  _penMobileState = nowMobile;
-  renderPenView(false);
-}, 200));
 
 function _penRichDesc(text) {
   try {

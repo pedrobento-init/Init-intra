@@ -1701,31 +1701,41 @@ async function fetchPendenciasPage(opts) {
 }
 
 // ── FASE 6: contadores no banco ────────────────────────────────────────────
-// Totais por status do escopo SEM trazer as linhas: consulta só a coluna
-// `status` (≈ bytes por registro) com os mesmos team/scope da paginação
-// (+ RLS). Agregação local via countPendenciaStatuses (pura, testada).
+// Totais por status do escopo SEM trazer as linhas: consulta `status` +
+// `deadline` (poucos bytes por registro) com os mesmos team/scope da
+// paginação (+ RLS). Agregação local via countPendenciaStatuses (pura,
+// testada) — inclui `vencidas` (prazo anterior a hoje, status aberto) p/ a
+// linha-resumo do quadro Kanban.
 // PostgREST não faz GROUP BY sem RPC — esta é a forma sem criar backend.
-function countPendenciaStatuses(statusRows) {
+const PEN_CLOSED_FOR_COUNT = ['concluido', 'resolvido', 'cancelado', 'fechado'];
+function countPendenciaStatuses(statusRows, todayISO) {
   const byStatus = {};
+  const today = todayISO ? String(todayISO) : '';
   let total = 0;
+  let vencidas = 0;
   for (const r of (statusRows || [])) {
     const s = (r && r.status) || 'aberto';
     byStatus[s] = (byStatus[s] || 0) + 1;
     total++;
+    const dl = r && r.deadline;
+    if (dl && today && String(dl) < today && PEN_CLOSED_FOR_COUNT.indexOf(s) === -1) vencidas++;
   }
-  return { byStatus, total };
+  return { byStatus, total, vencidas };
 }
 
 async function fetchPendenciaStatusCounts(scope) {
   const sc = _penPageScope();
-  let q = supabaseClient.from('pendencias').select('status');
+  let q = supabaseClient.from('pendencias').select('status,deadline');
   q = applyPendenciaPageFilters(q, {
     scope: scope === 'archived' ? 'archived' : 'active',
     team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao
   });
   const res = await q;
   if (res.error) throw new Error(res.error.message || 'Falha na contagem');
-  return countPendenciaStatuses(res.data || []);
+  const today = (typeof localDateISO === 'function')
+    ? localDateISO()
+    : new Date().toISOString().slice(0, 10);
+  return countPendenciaStatuses(res.data || [], today);
 }
 function getPendenciaById(id) { return getPendencias().find(p => p.id === id) || null; }
 function uniquePendenciaId(list) {

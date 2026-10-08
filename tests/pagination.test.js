@@ -72,15 +72,29 @@ describe('countPendenciaStatuses (FASE 6 — totais do banco)', () => {
     delete require.cache[require.resolve('../js/storage.js')];
     storage = require('../js/storage.js');
   });
-  it('agrega por status com total', () => {
+  it('agrega por status com total e vencidas', () => {
     const r = storage.countPendenciaStatuses([
       { status: 'aberto' }, { status: 'aberto' }, { status: 'em_andamento' },
     ]);
-    expect(r).toEqual({ byStatus: { aberto: 2, em_andamento: 1 }, total: 3 });
+    expect(r).toEqual({ byStatus: { aberto: 2, em_andamento: 1 }, total: 3, vencidas: 0 });
   });
   it('status ausente cai em aberto; vazio retorna zeros', () => {
-    expect(storage.countPendenciaStatuses([{}, { status: null }])).toEqual({ byStatus: { aberto: 2 }, total: 2 });
-    expect(storage.countPendenciaStatuses([])).toEqual({ byStatus: {}, total: 0 });
-    expect(storage.countPendenciaStatuses(null)).toEqual({ byStatus: {}, total: 0 });
+    expect(storage.countPendenciaStatuses([{}, { status: null }])).toEqual({ byStatus: { aberto: 2 }, total: 2, vencidas: 0 });
+    expect(storage.countPendenciaStatuses([])).toEqual({ byStatus: {}, total: 0, vencidas: 0 });
+    expect(storage.countPendenciaStatuses(null)).toEqual({ byStatus: {}, total: 0, vencidas: 0 });
+  });
+  it('vencidas = prazo anterior a hoje em status ainda aberto', () => {
+    const rows = [
+      { status: 'aberto', deadline: '2026-01-01' },
+      { status: 'em_andamento', deadline: '2026-01-02' },
+      { status: 'aberto', deadline: '2026-12-31' },
+      { status: 'resolvido', deadline: '2026-01-01' },
+      { status: 'aberto', deadline: null },
+    ];
+    expect(storage.countPendenciaStatuses(rows, '2026-06-01')).toEqual({
+      byStatus: { aberto: 3, em_andamento: 1, resolvido: 1 },
+      total: 5,
+      vencidas: 2,
+    });
   });
 });
