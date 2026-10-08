@@ -776,40 +776,45 @@ function clearLogs() {
   });
 }
 
-function initTheme() {
-  const theme = localStorage.getItem('intra_theme');
+function _themeIconSvg(isDark) {
+  return isDark
+    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+}
+
+function _applyThemeUI(isDark) {
+  document.body.classList.toggle('dark-theme', !!isDark);
   const btn = document.getElementById('themeToggleBtn');
-  
-  if (theme === 'dark') {
-    document.body.classList.add('dark-theme');
-    if (btn) {
-      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
-    }
-  } else {
-    document.body.classList.remove('dark-theme');
-    if (btn) {
-      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-    }
+  if (btn) btn.innerHTML = _themeIconSvg(!!isDark);
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme && typeof metaTheme.setAttribute === 'function') {
+    metaTheme.setAttribute('content', isDark ? '#0b0f19' : '#1a56db');
   }
+}
+
+function _storedTheme() {
+  const t = localStorage.getItem('intra_theme');
+  return (t === 'dark' || t === 'light') ? t : null;
+}
+
+function _systemThemeIsDark() {
+  return typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+}
+
+function initTheme() {
+  _applyThemeUI((_storedTheme() || (_systemThemeIsDark() ? 'dark' : 'light')) === 'dark');
+  if (typeof window === 'undefined' || !window.matchMedia) return;
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = function() { if (!_storedTheme()) _applyThemeUI(_systemThemeIsDark()); };
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
 }
 
 function toggleTheme() {
   const isDark = document.body.classList.toggle('dark-theme');
   localStorage.setItem('intra_theme', isDark ? 'dark' : 'light');
-  
-  const btn = document.getElementById('themeToggleBtn');
-  if (btn) {
-    if (isDark) {
-      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
-    } else {
-      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-    }
-  }
-  
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) {
-    metaTheme.setAttribute('content', isDark ? '#0b0f19' : '#1a56db');
-  }
+  _applyThemeUI(isDark);
 
   // Re-render dashboard charts if currently on dashboard
   const currentHash = (window.location.hash || '#dashboard').replace('#', '');

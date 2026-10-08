@@ -5177,7 +5177,7 @@ body.dark-theme .pen-board {
 }
 .pen-board .kb-ico--fill { fill: currentColor; stroke: none; }
 
-/* ── Cabeçalho do quadro: resumo + ações (tema e nova pendência) ── */
+/* ── Cabeçalho do quadro: resumo + alternância de tema ── */
 .pen-board-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px 12px; flex-wrap: wrap; margin-bottom: 14px;
@@ -5223,14 +5223,20 @@ body.dark-theme .pen-board {
   border-radius: 14px;
   padding: 14px;
   gap: 10px;
-  max-height: calc(100vh - 230px);
+  max-height: none;
 }
 .pen-board .kanban-col-header {
-  padding: 0; margin: 0;
-  background: transparent;
-  border-bottom: 0;
-  border-radius: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-shrink: 0;
+  padding: 7px 10px; margin: 0;
+  background: var(--kb-raised);
+  border: 0; border-bottom: 0;
+  border-radius: 8px;
 }
+.pen-board .kanban-col-aside {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+}
+.pen-board .kanban-col-aside .kb-ico { color: var(--kb-muted); }
 .pen-board .kanban-col-title {
   margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .01em;
   text-transform: none; color: var(--kb-text);
@@ -5309,6 +5315,9 @@ body.dark-theme .pen-board {
 .pen-board .kc-resp--empty { font-style: italic; }
 .pen-board .kc-stale {
   display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
+}
+.pen-board .kc-sla {
   font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
 }
 .pen-board .kc-overdue {

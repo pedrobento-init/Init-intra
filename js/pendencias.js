@@ -80,8 +80,8 @@ function penInitials(name) {
 const PEN_ICO_WARN = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>';
 const PEN_ICO_CAL = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
 const PEN_ICO_PLAY = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
-const PEN_ICO_PLUS = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const PEN_ICO_MOON = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+const PEN_ICO_CLK = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
 let penView = 'kanban';
 let penScope = 'active';
@@ -590,10 +590,11 @@ function renderPenKanban(area) {
             '<span class="kb-dot" aria-hidden="true"></span>' +
             escapeHtml(col.label) +
           '</h2>' +
-          '<div style="display:flex;align-items:center;gap:6px">' +
-            '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
+          '<span class="kanban-col-aside">' +
+            PEN_ICO_CLK +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-          '</div>' +
+            '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
+          '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
           (cards.length
@@ -609,7 +610,6 @@ function renderPenKanban(area) {
         summaryHtml +
         '<div class="pen-board-acts">' +
           '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'themeToggleBtn\').click()" aria-label="Alternar tema claro/escuro">' + PEN_ICO_MOON + 'Alternar tema</button>' +
-          '<button type="button" class="btn btn-primary" onclick="openPendenciaForm()">' + PEN_ICO_PLUS + 'Nova pendência</button>' +
         '</div>' +
       '</div>' +
       boardHtml +
@@ -751,6 +751,9 @@ function penKanbanCard(p) {
   var isStale = isStalePendencia(p);
   var title = getPendenciaTitulo(p);
   var num = penDisplayNumber(p);
+  var sla = (typeof slaCountdown === 'function') ? slaCountdown(p, 48) : null;
+  var slaHtml = (sla && !sla.expired && sla.label)
+    ? '<span class="kc-sla" title="SLA restante">' + sla.label + '</span>' : '';
 
   var deadlineHtml = p.deadline
     ? '<span class="kc-deadline' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Prazo vencido' : 'Prazo') + '">' +
@@ -777,6 +780,7 @@ function penKanbanCard(p) {
         ? '<span class="kc-resp" title="Responsável">' + escapeHtml(p.responsible) + '</span>'
         : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
       (isStale ? '<span class="kc-stale" title="Sem atualização há 7+ dias">Parada</span>' : '') +
+      slaHtml +
       (isOverdue ? '<span class="kc-overdue" title="Prazo vencido">' + PEN_ICO_WARN + 'Vencida</span>' : '') +
     '</div>' +
     '<div class="kanban-card-foot">' +

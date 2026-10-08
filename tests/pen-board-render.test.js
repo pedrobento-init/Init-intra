@@ -80,12 +80,12 @@ function render(pens) {
 describe('renderPenKanban (modo local)', () => {
   const html = render(PENS);
 
-  it('envolve tudo em .pen-board com cabeçalho de ações', () => {
+  it('cabeçalho: resumo + botão de tema, sem duplicar a ação primária da topbar', () => {
     expect(html).toContain('<div class="pen-board">');
     expect(html).toContain('<div class="pen-board-head">');
     expect(html).toContain('Alternar tema');
-    expect(html).toContain('Nova pendência');
     expect(html).toContain("getElementById('themeToggleBtn').click()");
+    expect(html).not.toContain('class="btn btn-primary"');
     expect(html).toContain('openPendenciaForm()');
   });
 
@@ -106,6 +106,15 @@ describe('renderPenKanban (modo local)', () => {
     expect(html).toContain('class="kanban-col-count"');
   });
 
+  it('cabeçalho da coluna é a barra com relógio + contagem + ordenação', () => {
+    expect(html).toContain('<div class="kanban-col-header">');
+    const aside = html.indexOf('class="kanban-col-aside"');
+    expect(aside).toBeGreaterThan(-1);
+    expect(html.indexOf('<circle cx="12" cy="12" r="9"/>')).toBeGreaterThan(aside);
+    expect(html.indexOf('class="kanban-col-count"')).toBeGreaterThan(aside);
+    expect(html).toContain('cyclePenColSort');
+  });
+
   it('um card por pendência, com drag-and-drop mantido', () => {
     expect(html).toContain('<article class="kanban-card" style="border-left:4px');
     expect((html.match(/<article class="kanban-card"/g) || []).length).toBe(3);
@@ -120,5 +129,17 @@ describe('renderPenKanban (modo local)', () => {
     expect(empty).toContain('Nenhuma pendência');
     expect(empty).toContain('<strong>0</strong>&nbsp;pendências ativas');
     expect(empty).toContain('<strong>0</strong> vencidas');
+  });
+
+  it('SLA restante aparece no card; SLA vencido fica de fora', () => {
+    const fresh = render([{
+      id: 'PEN-9', status: 'aberto', clientId: 1, clientName: 'Acme', priority: 'alta',
+      responsible: 'Ana', deadline: null, assunto: 'Nova pendência',
+      createdAt: new Date().toISOString(), timerRunning: false,
+    }]);
+    expect(fresh).toMatch(/<span class="kc-sla" title="SLA restante">\d+h<\/span>/);
+
+    const old = render(PENS);
+    expect(old).not.toContain('kc-sla');
   });
 });
