@@ -438,7 +438,7 @@ function slaCountdown(item, defaultHours) {
 // Supports logoShape: 'circle' (default) or 'square'
 function _safeLogoUrl(url) {
   if (!url) return '#';
-  if (/^https?:\/\//i.test(url)) return url;
+  if (/^https?:\/\//i.test(url)) { try { return new URL(url).href; } catch { return '#'; } }
   if (/^data:image\/(?!svg\+xml)[a-z+-]+;/i.test(url)) return url;
   return '#';
 }
@@ -447,7 +447,7 @@ function clientAvatar(c, size = 40) {
   const shape = c.logoShape || 'circle';
   const shapeClass = shape === 'square' ? 'client-logo-square' : 'client-logo-circle';
   if (c.logo) {
-    return `<img src="${_safeLogoUrl(c.logo)}" class="${shapeClass}" style="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
+    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" style="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
   }
   const borderRadius = shape === 'square' ? '6px' : '50%';
   return `<div style="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${c.color||'#1a56db'};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
