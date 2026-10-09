@@ -66,7 +66,7 @@ function workerBadgeHTML(item) {
   const worker = getCurrentWorker(item);
   if (!worker) return '';
   const itsMe = isCurrentWorker(item);
-  return `<span class="worker-badge ${itsMe ? 'worker-me' : 'worker-other'}" title="${itsMe ? 'Você está trabalhando neste item' : worker + ' está trabalhando neste item'}">${itsMe ? '🟢 Você' : '🟢 ' + escapeHtml(worker)}</span>`;
+  return `<span class="worker-badge ${itsMe ? 'worker-me' : 'worker-other'}" title="${itsMe ? 'Você está trabalhando neste item' : escapeHtml(worker) + ' está trabalhando neste item'}">${itsMe ? '🟢 Você' : '🟢 ' + escapeHtml(worker)}</span>`;
 }
 
 /**
