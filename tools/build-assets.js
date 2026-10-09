@@ -98,6 +98,23 @@ async function buildAssets(rootDir, opts) {
     }
   }
 
+  // 2b. Remove hashes antigos: sem isso cada build acumula arquivos em
+  // dist/ (o deploy passa a servir KB mortos junto com os atuais).
+  const removed = [];
+  if (!dry) {
+    const fresh = new Set(Object.values(manifest.js).concat(Object.values(manifest.css)));
+    for (const sub of ['js', 'css']) {
+      const dir = path.join(root, 'dist', sub);
+      if (!fs.existsSync(dir)) continue;
+      for (const name of fs.readdirSync(dir)) {
+        const rel = 'dist/' + sub + '/' + name;
+        if (fresh.has(rel)) continue;
+        fs.rmSync(path.join(dir, name), { force: true });
+        removed.push(rel);
+      }
+    }
+  }
+
   // 3. index.html reescrito (build-time)
   let outIndex = indexHtml;
   for (const [rel, hashed] of Object.entries(manifest.js)) {
@@ -125,14 +142,14 @@ async function buildAssets(rootDir, opts) {
     fs.writeFileSync(indexPath, outIndex);
     fs.writeFileSync(swPath, outSw);
   }
-  return { manifest, hashedAssets, buildTag, warnings, indexHtml: outIndex, sw: outSw };
+  return { manifest, hashedAssets, buildTag, warnings, removed, indexHtml: outIndex, sw: outSw };
 }
 
 if (require.main === module) {
   const check = process.argv.includes('--check');
   buildAssets(process.cwd(), { check })
     .then((r) => {
-      console.log('✅ build-assets ' + (check ? '(check)' : 'ok') + ': ' + Object.keys(r.manifest.js).length + ' js, ' + Object.keys(r.manifest.css).length + ' css, tag ' + r.buildTag);
+      console.log('✅ build-assets ' + (check ? '(check)' : 'ok') + ': ' + Object.keys(r.manifest.js).length + ' js, ' + Object.keys(r.manifest.css).length + ' css, tag ' + r.buildTag + (r.removed.length ? ', ' + r.removed.length + ' obsoleto(s) removido(s)' : ''));
       r.warnings.forEach((w) => console.warn('⚠️ ' + w));
     })
     .catch((e) => { console.error('❌ build-assets:', e.message); process.exit(1); });

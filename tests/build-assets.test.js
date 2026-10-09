@@ -59,6 +59,26 @@ describe('build-assets', () => {
     expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toContain('dist/js/a.');
     expect(r.warnings).toEqual([]);
   });
+  it('remove hashes antigos acumulados no dist', async () => {
+    const dir = fixture();
+    const staleJs = path.join(dir, 'dist', 'js', 'a.00000000.min.js');
+    const staleCss = path.join(dir, 'dist', 'css', 'styles.00000000.css');
+    fs.mkdirSync(path.dirname(staleJs), { recursive: true });
+    fs.mkdirSync(path.dirname(staleCss), { recursive: true });
+    fs.writeFileSync(staleJs, '// build antigo');
+    fs.writeFileSync(staleCss, '.stale{}');
+
+    const r = await buildAssets(dir, {});
+
+    expect(r.removed.sort()).toEqual(['dist/css/styles.00000000.css', 'dist/js/a.00000000.min.js']);
+    expect(fs.existsSync(staleJs)).toBe(false);
+    expect(fs.existsSync(staleCss)).toBe(false);
+    // arquivos do build atual continuam lá
+    expect(fs.existsSync(path.join(dir, r.manifest.js['js/a.js']))).toBe(true);
+    expect(fs.existsSync(path.join(dir, r.manifest.css['css/styles.css']))).toBe(true);
+    // nenhum alerta de build por causa da limpeza
+    expect(r.warnings).toEqual([]);
+  });
   it('shortHash estável e curto', () => {
     expect(shortHash('x')).toHaveLength(8);
     expect(shortHash('x')).toBe(shortHash('x'));
