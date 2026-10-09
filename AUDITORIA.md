@@ -1,6 +1,7 @@
 # AUDITORIA — Init Intra
 
-> **Branch:** `audit/2026-10-09` · **Data:** 09/10/2026 · **Status:** Fases 1–5 concluídas
+> **Branch:** `audit/2026-10-09` · **Data:** 09/10/2026 · **Status:** Fases 1–6 concluídas
+> (Fase 6 = fechamento das SUSPEITas, §9)
 > **Segredos:** nenhum valor sensível é reproduzido aqui. Credenciais aparecem mascaradas
 > (`https://****.supabase.co`, `sb_secret_****`, `<JWT-MASKED>`).
 
@@ -79,7 +80,10 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | SEC-09  | BAIXO   | ALTA  | `Access-Control-Allow-Origin: *` em todas as 9 Edge Functions (mitigado pela checagem de JWT, quando existe)                                                                               | `supabase/functions/*/index.ts`                                                                                                                                  | MONITORAR                                 |
 | SEC-10  | BAIXO   | ALTA  | Upload de anexos valida **apenas tamanho** (2 MB); sem allowlist de tipo/extensão                                                                                                          | `js/storage.js:1145,1227,1374,1444`                                                                                                                              | PROPOSTA (P-8)                            |
 | SEC-11  | INFO    | ALTA  | Credenciais antigas já estiveram no histórico Git (papel `anon`, removidas em `9ea37ad`); nenhum `service_role` vazado                                                                     | histórico Git                                                                                                                                                    | MONITORAR (rotacionar se exposto)         |
-| SEC-12  | —       | MÉDIA | **SUSPEITA** — XSS: varredura de 93 `${...}` em `innerHTML`; pontos conferidos escapam (`escapeHtml`/`esc`/`_richEsc`/`textContent`). Nenhum XSS confirmado                                | `js/*`                                                                                                                                                           | SUSPEITA                                  |
+| SEC-12  | INFO    | MÉDIA | XSS: varredura dos 93 `${...}` em `innerHTML`; todos os pontos com dado do usuário conferidos escapam (`escapeHtml`/`esc`/`_richEsc`/`textContent`)                                        | `js/*`                                                                                                                                                           | **RESOLVIDO** — nenhum XSS (§9)           |
+| SEC-13  | ALTO    | ALTA  | `equipamentos all` — `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (`anon` lê e escreve) e criada **depois** da `021`, que só derruba 8 tabelas → aplicar `021` **não fecha esta** | `supabase/migrations/035_equipamentos.sql:49`, `021_rls_remediation.sql:68-75`                                                                                   | PROPOSTA (P-15) / DBA                     |
+| SEC-14  | MÉDIO   | ALTA  | `checklists` e `checklist_modelo_itens` com `SELECT ... USING (true)` **sem isolamento por equipe** (escrita é admin-only); `checklist_marcacoes` já é team-scoped                         | `supabase/migrations/041_checklists.sql:157-158,174-176`, `040_checklist.sql:62-63`                                                                              | PROPOSTA (P-16) — decisão de produto      |
+| SEC-15  | MÉDIO   | ALTA  | **CSV/XLSX injection**: 4 exportadores não neutralizam células iniciadas por `=`/`+`/`-`/`@`; o `exportCSV` genérico também não escapa `;`/quebra de linha (quebra colunas)                | `js/ui.js:836-839`, `js/visitas.js:685-687`, `js/equipamentos.js:905`, `js/milvus-devices.js:520`                                                                | PROPOSTA (P-17)                           |
 | SYNC-01 | MÉDIO   | MÉDIA | **SUSPEITA** — `pull` sem `.range()`: se o PostgREST `max-rows` (padrão 1000) truncar, linhas ausentes são tratadas como “deletadas no servidor” e **descartadas do merged** → perda local | `js/storage.js:834`, `js/schema.js:295-297`                                                                                                                      | PROPOSTA (P-9)                            |
 | SYNC-02 | BAIXO   | ALTA  | Outbox cobre **só `pendencias`**; demais entidades sobem só no próximo ciclo de sync                                                                                                       | `js/storage.js:1910`, `js/storage.js:953`                                                                                                                        | PROPOSTA (P-10)                           |
 | SYNC-03 | BAIXO   | MÉDIA | **SUSPEITA** — `applyRemote` reescreve a lista inteira via `dbSet` em paralelo com o merge do sync (corrida de escrita perdida)                                                            | `js/sync-manager.js:143`                                                                                                                                         | PROPOSTA (P-10)                           |
@@ -94,6 +98,9 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | CONS-03 | MÉDIO   | ALTA  | `terser` declarado no `package.json` mas não instalado → build sem minify + teste falhando                                                                                                 | `tools/build-assets.js:41-47`                                                                                                                                    | **CORRIGIDO no ambiente** (`npm install`) |
 | CONS-04 | MÉDIO   | ALTA  | 3 CVEs restantes em devDeps exigindo `vitest@5` (breaking)                                                                                                                                 | `package.json`                                                                                                                                                   | PROPOSTA (P-6)                            |
 | CONS-05 | INFO    | ALTA  | Sem type-check em nenhum etapa                                                                                                                                                             | `package.json`                                                                                                                                                   | MONITORAR                                 |
+| CONS-06 | INFO    | ALTA  | Código morto: `_daySummary` é calculado (`buildDaySummary`) mas **nunca lido** — o sink do resumo diário não existe mais desde o redesign do dashboard                                     | `js/app.js:705-710`, `js/metrics.js:453`                                                                                                                         | MONITORAR                                 |
+| CONS-07 | INFO    | ALTA  | `clients.milvus_client_token` (identificador por cliente, não o API token) é sincronizado ao navegador e fica no IndexedDB; visível só p/ a equipe dona via RLS                            | `js/schema.js:22`, `js/clients.js:190,1513`                                                                                                                      | MONITORAR                                 |
+| CONS-08 | INFO    | MÉDIA | Exportação de `.ics` escapa `,` `;` e `\n`, mas não `\` nem CR solto (`_icsEscape`) — permite injeção de escape no arquivo de calendário                                                   | `js/calendar.js:683-685`                                                                                                                                         | PROPOSTA (P-17)                           |
 
 ---
 
@@ -177,22 +184,26 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 
 ## 7. Propostas (não aplicadas) — prós e contras
 
-| #    | Proposta                                                                                         | Prós                                                 | Contras / risco                                                                                                                              |
-| ---- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| P-1  | Aplicar `022_storage_private.sql` + migrar o app para signed URLs (`js/storage.js:1162`)         | Fecha leitura anônima de anexos (SEC-01)             | Requer backup, conferência de paths (Q-INV1/2/3), código de signed URLs antes da migração; sem isso anexos quebram. **DBA + deploy atômico** |
-| P-2  | Aplicar `021_rls_remediation.sql` (remove `X all USING (true)` e cria policies por equipe/admin) | Fecha SEC-02 em 8 tabelas                            | Exige DBA, staging e bateria de 13 testes; decisão pendente sobre `tickets` (SYNC-04)                                                        |
-| P-3  | `send-email`: exigir JWT + papel `admin`/`gestao` e fixar `from` permitido                       | Elimina relay aberto (SEC-03)                        | Altera contrato da API — clientes que chamam sem JWT passam a receber 401; precisa de deploy das 9 functions                                 |
-| P-4  | Remover override via `localStorage` de URL/chave (ou exigir flag de build)                       | Remove vetor de redirecionamento do backend (SEC-06) | Perde o recurso de “apontar p/ outro projeto pelo console”, usado na documentação interna                                                    |
-| P-5  | Tirar `unsafe-inline` do CSP (refatorar `onclick` globais p/ `addEventListener`)                 | Mitiga XSS de verdade (SEC-07)                       | Grande refatoração de UI; risco de quebrar handlers gerados por template                                                                     |
-| P-6  | Subir para `vitest@5` (resolve as 3 CVEs restantes)                                              | `npm audit` limpo                                    | Breaking: pode exigir mudar config/testes; precisa rodar a bateria completa                                                                  |
-| P-7  | Rate-limit de login no servidor (ou tabela de tentativas)                                        | Fecha SEC-08 de verdade                              | Exige migração + lógica nova; o guard client-side é apenas informativo                                                                       |
-| P-8  | Allowlist de MIME/extensão no upload de anexos                                                   | Reduz upload de SVG/HTML hostil (SEC-10)             | Pode bloquear formatos legítimos se for restritivo demais                                                                                    |
-| P-9  | Pull paginado (`.range()`) + colunas mínimas (`status,deadline`, etc.)                           | Resolve PERF-01 e mitiga SYNC-01                     | Tem que garantir `updated_at` em toda coluna selecionada, senão tombstone/merge quebram (risco de perda)                                     |
-| P-10 | Outbox genérica (todas as entidades) + lock de escrita entre `applyRemote` e merge               | Fecha SYNC-02/SYNC-03                                | Refatoração do caminho crítico de sync; exige testes de concorrência                                                                         |
-| P-11 | Renomear `011_visit_time_range.sql` p/ `012_*` (renumerar restantes)                             | Remove ambiguidade de ordem (SYNC-05)                | Só é seguro se a migration nunca rodou; **DBA precisa confirmar histórico**                                                                  |
-| P-12 | Code-splitting das telas + subset de fontes                                                      | Reduz payload inicial (PERF-03)                      | Muda a ordem de carregamento global (`navigateTo` depende de globais)                                                                        |
-| P-13 | Habilitar `no-empty` (exceto `_`) + log de erro mínimo nos `catch`                               | 398 falhas silenciosas viram visíveis (CONS-01)      | Gera centenas de alterações; precisa de janela dedicada                                                                                      |
-| P-14 | Limpar `no-unused-vars` (838) em lotes                                                           | Lint zerado, morte reduzida (CONS-02)                | Trabalho mecânico; risco de apagar variáveis “usadas por string/`window`”                                                                    |
+| #    | Proposta                                                                                                                                              | Prós                                                                                   | Contras / risco                                                                                                                              |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-1  | Aplicar `022_storage_private.sql` + migrar o app para signed URLs (`js/storage.js:1162`)                                                              | Fecha leitura anônima de anexos (SEC-01)                                               | Requer backup, conferência de paths (Q-INV1/2/3), código de signed URLs antes da migração; sem isso anexos quebram. **DBA + deploy atômico** |
+| P-2  | Aplicar `021_rls_remediation.sql` (remove `X all USING (true)` e cria policies por equipe/admin)                                                      | Fecha SEC-02 em 8 tabelas                                                              | Exige DBA, staging e bateria de 13 testes; decisão pendente sobre `tickets` (SYNC-04)                                                        |
+| P-3  | `send-email`: exigir JWT + papel `admin`/`gestao` e fixar `from` permitido                                                                            | Elimina relay aberto (SEC-03)                                                          | Altera contrato da API — clientes que chamam sem JWT passam a receber 401; precisa de deploy das 9 functions                                 |
+| P-4  | Remover override via `localStorage` de URL/chave (ou exigir flag de build)                                                                            | Remove vetor de redirecionamento do backend (SEC-06)                                   | Perde o recurso de “apontar p/ outro projeto pelo console”, usado na documentação interna                                                    |
+| P-5  | Tirar `unsafe-inline` do CSP (refatorar `onclick` globais p/ `addEventListener`)                                                                      | Mitiga XSS de verdade (SEC-07)                                                         | Grande refatoração de UI; risco de quebrar handlers gerados por template                                                                     |
+| P-6  | Subir para `vitest@5` (resolve as 3 CVEs restantes)                                                                                                   | `npm audit` limpo                                                                      | Breaking: pode exigir mudar config/testes; precisa rodar a bateria completa                                                                  |
+| P-7  | Rate-limit de login no servidor (ou tabela de tentativas)                                                                                             | Fecha SEC-08 de verdade                                                                | Exige migração + lógica nova; o guard client-side é apenas informativo                                                                       |
+| P-8  | Allowlist de MIME/extensão no upload de anexos                                                                                                        | Reduz upload de SVG/HTML hostil (SEC-10)                                               | Pode bloquear formatos legítimos se for restritivo demais                                                                                    |
+| P-9  | Pull paginado (`.range()`) + colunas mínimas (`status,deadline`, etc.)                                                                                | Resolve PERF-01 e mitiga SYNC-01                                                       | Tem que garantir `updated_at` em toda coluna selecionada, senão tombstone/merge quebram (risco de perda)                                     |
+| P-10 | Outbox genérica (todas as entidades) + lock de escrita entre `applyRemote` e merge                                                                    | Fecha SYNC-02/SYNC-03                                                                  | Refatoração do caminho crítico de sync; exige testes de concorrência                                                                         |
+| P-11 | Renomear `011_visit_time_range.sql` p/ `012_*` (renumerar restantes)                                                                                  | Remove ambiguidade de ordem (SYNC-05)                                                  | Só é seguro se a migration nunca rodou; **DBA precisa confirmar histórico**                                                                  |
+| P-12 | Code-splitting das telas + subset de fontes                                                                                                           | Reduz payload inicial (PERF-03)                                                        | Muda a ordem de carregamento global (`navigateTo` depende de globais)                                                                        |
+| P-13 | Habilitar `no-empty` (exceto `_`) + log de erro mínimo nos `catch`                                                                                    | 398 falhas silenciosas viram visíveis (CONS-01)                                        | Gera centenas de alterações; precisa de janela dedicada                                                                                      |
+| P-14 | Limpar `no-unused-vars` (838) em lotes                                                                                                                | Lint zerado, morte reduzida (CONS-02)                                                  | Trabalho mecânico; risco de apagar variáveis “usadas por string/`window`”                                                                    |
+| P-15 | Nova migration (ex.: `042_equipamentos_rls`) copiando o modelo da `021` para `equipamentos` (remover `"equipamentos all"`, policies por equipe/admin) | Fecha SEC-13 — `equipamentos` continua aberto mesmo **depois** da `021`                | Exige DBA/staging; tabela nova em relação ao escopo da `021`, precisa do mesmo rollback documentado                                          |
+| P-16 | Isolar `checklists`/`checklist_modelo_itens` por equipe (padrão `ckmarc`) ou manter leitura global                                                    | Fecha SEC-14 se for vazamento; mantém o fluxo atual se modelos são globais por desenho | **Decisão de produto**: mudar pode esconder modelos de quem precisa vê-los                                                                   |
+
+| P-17 | Normalização de exportação: escape de aspas e quebras em célula CSV, neutralização de `=`/`+`/`-`/`@` (prefixo `'`) e `_icsEscape` com `\` e CR | Fecha SEC-15 e CONS-08 (CSV injection + colunas corrompidas) | Muda o conteúdo exportado (valores ganham aspas/prefixo ao abrir no Excel); exige conferir os 4 exportadores e testes |
 
 ---
 
@@ -200,10 +211,85 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 
 1. **Urgente (DBA + staging):** P-1 e P-2 — as duas exposições CRÍTICO; rodar backup →
    `021` → conferir `pg_policies` → `022` (somente com signed URLs já em produção).
+   **Atenção:** aplicar a `021` sozinha **não** fecha `equipamentos` (SEC-13/P-15).
 2. **Alto:** P-3 (`send-email`) e P-6 (`vitest@5`) — correções pontuais, alto valor/baixo custo.
 3. **Verificação (somente leitura):** confirmar `Max rows` da API Supabase e
    `select count(*)` das tabelas grandes (valida/refuta SYNC-01).
-4. **Continuidade:** P-9 (pull paginado), P-13/P-14 (limpeza de código) e fechar SUSPEITA
-   SEC-12 com teste de fuzzing de campos de texto em `innerHTML`.
-5. **Antes de qualquer merge:** revisar os 4 commits, rodar `npm test` + `npm run lint` +
+4. **Continuidade:** P-9 (pull paginado), P-13/P-14 (limpeza de código) e P-16
+   (definir se checklists são globais ou por equipe).
+5. **Antes de qualquer merge:** revisar os commits, rodar `npm test` + `npm run lint` +
    `npm run build` no CI e decidir sobre `push` (hoje **não** foi feito, conforme orientado).
+
+---
+
+## 9. Fase 6 — fechamento das SUSPEITas
+
+Verificação adicional feita **depois** do relatório, para transformar SUSPEITas em
+achado/nao-achado.
+
+### SEC-12 (XSS) — nenhum XSS confirmado
+
+Varredura completa dos **93** candidatos `${...}` interpolados em `innerHTML`/templates.
+Pontos com dado do usuário verificados um a um:
+
+| Ponto                                              | Por que é seguro                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Chips de cliente (`js/pendencias.js:337,342-345`)  | `name = escapeHtml(...)` antes de renderizar                                    |
+| Painel “sobrecarregado” (`js/app.js:731,814`)      | `_ovOverTitle` passa por `escapeHtml`                                           |
+| Modal de ticket Milvus (`js/clients.js:1134-1150`) | helper `ir()` recebe valores já `escapeHtml(...)` em cada chamada               |
+| Cabeçalho da ficha (`js/clients.js:153-154`)       | `cfUpdatedMeta` escapa `updatedBy`; data via `formatDate` (`js/clients.js:749`) |
+| E-mails (`js/notifications.js:215-422`)            | todos os campos de dados em `escapeHtml`                                        |
+| Modal de preferências (`js/notifications.js:469`)  | só interpola booleans de `prefs`                                                |
+| Toasts (`js/ui.js:188`)                            | `msgSpan.textContent` (não `innerHTML`)                                         |
+| `onclick="...('${id}')"` gerados                   | ids vêm de `crypto.randomUUID()` (`js/storage.js:554`)                          |
+| Enriquecimento de texto (`js/ui.js:1142`)          | `_richEsc` + `safeUrl` (`js/ui.js:89`) nos links                                |
+
+Resíduo: **CONS-06** — `_daySummary` (`js/app.js:705-710`) é calculado e nunca lido
+(`buildDaySummary` só é exercitado por `tests/dashboard.test.js:186`); sem sink, sem XSS.
+
+### SEC-13 (novo, ALTO) — `equipamentos` escapou da remediação
+
+A `021` derruba exatamente 8 policies `"X all"` (`021_rls_remediation.sql:68-75`).
+`035_equipamentos.sql:49` é **posterior** e cria `"equipamentos all" FOR ALL USING (true)
+WITH CHECK (true)` sem `TO` → `PUBLIC` (inclui `anon`). Nenhuma migration entre `036` e `041`
+derruba essa policy. Consequência prática: **mesmo aplicando a `021`, `equipamentos` segue
+lido e gravado por anônimos.**
+
+### SEC-14 (novo, MÉDIO) — checklists sem isolamento de equipe
+
+`041_checklists.sql:157-158` e `:174-176` (idem `040_checklist.sql:62-63`) criam
+`SELECT ... TO authenticated USING (true)` — “leitura para todos” por comentário próprio,
+enquanto `checklist_marcacoes` usa a regra de equipe (`041:192-195`). Escrita é admin-only.
+Risco: operador de uma equipe lê checklists/modelos de clientes de outra equipe.
+
+### SEC-15 (novo, MÉDIO) / CONS-08 — exportações CSV e `.ics`
+
+Quatro exportadores gravam conteúdo livre do usuário (relatório de visita, hostname/usuário
+de inventário, nome de cliente) sem neutralizar o início de célula `=`/`+`/`-`/`@`:
+
+| Exportador                                                                                | Escapa `;`/quebra | Neutraliza fórmula |
+| ----------------------------------------------------------------------------------------- | ----------------- | ------------------ |
+| `exportCSV` genérico (`js/ui.js:836-839`) — clientes, pendências, histórico, equipamentos | **não**           | **não**            |
+| Relatório de visitas (`js/visitas.js:685-687`)                                            | sim (aspas)       | **não**            |
+| Acerto de equipamentos (`js/equipamentos.js:905`)                                         | sim               | **não**            |
+| Inventário Milvus (`js/milvus-devices.js:520`)                                            | sim               | **não**            |
+
+Impacto: (a) abrir o CSV no Excel/LibreOffice avalia a fórmula (`=HYPERLINK(...)`,
+`=cmd|...`); (b) em `exportCSV` um valor com `;` ou `\n` **desalinha as colunas** (quebra de
+formato, independente de ataque). Mitigação proposta em **P-17** — por mudar o conteúdo
+exportado, ficou como proposta em vez de correção automática.
+
+`CONS-08` (mesma família): `_icsEscape` (`js/calendar.js:683-685`) escapa `,` `;` e `\n`, mas
+não a própria barra invertida nem CR solto.
+
+### Verificações negativas (confirmadas como OK)
+
+- **`audit_logs`** continua admin-only: a `011` derruba as policies da `010` e recria
+  `logs_select`/`logs_delete` com `current_op_is_admin()` (`011_rls_roles_teams.sql:262-290`).
+- **`client_devices`**, **`milvus_client_map`**, **`client_milvus_tickets`** são team-scoped
+  (`026_client_devices.sql:87-151`, `029_client_milvus_tickets.sql:56-81`).
+- **Tokens Milvus:** `MILVUS_API_TOKEN` só em `Deno.env` (`milvus-atendimentos/index.ts:26`,
+  `milvus-chamado-create/index.ts:80`); o front recebe apenas `clients.milvus_client_token`
+  (identificador por cliente, visível à equipe dona via RLS) — **CONS-07**.
+- **`visits`/`reunioes`/`procedure_templates`** seguem dentro do bloco das 8 tabelas da `021`
+  (SEC-02).
