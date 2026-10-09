@@ -1,7 +1,7 @@
 # AUDITORIA — Init Intra
 
-> **Branch:** `audit/2026-10-09` · **Data:** 09/10/2026 · **Status:** Fases 1–6 concluídas
-> (Fase 6 = fechamento das SUSPEITas, §9)
+> **Branch:** `audit/2026-10-09` · **Data:** 09/10/2026 · **Status:** Fases 1–7 concluídas
+> (Fase 6 = fechamento das SUSPEITas, §9 · Fase 7 = Edge Functions, §10)
 > **Segredos:** nenhum valor sensível é reproduzido aqui. Credenciais aparecem mascaradas
 > (`https://****.supabase.co`, `sb_secret_****`, `<JWT-MASKED>`).
 
@@ -84,6 +84,7 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | SEC-13  | ALTO    | ALTA  | `equipamentos all` — `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (`anon` lê e escreve) e criada **depois** da `021`, que só derruba 8 tabelas → aplicar `021` **não fecha esta** | `supabase/migrations/035_equipamentos.sql:49`, `021_rls_remediation.sql:68-75`                                                                                   | PROPOSTA (P-15) / DBA                     |
 | SEC-14  | MÉDIO   | ALTA  | `checklists` e `checklist_modelo_itens` com `SELECT ... USING (true)` **sem isolamento por equipe** (escrita é admin-only); `checklist_marcacoes` já é team-scoped                         | `supabase/migrations/041_checklists.sql:157-158,174-176`, `040_checklist.sql:62-63`                                                                              | PROPOSTA (P-16) — decisão de produto      |
 | SEC-15  | MÉDIO   | ALTA  | **CSV/XLSX injection**: 4 exportadores não neutralizam células iniciadas por `=`/`+`/`-`/`@`; o `exportCSV` genérico também não escapa `;`/quebra de linha (quebra colunas)                | `js/ui.js:836-839`, `js/visitas.js:685-687`, `js/equipamentos.js:905`, `js/milvus-devices.js:520`                                                                | PROPOSTA (P-17)                           |
+| SEC-16  | BAIXO   | ALTA  | Nenhuma das 9 Edge Functions tem rate limit/quotas; autenticadas, podem ser chamadas em loop (consumo da API Milvus/Resend)                                                                | `supabase/functions/*/index.ts`                                                                                                                                  | MONITORAR                                 |
 | SYNC-01 | MÉDIO   | MÉDIA | **SUSPEITA** — `pull` sem `.range()`: se o PostgREST `max-rows` (padrão 1000) truncar, linhas ausentes são tratadas como “deletadas no servidor” e **descartadas do merged** → perda local | `js/storage.js:834`, `js/schema.js:295-297`                                                                                                                      | PROPOSTA (P-9)                            |
 | SYNC-02 | BAIXO   | ALTA  | Outbox cobre **só `pendencias`**; demais entidades sobem só no próximo ciclo de sync                                                                                                       | `js/storage.js:1910`, `js/storage.js:953`                                                                                                                        | PROPOSTA (P-10)                           |
 | SYNC-03 | BAIXO   | MÉDIA | **SUSPEITA** — `applyRemote` reescreve a lista inteira via `dbSet` em paralelo com o merge do sync (corrida de escrita perdida)                                                            | `js/sync-manager.js:143`                                                                                                                                         | PROPOSTA (P-10)                           |
@@ -293,3 +294,33 @@ não a própria barra invertida nem CR solto.
   (identificador por cliente, visível à equipe dona via RLS) — **CONS-07**.
 - **`visits`/`reunioes`/`procedure_templates`** seguem dentro do bloco das 8 tabelas da `021`
   (SEC-02).
+
+---
+
+## 10. Fase 7 — Edge Functions (9/9)
+
+Padrão observado em 8 das 9: `authorization` → `admin.auth.getUser(token)` (401 se inválido)
+→ `operators` por `auth_user_id` (403 se inativo) → escopo (admin puro ou team-check do
+cliente-alvo) → só então `service_role`.
+
+| Função                  | JWT     | Escopo                                                 | Observação                                                                                       |
+| ----------------------- | ------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `milvus-atendimentos`   | ✓       | admin **ou** team (`:109-113`, `:175-205`)             | valida token por `milvus_client_token` + time dono                                               |
+| `milvus-chamado-create` | ✓       | admin **ou** team (`:416-430`, `:464-469`, `:639-650`) | team-check antes de qualquer chamada/escrita                                                     |
+| `milvus-devices`        | ✓       | admin **ou** team (`:432-464`)                         | lê `clients` antes de autorizar                                                                  |
+| `milvus-tickets`        | ✓       | admin **ou** team (`:195-243`)                         | `404` se o cliente não existe, `403` se é de outra equipe (enumeração por id UUID é desprezível) |
+| `milvus-client-names`   | ✓       | **admin only** (`:208+`)                               |                                                                                                  |
+| `milvus-clients-import` | ✓       | **admin only** (`:141-150`)                            |                                                                                                  |
+| `milvus-token-backfill` | ✓       | **admin only** (`:132-141`)                            | duas fases (prévia → commit)                                                                     |
+| `update-user-password`  | ✓       | **admin only** (`:44-73`)                              | valida `password.length >= 8`                                                                    |
+| `send-email`            | **não** | **nenhum**                                             | **SEC-03** — única exceção                                                                       |
+
+Também verificado: nenhum valor de segredo aparece em log (só flags como
+`hasToken=${!!clientToken}` e nomes de tabela/coluna) e `MILVUS_API_TOKEN`/`SERVICE_ROLE_KEY`
+/`RESEND_API_KEY` vêm sempre de `Deno.env`.
+
+Restrições registradas: **SEC-09** (`Access-Control-Allow-Origin: *` em todas — aceitável
+enquanto a resposta exigir JWT) e **SEC-16** (nenhuma tem rate limit).
+
+> Nota: `milvus-chamado-create/index.ts` está com alterações de debug **no working tree**
+> (não commitadas); a leitura acima considera a versão de `HEAD`.
