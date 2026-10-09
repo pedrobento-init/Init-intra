@@ -83,7 +83,7 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | SEC-12  | INFO    | MÉDIA | XSS: varredura dos 93 `${...}` em `innerHTML`; todos os pontos com dado do usuário conferidos escapam (`escapeHtml`/`esc`/`_richEsc`/`textContent`)                                        | `js/*`                                                                                                                                                           | **RESOLVIDO** — nenhum XSS (§9)           |
 | SEC-13  | ALTO    | ALTA  | `equipamentos all` — `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (`anon` lê e escreve) e criada **depois** da `021`, que só derruba 8 tabelas → aplicar `021` **não fecha esta** | `supabase/migrations/035_equipamentos.sql:49`, `021_rls_remediation.sql:68-75`                                                                                   | PROPOSTA (P-15) / DBA                     |
 | SEC-14  | MÉDIO   | ALTA  | `checklists` e `checklist_modelo_itens` com `SELECT ... USING (true)` **sem isolamento por equipe** (escrita é admin-only); `checklist_marcacoes` já é team-scoped                         | `supabase/migrations/041_checklists.sql:157-158,174-176`, `040_checklist.sql:62-63`                                                                              | PROPOSTA (P-16) — decisão de produto      |
-| SEC-15  | MÉDIO   | ALTA  | **CSV/XLSX injection**: 4 exportadores não neutralizam células iniciadas por `=`/`+`/`-`/`@`; o `exportCSV` genérico também não escapa `;`/quebra de linha (quebra colunas)                | `js/ui.js:836-839`, `js/visitas.js:685-687`, `js/equipamentos.js:905`, `js/milvus-devices.js:520`                                                                | PROPOSTA (P-17)                           |
+| SEC-15  | MÉDIO   | ALTA  | **CSV/XLSX injection**: 4 exportadores não neutralizam células iniciadas por `=`/`+`/`-`/`@`; o `exportCSV` genérico também não escapa `;`/quebra de linha (quebra colunas)                | `js/ui.js:836-839`, `js/visitas.js:685-687`, `js/equipamentos.js:905`, `js/milvus-devices.js:520`                                                                | **CORRIGIDO** `53c9fe7`                   |
 | SEC-16  | BAIXO   | ALTA  | Nenhuma das 9 Edge Functions tem rate limit/quotas; autenticadas, podem ser chamadas em loop (consumo da API Milvus/Resend)                                                                | `supabase/functions/*/index.ts`                                                                                                                                  | MONITORAR                                 |
 | SYNC-01 | MÉDIO   | MÉDIA | **SUSPEITA** — `pull` sem `.range()`: se o PostgREST `max-rows` (padrão 1000) truncar, linhas ausentes são tratadas como “deletadas no servidor” e **descartadas do merged** → perda local | `js/storage.js:834`, `js/schema.js:295-297`                                                                                                                      | PROPOSTA (P-9)                            |
 | SYNC-02 | BAIXO   | ALTA  | Outbox cobre **só `pendencias`**; demais entidades sobem só no próximo ciclo de sync                                                                                                       | `js/storage.js:1910`, `js/storage.js:953`                                                                                                                        | PROPOSTA (P-10)                           |
@@ -101,7 +101,7 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | CONS-05 | INFO    | ALTA  | Sem type-check em nenhum etapa                                                                                                                                                             | `package.json`                                                                                                                                                   | MONITORAR                                 |
 | CONS-06 | INFO    | ALTA  | Código morto: `_daySummary` é calculado (`buildDaySummary`) mas **nunca lido** — o sink do resumo diário não existe mais desde o redesign do dashboard                                     | `js/app.js:705-710`, `js/metrics.js:453`                                                                                                                         | MONITORAR                                 |
 | CONS-07 | INFO    | ALTA  | `clients.milvus_client_token` (identificador por cliente, não o API token) é sincronizado ao navegador e fica no IndexedDB; visível só p/ a equipe dona via RLS                            | `js/schema.js:22`, `js/clients.js:190,1513`                                                                                                                      | MONITORAR                                 |
-| CONS-08 | INFO    | MÉDIA | Exportação de `.ics` escapa `,` `;` e `\n`, mas não `\` nem CR solto (`_icsEscape`) — permite injeção de escape no arquivo de calendário                                                   | `js/calendar.js:683-685`                                                                                                                                         | PROPOSTA (P-17)                           |
+| CONS-08 | INFO    | MÉDIA | Exportação de `.ics` escapa `,` `;` e `\n`, mas não `\` nem CR solto (`_icsEscape`) — permite injeção de escape no arquivo de calendário                                                   | `js/calendar.js:683-685`                                                                                                                                         | **CORRIGIDO** `53c9fe7`                   |
 
 ---
 
@@ -169,14 +169,15 @@ do remoto — comportamento correto para “deletado no servidor”, errado para
 
 Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/build rodando antes e depois:
 
-| #   | Commit                    | Correção                                                                                                                        | Testes                                                                                                             |
-| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 1   | `7ba3d0d` `chore(deps)`   | `npm audit fix` → `brace-expansion` 1.1.18→1.1.21 e `source-map-js` 1.2.1→1.2.2 (2 highs resolvidos, devDeps)                   | 537/537 ✓ lint 0 erros ✓                                                                                           |
-| 2   | `12c875f` `fix(build)`    | `tools/build-assets.js` agora remove hashes antigos de `dist/js` e `dist/css` antes de finalizar (`removed` reportado no build) | **novo teste** `tests/build-assets.test.js` (5) ✓ build: 72 obsoletos removidos, `dist/` 4.323 KB → 953 KB         |
-| 3   | `6ca1acc` `fix(security)` | `integrity` + `crossorigin` em `motion@13.1.1` no `index.html`                                                                  | **novo teste** `tests/cdn-sri.test.js` (3): falha se qualquer script externo sair sem SRI                          |
-| 4   | `24d9160` `fix(pwa)`      | SW não intercepta/cacheia GETs com `apikey`/`authorization`                                                                     | **novo teste** `tests/sw-cache.test.js` (5, sandbox `vm`): Supabase bypassado, mesmo-origem e CDN seguem cacheados |
+| #   | Commit                    | Correção                                                                                                                                                                                                                                                                                                   | Testes                                                                                                             |
+| --- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1   | `7ba3d0d` `chore(deps)`   | `npm audit fix` → `brace-expansion` 1.1.18→1.1.21 e `source-map-js` 1.2.1→1.2.2 (2 highs resolvidos, devDeps)                                                                                                                                                                                              | 537/537 ✓ lint 0 erros ✓                                                                                           |
+| 2   | `12c875f` `fix(build)`    | `tools/build-assets.js` agora remove hashes antigos de `dist/js` e `dist/css` antes de finalizar (`removed` reportado no build)                                                                                                                                                                            | **novo teste** `tests/build-assets.test.js` (5) ✓ build: 72 obsoletos removidos, `dist/` 4.323 KB → 953 KB         |
+| 3   | `6ca1acc` `fix(security)` | `integrity` + `crossorigin` em `motion@13.1.1` no `index.html`                                                                                                                                                                                                                                             | **novo teste** `tests/cdn-sri.test.js` (3): falha se qualquer script externo sair sem SRI                          |
+| 4   | `24d9160` `fix(pwa)`      | SW não intercepta/cacheia GETs com `apikey`/`authorization`                                                                                                                                                                                                                                                | **novo teste** `tests/sw-cache.test.js` (5, sandbox `vm`): Supabase bypassado, mesmo-origem e CDN seguem cacheados |
+| 5   | `53c9fe7` `fix(security)` | Helper único de célula CSV (`csvCell`/`csvRow` em `js/ui.js`) nos 4 exportadores: escape de `;`, aspa e quebra de linha + prefixo `'` em célula iniciada por `=`/`+`/`-`/`@`/tab/CR (número negativo puro preservado); `_icsEscape` escapa barra invertida e normaliza CRLF/CR/LF — fecha SEC-15 e CONS-08 | **novo teste** `tests/csv-export.test.js` (18) ✓ `npm test` 564/564 ✓                                              |
 
-**Estado final:** `npm test` **546/546** · `npm run lint` **0 erros / 838 warnings** ·
+**Estado final:** `npm test` **564/564** · `npm run lint` **0 erros / 838 warnings** ·
 `npm run build` ok (com minify) · `index.html`/`sw.js` restaurados ao modo dev após validar o build ·
 `git status` limpo (exceto `supabase/functions/milvus-chamado-create/index.ts`, debug, e
 `referencia/`, fora do escopo — **não commitados**).
@@ -184,6 +185,8 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 ---
 
 ## 7. Propostas (não aplicadas) — prós e contras
+
+Aplicada nesta sessão: **P-17** (commit `53c9fe7`) — fecha SEC-15 e CONS-08; ver §6 e §9. As demais seguem não aplicadas.
 
 | #    | Proposta                                                                                                                                              | Prós                                                                                   | Contras / risco                                                                                                                              |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -203,8 +206,6 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 | P-14 | Limpar `no-unused-vars` (838) em lotes                                                                                                                | Lint zerado, morte reduzida (CONS-02)                                                  | Trabalho mecânico; risco de apagar variáveis “usadas por string/`window`”                                                                    |
 | P-15 | Nova migration (ex.: `042_equipamentos_rls`) copiando o modelo da `021` para `equipamentos` (remover `"equipamentos all"`, policies por equipe/admin) | Fecha SEC-13 — `equipamentos` continua aberto mesmo **depois** da `021`                | Exige DBA/staging; tabela nova em relação ao escopo da `021`, precisa do mesmo rollback documentado                                          |
 | P-16 | Isolar `checklists`/`checklist_modelo_itens` por equipe (padrão `ckmarc`) ou manter leitura global                                                    | Fecha SEC-14 se for vazamento; mantém o fluxo atual se modelos são globais por desenho | **Decisão de produto**: mudar pode esconder modelos de quem precisa vê-los                                                                   |
-
-| P-17 | Normalização de exportação: escape de aspas e quebras em célula CSV, neutralização de `=`/`+`/`-`/`@` (prefixo `'`) e `_icsEscape` com `\` e CR | Fecha SEC-15 e CONS-08 (CSV injection + colunas corrompidas) | Muda o conteúdo exportado (valores ganham aspas/prefixo ao abrir no Excel); exige conferir os 4 exportadores e testes |
 
 ---
 
@@ -263,7 +264,7 @@ lido e gravado por anônimos.**
 enquanto `checklist_marcacoes` usa a regra de equipe (`041:192-195`). Escrita é admin-only.
 Risco: operador de uma equipe lê checklists/modelos de clientes de outra equipe.
 
-### SEC-15 (novo, MÉDIO) / CONS-08 — exportações CSV e `.ics`
+### SEC-15 (novo, MÉDIO) / CONS-08 — exportações CSV e `.ics` — CORRIGIDO
 
 Quatro exportadores gravam conteúdo livre do usuário (relatório de visita, hostname/usuário
 de inventário, nome de cliente) sem neutralizar o início de célula `=`/`+`/`-`/`@`:
@@ -277,11 +278,18 @@ de inventário, nome de cliente) sem neutralizar o início de célula `=`/`+`/`-
 
 Impacto: (a) abrir o CSV no Excel/LibreOffice avalia a fórmula (`=HYPERLINK(...)`,
 `=cmd|...`); (b) em `exportCSV` um valor com `;` ou `\n` **desalinha as colunas** (quebra de
-formato, independente de ataque). Mitigação proposta em **P-17** — por mudar o conteúdo
-exportado, ficou como proposta em vez de correção automática.
+formato, independente de ataque). Mitigação **P-17 — aplicada em `53c9fe7`**: o conteúdo
+exportado passa a ganhar aspas/prefixo ao abrir no Excel (conferir os 4 exportadores).
 
 `CONS-08` (mesma família): `_icsEscape` (`js/calendar.js:683-685`) escapa `,` `;` e `\n`, mas
 não a própria barra invertida nem CR solto.
+
+> **CORRIGIDO em `53c9fe7` (P-17):** os 4 exportadores agora passam por um helper
+> único (`csvCell`/`csvRow` em `js/ui.js`), que escapa ponto-e-vírgula, aspa dupla e
+> quebra de linha (colunas deixam de desalinhar) e prefixa apóstrofo em célula iniciada
+> por `=`, `+`, `-`, `@`, tab ou CR — números negativos puros são preservados.
+> `_icsEscape` agora escapa a barra invertida antes de `;` e `,` e normaliza
+> CRLF/CR/LF. A tabela acima descreve o estado **antes** da correção.
 
 ### Verificações negativas (confirmadas como OK)
 
