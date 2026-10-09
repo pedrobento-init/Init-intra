@@ -901,7 +901,12 @@ function exportEquipamentosPlanilha() {
     }
   } catch (_) { /* cai para o CSV abaixo */ }
   const fmtNum = n => (n == null || isNaN(Number(n))) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
-  const cell = v => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+  const cell = (v) => {
+    if (typeof csvCell === 'function') return csvCell(v);
+    let s = String(v == null ? '' : v);
+    if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+    return s.replace(/;/g, ',').replace(/\r?\n/g, ' ');
+  };
   const lines = [
     cell(sheet.title),
     sheet.header.join(';'),

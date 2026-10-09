@@ -683,8 +683,10 @@ function openVisitMonthReportModal() {
 }
 
 function _visitReportCsvCell(val) {
-  const s = (val == null ? '' : String(val)).replace(/\r?\n/g, ' ').replace(/"/g, '""');
-  return `"${s}"`;
+  if (typeof csvCell === 'function') return csvCell(val);
+  let s = (val == null ? '' : String(val)).replace(/\r?\n/g, ' ');
+  if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
 }
 
 function _visitReportEscHtml(val) {

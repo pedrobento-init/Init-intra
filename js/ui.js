@@ -833,8 +833,26 @@ if (themeToggleBtn) {
 initTheme();
 
 // ── CSV EXPORTERS ──────────────────────────────────────────────────────────────
+// Helper unico de celula (delimitador ";", padrao pt-BR) usado por TODOS os
+// exportadores (exportCSV, relatorio de visitas, acerto de equipamentos,
+// inventario Milvus). Duas protecoes:
+//  1) escape estrutural: valor com ";", aspa ou quebra de linha vira campo
+//     entre aspas (sem isso a coluna desalinha e a linha quebra);
+//  2) neutralizacao de formula: celula iniciada por =, +, -, @, tab ou CR
+//     ganha marcador de texto (a planilha ignora ao exibir), exceto
+//     numeros puros ("-12.5" continua sendo numero).
+function csvCell(v) {
+  let s = v == null ? '' : String(v);
+  if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+  s = s.replace(/"/g, '""');
+  return /[;\n\r"]/.test(s) ? '"' + s + '"' : s;
+}
+function csvRow(cells) {
+  return cells.map(csvCell).join(';');
+}
+
 function exportCSV(filename, headers, rows) {
-  const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.map(r => r.join(";")).join("\n");
+  const csvContent = "\uFEFF" + csvRow(headers) + "\n" + rows.map(csvRow).join("\n");
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
