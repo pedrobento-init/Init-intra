@@ -304,8 +304,8 @@ function renderPendencias() {
   renderPenView();
 }
 
-// Chips de cliente: toggle com estado pressionado. Clicar filtra pelo cliente
-// (chip fica destacado); clicar de novo limpa para todos os clientes.
+// Cards de cliente: toggle com estado pressionado. Clicar filtra pelo cliente
+// (card fica destacado, igual ao select "Todos os clientes"); clicar de novo limpa.
 function penClientChipState(selectedId, chipId) {
   return (selectedId && chipId && String(selectedId) === String(chipId)) ? ' is-active' : '';
 }
@@ -317,50 +317,80 @@ function togglePenClientChip(clientId) {
   if (typeof renderPenView === 'function') renderPenView(false);
 }
 
+function _penClientById(cid) {
+  try { return (typeof getClientById === 'function') ? getClientById(cid) : null; }
+  catch (_) { return null; }
+}
+
+// Clientes com pendências abertas: mais vencidas, depois mais abertas, depois nome.
+function _penClientSlaEntries() {
+  var today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+  var slaMap = typeof getAllSlaStats === 'function' ? getAllSlaStats(getPendencias(), today) : {};
+  return Object.entries(slaMap).filter(function(e){ return e[1].totalAbertas > 0; }).sort(function(a,b){
+    if (b[1].vencidas !== a[1].vencidas) return b[1].vencidas - a[1].vencidas;
+    if (b[1].totalAbertas !== a[1].totalAbertas) return b[1].totalAbertas - a[1].totalAbertas;
+    var ca = _penClientById(a[0]), cb = _penClientById(b[0]);
+    var na = (ca && ca.name) || a[1].clientName || '';
+    var nb = (cb && cb.name) || b[1].clientName || '';
+    return String(na).localeCompare(String(nb), 'pt-BR', { sensitivity:'base', numeric:true });
+  });
+}
+
+function _penClientCard(entry, selClient) {
+  var cid = entry[0], s = entry[1];
+  var c = _penClientById(cid);
+  var name = c ? c.name : (s.clientName || cid);
+  var safeName = escapeHtml(name);
+  var total = s.totalAbertas | 0;
+  var venc = s.vencidas | 0;
+  var segs = Math.min(Math.max(total, 1), 6);
+  var reds = Math.min(venc, segs);
+  var bars = '';
+  for (var i = 0; i < segs; i++) bars += `<i class="pen-cv-seg${i < reds ? ' is-venc' : ''}"></i>`;
+  var active = penClientChipState(selClient, cid);
+  return `<button class="pen-cv-card${active}" aria-pressed="${active ? 'true' : 'false'}" `+
+    `onclick="togglePenClientChip('${escapeHtml(cid)}')" `+
+    `title="Filtrar por ${safeName}: ${total} abertas, ${venc} vencidas">`+
+      `<span class="pen-cv-head">`+
+        `<span class="pen-cv-badge" aria-hidden="true">${escapeHtml(penInitials(name))}</span>`+
+        `<span class="pen-cv-name" title="${safeName}">${safeName}</span>`+
+      `</span>`+
+      `<span class="pen-cv-foot">`+
+        `<span class="pen-cv-bar" aria-hidden="true">${bars}</span>`+
+        `<span class="pen-cv-total">${total}</span>`+
+        (venc > 0 ? `<span class="pen-cv-venc">${venc} venc.</span>` : `<span class="pen-cv-ondia">em dia</span>`)+
+      `</span>`+
+    `</button>`;
+}
+
+// Só esmaece a borda direita quando a lista realmente rola (poucos cards = sem fade).
+function _penCvUpdateStrip() {
+  var list = document.getElementById('penClientStrip');
+  if (!list) return;
+  list.classList.toggle('is-scrollable', (list.scrollWidth - list.clientWidth) > 4);
+}
+if (typeof window !== 'undefined' && !window._penCvStripBound) {
+  window._penCvStripBound = true;
+  window.addEventListener('resize', _penCvUpdateStrip);
+}
+
 function _renderPendenciaSlaSummary() {
   const el = document.getElementById('penSlaSummary');
   if (!el) return;
-  const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
-  const slaMap = typeof getAllSlaStats === 'function' ? getAllSlaStats(getPendencias(), today) : {};
-  const entries = Object.entries(slaMap).sort((a,b)=> b[1].vencidas - a[1].vencidas || b[1].totalAbertas - a[1].totalAbertas);
+  const entries = _penClientSlaEntries();
   if (!entries.length) { el.innerHTML=''; return; }
   var _collapsed = el.dataset.collapsed !== '0';
   var _limit = _collapsed ? 4 : entries.length;
   var visible = entries.slice(0, _limit);
-  var overflow = entries.length - visible.length;
   var _selClient = document.getElementById('penClient')?.value || '';
-  el.innerHTML = `<div class="pen-client-carousel-wrap">`+
-    `<div class="pen-client-carousel" id="penClientCarousel" role="region" aria-label="Resumo por cliente">`+
-      visible.map(function(entry){
-        var cid=entry[0], s=entry[1];
-        var c=getClientById(cid);
-        var name=escapeHtml(c?c.name:s.clientName);
-        var hasVenc = s.vencidas>0;
-        var dotColor = hasVenc ? '#dc2626' : '#16a34a';
-        var chipState = penClientChipState(_selClient, cid);
-        var pressed = chipState ? 'true' : 'false';
-        return `<button class="pen-client-chip${chipState}" aria-pressed="${pressed}" onclick="togglePenClientChip('${escapeHtml(cid)}')" title="${name} · ${s.totalAbertas} abertas, ${s.vencidas} vencidas (clique para filtrar; de novo para limpar)">`+
-          `<span class="pen-chip-dot" style="background:${dotColor}"></span>`+
-          `<span class="pen-chip-name">${name}</span>`+
-          `<span class="pen-chip-counts">${s.totalAbertas}·<span style="color:${hasVenc?'#dc2626':'var(--text-muted)'}">${s.vencidas}v</span></span>`+
-        `</button>`;
-      }).join('')+
+  el.innerHTML = `<div class="pen-cv-row">`+
+    `<div class="pen-cv-label"><span>Clientes</span><span>por vencidas</span></div>`+
+    `<div class="pen-cv-list" id="penClientStrip" role="group" aria-label="Clientes por vencidas">`+
+      visible.map(function(entry){ return _penClientCard(entry, _selClient); }).join('')+
     `</div>`+
-    (entries.length>4 ? `<button class="btn btn-secondary btn-sm pen-chip-toggle" onclick="(function(el){el.dataset.collapsed=el.dataset.collapsed==='0'?'1':'0';_renderPendenciaSlaSummary()})(document.getElementById('penSlaSummary'))" aria-expanded="${_collapsed?'false':'true'}">${_collapsed ? 'Ver mais ('+entries.length+')' : 'Ver menos'}</button>` : '')+
+    (entries.length>4 ? `<button class="btn btn-secondary btn-sm pen-cv-more" onclick="(function(el){el.dataset.collapsed=el.dataset.collapsed==='0'?'1':'0';_renderPendenciaSlaSummary()})(document.getElementById('penSlaSummary'))" aria-expanded="${_collapsed?'false':'true'}">${_collapsed ? 'Ver todos ('+entries.length+')' : 'Ver menos'}</button>` : '')+
   `</div>`;
-  // scroll shadows
-  setTimeout(function(){
-    var car=document.getElementById('penClientCarousel');
-    if(!car) return;
-    function upd(){
-      var max=car.scrollWidth - car.clientWidth;
-      car.classList.toggle('has-scroll-left', car.scrollLeft>4);
-      car.classList.toggle('has-scroll-right', max>4 && car.scrollLeft < max-4);
-      el.classList.toggle('has-scroll-left', car.scrollLeft>4);
-      el.classList.toggle('has-scroll-right', max>4 && car.scrollLeft < max-4);
-    }
-    car.onscroll=upd; upd();
-  },30);
+  _penCvUpdateStrip();
 }
 
 function renderPenView(resetPage) {

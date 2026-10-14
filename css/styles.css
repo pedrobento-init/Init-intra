@@ -4043,21 +4043,29 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-pager .btn[disabled] { opacity: .45; cursor: not-allowed; }
 @media (hover: none) { .pen-check-remove { opacity: 1; } }
 
-/* ── 2. CARROSSEL CLIENTES (chips horizontais, altura reduzida) ── */
-.pen-client-carousel-wrap { display:flex; align-items:center; gap:10px; overflow:hidden; }
-.pen-client-carousel { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; flex:1; padding:4px 2px; scroll-snap-type:x proximity; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
-.pen-client-carousel::-webkit-scrollbar { height:4px; }
-.pen-client-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:20px; border:1px solid var(--border); background:var(--bg-surface); font-size:12px; font-weight:500; color:var(--text-primary); white-space:nowrap; cursor:pointer; flex-shrink:0; scroll-snap-align:start; transition:border-color var(--transition), background var(--transition); }
-.pen-client-chip:hover { border-color:var(--accent); background:var(--accent-dim); }
-/* Chip filtrando: mantém o visual "pressionado" até limpar o filtro. */
-.pen-client-chip.is-active { border-color:var(--accent); background:var(--accent-dim); box-shadow:0 0 0 1px var(--accent); }
-.pen-client-chip.is-active .pen-chip-name { font-weight:700; }
-.pen-chip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.pen-chip-name { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
-.pen-chip-counts { font-size:11px; color:var(--text-muted); font-variant-numeric:tabular-nums; }
-.pen-chip-toggle { flex-shrink:0; white-space:nowrap; }
-.pen-client-carousel.has-scroll-left { box-shadow: inset 12px 0 8px -8px rgba(15,23,42,0.12); }
-.pen-client-carousel.has-scroll-right { box-shadow: inset -12px 0 8px -8px rgba(15,23,42,0.12); }
+/* ── 2. CLIENTES POR VENCIDAS — cards roláveis no lugar dos chips ── */
+.pen-cv-row { display:flex; align-items:center; gap:12px; }
+.pen-cv-label { flex:none; display:flex; flex-direction:column; font-size:12px; line-height:1.3; color:var(--kb-muted); }
+.pen-cv-label span:first-child { font-weight:600; }
+.pen-cv-label span:last-child { font-weight:500; }
+.pen-cv-list { flex:1; min-width:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.pen-cv-list::-webkit-scrollbar { display:none; }
+.pen-cv-list.is-scrollable { -webkit-mask-image:linear-gradient(90deg,#000 92%,transparent); mask-image:linear-gradient(90deg,#000 92%,transparent); }
+.pen-cv-card { flex:none; width:188px; box-sizing:border-box; padding:9px 12px; border-radius:12px; background:var(--kb-panel); border:1px solid var(--kb-line); display:flex; flex-direction:column; gap:8px; text-align:left; color:var(--kb-text); cursor:pointer; transition:border-color var(--transition-fast), box-shadow var(--transition-fast); }
+.pen-cv-card:hover { border-color:var(--kb-muted); }
+.pen-cv-card:focus-visible { outline:2px solid var(--kb-accent); outline-offset:2px; }
+.pen-cv-card.is-active { border-color:var(--kb-accent); box-shadow:0 0 0 1px var(--kb-accent); }
+.pen-cv-head { display:flex; align-items:center; gap:8px; width:100%; min-width:0; }
+.pen-cv-badge { width:22px; height:22px; border-radius:6px; background:var(--kb-raised); color:var(--kb-muted); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none; }
+.pen-cv-name { flex:1; min-width:0; font-size:13px; font-weight:600; color:var(--kb-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pen-cv-foot { display:flex; align-items:center; gap:8px; width:100%; }
+.pen-cv-bar { flex:1; display:flex; gap:3px; min-width:0; }
+.pen-cv-seg { flex:1; height:4px; border-radius:2px; background:var(--kb-line); }
+.pen-cv-seg.is-venc { background:var(--kb-red); }
+.pen-cv-total { flex:none; font-size:11px; color:var(--kb-muted); font-variant-numeric:tabular-nums; }
+.pen-cv-venc { flex:none; font-size:11px; font-weight:700; color:var(--kb-red); }
+.pen-cv-ondia { flex:none; font-size:11px; font-weight:600; color:var(--kb-muted); }
+.pen-cv-more { flex:none; white-space:nowrap; }
 
 /* ── 3. BARRA DE FILTROS — Mais filtros ── */
 .pen-search-bar, .equip-search-bar { position:relative; }
@@ -4097,7 +4105,7 @@ body.dark-theme .kc-sla--muted { background:rgba(217,119,6,0.15); color:#fbbf24;
 .kanban-card-date, .pen-summary, .kc-deadline.is-empty, .kc-resp--empty { color:var(--text-secondary); }
 body.dark-theme .kanban-card-date, body.dark-theme .kanban-card-date.is-empty, body.dark-theme .pen-summary, body.dark-theme .kc-resp--empty { color:#a8b5c8; }
 body.dark-theme .kanban-card-meta, body.dark-theme .pen-mobile-card-meta, body.dark-theme .pen-mobile-card-footer { color:#a8b5c8; }
-body.dark-theme .pen-chip-counts, body.dark-theme .pen-pager-info { color:#cbd5e1; }
+body.dark-theme .pen-pager-info { color:#cbd5e1; }
 @media (max-width: 640px) {
   .pen-prop { grid-template-columns: 108px 1fr; }
   .pen-header-btns { margin-left: 0; }
@@ -5139,7 +5147,10 @@ select.cf-input { cursor: pointer; }
    ═════════════════════════════════════════════════════════════════ */
 
 /* ── Tokens (mesmos valores do "Meu dia"; dark via body.dark-theme) ── */
-.pen-board {
+/* #penSlaSummary (faixa "Clientes por vencidas") fica fora de .pen-board,
+   mas usa os mesmos tokens do quadro — por isso dividem a declaração. */
+.pen-board,
+#penSlaSummary {
   --kb-panel: #FFFFFF;
   --kb-raised: #F1F4FA;
   --kb-line: #DFE4EF;
@@ -5155,7 +5166,8 @@ select.cf-input { cursor: pointer; }
   font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--kb-text);
 }
-body.dark-theme .pen-board {
+body.dark-theme .pen-board,
+body.dark-theme #penSlaSummary {
   --kb-panel: #121929;
   --kb-raised: #1A2340;
   --kb-line: #242F4A;
