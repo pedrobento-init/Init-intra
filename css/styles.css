@@ -4048,8 +4048,13 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-cv-label { flex:none; display:flex; flex-direction:column; font-size:12px; line-height:1.3; color:var(--kb-muted); }
 .pen-cv-label span:first-child { font-weight:600; }
 .pen-cv-label span:last-child { font-weight:500; }
-.pen-cv-list { flex:1; min-width:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
-.pen-cv-list::-webkit-scrollbar { display:none; }
+/* Scrollbar sempre visível (barrinha de descoberta dos cards escondidos):
+   6px + padding/margin negativos p/ a altura da linha não mudar. */
+.pen-cv-list { flex:1; min-width:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; padding-bottom:8px; margin-bottom:-8px; scrollbar-color:var(--scrollbar-thumb-hover) transparent; }
+.pen-cv-list:hover, .pen-cv-list:focus-visible { scrollbar-color:var(--scrollbar-thumb-active) transparent; }
+.pen-cv-list::-webkit-scrollbar { height:6px; }
+.pen-cv-list::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb-hover); }
+.pen-cv-list:hover::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb-active); }
 .pen-cv-list.is-scrollable { -webkit-mask-image:linear-gradient(90deg,#000 92%,transparent); mask-image:linear-gradient(90deg,#000 92%,transparent); }
 .pen-cv-card { flex:none; width:188px; box-sizing:border-box; padding:9px 12px; border-radius:12px; background:var(--kb-panel); border:1px solid var(--kb-line); display:flex; flex-direction:column; gap:8px; text-align:left; color:var(--kb-text); cursor:pointer; transition:border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .pen-cv-card:hover { border-color:var(--kb-muted); }
