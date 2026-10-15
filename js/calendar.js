@@ -102,7 +102,7 @@ function agRecurringGroups(visits, monthKey) {
     if (monthKey && String(v.date || '').slice(0, 7) === monthKey) groups[key].count++;
     groups[key].visitId = v.id;
   });
-  var labels = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal' };
+  var labels = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', quarterly: 'Trimestral', yearly: 'Anual' };
   return Object.values(groups).sort(function (a, b) { return String(a.clientName).localeCompare(String(b.clientName)); }).map(function (g) {
     return { clientId: g.clientId, clientName: g.clientName, visitId: g.visitId, meta: (labels[g.recurrence] || 'Recorrente') + ' · ' + g.count + ' no mês' };
   });
@@ -376,8 +376,6 @@ function mapPendenciasToEvents(pendencias) {
 function mapVisitsToEvents(visits) {
   return visits.map(v => {
     const c = VISIT_COLORS[v.status] || VISIT_COLORS.agendada;
-    const rangeLabel = typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : (v.time || '');
-    const timeLabel = rangeLabel && rangeLabel !== '—' ? ' ⏰' + rangeLabel : '';
     const allDay = v.allDay === true || !v.time;
     let start = v.date;
     let end = undefined;

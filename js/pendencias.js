@@ -82,7 +82,13 @@ const PEN_ICO_CAL = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true">
 const PEN_ICO_PLAY = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
 const PEN_ICO_CLK = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const PEN_ICO_USER = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
-const PEN_ICO_BOLT ='<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
+const PEN_ICO_DOTS = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+const PEN_ICO_REPEAT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+function penRecurrenceLabel(r) {
+  var o = (typeof RECURRENCE_OPTIONS !== 'undefined' ? RECURRENCE_OPTIONS : []).find(function(x) { return x.value === r; });
+  return o ? o.label : 'Recorrente';
+}
+const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
 
 let penView = 'kanban';
 let penScope = 'active';
@@ -203,7 +209,6 @@ function togglePenMoreFilters(){
   var panel=document.getElementById('penMoreFiltersPanel');
   var btn=document.getElementById('penMoreFiltersBtn');
   if(!panel||!btn) return;
-  var open=panel.style.display!=='none' && panel.style.display!=='';
   // Close if open
   if(!panel.classList.contains('hidden') && panel.style.display!=='none' && getComputedStyle(panel).display!=='none' && panel.dataset.open==='1'){
     panel.dataset.open='0'; panel.style.display='none'; btn.setAttribute('aria-expanded','false');
@@ -841,7 +846,10 @@ function penKanbanCard(p) {
     ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
     '<div class="kanban-card-title" title="' + escapeHtml(title) + '">' +
       '<span class="pen-display-num">' + num + '</span>' + escapeHtml(title) +
+      (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
     '</div>' +
+    '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +
+      ' onclick="openPenQuickMenu(event,\'' + escapeHtml(p.id) + '\')" ondragstart="event.preventDefault()">' + PEN_ICO_DOTS + '</button>' +
     '<div class="kanban-card-meta">' +
       '<span class="kc-client" title="' + escapeHtml(clientName) + '">' +
         '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>' +
@@ -874,7 +882,11 @@ function onPenKanbanDragEnd(e) {
 function onPenKanbanDrop(e, colId) {
   e.preventDefault();
   document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
-  var id = e.dataTransfer.getData('penId');
+  penMoveTo(e.dataTransfer.getData('penId'), colId);
+}
+
+// Muda o status (arrastar no quadro ou menu ⋯ do card).
+function penMoveTo(id, colId) {
   var p = getPendenciaById(id);
   if (!p || p.status === colId) return;
   // Cópia destacada: getPendenciaById devolve a referência viva do cache e
@@ -887,6 +899,97 @@ function onPenKanbanDrop(e, colId) {
   renderPenView(false);
   var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
   showToast('Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"', 'success');
+}
+
+// ── Menu ⋯ do card: mover / atribuir sem abrir o detalhe ───────────────────
+function closePenQuickMenu() {
+  var m = document.getElementById('penQuickMenu');
+  if (m) m.remove();
+  document.querySelectorAll('.kc-menu[aria-expanded="true"]').forEach(function(b) { b.setAttribute('aria-expanded', 'false'); });
+}
+
+// Itens do menu (puro, testável): status de destino + operadores.
+function penQuickMenuModel(p, cols, operators) {
+  var statuses = (cols || []).filter(function(c) { return c.id !== p.status; })
+    .map(function(c) { return { id: c.id, label: c.label }; });
+  var people = (operators || []).filter(function(o) { return o && o.active !== false; })
+    .map(function(o) { return { name: o.name, current: o.name === (p.responsible || ''), away: o.onLeave === true }; });
+  return { statuses: statuses, people: people };
+}
+
+function openPenQuickMenu(ev, id) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  var btn = ev && ev.currentTarget;
+  var already = btn && btn.getAttribute('aria-expanded') === 'true';
+  closePenQuickMenu();
+  if (already) return;
+  var p = getPendenciaById(id);
+  if (!p) return;
+  var team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam
+    : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : null);
+  var ops = (typeof getOperators === 'function' ? getOperators() : []).filter(function(o) { return !team || (o.team || 'init') === team; });
+  // Ativas: colunas do quadro + "Resolvido" (concluir direto do card).
+  var cols = PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id) || c.id === 'resolvido'; });
+  var m = penQuickMenuModel(p, cols, ops);
+  var sid = escapeHtml(id);
+  var menu = document.createElement('div');
+  menu.id = 'penQuickMenu';
+  menu.className = 'pen-quick-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML =
+    '<div class="pqm-label">Mover para</div>' +
+    m.statuses.map(function(s) {
+      return '<button type="button" role="menuitem" onclick="closePenQuickMenu();penMoveTo(\'' + sid + '\',\'' + s.id + '\')">' +
+        '<span class="pqm-dot" style="--c:' + penColColor(s.id) + '"></span>' + escapeHtml(s.label) + '</button>';
+    }).join('') +
+    '<div class="pqm-label">Atribuir a</div>' +
+    '<div class="pqm-scroll">' +
+    m.people.map(function(o) {
+      var n = escapeHtml(o.name);
+      // Afastado não pode receber (updatePendenciaAssignee recusa): desabilitado.
+      return '<button type="button" role="menuitemradio" aria-checked="' + o.current + '"' + (o.current || o.away ? ' disabled' : '') +
+        ' onclick="closePenQuickMenu();penQuickAssign(\'' + sid + '\',\'' + n.replace(/&#39;/g, '\\&#39;') + '\')">' +
+        '<span class="pqm-check">' + (o.current ? '✓' : '') + '</span>' + n + (o.away ? ' <small>afastado</small>' : '') + '</button>';
+    }).join('') +
+    '</div>' +
+    '<div class="pqm-sep"></div>' +
+    '<button type="button" role="menuitem" onclick="closePenQuickMenu();openPendenciaDetail(\'' + sid + '\')">Abrir detalhes</button>';
+  document.body.appendChild(menu);
+  if (btn) {
+    btn.setAttribute('aria-expanded', 'true');
+    var r = btn.getBoundingClientRect();
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    var left = Math.min(window.innerWidth - w - 8, Math.max(8, r.right - w));
+    var top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+  }
+  var first = menu.querySelector('button:not([disabled])');
+  if (first) first.focus();
+}
+
+function penQuickAssign(id, name) {
+  try {
+    var res = updatePendenciaAssignee(id, { responsible: name });
+    try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {}
+    showToast(name ? 'Atribuída a ' + name + '.' : 'Responsável removido.', 'success');
+  } catch (err) {
+    showToast((err && err.message) || 'Não foi possível atribuir.', 'error');
+    return;
+  }
+  if (document.getElementById('penViewArea')) renderPenView(false);
+}
+
+if (typeof document !== 'undefined' && document.addEventListener && !(typeof window !== 'undefined' && window._penQuickMenuBound)) {
+  if (typeof window !== 'undefined') window._penQuickMenuBound = true;
+  document.addEventListener('click', function(e) {
+    var m = document.getElementById('penQuickMenu');
+    if (m && !m.contains(e.target)) closePenQuickMenu();
+  });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePenQuickMenu(); });
+  window.addEventListener('scroll', closePenQuickMenu, true);
+  window.addEventListener('resize', closePenQuickMenu);
 }
 
 function getFilteredPendencias() {
@@ -1321,8 +1424,21 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
     return true;
   }) : [];
 
+  // Modelos de Procedimento servem de modelo de pendência (só na criação):
+  // assunto, descrição e um checklist com os passos do modelo.
+  const _tpls = (!id && typeof getProcedureTemplates === 'function') ? (getProcedureTemplates() || []) : [];
+  const _tplField = _tpls.length ? `
+      <div class="form-group pen-tpl-field"><label class="form-label" for="penTemplateSel">Começar de um modelo</label>
+        <select class="form-select" id="penTemplateSel" onchange="applyPenTemplate(this.value)">
+          <option value="">Em branco</option>
+          ${_tpls.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title || '—')}${t.category ? ' · ' + escapeHtml(t.category) : ''}</option>`).join('')}
+        </select>
+        <input type="hidden" name="templateChecklist" id="penTemplateChecklist" value="" />
+        <div class="pen-tpl-hint" id="penTemplateHint" hidden></div></div>` : '';
+
   openModal(id ? 'Editar Pendência' : 'Nova Pendência', `
     <form onsubmit="submitPendenciaForm(event,'${escapeHtml(id||'')}')">
+      ${_tplField}
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cliente</label>
           <select class="form-select" name="clientId">
@@ -1393,6 +1509,38 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
   }, 30);
 }
 
+// Passos de um procedimento → itens de checklist (puro, testável).
+// Usa linhas numeradas/marcadas ("1.", "2)", "-", "•"); sem marcadores,
+// cada linha não vazia vira um item. Máx. 30.
+function templateStepsToChecklist(content) {
+  const lines = String(content || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const marked = lines.map(l => l.match(/^(?:\d+\s*[.)-]|[-*•▪☐□])\s*(.+)$/)).filter(Boolean).map(m => m[1].trim());
+  return (marked.length ? marked : lines).filter(Boolean).slice(0, 30);
+}
+
+function applyPenTemplate(tplId) {
+  const hint = document.getElementById('penTemplateHint');
+  const hidden = document.getElementById('penTemplateChecklist');
+  const form = hidden ? hidden.form : null;
+  const tpl = tplId && typeof getProcedureTemplates === 'function' ? (getProcedureTemplates() || []).find(t => t.id === tplId) : null;
+  if (!tpl || !form) {
+    if (hidden) hidden.value = '';
+    if (hint) { hint.hidden = true; hint.textContent = ''; }
+    return;
+  }
+  const steps = templateStepsToChecklist(tpl.content);
+  hidden.value = JSON.stringify(steps);
+  // Só preenche o que está vazio: não apaga o que a pessoa já digitou.
+  if (form.assunto && !form.assunto.value.trim()) form.assunto.value = String(tpl.title || '').slice(0, 120);
+  if (form.descricao && !form.descricao.value.trim()) form.descricao.value = 'Seguir o procedimento "' + (tpl.title || '') + '" (checklist abaixo).';
+  if (hint) {
+    hint.hidden = false;
+    hint.textContent = steps.length
+      ? (typeof plural === 'function' ? plural(steps.length, 'passo vira', 'passos viram') : steps.length + ' passos viram') + ' checklist ao salvar.'
+      : 'Este modelo não tem passos para o checklist.';
+  }
+}
+
 function submitPendenciaForm(e, id) {
   e.preventDefault();
   try {
@@ -1427,6 +1575,13 @@ function submitPendenciaForm(e, id) {
       tags: tagsRaw,
       recurrence: g('recurrence'),
     };
+    // Criada a partir de um modelo: nasce com o checklist dos passos.
+    if (!id && g('templateChecklist')) {
+      try {
+        const items = JSON.parse(g('templateChecklist'));
+        if (Array.isArray(items) && items.length) data.checklist = items.map(t => ({ text: String(t), done: false }));
+      } catch (_) {}
+    }
     const errors = validatePendencia(data);
     if (errors.length) { showToast(errors[0], 'error'); return; }
     const isNew = !id;
@@ -1542,7 +1697,7 @@ function cmdStatusSync() {
   badge.style.setProperty('--st-dot', dot);
   if (wrap) wrap.setAttribute('data-status', st);
 }
-function cmdStatusPreview(sel) {
+function cmdStatusPreview(_sel) {
   try { cmdStatusSync(); } catch (_) {}
   try { if (typeof showToast === 'function') showToast('Salvando status…', 'info'); } catch (_) {}
 }

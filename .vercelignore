@@ -3,3 +3,4 @@ supabase/
 tests/
 README.md
 .gitignore
+e2e/

@@ -28,7 +28,10 @@ export default [
       // A base usa um único escopo global entre os scripts carregados via
       // <script> no index.html — cross-file globals são esperados.
       'no-undef': 'off',
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // vars: 'local' — funções/consts de topo são globais usados por outros
+      // scripts e por onclick="..." no HTML; o ESLint não enxerga esse uso e
+      // acusava ~800 falsos positivos. Variáveis locais seguem verificadas.
+      'no-unused-vars': ['warn', { vars: 'local', args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
       'no-prototype-builtins': 'off',
       'no-useless-escape': 'off',
       // Padrões intencionais existentes: catch (_) {} e corpos vazios.

@@ -275,7 +275,7 @@ function exportData() {
     return;
   }
   const safeOps = (getOperators() || []).map(o => {
-    const { pinHash, pinSalt, pin, ...rest } = o;
+    const { pinHash: _pinHash, pinSalt: _pinSalt, pin: _pin, ...rest } = o; // remove segredos do backup
     return rest;
   });
   const data = {
@@ -486,7 +486,6 @@ const _pageScrollState = {};
 let _currentPage = null;
 
 function navigateTo(page) {
-  const contentArea = document.getElementById('contentArea');
   const currentHash = window.location.hash.replace('#', '') || 'dashboard';
 
   if (page === 'mapeamento-milvus') {

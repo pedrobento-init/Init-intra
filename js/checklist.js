@@ -776,7 +776,6 @@ function _ckRenderUso(clientId, el) {
   }
 
   const sel = checklistSelAtual(clientId);
-  const cidSel = _ckEsc(sel);
   const { grupos, marcado, done, total, pct } = _ckCompute(clientId, sel);
   const procs = typeof getProcedures === 'function' ? getProcedures(clientId) : [];
 
@@ -963,7 +962,6 @@ function _ckRenderGerir(clientId, el) {
 
 function _ckRenderItensSec(cid, checklistId) {
   const grupos = groupChecklistItens(getChecklistItensAll(checklistId));
-  const admin = ckIsAdmin();
   const selOpts = (atual) => checklistCategoriaOptions(atual)
     .map(c => `<option value="${escapeHtml(c)}"${checklistNormCat(c) === checklistNormCat(atual) ? ' selected' : ''}>${escapeHtml(c)}</option>`)
     .join('');

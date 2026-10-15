@@ -390,7 +390,6 @@ function _atendDoFetchAndRender(isGlobal){
   var resumoEl=document.getElementById(prefix+'Resumo');
   if(listEl) listEl.innerHTML='<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando…</p>';
   if(resumoEl) resumoEl.innerHTML=_atendSkeleton();
-  var pageBtn=document.getElementById(prefix+'PageInfo');
   // sincroniza seletor global antes do fetch
   if(isGlobal){
     var sel=document.getElementById('gAtendClient');

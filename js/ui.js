@@ -344,17 +344,42 @@ const RECURRENCE_OPTIONS = [
   { value: 'weekly', label: 'Semanal' },
   { value: 'biweekly', label: 'Quinzenal' },
   { value: 'monthly', label: 'Mensal' },
+  { value: 'quarterly', label: 'Trimestral' },
+  { value: 'yearly', label: 'Anual' },
 ];
+
+// Soma meses sem "estourar" o fim do mês: 31/01 + 1 mês = 28/02 (antes,
+// setMonth caía em 03/03 e a série ia escorregando de data).
+function _addMonthsClamped(d, months) {
+  const day = d.getDate();
+  const r = new Date(d.getTime());
+  r.setDate(1);
+  r.setMonth(r.getMonth() + months);
+  const last = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, last));
+  return r;
+}
 
 function nextRecurrenceDate(baseISO, recurrence) {
   if (!recurrence) return null;
   const base = baseISO ? parseDateOnly(baseISO) : new Date();
-  const d = new Date(base.getTime());
+  let d = new Date(base.getTime());
   if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
   else if (recurrence === 'biweekly') d.setDate(d.getDate() + 14);
-  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (recurrence === 'monthly') d = _addMonthsClamped(d, 1);
+  else if (recurrence === 'quarterly') d = _addMonthsClamped(d, 3);
+  else if (recurrence === 'yearly') d = _addMonthsClamped(d, 12);
   else return null;
   return localDateISO(d);
+}
+
+// Próxima ocorrência que não esteja no passado (pendência concluída com
+// atraso não deve nascer já vencida). Para no máximo em 400 passos.
+function nextRecurrenceDateFrom(baseISO, recurrence, todayISO) {
+  let next = nextRecurrenceDate(baseISO, recurrence);
+  let guard = 0;
+  while (next && todayISO && next < todayISO && guard++ < 400) next = nextRecurrenceDate(next, recurrence);
+  return next;
 }
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => showToast('Copiado!', 'success'));
