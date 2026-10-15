@@ -81,7 +81,8 @@ const PEN_ICO_WARN = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"
 const PEN_ICO_CAL = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
 const PEN_ICO_PLAY = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
 const PEN_ICO_CLK = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
-const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
+const PEN_ICO_USER = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+const PEN_ICO_BOLT ='<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
 
 let penView = 'kanban';
 let penScope = 'active';
@@ -762,11 +763,25 @@ function penTimerCell(p) {
   var running = !!(p && p.timerRunning) || !!worker;
   var secs = 0;
   try { if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p); } catch (_) {}
-  var fmt = (typeof formatTimer === 'function') ? formatTimer(secs) : '';
+  // Formato curto no card: "8d 21h" em vez de "213:06:51".
+  var fmt = (typeof formatTimerCompact === 'function') ? formatTimerCompact(secs)
+    : (typeof formatTimer === 'function') ? formatTimer(secs) : '';
   if (running || (closed && secs > 0)) {
     if (!fmt) return '';
-    return '<span class="kb-timer timer-display" data-timer-id="' + escapeHtml(p.id) + '" data-running="' + (running ? 'true' : 'false') + '"' +
+    var display = '<span class="kb-timer timer-display" data-format="compact" data-timer-id="' + escapeHtml(p.id) + '" data-running="' + (running ? 'true' : 'false') + '"' +
       ' title="' + (running ? 'Cronômetro ativo' : 'Tempo total trabalhado') + '">' + fmt + '</span>';
+    // Sessão ligada há muito tempo: provável esquecimento — alerta âmbar e
+    // atalho para parar registrando só o tempo real.
+    var forgotten = running && typeof isTimerForgotten === 'function' && isTimerForgotten(p);
+    if (forgotten) {
+      var ago = (typeof formatDurationWords === 'function' && typeof getSessionSeconds === 'function')
+        ? formatDurationWords(getSessionSeconds(p)) : '';
+      return '<button type="button" class="kb-timer-forgot" onclick="event.stopPropagation();openTimerAdjust(\'' + escapeHtml(p.id) + '\')"' +
+        ' title="Cronômetro ligado há ' + escapeHtml(ago) + ' — esqueceu ligado? Clique para parar e ajustar o tempo."' +
+        ' aria-label="Cronômetro ligado há ' + escapeHtml(ago) + '. Parar e ajustar tempo">' +
+        PEN_ICO_WARN + display + '</button>';
+    }
+    return display;
   }
   if (closed) return '';
   var label = 'Iniciar cronômetro de ' + penDisplayNumber(p);
@@ -779,16 +794,20 @@ function penKanbanCard(p) {
   var c = _penRenderClient(p.clientId);
   var clientName = p.clientName || (c && c.name) || '—';
   var isOverdue = penIsOverdue(p);
-  var isStale = isStalePendencia(p);
+  // "Parada" (sem atualização há 7+ dias) contradiz um cronômetro rodando;
+  // nesse caso o alerta certo é o de cronômetro esquecido, no rodapé.
+  var isStale = isStalePendencia(p) && !p.timerRunning;
   var title = getPendenciaTitulo(p);
   var num = penDisplayNumber(p);
   var sla = (typeof slaCountdown === 'function') ? slaCountdown(p, 48) : null;
   var slaHtml = (sla && !sla.expired && sla.label)
     ? '<span class="kc-sla" title="SLA restante">' + sla.label + '</span>' : '';
 
+  // Vencida aparece só aqui (data vermelha + ⚠), não repetida no meio do card.
   var deadlineHtml = p.deadline
-    ? '<span class="kc-deadline' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Prazo vencido' : 'Prazo') + '">' +
-        PEN_ICO_CAL + formatDate(parseDeadline(p.deadline)) + '</span>'
+    ? '<span class="kc-deadline' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Vencida — prazo' : 'Prazo') + '">' +
+        (isOverdue ? PEN_ICO_WARN : PEN_ICO_CAL) + formatDate(parseDeadline(p.deadline)) +
+        (isOverdue ? '<span class="sr-only"> (Vencida)</span>' : '') + '</span>'
     : '<span class="kc-deadline is-empty" title="Sem prazo">' + PEN_ICO_CAL + 'Sem prazo</span>';
 
   return '<article class="kanban-card"' +
@@ -808,11 +827,10 @@ function penKanbanCard(p) {
       '</span>' +
       '<span class="kb-pill" style="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
       (p.responsible
-        ? '<span class="kc-resp" title="Responsável">' + escapeHtml(p.responsible) + '</span>'
+        ? '<span class="kc-resp" title="Responsável">' + PEN_ICO_USER + escapeHtml(p.responsible) + '</span>'
         : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
       (isStale ? '<span class="kc-stale" title="Sem atualização há 7+ dias">Parada</span>' : '') +
       slaHtml +
-      (isOverdue ? '<span class="kc-overdue" title="Prazo vencido">' + PEN_ICO_WARN + 'Vencida</span>' : '') +
     '</div>' +
     '<div class="kanban-card-foot">' +
       deadlineHtml +
