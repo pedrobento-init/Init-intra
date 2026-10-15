@@ -5819,3 +5819,54 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 /* Na gaveta (640px) o detalhe em 2 colunas espremia as propriedades:
    empilha como no celular. */
 .modal.drawer .pen-cmd-grid { grid-template-columns: minmax(0, 1fr); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CABEÇALHO DE PÁGINA ÚNICO (.page-toolbar)
+   Mesma ordem em todas as telas: busca (cresce) → filtros → "Mais filtros"
+   → ações secundárias à direita (exportar/importar). A ação principal da
+   página fica só na topbar. No celular: busca na linha inteira, filtros e
+   botões em pares, ações numa linha própria.
+   ══════════════════════════════════════════════════════════════════════ */
+.page-toolbar, .ov-wrap .page-toolbar {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin: 0 0 16px;
+}
+.page-toolbar > .pt-search { flex: 1 1 260px; min-width: 200px; max-width: none; }
+.page-toolbar > .pt-filter { flex: none; }
+.page-toolbar > .pt-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+.page-toolbar .form-input,
+.page-toolbar .form-select,
+.page-toolbar > .btn,
+.page-toolbar > .pt-filter > .btn,
+.page-toolbar > .pt-actions > .btn,
+.page-toolbar > .pt-actions > div > .btn { min-height: 38px; }
+.page-toolbar > .pt-filter.pt-seg { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--ds-line); border-radius: 10px; background: var(--ds-panel); }
+.page-toolbar > .pt-filter.pt-seg > .btn { min-height: 30px; border: 0; background: none; }
+.page-toolbar > .pt-filter.pt-seg > .btn.active { background: var(--accent-dim2); color: var(--ds-accent); }
+@media (max-width:768px) {
+  .page-toolbar, .ov-wrap .page-toolbar { flex-direction: row; gap: 8px; margin-bottom: 12px; }
+  .page-toolbar > .pt-search { flex: 1 1 100%; width: 100% !important; min-width: 0; }
+  .page-toolbar > .pt-filter { flex: 1 1 calc(50% - 4px); width: auto !important; min-width: 0; }
+  .page-toolbar > .pt-filter.pt-full { flex-basis: 100%; }
+  .page-toolbar > .pt-filter > .form-select, .page-toolbar > .pt-filter.btn { width: 100%; justify-content: center; }
+  .page-toolbar > .pt-actions { flex: 1 1 100%; width: 100% !important; margin-left: 0; }
+  .page-toolbar > .pt-actions > .btn, .page-toolbar > .pt-actions > div { flex: 1 1 0; }
+  .page-toolbar > .pt-actions .btn { width: 100%; justify-content: center; }
+  .page-toolbar > .pt-filter.pt-seg > .btn { flex: 1 1 0; justify-content: center; }
+}
+/* Visitas: o botão de filtros (ícone) fica sempre ao lado da busca. */
+.vis-searchrow.page-toolbar { flex-wrap: nowrap; margin-bottom: 0; }
+.vis-searchrow.page-toolbar > .pt-search { flex: 1 1 auto; }
+/* Relatórios: período (2 datas) ocupa o espaço de um filtro. */
+.page-toolbar > .filter-date-wrap.pt-filter .form-input { width: 150px; }
+@media (max-width:768px) {
+  .page-toolbar > .filter-date-wrap.pt-filter .form-input { width: auto !important; flex: 1 1 0; min-width: 0; }
+}
+/* Tablet (769–1024px): menu só com ícones também sem a classe .collapsed —
+   seção vira um divisor fino, como no modo recolhido. */
+@media screen and (max-width:1024px) and (min-width:769px) {
+  .nav-section { margin: 8px 10px; height: 1px; font-size: 0; background: var(--sidebar-border); }
+}
+/* Histórico: a regra antiga max-width:260px nos campos encolhia a busca. */
+.log-toolbar.page-toolbar .pt-search .form-input { max-width: none; width: 100%; }
+.log-toolbar.page-toolbar { align-items: center; }

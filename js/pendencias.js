@@ -240,21 +240,21 @@ function renderPendencias() {
   const opNames  = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar pen-search-bar">
-      <div class="search-input-wrap filter-grow">
+    <div class="search-bar pen-search-bar page-toolbar">
+      <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="penSearch" placeholder="Buscar..." oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
       </div>
-      <select class="form-select filter-select-md" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+      <select class="form-select filter-select-md pt-filter pt-full" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
         <option value="">Todos os clientes</option>
         ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary pen-more-btn" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
       </button>
-      <button class="btn btn-secondary pen-more-btn" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
         ✕ Limpar
       </button>
       <div class="pen-more-panel" id="penMoreFiltersPanel" data-open="0" style="display:none">

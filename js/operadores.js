@@ -108,12 +108,12 @@ function _buildOperadoresPage(savedFilters = {}) {
         </div>
       </div>
 
-      <div class="search-bar">
-        <div class="search-input-wrap" style="flex:1">
+      <div class="search-bar page-toolbar">
+        <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="form-input" id="opSearch" placeholder="Buscar operador..." oninput="debouncedFilterOperadores()" />
         </div>
-        <div style="display:flex;gap:6px">
+        <div class="pt-filter pt-seg pt-full" role="group" aria-label="Filtrar operadores">
           <button class="btn btn-secondary btn-sm op-filter-btn active" data-filter="todos" onclick="setOpFilter(this,'todos')">Todos</button>
           <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="ativos" onclick="setOpFilter(this,'ativos')">Ativos</button>
           <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="inativos" onclick="setOpFilter(this,'inativos')">Inativos</button>

@@ -26,8 +26,8 @@ function renderVisitas() {
 
   document.getElementById('contentArea').innerHTML = `
     <div class="vis-wrap">
-      <div class="vis-searchrow">
-        <div class="vis-search">
+      <div class="vis-searchrow page-toolbar">
+        <div class="vis-search pt-search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
           <input id="visitSearch" type="search" placeholder="Buscar cliente, motivo ou relatório" aria-label="Buscar" oninput="saveVisitFilters();debouncedRenderVisitView()" />
         </div>

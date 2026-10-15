@@ -211,21 +211,21 @@ function renderEquipamentos() {
   const clients = _equipClients();
   document.getElementById('contentArea').innerHTML = `
     <div class="stats-grid" id="equipStats"></div>
-    <div class="search-bar equip-search-bar">
-      <div class="search-input-wrap filter-grow">
+    <div class="search-bar equip-search-bar page-toolbar">
+      <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="equipSearch" placeholder="Buscar equipamento, OS ou cliente..." oninput="saveEquipFilters();debouncedRenderEquipView()" aria-label="Buscar equipamento" />
       </div>
-      <select class="form-select filter-select-md" id="equipClient" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por cliente">
+      <select class="form-select filter-select-md pt-filter" id="equipClient" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por cliente">
         <option value="">Todos os clientes</option>
         <option value="__estoque__">Estoque Initnet</option>
         ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select filter-select" id="equipTipo" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por tipo">
+      <select class="form-select filter-select pt-filter" id="equipTipo" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por tipo">
         <option value="">Todos os tipos</option>
         ${EQUIP_TIPO_OPTIONS.map(t => `<option value="${t}">${escapeHtml(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary" id="equipMoreFiltersBtn" onclick="toggleEquipMoreFilters(event)" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pt-filter pt-full" id="equipMoreFiltersBtn" onclick="toggleEquipMoreFilters(event)" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="equipMoreFiltersBadge" style="display:none"></span>
@@ -243,10 +243,12 @@ function renderEquipamentos() {
           <input type="checkbox" id="equipOnlyOS" onchange="saveEquipFilters();renderEquipView();_equipUpdateMoreFiltersBadge()" /> Somente com OS
         </label>
       </div>
+      <div class="pt-actions">
       <button class="btn btn-secondary" onclick="exportEquipamentosPlanilha()" title="Exportar planilha de acerto (OS, cliente, serviço, valor)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Planilha
       </button>
+      </div>
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Filtrar por status">

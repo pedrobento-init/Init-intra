@@ -13,12 +13,12 @@ function renderTemplates() {
   // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
-      <div class="search-bar">
-        <div class="search-input-wrap filter-grow">
+      <div class="search-bar page-toolbar">
+        <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." oninput="debouncedFilterTemplatesGrid()" />
         </div>
-        <div class="filter-field">
+        <div class="filter-field pt-filter pt-full">
           <select class="form-select" id="templateCategorySelect" onchange="filterTemplatesGrid()">
             <option value="">Todas as categorias</option>
             ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
