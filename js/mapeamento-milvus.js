@@ -272,7 +272,7 @@ async function openMilvusTokenBackfillModal() {
       return;
     }
     body.innerHTML = `
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${t.total} vínculo(s) · <strong>${t.prontos} pronto(s)</strong> · ${t.jaPreenchidos} preenchidos · ${t.naoEncontrados} não encontrados · ${t.ambiguos} ambíguos</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${plural(t.total, 'vínculo', 'vínculos')} · <strong>${plural(t.prontos, 'pronto', 'prontos')}</strong> · ${t.jaPreenchidos} preenchidos · ${t.naoEncontrados} não encontrados · ${t.ambiguos} ambíguos</div>
       <div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th></th><th>Nome Milvus</th><th>Token</th><th>Status</th></tr></thead><tbody>
       ${_tokenBackfillPreview.map((p, i) => `<tr>
         <td>${p.status === 'pronto' ? `<input type="checkbox" data-tb-idx="${i}" checked />` : ''}</td>
@@ -302,7 +302,7 @@ async function confirmMilvusTokenBackfill() {
   if (btn) { btn.disabled = true; btn.textContent = 'Preenchendo…'; }
   try {
     const res = await commitMilvusTokenBackfill(onlyNomes);
-    setMsg(`<span style="color:var(--success,#16a34a)">${res.filled} token(s) preenchido(s)${res.skipped && res.skipped.length ? ` · ${res.skipped.length} pulado(s)` : ''}.</span>`);
+    setMsg(`<span style="color:var(--success,#16a34a)">${plural(res.filled, 'token preenchido', 'tokens preenchidos')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`);
     // Tokens preenchidos precisam aparecer: recarrega a tabela do mapa e
     // avisa as fichas de cliente (antes só apareciam após F5).
     try {
@@ -353,7 +353,7 @@ function importMilvusNameList() {
   }
   _mapImported = parsed;
   refreshMapeamentoRows();
-  if (typeof showToast === 'function') showToast(`${parsed.length} nome(s) importado(s)!`, 'success');
+  if (typeof showToast === 'function') showToast(`${plural(parsed.length, 'nome importado', 'nomes importados')}!`, 'success');
 }
 
 function clearMilvusNameList() {
@@ -388,7 +388,7 @@ function renderMapeamentoTable() {
   const rows = filterMapeamentoRows(_mapRows, _mapSearch, _mapFilter);
   const mapped = _mapRows.filter((r) => r.status === 'mapeado').length;
   const devs = _mapRows.reduce((s, r) => s + (r.quantidadeDispositivos || 0), 0);
-  if (stats) stats.textContent = `${_mapRows.length} nome(s) no Milvus · ${mapped} mapeado(s) · ${_mapRows.length - mapped} pendente(s) · ${devs} dispositivo(s)` +
+  if (stats) stats.textContent = `${plural(_mapRows.length, 'nome', 'nomes')} no Milvus · ${plural(mapped, 'mapeado', 'mapeados')} · ${plural(_mapRows.length - mapped, 'pendente', 'pendentes')} · ${plural(devs, 'dispositivo', 'dispositivos')}` +
     (_mapImported.length ? ` · ${_mapImported.length} da lista importada` : '');
   if (!_mapRows.length) {
     wrap.innerHTML = '<div class="empty-state"><p>Nenhum nome carregado. Clique em “Atualizar nomes do Milvus”.</p></div>';

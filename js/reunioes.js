@@ -526,7 +526,7 @@ function _meetingPenCard(p) {
 
       <div style="margin-bottom:8px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
-          ${(p.notes || []).length} nota(s)${isReviewed ? ' · <span style="color:#16a34a">Revisada</span>' : ''}
+          ${plural((p.notes || []).length, 'nota', 'notas')}${isReviewed ? ' · <span style="color:#16a34a">Revisada</span>' : ''}
         </div>
         ${(p.notes || []).length ? `
           <div style="max-height:100px;overflow-y:auto;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg-secondary)">
@@ -537,7 +537,7 @@ function _meetingPenCard(p) {
                 <div style="margin-top:2px">${escapeHtml(n.text || '').substring(0, 200)}${(n.text || '').length > 200 ? '...' : ''}</div>
               </div>
             `).join('')}
-            ${p.notes.length > 3 ? `<div style="color:var(--text-muted);font-size:11px">... e mais ${p.notes.length - 3} nota(s)</div>` : ''}
+            ${p.notes.length > 3 ? `<div style="color:var(--text-muted);font-size:11px">... e mais ${plural(p.notes.length - 3, 'nota', 'notas')}</div>` : ''}
           </div>
         ` : ''}
       </div>

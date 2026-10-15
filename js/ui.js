@@ -83,6 +83,17 @@ function escapeHtml(str) {
 }
 
 /**
+ * "1 pendência" / "2 pendências" / "0 pendências" — no lugar de "pendência(s)".
+ * @param {number} n
+ * @param {string} singular
+ * @param {string} pluralForm
+ */
+function plural(n, singular, pluralForm) {
+  const k = Number(n) || 0;
+  return k + ' ' + (k === 1 ? singular : pluralForm);
+}
+
+/**
  * Valida URLs para uso em href, bloqueando javascript: e afins.
  * Retorna '#' caso a URL seja inválida ou ausente.
  */
@@ -1042,11 +1053,11 @@ function checkOverdueAlerts() {
   if (overdue.length > 0 || dueTomorrow.length > 0) {
     let msg = '';
     if (overdue.length > 0 && dueTomorrow.length > 0) {
-      msg = `⚠️ ${overdue.length} pendência(s) vencida(s) e ${dueTomorrow.length} vencendo amanhã!`;
+      msg = `⚠️ ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} e ${dueTomorrow.length} vencendo amanhã!`;
     } else if (overdue.length > 0) {
-      msg = `⚠️ Você possui ${overdue.length} pendência(s) vencida(s) ou vencendo hoje!`;
+      msg = `⚠️ Você possui ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} ou vencendo hoje!`;
     } else {
-      msg = `⏰ Você possui ${dueTomorrow.length} pendência(s) vencendo amanhã!`;
+      msg = `⏰ Você possui ${plural(dueTomorrow.length, 'pendência', 'pendências')} vencendo amanhã!`;
     }
 
     showToast(msg, overdue.length > 0 ? 'error' : 'info');
@@ -1084,8 +1095,8 @@ function renderOverdueBanner(overdueCount, dueTomorrowCount) {
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:16px">${overdueCount > 0 ? '🚨' : '⏰'}</span>
       <span>
-        ${overdueCount > 0 ? `<strong>${overdueCount} pendência(s) vencida(s)</strong>.` : ''}
-        ${dueTomorrowCount > 0 ? ` ${dueTomorrowCount} pendência(s) vencendo amanhã.` : ''}
+        ${overdueCount > 0 ? `<strong>${plural(overdueCount, 'pendência vencida', 'pendências vencidas')}</strong>.` : ''}
+        ${dueTomorrowCount > 0 ? ` ${plural(dueTomorrowCount, 'pendência', 'pendências')} vencendo amanhã.` : ''}
       </span>
     </div>
     <button class="btn btn-secondary btn-sm" style="background:rgba(0,0,0,0.05)" onclick="navigateTo('pendencias')">Ver Pendências →</button>

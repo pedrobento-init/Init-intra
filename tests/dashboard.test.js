@@ -185,8 +185,9 @@ describe('reunião e resumo do dia', () => {
 
   it('buildDaySummary combina números + afastados/sobrecarga', () => {
     const s = buildDaySummary({ dueToday: [{}, {}], todayVisits: [{}], overloadedOps: [{ name: 'Ana', count: 9 }], onLeaveOps: ['Beto'] });
-    expect(s).toContain('2 pendência(s) vencem');
-    expect(s).toContain('1 visita(s)');
+    expect(s).toContain('2 pendências vencem');
+    expect(s).toContain('1 visita agendada');
+    expect(s).not.toContain('(s)');
     expect(s).toContain('Ana');
     expect(s).toContain('Beto');
   });

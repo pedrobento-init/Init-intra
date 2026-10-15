@@ -215,7 +215,7 @@ function renderCalendar() {
   document.getElementById('contentArea').innerHTML = `
     <div class="ag-head">
       <div>
-        <h1 class="ag-title">Agenda</h1>
+        <!-- Título "Agenda" já está na topbar (h1 #pageTitle); aqui só o subtítulo. -->
         <div class="ag-sub">Visitas, prazos e pendências administrativas</div>
       </div>
       <div class="nav ag-nav">
@@ -424,7 +424,7 @@ function openCalendarDaySheet(dateStr) {
   const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
   const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
   const total = allPens.length + allVisits.length;
-  const title = formatDate(dateStr) + (total ? ` — ${total} evento(s)` : ' — sem eventos');
+  const title = formatDate(dateStr) + (total ? ` — ${total} ${total === 1 ? 'evento' : 'eventos'}` : ' — sem eventos');
 
   let html = `<div style="max-height:60vh;overflow-y:auto">`;
   if (!total) {
