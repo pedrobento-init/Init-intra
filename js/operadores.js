@@ -317,7 +317,6 @@ async function resendOperatorInvite(operatorId) {
 }
 
 function _updateOpStats() {
-  const ops = getOperators();
   // rebuild full page to refresh counters
   _buildOperadoresPage();
 }

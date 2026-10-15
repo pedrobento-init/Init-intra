@@ -384,7 +384,6 @@ function checkDeadlineReminders() {
 
   const pens = (typeof getMyPendencias === 'function') ? getMyPendencias() : getPendencias();
   const today = new Date();
-    const todayStr = localDateISO(today);
 
   const reminderDays = prefs.reminderDaysBefore || 2;
 

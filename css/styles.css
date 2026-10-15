@@ -5870,3 +5870,38 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 /* Histórico: a regra antiga max-width:260px nos campos encolhia a busca. */
 .log-toolbar.page-toolbar .pt-search .form-input { max-width: none; width: 100%; }
 .log-toolbar.page-toolbar { align-items: center; }
+
+/* ── Card: menu ⋯ (ações rápidas) e selo de recorrência ── */
+.pen-board .kanban-card { position: relative; }
+.pen-board .kanban-card-title { padding-right: 24px; }
+.kc-menu {
+  position: absolute; top: 8px; right: 6px; width: 26px; height: 26px;
+  display: grid; place-items: center; border: 0; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--kb-muted); opacity: 0; transition: opacity .15s, background .15s;
+}
+.pen-board .kanban-card:hover .kc-menu, .kc-menu:focus-visible, .kc-menu[aria-expanded="true"] { opacity: 1; }
+.kc-menu:hover, .kc-menu[aria-expanded="true"] { background: var(--kb-panel); color: var(--kb-text); }
+@media (hover: none) { .kc-menu { opacity: 1; } }
+.kc-recur { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--kb-muted); }
+.kc-recur .kb-ico { width: 13px; height: 13px; }
+.pen-quick-menu {
+  position: fixed; z-index: 400; min-width: 220px; max-width: 280px; padding: 6px;
+  background: var(--ds-panel); color: var(--ds-text); border: 1px solid var(--ds-line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .22);
+}
+.pen-quick-menu .pqm-label { padding: 6px 8px 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ds-muted); }
+.pen-quick-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 6px;
+  background: none; color: inherit; font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.pen-quick-menu button:hover:not([disabled]), .pen-quick-menu button:focus-visible { background: var(--ds-raised); outline: none; }
+.pen-quick-menu button[disabled] { opacity: .55; cursor: default; }
+.pen-quick-menu button small { margin-left: auto; color: var(--ds-muted); font-size: 11px; }
+.pqm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.pqm-check { width: 14px; flex: none; color: var(--ds-accent); font-weight: 700; }
+.pqm-scroll { max-height: 180px; overflow-y: auto; }
+.pqm-sep { height: 1px; background: var(--ds-line); margin: 6px 4px; }
+
+/* Nova pendência: "Começar de um modelo" */
+.pen-tpl-field { padding: 10px 12px; border: 1px dashed var(--ds-line-strong); border-radius: 10px; background: var(--ds-raised); }
+.pen-tpl-hint { margin-top: 6px; font-size: 12px; color: var(--ds-accent); font-weight: 600; }

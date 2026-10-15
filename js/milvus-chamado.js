@@ -207,7 +207,7 @@ function _notifyMilvusVisitUI(changedIds) {
 // Varredura idempotente dos pendentes. Nunca lança; nunca apaga visita;
 // falha transitória volta a 'pendente' (+1 tentativa), permanente vira
 // 'erro'/'sem_token' (sem retry automático).
-async function processPendingMilvusChamados(reason) {
+async function processPendingMilvusChamados(_reason) {
   if (_milvusChamadoFlushing) return { ok: true, reason: 'already-running' };
   if (!_milvusChamadoCanRun()) return { ok: false, reason: 'offline' };
   if (typeof getVisits !== 'function' || typeof saveVisit !== 'function') {
@@ -317,7 +317,7 @@ function enqueueMilvusFinalizar(visitId) {
 // Varredura idempotente das finalizações pendentes. PUT repetir é seguro
 // (mesmo estado final no Milvus), então o retry pós-timeout não duplica
 // nada — no máximo refaz uma finalização já aplicada.
-async function processPendingMilvusFinalizar(reason) {
+async function processPendingMilvusFinalizar(_reason) {
   if (_milvusFinalizarFlushing) return { ok: true, reason: 'already-running' };
   if (!_milvusChamadoCanRun()) return { ok: false, reason: 'offline' };
   if (typeof getVisits !== 'function' || typeof saveVisit !== 'function') {

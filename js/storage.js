@@ -721,7 +721,7 @@ function _kickMilvusChamados(reason) {
 // Manutenção local dos números amigáveis (backfill + anti-colisão).
 // Roda após boot e após cada sync (mesmo offline/falho): só escreve no
 // banco local, nunca depende de rede, nunca relança.
-function _kickVisitNumeros(reason) {
+function _kickVisitNumeros(_reason) {
   try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
 }
 function triggerStartupSync(reason) {
@@ -1831,7 +1831,11 @@ function savePendencia(data) {
 
   if (justConcluded && data.recurrence) {
     try {
-      const nextDeadline = nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence);
+      // Concluída com atraso: a próxima não nasce já vencida (pula ciclos passados).
+      const _todayRec = typeof localDateISO === 'function' ? localDateISO() : null;
+      const nextDeadline = typeof nextRecurrenceDateFrom === 'function'
+        ? nextRecurrenceDateFrom(data.deadline || data.completedAt, data.recurrence, _todayRec)
+        : nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence);
       // Idempotência (idem visitas): mesma chave lógica — cliente + deadline
       // + assunto — impede duplicata em conclusão repetida/offline/2 devices.
       const penKey = p => ((p.assunto || '').trim() || p.descricao);
@@ -1856,6 +1860,11 @@ function savePendencia(data) {
           tags: data.tags || [],
           team: data.team || 'init',
           recurrence: data.recurrence,
+          // O checklist da rotina (ex.: passos do backup) segue para a próxima,
+          // desmarcado — antes a nova ocorrência nascia sem checklist.
+          checklist: (Array.isArray(data.checklist) ? data.checklist : [])
+            .filter(function (it) { return it && String(it.text || '').trim(); })
+            .map(function (it) { return { text: it.text, done: false }; }),
         });
       }
     } catch (e) { console.warn('⚠️ Erro ao gerar pendência recorrente:', e); }

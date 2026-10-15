@@ -185,8 +185,6 @@ function renderVisitView(resetPage) {
 function renderVisitStats() {
   const wrap = document.getElementById('visitStats');
   if (!wrap) return;
-  const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
-  const ops = getOperatorNames(team);
   const today = localDateISO();
   const base = isTeamAdmin() && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
   const total    = base.length;
@@ -431,7 +429,6 @@ function openVisitDetail(id) {
   const v = getVisitById(id);
   if (!v) return;
   const c = getClientById(v.clientId);
-  const m = VISIT_STATUS_MAP[v.status] || { label: v.status, color: '#94a3b8' };
   const hasReport = !!(v.relatorio && v.relatorio.trim());
 
   openModal(escapeHtml(visitDisplayTitle(v)), `

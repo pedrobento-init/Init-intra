@@ -117,7 +117,6 @@ function compareMeetings(mesA, mesB, pendencias, clients) {
   // e snapshot atual de abertas por cliente
   const idA = 'REU-' + mesA;
   const idB = 'REU-' + mesB;
-  const today = new Date().toISOString().slice(0,10);
   const isClosed = s => ['concluido','resolvido','cancelado','fechado'].includes(s);
   return clients.map(c => {
     const pensA = pendencias.filter(p => p.clientId === c.id && p.reviewedInMeeting === idA);

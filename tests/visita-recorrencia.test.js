@@ -290,20 +290,21 @@ describe('pendências: mesmo padrão de transição', () => {
     return getPendencias().find((p) => p.deadline === deadline);
   }
   it('mutação do cache cega; cópia gera +7 dias sem duplicar', () => {
-    const p = createPen('2026-09-15');
+    // Datas futuras: com prazo no passado a próxima ocorrência pula ciclos.
+    const p = createPen('2099-09-15');
     const live = getPendenciaById(p.id);
     live.status = 'concluido';
     savePendencia(live);
     expect(getPendencias()).toHaveLength(1);
     // padrão corrigido (cópia)
-    const p2 = createPen('2026-09-16');
+    const p2 = createPen('2099-09-16');
     savePendencia({ ...getPendenciaById(p2.id), status: 'concluido' });
     const all = getPendencias();
     expect(all).toHaveLength(3);
-    expect(all.find((x) => x.deadline === '2026-09-23' && x.assunto === 'Backup')).toBeTruthy();
+    expect(all.find((x) => x.deadline === '2099-09-23' && x.assunto === 'Backup')).toBeTruthy();
     // concluir de novo não duplica (guarda por cliente+deadline+assunto)
     savePendencia({ ...getPendenciaById(p2.id), status: 'aberto' });
     savePendencia({ ...getPendenciaById(p2.id), status: 'concluido' });
-    expect(getPendencias().filter((x) => x.deadline === '2026-09-23')).toHaveLength(1);
+    expect(getPendencias().filter((x) => x.deadline === '2099-09-23')).toHaveLength(1);
   });
 });
