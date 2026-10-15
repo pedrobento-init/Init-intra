@@ -26,8 +26,8 @@ function renderVisitas() {
 
   document.getElementById('contentArea').innerHTML = `
     <div class="vis-wrap">
-      <div class="vis-searchrow">
-        <div class="vis-search">
+      <div class="vis-searchrow page-toolbar">
+        <div class="vis-search pt-search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
           <input id="visitSearch" type="search" placeholder="Buscar cliente, motivo ou relatório" aria-label="Buscar" oninput="saveVisitFilters();debouncedRenderVisitView()" />
         </div>
@@ -267,8 +267,8 @@ function renderVisitTable(area) {
     const hasFilter = !!((document.getElementById('visitSearch')?.value || '').trim()
       || _visitFilter.client || _visitFilter.operator || _visitFilter.status || _visitFilter.from || _visitFilter.to);
     wrap.innerHTML = hasFilter
-      ? `<div class="vis-empty">Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</div>`
-      : `<div class="vis-empty">Nenhuma visita registrada ainda.<br><br><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
+      ? `<div class="vis-empty empty-state"><p>Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</p></div>`
+      : `<div class="vis-empty empty-state"><p>Nenhuma visita registrada ainda.</p><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
     return;
   }
   const totalPages = Math.ceil(visits.length / VISIT_PAGE_SIZE);

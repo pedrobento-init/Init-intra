@@ -551,15 +551,15 @@ function renderRelatorios(){
   // (filtros/resumo/lista intactos — só containers/classes visuais e tokens ov-*).
   content.innerHTML=
     '<div class="ov-wrap">'+
-      '<div class="search-bar" style="flex-wrap:wrap;gap:8px;align-items:center">'+
-        '<select class="form-select" id="gAtendClient" style="width:200px" onchange="_atendUI.clientId=this.value;_atendApplyFilters(true)"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
-        '<input type="date" class="form-input" id="gAtendDataInicial" value="'+range.start+'" style="width:150px" />'+
+      '<div class="search-bar page-toolbar">'+
+        '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>'+
+        '<select class="form-select pt-filter pt-full" id="gAtendClient" style="width:220px" onchange="_atendUI.clientId=this.value;_atendApplyFilters(true)"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
+        '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input" id="gAtendDataInicial" value="'+range.start+'" style="width:150px" aria-label="Data inicial" />'+
         '<span style="font-size:12px;color:var(--ov-muted)">até</span>'+
-        '<input type="date" class="form-input" id="gAtendDataFinal" value="'+range.end+'" style="width:150px" />'+
-        '<div class="search-input-wrap" style="flex:1;min-width:140px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>'+
-        '<button class="btn btn-primary btn-sm" onclick="_atendApplyFilters(true)">Buscar</button>'+
-        '<button class="btn btn-secondary btn-sm" id="gAtendMoreBtn" onclick="_atendToggleMore(\'gAtend\')" aria-expanded="false">Mais filtros</button>'+
-        '<div style="position:relative"><button class="btn btn-primary btn-sm" id="atendExportBtn" onclick="_atendToggleExport()">Exportar ▾</button><div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px"><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'csv\')">CSV</button><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'xls\')">XLS</button></div></div>'+
+        '<input type="date" class="form-input" id="gAtendDataFinal" value="'+range.end+'" style="width:150px" aria-label="Data final" /></div>'+
+        '<button class="btn btn-primary btn-sm pt-filter" onclick="_atendApplyFilters(true)">Buscar</button>'+
+        '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" onclick="_atendToggleMore(\'gAtend\')" aria-expanded="false">Mais filtros</button>'+
+        '<div class="pt-actions"><div style="position:relative"><button class="btn btn-secondary btn-sm" id="atendExportBtn" onclick="_atendToggleExport()">Exportar ▾</button><div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px"><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'csv\')">CSV</button><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'xls\')">XLS</button></div></div></div>'+
       '</div>'+
       '<div id="gAtendMorePanel" class="ov-more" data-open="0" style="display:none;flex-wrap:wrap;gap:8px;padding:10px">'+
         '<input class="form-input" id="gAtendTecnico" placeholder="Técnico" style="width:160px" />'+

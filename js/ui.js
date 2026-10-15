@@ -143,18 +143,26 @@ function openModal(title, bodyHTML, size = '') {
     overlay.style.animation = 'none';
     modal.style.animation = 'none';
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
-    Motion.animate(modal, isMobile
-      ? { opacity: [0, 1], y: [28, 0] }
-      : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
-      { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] });
+    const isDrawer = !isMobile && /\bdrawer\b/.test(size);
+    // Gaveta já aberta (trocando de card): só troca o conteúdo, sem reanimar.
+    const wasOpen = overlay.dataset.drawerOpen === '1';
+    overlay.dataset.drawerOpen = isDrawer ? '1' : '0';
+    if (!(isDrawer && wasOpen)) {
+      Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
+      Motion.animate(modal, isDrawer
+        ? { opacity: [0, 1], x: [40, 0] }
+        : isMobile
+          ? { opacity: [0, 1], y: [28, 0] }
+          : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
+        { duration: isDrawer ? 0.25 : 0.4, ease: isDrawer ? 'easeOut' : [0.34, 1.56, 0.64, 1] });
+    }
   }
 }
 function closeModal() {
   const modal = document.getElementById('modal');
   const overlay = document.getElementById('modalOverlay');
   if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
-  const hide = () => { overlay.style.display = 'none'; };
+  const hide = () => { overlay.style.display = 'none'; overlay.dataset.drawerOpen = '0'; };
   if (typeof Motion !== 'undefined' && overlay.style.display !== 'none') {
     Motion.animate(modal, { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] }, { duration: 0.14, ease: 'easeIn' });
     Motion.animate(overlay, { opacity: [1, 0] }, { duration: 0.14, ease: 'easeIn' });
@@ -655,9 +663,12 @@ function renderLogs() {
   const ops = typeof getOperators === 'function' ? getOperators() : [];
   
   const toolbarHtml = `
-    <div class="log-toolbar search-bar">
-      <input type="text" id="logSearch" placeholder="Buscar no histórico..." class="form-input filter-grow">
-      <select id="logTypeFilter" class="form-select filter-select-sm">
+    <div class="log-toolbar search-bar page-toolbar">
+      <div class="search-input-wrap pt-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="logSearch" placeholder="Buscar no histórico..." class="form-input">
+      </div>
+      <select id="logTypeFilter" class="form-select filter-select-sm pt-filter">
         <option value="">Todos os tipos</option>
         <option value="Cliente">Cliente</option>
         <option value="Pendência">Pendência</option>
@@ -666,23 +677,25 @@ function renderLogs() {
         <option value="Sessão">Sessão</option>
         <option value="Backup">Backup</option>
       </select>
-      <select id="logOpFilter" class="form-select filter-select-lg">
+      <select id="logOpFilter" class="form-select filter-select-lg pt-filter">
         <option value="">Todos os operadores</option>
         ${ops.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('')}
       </select>
-      <div class="filter-date-wrap">
+      <div class="filter-date-wrap pt-filter">
         <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
         <input type="date" id="logDateFrom" class="form-input filter-date" />
       </div>
-      <div class="filter-date-wrap">
+      <div class="filter-date-wrap pt-filter">
         <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">Até:</span>
         <input type="date" id="logDateTo" class="form-input filter-date" />
       </div>
+      <div class="pt-actions">
       <button class="btn btn-secondary btn-sm" onclick="exportLogsCSV()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         CSV Logs
       </button>
       ${isCurrentAdmin() ? '<button class="btn btn-danger btn-sm" onclick="clearLogs()">Limpar Histórico</button>' : ''}
+      </div>
     </div>
     <div id="logsContainer"></div>
   `;

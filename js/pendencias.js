@@ -240,21 +240,21 @@ function renderPendencias() {
   const opNames  = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
-    <div class="search-bar pen-search-bar">
-      <div class="search-input-wrap filter-grow">
+    <div class="search-bar pen-search-bar page-toolbar">
+      <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="form-input" id="penSearch" placeholder="Buscar..." oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
       </div>
-      <select class="form-select filter-select-md" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+      <select class="form-select filter-select-md pt-filter pt-full" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
         <option value="">Todos os clientes</option>
         ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary pen-more-btn" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
       </button>
-      <button class="btn btn-secondary pen-more-btn" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
         ✕ Limpar
       </button>
       <div class="pen-more-panel" id="penMoreFiltersPanel" data-open="0" style="display:none">
@@ -277,7 +277,7 @@ function renderPendencias() {
           <option value="">Filtros salvos...</option>
           ${getSavedPenFilters().map(f => `<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('')}
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual">💾</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual" aria-label="Salvar filtro atual"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></button>
         <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
       </div>
     </div>
@@ -644,12 +644,17 @@ function renderPenKanban(area) {
       '<div class="pen-board-head">' +
         summaryHtml +
       '</div>' +
+      // Celular: indicador da coluna visível ao deslizar ("Em Andamento · 2/5").
+      '<div class="kb-pager" aria-hidden="true"><span class="kb-pager-label"></span><span class="kb-pager-dots">' +
+        cols.map(function(col) { return '<i style="--c:' + penColColor(col.id) + '"></i>'; }).join('') +
+      '</span></div>' +
       boardHtml +
     '</div>';
   var board = area.querySelector('.kanban-board');
   if (board) {
     _updateKanbanScrollShadows(board);
-    board.onscroll = function() { _updateKanbanScrollShadows(board); };
+    _updateKanbanPager(board);
+    board.onscroll = function() { _updateKanbanScrollShadows(board); _updateKanbanPager(board); };
     if (typeof window !== 'undefined') {
       if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
       window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
@@ -668,6 +673,23 @@ function renderPenKanban(area) {
   } finally {
     _clearPenRenderCache();
   }
+}
+
+// Indicador de coluna (celular): qual coluna está no centro da tela.
+function _updateKanbanPager(board) {
+  try {
+    var pager = board && board.parentNode ? board.parentNode.querySelector('.kb-pager') : null;
+    if (!pager) return;
+    var cols = board.querySelectorAll('.kanban-col');
+    if (!cols.length) return;
+    var mid = board.scrollLeft + board.clientWidth / 2, idx = 0;
+    cols.forEach(function(c, i) { if (c.offsetLeft <= mid) idx = i; });
+    var title = cols[idx].querySelector('.kanban-col-title');
+    var count = cols[idx].querySelector('.kanban-col-count');
+    var lbl = pager.querySelector('.kb-pager-label');
+    if (lbl) lbl.textContent = (title ? title.textContent.trim() : '') + (count ? ' (' + count.textContent + ')' : '') + ' · ' + (idx + 1) + '/' + cols.length;
+    pager.querySelectorAll('.kb-pager-dots i').forEach(function(d, i) { d.classList.toggle('is-on', i === idx); });
+  } catch (_) {}
 }
 
 // Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
@@ -1192,7 +1214,7 @@ function openPendenciaDetail(id) {
       </aside>
     </div>
     </div>
-  `, 'lg');
+  `, 'lg drawer');
   setTimeout(() => {
     renderAttachmentList('pendencias', id, 'penAttachmentsList');
     renderPenChecklist(id);

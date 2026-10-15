@@ -81,7 +81,8 @@ describe('chip #syncStatus — anti-pisca (mountSyncStatus)', () => {
     const off = mountSyncStatus(chip);
     await flush();
     expect(writes.length).toBe(1); // sem o par síncrono+async não há 🟢→🟡
-    expect(writes[0]).toContain('🟡');
+    expect(chip['attr_data-sync']).toBe('pending');
+    expect(writes[0]).toContain('sync-dot');
     expect(writes[0]).toContain('(3)');
     off();
   });
@@ -91,7 +92,7 @@ describe('chip #syncStatus — anti-pisca (mountSyncStatus)', () => {
     const off = mountSyncStatus(chip);
     await flush();
     expect(writes.length).toBe(1);
-    expect(writes[0]).toContain('🔴');
+    expect(writes[0]).toContain('Offline');
     expect(chip.attr_dataSync || chip['attr_data-sync']).toBe('offline');
 
     globalThis.navigator.onLine = true;
@@ -99,7 +100,8 @@ describe('chip #syncStatus — anti-pisca (mountSyncStatus)', () => {
     await flush();
     // transição com offline envolvida é imediata (sem grace)
     expect(writes.length).toBe(2);
-    expect(writes[1]).toContain('🟡');
+    expect(writes[1]).toContain('Sincronizando');
+    expect(chip['attr_data-sync']).toBe('pending');
     off();
   });
 
