@@ -284,13 +284,21 @@ function mountSyncStatus(el) {
     try { off = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_) {}
     var st = 'idle';
     try { st = (typeof SyncManager !== 'undefined' && SyncManager) ? SyncManager.getStatus() : 'idle'; } catch (_) {}
-    return { pend: pend, off: off, st: st };
+    var local = false;
+    try { local = (typeof isSupabaseConnected === 'function' && !isSupabaseConnected()); } catch (_) {}
+    return { pend: pend, off: off, st: st, local: local };
   }
+  // O texto vai em .sync-label para o celular mostrar só o ponto colorido
+  // (+ contador): o chip inteiro espremia o título da página na topbar.
+  function _lbl(t) { return '<span class="sync-label">' + t + '</span>'; }
   function _desired(r, n) {
     var total = Math.max(r.pend, Number(n) || 0);
-    if (r.off) return { sync: 'offline', key: 'offline|' + total, html: '🔴 Offline' + (total ? ' (' + total + ' pendente' + (total > 1 ? 's' : '') + ')' : ''), title: 'Sem conexão — as alterações ficam na fila e enviam ao reconectar' };
-    if (r.st === 'live' && !total) return { sync: 'live', key: 'live', html: '🟢 Sincronizado', title: 'Tempo real ativo' };
-    return { sync: 'pending', key: 'pending|' + total, html: '🟡 Sincronizando...' + (total ? ' (' + total + ')' : ''), title: 'Sincronizando com o servidor' };
+    if (r.off) return { sync: 'offline', key: 'offline|' + total, html: '🔴 ' + _lbl('Offline') + (total ? ' (' + total + _lbl(' pendente' + (total > 1 ? 's' : '')) + ')' : ''), title: 'Sem conexão — as alterações ficam na fila e enviam ao reconectar' };
+    // Sem backend configurado não há o que sincronizar: "Sincronizando..."
+    // eterno passava a impressão de travamento.
+    if (r.local) return { sync: 'local', key: 'local', html: '⚪ ' + _lbl('Modo local'), title: 'Servidor não configurado — os dados ficam só neste dispositivo' };
+    if (r.st === 'live' && !total) return { sync: 'live', key: 'live', html: '🟢 ' + _lbl('Sincronizado'), title: 'Tempo real ativo' };
+    return { sync: 'pending', key: 'pending|' + total, html: '🟡 ' + _lbl('Sincronizando...') + (total ? ' (' + total + ')' : ''), title: 'Sincronizando com o servidor' };
   }
   function _clearGrace() { try { if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null; } } catch (_) {} }
   function _commit(d) {

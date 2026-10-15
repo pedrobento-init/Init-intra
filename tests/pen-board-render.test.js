@@ -80,11 +80,11 @@ function render(pens) {
 describe('renderPenKanban (modo local)', () => {
   const html = render(PENS);
 
-  it('cabeçalho: resumo + botão de tema, sem duplicar a ação primária da topbar', () => {
+  it('cabeçalho: só o resumo, sem duplicar ações da topbar (tema / nova pendência)', () => {
     expect(html).toContain('<div class="pen-board">');
     expect(html).toContain('<div class="pen-board-head">');
-    expect(html).toContain('Alternar tema');
-    expect(html).toContain("getElementById('themeToggleBtn').click()");
+    expect(html).not.toContain('Alternar tema');
+    expect(html).not.toContain("getElementById('themeToggleBtn').click()");
     expect(html).not.toContain('class="btn btn-primary"');
     expect(html).toContain('openPendenciaForm()');
   });
@@ -106,13 +106,16 @@ describe('renderPenKanban (modo local)', () => {
     expect(html).toContain('class="kanban-col-count"');
   });
 
-  it('cabeçalho da coluna é a barra com relógio + contagem + ordenação', () => {
+  it('cabeçalho da coluna: contagem + botão de ordenação com o ícone do modo atual', () => {
     expect(html).toContain('<div class="kanban-col-header">');
     const aside = html.indexOf('class="kanban-col-aside"');
     expect(aside).toBeGreaterThan(-1);
-    expect(html.indexOf('<circle cx="12" cy="12" r="9"/>')).toBeGreaterThan(aside);
     expect(html.indexOf('class="kanban-col-count"')).toBeGreaterThan(aside);
     expect(html).toContain('cyclePenColSort');
+    // Ordenação padrão (criação) = relógio, só dentro do botão (sem relógio solto)
+    const firstHeader = html.slice(aside, html.indexOf('</div>', aside));
+    expect((firstHeader.match(/<circle cx="12" cy="12" r="9"\/>/g) || []).length).toBe(1);
+    expect(firstHeader.indexOf('<circle cx="12" cy="12" r="9"/>')).toBeGreaterThan(firstHeader.indexOf('kanban-col-sort'));
   });
 
   it('um card por pendência, com drag-and-drop mantido', () => {

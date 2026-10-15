@@ -3055,7 +3055,7 @@ function seedDemoData() {
     {
       id: 'CLI-2', createdAt: '2025-02-15T10:00:00Z', updatedAt: '2025-02-15T10:00:00Z', team: 'init',
       name: 'Distribuidora Ômega', cnpj: '98.765.432/0001-10', segment: 'Distribuição',
-      color: '#6366f1', initials: 'DΩ',
+      color: '#6366f1', initials: 'DO',
       owner: 'Roberto Prado', ownerPhone: '(11) 97777-3333',
       responsible: 'Fernanda Costa', responsiblePhone: '(11) 96666-4444',
       technician: 'Maria Santos',

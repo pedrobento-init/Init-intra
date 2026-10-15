@@ -39,9 +39,9 @@ function renderVisitas() {
       <div class="vis-chips" id="visitChips" role="group" aria-label="Filtrar por status"></div>
       <div class="vis-monthrow"><h2 id="visitCount"></h2><button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></div>
       <div class="vis-list" id="visitViewArea"></div>
-      <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova visita">
+      <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova Visita">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Nova visita
+        Nova Visita
       </button>
     </div>`;
 
@@ -263,7 +263,12 @@ function renderVisitTable(area) {
   const countEl = document.getElementById('visitCount');
   if (countEl) countEl.textContent = visits.length + (visits.length === 1 ? ' visita' : ' visitas');
   if (!visits.length) {
-    wrap.innerHTML = `<div class="vis-empty">Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.<br><br><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
+    // "Ajuste os filtros" só faz sentido quando há busca/filtro ativo.
+    const hasFilter = !!((document.getElementById('visitSearch')?.value || '').trim()
+      || _visitFilter.client || _visitFilter.operator || _visitFilter.status || _visitFilter.from || _visitFilter.to);
+    wrap.innerHTML = hasFilter
+      ? `<div class="vis-empty">Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</div>`
+      : `<div class="vis-empty">Nenhuma visita registrada ainda.<br><br><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
     return;
   }
   const totalPages = Math.ceil(visits.length / VISIT_PAGE_SIZE);

@@ -76,14 +76,17 @@ img { max-width: 100%; height: auto; }
   outline: none;
 }
 
-html { overflow-x: hidden; }
+/* `clip` (e não `hidden`) evita que html/body virem contêineres de rolagem:
+   com `hidden`, o body passa a ser o scrollport do `position: sticky` e o
+   topbar rola junto com a página em vez de ficar fixo no topo. */
+html { overflow-x: clip; }
 
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   font-size: 14px;
 }
 
@@ -312,6 +315,11 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+/* Equipamentos: 6 indicadores (um por status da aba + valor) em grade
+   fechada — com auto-fit sobrava um card órfão na 2ª linha. */
+#equipStats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width:1280px) { #equipStats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width:640px) { #equipStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stat-value { font-size: 26px; font-weight: 700; line-height: 1; color: var(--text-primary); }
 .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
@@ -413,7 +421,7 @@ tr:hover td { background: var(--bg-hover); }
 /* ── FILTER SELECT SIZES & GROW (search/filter bars) ── */
 .filter-select { width: 170px; max-width: 100%; }
 .filter-select-md { width: 210px; max-width: 100%; }
-.filter-select-sm { width: 130px; max-width: 100%; }
+.filter-select-sm { width: 150px; max-width: 100%; }
 .filter-select-lg { width: 240px; max-width: 100%; }
 .filter-grow { flex: 1; min-width: 160px; }
 /* Busca não estica além do útil em telas largas (não comprime os selects). */
@@ -427,7 +435,8 @@ tr:hover td { background: var(--bg-hover); }
   margin-bottom: 24px;
 }
 .pen-scope-row { flex-direction:column; align-items:flex-start; gap:2px; margin-bottom:14px; }
-/* Abas de escopo: texto simples + sublinhado na ativa; o total vai embaixo. */
+/* Abas de escopo: texto simples + sublinhado na ativa; o total vai como
+   contador dentro da aba ativa (Pendências) ou embaixo (Equipamentos). */
 .pen-scope-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); }
 .pen-scope-tab {
   position:relative;
@@ -447,6 +456,11 @@ tr:hover td { background: var(--bg-hover); }
 }
 .pen-scope-count { font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums; padding:2px 12px 0; }
 .pen-scope-count:empty { display:none; }
+.pen-scope-tab .pen-scope-count {
+  display:inline-block; margin-left:6px; padding:0 7px; border-radius:999px;
+  background:var(--accent-dim2); color:var(--accent-light); font-size:11px; font-weight:700; line-height:18px;
+}
+.pen-scope-tab .pen-scope-count:empty { display:none; }
 
 /* ── TEMPLATES GRID ── */
 #templatesGridWrap {
@@ -932,14 +946,16 @@ body.dark-theme .template-suggestion {
 .client-card-logo { margin-bottom: 4px; width: 100%; display: flex; justify-content: center; }
 .client-card-name { font-size: 14px; font-weight: 700; color: var(--text-primary); word-break: break-word; max-width: 100%; }
 .client-card-seg  { font-size: 12px; color: var(--text-muted); }
+/* Selo em cima, ações embaixo: sempre empilhado. Com flex-wrap, cards
+   vizinhos quebravam em pontos diferentes conforme o tamanho do selo. */
 .client-card-footer {
   width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   margin-top: auto;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
 }
 .client-card-footer .tag {
   white-space: nowrap;
@@ -2978,8 +2994,10 @@ body.dark-theme .theme-toggle-btn:hover {
 /* Mesma altura dos inputs nos botões da barra */
 .log-toolbar .btn { height: 38px; }
 /* Labels De:/Até: acima do input, com a margem padrão dos labels do sistema */
-.filter-date-wrap { display: flex; flex-direction: column; justify-content: flex-end; }
-.log-toolbar .filter-date-wrap > span { font-weight: 600; margin-bottom: 5px; }
+/* Rótulo "De:/Até:" ao lado do campo: em cima, ele desalinhava a barra
+   (as datas ficavam mais baixas que a busca e os selects). */
+.filter-date-wrap { display: flex; align-items: center; gap: 6px; }
+.log-toolbar .filter-date-wrap > span { font-weight: 600; }
 /* Destrutiva secundária discreta na barra (vermelho cheio fica no modal) */
 .log-toolbar .btn-danger { background: transparent; border-color: transparent; }
 .log-toolbar .btn-danger:hover { background: var(--red-dim); color: var(--red); border-color: rgba(220,38,38,0.25); }
@@ -3245,6 +3263,7 @@ body.dark-theme .overdue-banner {
 .ag-nav button:hover { border-color:var(--accent); }
 .ag-nav button.is-active { background:var(--accent); border-color:var(--accent); color:#fff; }
 .ag-nav-sep { width:12px; flex-shrink:0; }
+.ag-period { min-width:150px; padding:0 4px; font-size:15px; font-weight:700; color:var(--text-primary); white-space:nowrap; }
 .ag-legend {
   display:flex; flex-wrap:wrap; gap:16px; align-items:center;
   padding:12px 16px; margin-bottom:20px;
@@ -3304,6 +3323,7 @@ body.dark-theme .overdue-banner {
   .ag-nav { flex-wrap:wrap; gap:8px; }
   .ag-nav button { min-height:40px; padding:8px 12px; }
   .ag-nav-sep { display:none; }
+  .ag-period { min-width:0; font-size:14px; }
   .ag-cal-card #calendarContainer { padding:8px; }
   #calendarContainer .fc .fc-daygrid-day { min-height:64px; }
   #calendarContainer .fc .ag-chip { font-size:10.5px; }
@@ -3389,6 +3409,14 @@ body.dark-theme .overdue-banner {
 .vis-fab:active { transform:scale(.97); }
 @media (max-width:768px){
   .vis-fab { right:16px; bottom:calc(20px + env(safe-area-inset-bottom, 0px)); }
+}
+/* Desktop/tablet: o botão "Nova Visita" da topbar já cobre a ação — o FAB
+   (padrão mobile) só duplicava; e os KPIs ocupam a largura toda. */
+@media (min-width:769px){
+  .vis-fab { display:none; }
+  .vis-wrap { padding-bottom:24px; }
+  .vis-kpis { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); overflow:visible; }
+  .vis-kpi { min-width:0; }
 }
 body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f19; border-color:#f1f5f9; }
 
@@ -4067,7 +4095,6 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-cv-bar { flex:1; display:flex; gap:3px; min-width:0; }
 .pen-cv-seg { flex:1; height:4px; border-radius:2px; background:var(--kb-line); }
 .pen-cv-seg.is-venc { background:var(--kb-red); }
-.pen-cv-total { flex:none; font-size:11px; color:var(--kb-muted); font-variant-numeric:tabular-nums; }
 .pen-cv-venc { flex:none; font-size:11px; font-weight:700; color:var(--kb-red); }
 .pen-cv-ondia { flex:none; font-size:11px; font-weight:600; color:var(--kb-muted); }
 .pen-cv-more { flex:none; white-space:nowrap; }
@@ -4079,6 +4106,14 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-more-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); min-width:280px; max-width:100%; }
 .pen-search-bar .pen-more-panel, .equip-search-bar .pen-more-panel { right:auto; left:0; }
 @media(max-width:640px){ .pen-more-panel{ left:0; right:0; min-width:0; } }
+/* Celular: "Mais filtros" e "Limpar" lado a lado (antes, uma linha cheia
+   para cada botão empurrava o quadro ~50px para baixo). */
+@media(max-width:768px){
+  .pen-search-bar { flex-direction:row; flex-wrap:wrap; }
+  .pen-search-bar > .search-input-wrap,
+  .pen-search-bar > select { flex:1 1 100%; }
+  .pen-search-bar > .pen-more-btn { flex:1 1 0; width:auto; justify-content:center; }
+}
 
 /* ── 6. ORDENAÇÃO POR COLUNA ── */
 .kanban-col-sort { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:4px; border:1px solid transparent; background:transparent; color:var(--text-muted); font-size:12px; cursor:pointer; transition:all var(--transition); }
@@ -4230,6 +4265,17 @@ body.dark-theme .ov-wrap {
 .ov-custom .date-input { border-radius: 8px; border: 1px solid var(--ov-line); background: var(--ov-panel); color: var(--ov-text); }
 .ov-until { color: var(--ov-muted); font-size: 12px; }
 .ov-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+/* A regra base .period-filter (flex-wrap: wrap) vem depois do bloco mobile e
+   o anulava: no celular o seletor virava uma "pílula" de 2 linhas. */
+.ov-seg { flex-wrap: nowrap; scrollbar-width: none; }
+.ov-seg::-webkit-scrollbar { display: none; }
+@media (max-width: 768px) {
+  /* Ações do dashboard numa faixa rolável (antes: 3 linhas de botões
+     empurrando o conteúdo para baixo). */
+  .ov-bar .ov-acts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; padding-bottom: 2px; }
+  .ov-bar .ov-acts::-webkit-scrollbar { display: none; }
+  .ov-bar .dash-export-btns .btn { flex: none; }
+}
 .ov-ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .ov-wrap .btn.ov-btn { border-radius: 8px; font-family: Manrope, system-ui, sans-serif; font-weight: 600; font-size: 13px; box-shadow: none; transition: background .15s, border-color .15s, color .15s; }
 .ov-wrap .btn-secondary.ov-btn { background: var(--ov-panel); border: 1px solid var(--ov-line); color: var(--ov-text); }
@@ -4566,7 +4612,9 @@ body.dark-theme .ov-wrap {
 .sync-status[data-sync="offline"] { background: var(--red-dim); color: var(--red); border-color: rgba(220,38,38,.35); }
 .sync-status[data-sync="pending"] { background: var(--yellow-dim); color: var(--yellow); border-color: rgba(217,119,6,.35); }
 @media (max-width: 640px) {
-  .sync-status { font-size: 11px; padding: 4px 9px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+  .sync-status { font-size: 11px; padding: 4px 8px; gap: 2px; }
+  /* Só o ponto (+ contador); o texto completo segue no title/leitor de tela. */
+  .sync-status .sync-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -5194,12 +5242,11 @@ body.dark-theme #penSlaSummary {
 }
 .pen-board .kb-ico--fill { fill: currentColor; stroke: none; }
 
-/* ── Cabeçalho do quadro: resumo + alternância de tema ── */
+/* ── Cabeçalho do quadro: linha-resumo ── */
 .pen-board-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px 12px; flex-wrap: wrap; margin-bottom: 14px;
 }
-.pen-board-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .pen-board .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   border-radius: 8px; font-family: Manrope, system-ui, sans-serif;
@@ -5253,7 +5300,6 @@ body.dark-theme #penSlaSummary {
 .pen-board .kanban-col-aside {
   display: inline-flex; align-items: center; gap: 8px; flex: none;
 }
-.pen-board .kanban-col-aside .kb-ico { color: var(--kb-muted); }
 .pen-board .kanban-col-title {
   margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .01em;
   text-transform: none; color: var(--kb-text);
@@ -5381,7 +5427,6 @@ body.dark-theme #penSlaSummary {
   .pen-board .kanban-board { gap: 10px; scroll-snap-type: x proximity; }
   .pen-board .kanban-col { flex: 0 0 82vw; min-width: 82vw; max-height: none; scroll-snap-align: start; }
   .pen-board-head { flex-direction: column; align-items: stretch; }
-  .pen-board-acts .btn { flex: 1 1 auto; }
 }
 
 /* ── Movimento reduzido ── */
