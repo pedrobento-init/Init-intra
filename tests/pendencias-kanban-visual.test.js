@@ -176,7 +176,7 @@ describe('pager página única: barra "N pendências" removida', () => {
   });
 });
 
-describe('chips de cliente: toggle com estado pressionado', () => {
+describe('cards de cliente: toggle com estado pressionado', () => {
   it('clica em chip inativo: filtra; clica de novo: volta a todos', () => {
     const r1 = runToggle('', 'c1');
     expect(r1.value).toBe('c1');
@@ -200,6 +200,6 @@ describe('chips de cliente: toggle com estado pressionado', () => {
     expect(src).toContain('togglePenClientChip');
     expect(src).toContain('aria-pressed');
     const css = fs.readFileSync('css/styles.css', 'utf8').replace(/\s+/g, ' ');
-    expect(css).toContain('.pen-client-chip.is-active');
+    expect(css).toContain('.pen-cv-card.is-active');
   });
 });
