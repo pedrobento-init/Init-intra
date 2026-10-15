@@ -6,8 +6,12 @@ import { expect } from '@playwright/test';
  * abre a sessão do operador de demonstração e inicia o app, como o login faria.
  */
 export async function loginLocal(page, { name = 'Pedro', hash = 'pendencias' } = {}) {
-  await page.goto('/#' + hash);
-  await page.waitForFunction(() => typeof getOperators === 'function' && getOperators().length > 0);
+  await page.goto('/#' + hash, { waitUntil: 'load' });
+  // Durante o carregamento dos <script defer> uma consulta pode cair entre
+  // scripts (variável ainda não inicializada): só considera pronto sem erro.
+  await page.waitForFunction(() => {
+    try { return typeof _startApp === 'function' && getOperators().length > 0; } catch (_) { return false; }
+  });
   await page.evaluate((opName) => {
     const op = getOperators().find((o) => o.name === opName) || getOperators()[0];
     setSession(op.id);

@@ -935,6 +935,8 @@ function openPenQuickMenu(ev, id) {
   var menu = document.createElement('div');
   menu.id = 'penQuickMenu';
   menu.className = 'pen-quick-menu';
+  menu.dataset.openY = String(window.scrollY || 0);
+  menu.dataset.openW = String(window.innerWidth || 0);
   menu.setAttribute('role', 'menu');
   menu.innerHTML =
     '<div class="pqm-label">Mover para</div>' +
@@ -988,8 +990,19 @@ if (typeof document !== 'undefined' && document.addEventListener && !(typeof win
     if (m && !m.contains(e.target)) closePenQuickMenu();
   });
   document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePenQuickMenu(); });
-  window.addEventListener('scroll', closePenQuickMenu, true);
-  window.addEventListener('resize', closePenQuickMenu);
+  // Rolagem/redimensionamento só fecham o menu se a página mudou DE VERDADE
+  // desde a abertura. O evento `scroll` chega no frame seguinte: uma rolagem
+  // de inércia no celular (ou o scroll que leva o card à vista antes do
+  // toque) fechava o menu que a pessoa tinha acabado de abrir.
+  window.addEventListener('scroll', function () {
+    var m = document.getElementById('penQuickMenu');
+    if (m && Math.abs((window.scrollY || 0) - Number(m.dataset.openY || 0)) > 48) closePenQuickMenu();
+  }, { passive: true });
+  window.addEventListener('resize', function () {
+    var m = document.getElementById('penQuickMenu');
+    // Só largura: o teclado do celular muda apenas a altura.
+    if (m && window.innerWidth !== Number(m.dataset.openW || 0)) closePenQuickMenu();
+  });
 }
 
 function getFilteredPendencias() {

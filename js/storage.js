@@ -206,12 +206,15 @@ async function _pullPaged(table, columns, timed, what) {
 
 async function _pullEntityRows(e, local, timed) {
   const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields);
-  const fullPull = async () => ({ ...(await _pullPaged(e.table, '*', timed, 'pull:' + e.table)), mode: 'full' });
+  // Tudo que o servidor devolve no pull está confirmado lá (faixa de pendentes).
+  const _seen = (rows) => { try { if (rows && typeof markServerSeen === 'function') markServerSeen(e.table, rows); } catch (_) {} };
+  const fullPull = async () => { const r = await _pullPaged(e.table, '*', timed, 'pull:' + e.table); _seen(r.data); return { ...r, mode: 'full' }; };
   const canDelta = typeof _shouldFullSync === 'function' && typeof _planDeltaPull === 'function';
   if (!canDelta || _shouldFullSync(e, _getLastSyncAt(_FULL_KEY(e.table)))) return fullPull();
 
   const light = await _pullPaged(e.table, 'id,updated_at', timed, 'pull-light:' + e.table);
   if (light.error) return { ...light, mode: 'delta' };
+  _seen(light.data);
   const plan = _planDeltaPull(local, light.data);
   // Muita coisa mudou: uma leitura completa sai mais barata que N lotes.
   if (plan.changedIds.length > Math.max(300, light.data.length / 2)) return fullPull();
