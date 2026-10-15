@@ -267,8 +267,8 @@ function renderVisitTable(area) {
     const hasFilter = !!((document.getElementById('visitSearch')?.value || '').trim()
       || _visitFilter.client || _visitFilter.operator || _visitFilter.status || _visitFilter.from || _visitFilter.to);
     wrap.innerHTML = hasFilter
-      ? `<div class="vis-empty">Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</div>`
-      : `<div class="vis-empty">Nenhuma visita registrada ainda.<br><br><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
+      ? `<div class="vis-empty empty-state"><p>Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</p></div>`
+      : `<div class="vis-empty empty-state"><p>Nenhuma visita registrada ainda.</p><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
     return;
   }
   const totalPages = Math.ceil(visits.length / VISIT_PAGE_SIZE);

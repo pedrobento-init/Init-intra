@@ -277,7 +277,7 @@ function renderPendencias() {
           <option value="">Filtros salvos...</option>
           ${getSavedPenFilters().map(f => `<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('')}
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual">💾</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual" aria-label="Salvar filtro atual"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></button>
         <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
       </div>
     </div>
@@ -644,12 +644,17 @@ function renderPenKanban(area) {
       '<div class="pen-board-head">' +
         summaryHtml +
       '</div>' +
+      // Celular: indicador da coluna visível ao deslizar ("Em Andamento · 2/5").
+      '<div class="kb-pager" aria-hidden="true"><span class="kb-pager-label"></span><span class="kb-pager-dots">' +
+        cols.map(function(col) { return '<i style="--c:' + penColColor(col.id) + '"></i>'; }).join('') +
+      '</span></div>' +
       boardHtml +
     '</div>';
   var board = area.querySelector('.kanban-board');
   if (board) {
     _updateKanbanScrollShadows(board);
-    board.onscroll = function() { _updateKanbanScrollShadows(board); };
+    _updateKanbanPager(board);
+    board.onscroll = function() { _updateKanbanScrollShadows(board); _updateKanbanPager(board); };
     if (typeof window !== 'undefined') {
       if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
       window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
@@ -668,6 +673,23 @@ function renderPenKanban(area) {
   } finally {
     _clearPenRenderCache();
   }
+}
+
+// Indicador de coluna (celular): qual coluna está no centro da tela.
+function _updateKanbanPager(board) {
+  try {
+    var pager = board && board.parentNode ? board.parentNode.querySelector('.kb-pager') : null;
+    if (!pager) return;
+    var cols = board.querySelectorAll('.kanban-col');
+    if (!cols.length) return;
+    var mid = board.scrollLeft + board.clientWidth / 2, idx = 0;
+    cols.forEach(function(c, i) { if (c.offsetLeft <= mid) idx = i; });
+    var title = cols[idx].querySelector('.kanban-col-title');
+    var count = cols[idx].querySelector('.kanban-col-count');
+    var lbl = pager.querySelector('.kb-pager-label');
+    if (lbl) lbl.textContent = (title ? title.textContent.trim() : '') + (count ? ' (' + count.textContent + ')' : '') + ' · ' + (idx + 1) + '/' + cols.length;
+    pager.querySelectorAll('.kb-pager-dots i').forEach(function(d, i) { d.classList.toggle('is-on', i === idx); });
+  } catch (_) {}
 }
 
 // Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
@@ -1192,7 +1214,7 @@ function openPendenciaDetail(id) {
       </aside>
     </div>
     </div>
-  `, 'lg');
+  `, 'lg drawer');
   setTimeout(() => {
     renderAttachmentList('pendencias', id, 'penAttachmentsList');
     renderPenChecklist(id);

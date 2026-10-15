@@ -59,7 +59,7 @@ function renderClients() {
           <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
         </div>
         <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
-        ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)">📥 Milvus</button>` : ''}
+        ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Milvus</button>` : ''}
       </div>
       <div class="client-cards-grid" id="clientGrid"></div>
     </div>`;
@@ -102,7 +102,7 @@ function renderClientGrid() {
       const dentro = sla.dentroPrazo;
       return `<div class="client-card" onclick="viewClient('${escapeHtml(c.id)}')">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
-      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${health.totalAbertas} abertas, ${health.vencidas} vencidas, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" style="font-size:14px">${health.emoji}</span>` : ''}</div>
+      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
@@ -125,10 +125,36 @@ function renderClientGrid() {
   }, 10);
 }
 
+// Resumo no topo do cliente: o essencial antes das 9 abas (saúde, pendências
+// abertas/vencidas, última e próxima visita).
+function clientSummaryHtml(c) {
+  try {
+    const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
+    const pens = _getPendenciasList();
+    const sla = typeof getSlaStatsForClient === 'function'
+      ? getSlaStatsForClient(pens, c.id, today)
+      : { totalAbertas: pens.filter(p => p.clientId === c.id && !isPendenciaClosed(p.status)).length, vencidas: 0 };
+    const health = typeof getHealthForClient === 'function' ? getHealthForClient(pens, c.id, today) : null;
+    const visits = (typeof getVisits === 'function' ? getVisits() : []).filter(v => v.clientId === c.id);
+    const past = visits.filter(v => v.date && v.date <= today && v.status !== 'cancelada').sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    const next = visits.filter(v => v.date && v.date > today && v.status === 'agendada').sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+    const tone = !health ? 'ok' : health.level === 'red' ? 'danger' : health.level === 'yellow' ? 'warn' : 'ok';
+    const item = (label, value, cls) => `<div class="cs-item${cls ? ' ' + cls : ''}"><span>${label}</span><b>${value}</b></div>`;
+    return `<div class="client-summary">
+      ${item('Saúde', health ? escapeHtml(health.label || '—') : '—', 'is-' + tone)}
+      ${item('Abertas', String(sla.totalAbertas || 0), '')}
+      ${item('Vencidas', String(sla.vencidas || 0), sla.vencidas ? 'is-danger' : '')}
+      ${item('Última visita', past ? escapeHtml(formatDate(past.date)) : '—', '')}
+      ${item('Próxima visita', next ? escapeHtml(formatDate(next.date)) : '—', '')}
+    </div>`;
+  } catch (_) { return ''; }
+}
+
 function viewClient(id) {
   const c = getClientById(id);
   if (!c) return;
   openModal(c.name, `
+    ${clientSummaryHtml(c)}
     <div class="tabs" id="clientTabs">
       <div class="tab active" onclick="switchClientTab('ficha','${id}')">Ficha TI</div>
       <div class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</div>

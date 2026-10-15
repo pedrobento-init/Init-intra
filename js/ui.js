@@ -143,18 +143,26 @@ function openModal(title, bodyHTML, size = '') {
     overlay.style.animation = 'none';
     modal.style.animation = 'none';
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
-    Motion.animate(modal, isMobile
-      ? { opacity: [0, 1], y: [28, 0] }
-      : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
-      { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] });
+    const isDrawer = !isMobile && /\bdrawer\b/.test(size);
+    // Gaveta já aberta (trocando de card): só troca o conteúdo, sem reanimar.
+    const wasOpen = overlay.dataset.drawerOpen === '1';
+    overlay.dataset.drawerOpen = isDrawer ? '1' : '0';
+    if (!(isDrawer && wasOpen)) {
+      Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
+      Motion.animate(modal, isDrawer
+        ? { opacity: [0, 1], x: [40, 0] }
+        : isMobile
+          ? { opacity: [0, 1], y: [28, 0] }
+          : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
+        { duration: isDrawer ? 0.25 : 0.4, ease: isDrawer ? 'easeOut' : [0.34, 1.56, 0.64, 1] });
+    }
   }
 }
 function closeModal() {
   const modal = document.getElementById('modal');
   const overlay = document.getElementById('modalOverlay');
   if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
-  const hide = () => { overlay.style.display = 'none'; };
+  const hide = () => { overlay.style.display = 'none'; overlay.dataset.drawerOpen = '0'; };
   if (typeof Motion !== 'undefined' && overlay.style.display !== 'none') {
     Motion.animate(modal, { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] }, { duration: 0.14, ease: 'easeIn' });
     Motion.animate(overlay, { opacity: [1, 0] }, { duration: 0.14, ease: 'easeIn' });

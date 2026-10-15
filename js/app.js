@@ -520,13 +520,25 @@ function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const el = document.getElementById('nav-' + page);
   if (el) el.classList.add('active');
+  // Barra inferior (celular): destaca o destino atual; páginas fora dela
+  // acendem o "Mais".
+  const _bottom = document.querySelectorAll('.bottom-nav-item');
+  if (_bottom.length) {
+    const _inBar = ['fila', 'pendencias', 'calendario'].includes(page);
+    _bottom.forEach(b => {
+      const on = _inBar ? b.dataset.page === page : b.dataset.page === '__more';
+      b.classList.toggle('is-active', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+  }
 
   const btn = document.getElementById('topbarActionBtn');
   btn.style.display = 'none';
 
   if (typeof updateBadges === 'function') updateBadges();
 
-  if      (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
+  if      (page === 'fila')        renderFila();
+  else if (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
   else if (page === 'clientes')    renderClients();
   else if (page === 'templates')   renderTemplates();
   else if (page === 'pendencias')  renderPendencias();
@@ -540,6 +552,7 @@ function navigateTo(page) {
   else if (page === 'historico')   renderLogs();
 
   window.location.hash = page;
+  if (typeof renderAlertStrip === 'function') { try { renderAlertStrip(); } catch (_) {} }
 
   var ca = document.getElementById('contentArea');
   if (ca) {
@@ -1426,11 +1439,14 @@ function _startApp() {
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['dashboard','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['fila','dashboard','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
+  // dia a dia cai na Minha fila.
+  const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';
   // Números amigáveis antes da primeira pintura (local, sem rede): evita
   // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
   try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
-  navigateTo(pages.includes(hash) ? hash : 'dashboard');
+  navigateTo(pages.includes(hash) ? hash : homePage);
   // Offline-first: a UI já montou a partir do banco local; a sincronização
   // automática roda agora em segundo plano, sem bloquear (toda falha de rede
   // vira fallback local + retry — ver triggerStartupSync em storage.js).

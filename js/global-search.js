@@ -82,6 +82,57 @@ function _triggerBackgroundSync(logLabel) {
   } catch (err) { console.warn(logLabel, err); }
 }
 
+// ── Ações rápidas (Ctrl+K como paleta de comandos) ─────────────────────────
+// Lista montada na hora (depende de quem está logado / cronômetro ligado).
+function _normSearch(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function getSearchActions() {
+  const go = (page, label, kw) => ({ id: 'go-' + page, label: 'Ir para ' + label, kw: 'ir abrir tela ' + kw, run: () => navigateTo(page) });
+  const list = [
+    { id: 'new-pen', label: 'Nova pendência', kw: 'nova criar adicionar pendencia chamado tarefa', run: () => { if (typeof openPendenciaForm === 'function') openPendenciaForm(); } },
+    { id: 'new-visit', label: 'Nova visita', kw: 'nova criar agendar visita tecnica', run: () => { if (typeof openVisitForm === 'function') openVisitForm(); } },
+    go('fila', 'Minha fila', 'fila minha hoje urgente'),
+    go('pendencias', 'Pendências', 'pendencias quadro kanban'),
+    go('calendario', 'Agenda', 'agenda calendario prazos'),
+    go('visitas', 'Visitas', 'visitas'),
+    go('clientes', 'Clientes', 'clientes'),
+    go('equipamentos', 'Equipamentos', 'equipamentos estoque'),
+    { id: 'theme', label: 'Alternar tema claro/escuro', kw: 'tema escuro claro dark light', run: () => { const b = document.getElementById('themeToggleBtn'); if (b) b.click(); } },
+  ];
+  try {
+    const me = (typeof getUser === 'function' && getUser()) || {};
+    const pens = typeof getPendencias === 'function' ? getPendencias() : [];
+    const mine = pens.find((p) => p && p.timerRunning && p.timerOperator === me.name);
+    if (mine) {
+      const forgot = typeof isTimerForgotten === 'function' && isTimerForgotten(mine);
+      list.unshift(forgot
+        ? { id: 'timer-adjust', label: 'Parar e ajustar meu cronômetro', kw: 'cronometro timer parar ajustar esquecido', run: () => openTimerAdjust(mine.id) }
+        : { id: 'timer-pause', label: 'Pausar meu cronômetro', kw: 'cronometro timer pausar parar', run: () => toggleTimer('pendencia', mine.id) });
+    }
+  } catch (_) {}
+  return list;
+}
+/** Filtra ações pelo texto (todas as palavras precisam aparecer); vazio → todas. */
+function matchSearchActions(query, actions, max) {
+  const words = _normSearch(query).split(/\s+/).filter(Boolean);
+  const list = actions || [];
+  const hits = words.length
+    ? list.filter((a) => { const hay = _normSearch(a.label + ' ' + (a.kw || '')); return words.every((w) => hay.includes(w)); })
+    : list;
+  return hits.slice(0, max || 6);
+}
+function _searchActionHtml(a, idx) {
+  return `
+      <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
+        <div class="search-result-icon search-result-icon--action">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
+        </div>
+        <div style="min-width:0;flex:1"><div class="search-result-title">${_snippetEscapeHtml(a.label)}</div></div>
+        <kbd>↵</kbd>
+      </div>`;
+}
+
 function openGlobalSearch() {
   const modal = document.getElementById('globalSearchModal');
   if (!modal) return;
@@ -114,9 +165,13 @@ function _renderSearchResults(query) {
   const q = remainingText.trim().toLowerCase();
   const hasFilters = Object.keys(filters).length > 0;
 
+  // Sem filtros de atalho, a busca também procura ações ("nova visita"...).
+  const matchActions = hasFilters ? [] : matchSearchActions(remainingText, getSearchActions(), q ? 3 : 6);
   if (!q && !hasFilters) {
-    container.innerHTML = '<div class="search-empty">Digite para pesquisar…</div>';
-    _searchResults = [];
+    _searchResults = matchActions.map(a => ({ type: 'action', data: a }));
+    container.innerHTML = '<div class="search-group-label">Ações rápidas</div>' +
+      matchActions.map((a, i) => _searchActionHtml(a, i)).join('') +
+      '<div class="search-empty" style="padding:10px 18px 14px">Ou digite para buscar clientes, pendências e equipamentos.</div>';
     return;
   }
 
@@ -159,7 +214,9 @@ function _renderSearchResults(query) {
   }).slice(0, 5);
 
   const matchEquips = equipamentos.filter(eq => {
-    if (!q) return false;
+    // (CONS-09) havia um `if (!q) return false` aqui que tornava o
+    // `if (!q) return true` abaixo inalcançável: status:/cliente: nunca
+    // retornavam equipamentos.
     if (statusFilter) {
       const meta = (typeof getEquipStatusMeta === 'function') ? getEquipStatusMeta(eq.status).label : eq.status;
       if (String(eq.status || '').toLowerCase() !== String(statusFilter).toLowerCase()
@@ -175,6 +232,7 @@ function _renderSearchResults(query) {
   }).slice(0, 5);
 
   _searchResults = [
+    ...matchActions.map(a => ({ type: 'action', data: a })),
     ...matchClients.map(c => ({ type: 'client', data: c })),
     ...matchPens.map(p => ({ type: 'pendencia', data: p })),
     ...matchEquips.map(eq => ({ type: 'equipamento', data: eq }))
@@ -204,10 +262,16 @@ function _renderSearchResults(query) {
     html += '</div>';
   }
 
+  const actionOffset = matchActions.length;
+  if (matchActions.length) {
+    html += `<div class="search-group-label">Ações</div>`;
+    html += matchActions.map((a, i) => _searchActionHtml(a, i)).join('');
+  }
+
   if (matchClients.length) {
     html += `<div class="search-group-label">Clientes</div>`;
     html += matchClients.map((c, i) => `
-      <div class="search-result-item" data-idx="${i}" onclick="selectSearchResult(${i})">
+      <div class="search-result-item" data-idx="${actionOffset + i}" onclick="selectSearchResult(${actionOffset + i})">
         <div class="search-result-icon" style="background:#eff6ff">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
@@ -219,7 +283,7 @@ function _renderSearchResults(query) {
       </div>`).join('');
   }
 
-  const clientOffset = matchClients.length;
+  const clientOffset = actionOffset + matchClients.length;
   const penOffset = clientOffset + matchPens.length;
   if (matchPens.length) {
     html += `<div class="search-group-label">Pendências</div>`;
@@ -278,6 +342,9 @@ function selectSearchResult(idx) {
   if (modal) modal.style.display = 'none';
 
   switch (result.type) {
+    case 'action':
+      try { result.data.run(); } catch (err) { console.warn('[busca] ação falhou:', err); }
+      break;
     case 'client':
       navigateTo('clientes');
       _openSearchDetailWhenReady('client', result.data.id);
@@ -459,5 +526,5 @@ if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', (
 });
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseSearchShortcuts, getNoteSnippet, _getPendingSyncCountSafe, _getPendingSyncText, _refreshSyncBannerSafe, _triggerBackgroundSync };
+  module.exports = { parseSearchShortcuts, getNoteSnippet, matchSearchActions, _getPendingSyncCountSafe, _getPendingSyncText, _refreshSyncBannerSafe, _triggerBackgroundSync };
 }
