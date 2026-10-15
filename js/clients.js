@@ -105,13 +105,8 @@ function renderClientGrid() {
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
       <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${health.totalAbertas} abertas, ${health.vencidas} vencidas, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" style="font-size:14px">${health.emoji}</span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
-      <div style="font-size:11px;color:var(--ov-muted);margin:4px 0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-        <span>${pending} abertas</span>
-        <span style="color:${vencidas? 'var(--ov-red)':'var(--ov-muted)'}">${vencidas} vencidas</span>
-        <span style="color:var(--ov-green)">${dentro} no prazo</span>
-      </div>
       <div class="client-card-footer">
-        ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
+        ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
         <div style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientForm('${escapeHtml(c.id)}')">Editar</button>
           ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteClientConfirm('${escapeHtml(c.id)}')">✕</button>` : ''}

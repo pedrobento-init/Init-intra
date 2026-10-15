@@ -80,8 +80,8 @@ function penInitials(name) {
 const PEN_ICO_WARN = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>';
 const PEN_ICO_CAL = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
 const PEN_ICO_PLAY = '<svg class="kb-ico kb-ico--fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
-const PEN_ICO_MOON = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 const PEN_ICO_CLK = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
 
 let penView = 'kanban';
 let penScope = 'active';
@@ -282,10 +282,9 @@ function renderPendencias() {
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Escopo das pendências">
-        <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas</button>
-        <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas</button>
+        <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
+        <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas${penScope==='archived' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
       </div>
-      <span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>
     </div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <div id="penViewArea"></div>`;
@@ -357,8 +356,10 @@ function _penClientCard(entry, selClient) {
       `</span>`+
       `<span class="pen-cv-foot">`+
         `<span class="pen-cv-bar" aria-hidden="true">${bars}</span>`+
-        `<span class="pen-cv-total">${total}</span>`+
-        (venc > 0 ? `<span class="pen-cv-venc">${venc} venc.</span>` : `<span class="pen-cv-ondia">em dia</span>`)+
+        // Antes: "2" solto + "2 venc." — o número sozinho não dizia o que contava.
+        (venc > 0
+          ? `<span class="pen-cv-venc">${venc}/${total} venc.</span>`
+          : `<span class="pen-cv-ondia">${total} em dia</span>`)+
       `</span>`+
     `</button>`;
 }
@@ -608,7 +609,9 @@ function renderPenKanban(area) {
       var rawCards = pens.filter(function(p) { return p.status === col.id; });
       var cards = _penSortCards(rawCards, col.id);
       var sortMode = _penColSort[col.id] || 'criacao';
-      var sortIcon = sortMode==='prazo' ? '📅' : sortMode==='prioridade' ? '⚡' : '🕒';
+      // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
+      // decorativo fixo ao lado do botão, que também mostrava um relógio).
+      var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : PEN_ICO_CLK;
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : 'Ordenado por criação';
       return '<section class="kanban-col" style="--c:' + penColColor(col.id) + '"' +
         ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
@@ -621,7 +624,6 @@ function renderPenKanban(area) {
             escapeHtml(col.label) +
           '</h2>' +
           '<span class="kanban-col-aside">' +
-            PEN_ICO_CLK +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
             '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
           '</span>' +
@@ -636,11 +638,10 @@ function renderPenKanban(area) {
   '</section>';
   area.innerHTML = _penPagerBar() +
     '<div class="pen-board">' +
+      // Sem botão de tema aqui: o protótipo era uma página solta; no app a
+      // topbar já tem o seletor de tema (o botão duplicava a ação).
       '<div class="pen-board-head">' +
         summaryHtml +
-        '<div class="pen-board-acts">' +
-          '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'themeToggleBtn\').click()" aria-label="Alternar tema claro/escuro">' + PEN_ICO_MOON + 'Alternar tema</button>' +
-        '</div>' +
       '</div>' +
       boardHtml +
     '</div>';
@@ -655,7 +656,7 @@ function renderPenKanban(area) {
     }
   }
   _applyPenCardMotion(area);
-  // Número abaixo da aba ativa (só o total; o rótulo vive na própria aba)
+  // Total como contador dentro da aba ativa ("Ativas 5")
   try{
     var cntEl=document.getElementById('penScopeCount');
     if(cntEl){

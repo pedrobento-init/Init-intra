@@ -237,7 +237,7 @@ function _renderOpGrid() {
         ${op.email ? `<div class="op-card-contact"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> ${escapeHtml(op.email)}</div>` : ''}
         <div class="op-card-tasks">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          <span>${penCount} pendência(s)</span>
+          <span>${penCount} pendência${penCount === 1 ? '' : 's'}</span>
           ${penCount > 0 ? '<span class="op-tasks-link">Ver →</span>' : '<span class="op-tasks-empty" aria-hidden="true"></span>'}
         </div>
         ${actionsHtml ? `<div class="op-card-actions">${actionsHtml}</div>` : ''}

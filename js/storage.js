@@ -1875,39 +1875,44 @@ function savePendencia(data) {
   // Push fire-and-forget + outbox: offline ou falha de conectividade
   // enfileira a operação (drain no `online`); erro de dados (4xx/schema)
   // NÃO enfileira para não repetir escrita inválida em loop.
+  // O payload remoto sai do registro MESCLADO (fonte completa), nunca do objeto
+  // parcial montado no form: sem isso, campos ausentes do form subiriam como
+  // []/null e o pull/realtime espalharia o zeramento para todos os aparelhos (SYNC-06).
+  const _idx = list.findIndex(p => p.id === data.id);
+  const _full = _idx !== -1 ? list[_idx] : data;
   var _remotePen = {
-    id: data.id,
-    client_id: data.clientId,
-    client_name: data.clientName,
-    tipo: data.tipo,
-    assunto: data.assunto || '',
-    descricao: data.descricao,
-    responsible: data.responsible,
-    status: data.status,
-    priority: data.priority,
-    deadline: data.deadline || null,
-    notes: data.notes || [],
-    link_util: data.linkUtil || '',
-    team: data.team || 'init',
-    attachments: data.attachments || [],
-    checklist: data.checklist || [],
-    tags: data.tags || [],
-    recurrence: data.recurrence || null,
-    visit_id: data.visitId || null,
-    reviewed_in_meeting: data.reviewedInMeeting || null,
-    timer_running: data.timerRunning === true,
-    timer_started_at: data.timerStartedAt || null,
-    timer_total_seconds: data.timerTotalSeconds || 0,
-    timer_operator: data.timerOperator || null,
-    completed_at: data.completedAt || null,
-    completed_by: data.completedBy || null,
-    created_at: data.createdAt || now,
+    id: _full.id,
+    client_id: _full.clientId,
+    client_name: _full.clientName,
+    tipo: _full.tipo,
+    assunto: _full.assunto || '',
+    descricao: _full.descricao,
+    responsible: _full.responsible,
+    status: _full.status,
+    priority: _full.priority,
+    deadline: _full.deadline || null,
+    notes: _full.notes || [],
+    link_util: _full.linkUtil || '',
+    team: _full.team || 'init',
+    attachments: _full.attachments || [],
+    checklist: _full.checklist || [],
+    tags: _full.tags || [],
+    recurrence: _full.recurrence || null,
+    visit_id: _full.visitId || null,
+    reviewed_in_meeting: _full.reviewedInMeeting || null,
+    timer_running: _full.timerRunning === true,
+    timer_started_at: _full.timerStartedAt || null,
+    timer_total_seconds: _full.timerTotalSeconds || 0,
+    timer_operator: _full.timerOperator || null,
+    completed_at: _full.completedAt || null,
+    completed_by: _full.completedBy || null,
+    created_at: _full.createdAt || now,
     updated_at: now
   };
   function _enqueuePen(reason) {
     try {
-      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', data);
-      else if (typeof outboxEnqueue === 'function') outboxEnqueue('pendencias', 'upsert', data);
+      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', _full);
+      else if (typeof outboxEnqueue === 'function') outboxEnqueue('pendencias', 'upsert', _full);
     } catch (_) {}
     try { if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted') markSyncPushFailed(); } catch (_) {}
   }
@@ -2448,33 +2453,37 @@ function saveVisit(data) {
     } catch (e) { console.warn('⚠️ Erro ao gerar visita recorrente:', e); }
   }
 
+  // Payload remoto da visita a partir do registro MESCLADO (numero, categories,
+  // checklist e campos milvus_* preservados) — ver SYNC-07.
+  const _idxV = list.findIndex(v => v.id === data.id);
+  const _fullV = _idxV !== -1 ? list[_idxV] : data;
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('visits').upsert({
-      id: data.id,
-      client_id: data.clientId,
-      client_name: data.clientName,
-      operator: data.operator,
-      date: data.date,
-      time: data.allDay ? null : (data.time || null),
-      time_end: data.allDay ? null : (data.timeEnd || null),
-      all_day: data.allDay === true,
-      motivo: data.motivo,
-      observacoes: data.observacoes || '',
-      relatorio: data.relatorio || '',
-      status: data.status,
-      recurrence: data.recurrence || null,
-      team: data.team || 'init',
-      categories: data.categories || [],
-      checklist: data.checklist || [],
-      numero: _visitNumeroOf(data),
-      milvus_chamado_codigo: data.milvusChamadoCodigo ?? null,
-      milvus_chamado_status: data.milvusChamadoStatus ?? null,
-      milvus_chamado_erro: data.milvusChamadoErro ?? null,
-      milvus_chamado_tentativas: data.milvusChamadoTentativas ?? 0,
-      milvus_finalizar_status: data.milvusFinalizarStatus ?? null,
-      milvus_finalizar_erro: data.milvusFinalizarErro ?? null,
-      milvus_finalizar_tentativas: data.milvusFinalizarTentativas ?? 0,
-      created_at: data.createdAt,
+      id: _fullV.id,
+      client_id: _fullV.clientId,
+      client_name: _fullV.clientName,
+      operator: _fullV.operator,
+      date: _fullV.date,
+      time: _fullV.allDay ? null : (_fullV.time || null),
+      time_end: _fullV.allDay ? null : (_fullV.timeEnd || null),
+      all_day: _fullV.allDay === true,
+      motivo: _fullV.motivo,
+      observacoes: _fullV.observacoes || '',
+      relatorio: _fullV.relatorio || '',
+      status: _fullV.status,
+      recurrence: _fullV.recurrence || null,
+      team: _fullV.team || 'init',
+      categories: _fullV.categories || [],
+      checklist: _fullV.checklist || [],
+      numero: _visitNumeroOf(_fullV),
+      milvus_chamado_codigo: _fullV.milvusChamadoCodigo ?? null,
+      milvus_chamado_status: _fullV.milvusChamadoStatus ?? null,
+      milvus_chamado_erro: _fullV.milvusChamadoErro ?? null,
+      milvus_chamado_tentativas: _fullV.milvusChamadoTentativas ?? 0,
+      milvus_finalizar_status: _fullV.milvusFinalizarStatus ?? null,
+      milvus_finalizar_erro: _fullV.milvusFinalizarErro ?? null,
+      milvus_finalizar_tentativas: _fullV.milvusFinalizarTentativas ?? 0,
+      created_at: _fullV.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
@@ -3046,7 +3055,7 @@ function seedDemoData() {
     {
       id: 'CLI-2', createdAt: '2025-02-15T10:00:00Z', updatedAt: '2025-02-15T10:00:00Z', team: 'init',
       name: 'Distribuidora Ômega', cnpj: '98.765.432/0001-10', segment: 'Distribuição',
-      color: '#6366f1', initials: 'DΩ',
+      color: '#6366f1', initials: 'DO',
       owner: 'Roberto Prado', ownerPhone: '(11) 97777-3333',
       responsible: 'Fernanda Costa', responsiblePhone: '(11) 96666-4444',
       technician: 'Maria Santos',

@@ -479,6 +479,11 @@ async function _pushImportToSupabase(data) {
 
 // ── Navegação ──────────────────────────────────────────────────────────────────
 const _pageScrollState = {};
+// Página efetivamente renderizada por último. O listener de hashchange usa
+// isto para não renderizar de novo a página que navigateTo acabou de montar
+// (antes, toda navegação renderizava 2x: duplicava toasts/fetches e criava
+// corrida no FullCalendar, que podia deixar a Agenda em branco).
+let _currentPage = null;
 
 function navigateTo(page) {
   const contentArea = document.getElementById('contentArea');
@@ -505,9 +510,12 @@ function navigateTo(page) {
     page = 'pendencias';
   }
 
-  if (currentHash !== page && contentArea) {
-    _pageScrollState[currentHash] = contentArea.scrollTop;
+  // A rolagem é da janela (o content-area não é contêiner de scroll).
+  const _changingPage = _currentPage !== page;
+  if (_changingPage) {
+    _pageScrollState[_currentPage || currentHash] = window.scrollY || 0;
   }
+  _currentPage = page;
 
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const el = document.getElementById('nav-' + page);
@@ -539,8 +547,12 @@ function navigateTo(page) {
     void ca.offsetWidth;
     ca.classList.add('transitioning');
     requestAnimationFrame(() => {
-      const saved = _pageScrollState[page];
-      if (saved) { ca.scrollTop = saved; _pageScrollState[page] = 0; }
+      // Página nova abre no topo (ou na posição salva ao sair dela);
+      // "Recarregar" a mesma página mantém a rolagem atual.
+      if (!_changingPage) return;
+      const saved = _pageScrollState[page] || 0;
+      _pageScrollState[page] = 0;
+      window.scrollTo(0, saved);
     });
   }
 }
@@ -824,11 +836,11 @@ function renderDashboard() {
       ${_dashHideBtn('reuniao')}
       <div class="ov-meet-main">
         <div class="ov-meet-title-row">
-          <h2 class="ov-h2" id="ov-reuniao">Reunião mensal — ${escapeHtml(_meetingLabel)}</h2>${_nextMeeting ? `<span class="ov-chip">${escapeHtml(_nextMeeting.status || '—')}</span>` : ''}
+          <h2 class="ov-h2" id="ov-reuniao">Reunião mensal${_nextMeeting ? ` — ${escapeHtml(_meetingLabel)}` : ''}</h2>${_nextMeeting ? `<span class="ov-chip">${escapeHtml(_nextMeeting.status || '—')}</span>` : ''}
         </div>
         ${_nextMeeting
         ? `<div class="ov-stats"><span><b>${activePens.length}</b> pendências abertas aguardando revisão</span><span><b>${allClients.length}</b> clientes no escopo</span></div>`
-        : `<p class="ov-muted">Nenhuma reunião encontrada no escopo. Acesse o módulo para criar.</p>`}
+        : `<p class="ov-muted">Nenhuma reunião registrada ainda. Use “Iniciar/Continuar Reunião” para começar a deste mês.</p>`}
       </div>
       <div class="dash-export-btns ov-acts ov-meet-acts">
         <button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="dashGoPresentation()">
@@ -1427,7 +1439,7 @@ function _startApp() {
     _appStarted = true;
     window.addEventListener('hashchange', () => {
       const p = window.location.hash.replace('#','');
-      if (pages.includes(p)) navigateTo(p);
+      if (pages.includes(p) && p !== _currentPage) navigateTo(p);
     });
   }
 }

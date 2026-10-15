@@ -137,6 +137,15 @@ function agNav(dir) {
 function agToday() {
   try { if (_fcInstance) _fcInstance.today(); } catch (_) {}
 }
+// Período visível ("Outubro de 2026") ao lado das setas de navegação.
+function agPaintPeriod(title) {
+  try {
+    var el = document.getElementById('agPeriod');
+    if (!el) return;
+    var t = String(title || '');
+    el.textContent = t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  } catch (_) {}
+}
 function _paintAgNav() {
   try {
     var cur = _agView || agDefaultView();
@@ -214,6 +223,7 @@ function renderCalendar() {
           <button class="ghost" onclick="agNav('prev')" aria-label="Período anterior">‹</button>
           <button onclick="agToday()">Hoje</button>
           <button class="ghost" onclick="agNav('next')" aria-label="Próximo período">›</button>
+          <span class="ag-period" id="agPeriod" aria-live="polite"></span>
         </div>
         <div class="ag-nav-group ag-filter-group">
           <button id="calFiltersToggle" onclick="toggleCalFilters(event)" aria-expanded="false" aria-controls="calFilters" title="Filtros">
@@ -450,9 +460,15 @@ function openCalendarDaySheet(dateStr) {
   }
 }
 
+let _fcInitSeq = 0;
 async function initFullCalendar() {
   const container = document.getElementById('calendarContainer');
   if (!container) return;
+  // Chamadas concorrentes (re-render da página, troca de tema) esperam o
+  // mesmo download: só a mais recente monta. Sem isso, uma chamada antiga
+  // que terminava por último destruía a grade nova e montava num container
+  // já fora do DOM — a Agenda ficava em branco.
+  const seq = ++_fcInitSeq;
 
   // Feedback imediato: no 1º acesso o FullCalendar vem do CDN e a grade
   // ficava vazia sem explicação enquanto baixava (ou para sempre, se
@@ -461,9 +477,11 @@ async function initFullCalendar() {
   try {
     await _loadFullCalendarWithTimeout(15000);
   } catch (_) {
+    if (seq !== _fcInitSeq) return;
     container.innerHTML = '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
     return;
   }
+  if (seq !== _fcInitSeq || container.isConnected === false) return;
 
   if (typeof FullCalendar === 'undefined') {
     container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
@@ -548,7 +566,9 @@ async function initFullCalendar() {
     viewDidMount: function() {
       applyCalendarDarkMode(isDark);
     },
-    datesSet: function() {
+    datesSet: function(info) {
+      // Sem a toolbar nativa, o período visível só aparecia aqui.
+      agPaintPeriod(info && info.view ? info.view.title : '');
       renderAgendaSide();
     },
   });
@@ -681,7 +701,11 @@ function applyCalendarDarkMode(isDark) {
 }
 
 function _icsEscape(str) {
-  return String(str || '').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+  return String(str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 function _icsDate(dateStr) {
   return String(dateStr || '').replace(/-/g, '');

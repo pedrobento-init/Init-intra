@@ -404,6 +404,12 @@ function renderEquipStats() {
       <div><div class="stat-value" style="color:#d97706">${b.em_manutencao}</div><div class="stat-label">Em manutenção</div></div>
     </div>
     <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
+      </div>
+      <div><div class="stat-value" style="color:#1a56db">${b.estoque || 0}</div><div class="stat-label">Em estoque</div></div>
+    </div>
+    <div class="stat-card">
       <div class="stat-icon" style="background:#fef2f2">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </div>
@@ -901,7 +907,12 @@ function exportEquipamentosPlanilha() {
     }
   } catch (_) { /* cai para o CSV abaixo */ }
   const fmtNum = n => (n == null || isNaN(Number(n))) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
-  const cell = v => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+  const cell = (v) => {
+    if (typeof csvCell === 'function') return csvCell(v);
+    let s = String(v == null ? '' : v);
+    if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+    return s.replace(/;/g, ',').replace(/\r?\n/g, ' ');
+  };
   const lines = [
     cell(sheet.title),
     sheet.header.join(';'),

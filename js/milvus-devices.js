@@ -516,7 +516,12 @@ async function exportClientInventory(clientId) {
       throw new Error('xlsx indisponível');
     }
   } catch (_) {
-    const cell = (v) => String(v == null ? '' : v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+    const cell = (v) => {
+      if (typeof csvCell === 'function') return csvCell(v);
+      let s = String(v == null ? '' : v);
+      if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+      return s.replace(/;/g, ',').replace(/\r?\n/g, ' ');
+    };
     const lines = [sheet.header.join(';'), ...sheet.rows.map((r) => r.map(cell).join(';'))];
     const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

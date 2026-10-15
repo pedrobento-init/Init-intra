@@ -106,6 +106,13 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
 
+  // Respostas autenticadas (Supabase REST/Storage/Functions) ficam FORA do
+  // Cache Storage: a chave de cache é só a URL e ignora o Authorization, então
+  // um GET do usuário A poderia ser servido para o usuário B (ou para uma
+  // sessão já encerrada) quando a rede cai. O app não depende disso — o
+  // offline-first roda por IndexedDB/outbox.
+  if (request.headers.has('apikey') || request.headers.has('authorization')) return;
+
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

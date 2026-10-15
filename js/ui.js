@@ -438,7 +438,7 @@ function slaCountdown(item, defaultHours) {
 // Supports logoShape: 'circle' (default) or 'square'
 function _safeLogoUrl(url) {
   if (!url) return '#';
-  if (/^https?:\/\//i.test(url)) return url;
+  if (/^https?:\/\//i.test(url)) { try { return new URL(url).href; } catch { return '#'; } }
   if (/^data:image\/(?!svg\+xml)[a-z+-]+;/i.test(url)) return url;
   return '#';
 }
@@ -447,7 +447,7 @@ function clientAvatar(c, size = 40) {
   const shape = c.logoShape || 'circle';
   const shapeClass = shape === 'square' ? 'client-logo-square' : 'client-logo-circle';
   if (c.logo) {
-    return `<img src="${_safeLogoUrl(c.logo)}" class="${shapeClass}" style="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
+    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" style="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
   }
   const borderRadius = shape === 'square' ? '6px' : '50%';
   return `<div style="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${c.color||'#1a56db'};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
@@ -833,8 +833,26 @@ if (themeToggleBtn) {
 initTheme();
 
 // ── CSV EXPORTERS ──────────────────────────────────────────────────────────────
+// Helper unico de celula (delimitador ";", padrao pt-BR) usado por TODOS os
+// exportadores (exportCSV, relatorio de visitas, acerto de equipamentos,
+// inventario Milvus). Duas protecoes:
+//  1) escape estrutural: valor com ";", aspa ou quebra de linha vira campo
+//     entre aspas (sem isso a coluna desalinha e a linha quebra);
+//  2) neutralizacao de formula: celula iniciada por =, +, -, @, tab ou CR
+//     ganha marcador de texto (a planilha ignora ao exibir), exceto
+//     numeros puros ("-12.5" continua sendo numero).
+function csvCell(v) {
+  let s = v == null ? '' : String(v);
+  if (/^[=+@\t\r]|^-/.test(s) && !/^-\d+(?:[.,]\d+)?$/.test(s)) s = "'" + s;
+  s = s.replace(/"/g, '""');
+  return /[;\n\r"]/.test(s) ? '"' + s + '"' : s;
+}
+function csvRow(cells) {
+  return cells.map(csvCell).join(';');
+}
+
 function exportCSV(filename, headers, rows) {
-  const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.map(r => r.join(";")).join("\n");
+  const csvContent = "\uFEFF" + csvRow(headers) + "\n" + rows.map(csvRow).join("\n");
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
