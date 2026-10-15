@@ -51,6 +51,50 @@ function formatTimer(totalSeconds) {
 }
 
 /**
+ * Versão curta para cards: até 24h igual a formatTimer; acima disso "8d 21h"
+ * ("213:06:51" não se lê de relance).
+ */
+function formatTimerCompact(totalSeconds) {
+  const t = Number(totalSeconds) || 0;
+  if (t < 86400) return formatTimer(t);
+  const d = Math.floor(t / 86400);
+  const h = Math.floor((t % 86400) / 3600);
+  return d + 'd ' + h + 'h';
+}
+
+// Sessão ligada além disto = provável cronômetro esquecido.
+const TIMER_FORGOTTEN_SECONDS = 10 * 3600;
+
+/** Segundos da sessão atual (desde o último play), 0 se parado. */
+function getSessionSeconds(item) {
+  if (!item?.timerRunning || !item?.timerStartedAt) return 0;
+  const started = new Date(item.timerStartedAt).getTime();
+  if (!Number.isFinite(started)) return 0;
+  return Math.max(0, Math.floor((Date.now() - started) / 1000));
+}
+
+function isTimerForgotten(item) {
+  return getSessionSeconds(item) >= TIMER_FORGOTTEN_SECONDS;
+}
+
+/** "8 dias", "1 dia e 3h", "14h" — para textos de alerta. */
+function formatDurationWords(totalSeconds) {
+  const t = Math.max(0, Number(totalSeconds) || 0);
+  const d = Math.floor(t / 86400);
+  const h = Math.floor((t % 86400) / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  if (d > 0) return d + (d === 1 ? ' dia' : ' dias') + (h ? ' e ' + h + 'h' : '');
+  if (h > 0) return h + 'h' + (m ? ' ' + String(m).padStart(2, '0') + 'min' : '');
+  return m + 'min';
+}
+
+/** Texto do display conforme o formato pedido pelo elemento. */
+function _timerText(el, item) {
+  const secs = getElapsedSeconds(item);
+  return el && el.dataset && el.dataset.format === 'compact' ? formatTimerCompact(secs) : formatTimer(secs);
+}
+
+/**
  * HTML do display de tempo
  */
 function timerDisplayHTML(item) {
@@ -207,6 +251,82 @@ function toggleTimer(type, id, btnEl) {
 }
 
 /**
+ * "Parar e ajustar tempo": encerra uma sessão (normalmente esquecida ligada)
+ * gravando só o tempo real informado, em vez de somar dias de relógio aos
+ * relatórios de horas. Pode o próprio operador da sessão ou um admin.
+ */
+function _canAdjustTimer(item) {
+  const worker = getCurrentWorker(item);
+  if (!worker) return false;
+  if (worker === getUser()?.name) return true;
+  try { return typeof isCurrentAdmin === 'function' && isCurrentAdmin(); } catch (_) { return false; }
+}
+
+function openTimerAdjust(id) {
+  const item = getPendenciaById(id);
+  if (!item || !item.timerRunning) return;
+  if (!_canAdjustTimer(item)) {
+    showToast('Só ' + (getCurrentWorker(item) || 'quem iniciou') + ' ou um administrador pode parar este cronômetro.', 'warning');
+    return;
+  }
+  const session = getSessionSeconds(item);
+  // Sugestão: a sessão inteira se for plausível; senão 8h (jornada) — o
+  // operador corrige para o tempo real.
+  const suggested = Math.min(session, 8 * 3600);
+  const sh = Math.floor(suggested / 3600);
+  const sm = Math.round((suggested % 3600) / 60 / 5) * 5;
+  const started = item.timerStartedAt ? new Date(item.timerStartedAt) : null;
+  const startedTxt = started ? started.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  openModal('Parar e ajustar tempo', `
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+      O cronômetro de <strong>${escapeHtml(getCurrentWorker(item))}</strong> está ligado desde
+      <strong>${escapeHtml(startedTxt)}</strong> (${escapeHtml(formatDurationWords(session))}).
+      Informe quanto tempo foi realmente trabalhado nesta sessão — só isso entra no total.
+    </p>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label" for="timerAdjH">Horas</label>
+        <input type="number" class="form-input" id="timerAdjH" min="0" max="999" step="1" value="${sh}" /></div>
+      <div class="form-group"><label class="form-label" for="timerAdjM">Minutos</label>
+        <input type="number" class="form-input" id="timerAdjM" min="0" max="59" step="5" value="${Math.min(sm, 55)}" /></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="submitTimerAdjust('${_jsEscape(id)}')">Parar e salvar</button>
+    </div>`, 'sm');
+}
+
+function submitTimerAdjust(id) {
+  const cur = getPendenciaById(id);
+  if (!cur || !cur.timerRunning) { closeModal(); return; }
+  if (!_canAdjustTimer(cur)) { showToast('Permissão negada.', 'error'); return; }
+  const h = Math.max(0, parseInt(document.getElementById('timerAdjH')?.value, 10) || 0);
+  const m = Math.min(59, Math.max(0, parseInt(document.getElementById('timerAdjM')?.value, 10) || 0));
+  const sessionReal = Math.min(h * 3600 + m * 60, getSessionSeconds(cur));
+  const total = (Number(cur.timerTotalSeconds) || 0) + sessionReal;
+  const now = new Date().toISOString();
+  const me = getUser()?.name || 'Operador';
+  const note = {
+    text: `⏹ ${me} parou o cronômetro de ${getCurrentWorker(cur)} (ligado há ${formatDurationWords(getSessionSeconds(cur))}). Sessão registrada: ${formatTimer(sessionReal)}. Total: ${formatTimer(total)}.`,
+    author: me, createdAt: now,
+  };
+  savePendencia({
+    ...cur,
+    timerTotalSeconds: total,
+    timerRunning: false,
+    timerStartedAt: null,
+    timerOperator: null,
+    status: 'pausado',
+    notes: [...(cur.notes || []), note],
+    updatedAt: now,
+  });
+  closeModal();
+  showToast('Cronômetro parado — tempo ajustado.', 'success');
+  _refreshTimerFull(id, 'pendencia');
+  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
+}
+
+/**
  * Atualiza no DOM os displays de um timer específico
  */
 function _refreshTimerUI(id) {
@@ -216,7 +336,7 @@ function _refreshTimerUI(id) {
   const seconds = getElapsedSeconds(item);
   const running = item.timerRunning ? 'true' : 'false';
   displays.forEach(el => {
-    el.textContent = formatTimer(seconds);
+    el.textContent = el.dataset.format === 'compact' ? formatTimerCompact(seconds) : formatTimer(seconds);
     el.dataset.running = running;
   });
 }
@@ -303,7 +423,7 @@ function _startTimerInterval() {
       const id = el.dataset.timerId;
       const item = getPendenciaById(id);
       if (item && item.timerRunning) {
-        el.textContent = formatTimer(getElapsedSeconds(item));
+        el.textContent = _timerText(el, item);
       } else {
         el.dataset.running = 'false';
       }

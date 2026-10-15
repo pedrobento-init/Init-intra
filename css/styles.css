@@ -66,6 +66,9 @@
 
 img { max-width: 100%; height: auto; }
 
+/* Texto só para leitores de tela. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 /* Controles nativos não herdam a fonte por padrão. */
 button, input, select, textarea { font-family: inherit; }
 
@@ -5402,12 +5405,25 @@ body.dark-theme #penSlaSummary {
 .pen-board .kb-pill::before {
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
 }
-.pen-board .kc-resp { font-size: 12.5px; color: var(--kb-muted); max-width: 100%; }
+.pen-board .kc-resp { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--kb-muted); max-width: 100%; }
+.pen-board .kc-resp .kb-ico { width: 12px; height: 12px; }
 .pen-board .kc-resp--empty { font-style: italic; }
+/* "Parada" como selo, para não ler junto do nome ("Joarli Parada"). */
 .pen-board .kc-stale {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
+  font-size: 11px; font-weight: 700; color: var(--kb-muted); white-space: nowrap;
+  padding: 0 7px; border-radius: 999px; border: 1px dashed var(--kb-line);
 }
+/* Cronômetro ligado há muito tempo (provável esquecimento): âmbar + ⚠, clicável. */
+.pen-board .kb-timer-forgot {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  border: 1px solid color-mix(in srgb, var(--kb-amber) 45%, transparent);
+  background: color-mix(in srgb, var(--kb-amber) 12%, transparent);
+  color: var(--kb-amber); border-radius: 999px; padding: 1px 8px; cursor: pointer;
+  font: inherit;
+}
+.pen-board .kb-timer-forgot .kb-timer { color: inherit; }
+.pen-board .kb-timer-forgot:hover { background: color-mix(in srgb, var(--kb-amber) 22%, transparent); }
 .pen-board .kc-sla {
   font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
 }
