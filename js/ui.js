@@ -674,6 +674,72 @@ function updateUserUI() {
   if (roleEl) roleEl.textContent = u.role || 'Técnico';
 }
 
+// ── AUDITORIA (Histórico de Atividades) ─────────────────────────────────────
+// Filtros por pessoa, tipo de registro, ação e período; agrupado por dia;
+// "carregar mais" (100 por vez); clique abre o registro; busca no servidor
+// além dos últimos 500 que o sync traz para o aparelho.
+const AUDIT_PAGE = 100;
+
+function _auditNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+/** Valores distintos para os filtros (puro). */
+function auditFacets(logs) {
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  return {
+    types: uniq((logs || []).map((l) => l.type)),
+    actions: uniq((logs || []).map((l) => l.action)),
+    people: uniq((logs || []).map((l) => l.operatorName || 'Sistema')),
+  };
+}
+
+/** Filtro puro. f = { q, type, action, person, from, to } (datas YYYY-MM-DD, fuso local). */
+function filterAuditLogs(logs, f) {
+  const o = f || {};
+  const q = _auditNorm(o.q);
+  const day = (l) => (l.timestamp ? (typeof localDateISO === 'function' ? localDateISO(new Date(l.timestamp)) : String(l.timestamp).slice(0, 10)) : '');
+  return (logs || []).filter((l) => {
+    if (o.type && l.type !== o.type) return false;
+    if (o.action && l.action !== o.action) return false;
+    if (o.person && (l.operatorName || 'Sistema') !== o.person) return false;
+    if (o.from && day(l) < o.from) return false;
+    if (o.to && day(l) > o.to) return false;
+    if (q && ![l.action, l.type, l.details, l.operatorName, l.targetId].some((v) => _auditNorm(v).includes(q))) return false;
+    return true;
+  }).sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+}
+
+/** Agrupa por dia (já ordenado) com rótulo Hoje/Ontem/data (puro). */
+function groupAuditLogsByDay(logs, todayISO) {
+  const d = new Date(todayISO + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  const yesterday = d.toISOString().slice(0, 10);
+  const groups = [];
+  let cur = null;
+  for (const l of (logs || [])) {
+    const key = l.timestamp ? (typeof localDateISO === 'function' ? localDateISO(new Date(l.timestamp)) : String(l.timestamp).slice(0, 10)) : '—';
+    if (!cur || cur.key !== key) {
+      const label = key === todayISO ? 'Hoje' : key === yesterday ? 'Ontem' : (key === '—' ? 'Sem data' : key.split('-').reverse().join('/'));
+      cur = { key, label, items: [] };
+      groups.push(cur);
+    }
+    cur.items.push(l);
+  }
+  return groups;
+}
+
+// Abre o registro citado no log, quando ainda existe.
+function openAuditTarget(type, id) {
+  const t = _auditNorm(type);
+  try {
+    if (t === 'pendencia' && getPendenciaById(id)) return openPendenciaDetail(id);
+    if (t === 'visita' && getVisitById(id)) return openVisitDetail(id);
+    if (t === 'cliente' && getClientById(id)) return viewClient(id);
+  } catch (_) {}
+  showToast('Registro não encontrado (pode ter sido excluído).', 'info');
+}
+
+let _auditState = { f: {}, shown: AUDIT_PAGE, remote: null };
+
 function renderLogs() {
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
     showToast('Apenas administradores podem ver o histórico.', 'error');
@@ -683,29 +749,19 @@ function renderLogs() {
   document.getElementById('pageTitle').textContent = 'Histórico de Atividades';
   const btn = document.getElementById('topbarActionBtn');
   if (btn) btn.style.display = 'none';
+  _auditState = { f: {}, shown: AUDIT_PAGE, remote: null };
 
-  const content = document.getElementById('contentArea');
-  const ops = typeof getOperators === 'function' ? getOperators() : [];
-  
-  const toolbarHtml = `
+  const facets = auditFacets(_auditLocalLogs());
+  const opt = (arr, all) => '<option value="">' + all + '</option>' + arr.map((v) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
+  document.getElementById('contentArea').innerHTML = `
     <div class="log-toolbar search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="logSearch" placeholder="Buscar no histórico..." class="form-input">
+        <input type="text" id="logSearch" placeholder="Buscar em ações, detalhes, IDs…" class="form-input">
       </div>
-      <select id="logTypeFilter" class="form-select filter-select-sm pt-filter">
-        <option value="">Todos os tipos</option>
-        <option value="Cliente">Cliente</option>
-        <option value="Pendência">Pendência</option>
-        <option value="Procedimento">Procedimento</option>
-        <option value="Operador">Operador</option>
-        <option value="Sessão">Sessão</option>
-        <option value="Backup">Backup</option>
-      </select>
-      <select id="logOpFilter" class="form-select filter-select-lg pt-filter">
-        <option value="">Todos os operadores</option>
-        ${ops.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('')}
-      </select>
+      <select id="logOpFilter" class="form-select filter-select-lg pt-filter" aria-label="Pessoa">${opt(facets.people, 'Todas as pessoas')}</select>
+      <select id="logTypeFilter" class="form-select filter-select-sm pt-filter" aria-label="Tipo de registro">${opt(facets.types, 'Todos os tipos')}</select>
+      <select id="logActionFilter" class="form-select filter-select-sm pt-filter" aria-label="Ação">${opt(facets.actions, 'Todas as ações')}</select>
       <div class="filter-date-wrap pt-filter">
         <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
         <input type="date" id="logDateFrom" class="form-input filter-date" />
@@ -715,90 +771,137 @@ function renderLogs() {
         <input type="date" id="logDateTo" class="form-input filter-date" />
       </div>
       <div class="pt-actions">
-      <button class="btn btn-secondary btn-sm" onclick="exportLogsCSV()">
+      <button class="btn btn-secondary btn-sm" onclick="exportLogsCSV()" title="Exporta o que está filtrado">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        CSV Logs
+        CSV
       </button>
       ${isCurrentAdmin() ? '<button class="btn btn-danger btn-sm" onclick="clearLogs()">Limpar Histórico</button>' : ''}
       </div>
     </div>
-    <div id="logsContainer"></div>
-  `;
-  content.innerHTML = toolbarHtml;
+    <div class="audit-quick" role="group" aria-label="Período rápido">
+      <button type="button" class="vis-chip" data-p="today" onclick="auditQuickPeriod('today')">Hoje</button>
+      <button type="button" class="vis-chip" data-p="7" onclick="auditQuickPeriod('7')">7 dias</button>
+      <button type="button" class="vis-chip" data-p="30" onclick="auditQuickPeriod('30')">30 dias</button>
+      <button type="button" class="vis-chip" data-p="" onclick="auditQuickPeriod('')">Tudo</button>
+    </div>
+    <div class="audit-summary" id="auditSummary" aria-live="polite"></div>
+    <div id="logsContainer"></div>`;
 
-  function renderList() {
-    const term = document.getElementById('logSearch').value.toLowerCase();
-    const type = document.getElementById('logTypeFilter').value;
-    const op = document.getElementById('logOpFilter').value;
-    const dateFrom = document.getElementById('logDateFrom').value;
-    const dateTo = document.getElementById('logDateTo').value;
-    let logs = typeof getLogs === 'function' ? getLogs() : [];
-    // Gestão: esconde logs de pendência Gestão de quem não é Gestão.
-    try {
-      if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
-      else if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') logs = logs.filter(l => !isGestaoLog(l));
-    } catch (_) {}
-    
-    if (term) {
-      logs = logs.filter(l => 
-        (l.action && l.action.toLowerCase().includes(term)) ||
-        (l.type && l.type.toLowerCase().includes(term)) ||
-        (l.details && l.details.toLowerCase().includes(term)) ||
-        (l.operatorName && l.operatorName.toLowerCase().includes(term))
-      );
-    }
-    if (type) logs = logs.filter(l => l.type === type);
-    if (op) logs = logs.filter(l => l.operatorName === op);
-    if (dateFrom) {
-      logs = logs.filter(l => l.timestamp && l.timestamp.slice(0, 10) >= dateFrom);
-    }
-    if (dateTo) {
-      logs = logs.filter(l => l.timestamp && l.timestamp.slice(0, 10) <= dateTo);
-    }
+  const rerender = () => { _auditState.shown = AUDIT_PAGE; _auditState.remote = null; _renderAuditList(); };
+  document.getElementById('logSearch').addEventListener('input', typeof debounce === 'function' ? debounce(rerender, 200) : rerender);
+  ['logTypeFilter', 'logOpFilter', 'logActionFilter', 'logDateFrom', 'logDateTo'].forEach((id) => document.getElementById(id).addEventListener('change', rerender));
+  _renderAuditList();
+}
 
-    const container = document.getElementById('logsContainer');
-    if (!logs.length) {
-      container.innerHTML = '<div class="empty-state" style="padding:40px"><p>Nenhum registro encontrado.</p></div>';
-      return;
-    }
+function _auditLocalLogs() {
+  let logs = typeof getLogs === 'function' ? getLogs() : [];
+  // Gestão: esconde logs de pendência Gestão de quem não é Gestão.
+  try {
+    if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
+    else if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') logs = logs.filter((l) => !isGestaoLog(l));
+  } catch (_) {}
+  return logs;
+}
 
-    const html = `
-      <div class="log-timeline">
-          ${logs.map(log => {
-            const actionKey = (log.action || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
-            const actionClass = ['criou','ativou','editou','excluiu','desativou','login','backup','limpou'].includes(actionKey.split('-')[0])
-              ? 'log-action-' + actionKey.split('-')[0]
-              : 'log-action-default';
+function _auditFilters() {
+  const v = (id) => (document.getElementById(id) || {}).value || '';
+  return { q: v('logSearch'), type: v('logTypeFilter'), action: v('logActionFilter'), person: v('logOpFilter'), from: v('logDateFrom'), to: v('logDateTo') };
+}
 
-            return `
-              <div class="log-card">
-                <div class="log-dot ${actionClass}" style="background:currentColor"></div>
-                <div class="log-header">
-                  <span class="log-action-label">${escapeHtml(log.action)}</span>
-                  <span class="log-type-badge ${actionClass}">${escapeHtml(log.type)}</span>
-                  <span style="flex:1"></span>
-                  <span class="log-meta">${formatDateTime(log.timestamp)}</span>
-                </div>
-                <div class="log-details">${escapeHtml(log.details)}</div>
-                <div class="log-meta">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  ${escapeHtml(log.operatorName || 'Sistema')}
-                </div>
-              </div>
-            `;
-          }).join('')}
-      </div>
-    `;
-    container.innerHTML = html;
+function auditQuickPeriod(p) {
+  const today = localDateISO();
+  const from = document.getElementById('logDateFrom');
+  const to = document.getElementById('logDateTo');
+  if (!from || !to) return;
+  if (!p) { from.value = ''; to.value = ''; }
+  else if (p === 'today') { from.value = today; to.value = today; }
+  else { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - (Number(p) - 1)); from.value = d.toISOString().slice(0, 10); to.value = today; }
+  document.querySelectorAll('.audit-quick .vis-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === p)));
+  _auditState.shown = AUDIT_PAGE; _auditState.remote = null;
+  _renderAuditList();
+}
+
+// Logs filtrados atuais (locais + os trazidos do servidor, sem duplicar).
+function _auditCurrentList() {
+  const f = _auditFilters();
+  const base = _auditLocalLogs();
+  const extra = _auditState.remote || [];
+  const ids = new Set(base.map((l) => l.id));
+  return filterAuditLogs(base.concat(extra.filter((l) => !ids.has(l.id))), f);
+}
+
+function _renderAuditList() {
+  const container = document.getElementById('logsContainer');
+  if (!container) return;
+  const list = _auditCurrentList();
+  const people = new Set(list.map((l) => l.operatorName || 'Sistema')).size;
+  const sum = document.getElementById('auditSummary');
+  const online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  if (sum) {
+    sum.innerHTML = '<b>' + plural(list.length, 'registro', 'registros') + '</b> · ' + plural(people, 'pessoa', 'pessoas') +
+      (online && !_auditState.remote ? ' · <button type="button" class="link-btn" onclick="auditFetchRemote(this)" title="O aparelho guarda só os últimos 500 registros">Buscar também no servidor</button>' : '') +
+      (_auditState.remote ? ' · inclui registros do servidor' : '');
   }
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:40px"><p>Nenhum registro encontrado com esses filtros.</p></div>';
+    return;
+  }
+  const page = list.slice(0, _auditState.shown);
+  const groups = groupAuditLogsByDay(page, localDateISO());
+  const actionClass = (log) => {
+    const k = _auditNorm(log.action).split(/\s+/)[0];
+    return ['criou', 'ativou', 'editou', 'excluiu', 'desativou', 'login', 'backup', 'limpou'].includes(k) ? 'log-action-' + k : 'log-action-default';
+  };
+  const time = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const canOpen = (l) => ['pendencia', 'visita', 'cliente'].includes(_auditNorm(l.type)) && l.targetId;
+  container.innerHTML = groups.map((g) =>
+    '<section class="audit-day"><h3 class="audit-day-label">' + escapeHtml(g.label) + ' <small>' + g.items.length + '</small></h3>' +
+    '<div class="log-timeline">' + g.items.map((log) => {
+      const cls = actionClass(log);
+      return '<div class="log-card">' +
+        '<div class="log-dot ' + cls + '" style="background:currentColor"></div>' +
+        '<div class="log-header">' +
+          '<span class="log-action-label">' + escapeHtml(log.action) + '</span>' +
+          '<span class="log-type-badge ' + cls + '">' + escapeHtml(log.type) + '</span>' +
+          '<span style="flex:1"></span>' +
+          '<span class="log-meta">' + escapeHtml(time(log.timestamp)) + '</span>' +
+        '</div>' +
+        '<div class="log-details">' + escapeHtml(log.details) + '</div>' +
+        '<div class="log-meta">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+          escapeHtml(log.operatorName || 'Sistema') +
+          (canOpen(log) ? ' · <button type="button" class="link-btn" onclick="openAuditTarget(\'' + escapeHtml(log.type) + '\',\'' + escapeHtml(log.targetId) + '\')">Abrir</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div></section>').join('') +
+    (list.length > page.length
+      ? '<div style="text-align:center;padding:12px"><button type="button" class="btn btn-secondary" onclick="_auditState.shown+=' + AUDIT_PAGE + ';_renderAuditList()">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
+      : '');
+}
 
-  document.getElementById('logSearch').addEventListener('input', renderList);
-  document.getElementById('logTypeFilter').addEventListener('change', renderList);
-  document.getElementById('logOpFilter').addEventListener('change', renderList);
-  document.getElementById('logDateFrom').addEventListener('change', renderList);
-  document.getElementById('logDateTo').addEventListener('change', renderList);
-  
-  renderList();
+// Busca no servidor com os mesmos filtros (até 1.000 registros) — o
+// aparelho guarda só os últimos 500 do sync.
+async function auditFetchRemote(btn) {
+  if (btn) btn.disabled = true;
+  const f = _auditFilters();
+  try {
+    let q = supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(1000);
+    if (f.type) q = q.eq('type', f.type);
+    if (f.action) q = q.eq('action', f.action);
+    if (f.person) q = q.eq('operator_name', f.person);
+    if (f.from) q = q.gte('timestamp', new Date(f.from + 'T00:00:00').toISOString());
+    if (f.to) q = q.lte('timestamp', new Date(f.to + 'T23:59:59.999').toISOString());
+    const { data, error } = await q;
+    if (error) throw error;
+    let rows = (data || []).map((l) => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
+    try { if (typeof filterGestaoLogs === 'function') rows = filterGestaoLogs(rows); } catch (_) {}
+    _auditState.remote = rows;
+    _auditState.shown = AUDIT_PAGE;
+    _renderAuditList();
+  } catch (_) {
+    showToast('Não foi possível buscar no servidor.', 'error');
+    if (btn) btn.disabled = false;
+  }
 }
 
 function clearLogs() {
@@ -1026,7 +1129,8 @@ function exportLogsCSV() {
     showToast('Apenas administradores podem exportar o histórico.', 'error');
     return;
   }
-  const logs = (function(){
+  // Na tela de histórico, exporta exatamente o que está filtrado.
+  const logs = (document.getElementById('logsContainer') && typeof _auditCurrentList === 'function') ? _auditCurrentList() : (function(){
     var _l = typeof getLogs === 'function' ? getLogs() : [];
     try {
       if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l);

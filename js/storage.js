@@ -174,6 +174,67 @@ function _setLastSyncAt(table, iso) {
   try { const m = _loadSyncAt(); m[table] = iso; _saveSyncAt(m); } catch (_) {}
 }
 
+// ── PULL PAGINADO + SYNC PARCIAL (P-9 / SYNC-01 / PERF-01) ───────────────────
+// SYNC-01: `select('*')` sem `.range()` é cortado pelo PostgREST (max-rows,
+// padrão 1000) e as linhas além do corte eram tratadas como "deletadas no
+// servidor". Agora o pull pagina por id. PERF-01: em vez de baixar a tabela
+// inteira a cada sync, baixa só `id,updated_at` e busca a linha completa do
+// que mudou; o que não mudou entra no merge reconstruído do local (o merge
+// recebe exatamente o que receberia num pull completo). Sync completo 1x/dia.
+const SYNC_PAGE_SIZE = 1000;
+const SYNC_DELTA_CHUNK = 100;
+const _FULL_KEY = (table) => '__full__:' + table;
+
+async function _pullPaged(table, columns, timed, what) {
+  const all = [];
+  for (let from = 0; from <= 500000; from += SYNC_PAGE_SIZE) {
+    const q = supabaseClient.from(table).select(columns);
+    const ordered = q && typeof q.order === 'function' ? q.order('id', { ascending: true }) : null;
+    // Cliente sem paginação (mocks/antigos): uma leitura só, como antes.
+    if (!ordered || typeof ordered.range !== 'function') {
+      const res = await timed(q, what);
+      return { data: (res && res.data) || (res && res.error ? null : []), error: (res && res.error) || null };
+    }
+    const res = await timed(ordered.range(from, from + SYNC_PAGE_SIZE - 1), what + '@' + from);
+    if (res && res.error) return { data: null, error: res.error };
+    const rows = (res && res.data) || [];
+    for (const r of rows) all.push(r);
+    if (rows.length < SYNC_PAGE_SIZE) break;
+  }
+  return { data: all, error: null };
+}
+
+async function _pullEntityRows(e, local, timed) {
+  const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields);
+  const fullPull = async () => ({ ...(await _pullPaged(e.table, '*', timed, 'pull:' + e.table)), mode: 'full' });
+  const canDelta = typeof _shouldFullSync === 'function' && typeof _planDeltaPull === 'function';
+  if (!canDelta || _shouldFullSync(e, _getLastSyncAt(_FULL_KEY(e.table)))) return fullPull();
+
+  const light = await _pullPaged(e.table, 'id,updated_at', timed, 'pull-light:' + e.table);
+  if (light.error) return { ...light, mode: 'delta' };
+  const plan = _planDeltaPull(local, light.data);
+  // Muita coisa mudou: uma leitura completa sai mais barata que N lotes.
+  if (plan.changedIds.length > Math.max(300, light.data.length / 2)) return fullPull();
+
+  const rows = [];
+  for (let i = 0; i < plan.changedIds.length; i += SYNC_DELTA_CHUNK) {
+    const q = supabaseClient.from(e.table).select('*');
+    if (!q || typeof q.in !== 'function') return fullPull();
+    const res = await timed(q.in('id', plan.changedIds.slice(i, i + SYNC_DELTA_CHUNK)), 'pull-delta:' + e.table);
+    if (res && res.error) return { data: null, error: res.error, mode: 'delta' };
+    for (const r of ((res && res.data) || [])) rows.push(r);
+  }
+  const localById = new Map((local || []).map(r => [r.id, r]));
+  const lightById = new Map(light.data.map(r => [r.id, r]));
+  for (const id of plan.sameIds) {
+    const loc = localById.get(id);
+    if (!loc) continue;
+    rows.push({ ...mapPayload(loc), id, updated_at: lightById.get(id).updated_at });
+  }
+  try { console.debug('[sync] ' + e.table + ': parcial — ' + plan.changedIds.length + ' alterado(s), ' + plan.sameIds.length + ' igual(is).'); } catch (_) {}
+  return { data: rows, error: null, mode: 'delta' };
+}
+
 // ── EQUIPES / PERFIS ──
 // Poiesis 1-6 unificados em "poiesis" único (031). Legados mantidos como alias.
 const TEAMS = {
@@ -831,7 +892,7 @@ async function _runSupabaseSync(reason, opts) {
     }
     let pull;
     try {
-      pull = await timed(supabaseClient.from(e.table).select('*'), 'pull:' + e.table);
+      pull = await _pullEntityRows(e, dbGet(e.dbKey), timed);
     } catch (err) {
       if (_isConnectivityError(err)) {
         connectivityFailed = true;
@@ -967,7 +1028,10 @@ async function _runSupabaseSync(reason, opts) {
         }
       }
     }
-    if (entityOk) _setLastSyncAt(e.table, nowIso);
+    if (entityOk) {
+      _setLastSyncAt(e.table, nowIso);
+      if (pull && pull.mode === 'full') _setLastSyncAt(_FULL_KEY(e.table), nowIso);
+    }
     return entityOk;
   };
 

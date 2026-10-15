@@ -322,6 +322,40 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
   return { merged, conflicts, conflictDetails };
 }
 
+// ── Sync parcial (P-9) — planejamento puro e testável ───────────────────────
+// Entrada: locais + "leves" do servidor ({id, updated_at}). Sai quais ids
+// precisam da linha completa (novos no servidor ou com updated_at diferente
+// do local) e quais podem ser reconstruídos do local (iguais). Comparação por
+// instante (getTime), não por texto: "…+00:00" e "…Z" são o mesmo momento.
+// Não usa o relógio deste aparelho: carimbos de outros aparelhos adiantados
+// ou atrasados não fazem nada escapar.
+function _planDeltaPull(local, light) {
+  const localById = new Map((local || []).filter(r => r && r.id).map(r => [r.id, r]));
+  const changedIds = [];
+  const sameIds = [];
+  for (const r of (light || [])) {
+    if (!r || !r.id) continue;
+    const loc = localById.get(r.id);
+    const rt = new Date(r.updated_at || 0).getTime();
+    const lt = loc ? new Date(loc.updatedAt || 0).getTime() : NaN;
+    if (!loc || !r.updated_at || isNaN(rt) || isNaN(lt) || rt !== lt) changedIds.push(r.id);
+    else sameIds.push(r.id);
+  }
+  return { changedIds, sameIds };
+}
+
+// Sync completo quando: nunca sincronizou, passou do intervalo (rede de
+// segurança contra edições no servidor que não mexem em updated_at) ou a
+// entidade não tem updated_at.
+const FULL_SYNC_EVERY_MS = 24 * 3600000;
+function _shouldFullSync(entity, lastFullAtIso, nowMs) {
+  if (!entity || !entity.fields || !entity.fields.updated_at) return true;
+  if (!lastFullAtIso) return true;
+  const t = new Date(lastFullAtIso).getTime();
+  if (isNaN(t)) return true;
+  return ((typeof nowMs === 'number' ? nowMs : Date.now()) - t) >= FULL_SYNC_EVERY_MS;
+}
+
 function _needsPush(local, remote) {
   if (!remote) return true;
   return new Date(local.updatedAt || 0).getTime() > new Date(remote.updated_at || 0).getTime();
@@ -406,5 +440,5 @@ function _retainFailedPush(merged, failedRecs) {
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush };
+  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
 }

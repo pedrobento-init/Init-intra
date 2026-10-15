@@ -488,6 +488,8 @@ function openVisitDetail(id) {
       </div>
     </div>
 
+    ${typeof visitPhotosSectionHtml === 'function' ? visitPhotosSectionHtml(id) : ''}
+
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
       if (!linked.length) return `<div style="margin-top:16px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
@@ -505,6 +507,7 @@ function openVisitDetail(id) {
       </div>
     </div>
   `);
+  if (typeof renderVisitPhotos === 'function') renderVisitPhotos(id);
 }
 
 function changeVisitStatus(id) {
