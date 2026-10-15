@@ -552,6 +552,7 @@ function navigateTo(page) {
 
   window.location.hash = page;
   if (typeof renderAlertStrip === 'function') { try { renderAlertStrip(); } catch (_) {} }
+  if (typeof refreshPendingStrip === 'function') { try { refreshPendingStrip(); } catch (_) {} }
 
   var ca = document.getElementById('contentArea');
   if (ca) {
@@ -1598,6 +1599,15 @@ async function doLogin() {
 }
 
 async function doLogout() {
+  // Alterações ainda não enviadas ficam só neste aparelho: avisa antes de sair.
+  try {
+    if (typeof getPendingChanges === 'function' && typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
+      const pend = await getPendingChanges();
+      if (pend.length && !window.confirm(
+        (pend.length === 1 ? 'Há 1 alteração que ainda não foi enviada' : 'Há ' + pend.length + ' alterações que ainda não foram enviadas') +
+        ' ao servidor.\n\nElas continuam salvas neste aparelho e sobem no próximo acesso, mas não aparecem para a equipe até lá.\n\nSair mesmo assim?')) return;
+    }
+  } catch (_) {}
   try {
     await authSignOut();
   } catch (err) {

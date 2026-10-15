@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v46';
-const CDN_CACHE_NAME = 'init-intra-cdn-v46';
+const CACHE_NAME = 'init-intra-v47';
+const CDN_CACHE_NAME = 'init-intra-cdn-v47';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   'js/notifications.js',
   'js/calendar.js',
   'js/visitas.js',
+  'js/visit-photos.js',
   'js/templates.js',
   'js/global-search.js',
   'js/timer.js',
@@ -29,6 +30,7 @@ const STATIC_ASSETS = [
   'js/milvus-chamado.js',
   'js/checklist.js',
   'js/fila.js',
+  'js/pendentes.js',
   'js/milvus-clients-import.js',
   'js/milvus-devices.js',
   'js/milvus-tickets.js',
