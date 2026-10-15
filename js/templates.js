@@ -13,7 +13,6 @@ function renderTemplates() {
   // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
-      <header class="ov-head"><h1 class="ov-h1">Modelos de Procedimentos</h1></header>
       <div class="search-bar">
         <div class="search-input-wrap filter-grow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -272,5 +271,5 @@ function submitApplyTemplate(e, templateId) {
   });
 
   closeModal();
-  showToast(`Procedimento "${escapeHtml(tpl.title)}" aplicado a ${count} cliente(s)!`, 'success');
+  showToast(`Procedimento "${escapeHtml(tpl.title)}" aplicado a ${plural(count, 'cliente', 'clientes')}!`, 'success');
 }

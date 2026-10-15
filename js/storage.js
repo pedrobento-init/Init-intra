@@ -461,7 +461,7 @@ function _migrateLegacyPenStatuses() {
     }
   } catch (_) {}
   try {
-    if (touched > 0 && typeof showToast === 'function') showToast(touched + ' pendência(s) antiga(s) atualizada(s) para os novos status.', 'info');
+    if (touched > 0 && typeof showToast === 'function') showToast(touched + (touched === 1 ? ' pendência antiga atualizada' : ' pendências antigas atualizadas') + ' para os novos status.', 'info');
     else console.debug('[migração] status legados convertidos: ' + touched);
   } catch (_) {}
   return touched;

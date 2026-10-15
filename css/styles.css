@@ -41,6 +41,8 @@
   --hamburger-bg-hover: rgba(15, 23, 42, 0.08);
   --hamburger-border: rgba(15, 23, 42, 0.1);
   --focus-ring: rgba(26, 86, 219, 0.55);
+  /* Fonte única do app (antes: Inter + Manrope + Schibsted misturadas). */
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .skip-link {
@@ -64,6 +66,9 @@
 
 img { max-width: 100%; height: auto; }
 
+/* Controles nativos não herdam a fonte por padrão. */
+button, input, select, textarea { font-family: inherit; }
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -82,7 +87,7 @@ img { max-width: 100%; height: auto; }
 html { overflow-x: clip; }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg-base);
   color: var(--text-primary);
   min-height: 100vh;
@@ -3251,7 +3256,7 @@ body.dark-theme .overdue-banner {
 
 /* ── AGENDA (visual mock: header + legenda + grade + sidebar) ── */
 .ag-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin:18px 0 16px; }
-.ag-title { font-family:'Manrope','Inter',sans-serif; font-size:26px; font-weight:800; letter-spacing:-0.01em; color:var(--text-primary); }
+.ag-title { font-size:26px; font-weight:800; letter-spacing:-0.01em; color:var(--text-primary); }
 .ag-sub { color:var(--text-muted); font-size:14px; margin-top:4px; }
 .ag-nav { display:flex; align-items:center; gap:10px; }
 .ag-nav button {
@@ -3330,7 +3335,7 @@ body.dark-theme .overdue-banner {
 }
 
 /* ── VISITAS (redesign mobile: busca, KPIs, chips, cards, FAB, filtros) ── */
-.vis-wrap { max-width:720px; margin:0 auto; font-family:'Schibsted Grotesk','Inter',sans-serif; padding-bottom:96px; }
+.vis-wrap { max-width:720px; margin:0 auto; padding-bottom:96px; }
 .vis-searchrow { display:flex; align-items:center; gap:10px; }
 .vis-search { position:relative; flex:1; min-width:0; }
 .vis-search input {
@@ -3409,6 +3414,11 @@ body.dark-theme .overdue-banner {
 .vis-fab:active { transform:scale(.97); }
 @media (max-width:768px){
   .vis-fab { right:16px; bottom:calc(20px + env(safe-area-inset-bottom, 0px)); }
+  /* 4 KPIs compactos lado a lado (antes o 4º ficava cortado na rolagem). */
+  .vis-kpis { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; overflow:visible; }
+  .vis-kpi { min-width:0; padding:8px 10px; border-radius:12px; }
+  .vis-kpi b { font-size:20px; }
+  .vis-kpi span { font-size:11px; line-height:1.25; display:block; }
 }
 /* Desktop/tablet: o botão "Nova Visita" da topbar já cobre a ação — o FAB
    (padrão mobile) só duplicava; e os KPIs ocupam a largura toda. */
@@ -3425,7 +3435,6 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   min-height: 500px;
 }
 #calendarContainer .fc {
-  font-family: 'Inter', sans-serif;
   font-size: 13px;
 }
 #calendarContainer .fc .fc-toolbar-title {
@@ -3883,7 +3892,7 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  font-family: 'Inter', monospace;
+  font-variant-numeric: tabular-nums;
 }
 .timer-display[data-running="true"] {
   color: var(--green);
@@ -4109,10 +4118,18 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 /* Celular: "Mais filtros" e "Limpar" lado a lado (antes, uma linha cheia
    para cada botão empurrava o quadro ~50px para baixo). */
 @media(max-width:768px){
-  .pen-search-bar { flex-direction:row; flex-wrap:wrap; }
+  .pen-search-bar, .equip-search-bar { flex-direction:row; flex-wrap:wrap; }
   .pen-search-bar > .search-input-wrap,
-  .pen-search-bar > select { flex:1 1 100%; }
+  .pen-search-bar > select,
+  .equip-search-bar > .search-input-wrap { flex:1 1 100%; }
   .pen-search-bar > .pen-more-btn { flex:1 1 0; width:auto; justify-content:center; }
+  /* Equipamentos: cliente + tipo lado a lado; "Mais filtros" + "Planilha" idem. */
+  .equip-search-bar > select { flex:1 1 calc(50% - 4px); width:auto !important; min-width:0; }
+  .equip-search-bar > .btn { flex:1 1 calc(50% - 4px); width:auto; justify-content:center; }
+  /* Abas de status (5 em Equipamentos) roláveis em vez de vazar da tela. */
+  .pen-scope-tabs { max-width:100%; overflow-x:auto; scrollbar-width:none; }
+  .pen-scope-tabs::-webkit-scrollbar { display:none; }
+  .pen-scope-tab { flex:none; white-space:nowrap; }
 }
 
 /* ── 6. ORDENAÇÃO POR COLUNA ── */
@@ -4404,6 +4421,17 @@ body.dark-theme .ov-wrap {
 .ov-g-day > .ov-col:first-child { padding: 0; }
 .ov-col { display: grid; gap: 16px; align-content: start; }
 .ov-col + .ov-col { border-left: 0; }
+/* Resumo do dia: a regra genérica .ov-col acima (gap 16px) afastava o número
+   do rótulo. Número e rótulo juntos; no celular, 3 colunas compactas em vez
+   de 3 blocos empilhados ocupando meia tela. */
+.ov-sum .ov-col { gap: 2px; }
+@media (max-width:640px) {
+  .ov-sum { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .ov-sum .ov-col, .ov-sum .ov-col:first-child { padding: 0; }
+  .ov-sum .ov-col + .ov-col { border-top: 0; padding-top: 0; }
+  .ov-sum .ov-n { font-size: 22px; flex-wrap: wrap; gap: 4px; }
+  .ov-sum .ov-l { font-size: 11.5px; line-height: 1.3; }
+}
 .ov-acts-big { display: grid; gap: 10px; }
 .ov-wrap .btn.ov-big { width: 100%; padding: 12px 14px; font-size: 14px; justify-content: center; }
 @media (max-width: 1100px) { .ov-kpis { grid-template-columns: repeat(3, 1fr); } }
@@ -4486,7 +4514,7 @@ body.dark-theme .ov-wrap {
    (funciona em light + dark). Raios 8–12px, Inter, semânticas:
    verde=sucesso/timer, azul=primário/postar, vermelho-laranja=alerta. */
 .modal.lg { max-width: 980px; }
-.pen-cmd { min-width: 0; font-family: 'Inter', 'Roboto', system-ui, sans-serif; }
+.pen-cmd { min-width: 0; }
 .pen-cmd-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 14px; margin-bottom: 12px; flex-wrap: wrap;

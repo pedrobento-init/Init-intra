@@ -93,7 +93,6 @@ function _buildOperadoresPage(savedFilters = {}) {
   // (stats/search/grid idênticos por classe — só containers/classes visuais).
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
-      <header class="ov-head"><h1 class="ov-h1">Operadores</h1></header>
       <div class="op-stats-row">
         <div class="op-stat">
           <span class="op-stat-value">${ops.length}</span>

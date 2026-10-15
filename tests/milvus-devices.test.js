@@ -118,7 +118,7 @@ describe('formatMilvusSyncResult', () => {
       unresolvedNames: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
     });
     expect(r.unresolved).toBe(7);
-    expect(r.line).toContain('7 nome(s) sem resolução');
+    expect(r.line).toContain('7 nomes sem resolução');
     expect(r.line).toContain('A, B, C, D, E');
     expect(r.line.endsWith('…')).toBe(true);
   });

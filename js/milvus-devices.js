@@ -127,7 +127,7 @@ function formatMilvusSyncResult(res) {
   const u = Number((res && res.updated)) || 0;
   const un = Array.isArray(res && res.unresolvedNames) ? res.unresolvedNames : [];
   let line = `${s} dispositivos sincronizados · ${c} novos · ${u} atualizados`;
-  if (un.length) line += ` · ${un.length} nome(s) sem resolução: ${un.slice(0, 5).join(', ')}${un.length > 5 ? '…' : ''}`;
+  if (un.length) line += ` · ${un.length} ${un.length === 1 ? 'nome' : 'nomes'} sem resolução:${un.slice(0, 5).join(', ')}${un.length > 5 ? '…' : ''}`;
   return { line: line, unresolved: un.length };
 }
 

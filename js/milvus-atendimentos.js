@@ -551,7 +551,6 @@ function renderRelatorios(){
   // (filtros/resumo/lista intactos — só containers/classes visuais e tokens ov-*).
   content.innerHTML=
     '<div class="ov-wrap">'+
-      '<header class="ov-head"><h1 class="ov-h1">Relatórios — Atendimentos</h1></header>'+
       '<div class="search-bar" style="flex-wrap:wrap;gap:8px;align-items:center">'+
         '<select class="form-select" id="gAtendClient" style="width:200px" onchange="_atendUI.clientId=this.value;_atendApplyFilters(true)"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
         '<input type="date" class="form-input" id="gAtendDataInicial" value="'+range.start+'" style="width:150px" />'+

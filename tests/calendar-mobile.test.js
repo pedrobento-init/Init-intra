@@ -217,8 +217,10 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
     expect(src).toContain("agSetView('list')");
   });
 
-  it('header da Agenda com título "Agenda" + legenda + layout grade/sidebar', () => {
-    expect(src).toContain('<h1 class="ag-title">Agenda</h1>');
+  it('header da Agenda: título só na topbar (sem h1 duplicado) + legenda + layout grade/sidebar', () => {
+    expect(src).toContain("return 'Agenda'");
+    expect(src).not.toContain('<h1 class="ag-title">');
+    expect(src).toContain('class="ag-sub"');
     expect(src).toContain('id="agendaSide"');
     expect(src).toContain('ag-legend');
   });

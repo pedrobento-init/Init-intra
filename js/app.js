@@ -353,7 +353,7 @@ async function _runImportBackup(data) {
       const errors = await _pushImportToSupabase(data);
       if (errors.length) {
         if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
-        showToast(`Backup local OK, mas ${errors.length} erro(s) no envio à nuvem.`, 'warning', 6000);
+        showToast(`Backup local OK, mas ${plural(errors.length, 'erro', 'erros')} no envio à nuvem.`, 'warning', 6000);
       } else {
         showToast('Backup importado e sincronizado!', 'success');
       }
@@ -718,8 +718,8 @@ function renderDashboard() {
   try {
     // Operador comum: sem nomes de colegas (gestão de equipe) — só contagens.
     if (typeof buildDaySummary === 'function') _daySummary = buildDaySummary({ dueToday, todayVisits, overloadedOps: (_dashCanManage ? _overloaded : []), onLeaveOps: (_dashCanManage ? _onLeaveOps.map(o => o.name) : []) });
-    else _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).` + ((_dashCanManage && (_overloaded.length || _onLeaveOps.length)) ? ' Atenção: ' + [..._overloaded.map(o => `${o.name} está sobrecarregado (${o.count} ativas)`), ..._onLeaveOps.map(o => `${o.name} está afastado`)].join('; ') + '.' : '');
-  } catch (_) { _daySummary = `Hoje: ${dueToday.length} pendência(s) vencem, ${todayVisits.length} visita(s) agendada(s).`; }
+    else _daySummary = `Hoje: ${plural(dueToday.length, 'pendência vence', 'pendências vencem')}, ${plural(todayVisits.length, 'visita agendada', 'visitas agendadas')}.` + ((_dashCanManage && (_overloaded.length || _onLeaveOps.length)) ? ' Atenção: ' + [..._overloaded.map(o => `${o.name} está sobrecarregado (${o.count} ativas)`), ..._onLeaveOps.map(o => `${o.name} está afastado`)].join('; ') + '.' : '');
+  } catch (_) { _daySummary = `Hoje: ${plural(dueToday.length, 'pendência vence', 'pendências vencem')}, ${plural(todayVisits.length, 'visita agendada', 'visitas agendadas')}.`; }
   // Comparativo com período anterior (apenas quando há filtro de período)
   let _prevStats = null, _deltaOpen = null, _deltaSla = null, _deltaComp = null;
   if (_dashPeriod !== 'all') {
@@ -857,7 +857,7 @@ function renderDashboard() {
       <div style="display:flex;flex-direction:column;gap:8px">
         ${_onLeaveWithCount.map(o => `
           <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--bg-secondary)">
-            <span style="font-size:13px;flex:1"><strong>${escapeHtml(o.name)}</strong> está afastado — ${o.count} pendência(s) aguardando reatribuição</span>
+            <span style="font-size:13px;flex:1"><strong>${escapeHtml(o.name)}</strong> está afastado — ${plural(o.count, 'pendência aguardando', 'pendências aguardando')} reatribuição</span>
             <button class="btn btn-secondary btn-sm" onclick="dashGoToPendenciasByOperator('${escapeHtml(o.name)}')">Ver pendências →</button>
           </div>`).join('')}
       </div>
@@ -1159,7 +1159,7 @@ function renderCharts(pens, visits) {
   loadChartJs().then(() => {
     if (window.Chart) {
       Chart.defaults.color = textColor;
-      Chart.defaults.font.family = "'Inter', sans-serif";
+      Chart.defaults.font.family = "'Manrope', system-ui, sans-serif";
     } else return;
 
   const activeItems = pens.filter(p => !isPendenciaClosed(p.status));
@@ -1474,7 +1474,7 @@ function showLoginScreen() {
     <div class="login-header">
       <div class="login-logo">
         <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-          <text x="50%" y="54%" dominant-baseline="central" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-weight="800" font-size="22">I</text>
+          <text x="50%" y="54%" dominant-baseline="central" text-anchor="middle" fill="#fff" font-family="Manrope,sans-serif" font-weight="800" font-size="22">I</text>
         </svg>
       </div>
       <div class="login-title">Init Intra</div>

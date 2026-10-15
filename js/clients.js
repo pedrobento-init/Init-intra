@@ -53,7 +53,6 @@ function renderClients() {
   // (apenas containers/classes visuais; IDs e handlers intactos).
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
-      <header class="ov-head"><h1 class="ov-h1">Clientes</h1></header>
       <div class="search-bar">
         <div class="search-input-wrap" style="flex:1">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -884,7 +883,7 @@ function renderClientTab(tab, id) {
     if (!filtered.length) {
       el.innerHTML = `<div class="empty-state" style="padding:20px"><p>Nenhum histórico para este cliente.</p></div>`;
     } else {
-      el.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${filtered.length} registro(s) — reaproveitando estilo do Histórico</div>
+      el.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${plural(filtered.length, 'registro', 'registros')}</div>
         <div class="log-timeline">${filtered.map(log => {
           const actionKey = (log.action || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
           const actionClass = ['criou','ativou','editou','excluiu','desativou','login','backup','limpou'].includes(actionKey.split('-')[0]) ? 'log-action-' + actionKey.split('-')[0] : 'log-action-default';
@@ -989,10 +988,10 @@ async function confirmMilvusClientsImport() {
   if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
   try {
     const res = await commitMilvusClientsImport(onlyIds);
-    setMsg(`<span style="color:var(--success,#16a34a)">${res.created} cliente(s) importado(s)${res.skipped && res.skipped.length ? ` · ${res.skipped.length} pulado(s)` : ''}.</span>`);
+    setMsg(`<span style="color:var(--success,#16a34a)">${plural(res.created, 'cliente importado', 'clientes importados')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`);
     try {
       if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal().catch(() => {});
-      if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${res.created} novo(s) do Milvus`);
+      if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${plural(res.created, 'novo', 'novos')} do Milvus`);
       // A grade atrás do modal estava ficando stale: reconstrói o filtro e os badges.
       if (typeof _refreshClientsInPlace === 'function') _refreshClientsInPlace();
       if (typeof updateBadges === 'function') updateBadges();
@@ -1100,7 +1099,7 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
       setMsg('<span style="color:var(--text-muted)">Cliente não possui mapeamento no Milvus.</span>');
     } else if (!silent) {
       const s = (res && res.synced) || 0;
-      setMsg(`<span style="color:var(--success,#16a34a)">${s} chamado(s) atualizado(s).</span>`);
+      setMsg(`<span style="color:var(--success,#16a34a)">${plural(s, 'chamado atualizado', 'chamados atualizados')}.</span>`);
     } else {
       setMsg('');
     }
@@ -1223,9 +1222,9 @@ async function importClientInventoryUI(clientId, input) {
   try {
     setMsg('<span style="color:var(--text-muted)">Lendo planilha…</span>');
     const rows = await readMilvusExportFile(file);
-    setMsg(`<span style="color:var(--text-muted)">Importando ${rows.length} linha(s)…</span>`);
+    setMsg(`<span style="color:var(--text-muted)">Importando ${plural(rows.length, 'linha', 'linhas')}…</span>`);
     const res = await importClientDevicesFromRows(clientId, rows);
-    setMsg(`<span style="color:var(--success,#16a34a)">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outro(s) cliente(s), ignorados` : ''}</span>`);
+    setMsg(`<span style="color:var(--success,#16a34a)">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outros clientes, ignorados` : ''}</span>`);
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
@@ -2235,12 +2234,12 @@ function renderImportPreview() {
           ${row.map((c, ci) => `<td style="padding:4px 8px;${ci >= colCount ? 'display:none' : ''}">${escapeHtml(c)}</td>`).join('')}
           ${Array(Math.max(0, colCount - row.length)).fill('<td style="padding:4px 8px;color:var(--text-muted)">—</td>').join('')}
         </tr>`).join('')}
-        ${validRows.length > 8 ? `<tr><td colspan="${colCount + 1}" style="padding:8px;text-align:center;color:var(--text-muted);font-size:11px">...e mais ${validRows.length - 8} linha(s)</td></tr>` : ''}
+        ${validRows.length > 8 ? `<tr><td colspan="${colCount + 1}" style="padding:8px;text-align:center;color:var(--text-muted);font-size:11px">...e mais ${plural(validRows.length - 8, 'linha', 'linhas')}</td></tr>` : ''}
       </tbody>
     </table>
   `;
 
-  statsDiv.textContent = `${validRows.length} linha(s) para importar · ${headerRow.length} coluna(s)`;
+  statsDiv.textContent = `${plural(validRows.length, 'linha', 'linhas')} para importar · ${plural(headerRow.length, 'coluna', 'colunas')}`;
   if (importBtn) importBtn.style.display = validRows.length ? 'inline-flex' : 'none';
 }
 
@@ -2300,7 +2299,7 @@ function executeClientImport() {
   closeModal();
   _refreshClientsInPlace(); // reconstrói o filtro (importados visíveis mesmo com busca ativa)
   updateBadges();
-  showToast(`${created} cliente(s) importado(s)${skipped ? ` · ${skipped} linha(s) ignoradas` : ''}`, 'success');
+  showToast(`${plural(created, 'cliente importado', 'clientes importados')}${skipped ? ` · ${plural(skipped, 'linha ignorada', 'linhas ignoradas')}` : ''}`, 'success');
 }
 
 // ── Auto-refresh global (preserva filtros/paginação/scroll) ──

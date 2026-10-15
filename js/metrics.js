@@ -453,7 +453,7 @@ function getNextMeeting(reunioes, team) {
 function buildDaySummary({ dueToday, todayVisits, overloadedOps, onLeaveOps }) {
   const d = (dueToday || []).length != null ? (Array.isArray(dueToday) ? dueToday.length : dueToday) : 0;
   const v = (todayVisits || []).length != null ? (Array.isArray(todayVisits) ? todayVisits.length : todayVisits) : 0;
-  let s = `Hoje: ${d} pendência(s) vencem, ${v} visita(s) agendada(s).`;
+  let s = `Hoje: ${d} ${d === 1 ? 'pendência vence' : 'pendências vencem'}, ${v} ${v === 1 ? 'visita agendada' : 'visitas agendadas'}.`;
   const extras = [];
   (overloadedOps || []).forEach((o) => {
     const name = typeof o === 'string' ? o : o.name;

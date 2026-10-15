@@ -201,10 +201,14 @@ describe('contrato do template e do CSS', () => {
     expect(src).toContain("closeModal();deleteVisitConfirm(");
   });
 
-  it('CSS do redesign presente + fonte Schibsted', () => {
+  it('CSS do redesign presente + fonte única do app (sem Schibsted/Inter)', () => {
     for (const sel of ['.vis-card', '.vis-chip[aria-pressed', '.vis-fab', '.vis-kpis', '.vis-fbtn.on', '.vis-st', '.vis-av']) {
       expect(css).toContain(sel);
     }
-    expect(fs.readFileSync('index.html', 'utf8')).toContain('Schibsted+Grotesk');
+    const html = fs.readFileSync('index.html', 'utf8');
+    expect(html).toContain('family=Manrope');
+    expect(html).not.toContain('Schibsted+Grotesk');
+    expect(html).not.toContain('family=Inter');
+    expect(css).toContain('font-family: var(--font-sans)');
   });
 });
