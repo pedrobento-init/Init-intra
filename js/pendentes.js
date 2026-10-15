@@ -3,8 +3,14 @@
 // próximo sync. Antes só havia um contador (que zerava no reload e não dizia
 // O QUE estava pendente). Aqui a lista vem das mesmas fontes que o sync usa:
 //  - outbox (pendências salvas offline, com nº de tentativas);
-//  - registros alterados depois do último sync bem-sucedido da entidade;
-//  - exclusões aguardando envio (tombstones).
+//  - registros mais novos que a última versão CONFIRMADA pelo servidor;
+//  - exclusões ainda não confirmadas pelo servidor (tombstones).
+//
+// "Confirmado pelo servidor" (versão 2): online, cada save vai direto ao
+// Supabase sem esperar o sync — comparar com a data do último sync marcava
+// como pendente tudo que já tinha subido. Agora registramos, por registro, o
+// updated_at que o servidor confirmou (upsert sem erro, delete sem erro,
+// realtime e pull do sync) e só é pendente o que for mais novo que isso.
 
 const PENDENTES_LABELS = {
   pendencias: 'Pendência', visits: 'Visita', clients: 'Cliente', operators: 'Operador',
@@ -19,34 +25,140 @@ function _pendTitle(table, r) {
   return r.name || r.nome || r.title || r.assunto || r.id;
 }
 
+const _ms = (iso) => { const t = new Date(iso || 0).getTime(); return isNaN(t) ? 0 : t; };
+
 /**
  * Lista pura (testável).
  * @param {{table:string, dbKey:string, records:object[], lastSyncAt:string|null}[]} sources
  * @param {object[]} outboxRows  entradas da outbox ({entity, targetId, payload, createdAt, attempts})
  * @param {object} tombstones    { dbKey: { id: deletedAtISO } }
+ * @param {{up?:object, del?:object}} [confirmed] confirmações do servidor:
+ *        up[table][id] = updated_at confirmado; del[table][id] = 1
  */
-function buildPendingList(sources, outboxRows, tombstones) {
+function buildPendingList(sources, outboxRows, tombstones, confirmed) {
+  const up = (confirmed && confirmed.up) || {};
+  const del = (confirmed && confirmed.del) || {};
+  const isConfirmed = (table, id, stamp) => {
+    const c = up[table] && up[table][id];
+    return !!c && _ms(stamp) <= _ms(c);
+  };
   const out = [];
   const seen = new Set();
   const push = (item) => { const k = item.table + ':' + item.id; if (seen.has(k)) return; seen.add(k); out.push(item); };
   for (const o of (outboxRows || [])) {
     if (!o || !o.targetId) continue;
-    push({ table: o.entity, id: o.targetId, kind: 'save', title: _pendTitle(o.entity, o.payload), at: (o.payload && o.payload.updatedAt) || o.createdAt, attempts: o.attempts || 0 });
+    const at = (o.payload && o.payload.updatedAt) || o.createdAt;
+    if (isConfirmed(o.entity, o.targetId, at)) continue; // já subiu por outro caminho
+    push({ table: o.entity, id: o.targetId, kind: 'save', title: _pendTitle(o.entity, o.payload), at, attempts: o.attempts || 0 });
   }
   for (const s of (sources || [])) {
     for (const r of (s.records || [])) {
       if (!r || !r.id) continue;
       const stamp = r.updatedAt || r.createdAt || '';
-      // Nunca sincronizou: tudo que existe só aqui está pendente.
-      if (!s.lastSyncAt || (stamp && stamp > s.lastSyncAt)) {
-        push({ table: s.table, id: r.id, kind: stamp && r.createdAt && r.createdAt > (s.lastSyncAt || '') ? 'create' : 'save', title: _pendTitle(s.table, r), at: stamp, attempts: 0 });
+      const conf = up[s.table] && up[s.table][r.id];
+      // Com confirmação do servidor: pendente só se o local for mais novo.
+      // Sem confirmação (dados de antes desta versão): regra do último sync.
+      const pending = conf ? _ms(stamp) > _ms(conf) : (!s.lastSyncAt || (stamp && stamp > s.lastSyncAt));
+      if (pending) {
+        push({ table: s.table, id: r.id, kind: !conf && stamp && r.createdAt && r.createdAt > (s.lastSyncAt || '') ? 'create' : 'save', title: _pendTitle(s.table, r), at: stamp, attempts: 0 });
       }
     }
     const tomb = (tombstones && tombstones[s.dbKey]) || {};
-    for (const id of Object.keys(tomb)) push({ table: s.table, id, kind: 'delete', title: 'Exclusão de ' + (PENDENTES_LABELS[s.table] || s.table).toLowerCase(), at: tomb[id], attempts: 0 });
+    for (const id of Object.keys(tomb)) {
+      if (del[s.table] && del[s.table][id]) continue; // servidor já apagou
+      push({ table: s.table, id, kind: 'delete', title: 'Exclusão de ' + (PENDENTES_LABELS[s.table] || s.table).toLowerCase(), at: tomb[id], attempts: 0 });
+    }
   }
   return out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
 }
+
+// ── Confirmações do servidor (persistidas no aparelho) ─────────────────────
+const SERVER_SEEN_KEY = 'intra_server_seen_v1';
+let _serverSeen = null;
+let _serverSeenTimer = null;
+function _loadServerSeen() {
+  if (_serverSeen) return _serverSeen;
+  try { _serverSeen = JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(SERVER_SEEN_KEY)) || 'null'); } catch (_) { _serverSeen = null; }
+  if (!_serverSeen || typeof _serverSeen !== 'object') _serverSeen = {};
+  _serverSeen.up = _serverSeen.up || {};
+  _serverSeen.del = _serverSeen.del || {};
+  return _serverSeen;
+}
+function _saveServerSeen() {
+  clearTimeout(_serverSeenTimer);
+  _serverSeenTimer = setTimeout(() => {
+    try { localStorage.setItem(SERVER_SEEN_KEY, JSON.stringify(_loadServerSeen())); } catch (_) {}
+  }, 300);
+}
+/** Servidor confirmou estas linhas (id + updated_at). */
+function markServerSeen(table, rows) {
+  if (!table || !rows) return;
+  const s = _loadServerSeen();
+  const t = s.up[table] || (s.up[table] = {});
+  let changed = false;
+  for (const r of (Array.isArray(rows) ? rows : [rows])) {
+    if (!r || !r.id) continue;
+    const at = r.updated_at || r.updatedAt;
+    if (!at) continue;
+    if (!t[r.id] || _ms(at) > _ms(t[r.id])) { t[r.id] = at; changed = true; }
+  }
+  if (changed) { _saveServerSeen(); refreshPendingStrip(); }
+}
+/** Servidor confirmou a exclusão. */
+function markServerDeleted(table, id) {
+  if (!table || !id) return;
+  const s = _loadServerSeen();
+  (s.del[table] || (s.del[table] = {}))[id] = 1;
+  _saveServerSeen();
+  refreshPendingStrip();
+}
+
+// Intercepta o cliente Supabase num ponto só (22 upserts espalhados pelo
+// app): upsert/delete sem erro viram confirmação. Encadeia no `then` do
+// próprio builder — não dispara requisição extra.
+function _hookThen(builder, onOk) {
+  if (!builder || typeof builder.then !== 'function' || builder.__seenHooked) return builder;
+  const origThen = builder.then;
+  builder.then = function (res, rej) {
+    return origThen.call(this, (r) => { try { if (r && !r.error) onOk(r); } catch (_) {} return res ? res(r) : r; }, rej);
+  };
+  builder.__seenHooked = true;
+  return builder;
+}
+function wrapSupabaseForSeen(client) {
+  if (!client || typeof client.from !== 'function' || client.__seenWrapped) return client;
+  const origFrom = client.from.bind(client);
+  client.from = function (table) {
+    const b = origFrom(table);
+    if (!b) return b;
+    if (typeof b.upsert === 'function') {
+      const origUpsert = b.upsert;
+      b.upsert = function (payload, opts) {
+        const q = origUpsert.call(this, payload, opts);
+        const rows = Array.isArray(payload) ? payload : [payload];
+        return _hookThen(q, () => markServerSeen(table, rows));
+      };
+    }
+    if (typeof b.delete === 'function') {
+      const origDelete = b.delete;
+      b.delete = function () {
+        const q = origDelete.apply(this, arguments);
+        if (q && typeof q.eq === 'function') {
+          const origEq = q.eq;
+          q.eq = function (col, val) {
+            const r = origEq.call(this, col, val);
+            return col === 'id' ? _hookThen(r, () => markServerDeleted(table, val)) : r;
+          };
+        }
+        return q;
+      };
+    }
+    return b;
+  };
+  client.__seenWrapped = true;
+  return client;
+}
+try { if (typeof supabaseClient !== 'undefined' && supabaseClient) wrapSupabaseForSeen(supabaseClient); } catch (_) {}
 
 async function getPendingChanges() {
   let rows = [];
@@ -63,7 +175,7 @@ async function getPendingChanges() {
   } catch (_) {}
   let tombs = {};
   try { tombs = typeof _loadTombstones === 'function' ? _loadTombstones() : {}; } catch (_) { tombs = {}; }
-  const list = buildPendingList(sources, rows, tombs);
+  const list = buildPendingList(sources, rows, tombs, _loadServerSeen());
   // Fotos de visita tiradas offline (fila própria, ver visit-photos.js).
   try {
     const q = (typeof getCacheKV === 'function' ? getCacheKV('intra_visit_photos_queue', []) : []) || [];
@@ -82,6 +194,7 @@ function refreshPendingStrip() {
   _pendStripTimer = setTimeout(_paintPendingStrip, 250);
 }
 async function _paintPendingStrip() {
+  if (typeof document === 'undefined') return;
   const el = document.getElementById('pendingStrip');
   if (!el) return;
   // Sem servidor configurado não há "pendente de envio": tudo é local mesmo.
@@ -135,4 +248,4 @@ if (typeof window !== 'undefined' && !window._pendStripBound) {
   } catch (_) {}
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { buildPendingList };
+if (typeof module !== 'undefined' && module.exports) module.exports = { buildPendingList, wrapSupabaseForSeen, markServerSeen, markServerDeleted, _loadServerSeen };

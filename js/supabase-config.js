@@ -87,6 +87,12 @@ function _applyRealtimePayload(table, payload) {
           }
         } catch (_) {}
         const event = payload.eventType || payload.event;
+        // O que chega do servidor está, por definição, confirmado no servidor
+        // (faixa "aguardando envio" não conta mudança de colega como nossa).
+        try {
+          if (event === 'DELETE' && payload.old && typeof markServerDeleted === 'function') markServerDeleted(table, payload.old.id);
+          else if (payload.new && typeof markServerSeen === 'function') markServerSeen(table, [payload.new]);
+        } catch (_) {}
         if (event === 'DELETE' && payload.old) {
             const id = payload.old.id;
             list = list.filter(x => x.id !== id);
