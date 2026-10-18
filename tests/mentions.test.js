@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -8,8 +10,7 @@ describe('parseMentionedOperators', () => {
     globalThis.getOperatorNames = () => ['Pedro', 'João Silva', 'Maria'];
     globalThis.escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     // clear require cache
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
   it('detecta @Pedro case-insensitive', () => {
     const r = storage.parseMentionedOperators('Oi @pedro tudo bem?');
@@ -40,8 +41,7 @@ describe('highlightMentions', () => {
   beforeEach(() => {
     globalThis.getOperatorNames = () => ['Pedro', 'João Silva'];
     globalThis.escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
   it('envolve @Nome com span estilizado', () => {
     const out = storage.highlightMentions('Oi @Pedro tudo bem');

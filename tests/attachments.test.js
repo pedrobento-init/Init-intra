@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -7,8 +9,7 @@ describe('_dataUrlToBlob (FASE 2 — backfill base64 para Storage)', () => {
   beforeEach(() => {
     globalThis.getOperatorNames = () => [];
     globalThis.escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
   it('converte dataURL png em Blob com mime e bytes corretos', () => {
     // 1x1 png

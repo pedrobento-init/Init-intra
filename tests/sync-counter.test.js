@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Stubs de browser ANTES de carregar storage.js ────────────────────────────
@@ -61,7 +63,7 @@ const _origError = console.error;
 console.error = () => {};
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const storage = require('../js/storage.js');
+const storage = requireStorage();
 const gs = require('../js/global-search.js');
 console.error = _origError;
 

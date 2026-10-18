@@ -96,7 +96,10 @@ function getSearchActions() {
     go('pendencias', 'Pendências', 'pendencias quadro kanban'),
     go('calendario', 'Agenda', 'agenda calendario'),
     go('prazos', 'Prazos e SLA', 'prazos sla vencidas atrasadas cumprimento'),
+    go('vencimentos', 'Vencimentos', 'vencimentos licenca ssl certificado dominio garantia renovacao'),
+    { id: 'new-venc', label: 'Novo vencimento', kw: 'novo cadastrar vencimento licenca ssl dominio garantia', run: () => { if (typeof openVencimentoForm === 'function') openVencimentoForm(); } },
     go('visitas', 'Visitas', 'visitas'),
+    { id: 'cal-feed', label: 'Agenda no celular (Google/Outlook)', kw: 'agenda celular google outlook iphone ics calendario assinar', run: () => { if (typeof openCalendarFeed === 'function') openCalendarFeed(); } },
     go('clientes', 'Clientes', 'clientes'),
     go('equipamentos', 'Equipamentos', 'equipamentos estoque'),
     { id: 'theme', label: 'Alternar tema claro/escuro', kw: 'tema escuro claro dark light', run: () => { const b = document.getElementById('themeToggleBtn'); if (b) b.click(); } },
@@ -232,11 +235,18 @@ function _renderSearchResults(query) {
            (eq.tipo || '').toLowerCase().includes(q);
   }).slice(0, 5);
 
+  // Base de conhecimento (artigos, procedimentos, modelos, casos resolvidos).
+  let matchKb = [];
+  if (q && !hasFilters && typeof kbSearch === 'function' && typeof kbDocs === 'function') {
+    try { matchKb = kbSearch(kbDocs(), remainingText, { limit: 4 }).filter((d) => d.kind !== 'caso' || !matchPens.some((p) => p.id === d.id)); } catch (_) { matchKb = []; }
+  }
+
   _searchResults = [
     ...matchActions.map(a => ({ type: 'action', data: a })),
     ...matchClients.map(c => ({ type: 'client', data: c })),
     ...matchPens.map(p => ({ type: 'pendencia', data: p })),
-    ...matchEquips.map(eq => ({ type: 'equipamento', data: eq }))
+    ...matchEquips.map(eq => ({ type: 'equipamento', data: eq })),
+    ...matchKb.map(d => ({ type: 'kb', data: d }))
   ];
 
   if (_searchResults.length === 0) {
@@ -332,6 +342,22 @@ function _renderSearchResults(query) {
     }).join('');
   }
 
+  if (matchKb.length) {
+    const kbOffset = penOffset + matchEquips.length;
+    html += `<div class="search-group-label">Conhecimento</div>`;
+    html += matchKb.map((d, i) => `
+      <div class="search-result-item" data-idx="${kbOffset + i}" onclick="selectSearchResult(${kbOffset + i})">
+        <div class="search-result-icon" style="background:#ecfdf5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        <div style="min-width:0;flex:1">
+          <div class="search-result-title">${escapeHtml(d.title || '—')}</div>
+          <div class="search-result-sub">${escapeHtml([typeof KB_KINDS !== 'undefined' ? KB_KINDS[d.kind] : d.kind, d.clientName].filter(Boolean).join(' · '))}</div>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`).join('');
+  }
+
   container.innerHTML = html;
 }
 
@@ -356,6 +382,9 @@ function selectSearchResult(idx) {
       break;
     case 'equipamento':
       navigateTo('equipamentos');
+      break;
+    case 'kb':
+      if (typeof openKbDoc === 'function') openKbDoc(result.data.kind, result.data.id);
       break;
   }
 }

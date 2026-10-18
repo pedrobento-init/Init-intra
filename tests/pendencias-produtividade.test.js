@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -43,7 +45,7 @@ describe('recorrência', () => {
     expect(T.nextRecurrenceDateFrom('2026-10-14', 'monthly', '2026-10-15')).toBe('2026-11-14');
   });
   it('próxima ocorrência herda o checklist desmarcado (contrato no storage)', () => {
-    const src = fs.readFileSync('js/storage.js', 'utf8');
+    const src = storageSource();
     expect(src).toMatch(/checklist: \(Array\.isArray\(data\.checklist\)[^]*done: false/);
   });
   it('card mostra o selo de recorrência', () => {

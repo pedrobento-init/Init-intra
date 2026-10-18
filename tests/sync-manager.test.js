@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -45,7 +47,7 @@ describe('SyncManager — backoff exponencial', () => {
 });
 
 describe('Sync — detecção de sessão expirada (_isAuthError)', () => {
-  const storage = require('../js/storage.js');
+  const storage = requireStorage();
   const { _isAuthError } = storage;
 
   it('401 é auth (short-circuit + refresh, não retry de rede)', () => {

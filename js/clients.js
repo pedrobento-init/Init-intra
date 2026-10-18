@@ -210,6 +210,7 @@ const FICHA_SECTIONS = [
     { k: 'responsible', l: 'Responsável TI' },
     { k: 'responsiblePhone', l: 'Contato', ty: 'phone' },
     { k: 'technician', l: 'Técnico' },
+    { k: 'address', l: 'Endereço', ty: 'address', w: true },
     { k: 'milvusClientToken', l: 'Token Milvus', ty: 'secret' },
   ]},
   { id: 'servidor', title: 'Servidor', icon: 'server', fields: [
@@ -289,6 +290,7 @@ const FICHA_ICON_PATHS = {
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/><line x1="1" y1="1" x2="23" y2="23"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
   form: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
 };
@@ -336,11 +338,18 @@ function cfDateTimeLocalValue(v) {
   return '';
 }
 
+// Campo preenchido? O ID de acesso guardado no cofre (043) conta como preenchido
+// mesmo sem o valor no registro.
+function cfFieldFilled(c, f) {
+  if (f.k === 'server.remoteId' && typeof isRemoteIdVaulted === 'function' && isRemoteIdVaulted(c)) return true;
+  return cfFilled(cfGet(c, f.k));
+}
+
 function cfProgress(c) {
   let filled = 0, total = 0;
   FICHA_SECTIONS.forEach(s => s.fields.forEach(f => {
     total++;
-    if (cfFilled(cfGet(c, f.k))) filled++;
+    if (cfFieldFilled(c, f)) filled++;
   }));
   return { filled, total };
 }
@@ -367,7 +376,7 @@ function cfSectionCount(sec, c) {
     const n = (c.licenses || []).length;
     return n ? `${n} licença${n > 1 ? 's' : ''}` : 'Nenhuma licença';
   }
-  const n = sec.fields.filter(f => cfFilled(cfGet(c, f.k))).length;
+  const n = sec.fields.filter(f => cfFieldFilled(c, f)).length;
   return n ? `${n} de ${sec.fields.length} preenchidos` : 'Nenhum dado preenchido';
 }
 
@@ -425,9 +434,64 @@ function cfLinkAction(label, icon, href, title, newTab) {
   return a;
 }
 
+// ── ID de acesso guardado no cofre (migration 043) ─────────────────────────
+// O valor não está no registro: Mostrar/Copiar/Abrir buscam no servidor
+// (cada busca vai para a auditoria) e o valor fica 1 min só em memória.
+function cfVaultedRemoteIdEl(field, clientId, c) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cf-value';
+  wrap.dataset.cfKey = field.k;
+  const shown = getRevealedSecret(clientId, 'remote_id');
+  const refresh = () => cfRefreshFields(clientId, field.k);
+  const withValue = async (fn) => {
+    try { fn(await revealClientSecret(clientId, 'remote_id', null, refresh)); }
+    catch (err) { showToast(err.message, 'warning'); }
+  };
+
+  const txt = document.createElement('span');
+  txt.className = 'cf-text';
+  txt.tabIndex = 0;
+  txt.setAttribute('role', 'button');
+  txt.setAttribute('aria-label', 'Trocar ' + field.l);
+  txt.title = 'Clique para trocar (o atual fica guardado até você digitar outro)';
+  txt.textContent = shown !== null ? (shown || '—') : '••••••';
+  txt.addEventListener('click', () => cfStartEdit(wrap, field, clientId));
+  txt.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cfStartEdit(wrap, field, clientId); }
+  });
+  wrap.appendChild(txt);
+
+  const actions = document.createElement('span');
+  actions.className = 'cf-actions';
+  if (shown !== null) {
+    actions.appendChild(cfActionButton('Ocultar', 'eyeOff', 'Ocultar ' + field.l, () => { forgetClientSecret(clientId, 'remote_id'); refresh(); }));
+  } else {
+    actions.appendChild(cfActionButton('Mostrar', 'eye', 'Mostrar ' + field.l + ' (fica registrado na auditoria)', () => withValue(refresh)));
+  }
+  actions.appendChild(cfActionButton('Copiar', 'copy', 'Copiar ' + field.l, () => withValue((v) => cfCopy(v, { mask: true, label: field.l }))));
+  if (field.openWith === 'anydesk' && /anydesk/i.test(String(cfGet(c, 'server.remoteAccess') || ''))) {
+    actions.appendChild(cfActionButton('Abrir', 'open', 'Abrir no AnyDesk', () => withValue((v) => { if (v) window.location.href = 'anydesk:' + v.replace(/\s+/g, ''); })));
+  }
+  actions.appendChild(cfActionButton('Apagar', 'trash', 'Apagar ' + field.l, async () => {
+    if (!window.confirm('Apagar o ' + field.l + ' guardado deste cliente?')) return;
+    try {
+      await setClientRemoteId(clientId, '');
+      const cur = getClientById(clientId);
+      if (cur) saveClient(cfSet(cur, 'server.remoteIdSet', false));
+      showToast(field.l + ' apagado.', 'success');
+    } catch (err) { showToast(err.message, 'error'); }
+    refresh();
+  }));
+  wrap.appendChild(actions);
+  return wrap;
+}
+
 // ── Célula de valor: texto + ações + clique para editar ────────────────────
 function cfValueEl(field, clientId) {
   const c = getClientById(clientId) || {};
+  if (field.k === 'server.remoteId' && typeof isRemoteIdVaulted === 'function' && isRemoteIdVaulted(c)) {
+    return cfVaultedRemoteIdEl(field, clientId, c);
+  }
   const raw = String(cfGet(c, field.k) == null ? '' : cfGet(c, field.k));
   const has = cfFilled(raw);
   const revealed = _fichaReveal[field.k] === true;
@@ -488,6 +552,11 @@ function cfValueEl(field, clientId) {
         actions.appendChild(cfLinkAction('Ligar', 'phone', 'tel:' + d, 'Ligar para ' + field.l));
         actions.appendChild(cfLinkAction('WhatsApp', 'chat', 'https://wa.me/55' + d, 'Abrir WhatsApp', true));
       }
+    }
+    if (field.ty === 'address' && typeof mapsLinks === 'function') {
+      const ml = mapsLinks(raw);
+      actions.appendChild(cfLinkAction('Maps', 'open', ml.google, 'Abrir no Google Maps', true));
+      actions.appendChild(cfLinkAction('Waze', 'open', ml.waze, 'Abrir no Waze', true));
     }
     if (field.openWith === 'anydesk') {
       const remote = String(cfGet(c, 'server.remoteAccess') || '');
@@ -554,6 +623,10 @@ function cfStartEdit(wrap, field, clientId) {
   }
   input.className = 'cf-input';
   input.setAttribute('aria-label', 'Editar ' + field.l);
+  // ID no cofre: o campo abre vazio (o atual não desce); vazio = mantém.
+  if (field.k === 'server.remoteId' && typeof isRemoteIdVaulted === 'function' && isRemoteIdVaulted(c)) {
+    input.placeholder = 'Novo ID — vazio mantém o atual';
+  }
   wrap.classList.add('is-editing');
   txt.replaceWith(input);
   input.focus();
@@ -636,7 +709,7 @@ function toggleFichaSection(clientId, secId) {
   const root = document.getElementById('clientTabContent');
   if (!sec || !c || !root) return;
   const key = clientId + '|' + secId;
-  const hasData = sec.ro ? (c.licenses || []).length > 0 : sec.fields.some(f => cfFilled(cfGet(c, f.k)));
+  const hasData = sec.ro ? (c.licenses || []).length > 0 : sec.fields.some(f => cfFieldFilled(c, f));
   const cur = _fichaOpen[key] !== undefined ? _fichaOpen[key] : hasData;
   _fichaOpen[key] = !cur;
   const wrap = root.querySelector('[data-cf-sec="' + secId + '"]');
@@ -661,7 +734,7 @@ function openClientFullForm(clientId) {
 
 function cfSectionEl(sec, clientId, c) {
   const key = clientId + '|' + sec.id;
-  const hasData = sec.ro ? (c.licenses || []).length > 0 : sec.fields.some(f => cfFilled(cfGet(c, f.k)));
+  const hasData = sec.ro ? (c.licenses || []).length > 0 : sec.fields.some(f => cfFieldFilled(c, f));
   const open = _fichaOpen[key] !== undefined ? !!_fichaOpen[key] : hasData;
 
   const wrap = document.createElement('section');
@@ -710,6 +783,26 @@ function cfLicensesEl(c) {
     row.className = 'cf-lic';
     row.innerHTML = `<div class="cf-lic-name">${escapeHtml(l.software || '—')}${l.expiry ? `<span class="cf-badge cf-badge--warn">até ${escapeHtml(l.expiry)}</span>` : ''}</div>` +
       (l.key ? `<code class="cf-lic-key">${escapeHtml(l.key)}</code>` : '');
+    // Chave no cofre (043): mascarada; Mostrar/Copiar buscam no servidor (auditado).
+    if (typeof isLicenseKeyVaulted === 'function' && isLicenseKeyVaulted(l)) {
+      const shown = getRevealedSecret(c.id, 'license', l.kid);
+      const code = document.createElement('code');
+      code.className = 'cf-lic-key';
+      code.textContent = shown !== null ? (shown || '—') : '••••-••••';
+      row.appendChild(code);
+      const repaint = () => { const fresh = cfLicensesEl(getClientById(c.id) || c); wrap.replaceWith(fresh); };
+      const withKey = async (fn) => {
+        try { fn(await revealClientSecret(c.id, 'license', l.kid, repaint)); }
+        catch (err) { showToast(err.message, 'warning'); }
+      };
+      const acts = document.createElement('span');
+      acts.className = 'cf-actions';
+      acts.appendChild(shown !== null
+        ? cfActionButton('Ocultar', 'eyeOff', 'Ocultar chave', () => { forgetClientSecret(c.id, 'license', l.kid); repaint(); })
+        : cfActionButton('Mostrar', 'eye', 'Mostrar chave (fica registrado na auditoria)', () => withKey(repaint)));
+      acts.appendChild(cfActionButton('Copiar', 'copy', 'Copiar chave', () => withKey((v) => cfCopy(v, { mask: true, label: 'Chave' }))));
+      row.appendChild(acts);
+    }
     wrap.appendChild(row);
   });
   return wrap;
@@ -1546,6 +1639,7 @@ function openClientForm(id = null) {
           <div class="form-group"><label class="form-label">Contato</label><input class="form-input" name="responsiblePhone" value="${esc(c.responsiblePhone)}" /></div>
         </div>
         <div class="form-group"><label class="form-label">Técnico da Equipe</label><input class="form-input" name="technician" value="${esc(c.technician)}" /></div>
+        <div class="form-group"><label class="form-label">Endereço</label><input class="form-input" name="address" value="${esc(c.address)}" placeholder="Rua, número - bairro, cidade" autocomplete="street-address" /></div>
       </div>
       <div class="form-section">
         <div class="form-section-title">Servidor</div>
@@ -1560,7 +1654,7 @@ function openClientForm(id = null) {
             <select class="form-select" name="server_remoteAccess">${FICHA_OPTS.remoteAccess.map(o=>`<option ${c.server?.remoteAccess===o?'selected':''}>${o}</option>`).join('')}</select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">ID / Endereço</label><input class="form-input" name="server_remoteId" value="${esc(c.server?.remoteId)}" /></div>
+          <div class="form-group"><label class="form-label">ID / Endereço</label><input class="form-input" name="server_remoteId" value="${esc(c.server?.remoteId)}"${c.server?.remoteIdSet && !c.server?.remoteId ? ' placeholder="Guardado — preencha para trocar"' : ''} autocomplete="off" /></div>
           <div class="form-group"><label class="form-label">Obs</label><input class="form-input" name="server_notes" value="${esc(c.server?.notes)}" /></div>
         </div>
       </div>
@@ -1629,7 +1723,7 @@ function licRow(l={}, i=0) {
   const esc = v => escapeHtml(v || '');
   return `<div class="form-row" id="lr${i}" style="align-items:end;margin-bottom:8px">
     <div class="form-group" style="margin-bottom:0"><label class="form-label">Software</label><input class="form-input" name="ls_${i}" value="${esc(l.software)}" /></div>
-    <div class="form-group" style="margin-bottom:0"><label class="form-label">Chave</label><input class="form-input" name="lk_${i}" value="${esc(l.key)}" /></div>
+    <div class="form-group" style="margin-bottom:0"><label class="form-label">Chave</label><input class="form-input" name="lk_${i}" value="${esc(l.key)}"${l.hasKey && !l.key ? ' placeholder="Guardada — preencha para trocar"' : ''} autocomplete="off" /><input type="hidden" name="lid_${i}" value="${esc(l.kid)}" /><input type="hidden" name="lh_${i}" value="${l.hasKey ? '1' : ''}" /></div>
     <div class="form-group" style="margin-bottom:0"><label class="form-label">Validade</label><input type="date" class="form-input" name="le_${i}" value="${esc(l.expiry)}" /></div>
     <button type="button" class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="document.getElementById('lr${i}').remove()">✕</button>
   </div>`;
@@ -1847,7 +1941,12 @@ function submitClientForm(e, id) {
     document.querySelectorAll('[id^="lr"]').forEach(row => {
       const i = row.id.replace('lr','');
       const s = fd.get(`ls_${i}`);
-      if (s) lics.push({ software: s, key: fd.get(`lk_${i}`), expiry: fd.get(`le_${i}`) });
+      if (!s) return;
+      // kid liga a linha à chave guardada no cofre: chave vazia = mantém a guardada.
+      const kid = fd.get(`lid_${i}`) || '';
+      const lic = { software: s, key: fd.get(`lk_${i}`), expiry: fd.get(`le_${i}`) };
+      if (kid) { lic.kid = kid; if (!lic.key && fd.get(`lh_${i}`) === '1') lic.hasKey = true; }
+      lics.push(lic);
     });
     const logoValue = window._currentLogoData || g('logo');
     const existing = id ? getClientById(id) : null;
@@ -1865,8 +1964,10 @@ function submitClientForm(e, id) {
       color: window._selectedColor||COLORS[0], initials:g('initials'), logo: logoValue,
       logoShape: window._selectedLogoShape||'circle',
       owner:g('owner'), ownerPhone:g('ownerPhone'), responsible:g('responsible'),
-      responsiblePhone:g('responsiblePhone'), technician:g('technician'),
-      server:{type:g('server_type'),os:g('server_os'),ip:g('server_ip'),remoteAccess:g('server_remoteAccess'),remoteId:g('server_remoteId'),notes:g('server_notes')},
+      responsiblePhone:g('responsiblePhone'), technician:g('technician'), address:g('address').trim(),
+      server:{type:g('server_type'),os:g('server_os'),ip:g('server_ip'),remoteAccess:g('server_remoteAccess'),remoteId:g('server_remoteId'),notes:g('server_notes'),
+        // ID no cofre: campo vazio mantém o guardado (a marca não pode se perder).
+        ...(!g('server_remoteId') && existing && existing.server && existing.server.remoteIdSet === true ? { remoteIdSet: true } : {})},
       hosting:{provider:g('hosting_provider'),panelUrl:g('hosting_panelUrl'),user:g('hosting_user'),notes:g('hosting_notes')},
       backup:{frequency:g('backup_frequency'),time:g('backup_time'),destination:g('backup_destination'),tool:g('backup_tool'),lastCheck:g('backup_lastCheck'),lastBackupAt:g('backup_lastBackupAt'),lastBackupStatus:g('backup_lastBackupStatus')},
       emails:{provider:g('emails_provider'),domain:g('emails_domain'),server:g('emails_server'),port:g('emails_port'),quota:g('emails_quota')},

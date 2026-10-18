@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -59,8 +61,7 @@ describe('updatePendenciaAssignee (regras 404/400/403)', () => {
     delete _tables.audit_logs;
     mockOps();
     _session = { opId: 'OP-9', name: 'Ana', team: 'init', isAdmin: false };
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
 
   it('reatribui, mantém completedBy e registra auditoria', () => {
@@ -112,8 +113,7 @@ describe('completedBy (quem concluiu)', () => {
     delete _tables.audit_logs;
     mockOps();
     _session = { opId: 'OP-9', name: 'Ana', team: 'init', isAdmin: false };
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
 
   it('corrige quem concluiu e registra auditoria (completedAt intacto)', () => {

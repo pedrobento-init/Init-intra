@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -46,8 +48,7 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
       { id: 'OP-9', name: 'Ana', team: 'init', isAdmin: false, active: true, role: 'Técnico' },
     ];
     _session = null;
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
     try {
       const src = fs.readFileSync('js/pendencias.js', 'utf8');
       const m = src.match(/const TIPOS = \[(.*?)\];/);
