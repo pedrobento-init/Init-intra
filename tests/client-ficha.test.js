@@ -92,9 +92,9 @@ describe('Ficha TI', () => {
   describe('progresso da ficha', () => {
     it('conta campos preenchidos sobre o total do modelo', () => {
       const { filled, total } = mod.cfProgress(CLIENT);
-      expect(total).toBe(31);
+      expect(total).toBe(32); // + Endereço (roteiro do dia)
       expect(filled).toBe(29);
-      expect(Math.round((filled / total) * 100)).toBe(94);
+      expect(Math.round((filled / total) * 100)).toBe(91);
     });
     it('ficha vazia fica em 0', () => {
       const { filled, total } = mod.cfProgress({ id: 'X' });

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v48';
-const CDN_CACHE_NAME = 'init-intra-cdn-v48';
+const CACHE_NAME = 'init-intra-v49';
+const CDN_CACHE_NAME = 'init-intra-cdn-v49';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -10,6 +10,13 @@ const STATIC_ASSETS = [
   'js/supabase-config.js',
   'js/db.js',
   'js/storage.js',
+  'js/storage-anexos.js',
+  'js/storage-pendencias.js',
+  'js/storage-visitas.js',
+  'js/storage-operadores.js',
+  'js/outbox.js',
+  'js/sync-manager.js',
+  'js/equipamentos.js',
   'js/app-events.js',
   'js/auth.js',
   'js/ui.js',
@@ -20,6 +27,7 @@ const STATIC_ASSETS = [
   'js/calendar.js',
   'js/visitas.js',
   'js/visit-photos.js',
+  'js/ia-relatorio.js',
   'js/templates.js',
   'js/global-search.js',
   'js/timer.js',
@@ -29,8 +37,13 @@ const STATIC_ASSETS = [
   'js/milvus-atendimentos.js',
   'js/milvus-chamado.js',
   'js/checklist.js',
+  'js/client-secrets.js',
+  'js/roteiro.js',
   'js/fila.js',
   'js/prazos.js',
+  'js/vencimentos.js',
+  'js/conhecimento.js',
+  'js/agenda-feed.js',
   'js/relatorio-cliente.js',
   'js/milvus-status.js',
   'js/pendentes.js',

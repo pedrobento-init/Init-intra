@@ -69,6 +69,7 @@ function buildAlertStripText(counts) {
   if (c.overdue) parts.push(pl(c.overdue, 'pendência vencida', 'pendências vencidas'));
   if (c.forgotten) parts.push(pl(c.forgotten, 'cronômetro esquecido', 'cronômetros esquecidos'));
   if (c.visitsToday) parts.push(pl(c.visitsToday, 'visita hoje', 'visitas hoje'));
+  if (c.vencimentos) parts.push(pl(c.vencimentos, 'vencimento em 7 dias', 'vencimentos em 7 dias'));
   return parts.join(' · ');
 }
 
@@ -155,7 +156,9 @@ function renderFila() {
       '<div class="fila-grid">' +
         '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Para fazer agora</h2><span class="ov-muted">' + m.now.length + '</span></div>' + nowHtml + '</section>' +
         '<div class="fila-side">' +
-          '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Visitas de hoje</h2><button class="btn btn-secondary btn-sm" onclick="openVisitForm()">+ Visita</button></div>' + visitsHtml + '</section>' +
+          (typeof roteiroPanelHtml === 'function'
+            ? roteiroPanelHtml(s.visits, s.today, s.userName)
+            : '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Visitas de hoje</h2><button class="btn btn-secondary btn-sm" onclick="openVisitForm()">+ Visita</button></div>' + visitsHtml + '</section>') +
           '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Próximos 7 dias</h2></div>' + weekHtml + '</section>' +
         '</div>' +
       '</div>' +
@@ -172,7 +175,12 @@ function renderAlertStrip() {
   let text = '';
   try {
     const s = _filaScope();
-    text = buildAlertStripText(buildFilaModel(s.pens, s.visits, s.userName, s.today).counts);
+    const counts = buildFilaModel(s.pens, s.visits, s.userName, s.today).counts;
+    // Vencimentos sob a responsabilidade do usuário (licença, SSL, domínio…).
+    if (typeof countVencimentosUrgentes === 'function' && typeof getMyVencimentos === 'function') {
+      counts.vencimentos = countVencimentosUrgentes(getMyVencimentos(), s.today, s.userName);
+    }
+    text = buildAlertStripText(counts);
   } catch (_) { text = ''; }
   let dismissed = false;
   try { dismissed = !!sessionStorage.getItem(_alertStripKey(text)); } catch (_) {}

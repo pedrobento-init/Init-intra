@@ -20,8 +20,12 @@ const ENTITIES = [
       owner_phone: 'ownerPhone', responsible: 'responsible', responsible_phone: 'responsiblePhone',
       technician: 'technician', server: 'server', hosting: 'hosting', backup: 'backup',
       licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', milvus_client_token: 'milvusClientToken', team: 'team',
-      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_by: 'updatedBy', updated_at: 'updatedAt'
+      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_by: 'updatedBy', updated_at: 'updatedAt',
+      address: 'address'
     },
+    // Colunas novas (migration 044+): só vão no upsert quando têm valor —
+    // banco ainda sem a coluna não derruba o sync de todos os clientes.
+    optionalFields: ['address'],
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
     }
@@ -120,8 +124,10 @@ const ENTITIES = [
     realtime: true,
     fields: {
       id: 'id', client_id: 'clientId', title: 'title', category: 'category', content: 'content',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      created_at: 'createdAt', updated_at: 'updatedAt',
+      team: 'team' // artigos da base de conhecimento (sem cliente) — migration 042
     },
+    optionalFields: ['team'],
     onChange: () => {}
   },
   {
@@ -224,6 +230,27 @@ const ENTITIES = [
     }
   },
   {
+    table: 'vencimentos',
+    dbKey: 'intra_vencimentos',
+    label: 'Vencimentos',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 045: banco sem a tabela não quebra o sync
+    fields: {
+      id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo',
+      descricao: 'descricao', data_vencimento: 'dataVencimento', responsavel: 'responsavel',
+      renovacao_auto: 'renovacaoAuto', status: 'status', observacoes: 'observacoes',
+      avisos: 'avisos', historico: 'historico', team: 'team',
+      created_at: 'createdAt', updated_at: 'updatedAt'
+    },
+    onChange: () => {
+      const h = window.location.hash.replace('#', '') || '';
+      if (h === 'vencimentos' && typeof renderVencimentos === 'function' && document.getElementById('vencList')) renderVencimentos();
+      if (typeof updateBadges === 'function') updateBadges();
+    }
+  },
+  {
     table: 'procedure_templates',
     dbKey: 'intra_procedure_templates',
     label: 'Modelos',
@@ -280,9 +307,14 @@ function _mapFromRemote(remote, fieldMap) {
 }
 
 // local -> remote (usado no push/upsert)
-function _mapToRemote(record, fieldMap) {
+function _mapToRemote(record, fieldMap, optionalFields) {
   const out = {};
-  for (const [rk, lk] of Object.entries(fieldMap)) out[rk] = record[lk] ?? null;
+  const opt = optionalFields && optionalFields.length ? new Set(optionalFields) : null;
+  for (const [rk, lk] of Object.entries(fieldMap)) {
+    const v = record[lk] ?? null;
+    if (opt && opt.has(rk) && (v === null || v === '')) continue;
+    out[rk] = v;
+  }
   return out;
 }
 

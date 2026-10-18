@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -254,7 +256,7 @@ describe('equipamentos: schema/sync', () => {
     const dbSrc = fs.readFileSync('js/db.js', 'utf8');
     expect(dbSrc).toContain('equipamentos');
     expect(dbSrc).toContain('idb.version(7)');
-    const stSrc = fs.readFileSync('js/storage.js', 'utf8');
+    const stSrc = storageSource();
     for (const fn of ['getEquipamentos', 'getMyEquipamentos', 'getEquipamentoById', 'saveEquipamento', 'deleteEquipamento']) {
       expect(stSrc).toContain('function ' + fn);
     }

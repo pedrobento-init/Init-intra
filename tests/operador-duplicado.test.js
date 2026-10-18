@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -7,8 +9,7 @@ describe('validateOperator anti-duplicata', () => {
   const GIO = { id: 'OP-9', name: 'Giovane', email: 'giba@initnet.com.br' };
   beforeEach(() => {
     globalThis.getCacheStore = (store) => (store === 'operators' ? [GIO] : []);
-    delete require.cache[require.resolve('../js/storage.js')];
-    storage = require('../js/storage.js');
+        storage = requireStorage();
   });
   it('criação com e-mail repetido (case-insensitive) é rejeitada', () => {
     const errs = storage.validateOperator({ name: 'Giovane 2', email: 'GIBA@initnet.com.br' });

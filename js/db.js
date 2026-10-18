@@ -58,6 +58,11 @@ idb.version(10).stores({
   checklists: 'id, ativo, ordem'
 });
 
+// v11: vencimentos (licenças, SSL, domínios, garantias…). Aditiva.
+idb.version(11).stores({
+  vencimentos: 'id, clientId, dataVencimento'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -71,6 +76,7 @@ const _dbCache = {
   client_devices: [],
   client_milvus_tickets: [],
   checklists: [],
+  vencimentos: [],
   checklist_modelo_itens: [],
   checklist_marcacoes: [],
   keyvalue: {},
@@ -173,6 +179,8 @@ async function initIndexedDB() {
     catch (_) { _dbCache.checklist_marcacoes = []; }
     try { _dbCache.checklists = await idb.checklists.toArray(); }
     catch (_) { _dbCache.checklists = []; }
+    try { _dbCache.vencimentos = await idb.vencimentos.toArray(); }
+    catch (_) { _dbCache.vencimentos = []; }
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {

@@ -539,6 +539,8 @@ function navigateTo(page) {
   if      (page === 'fila')        renderFila();
   else if (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
   else if (page === 'prazos')      renderPrazos();
+  else if (page === 'vencimentos') renderVencimentos();
+  else if (page === 'conhecimento') renderConhecimento();
   else if (page === 'clientes')    renderClients();
   else if (page === 'templates')   renderTemplates();
   else if (page === 'pendencias')  renderPendencias();
@@ -1358,6 +1360,7 @@ function updateBadges() {
     if (ebadge) { ebadge.textContent = inMaint; ebadge.classList.toggle('hidden', inMaint === 0); }
   } catch (_) {}
 
+  try { if (typeof updateVencimentosBadge === 'function') updateVencimentosBadge(); } catch (_) {}
   // badge-chamados removido (módulo descontinuado na interface)
 }
 
@@ -1440,7 +1443,7 @@ function _startApp() {
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['fila','dashboard','prazos','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
   // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
   // dia a dia cai na Minha fila.
   const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';
@@ -1615,6 +1618,7 @@ async function doLogout() {
     console.warn('Erro no logout:', err);
   }
   // Garantir limpeza total mesmo se authSignOut falhou
+  if (typeof forgetAllClientSecrets === 'function') forgetAllClientSecrets();
   clearSession();
   window._supabaseAuthActive = false;
   // Limpar tokens Supabase do localStorage (safety net adicional)

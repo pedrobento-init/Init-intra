@@ -14,7 +14,7 @@
 
 const PENDENTES_LABELS = {
   pendencias: 'Pendência', visits: 'Visita', clients: 'Cliente', operators: 'Operador',
-  equipamentos: 'Equipamento', procedures: 'Procedimento', procedure_templates: 'Modelo', reunioes: 'Reunião', visit_photos: 'Foto',
+  equipamentos: 'Equipamento', vencimentos: 'Vencimento', procedures: 'Procedimento', procedure_templates: 'Modelo', reunioes: 'Reunião', visit_photos: 'Foto',
 };
 
 function _pendTitle(table, r) {
@@ -244,7 +244,7 @@ if (typeof window !== 'undefined' && !window._pendStripBound) {
   window._pendStripBound = true;
   ['online', 'offline', 'sync:update'].forEach((ev) => window.addEventListener(ev, refreshPendingStrip));
   try {
-    if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
+    if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'vencimentos', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
   } catch (_) {}
 }
 

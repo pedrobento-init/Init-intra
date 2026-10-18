@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -50,7 +52,7 @@ globalThis.Dexie = class {
 const _quietErr = console.error;
 console.error = () => {};
 try {
-  vm.runInThisContext(fs.readFileSync('js/storage.js', 'utf8'), { filename: 'storage.js' });
+  vm.runInThisContext(storageSource(), { filename: 'storage.js' });
   vm.runInThisContext(fs.readFileSync('js/ui.js', 'utf8'), { filename: 'ui.js' });
   vm.runInThisContext(fs.readFileSync('js/visitas.js', 'utf8'), { filename: 'visitas.js' });
 } finally {

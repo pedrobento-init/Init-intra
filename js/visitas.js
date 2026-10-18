@@ -446,27 +446,27 @@ function openVisitDetail(id) {
       if (typeof resolveMilvusChamadoState !== 'function') return '';
       const ms = resolveMilvusChamadoState(v);
       if (ms.kind === 'nao_aplicavel') return '';
-      const box = (inner) => `<div class="form-group" style="margin:12px 0 0"><label class="form-label">Chamado Milvus</label><div style="font-size:13px">${inner}</div></div>`;
+      const box = (inner) => `<div class="form-group mchip-box"><label class="form-label">Chamado Milvus</label><div class="mchip-row">${inner}</div></div>`;
       if (ms.kind === 'criado') {
         let fin = '';
         if (typeof resolveMilvusFinalizarState === 'function') {
           const fs = resolveMilvusFinalizarState(v);
-          if (fs.kind === 'finalizado') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">✓ Finalizado</span>`;
-          else if (fs.kind === 'pendente') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Pendente de finalização</span>`;
-          else if (fs.kind === 'finalizando') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Finalizando…</span>`;
-          else if (fs.kind === 'erro') fin = ` <span style="display:inline-flex;align-items:center;gap:6px;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:6px;border:1px solid #fecaca">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">↻ Tentar novamente</button>`;
+          if (fs.kind === 'finalizado') fin = ` <span class="mchip mchip--ok">✓ Finalizado</span>`;
+          else if (fs.kind === 'pendente') fin = ` <span class="mchip mchip--warn">⏳ Pendente de finalização</span>`;
+          else if (fs.kind === 'finalizando') fin = ` <span class="mchip mchip--info">🔄 Finalizando…</span>`;
+          else if (fs.kind === 'erro') fin = ` <span class="mchip mchip--bad">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">↻ Tentar novamente</button>`;
           // Visita concluída antes da etapa 2 (ou sem transição nova): nunca
           // entrou sozinha (sem bulk-finalize). Ação manual explícita —
           // só aparece com chamado já criado (sem codigo, sem botão).
-          else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">✓ Finalizar chamado no Milvus</button>`;
+          else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">✓ Finalizar chamado no Milvus</button>`;
         }
         const back = typeof milvusStatusDetailHtml === 'function' ? milvusStatusDetailHtml(v) : '';
-        return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`);
+        return box(`<span class="mchip mchip--ok">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`);
       }
-      if (ms.kind === 'pendente') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Aguardando criação do chamado</span>`);
-      if (ms.kind === 'criando') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Criando chamado no Milvus…</span>`);
-      if (ms.kind === 'sem_token') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:var(--text-muted);background:var(--bg-secondary);padding:4px 10px;border-radius:6px;border:1px solid var(--border)">Cliente sem integração Milvus</span>`);
-      return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:6px;border:1px solid #fecaca">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusChamado('${escapeHtml(id)}')">↻ Tentar novamente</button>`);
+      if (ms.kind === 'pendente') return box(`<span class="mchip mchip--warn">⏳ Aguardando criação do chamado</span>`);
+      if (ms.kind === 'criando') return box(`<span class="mchip mchip--info">🔄 Criando chamado no Milvus…</span>`);
+      if (ms.kind === 'sem_token') return box(`<span class="mchip">Cliente sem integração Milvus</span>`);
+      return box(`<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusChamado('${escapeHtml(id)}')">↻ Tentar novamente</button>`);
     })()}
     <hr class="divider"/>
     
@@ -557,7 +557,7 @@ function openConcludeVisitModal(id) {
         <label class="form-label" style="font-weight:700;color:#16a34a">
           O que foi feito no atendimento? *
         </label>
-        <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>
+        <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('concludeRelatorio', v.id) : ''}
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)">
@@ -624,7 +624,7 @@ function openEditVisitReportModal(id) {
     <form onsubmit="submitEditVisitReport(event, '${escapeHtml(id)}')">
       <div class="form-group">
         <label class="form-label" style="font-weight:700">Relatório (O que foi feito na visita)</label>
-        <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>
+        <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('editVisitReportText', id) : ''}
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Cancelar</button>

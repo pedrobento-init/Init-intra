@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -148,7 +150,7 @@ _setGlobal('supabaseClient', {
 const _quietErr = console.error;
 console.error = () => {};
 try {
-  vm.runInThisContext(fs.readFileSync('js/storage.js', 'utf8'), { filename: 'storage.js' });
+  vm.runInThisContext(storageSource(), { filename: 'storage.js' });
 } finally {
   console.error = _quietErr;
 }

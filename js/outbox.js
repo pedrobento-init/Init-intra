@@ -98,7 +98,7 @@ async function outboxDrain() {
           : null;
       } catch (_) { meta = null; }
       if (!meta) { try { await t.delete(r.seq); } catch (_) {} sent++; continue; }
-      var remote = (typeof _mapToRemote === 'function') ? _mapToRemote(r.payload || {}, meta.fields) : (r.payload || {});
+      var remote = (typeof _mapToRemote === 'function') ? _mapToRemote(r.payload || {}, meta.fields, meta.optionalFields) : (r.payload || {});
       var res = await supabaseClient.from(meta.table).upsert(remote);
       if (res && res.error) throw res.error;
       try { await t.delete(r.seq); } catch (_) {}

@@ -1,3 +1,5 @@
+import { createRequire as __storageReq } from 'node:module';
+const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 
@@ -26,7 +28,7 @@ const schema = require('../js/schema.js');
 for (const k of ['_mergeRecords', '_mapToRemote', '_needsPush', '_classifyLocalOnly', '_filterRemoteByTombstones', '_retainFailedPush', '_planDeltaPull', '_shouldFullSync', '_pruneTombstones']) _setGlobal(k, schema[k]);
 _setGlobal('SYNC_ENTITIES', []);
 const quiet = console.error; console.error = () => {};
-const storage = require('../js/storage.js');
+const storage = requireStorage();
 console.error = quiet;
 
 const ENTITY = { table: 'items', dbKey: 'intra_items_test', label: 'Itens', fields: { id: 'id', name: 'name', created_at: 'createdAt', updated_at: 'updatedAt' } };
