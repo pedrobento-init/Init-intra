@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -37,8 +39,7 @@ describe('Ficha TI', () => {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     globalThis.getPendencias = () => pendencias;
     globalThis.getMyPendencias = () => pendencias;
-    delete require.cache[require.resolve('../js/clients.js')];
-    mod = require('../js/clients.js');
+    mod = requireParts('clients');
   });
 
   describe('modelo (campos, acesso rápido, resumo)', () => {

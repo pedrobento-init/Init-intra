@@ -86,3 +86,18 @@ describe('buildClientMonthReport', () => {
     expect(html).toContain('Chamado #501');
   });
 });
+
+describe('horas pelos lançamentos (048)', () => {
+  it('pendência com lançamentos usa só eles; sem lançamentos cai nas notas', () => {
+    const pens = [
+      { id: 'A', status: 'aberto', notes: [{ text: 'Sessão registrada: 05:00:00', createdAt: '2026-10-05T12:00:00Z' }] },
+      { id: 'B', status: 'aberto', notes: [{ text: 'Tempo sessão: 00:30:00', createdAt: '2026-10-06T12:00:00Z' }] },
+    ];
+    const entries = [
+      { pendenciaId: 'A', seconds: 3600, endedAt: '2026-10-05T12:00:00Z' },
+      { pendenciaId: 'A', seconds: 1800, endedAt: '2026-09-30T12:00:00Z' }, // fora do mês
+    ];
+    const m = R.buildClientMonthReport({ client: { name: 'X' }, pens, visits: [], entries }, '2026-10');
+    expect(m.penMinutes).toBe(60 + 30); // A: 1h do lançamento (não as 5h da nota); B: 30min da nota
+  });
+});

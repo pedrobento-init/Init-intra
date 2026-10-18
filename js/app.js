@@ -286,7 +286,6 @@ function exportData() {
     procedureTemplates: dbGet('intra_procedure_templates'),
     operators:  safeOps,
     visits:     getVisits(),
-    tickets:    getTickets(),
     reunioes:   getReunioes(),
     equipamentos: (typeof getEquipamentos === 'function' ? getEquipamentos() : []),
   };
@@ -340,7 +339,6 @@ async function _runImportBackup(data) {
       if (data.procedureTemplates) dbSet('intra_procedure_templates', data.procedureTemplates);
       if (data.operators)  dbSet('intra_operators',  data.operators);
       if (data.visits)     dbSet('intra_visits',     data.visits);
-      if (data.tickets)    dbSet('intra_tickets',    data.tickets);
       if (data.reunioes)   dbSet('intra_reunioes',   data.reunioes);
       if (data.equipamentos) dbSet('intra_equipamentos', data.equipamentos);
     } finally {
@@ -442,16 +440,6 @@ async function _pushImportToSupabase(data) {
     errors.push('visits: ' + e.message);
   }
 
-  try {
-    await chunk('tickets', (data.tickets || []).map(t => ({
-      id: t.id, client_id: t.clientId, client_name: t.clientName, title: t.title, description: t.description,
-      status: t.status, priority: t.priority, technician: t.technician, updates: t.updates || [],
-      team: t.team || 'init', attachments: t.attachments || [],
-      timer_running: t.timerRunning === true, timer_started_at: t.timerStartedAt || null,
-      timer_total_seconds: t.timerTotalSeconds || 0, timer_operator: t.timerOperator || null,
-      completed_at: t.completedAt || null, created_at: t.createdAt || now, updated_at: t.updatedAt || now
-    })));
-  } catch (e) { errors.push('tickets: ' + e.message); }
 
   try {
     await chunk('reunioes', (data.reunioes || []).map(r => ({
@@ -488,11 +476,6 @@ let _currentPage = null;
 function navigateTo(page) {
   const currentHash = window.location.hash.replace('#', '') || 'dashboard';
 
-  if (page === 'mapeamento-milvus') {
-    // Módulo oculto para todos (decisão de produto): acesso direto redireciona.
-    if (typeof showToast === 'function') showToast('Módulo desativado.', 'error');
-    page = 'dashboard';
-  }
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
     if (page === 'historico') {
       if (typeof showToast === 'function') showToast('Apenas administradores podem ver o histórico.', 'error');
@@ -501,7 +484,7 @@ function navigateTo(page) {
     // Dashboard liberado p/ todos os perfis (blocos de gestão filtrados em renderDashboard).
   }
   if (page === 'relatorios' && typeof canViewInitOnly === 'function' && !canViewInitOnly()) {
-    if (typeof showToast === 'function') showToast('Relatórios disponível apenas para o time Init.', 'error');
+    if (typeof showToast === 'function') showToast('Atendimentos Milvus disponível apenas para o time Init.', 'error');
     page = 'pendencias';
   }
   if (page === 'reuniao' && typeof canViewInitOnly === 'function' && !canViewInitOnly()) {
@@ -517,7 +500,8 @@ function navigateTo(page) {
   _currentPage = page;
 
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  const el = document.getElementById('nav-' + page);
+  // Modelos vive dentro de Conhecimento (aba): acende o item dela no menu.
+  const el = document.getElementById('nav-' + (page === 'templates' ? 'conhecimento' : page));
   if (el) el.classList.add('active');
   // Barra inferior (celular): destaca o destino atual; páginas fora dela
   // acendem o "Mais".
@@ -550,7 +534,6 @@ function navigateTo(page) {
   else if (page === 'operadores')  renderOperadores();
   else if (page === 'relatorios')  { if(typeof renderRelatorios==='function') renderRelatorios(); else document.getElementById('contentArea').innerHTML='<p>Relatórios em carregamento...</p>'; }
   else if (page === 'equipamentos') renderEquipamentos();
-  else if (page === 'mapeamento-milvus') renderMapeamentoMilvus();
   else if (page === 'historico')   renderLogs();
 
   window.location.hash = page;
@@ -593,10 +576,12 @@ function renderDashboard() {
   const critical = pens.filter(p => ['alta','critica'].includes(p.priority) && !isPendenciaClosed(p.status));
   const activePens = pens.filter(p => !isPendenciaClosed(p.status));
   const overdue = activePens.filter(p => p.deadline && p.deadline < today);
+  // Prazos: mesma conta da tela Prazos e SLA (prazos.js) — os números batem.
+  const _pz = (typeof buildPrazosModel === 'function') ? buildPrazosModel(allPens, today).kpis : null;
   const dueToday = activePens.filter(p => p.deadline === today);
   const unassigned = activePens.filter(p => !p.responsible || !p.responsible.trim());
   const recentPens = [...pens]
-    .filter(p => !isPendenciaClosed(p.status) && p.responsible === currentUser)
+    .filter(p => !isPendenciaClosed(p.status) && isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser))
     .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, 5);
 
@@ -611,7 +596,7 @@ function renderDashboard() {
     const _isStale = typeof isStalePendencia === 'function' ? isStalePendencia : function(){ return false; };
     myQueue = (allPens||[]).filter(function(p){
       if (_isClosed(p.status)) return false;
-      if ((p.responsible||'') !== currentUser) return false;
+      if (!isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser)) return false;
       const highPri = ['alta','critica'].includes(p.priority);
       const dueSoon = p.deadline === today || p.deadline === _tomorrowISO || (p.deadline && p.deadline < today);
       const stale = _isStale(p);
@@ -635,7 +620,7 @@ function renderDashboard() {
     try { myTodayVisits = getTodayVisitsForOperator(allVisits, currentUser, today); } catch (_) { myTodayVisits = []; }
   } else {
     myTodayVisits = (allVisits || []).filter(function (v) {
-      return v && v.date === today && (v.operator || '') === currentUser && v.status !== 'cancelada' && v.status !== 'concluida';
+      return v && v.date === today && isSameOperator(v.operatorId, v.operator, session && session.opId, currentUser) && v.status !== 'cancelada' && v.status !== 'concluida';
     }).sort(function (a, b) {
       const aT = a.allDay ? '' : (a.time || '99');
       const bT = b.allDay ? '' : (b.time || '99');
@@ -761,7 +746,7 @@ function renderDashboard() {
   let _ovNeutralLabel = 'pendências ativas';
   if (!_ovOverTop) {
     if (!_dashCanManage) {
-      _ovNeutralCount = activePens.filter(p => p.responsible === currentUser).length;
+      _ovNeutralCount = activePens.filter(p => isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser)).length;
       _ovNeutralLabel = 'suas pendências ativas';
     } else {
       let _mx = 0;
@@ -952,11 +937,11 @@ function renderDashboard() {
       <div class="ov-k amber" onclick="navigateTo('pendencias')">
         <b class="stat-value">${critical.length}</b><span>Alta prioridade${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
-      <div class="ov-k red" onclick="navigateTo('pendencias')">
-        <b class="stat-value">${overdue.length}</b><span>Pendências vencidas</span>
+      <div class="ov-k red" onclick="navigateTo('prazos')" title="Ver por responsável e cliente em Prazos e SLA">
+        <b class="stat-value">${_pz ? _pz.vencidas : overdue.length}</b><span>Pendências vencidas →</span>
       </div>
-      <div class="ov-k amber" onclick="navigateTo('pendencias')">
-        <b class="stat-value">${dueToday.length}</b><span>Vencem hoje</span>
+      <div class="ov-k amber" onclick="navigateTo('prazos')" title="Ver em Prazos e SLA">
+        <b class="stat-value">${_pz ? _pz.hoje : dueToday.length}</b><span>Vencem hoje →</span>
       </div>
       ${_dashCanManage ? `<div class="ov-k" onclick="navigateTo('pendencias')">
         <b class="stat-value">${unassigned.length}</b><span>Sem responsável</span>
@@ -1339,7 +1324,7 @@ function updateBadges() {
   var session = getSession();
   var currentUser = session ? session.name : '';
   var pens = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
-  var open = pens.filter(function(p) { return !isPendenciaClosed(p.status) && p.responsible === currentUser; }).length;
+  var open = pens.filter(function(p) { return !isPendenciaClosed(p.status) && isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser); }).length;
   var badge = document.getElementById('badge-pendencias');
   if (badge) { badge.textContent = open; badge.classList.toggle('hidden', open === 0); }
 
@@ -1433,17 +1418,13 @@ function _startApp() {
     var histNav = document.getElementById('nav-historico');
     if (histNav) histNav.style.display = 'none';
   }
-  // Mapeamento Milvus × Clientes oculto para todos (decisão de produto):
-  // a rota segue funcional via #mapeamento-milvus, só sai do menu.
-  var mapNav = document.getElementById('nav-mapeamento-milvus');
-  if (mapNav) mapNav.style.display = 'none';
   if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
   document.querySelectorAll('.btn-export').forEach(function (btn) {
     btn.style.display = isAdmin ? '' : 'none';
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','calendario','operadores','relatorios','equipamentos','historico','templates','visitas','reuniao'];
   // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
   // dia a dia cai na Minha fila.
   const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';

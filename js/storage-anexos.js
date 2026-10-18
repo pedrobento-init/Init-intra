@@ -27,7 +27,7 @@ function addLog(action, type, targetId, details) {
       var _lp = getPendenciaById(targetId);
       if (isPendenciaGestao(_lp)) safeDetails = '[Gestão – restrito]';
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-anexos'); }
   const log = {
     id: nextId('LOG'),
     timestamp: new Date().toISOString(),
@@ -73,8 +73,8 @@ const ATTACHMENT_MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ATTACHMENT_MAX_COUNT = 5;
 
 function getAttachments(type, itemId) {
-  // type = 'clients' | 'pendencias' | 'tickets'
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
+  // type = 'clients' | 'pendencias'
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
   const list = dbGet(keyMap[type] || type);
   const item = list.find(i => i.id === itemId);
   return (item && item.attachments) ? item.attachments : [];
@@ -120,7 +120,7 @@ async function migrateAttachmentDataToStorage(type, itemId) {
     if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()
         || (typeof window !== 'undefined' && !window._supabaseAuthActive)) return 0;
     if (typeof File === 'undefined' || typeof supabaseClient === 'undefined') return 0;
-    const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
+    const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
     const key = keyMap[type];
     if (!key) return 0;
     const list = dbGet(key);
@@ -154,7 +154,7 @@ function addAttachment(type, itemId, fileObj) {
   if (fileObj.size > ATTACHMENT_MAX_SIZE) {
     return { error: 'Arquivo excede o limite de 2MB.' };
   }
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
   const key = keyMap[type];
   if (!key) return { error: 'Tipo inválido.' };
   const list = dbGet(key);
@@ -183,7 +183,7 @@ function addAttachment(type, itemId, fileObj) {
 }
 
 function removeAttachment(type, itemId, attachmentId) {
-  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS, tickets: DB.TICKETS };
+  const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
   const key = keyMap[type];
   if (!key) return false;
   const list = dbGet(key);

@@ -168,7 +168,7 @@ function _prazosItemRow(it, today, groupBy) {
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
   const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
   const other = groupBy === 'cliente' ? (p.responsible || 'Sem responsável') : (p.clientName || 'Sem cliente');
-  return '<li class="fila-row" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
+  return '<li class="fila-row" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
     '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(other) + '</span></span>' +
@@ -201,7 +201,7 @@ function renderPrazos() {
     ].join('');
     const items = g.items.filter((it) => !_prazosOnlyRisk || ['vencida', 'hoje', 'breve'].includes(it.band));
     return '<li class="pz-group' + (open ? ' is-open' : '') + '" data-key="' + escapeHtml(g.key) + '">' +
-      '<button type="button" class="pz-head" aria-expanded="' + open + '" onclick="togglePrazosGroup(this)">' +
+      '<button type="button" class="pz-head" aria-expanded="' + open + '" data-action="pzToggleGroup">' +
         '<svg class="pz-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>' +
         '<span class="pz-name">' + escapeHtml(g.label) + '</span>' +
         '<span class="pz-chips">' + chips + '</span>' +
@@ -217,10 +217,10 @@ function renderPrazos() {
     '<div class="ov-wrap prazos">' +
       '<div class="ov-bar">' +
         '<div class="ov-seg" role="group" aria-label="Agrupar por">' +
-          '<button type="button" class="period-btn' + (groupBy === 'responsavel' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'responsavel') + '" onclick="setPrazosGroup(\'responsavel\')">Por responsável</button>' +
-          '<button type="button" class="period-btn' + (groupBy === 'cliente' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'cliente') + '" onclick="setPrazosGroup(\'cliente\')">Por cliente</button>' +
+          '<button type="button" class="period-btn' + (groupBy === 'responsavel' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'responsavel') + '" data-action="pzGroup" data-arg="responsavel">Por responsável</button>' +
+          '<button type="button" class="period-btn' + (groupBy === 'cliente' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'cliente') + '" data-action="pzGroup" data-arg="cliente">Por cliente</button>' +
         '</div>' +
-        '<label class="pz-toggle"><input type="checkbox"' + (_prazosOnlyRisk ? ' checked' : '') + ' onchange="togglePrazosRisk()"> Só com risco</label>' +
+        '<label class="pz-toggle"><input type="checkbox"' + (_prazosOnlyRisk ? ' checked' : '') + ' data-change="pzRisk"> Só com risco</label>' +
       '</div>' +
       '<div class="ov-kpis pz-kpis">' +
         kpi(k.vencidas, 'Vencidas', k.vencidas ? 'red' : '') +
@@ -248,6 +248,14 @@ function renderPrazos() {
     } catch (_) {}
   });
 })();
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    pzToggleGroup: (el) => togglePrazosGroup(el),
+    pzGroup: (_el, v) => setPrazosGroup(v),
+    pzRisk: () => togglePrazosRisk(),
+  });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { buildPrazosModel, classifyDeadline, prazosDaysBetween, PRAZOS_SOON_DAYS };

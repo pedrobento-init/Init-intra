@@ -32,9 +32,10 @@ function buildRouteUrl(addresses) {
  * em ordem; "dia inteiro" no fim. Concluídas ficam na lista (riscadas), fora da rota.
  * @param {(id: string) => object|null} getClient
  */
-function buildRoteiro(visits, getClient, todayISO, userName) {
+function buildRoteiro(visits, getClient, todayISO, userName, userId) {
   const stops = (visits || [])
-    .filter((v) => v && v.date === todayISO && v.status !== 'cancelada' && (v.operator || '') === (userName || ''))
+    .filter((v) => v && v.date === todayISO && v.status !== 'cancelada' &&
+      ((v.operatorId && userId) ? v.operatorId === userId : (v.operator || '') === (userName || '')))
     .map((v) => {
       const c = typeof getClient === 'function' ? getClient(v.clientId) : null;
       const address = String((c && c.address) || '').trim();
@@ -51,12 +52,12 @@ function buildRoteiro(visits, getClient, todayISO, userName) {
   };
 }
 
-function roteiroPanelHtml(visits, todayISO, userName) {
-  const r = buildRoteiro(visits, typeof getClientById === 'function' ? getClientById : null, todayISO, userName);
+function roteiroPanelHtml(visits, todayISO, userName, userId) {
+  const r = buildRoteiro(visits, typeof getClientById === 'function' ? getClientById : null, todayISO, userName, userId);
   const head = '<div class="ov-ph"><h2 class="ov-h2">Roteiro do dia</h2>' +
     '<div class="rt-head-acts">' +
       (r.routeUrl && r.routable > 1 ? '<a class="btn btn-primary btn-sm" href="' + escapeHtml(r.routeUrl) + '" target="_blank" rel="noopener">Rota completa</a>' : '') +
-      '<button class="btn btn-secondary btn-sm" onclick="openVisitForm()">+ Visita</button>' +
+      '<button class="btn btn-secondary btn-sm" data-action="newVisit">+ Visita</button>' +
     '</div></div>';
   if (!r.stops.length) return '<section class="ov-panel">' + head + '<p class="fila-none">Nenhuma visita sua hoje.</p></section>';
 
@@ -70,12 +71,12 @@ function roteiroPanelHtml(visits, todayISO, userName) {
     if (s.address) {
       const ml = mapsLinks(s.address);
       place = '<span class="rt-addr">' + escapeHtml(s.address) + '</span>' +
-        (s.done ? '' : '<span class="rt-nav"><a href="' + escapeHtml(ml.google) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Maps</a>' +
-          '<a href="' + escapeHtml(ml.waze) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Waze</a></span>');
+        (s.done ? '' : '<span class="rt-nav"><a href="' + escapeHtml(ml.google) + '" target="_blank" rel="noopener" data-rt-link="1">Maps</a>' +
+          '<a href="' + escapeHtml(ml.waze) + '" target="_blank" rel="noopener" data-rt-link="1">Waze</a></span>');
     } else {
-      place = '<button type="button" class="link-btn rt-noaddr" onclick="event.stopPropagation();viewClient(\'' + escapeHtml(v.clientId || '') + '\')">Sem endereço — adicionar</button>';
+      place = '<button type="button" class="link-btn rt-noaddr" data-action="openClient" data-stop="1" data-arg="' + escapeHtml(v.clientId || '') + '">Sem endereço — adicionar</button>';
     }
-    return '<li class="rt-stop' + (s.done ? ' is-done' : '') + '" onclick="openVisitDetail(\'' + id + '\')">' +
+    return '<li class="rt-stop' + (s.done ? ' is-done' : '') + '" data-action="rtOpenVisit" data-arg="' + id + '">' +
       '<span class="rt-num" aria-hidden="true">' + num + '</span>' +
       '<span class="rt-main"><span class="rt-top"><b>' + escapeHtml(v.clientName || '—') + '</b><span class="rt-when">' + escapeHtml(when) + '</span></span>' +
       (v.motivo ? '<span class="rt-why">' + escapeHtml(v.motivo) + '</span>' : '') +
@@ -85,6 +86,11 @@ function roteiroPanelHtml(visits, todayISO, userName) {
     ? '<p class="rt-note">' + r.missingAddress + (r.missingAddress === 1 ? ' parada sem endereço fica' : ' paradas sem endereço ficam') + ' fora da rota.</p>'
     : '';
   return '<section class="ov-panel rt">' + head + '<ol class="rt-list">' + rows + '</ol>' + note + '</section>';
+}
+
+if (typeof registerActions === 'function') {
+  // Clique no link de Maps/Waze (dentro da parada) não abre a visita.
+  registerActions({ rtOpenVisit: (_el, id, ev) => { if (ev && ev.target && ev.target.closest && ev.target.closest('[data-rt-link]')) return; openVisitDetail(id); } });
 }
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -25,7 +25,7 @@ function buildOutboxEntry(entity, op, payload) {
 function _outboxTable() {
   try {
     if (typeof idb !== 'undefined' && idb && idb.outbox) return idb.outbox;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
   return null;
 }
 
@@ -35,20 +35,20 @@ async function outboxEnqueue(entity, op, payload) {
   if (!entry.entity || !entry.targetId) return null;
   var t = _outboxTable();
   if (!t) {
-    try { if (typeof incrementPendingSync === 'function') incrementPendingSync(); } catch (_) {}
+    try { if (typeof incrementPendingSync === 'function') incrementPendingSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     return null;
   }
   try {
     var prev = await t.where('targetId').equals(entry.targetId).toArray();
     for (var i = 0; i < prev.length; i++) {
-      try { await t.delete(prev[i].seq); } catch (_) {}
+      try { await t.delete(prev[i].seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     }
     var seq = await t.add(entry);
-    try { if (typeof incrementPendingSync === 'function') incrementPendingSync(); } catch (_) {}
+    try { if (typeof incrementPendingSync === 'function') incrementPendingSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     try {
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sync:update', { detail: { status: 'pending' } }));
       if (typeof emitDataChanged === 'function') emitDataChanged('sync-status', { status: 'pending' });
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     return seq;
   } catch (_) {
     return null;
@@ -67,7 +67,7 @@ async function outboxHas(targetId) {
 async function outboxCount() {
   var t = _outboxTable();
   if (!t) {
-    try { if (typeof getPendingSyncCount === 'function') return getPendingSyncCount(); } catch (_) {}
+    try { if (typeof getPendingSyncCount === 'function') return getPendingSyncCount(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     return 0;
   }
   try { return await t.count(); } catch (_) { return 0; }
@@ -97,23 +97,23 @@ async function outboxDrain() {
           ? ENTITIES.find(function (e) { return e.table === r.entity || e.dbKey === r.entity; })
           : null;
       } catch (_) { meta = null; }
-      if (!meta) { try { await t.delete(r.seq); } catch (_) {} sent++; continue; }
+      if (!meta) { try { await t.delete(r.seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); } sent++; continue; }
       var remote = (typeof _mapToRemote === 'function') ? _mapToRemote(r.payload || {}, meta.fields, meta.optionalFields) : (r.payload || {});
       var res = await supabaseClient.from(meta.table).upsert(remote);
       if (res && res.error) throw res.error;
-      try { await t.delete(r.seq); } catch (_) {}
+      try { await t.delete(r.seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
       sent++;
     } catch (_) {
-      try { await t.update(r.seq, { attempts: (r.attempts || 0) + 1 }); } catch (_) {}
+      try { await t.update(r.seq, { attempts: (r.attempts || 0) + 1 }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
       break;
     }
   }
   try {
     if (typeof triggerStartupSync === 'function') triggerStartupSync('outbox-drained');
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
   try {
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sync:update', { detail: { status: 'drained', sent: sent } }));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
   return { ok: true, sent: sent, remaining: rows.length - sent };
 }
 
@@ -128,12 +128,12 @@ var Outbox = {
 
 if (typeof window !== 'undefined') {
   window.Outbox = Outbox;
-  window.addEventListener('online', function () { try { outboxDrain(); } catch (_) {} });
+  window.addEventListener('online', function () { try { outboxDrain(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); } });
   if (!window._outboxDrainBound && typeof document !== 'undefined') {
     window._outboxDrainBound = true;
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible') return;
-      try { if (typeof navigator === 'undefined' || navigator.onLine !== false) outboxDrain(); } catch (_) {}
+      try { if (typeof navigator === 'undefined' || navigator.onLine !== false) outboxDrain(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     });
   }
 }

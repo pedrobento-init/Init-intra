@@ -1,8 +1,10 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const tk = require('../js/milvus-tickets.js');
-const clients = require('../js/clients.js');
+const clients = requireParts('clients');
 const schema = require('../js/schema.js');
 
 describe('normalizeMilvusClientToken (só trim, sem transformar)', () => {

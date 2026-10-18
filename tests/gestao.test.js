@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { createRequire as __storageReq } from 'node:module';
 const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -43,14 +45,14 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
     _stores.pendencias = [];
     _stores.operators = [
       { id: 'OP-1', name: 'Pedro', team: 'init', isAdmin: true, active: true },
-      { id: 'OP-4', name: 'Joarli', team: 'init', isAdmin: true, active: true },
-      { id: 'OP-5', name: 'Felipe', team: 'init', isAdmin: true, active: true },
+      { id: 'OP-4', name: 'Joarli', team: 'init', isAdmin: true, isGestao: true, active: true },
+      { id: 'OP-5', name: 'Felipe', team: 'init', isAdmin: true, isGestao: true, active: true },
       { id: 'OP-9', name: 'Ana', team: 'init', isAdmin: false, active: true, role: 'Técnico' },
     ];
     _session = null;
         storage = requireStorage();
     try {
-      const src = fs.readFileSync('js/pendencias.js', 'utf8');
+      const src = partsSource('pendencias');
       const m = src.match(/const TIPOS = \[(.*?)\];/);
       globalThis.__TIPOS_SRC__ = m ? m[1] : '';
     } catch (_) { globalThis.__TIPOS_SRC__ = ''; }
@@ -69,10 +71,10 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
     expect(storage.isPendenciaGestao(null)).toBe(false);
   });
 
-  it('isGestaoOperator: flag isGestao/is_gestao ou nome Felipe/Joarli; Pedro não', () => {
-    expect(storage.isGestaoOperator({ name: 'Felipe', active: true })).toBe(true);
-    expect(storage.isGestaoOperator({ name: 'Joarli Souza', active: true })).toBe(true);
-    expect(storage.isGestaoOperator({ name: 'FELIPE ADM', active: true })).toBe(true);
+  it('isGestaoOperator: só a marcação no cadastro conta (o nome não dá acesso)', () => {
+    expect(storage.isGestaoOperator({ name: 'Felipe', active: true })).toBe(false);
+    expect(storage.isGestaoOperator({ name: 'Joarli Souza', active: true })).toBe(false);
+    expect(storage.isGestaoOperator({ name: 'Felipe', isGestao: true, active: false })).toBe(false);
     expect(storage.isGestaoOperator({ name: 'Pedro', active: true })).toBe(false);
     expect(storage.isGestaoOperator({ name: 'Ana', active: true })).toBe(false);
     expect(storage.isGestaoOperator({ name: 'Qualquer', isGestao: true, active: true })).toBe(true);

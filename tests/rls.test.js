@@ -6,6 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 // migration 042 sobre tabelas mínimas com as mesmas colunas usadas nas
 // regras, já "sujas" com policies abertas antigas, e confere cada perfil.
 const MIGRATION = fs.readFileSync(new URL('../supabase/migrations/042_rls_completo.sql', import.meta.url), 'utf8');
+const MIGRATION_047 = fs.readFileSync(new URL('../supabase/migrations/047_remove_pin_hash.sql', import.meta.url), 'utf8');
 
 const UID = {
   admin: '00000000-0000-0000-0000-00000000000a',
@@ -51,10 +52,10 @@ beforeAll(async () => {
     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon, authenticated;
 
     CREATE TABLE operators (id text PRIMARY KEY, name text, email text, auth_user_id uuid, is_admin boolean DEFAULT false,
-      active boolean DEFAULT true, team text DEFAULT 'init', phone text, updated_at timestamptz DEFAULT now());
+      active boolean DEFAULT true, team text DEFAULT 'init', phone text, pin_hash text, pin_salt text, updated_at timestamptz DEFAULT now());
     CREATE TABLE clients (id text PRIMARY KEY, name text, team text DEFAULT 'init');
-    CREATE TABLE pendencias (id text PRIMARY KEY, client_id text, team text DEFAULT 'init', tipo text DEFAULT 'tarefa');
-    CREATE TABLE visits (id text PRIMARY KEY, team text DEFAULT 'init');
+    CREATE TABLE pendencias (id text PRIMARY KEY, client_id text, team text DEFAULT 'init', tipo text DEFAULT 'tarefa', notes jsonb DEFAULT '[]', responsible text, timer_operator text, updated_at timestamptz DEFAULT now());
+    CREATE TABLE visits (id text PRIMARY KEY, team text DEFAULT 'init', operator text, updated_at timestamptz DEFAULT now());
     CREATE TABLE procedures (id text PRIMARY KEY, client_id text, title text);
     CREATE TABLE procedure_templates (id text PRIMARY KEY);
     CREATE TABLE audit_logs (id text PRIMARY KEY, operator_name text, action text);
@@ -84,6 +85,7 @@ beforeAll(async () => {
   // Dados de antes da migration (procedures ainda sem coluna team).
   await db.exec("INSERT INTO clients VALUES ('c-init', 'Acme', 'init'), ('c-mam', 'Zeta', 'mam'); INSERT INTO procedures (id, client_id, title) VALUES ('pr-init', 'c-init', 'a'), ('pr-mam', 'c-mam', 'b'), ('pr-orfao', 'c-sumiu', 'c');");
   await db.exec(MIGRATION);
+  await db.exec(MIGRATION_047);
   // Rodar de novo não pode quebrar (idempotente).
   await db.exec(MIGRATION);
 
@@ -232,5 +234,77 @@ describe('verificação pós-migração (as consultas do fim do arquivo)', () =>
   it('anon sem nenhum privilégio de tabela', async () => {
     const r = await db.query("SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public'");
     expect(r.rows).toEqual([]);
+  });
+});
+
+describe('hash de senha (047)', () => {
+  it('app antigo mandando pin_hash: o banco grava sem o hash', async () => {
+    await as('ana', "UPDATE operators SET pin_hash = 'abc', pin_salt = 'xy', phone = '5' WHERE id = 'op-ana'");
+    const r = await db.query("SELECT pin_hash, pin_salt, phone FROM operators WHERE id = 'op-ana'");
+    expect(r.rows[0]).toEqual({ pin_hash: null, pin_salt: null, phone: '5' });
+  });
+});
+
+describe('lançamentos de horas (048)', () => {
+  beforeAll(async () => {
+    const notes = JSON.stringify([
+      { text: '⏸ Ana pausou. Tempo sessão: 01:30:00. Total: 01:30:00.', author: 'Ana', createdAt: '2026-10-02T15:00:00Z' },
+      { text: 'Sessão registrada: 00:45:00. Total: 02:15:00.', author: 'Ana', createdAt: '2026-10-03T12:00:00Z' },
+      { text: 'Conversei com o cliente.', author: 'Ana', createdAt: '2026-10-03T13:00:00Z' },
+    ]);
+    await db.query("INSERT INTO pendencias (id, client_id, team, tipo, notes) VALUES ('p-horas', 'c-init', 'init', 'tarefa', $1::jsonb)", [notes]);
+    const sql = fs.readFileSync(new URL('../supabase/migrations/048_time_entries.sql', import.meta.url), 'utf8');
+    await db.exec(sql);
+    await db.exec(sql); // idempotente: não duplica
+  });
+
+  it('backfill: cada sessão das notas vira um lançamento, com início calculado', async () => {
+    const r = await db.query("SELECT seconds, source, operator_id, client_id, started_at, ended_at FROM time_entries WHERE pendencia_id = 'p-horas' ORDER BY ended_at");
+    expect(r.rows.map((x) => x.seconds)).toEqual([5400, 2700]);
+    expect(r.rows[0]).toMatchObject({ source: 'notas', operator_id: 'op-ana', client_id: 'c-init' });
+    expect(new Date(r.rows[0].ended_at) - new Date(r.rows[0].started_at)).toBe(5400 * 1000);
+  });
+
+  it('equipe vê; outra equipe não; corrigir só o próprio (ou admin)', async () => {
+    expect((await as('ana', "SELECT id FROM time_entries WHERE pendencia_id = 'p-horas'")).rows).toHaveLength(2);
+    expect((await as('beto', 'SELECT id FROM time_entries')).rows).toHaveLength(0);
+    await as('gil', "INSERT INTO time_entries (id, pendencia_id, operator_id, ended_at, seconds, source, team) VALUES ('te-gil', 'p-horas', 'op-gil', now(), 600, 'manual', 'init')");
+    expect((await as('ana', "UPDATE time_entries SET seconds = 1 WHERE id = 'te-gil'")).affectedRows).toBe(0);
+    expect((await as('gil', "UPDATE time_entries SET seconds = 900 WHERE id = 'te-gil'")).affectedRows).toBe(1);
+    expect((await as('admin', "DELETE FROM time_entries WHERE id = 'te-gil'")).affectedRows).toBe(1);
+  });
+});
+
+describe('pessoas por id (049)', () => {
+  beforeAll(async () => {
+    await db.exec("INSERT INTO visits (id, team, operator) VALUES ('v-ana', 'init', 'Ana'), ('v-fantasma', 'init', 'Ninguém')");
+    await db.exec("UPDATE pendencias SET responsible = 'Ana', timer_operator = 'Ana' WHERE id = 'p-init'");
+    await db.exec(fs.readFileSync(new URL('../supabase/migrations/049_operator_ids.sql', import.meta.url), 'utf8'));
+  });
+
+  it('backfill: o id vem do nome; nome desconhecido fica sem id', async () => {
+    const v = await db.query("SELECT id, operator_id FROM visits WHERE id IN ('v-ana','v-fantasma') ORDER BY id");
+    expect(v.rows).toEqual([{ id: 'v-ana', operator_id: 'op-ana' }, { id: 'v-fantasma', operator_id: null }]);
+    const p = await db.query("SELECT responsible_id, timer_operator_id FROM pendencias WHERE id = 'p-init'");
+    expect(p.rows[0]).toEqual({ responsible_id: 'op-ana', timer_operator_id: 'op-ana' });
+  });
+
+  it('gravação só com o nome (app antigo) ganha o id; trocar o nome troca o id', async () => {
+    await as('ana', "INSERT INTO visits (id, team, operator) VALUES ('v-nova', 'init', 'ana ')");
+    expect((await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id).toBe('op-ana');
+    await as('ana', "UPDATE visits SET operator = 'Gil' WHERE id = 'v-nova'");
+    expect((await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id).toBe('op-gil');
+  });
+
+  it('renomear o operador reescreve o nome nos registros dele', async () => {
+    await db.exec("UPDATE operators SET name = 'Ana Paula' WHERE id = 'op-ana'");
+    const v = await db.query("SELECT operator, operator_id FROM visits WHERE id = 'v-ana'");
+    expect(v.rows[0]).toEqual({ operator: 'Ana Paula', operator_id: 'op-ana' });
+    expect((await db.query("SELECT responsible FROM pendencias WHERE id = 'p-init'")).rows[0].responsible).toBe('Ana Paula');
+    await db.exec("UPDATE operators SET name = 'Ana' WHERE id = 'op-ana'");
+  });
+
+  it('nome repetido entre ativos é bloqueado', async () => {
+    await expect(db.exec("INSERT INTO operators (id, name, team) VALUES ('op-ana2', 'ANA', 'init')")).rejects.toThrow(/unique|duplicate/i);
   });
 });

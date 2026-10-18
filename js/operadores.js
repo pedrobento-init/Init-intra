@@ -368,14 +368,15 @@ function openOperadorForm(id = null) {
   const op = id ? getOperatorById(id) : {};
   const selColor = op?.color || getOpAvatarColor(op?.name || '') || OP_COLORS[0];
   const isSelf = session && session.opId === op.id;
-  const hasCurrentPassword = !!op.pinHash;
+  // Trocar a própria senha pede a atual, conferida no Supabase Auth (online).
+  const hasCurrentPassword = !!(op.email && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive);
   const esc = v => escapeHtml(v || '');
 
   const currentPasswordHtml = (isSelf && hasCurrentPassword) ? `
     <div class="form-row" style="margin-bottom: 12px;">
       <div class="form-group" style="width:100%">
-        <label class="form-label">Senha atual *</label>
-        <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" required placeholder="Digite sua senha atual para confirmar" />
+        <label class="form-label">Senha atual <span style="font-weight:400;color:var(--text-muted)">(só para trocar a senha)</span></label>
+        <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
       </div>
     </div>
   ` : '';
@@ -440,6 +441,10 @@ function openOperadorForm(id = null) {
         <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
           <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opIsAdmin" class="form-label" style="margin-bottom:0;cursor:pointer;font-weight:600">Perfil Administrador</label>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
+          <label for="opIsGestao" class="form-label" style="margin-bottom:0;cursor:pointer">Gestão <span style="font-weight:400;color:var(--text-muted)">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
           <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
@@ -545,15 +550,20 @@ async function submitOperadorForm(e, id) {
 
     const existing = id ? getOperatorById(id) : null;
 
-    if (isSelf && existing && existing.pinHash) {
+    // Trocar a PRÓPRIA senha exige a atual, conferida no Supabase Auth (quem
+    // pegar o aparelho desbloqueado não troca a senha do dono).
+    if (isSelf && existing && g('newPwd').trim() && existing.email &&
+        typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
       const currentPwd = g('currentPwd').trim();
       if (!currentPwd) {
-        showToast('A senha atual é necessária para salvar as alterações.', 'error');
+        showToast('Para trocar a senha, digite a senha atual.', 'error');
         return;
       }
-      const currentHash = await hashPin(currentPwd, existing.pinSalt);
-      if (currentHash !== existing.pinHash) {
-        showToast('Senha atual incorreta.', 'error');
+      try {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email: existing.email, password: currentPwd });
+        if (error) { showToast('Senha atual incorreta.', 'error'); return; }
+      } catch (_) {
+        showToast('Não foi possível conferir a senha atual agora.', 'error');
         return;
       }
     }
@@ -574,7 +584,6 @@ async function submitOperadorForm(e, id) {
       if (newPwd.length < 8)    { showToast('A senha deve ter pelo menos 8 caracteres.', 'error'); return; }
     }
 
-    const pinHash = newPwd ? undefined : (existing?.pinHash || null);
 
     let activeVal = true;
     if (isAdminUser) {
@@ -589,6 +598,9 @@ async function submitOperadorForm(e, id) {
     } else if (existing) {
       isAdminVal = existing.isAdmin === true;
     }
+
+    // Gestão: só admin altera; demais preservam o valor atual.
+    const isGestaoVal = isAdminUser ? fd.get('isGestao') !== null : (existing ? existing.isGestao === true : false);
 
     let onLeaveVal = false;
     if (isAdminUser) {
@@ -608,11 +620,9 @@ async function submitOperadorForm(e, id) {
       notes:  g('notes'),
       active: activeVal,
       isAdmin: isAdminVal,
+      isGestao: isGestaoVal,
       onLeave: onLeaveVal,
       team:   g('team') || 'init',
-      pinHash,
-      pinSalt: existing?.pinSalt,
-      pin: newPwd
     };
 
     const opErrors = validateOperator(opData);

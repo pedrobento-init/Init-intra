@@ -71,7 +71,7 @@ function _rptClosed(status) {
 
 /**
  * Modelo puro do relatório (testável). Listas já filtradas pelo cliente.
- * @param {{ client: object, pens: object[], visits: object[], atend?: object[]|null, atendTruncated?: boolean }} src
+ * @param {{ client: object, pens: object[], visits: object[], entries?: object[], atend?: object[]|null, atendTruncated?: boolean }} src
  * @param {string} ym 'YYYY-MM'
  */
 function buildClientMonthReport(src, ym) {
@@ -85,10 +85,19 @@ function buildClientMonthReport(src, ym) {
   const visitsDone = visits.filter((x) => x.v.status === 'concluida');
   const visitMinutes = visitsDone.reduce((s, x) => s + (x.minutes || 0), 0);
 
+  // Horas: lançamentos (time_entries, 048) são a fonte. Pendência sem nenhum
+  // lançamento ainda (aparelho que não sincronizou o backfill) cai nas notas.
   let penSeconds = 0;
   const penTime = new Map();
+  const byPen = new Map();
+  for (const e of src.entries || []) {
+    if (!e || !e.pendenciaId) continue;
+    if (!byPen.has(e.pendenciaId)) byPen.set(e.pendenciaId, []);
+    byPen.get(e.pendenciaId).push({ at: e.endedAt, seconds: Number(e.seconds) || 0 });
+  }
   for (const p of src.pens || []) {
-    for (const s of parseTimerSessions(p.notes)) {
+    const sessions = byPen.has(p.id) ? byPen.get(p.id) : parseTimerSessions(p.notes);
+    for (const s of sessions) {
       if (!inMonth(_rptLocalDate(s.at))) continue;
       penSeconds += s.seconds;
       penTime.set(p.id, (penTime.get(p.id) || 0) + s.seconds);
@@ -277,6 +286,8 @@ async function loadClientReport(clientId) {
 
   const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter((p) => p && p.clientId === clientId);
   const visits = (typeof getVisits === 'function' ? getVisits() : []).filter((v) => v && v.clientId === clientId);
+  const penIds = new Set(pens.map((p) => p.id));
+  const entries = (typeof getTimeEntries === 'function' ? getTimeEntries() : []).filter((e) => e && penIds.has(e.pendenciaId));
 
   // Atendimentos do Milvus: opcional (online + cliente integrado).
   let atend = null;
@@ -291,7 +302,7 @@ async function loadClientReport(clientId) {
   // Trocou de mês/fechou enquanto buscava: descarta.
   if (!document.getElementById('rptPreview') || document.getElementById('rptMonth').value !== ym) return;
 
-  const model = buildClientMonthReport({ client: c, pens, visits, atend, atendTruncated }, ym);
+  const model = buildClientMonthReport({ client: c, pens, visits, entries, atend, atendTruncated }, ym);
   const html = renderClientReportHtml(model);
   _rptLast = { html, title: 'Relatório ' + c.name + ' ' + ym };
   box.innerHTML = html;

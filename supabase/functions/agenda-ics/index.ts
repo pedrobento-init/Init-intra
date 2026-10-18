@@ -36,14 +36,17 @@ serve(async (req: Request) => {
   const now = new Date();
   const from = new Date(now.getTime() - 30 * 86400000);
   const to = new Date(now.getTime() + 183 * 86400000);
-  const { data: visits, error } = await admin
-    .from("visits")
-    .select("id, numero, client_name, motivo, observacoes, date, time, time_end, all_day, status, updated_at")
-    .eq("operator", op.name)
-    .gte("date", iso(from))
-    .lte("date", iso(to))
-    .order("date")
-    .limit(1000);
+  // Por id (049); registros sem id (nome que não bateu com ninguém) pelo nome.
+  const cols = "id, numero, client_name, motivo, observacoes, date, time, time_end, all_day, status, updated_at";
+  const [byId, byName] = await Promise.all([
+    admin.from("visits").select(cols).eq("operator_id", op.id).gte("date", iso(from)).lte("date", iso(to)).limit(1000),
+    admin.from("visits").select(cols).is("operator_id", null).eq("operator", op.name).gte("date", iso(from)).lte("date", iso(to)).limit(1000),
+  ]);
+  // Banco ainda sem a coluna (049 não aplicada): cai só no nome.
+  const legacy = byId.error ? await admin.from("visits").select(cols).eq("operator", op.name).gte("date", iso(from)).lte("date", iso(to)).limit(1000) : null;
+  const error = legacy ? legacy.error : (byId.error || byName.error);
+  const visits = legacy ? (legacy.data || []) : [...(byId.data || []), ...(byName.data || [])]
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (error) {
     console.error(`agenda-ics: leitura falhou op=${op.id}`);
     return new Response("Erro", { status: 500 });

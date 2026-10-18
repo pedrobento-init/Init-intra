@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -140,7 +142,7 @@ describe('contrato mobile no CSS e no HTML', () => {
     expect(norm).toContain('.pen-scope-tab.is-active::after');
     expect(norm).toMatch(/\.pen-scope-row\s*\{[^}]*flex-direction:\s*column/);
     // markup: abas sem btn-primary/btn-secondary, contador sem rótulo duplicado
-    const penJs = fs.readFileSync('js/pendencias.js', 'utf8');
+    const penJs = partsSource('pendencias');
     expect(penJs).toContain('pen-scope-tab');
     expect(penJs).not.toMatch(/setPenScope\('active'\)">Ativas<\/button>\s*<button class="btn/);
     expect(penJs).toContain("cntEl.textContent = total ? String(total) : ''");

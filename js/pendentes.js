@@ -14,7 +14,7 @@
 
 const PENDENTES_LABELS = {
   pendencias: 'Pendência', visits: 'Visita', clients: 'Cliente', operators: 'Operador',
-  equipamentos: 'Equipamento', vencimentos: 'Vencimento', procedures: 'Procedimento', procedure_templates: 'Modelo', reunioes: 'Reunião', visit_photos: 'Foto',
+  equipamentos: 'Equipamento', vencimentos: 'Vencimento', time_entries: 'Horas', procedures: 'Procedimento', procedure_templates: 'Modelo', reunioes: 'Reunião', visit_photos: 'Foto',
 };
 
 function _pendTitle(table, r) {
@@ -87,7 +87,7 @@ function _loadServerSeen() {
 function _saveServerSeen() {
   clearTimeout(_serverSeenTimer);
   _serverSeenTimer = setTimeout(() => {
-    try { localStorage.setItem(SERVER_SEEN_KEY, JSON.stringify(_loadServerSeen())); } catch (_) {}
+    try { localStorage.setItem(SERVER_SEEN_KEY, JSON.stringify(_loadServerSeen())); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
   }, 300);
 }
 /** Servidor confirmou estas linhas (id + updated_at). */
@@ -120,7 +120,7 @@ function _hookThen(builder, onOk) {
   if (!builder || typeof builder.then !== 'function' || builder.__seenHooked) return builder;
   const origThen = builder.then;
   builder.then = function (res, rej) {
-    return origThen.call(this, (r) => { try { if (r && !r.error) onOk(r); } catch (_) {} return res ? res(r) : r; }, rej);
+    return origThen.call(this, (r) => { try { if (r && !r.error) onOk(r); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); } return res ? res(r) : r; }, rej);
   };
   builder.__seenHooked = true;
   return builder;
@@ -136,7 +136,13 @@ function wrapSupabaseForSeen(client) {
       b.upsert = function (payload, opts) {
         const q = origUpsert.call(this, payload, opts);
         const rows = Array.isArray(payload) ? payload : [payload];
-        return _hookThen(q, () => markServerSeen(table, rows));
+        return _hookThen(q, () => {
+          markServerSeen(table, rows);
+          // Upsert confirmado: as edições locais desses registros foram entregues.
+          if (typeof _clearDirtyFields === 'function') {
+            for (const r of rows) { if (r && r.id) _clearDirtyFields(table, r.id, r.updated_at || r.updatedAt); }
+          }
+        });
       };
     }
     if (typeof b.delete === 'function') {
@@ -158,7 +164,7 @@ function wrapSupabaseForSeen(client) {
   client.__seenWrapped = true;
   return client;
 }
-try { if (typeof supabaseClient !== 'undefined' && supabaseClient) wrapSupabaseForSeen(supabaseClient); } catch (_) {}
+try { if (typeof supabaseClient !== 'undefined' && supabaseClient) wrapSupabaseForSeen(supabaseClient); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
 
 async function getPendingChanges() {
   let rows = [];
@@ -172,7 +178,7 @@ async function getPendingChanges() {
       try { records = dbGet(e.dbKey) || []; } catch (_) { records = []; }
       sources.push({ table: e.table, dbKey: e.dbKey, records: Array.isArray(records) ? records : [], lastSyncAt: typeof _getLastSyncAt === 'function' ? _getLastSyncAt(e.table) : null });
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
   let tombs = {};
   try { tombs = typeof _loadTombstones === 'function' ? _loadTombstones() : {}; } catch (_) { tombs = {}; }
   const list = buildPendingList(sources, rows, tombs, _loadServerSeen());
@@ -183,7 +189,7 @@ async function getPendingChanges() {
       const v = typeof getVisitById === 'function' ? getVisitById(ph.visitId) : null;
       list.push({ table: 'visit_photos', id: ph.id, kind: 'create', title: 'Foto · Visita ' + ((v && v.clientName) || ''), at: ph.createdAt, attempts: 0 });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
   return list;
 }
 
@@ -235,7 +241,7 @@ async function pendingSyncNow(btn) {
     if (typeof outboxDrain === 'function') await outboxDrain();
     if (typeof syncNow === 'function') await syncNow();
     else if (typeof syncSupabaseToLocal === 'function') await syncSupabaseToLocal();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
   if (btn) btn.disabled = false;
   refreshPendingStrip();
 }
@@ -244,8 +250,8 @@ if (typeof window !== 'undefined' && !window._pendStripBound) {
   window._pendStripBound = true;
   ['online', 'offline', 'sync:update'].forEach((ev) => window.addEventListener(ev, refreshPendingStrip));
   try {
-    if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'vencimentos', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
-  } catch (_) {}
+    if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'vencimentos', 'horas', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { buildPendingList, wrapSupabaseForSeen, markServerSeen, markServerDeleted, _loadServerSeen };

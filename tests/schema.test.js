@@ -5,6 +5,7 @@ import {
   _mapFromRemote,
   _mapToRemote,
   _mergeRecords,
+  _keepLocalEdits,
   _needsPush,
 } from '../js/schema.js';
 
@@ -27,7 +28,7 @@ describe('ENTITIES (schema central)', () => {
 
   it('apenas as tabelas com RLS por equipe têm hasTeam=true', () => {
     const teamScoped = ENTITIES.filter((e) => e.hasTeam).map((e) => e.table).sort();
-    expect(teamScoped).toEqual(['clients', 'equipamentos', 'pendencias', 'reunioes', 'vencimentos', 'visits']);
+    expect(teamScoped).toEqual(['clients', 'equipamentos', 'pendencias', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
   });
 });
 
@@ -84,5 +85,26 @@ describe('_needsPush', () => {
     expect(_needsPush({ updatedAt: '2024-01-01' }, null)).toBe(true);
     expect(_needsPush({ updatedAt: '2024-01-02' }, { updated_at: '2024-01-01' })).toBe(true);
     expect(_needsPush({ updatedAt: '2024-01-01' }, { updated_at: '2024-01-02' })).toBe(false);
+  });
+});
+
+describe('merge por campo (edições locais não enviadas)', () => {
+  const fields = { id: 'id', name: 'name', phone: 'phone', notes: 'notes', updated_at: 'updatedAt' };
+  it('servidor mais novo: fica a versão dele + os campos editados aqui', () => {
+    const local = [{ id: '1', name: 'Acme', phone: '9999', notes: 'velha', updatedAt: '2026-10-18T10:00:00Z', _dirtyFields: ['phone'] }];
+    const remote = [{ id: '1', name: 'Acme', phone: '1111', notes: 'nota da Ana', updated_at: '2026-10-18T11:00:00Z' }];
+    const { merged, conflictDetails } = _mergeRecords(local, remote, fields);
+    expect(merged[0]).toMatchObject({ phone: '9999', notes: 'nota da Ana', _dirtyFields: ['phone'] });
+    expect(Date.parse(merged[0].updatedAt)).toBeGreaterThan(Date.parse('2026-10-18T11:00:00Z')); // volta a ser enviado
+    const lostFields = conflictDetails[0].fields.map((f) => f.field);
+    expect(lostFields).toContain('notes'); // substituído pelo servidor
+    expect(lostFields).not.toContain('phone'); // mantido (editado aqui)
+  });
+  it('sem edição pendente, servidor mais novo substitui como antes', () => {
+    const local = [{ id: '1', name: 'Acme', phone: '9999', updatedAt: '2026-10-18T10:00:00Z' }];
+    const remote = [{ id: '1', name: 'Acme', phone: '1111', updated_at: '2026-10-18T11:00:00Z' }];
+    const { merged } = _mergeRecords(local, remote, fields);
+    expect(merged[0].phone).toBe('1111');
+    expect(merged[0]._dirtyFields).toBeUndefined();
   });
 });

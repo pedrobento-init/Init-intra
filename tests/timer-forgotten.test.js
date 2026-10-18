@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -55,7 +57,7 @@ describe('formatDurationWords', () => {
 });
 
 describe('card da pendência (contrato no código)', () => {
-  const src = fs.readFileSync('js/pendencias.js', 'utf8');
+  const src = partsSource('pendencias');
   it('cronômetro esquecido abre "parar e ajustar"', () => {
     expect(src).toContain('openTimerAdjust(');
     expect(src).toContain('kb-timer-forgot');

@@ -2,17 +2,18 @@
 // ============================================================
 //
 // A anon key é protegida por Row Level Security (RLS) no Supabase.
-// Os valores são carregados de js/config.js (gitignored) via window.SUPABASE_CONFIG.
-// Administradores podem substituir temporariamente via localStorage no console:
-//   setSupabaseConfig('https://...', 'eyJ...')
+// Os valores vêm SÓ de js/config.js (gitignored; gerado no build) via
+// window.SUPABASE_CONFIG. A antiga substituição por localStorage
+// (intra_supabase_url/key) foi removida (SEC-06): um script injetado ou uma
+// pessoa no console podia apontar o app para outro servidor e capturar logins.
 //
 // Para configurar: copie js/config.example.js → js/config.js e preencha os valores.
 
 const _cfg = (typeof window !== 'undefined' && window.SUPABASE_CONFIG) || {};
-const SUPABASE_URL = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_url'))
-  || _cfg.url || '';
-const SUPABASE_ANON_KEY = (typeof localStorage !== 'undefined' && localStorage.getItem('intra_supabase_key'))
-  || _cfg.anonKey || '';
+const SUPABASE_URL = _cfg.url || '';
+const SUPABASE_ANON_KEY = _cfg.anonKey || '';
+// Limpa a substituição antiga de quem já tinha usado.
+try { localStorage.removeItem('intra_supabase_url'); localStorage.removeItem('intra_supabase_key'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
 
 let supabaseClient = null;
 
@@ -28,26 +29,10 @@ if (SUPABASE_URL && SUPABASE_ANON_KEY) {
                 }
             });
         }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
 }
 
 function isSupabaseConnected() { return !!supabaseClient; }
-
-/** Uso interno/admin via console — não exposto na UI de login */
-function setSupabaseConfig(url, key) {
-    if (url) localStorage.setItem('intra_supabase_url', url.trim());
-    if (key) localStorage.setItem('intra_supabase_key', key.trim());
-    window.location.reload();
-}
-
-function openSupabaseConfig() {
-    // Configuração removida da interface pública por segurança.
-    return;
-}
-
-function saveSupabaseConfigFromModal() {
-    return;
-}
 
 // Inicializador de escutadores em Tempo Real (Realtime WebSockets)
 let _realtimeChannel = null;
@@ -85,14 +70,14 @@ function _applyRealtimePayload(table, payload) {
               if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
             }
           }
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
         const event = payload.eventType || payload.event;
         // O que chega do servidor está, por definição, confirmado no servidor
         // (faixa "aguardando envio" não conta mudança de colega como nossa).
         try {
           if (event === 'DELETE' && payload.old && typeof markServerDeleted === 'function') markServerDeleted(table, payload.old.id);
           else if (payload.new && typeof markServerSeen === 'function') markServerSeen(table, [payload.new]);
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
         if (event === 'DELETE' && payload.old) {
             const id = payload.old.id;
             list = list.filter(x => x.id !== id);
@@ -105,12 +90,10 @@ function _applyRealtimePayload(table, payload) {
                 const localT = new Date(list[idx].updatedAt || list[idx].timestamp || 0).getTime();
                 const remoteT = new Date(row.updatedAt || row.timestamp || 0).getTime();
                 if (remoteT >= localT) {
-                    // Preserva pin local se realtime não envia hashes
-                    const prevPin = list[idx].pinHash;
-                    const prevSalt = list[idx].pinSalt;
-                    list[idx] = { ...list[idx], ...row };
-                    if (prevPin && !row.pinHash) list[idx].pinHash = prevPin;
-                    if (prevSalt && !row.pinSalt) list[idx].pinSalt = prevSalt;
+                    list[idx] = (typeof _keepLocalEdits === 'function')
+                        ? _keepLocalEdits({ ...list[idx], ...row }, list[idx])
+                        : { ...list[idx], ...row };
+                    delete list[idx].pinHash; delete list[idx].pinSalt; // hash de senha não é mais guardado
                 }
             } else {
                 list.unshift(row);
@@ -122,7 +105,7 @@ function _applyRealtimePayload(table, payload) {
             dbSet(meta.dbKey, list);
         }
         if (typeof meta.onChange === 'function') meta.onChange();
-    } catch (_) {} finally {
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); } finally {
         if (typeof window !== 'undefined') window._suppressPendingSync = _prevSuppress;
     }
 }

@@ -168,11 +168,17 @@ function _kbSnippet(d, q) {
 }
 
 function _kbRow(d, q) {
-  return '<li><button type="button" class="kb-row" onclick="openKbDoc(\'' + escapeHtml(d.kind) + '\',\'' + escapeHtml(d.id) + '\')">' +
+  return '<li><button type="button" class="kb-row" data-action="kbOpen" data-kind="' + escapeHtml(d.kind) + '" data-arg="' + escapeHtml(d.id) + '">' +
     '<svg class="kb-ico kb-ico--' + d.kind + '" viewBox="0 0 24 24" aria-hidden="true">' + KB_ICON[d.kind] + '</svg>' +
     '<span class="kb-main"><b>' + escapeHtml(d.title || '(sem título)') + '</b>' +
     '<span class="kb-meta">' + escapeHtml([KB_KINDS[d.kind], d.clientName, d.category].filter(Boolean).join(' · ')) + '</span>' +
     (d.body ? '<span class="kb-snip">' + _kbSnippet(d, q) + '</span>' : '') + '</span></button></li>';
+}
+
+/** Abas da Conhecimento: a base e os modelos (antes um item de menu à parte). */
+function kbTabsHtml(active) {
+  const tab = (id, page, label) => '<button type="button" class="kb-tab' + (active === id ? ' is-active' : '') + '" role="tab" aria-selected="' + (active === id) + '" data-action="nav" data-arg="' + page + '">' + label + '</button>';
+  return '<div class="kb-tabs" role="tablist" aria-label="Conhecimento">' + tab('base', 'conhecimento', 'Base de conhecimento') + tab('modelos', 'templates', 'Modelos de procedimento') + '</div>';
 }
 
 function renderConhecimento() {
@@ -182,11 +188,11 @@ function renderConhecimento() {
     window._topbarAction = () => openKbArticleForm();
   }
   if (!document.getElementById('kbResults')) {
-    const chip = (k, l) => '<button type="button" class="vis-chip" aria-pressed="' + (_kbKind === k) + '" data-kind="' + k + '" onclick="setKbKind(\'' + k + '\')">' + l + '</button>';
+    const chip = (k, l) => '<button type="button" class="vis-chip" aria-pressed="' + (_kbKind === k) + '" data-kind="' + k + '" data-action="kbKind" data-arg="' + k + '">' + l + '</button>';
     document.getElementById('contentArea').innerHTML =
-      '<div class="ov-wrap kb">' +
+      '<div class="ov-wrap kb">' + kbTabsHtml('base') +
         '<div class="search-bar page-toolbar"><div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-        '<input class="form-input" id="kbSearch" placeholder="Descreva o problema: \'impressora não imprime\', \'VPN cai\'…" value="' + escapeHtml(_kbQuery) + '" oninput="_kbQuery=this.value;_kbPaint()" autocomplete="off" /></div></div>' +
+        '<input class="form-input" id="kbSearch" placeholder="Descreva o problema: \'impressora não imprime\', \'VPN cai\'…" value="' + escapeHtml(_kbQuery) + '" data-input="kbSearch" autocomplete="off" /></div></div>' +
         '<div class="kb-chips">' + chip('', 'Tudo') + chip('artigo', 'Artigos') + chip('caso', 'Casos resolvidos') + chip('procedimento', 'Procedimentos de clientes') + chip('modelo', 'Modelos') + '</div>' +
         '<div id="kbResults"></div>' +
       '</div>';
@@ -212,13 +218,13 @@ function _kbPaint() {
     const counts = Object.keys(KB_KINDS).map((k) => docs.filter((d) => d.kind === k).length);
     box.innerHTML = '<p class="kb-hint">' + counts[0] + ' artigos · ' + counts[3] + ' casos resolvidos · ' + counts[1] + ' procedimentos de clientes · ' + counts[2] + ' modelos. Busque pelo sintoma.</p>' +
       (list.length ? '<section class="card ov-panel"><ul class="kb-list">' + list.map((d) => _kbRow(d, '')).join('') + '</ul></section>'
-        : '<div class="empty-state"><p>Nenhum artigo da equipe ainda. Escreva um, ou transforme uma pendência resolvida em artigo (botão no detalhe dela).</p><button class="btn btn-primary btn-sm" onclick="openKbArticleForm()">+ Novo artigo</button></div>');
+        : '<div class="empty-state"><p>Nenhum artigo da equipe ainda. Escreva um, ou transforme uma pendência resolvida em artigo (botão no detalhe dela).</p><button class="btn btn-primary btn-sm" data-action="kbNew">+ Novo artigo</button></div>');
     return;
   }
   const found = kbSearch(docs, q, { kind: _kbKind || undefined, limit: 60 });
   box.innerHTML = found.length
     ? '<p class="kb-hint">' + found.length + (found.length === 1 ? ' resultado' : ' resultados') + '</p><section class="card ov-panel"><ul class="kb-list">' + found.map((d) => _kbRow(d, q)).join('') + '</ul></section>'
-    : '<div class="empty-state"><p>Nada encontrado para "' + escapeHtml(q) + '".</p><button class="btn btn-secondary btn-sm" onclick="openKbArticleForm(null,{title:document.getElementById(\'kbSearch\').value})">Escrever um artigo sobre isso</button></div>';
+    : '<div class="empty-state"><p>Nada encontrado para "' + escapeHtml(q) + '".</p><button class="btn btn-secondary btn-sm" data-action="kbNewFromSearch">Escrever um artigo sobre isso</button></div>';
 }
 
 function openKbDoc(kind, id) {
@@ -226,13 +232,13 @@ function openKbDoc(kind, id) {
   const d = kbDocs().find((x) => x.kind === kind && x.id === id);
   if (!d) { if (typeof showToast === 'function') showToast('Documento não encontrado.', 'warning'); return; }
   const acts = [];
-  if (kind === 'artigo') acts.push('<button type="button" class="btn btn-secondary btn-sm" onclick="openKbArticleForm(\'' + escapeHtml(id) + '\')">Editar</button>');
-  if (kind === 'procedimento' && d.clientId) acts.push('<button type="button" class="btn btn-secondary btn-sm" onclick="viewClient(\'' + escapeHtml(d.clientId) + '\')">Abrir cliente</button>');
-  acts.push('<button type="button" class="btn btn-secondary btn-sm" onclick="copyKbDoc(\'' + escapeHtml(kind) + '\',\'' + escapeHtml(id) + '\')">Copiar texto</button>');
+  if (kind === 'artigo') acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="kbEdit" data-arg="' + escapeHtml(id) + '">Editar</button>');
+  if (kind === 'procedimento' && d.clientId) acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="openClient" data-arg="' + escapeHtml(d.clientId) + '">Abrir cliente</button>');
+  acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="kbCopy" data-kind="' + escapeHtml(kind) + '" data-arg="' + escapeHtml(id) + '">Copiar texto</button>');
   openModal(escapeHtml(d.title || 'Documento'),
     '<div class="kb-doc-meta">' + escapeHtml([KB_KINDS[kind], d.clientName, d.category].filter(Boolean).join(' · ')) + '</div>' +
     '<div class="kb-doc-body">' + escapeHtml(d.body || '—') + '</div>' +
-    '<div class="form-actions">' + acts.join('') + '<button type="button" class="btn btn-primary btn-sm" onclick="closeModal()">Fechar</button></div>', 'lg');
+    '<div class="form-actions">' + acts.join('') + '<button type="button" class="btn btn-primary btn-sm" data-action="closeModal">Fechar</button></div>', 'lg');
 }
 
 function copyKbDoc(kind, id) {
@@ -246,14 +252,14 @@ function copyKbDoc(kind, id) {
 function openKbArticleForm(id, pre) {
   const a = id ? ((typeof getProcedures === 'function' ? getProcedures() : []).find((p) => p.id === id) || {}) : (pre || {});
   openModal(id ? 'Editar artigo' : 'Novo artigo', `
-    <form onsubmit="submitKbArticle(event,'${escapeHtml(id || '')}')">
+    <form data-submit="kbSave" data-arg="${escapeHtml(id || '')}">
       <div class="form-group"><label class="form-label">Título *</label><input class="form-input" name="title" value="${escapeHtml(a.title || '')}" placeholder="Ex.: Impressora HP some da rede depois de atualizar o Windows" required /></div>
       <div class="form-group"><label class="form-label">Categoria</label><input class="form-input" name="category" value="${escapeHtml(a.category || '')}" placeholder="Rede, Impressora, E-mail, Backup…" /></div>
       <div class="form-group"><label class="form-label">Sintoma, causa e solução</label><textarea class="form-textarea" name="content" rows="12" placeholder="Sintoma:&#10;Causa:&#10;Solução (passo a passo):">${escapeHtml(a.content || '')}</textarea></div>
       <p class="kb-hint" style="margin:-6px 0 12px">Fica visível para toda a sua equipe, não só para um cliente.</p>
       <div class="form-actions">
-        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" style="margin-right:auto" onclick="if(confirm('Excluir este artigo?')){deleteProcedure('${escapeHtml(id)}');closeModal();if(document.getElementById('kbResults'))_kbPaint();}">Excluir</button>` : ''}
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" style="margin-right:auto" data-action="kbDelete" data-arg="${escapeHtml(id)}">Excluir</button>` : ''}
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar</button>
       </div>
     </form>`, 'lg');
@@ -290,7 +296,7 @@ function kbPendenciaPanelHtml(p) {
   if (!related.length && !resolved) return '';
   return '<div class="kb-pen">' +
     '<div class="kb-pen-head"><span>Base de conhecimento</span>' +
-    (resolved ? '<button type="button" class="link-btn" onclick="kbFromPendencia(\'' + escapeHtml(p.id) + '\')">Transformar em artigo</button>' : '') + '</div>' +
+    (resolved ? '<button type="button" class="link-btn" data-action="kbFromPen" data-arg="' + escapeHtml(p.id) + '">Transformar em artigo</button>' : '') + '</div>' +
     (related.length ? '<ul class="kb-list kb-list--sm">' + related.map((d) => _kbRow(d, [p.assunto, p.descricao].join(' '))).join('') + '</ul>'
       : '<p class="kb-hint">Registre como resolveu: vira consulta para a próxima vez.</p>') +
   '</div>';
@@ -301,6 +307,21 @@ if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !win
   ['procedimentos', 'templates', 'pendencias'].forEach((n) => onDataChanged(n, function () {
     try { if ((window.location.hash || '').replace('#', '') === 'conhecimento') _kbPaint(); } catch (_) {}
   }));
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    kbOpen: (el, id) => openKbDoc(el.dataset.kind, id),
+    kbKind: (_el, k) => setKbKind(k || ''),
+    kbSearch: (_el, v) => { _kbQuery = v; _kbPaint(); },
+    kbNew: () => openKbArticleForm(),
+    kbNewFromSearch: () => openKbArticleForm(null, { title: (document.getElementById('kbSearch') || {}).value || '' }),
+    kbEdit: (_el, id) => openKbArticleForm(id),
+    kbCopy: (el, id) => copyKbDoc(el.dataset.kind, id),
+    kbSave: (_el, id, ev) => submitKbArticle(ev, id || ''),
+    kbDelete: (_el, id) => { if (!window.confirm('Excluir este artigo?')) return; deleteProcedure(id); closeModal(); if (document.getElementById('kbResults')) _kbPaint(); },
+    kbFromPen: (_el, id) => kbFromPendencia(id),
+  });
 }
 
 if (typeof module !== 'undefined' && module.exports) {

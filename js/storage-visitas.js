@@ -63,11 +63,11 @@ function nextVisitNumero() {
       const n = _visitNumeroOf(v);
       if (n !== null && n > maxSeen) maxSeen = n;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   let mark = 0;
-  try { mark = Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0; } catch (_) {}
+  try { mark = Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   const next = Math.max(maxSeen, mark) + 1;
-  try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_) {}
+  try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   return next;
 }
 
@@ -94,11 +94,11 @@ function maintainVisitNumeros() {
     if (next === null) {
       let m = 0;
       for (const v of list) { const n = _visitNumeroOf(v); if (n !== null && n > m) m = n; }
-      try { m = Math.max(m, Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0); } catch (_) {}
+      try { m = Math.max(m, Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
       next = m;
     }
     next += 1;
-    try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_) {}
+    try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
     return next;
   };
   for (const v of missing) {
@@ -123,9 +123,9 @@ function maintainVisitNumeros() {
   if (changed) {
     const prev = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
     if (typeof window !== 'undefined') window._suppressPendingSync = true;
-    try { dbSet(DB.VISITS, list); } catch (_) {}
+    try { dbSet(DB.VISITS, list); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
     if (typeof window !== 'undefined') window._suppressPendingSync = prev;
-    try { console.debug('[visitas] maintainVisitNumeros: ' + changed + ' ajuste(s) aplicado(s).'); } catch (_) {}
+    try { console.debug('[visitas] maintainVisitNumeros: ' + changed + ' ajuste(s) aplicado(s).'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
   return changed;
 }
@@ -138,6 +138,8 @@ function saveVisit(data) {
     if (client) data.team = client.team || 'init';
   }
   if (!data.team) data.team = getCurrentTeam();
+  // Pessoas por id (049): o id acompanha o nome gravado.
+  if ('operator' in data) data.operatorId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.operator) : null;
   data.allDay = data.allDay === true;
   if (data.allDay) {
     data.time = '';
@@ -150,7 +152,7 @@ function saveVisit(data) {
   let oldStatus = null;
   if (isEdit) {
     const i = list.findIndex(v => v.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now }; }
+    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now }); }
     else list.push({ ...data, createdAt: now, updatedAt: now });
   } else {
     data.id = nextId('VIS');
@@ -257,13 +259,13 @@ function saveVisit(data) {
   // criar o chamado já; offline, a visita segue 'pendente' no local e o
   // processador retoma no pós-sync/online/boot. Nunca bloqueia nem lança.
   if (!isEdit) {
-    try { if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id); } catch (_) {}
+    try { if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
   // Finalização Milvus (etapa 2, fire-and-forget): visita concluída com
   // finalização pendente tenta finalizar já; offline/sem rede o processador
   // retoma depois. Nunca bloqueia a conclusão nem lança.
   if (data.status === 'concluida') {
-    try { if (typeof enqueueMilvusFinalizar === 'function') enqueueMilvusFinalizar(data.id); } catch (_) {}
+    try { if (typeof enqueueMilvusFinalizar === 'function') enqueueMilvusFinalizar(data.id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
   return data;
 }
@@ -299,7 +301,7 @@ function saveReuniao(data) {
   if (!data.team) data.team = getCurrentTeam();
   if (isEdit) {
     const i = list.findIndex(r => r.id === data.id);
-    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
     else list.push({ ...data, createdAt: now, updatedAt: now });
   } else {
     data.id = nextId('REU');
@@ -372,7 +374,7 @@ function saveEquipamento(data) {
     try {
       const maybe = String(data.osVinculada).trim();
       if (maybe && typeof getPendenciaById === 'function' && getPendenciaById(maybe)) data.pendenciaId = maybe;
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
   if (!data.team && data.clientId && data.clientId !== '__estoque__') {
     const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
@@ -390,7 +392,7 @@ function saveEquipamento(data) {
   }
   if (isEdit) {
     const i = list.findIndex(e => e.id === data.id);
-    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
     else list.push({ ...data, createdAt: data.createdAt || now, updatedAt: now });
   } else {
     data.id = nextId('EQP');
@@ -442,7 +444,7 @@ function deleteEquipamento(id) {
       supabaseClient.from('equipamentos').delete().eq('id', id)
         .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir equipamento:', res.error.message); markSyncPushFailed(); } })
         .catch(() => markSyncPushFailed());
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
 }
 
@@ -477,10 +479,11 @@ function saveVencimento(data, opts) {
     data.clientName = data.clientName || 'Interno';
   }
   if (!data.team) data.team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init';
+  if ('responsavel' in data) data.responsavelId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.responsavel) : null;
   let saved;
   if (isEdit) {
     const i = list.findIndex(v => v.id === data.id);
-    saved = i !== -1 ? { ...list[i], ...data, updatedAt: now } : { ...data, createdAt: data.createdAt || now, updatedAt: now };
+    saved = i !== -1 ? _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now }) : { ...data, createdAt: data.createdAt || now, updatedAt: now };
     if (i !== -1) list[i] = saved; else list.push(saved);
   } else {
     saved = { status: 'ativo', avisos: [], historico: [], ...data, id: nextId('VEN'), createdAt: now, updatedAt: now };
@@ -505,7 +508,7 @@ function deleteVencimento(id) {
       supabaseClient.from('vencimentos').delete().eq('id', id)
         .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir vencimento:', res.error.message); markSyncPushFailed(); } })
         .catch(() => markSyncPushFailed());
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
   }
   return true;
 }
@@ -521,7 +524,7 @@ function saveProcedure(data) {
   var now = new Date().toISOString();
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
-    if (i !== -1) list[i] = { ...list[i], ...data, updatedAt: now };
+    if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
   } else {
     data.id = nextId('PROC');
     data.createdAt = now;
