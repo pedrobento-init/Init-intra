@@ -1844,6 +1844,7 @@ function savePendencia(data) {
       var _sEl = 0;
       if (data.timerStartedAt) { _sEl = Math.max(0, Math.floor((Date.now() - new Date(data.timerStartedAt).getTime()) / 1000)); }
       data.timerTotalSeconds = (Number(data.timerTotalSeconds) || 0) + _sEl;
+      if (typeof timerClosedSessionNote === 'function') data.notes = [...(data.notes || []), timerClosedSessionNote(data.timerOperator, _sEl, data.timerTotalSeconds)];
       data.timerRunning = false;
       data.timerStartedAt = null;
       data.timerOperator = null;

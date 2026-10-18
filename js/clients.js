@@ -157,6 +157,7 @@ function viewClient(id) {
   if (!c) return;
   openModal(c.name, `
     ${clientSummaryHtml(c)}
+    <div class="cs-actions"><button type="button" class="link-btn" onclick="openClientReport('${id}')">Relatório do mês (PDF)</button></div>
     <div class="tabs" id="clientTabs">
       <div class="tab active" onclick="switchClientTab('ficha','${id}')">Ficha TI</div>
       <div class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</div>

@@ -51,6 +51,20 @@ function formatTimer(totalSeconds) {
 }
 
 /**
+ * Nota de sessão encerrada pela conclusão (o cronômetro para sozinho ao
+ * fechar a pendência). Mesmo formato "Sessão registrada: HH:MM:SS" do ajuste:
+ * é das notas de sessão que o relatório mensal tira as horas do período.
+ */
+function timerClosedSessionNote(operator, sessionSeconds, totalSeconds) {
+  const me = (typeof getUser === 'function' && getUser() && getUser().name) || operator || 'Operador';
+  return {
+    text: `⏹ Cronômetro de ${operator || me} parado ao concluir. Sessão registrada: ${formatTimer(sessionSeconds)}. Total: ${formatTimer(totalSeconds)}.`,
+    author: me,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Versão curta para cards: até 24h igual a formatTimer; acima disso "8d 21h"
  * ("213:06:51" não se lê de relance).
  */
