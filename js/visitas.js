@@ -248,7 +248,8 @@ function visitCardHtml(v) {
   return '<button type="button" class="vis-card" style="--st:' + m.color + '" onclick="openVisitDetail(\'' + escapeHtml(v.id) + '\')">'
     + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
     + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
-    + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span></div>'
+    + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span>'
+    + (typeof milvusStatusChipHtml === 'function' ? milvusStatusChipHtml(v) : '') + '</div>'
     + '<div class="vis-meta"><span class="vis-who"><i>' + escapeHtml(visitInitials(v.operator)) + '</i>' + escapeHtml(v.operator || '—') + '</span>'
     + '<span>' + escapeHtml(timeLabel) + '</span></div>'
     + '</button>';
@@ -285,6 +286,8 @@ function renderVisitTable(area) {
         <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} onclick="_visitPage++;renderVisitView(false)">Próxima →</button>
       </div>
     </div>` : '');
+  // Status dos chamados no Milvus: consulta em segundo plano (TTL/throttle no módulo).
+  if (typeof scheduleMilvusStatusRefresh === 'function') scheduleMilvusStatusRefresh();
 }
 
 function openVisitForm(id = null, preClientId = null, preDate = null) {
@@ -457,7 +460,8 @@ function openVisitDetail(id) {
           // só aparece com chamado já criado (sem codigo, sem botão).
           else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">✓ Finalizar chamado no Milvus</button>`;
         }
-        return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}`);
+        const back = typeof milvusStatusDetailHtml === 'function' ? milvusStatusDetailHtml(v) : '';
+        return box(`<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#16a34a;background:#16a34a15;padding:4px 10px;border-radius:6px;border:1px solid #16a34a30">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`);
       }
       if (ms.kind === 'pendente') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#b45309;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⏳ Aguardando criação do chamado</span>`);
       if (ms.kind === 'criando') return box(`<span style="display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;background:#dbeafe;padding:4px 10px;border-radius:6px;border:1px solid #93c5fd">🔄 Criando chamado no Milvus…</span>`);
@@ -508,6 +512,13 @@ function openVisitDetail(id) {
     </div>
   `);
   if (typeof renderVisitPhotos === 'function') renderVisitPhotos(id);
+  // Detalhe aberto: status do Milvus com mais de 2 min é consultado de novo.
+  try {
+    if (Number(v.milvusChamadoCodigo) > 0 && typeof scheduleMilvusStatusRefresh === 'function') {
+      const e = typeof getMilvusStatusEntry === 'function' ? getMilvusStatusEntry(id) : null;
+      if (!e || Date.now() - new Date(e.checkedAt || 0).getTime() > 120000) scheduleMilvusStatusRefresh({ force: [id] });
+    }
+  } catch (_) {}
 }
 
 function changeVisitStatus(id) {

@@ -538,6 +538,7 @@ function navigateTo(page) {
 
   if      (page === 'fila')        renderFila();
   else if (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
+  else if (page === 'prazos')      renderPrazos();
   else if (page === 'clientes')    renderClients();
   else if (page === 'templates')   renderTemplates();
   else if (page === 'pendencias')  renderPendencias();
@@ -1439,7 +1440,7 @@ function _startApp() {
   });
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['fila','dashboard','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
+  const pages = ['fila','dashboard','prazos','clientes','pendencias','calendario','operadores','relatorios','equipamentos','mapeamento-milvus','historico','templates','visitas','reuniao'];
   // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
   // dia a dia cai na Minha fila.
   const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';
@@ -1719,46 +1720,32 @@ function generateMonthlyReport() {
   var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   var monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  var monthPens = pens.filter(function(p) { return new Date(p.createdAt) >= monthStart; });
-  var resolvedPens = monthPens.filter(function(p) { return isPendenciaResolvida(p.status); });
+  // Resolvidas no mês = concluídas no mês (antes contava só as criadas no mês).
+  var resolvedPens = pens.filter(function(p) {
+    if (!isPendenciaResolvida(p.status)) return false;
+    var d = new Date(p.completedAt || p.updatedAt);
+    return !isNaN(d.getTime()) && d >= monthStart;
+  });
+  var activeOps = ops.filter(function(o) { return o.active !== false; });
 
-  var w = window.open('', '_blank', 'width=900,height=700,noopener');
-  if (!w) {
-    showToast('Permita pop-ups para gerar o relatório.', 'error');
-    return;
-  }
-  try { w.opener = null; } catch (_) {}
-  w.document.write(
-    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório Mensal — Init Intra</title>' +
-    '<style>' +
-      'body{font-family:Arial,sans-serif;color:#1e293b;padding:40px;max-width:800px;margin:0 auto}' +
-      'h1{font-size:24px;margin-bottom:4px}h2{font-size:18px;border-bottom:2px solid #1a56db;padding-bottom:6px;margin:24px 0 12px}' +
-      '.date{color:#64748b;font-size:13px;margin-bottom:20px}' +
-      'table{width:100%;border-collapse:collapse;margin-bottom:16px}' +
-      'th{text-align:left;padding:6px 10px;background:#f1f5f9;font-size:11px;text-transform:uppercase;color:#64748b}' +
-      'td{padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:13px}' +
-      '.kpi{display:flex;gap:16px;margin-bottom:20px}' +
-      '.kpi-box{flex:1;padding:16px;border-radius:8px;text-align:center;border:1px solid #e2e8f0}' +
-      '.kpi-num{font-size:28px;font-weight:700}.kpi-label{font-size:11px;color:#64748b;text-transform:uppercase}' +
-      '@media print{.kpi-box{border-color:#ccc}}' +
-    '</style></head><body>' +
-    '<h1>Init Intra — Relatório Mensal</h1>' +
-    '<div class="date">' + monthNames[now.getMonth()] + ' de ' + now.getFullYear() + ' — Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</div>' +
-    '<div class="kpi">' +
-      '<div class="kpi-box"><div class="kpi-num" style="color:#3b82f6">' + clients.length + '</div><div class="kpi-label">Clientes Totais</div></div>' +
-      '<div class="kpi-box"><div class="kpi-num" style="color:#16a34a">' + resolvedPens.length + '</div><div class="kpi-label">Pendências Resolvidas</div></div>' +
-      '<div class="kpi-box"><div class="kpi-num">' + ops.filter(function(o) { return o.active !== false; }).length + '</div><div class="kpi-label">Técnicos Ativos</div></div>' +
-    '</div>' +
-    '<h2>Produtividade por Técnico</h2>' +
-    '<table><thead><tr><th>Técnico</th><th>Pendências Resolvidas</th></tr></thead><tbody>' +
-    ops.filter(function(o) { return o.active !== false; }).map(function(o) {
+  // Imprime numa área da própria página: window.open com 'noopener' sempre
+  // devolve null, então o pop-up nunca abria ('Permita pop-ups...').
+  var html = '<article class="rpt">' +
+    '<header class="rpt-head"><div><div class="rpt-brand">Init Intra · Relatório mensal</div><h1>Visão geral da equipe</h1>' +
+    '<div class="rpt-period">' + monthNames[now.getMonth()] + ' de ' + now.getFullYear() + '</div></div>' +
+    '<div class="rpt-gen">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</div></header>' +
+    '<section class="rpt-kpis" style="grid-template-columns:repeat(3,1fr)">' +
+      '<div class="rpt-kpi"><b>' + clients.length + '</b><span>Clientes</span></div>' +
+      '<div class="rpt-kpi"><b>' + resolvedPens.length + '</b><span>Pendências resolvidas no mês</span></div>' +
+      '<div class="rpt-kpi"><b>' + activeOps.length + '</b><span>Técnicos ativos</span></div>' +
+    '</section>' +
+    '<h2>Produtividade por técnico</h2>' +
+    '<table><thead><tr><th>Técnico</th><th class="rpt-num">Pendências resolvidas</th></tr></thead><tbody>' +
+    activeOps.map(function(o) {
       var pCnt = resolvedPens.filter(function(p) { return p.responsible === o.name; }).length;
-      return '<tr><td><strong>' + escapeHtml(o.name) + '</strong></td><td>' + pCnt + '</td></tr>';
+      return '<tr><td><strong>' + escapeHtml(o.name) + '</strong></td><td class="rpt-num">' + pCnt + '</td></tr>';
     }).join('') +
     '</tbody></table>' +
-    '<p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:30px">Init Intra — Sistema de Gestão Interna</p>' +
-    '<script>window.print()</' + 'script>' +
-    '</body></html>'
-  );
-  w.document.close();
+  '</article>';
+  if (typeof printHtmlDocument === 'function') printHtmlDocument(html, 'Relatório mensal ' + monthNames[now.getMonth()] + ' ' + now.getFullYear());
 }

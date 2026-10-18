@@ -1392,6 +1392,7 @@ function changePenStatus(id) {
       var _el = 0;
       if (p.timerStartedAt) { _el = Math.max(0, Math.floor((Date.now() - new Date(p.timerStartedAt).getTime()) / 1000)); }
       next.timerTotalSeconds = (Number(p.timerTotalSeconds) || 0) + _el;
+      if (typeof timerClosedSessionNote === 'function') next.notes = [...(p.notes || []), timerClosedSessionNote(p.timerOperator, _el, next.timerTotalSeconds)];
       next.timerRunning = false;
       next.timerStartedAt = null;
       next.timerOperator = null;
