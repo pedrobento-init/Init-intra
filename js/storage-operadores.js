@@ -36,29 +36,44 @@ function getOperatorByAuthId(authUserId) {
   if (!authUserId) return null;
   return getOperators().find(o => o.auth_user_id === authUserId) || null;
 }
+/** Reescreve localmente o nome da pessoa nos registros dela (sem gerar envio). */
+function _propagateOperatorRename(opId, oldName, newName) {
+  const same = (id, name) => (id ? id === opId : name === oldName);
+  const jobs = [
+    [DB.PENDENCIAS, (r) => { let c = false; if (same(r.responsibleId, r.responsible)) { r.responsible = newName; c = true; } if (r.timerOperator && same(r.timerOperatorId, r.timerOperator)) { r.timerOperator = newName; c = true; } return c; }],
+    [DB.VISITS, (r) => { if (same(r.operatorId, r.operator)) { r.operator = newName; return true; } return false; }],
+    [DB.VENCIMENTOS, (r) => { if (r.responsavel && same(r.responsavelId, r.responsavel)) { r.responsavel = newName; return true; } return false; }],
+    [DB.TIME_ENTRIES, (r) => { if (same(r.operatorId, r.operatorName)) { r.operatorName = newName; return true; } return false; }],
+  ];
+  const prev = typeof window !== 'undefined' ? window._suppressPendingSync : undefined;
+  try {
+    if (typeof window !== 'undefined') window._suppressPendingSync = true;
+    for (const [key, fn] of jobs) {
+      if (!key) continue;
+      const list = dbGet(key) || [];
+      let changed = false;
+      for (const r of list) { if (r && fn(r)) changed = true; }
+      if (changed) dbSet(key, list);
+    }
+  } catch (_) {
+  } finally {
+    if (typeof window !== 'undefined') window._suppressPendingSync = prev;
+  }
+}
+
 async function saveOperator(data) {
   const list = getOperators();
   const isEdit = !!data.id;
-  const existing = isEdit ? list.find(o => o.id === data.id) : null;
+  const prevName = isEdit ? ((list.find(o => o.id === data.id) || {}).name || null) : null;
   
   var now = new Date().toISOString();
 
-  // Preserve existing pinSalt or generate new one
-  if (!data.pinSalt && existing?.pinSalt) {
-    data.pinSalt = existing.pinSalt;
-  }
-  if (!data.pinSalt) {
-    data.pinSalt = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-  
-  // Compute new hash only if a new pin was provided
-  if (data.pin) {
-    data.pinHash = await hashPin(data.pin, data.pinSalt);
-    delete data.pin;
-  } else if (!data.pinHash && existing?.pinHash) {
-    // Preserve existing password when not changing it
-    data.pinHash = existing.pinHash;
-  }
+  // Senha: quem guarda é o Supabase Auth. Antes um hash (SHA-256) da MESMA
+  // senha de login ia para operators — legível por todos os autenticados —
+  // e para o cache do aparelho. Não guardamos mais nada aqui.
+  delete data.pin;
+  delete data.pinHash;
+  delete data.pinSalt;
 
   let savedOp;
   if (isEdit) {
@@ -87,16 +102,14 @@ async function saveOperator(data) {
     list.push(data);
     savedOp = data;
   }
+  // Nenhum resquício de hash de senha no registro (cópias antigas do aparelho).
+  if (savedOp) { delete savedOp.pinHash; delete savedOp.pinSalt; }
   // ensure boolean normalization for onLeave
   if (savedOp) savedOp.onLeave = savedOp.onLeave === true;
-  // Gestão: preserva flag isGestao local (migration 037); fallback por nome
-  // garante Felipe/Joarli mesmo antes da coluna sincronizar.
-  try {
-    if (savedOp && typeof isGestaoOperator === 'function' && savedOp.isGestao !== true) {
-      if (isGestaoOperator(Object.assign({}, savedOp, { isGestao: false }))) savedOp.isGestao = true;
-    }
-  } catch (_) {}
   dbSet(DB.OPERATORS, list);
+  // Renomeou: os registros dessa pessoa passam a mostrar o nome novo (o banco
+  // faz o mesmo pelo id — migration 049 — e manda no próximo sync).
+  if (prevName && savedOp && savedOp.name && savedOp.name !== prevName) _propagateOperatorRename(savedOp.id, prevName, savedOp.name);
   
   // Sync the current session if this operator is the one logged in
   const session = getSession();
@@ -118,8 +131,6 @@ async function saveOperator(data) {
       phone: savedOp.phone,
        email: savedOp.email,
        auth_user_id: savedOp.auth_user_id || null,
-       pin_hash: savedOp.pinHash || null,
-      pin_salt: savedOp.pinSalt || null,
       is_admin: savedOp.isAdmin === true,
       is_gestao: savedOp.isGestao === true,
        active: savedOp.active !== false,
@@ -200,29 +211,6 @@ function canManageOps() { return getCurrentPermissions().manageOps; }
 function canViewAll() { return getCurrentPermissions().viewAll; }
 function canExport() { return getCurrentPermissions().export; }
 
-function resetOperatorPassword(opId) {
-  if (!isCurrentAdmin()) return false;
-  const list = getOperators();
-  const i = list.findIndex(o => o.id === opId);
-  if (i !== -1) {
-    list[i].pinHash = null;
-    list[i].updatedAt = new Date().toISOString();
-    dbSet(DB.OPERATORS, list);
-
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-      supabaseClient.from('operators').update({ pin_hash: null, updated_at: list[i].updatedAt }).eq('id', opId).then(res => { if (res.error) { console.error('❌ Supabase reset de senha:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
-    }
-
-    // If the reset operator is the current session, update it
-    const session = getSession();
-    if (session && session.opId === opId) {
-      setSession(opId);
-    }
-    return true;
-  }
-  return false;
-}
-
 // ── SEED ──
 function seedDemoData() {
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -239,8 +227,8 @@ function seedDemoData() {
       { id:'OP-1', name:'Pedro',   initials:'PE', color:'#1a56db', role:'Técnico',   phone:'', email:'op1@example.local',   auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
       { id:'OP-2', name:'Giovane', initials:'GI', color:'#0891b2', role:'Técnico',   phone:'', email:'op2@example.local', auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
       { id:'OP-3', name:'Rafael',  initials:'RA', color:'#0f766e', role:'Técnico',   phone:'', email:'op3@example.local',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-4', name:'Joarli',  initials:'JO', color:'#4f46e5', role:'Técnico',   phone:'', email:'op4@example.local',  auth_user_id:null, active:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
-      { id:'OP-5', name:'Felipe',  initials:'FE', color:'#6366f1', role:'CEO',       phone:'', email:'op5@example.local', auth_user_id:null, active:true, isAdmin:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-4', name:'Joarli',  initials:'JO', color:'#4f46e5', role:'Técnico',   phone:'', email:'op4@example.local',  auth_user_id:null, active:true, isGestao:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
+      { id:'OP-5', name:'Felipe',  initials:'FE', color:'#6366f1', role:'CEO',       phone:'', email:'op5@example.local', auth_user_id:null, active:true, isAdmin:true, isGestao:true, team:'init', createdAt:'2025-01-01T00:00:00Z', updatedAt:'2025-01-01T00:00:00Z' },
     ];
     dbSet(DB.OPERATORS, operators);
     const c = dbGetObj(DB.COUNTER, {});
@@ -463,13 +451,21 @@ function validateOperator(data) {
   if (data.email && !Validators.email(data.email)) errors.push('E-mail inválido.');
   if (data.phone && !Validators.phone(data.phone)) errors.push('Telefone inválido.');
   if (data.initials && data.initials.length > 3) errors.push('Iniciais devem ter no máximo 3 caracteres.');
+  // Nome único entre ativos (049): dois "Pedro" misturavam fila, contagens e agenda.
+  if (data.name && data.active !== false) {
+    try {
+      const n = String(data.name).trim().toLowerCase();
+      const dupeName = getOperators().find(o => o && o.id !== data.id && o.active !== false && String(o.name || '').trim().toLowerCase() === n);
+      if (dupeName) errors.push('Já existe um operador ativo chamado "' + dupeName.name + '". Use um nome diferente (ex.: com sobrenome).');
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-operadores'); }
+  }
   // Anti-duplicata: criação com e-mail já cadastrado (case-insensitive).
   // Edição (com id) passa — o próprio registro é ignorado na comparação.
   if (!data.id && data.email) {
     try {
       const dupe = getOperators().find(o => o && o.email && o.email.trim().toLowerCase() === String(data.email).trim().toLowerCase());
       if (dupe) errors.push('Já existe um operador com este e-mail (' + dupe.name + ').');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-operadores'); }
   }
   return errors;
 }
@@ -482,5 +478,5 @@ function validateTemplate(data) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, _isAuthError, _refreshSupabaseSession, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia, updatePendenciaAssignee };
+  module.exports = { _withDirtyFields, operatorIdByName, isSameOperator, getOperators, saveOperator, getPendingSyncCount, incrementPendingSync, resetPendingSyncCount, markSyncPushFailed, dbSet, dbGet, DB, parseMentionedOperators, highlightMentions, getClientDocuments, addClientDocument, removeClientDocument, _dataUrlToBlob, applyPendenciaPageFilters, countPendenciaStatuses, syncSupabaseToLocal, triggerStartupSync, checkBackendConnectivity, _withSyncTimeout, _isConnectivityError, _isAuthError, _refreshSupabaseSession, nextVisitNumero, maintainVisitNumeros, validateOperator, isPendenciaGestao, isGestaoOperator, canViewGestao, canViewPendencia, filterGestaoPendencias, isGestaoLog, filterGestaoLogs, getMyPendencias, getPendenciasByTeam, getPendencias, getPendenciaById, savePendencia, updatePendenciaAssignee };
 }

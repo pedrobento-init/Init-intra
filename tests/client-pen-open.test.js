@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -38,7 +40,7 @@ vm.createContext(sandbox);
 const _quietErr = console.error;
 console.error = () => {};
 try {
-  vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), sandbox, { filename: 'clients.js' });
+  vm.runInContext(partsSource('clients'), sandbox, { filename: 'clients.js' });
   vm.runInContext(
     'globalThis.__t = { openClientPenRow, openClientPendencia, _getReturn: () => _clientPenReturn, _getOrigin: () => _clientPenOrigin };',
     sandbox
@@ -96,9 +98,9 @@ describe('openClientPendencia (botão Abrir)', () => {
 });
 
 describe('contrato da tabela e do retorno à aba', () => {
-  const clientsSrc = fs.readFileSync('js/clients.js', 'utf8');
+  const clientsSrc = partsSource('clients');
   const uiSrc = fs.readFileSync('js/ui.js', 'utf8');
-  const penSrc = fs.readFileSync('js/pendencias.js', 'utf8');
+  const penSrc = partsSource('pendencias');
 
   it('coluna de ações com Abrir (focável, aria-label, sem propagar)', () => {
     expect(clientsSrc).toContain("onclick=\"event.stopPropagation();openClientPendencia('");

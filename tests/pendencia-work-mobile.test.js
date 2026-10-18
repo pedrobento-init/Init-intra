@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -31,7 +33,7 @@ describe('contrato mobile do bloco pen-work no CSS', () => {
 });
 
 describe('estrutura do bloco pen-work no detalhe', () => {
-  const src = fs.readFileSync('js/pendencias.js', 'utf8');
+  const src = partsSource('pendencias');
 
   it('detalhe renderiza faixa trabalhando-agora + tempo acumulado', () => {
     expect(src).toContain('pen-work');

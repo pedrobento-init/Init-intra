@@ -192,9 +192,8 @@ function timerWidget(item, type = 'pendencia') {
  */
 function toggleTimer(type, id, btnEl) {
   const now = new Date().toISOString();
-  const isTicket = type === 'ticket';
-  const cur = isTicket ? getTicketById(id) : getPendenciaById(id);
-  const saveFn = isTicket ? saveTicket : savePendencia;
+  const cur = getPendenciaById(id);
+  const saveFn = savePendencia;
   const renderFn = renderPenView;
   const updateLabel = 'Pendência';
 
@@ -237,6 +236,7 @@ function toggleTimer(type, id, btnEl) {
         updatedAt: now,
       };
       saveFn(next);
+      if (typeof recordTimeSession === 'function') recordTimeSession(cur, elapsed, { source: 'timer', operatorName: myName, endedAt: now });
       showToast('Trabalho pausado — item movido para Pausados.', 'info');
     } else {
       // INICIAR
@@ -334,6 +334,7 @@ function submitTimerAdjust(id) {
     notes: [...(cur.notes || []), note],
     updatedAt: now,
   });
+  if (typeof recordTimeSession === 'function') recordTimeSession(cur, sessionReal, { source: 'ajuste', operatorName: getCurrentWorker(cur), endedAt: now });
   closeModal();
   showToast('Cronômetro parado — tempo ajustado.', 'success');
   _refreshTimerFull(id, 'pendencia');
@@ -363,9 +364,8 @@ function _refreshTimerUI(id) {
  */
 function _refreshTimerFull(id, type) {
   var t = type || 'pendencia';
-  var isTicket = t === 'ticket';
   var item = null;
-  try { item = isTicket ? getTicketById(id) : getPendenciaById(id); } catch (_) { item = null; }
+  try { item = getPendenciaById(id); } catch (_) { item = null; }
   if (!item) return;
   // 1. Displays (texto do cronômetro)
   try { _refreshTimerUI(id); } catch (_) {}

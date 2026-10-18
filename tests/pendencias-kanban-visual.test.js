@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -37,7 +39,7 @@ const _quietErr = console.error;
 console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
-  vm.runInContext(fs.readFileSync('js/pendencias.js', 'utf8'), sandbox, { filename: 'pendencias.js' });
+  vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
     'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
     sandbox
@@ -196,7 +198,7 @@ describe('cards de cliente: toggle com estado pressionado', () => {
   });
 
   it('contrato: chip chama o toggle, tem aria-pressed e CSS de ativo', () => {
-    const src = fs.readFileSync('js/pendencias.js', 'utf8');
+    const src = partsSource('pendencias');
     expect(src).toContain('togglePenClientChip');
     expect(src).toContain('aria-pressed');
     const css = fs.readFileSync('css/styles.css', 'utf8').replace(/\s+/g, ' ');

@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 // ── Smoke test do render do quadro Kanban (Pendências) no design "Meu dia":
 // confere a estrutura .pen-board (resumo + ações) e as 5 colunas com cards ───
 import { describe, it, expect } from 'vitest';
@@ -52,7 +54,7 @@ const quiet = console.error;
 console.error = () => {};
 try {
   vm.runInContext(read('js/ui.js'), sandbox, { filename: 'ui.js' });
-  vm.runInContext(read('js/pendencias.js'), sandbox, { filename: 'pendencias.js' });
+  vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
     `globalThis.__t = { renderPenKanban, penStatusSummary,
       setData: function(pens, serverMode){ _filteredPens = pens; _penServerMode = !!serverMode; } };`,

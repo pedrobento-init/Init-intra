@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { createRequire as __storageReq } from 'node:module';
 const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -52,7 +54,7 @@ try {
   vm.runInThisContext(storageSource(), { filename: 'storage.js' });
   vm.runInThisContext(fs.readFileSync('js/ui.js', 'utf8'), { filename: 'ui.js' });
   vm.runInThisContext(fs.readFileSync('js/operadores.js', 'utf8'), { filename: 'operadores.js' });
-  vm.runInThisContext(fs.readFileSync('js/clients.js', 'utf8'), { filename: 'clients.js' });
+  vm.runInThisContext(partsSource('clients'), { filename: 'clients.js' });
 } finally {
   console.error = _quietErr;
 }

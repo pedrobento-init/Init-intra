@@ -3,7 +3,7 @@
 let _templatesCategoryFilter = '';
 
 function renderTemplates() {
-  document.getElementById('pageTitle').textContent = 'Modelos de Procedimentos';
+  document.getElementById('pageTitle').textContent = 'Conhecimento';
   setTopbarAction('Novo Modelo', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
   window._topbarAction = () => openTemplateForm();
 
@@ -12,7 +12,8 @@ function renderTemplates() {
 
   // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   document.getElementById('contentArea').innerHTML = `
-    <div class="ov-wrap">
+    <div class="ov-wrap kb">
+      ${typeof kbTabsHtml === 'function' ? kbTabsHtml('modelos') : ''}
       <div class="search-bar page-toolbar">
         <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>

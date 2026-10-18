@@ -44,8 +44,11 @@ const ENTITIES = [
       checklist: 'checklist', tags: 'tags', recurrence: 'recurrence', visit_id: 'visitId',
       reviewed_in_meeting: 'reviewedInMeeting',
       timer_running: 'timerRunning', timer_started_at: 'timerStartedAt', timer_total_seconds: 'timerTotalSeconds',
-      timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt'
+      timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt',
+      responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId'
     },
+    // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
+    optionalFields: ['responsible_id', 'timer_operator_id'],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
@@ -80,28 +83,15 @@ const ENTITIES = [
       on_leave: 'onLeave',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
-    // pinHash/pinSalt não vêm do mapeamento genérico — são preservados por onMerged
-    onMerged: (merged, local, remote) => {
-      const localMap = new Map(local.map(o => [o.id, o]));
-      const remoteMap = new Map(remote.map(r => [r.id, r]));
-      for (const o of merged) {
-        const loc = localMap.get(o.id);
-        const rem = remoteMap.get(o.id);
-        const localTime = new Date(loc?.updatedAt || 0).getTime();
-        const remoteTime = new Date(rem?.updated_at || 0).getTime();
-        if (localTime >= remoteTime) {
-          o.pinHash = loc?.pinHash || null;
-          o.pinSalt = loc?.pinSalt || null;
-        } else {
-          o.pinHash = rem?.pin_hash || loc?.pinHash || null;
-          o.pinSalt = rem?.pin_salt || loc?.pinSalt || null;
-        }
-      }
+    // Hash de senha não existe mais no app (a senha é do Supabase Auth):
+    // o merge apaga qualquer pinHash/pinSalt que tenha ficado no aparelho.
+    onMerged: (merged) => {
+      for (const o of merged) { delete o.pinHash; delete o.pinSalt; }
       return merged;
     },
     buildUpsert: o => ({
       id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone,
-      email: o.email, pin_hash: o.pinHash || null, pin_salt: o.pinSalt || null,
+      email: o.email,
       is_admin: o.isAdmin === true, is_gestao: o.isGestao === true, active: o.active !== false, team: o.team || 'init',
       auth_user_id: o.auth_user_id || null, on_leave: o.onLeave === true,
       created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
@@ -138,6 +128,7 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     optional: true,
+    optionalFields: ['operator_id'], // 049
     fields: {
       id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
       time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
@@ -147,6 +138,7 @@ const ENTITIES = [
       milvus_chamado_erro: 'milvusChamadoErro', milvus_chamado_tentativas: 'milvusChamadoTentativas',
       milvus_finalizar_status: 'milvusFinalizarStatus', milvus_finalizar_erro: 'milvusFinalizarErro',
       milvus_finalizar_tentativas: 'milvusFinalizarTentativas',
+      operator_id: 'operatorId',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     mapRow: r => ({
@@ -162,6 +154,7 @@ const ENTITIES = [
       milvusFinalizarStatus: r.milvus_finalizar_status ?? null,
       milvusFinalizarErro: r.milvus_finalizar_erro ?? null,
       milvusFinalizarTentativas: r.milvus_finalizar_tentativas ?? 0,
+      operatorId: r.operator_id ?? null,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
     // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem
@@ -237,11 +230,12 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     optional: true, // migration 045: banco sem a tabela não quebra o sync
+    optionalFields: ['responsavel_id'], // 049
     fields: {
       id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo',
       descricao: 'descricao', data_vencimento: 'dataVencimento', responsavel: 'responsavel',
       renovacao_auto: 'renovacaoAuto', status: 'status', observacoes: 'observacoes',
-      avisos: 'avisos', historico: 'historico', team: 'team',
+      avisos: 'avisos', historico: 'historico', team: 'team', responsavel_id: 'responsavelId',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     onChange: () => {
@@ -249,6 +243,21 @@ const ENTITIES = [
       if (h === 'vencimentos' && typeof renderVencimentos === 'function' && document.getElementById('vencList')) renderVencimentos();
       if (typeof updateBadges === 'function') updateBadges();
     }
+  },
+  {
+    table: 'time_entries',
+    dbKey: 'intra_time_entries',
+    label: 'Horas',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 048
+    fields: {
+      id: 'id', pendencia_id: 'pendenciaId', client_id: 'clientId', operator_id: 'operatorId',
+      operator_name: 'operatorName', started_at: 'startedAt', ended_at: 'endedAt', seconds: 'seconds',
+      source: 'source', note: 'note', team: 'team', created_at: 'createdAt', updated_at: 'updatedAt'
+    },
+    onChange: () => {}
   },
   {
     table: 'procedure_templates',
@@ -318,6 +327,21 @@ function _mapToRemote(record, fieldMap, optionalFields) {
   return out;
 }
 
+/**
+ * Servidor trouxe versão mais nova, mas este aparelho tem edições ainda não
+ * enviadas (_dirtyFields): fica a versão do servidor + os campos editados
+ * aqui. A mudança de outra pessoa em OUTROS campos não se perde, e a nossa
+ * também não. O registro volta a ficar mais novo, para ser enviado.
+ */
+function _keepLocalEdits(merged, loc, nowIso) {
+  const dirty = Array.isArray(loc && loc._dirtyFields) ? loc._dirtyFields : [];
+  if (!dirty.length) { delete merged._dirtyFields; return merged; }
+  for (const f of dirty) { if (Object.prototype.hasOwnProperty.call(loc, f)) merged[f] = loc[f]; }
+  merged._dirtyFields = dirty.slice();
+  merged.updatedAt = nowIso || new Date().toISOString();
+  return merged;
+}
+
 function _mergeRecords(local, remote, localKeyFromRemote) {
   const merged = [];
   let conflicts = 0;
@@ -341,8 +365,11 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
           changedFields.push({ field: lk, local: loc[lk], remote: rem[rk] });
         }
       }
-      if (changedFields.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.assunto || loc.descricao || loc.id, fields: changedFields });
-      merged.push({ ...loc, ...mapped });
+      // Campos editados aqui e ainda não enviados não são perdidos (só os demais).
+      const kept = new Set(Array.isArray(loc._dirtyFields) ? loc._dirtyFields : []);
+      const lost = changedFields.filter((c) => !kept.has(c.field));
+      if (lost.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.assunto || loc.descricao || loc.id, fields: lost });
+      merged.push(_keepLocalEdits({ ...loc, ...mapped }, loc));
     }
     remoteById.delete(loc.id);
   }
@@ -472,5 +499,5 @@ function _retainFailedPush(merged, failedRecs) {
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
+  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _keepLocalEdits, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
 }

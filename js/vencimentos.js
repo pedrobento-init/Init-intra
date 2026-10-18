@@ -81,9 +81,10 @@ function buildVencimentosModel(list, todayISO, f) {
 }
 
 /** Quantos vencem em até 7 dias (ou já venceram), opcionalmente só de um responsável. */
-function countVencimentosUrgentes(list, todayISO, responsavel) {
-  return (list || []).filter((v) => v && v.status !== 'encerrado' && v.dataVencimento &&
-    (!responsavel || (v.responsavel || '') === responsavel) && vencDaysLeft(v, todayISO) <= 7).length;
+function countVencimentosUrgentes(list, todayISO, responsavel, responsavelId) {
+  const mine = (v) => !responsavel && !responsavelId ? true
+    : (v.responsavelId && responsavelId ? v.responsavelId === responsavelId : (v.responsavel || '') === responsavel);
+  return (list || []).filter((v) => v && v.status !== 'encerrado' && v.dataVencimento && mine(v) && vencDaysLeft(v, todayISO) <= 7).length;
 }
 
 // ── Tela ─────────────────────────────────────────────────────────────────
@@ -106,10 +107,10 @@ function _vencRow(it) {
   const meta = [v.clientName || 'Interno', v.responsavel ? 'Resp.: ' + v.responsavel : '', v.renovacaoAuto ? 'renovação automática' : ''].filter(Boolean).join(' · ');
   return '<li class="venc-row">' +
     '<span class="venc-tipo venc-tipo--' + escapeHtml(v.tipo || 'outro') + '">' + escapeHtml(VENC_TIPOS[v.tipo] || 'Outro') + '</span>' +
-    '<button type="button" class="venc-main" onclick="openVencimentoForm(\'' + id + '\')">' +
+    '<button type="button" class="venc-main" data-action="vencEdit" data-arg="' + id + '">' +
       '<b>' + escapeHtml(v.descricao || '—') + '</b><span>' + escapeHtml(meta) + '</span></button>' +
     '<span class="venc-date"><b>' + escapeHtml(typeof formatDate === 'function' ? formatDate(v.dataVencimento) : v.dataVencimento) + '</b>' + _vencWhen(it.days) + '</span>' +
-    (v.status === 'encerrado' ? '<span></span>' : '<button type="button" class="btn btn-secondary btn-sm" onclick="openRenovarVencimento(\'' + id + '\')">Renovar</button>') +
+    (v.status === 'encerrado' ? '<span></span>' : '<button type="button" class="btn btn-secondary btn-sm" data-action="vencRenew" data-arg="' + id + '">Renovar</button>') +
   '</li>';
 }
 
@@ -125,10 +126,10 @@ function renderVencimentos() {
       '<div class="ov-wrap venc">' +
         '<div class="search-bar page-toolbar">' +
           '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-          '<input class="form-input" id="vencSearch" placeholder="Buscar descrição, cliente ou responsável" value="' + escapeHtml(_vencFilter.q) + '" oninput="_vencFilter.q=this.value;renderVencimentos()" /></div>' +
-          '<select class="form-select pt-filter" id="vencTipo" onchange="_vencFilter.tipo=this.value;renderVencimentos()"><option value="">Todos os tipos</option>' +
+          '<input class="form-input" id="vencSearch" placeholder="Buscar descrição, cliente ou responsável" value="' + escapeHtml(_vencFilter.q) + '" data-input="vencSearch" /></div>' +
+          '<select class="form-select pt-filter" id="vencTipo" data-change="vencTipo"><option value="">Todos os tipos</option>' +
             Object.keys(VENC_TIPOS).map((k) => '<option value="' + k + '"' + (_vencFilter.tipo === k ? ' selected' : '') + '>' + VENC_TIPOS[k] + '</option>').join('') + '</select>' +
-          '<label class="pz-toggle pt-filter"><input type="checkbox"' + (_vencFilter.encerrados ? ' checked' : '') + ' onchange="_vencFilter.encerrados=this.checked;renderVencimentos()"> Encerrados</label>' +
+          '<label class="pz-toggle pt-filter"><input type="checkbox"' + (_vencFilter.encerrados ? ' checked' : '') + ' data-change="vencClosed"> Encerrados</label>' +
         '</div>' +
         '<div id="vencKpis"></div><div id="vencList"></div>' +
       '</div>';
@@ -148,7 +149,7 @@ function renderVencimentos() {
   const html = sec('vencido', 'Vencidos') + sec('semana', 'Próximos 7 dias') + sec('mes', 'Próximos 30 dias') + sec('depois', 'Mais adiante') + sec('encerrado', 'Encerrados');
   document.getElementById('vencList').innerHTML = html ||
     '<div class="empty-state"><p>' + (_vencFilter.q || _vencFilter.tipo ? 'Nada encontrado com esses filtros.' : 'Nenhum vencimento cadastrado. Cadastre licenças, certificados, domínios e garantias para ser avisado antes.') + '</p>' +
-    '<button class="btn btn-primary btn-sm" onclick="openVencimentoForm()">+ Novo vencimento</button></div>';
+    '<button class="btn btn-primary btn-sm" data-action="vencEdit">+ Novo vencimento</button></div>';
 }
 
 function openVencimentoForm(id, preClientId) {
@@ -157,7 +158,7 @@ function openVencimentoForm(id, preClientId) {
   const ops = typeof getOperatorNames === 'function' ? getOperatorNames() : [];
   const esc = (x) => escapeHtml(x == null ? '' : String(x));
   openModal(id ? 'Editar vencimento' : 'Novo vencimento', `
-    <form id="vencForm" onsubmit="submitVencimentoForm(event, '${esc(id || '')}')">
+    <form id="vencForm" data-submit="vencSave" data-arg="${esc(id || '')}">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Tipo</label><select class="form-select" name="tipo">${Object.keys(VENC_TIPOS).map((k) => `<option value="${k}"${v.tipo === k ? ' selected' : ''}>${VENC_TIPOS[k]}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">Vence em *</label><input type="date" class="form-input" name="dataVencimento" value="${esc(v.dataVencimento)}" required /></div>
@@ -171,9 +172,9 @@ function openVencimentoForm(id, preClientId) {
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" name="observacoes" rows="2">${esc(v.observacoes)}</textarea></div>
       ${(v.historico || []).length ? `<div class="venc-hist"><b>Renovações anteriores</b>${v.historico.slice().reverse().map((h) => `<span>Até ${esc(formatDate(h.ate))} · renovado em ${esc(formatDate(String(h.em || '').slice(0, 10)))}${h.por ? ' por ' + esc(h.por) : ''}</span>`).join('')}</div>` : ''}
       <div class="form-actions">
-        ${id ? `<button type="button" class="btn btn-secondary" style="margin-right:auto" onclick="toggleEncerrarVencimento('${esc(id)}')">${v.status === 'encerrado' ? 'Reativar' : 'Encerrar (não renovar)'}</button>` : ''}
-        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" onclick="if(confirm('Excluir este vencimento?')){deleteVencimento('${esc(id)}');closeModal();renderVencimentos();}">Excluir</button>` : ''}
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        ${id ? `<button type="button" class="btn btn-secondary" style="margin-right:auto" data-action="vencToggleClosed" data-arg="${esc(id)}">${v.status === 'encerrado' ? 'Reativar' : 'Encerrar (não renovar)'}</button>` : ''}
+        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" data-action="vencDelete" data-arg="${esc(id)}">Excluir</button>` : ''}
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar</button>
       </div>
     </form>`);
@@ -219,14 +220,14 @@ function openRenovarVencimento(id) {
   openModal('Renovar — ' + escapeHtml(v.descricao || ''), `
     <p style="margin:0 0 10px;font-size:13px;color:var(--ds-muted)">Vencia em <b>${escapeHtml(formatDate(base))}</b>. Até quando foi renovado?</p>
     <div class="venc-quick">
-      <button type="button" class="vis-chip" onclick="document.getElementById('vencNova').value='${vencAddMonths(base, 1)}'">+1 mês</button>
-      <button type="button" class="vis-chip" onclick="document.getElementById('vencNova').value='${vencAddMonths(base, 3)}'">+3 meses</button>
-      <button type="button" class="vis-chip" onclick="document.getElementById('vencNova').value='${vencAddMonths(base, 12)}'">+1 ano</button>
-      <button type="button" class="vis-chip" onclick="document.getElementById('vencNova').value='${vencAddMonths(base, 24)}'">+2 anos</button>
+      <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 1)}">+1 mês</button>
+      <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 3)}">+3 meses</button>
+      <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 12)}">+1 ano</button>
+      <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 24)}">+2 anos</button>
     </div>
     <div class="form-group"><label class="form-label">Novo vencimento</label><input type="date" class="form-input" id="vencNova" value="${vencAddMonths(base, 12)}" /></div>
-    <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="confirmRenovarVencimento('${escapeHtml(id)}')">Renovar</button></div>`, 'sm');
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
+      <button type="button" class="btn btn-primary" data-action="vencRenewConfirm" data-arg="${escapeHtml(id)}">Renovar</button></div>`, 'sm');
 }
 
 function confirmRenovarVencimento(id) {
@@ -302,6 +303,21 @@ if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !win
     _vencCheckTimer = setTimeout(checkVencimentoReminders, 5000);
   });
   window.addEventListener('load', () => setTimeout(checkVencimentoReminders, 15000));
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    vencEdit: (_el, id) => openVencimentoForm(id || undefined),
+    vencRenew: (_el, id) => openRenovarVencimento(id),
+    vencRenewConfirm: (_el, id) => confirmRenovarVencimento(id),
+    vencSetDate: (_el, iso) => { const inp = document.getElementById('vencNova'); if (inp) inp.value = iso; },
+    vencSave: (_el, id, ev) => submitVencimentoForm(ev, id || ''),
+    vencToggleClosed: (_el, id) => toggleEncerrarVencimento(id),
+    vencDelete: (_el, id) => { if (!window.confirm('Excluir este vencimento?')) return; deleteVencimento(id); closeModal(); renderVencimentos(); },
+    vencSearch: (_el, v) => { _vencFilter.q = v; renderVencimentos(); },
+    vencTipo: (_el, v) => { _vencFilter.tipo = v; renderVencimentos(); },
+    vencClosed: (_el, checked) => { _vencFilter.encerrados = !!checked; renderVencimentos(); },
+  });
 }
 
 if (typeof module !== 'undefined' && module.exports) {

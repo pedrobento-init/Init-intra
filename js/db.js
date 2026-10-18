@@ -63,6 +63,11 @@ idb.version(11).stores({
   vencimentos: 'id, clientId, dataVencimento'
 });
 
+// v12: lançamentos de horas (uma linha por sessão de trabalho). Aditiva.
+idb.version(12).stores({
+  time_entries: 'id, pendenciaId, clientId, endedAt'
+});
+
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
 const _dbCache = {
   clients: [],
@@ -77,6 +82,7 @@ const _dbCache = {
   client_milvus_tickets: [],
   checklists: [],
   vencimentos: [],
+  time_entries: [],
   checklist_modelo_itens: [],
   checklist_marcacoes: [],
   keyvalue: {},
@@ -181,6 +187,8 @@ async function initIndexedDB() {
     catch (_) { _dbCache.checklists = []; }
     try { _dbCache.vencimentos = await idb.vencimentos.toArray(); }
     catch (_) { _dbCache.vencimentos = []; }
+    try { _dbCache.time_entries = await idb.time_entries.toArray(); }
+    catch (_) { _dbCache.time_entries = []; }
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {

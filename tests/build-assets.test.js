@@ -6,20 +6,23 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const { buildAssets, shortHash, parseLocalScripts } = require('../tools/build-assets.js');
 
+const INDEX = '<html><head><link rel="stylesheet" href="css/styles.css" /></head><body>\n' +
+  '<script src="https://cdn.jsdelivr.net/npm/x@1/x.min.js"></script>\n' +
+  '<script defer src="js/a.js"></script>\n' +
+  '<script defer src="js/b.js"></script>\n</body></html>';
+const SW = "const CACHE_NAME = 'init-intra-vX';\nconst CDN_CACHE_NAME = 'init-intra-cdn-vX';\nconst STATIC_ASSETS = [\n  '/',\n  'index.html'\n];\n";
+
 function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'intra-build-'));
   fs.mkdirSync(path.join(dir, 'js'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'css'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'index.html'),
-    '<html><head><link rel="stylesheet" href="css/styles.css" /></head><body>\n' +
-    '<script src="https://cdn.jsdelivr.net/npm/x@1/x.min.js"></script>\n' +
-    '<script defer src="js/a.js"></script>\n' +
-    '<script defer src="js/b.js"></script>\n</body></html>');
+  fs.writeFileSync(path.join(dir, 'index.html'), INDEX);
   fs.writeFileSync(path.join(dir, 'js', 'a.js'), 'function hello(){ return 1; }\n');
   fs.writeFileSync(path.join(dir, 'js', 'b.js'), 'function world(){ return hello() + 1; }\n');
   fs.writeFileSync(path.join(dir, 'css', 'styles.css'), '.a { color: red; }\n');
-  fs.writeFileSync(path.join(dir, 'sw.js'),
-    "const CACHE_NAME = 'init-intra-vX';\nconst CDN_CACHE_NAME = 'init-intra-cdn-vX';\nconst STATIC_ASSETS = [\n  '/',\n  'index.html'\n];\n");
+  fs.writeFileSync(path.join(dir, 'sw.js'), SW);
+  fs.writeFileSync(path.join(dir, 'manifest.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'icon.svg'), '<svg/>');
   return dir;
 }
 
@@ -28,57 +31,47 @@ describe('build-assets', () => {
     expect(parseLocalScripts('<script src="https://x/y.js"></script><script defer src="js/a.js"></script>'))
       .toEqual(['js/a.js']);
   });
-  it('gera dist com hash, reescreve index.html e sw.js (dry)', async () => {
+
+  it('modo check: monta o resultado sem escrever nada', async () => {
     const dir = fixture();
     const r = await buildAssets(dir, { check: true });
-    // manifest cobre os 2 js + css
     expect(Object.keys(r.manifest.js).sort()).toEqual(['js/a.js', 'js/b.js']);
     expect(Object.keys(r.manifest.css)).toEqual(['css/styles.css']);
-    // nada escrito em modo check
-    expect(fs.existsSync(path.join(dir, 'dist'))).toBe(false);
-    // index.html reescrito aponta p/ dist com hash
-    expect(r.indexHtml).toContain('dist/js/a.');
-    expect(r.indexHtml).toContain('.min.js');
+    expect(fs.existsSync(path.join(dir, 'build'))).toBe(false);
+    expect(r.indexHtml).toContain('src="assets/js/a.');
     expect(r.indexHtml).toContain('https://cdn.jsdelivr.net/npm/x@1/x.min.js');
-    expect(r.indexHtml).not.toContain('src="js/a.js"');
-    // sw.js com tag nova e assets dist
     expect(r.sw).toContain('init-intra-' + r.buildTag);
-    expect(r.sw).toContain('dist/js/b.');
-    expect(r.sw).not.toContain('init-intra-vX');
+    expect(r.sw).toContain("'assets/js/b.");
+    expect(r.sw).toContain("'manifest.json'");
   });
-  it('escreve arquivos reais fora do dry', async () => {
+
+  it('escreve o site em build/ e NUNCA altera os arquivos-fonte', async () => {
     const dir = fixture();
     const r = await buildAssets(dir, {});
-    const outJs = path.join(dir, r.manifest.js['js/a.js']);
-    expect(fs.existsSync(outJs)).toBe(true);
-    const code = fs.readFileSync(outJs, 'utf8');
-    // minificado (1 linha) e global preservado
-    expect(code.trim().includes('\n')).toBe(false);
-    expect(code).toContain('hello');
-    // index.html e sw.js do fixture foram reescritos
-    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toContain('dist/js/a.');
+    // fontes intactos (antes o build reescrevia index.html e sw.js no lugar)
+    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toBe(INDEX);
+    expect(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')).toBe(SW);
+    // site completo em build/
+    const b = (p) => path.join(dir, 'build', p);
+    expect(fs.readFileSync(b('index.html'), 'utf8')).toContain('assets/js/a.');
+    expect(fs.readFileSync(b('sw.js'), 'utf8')).toContain('init-intra-' + r.buildTag);
+    expect(fs.existsSync(b('manifest.json'))).toBe(true);
+    expect(fs.existsSync(b('icon.svg'))).toBe(true);
+    const code = fs.readFileSync(b(r.manifest.js['js/a.js']), 'utf8');
+    expect(code.trim().includes('\n')).toBe(false); // minificado
+    expect(code).toContain('hello'); // global preservado
     expect(r.warnings).toEqual([]);
   });
-  it('remove hashes antigos acumulados no dist', async () => {
+
+  it('zera build/ a cada execução (nenhum hash antigo sobra)', async () => {
     const dir = fixture();
-    const staleJs = path.join(dir, 'dist', 'js', 'a.00000000.min.js');
-    const staleCss = path.join(dir, 'dist', 'css', 'styles.00000000.css');
-    fs.mkdirSync(path.dirname(staleJs), { recursive: true });
-    fs.mkdirSync(path.dirname(staleCss), { recursive: true });
-    fs.writeFileSync(staleJs, '// build antigo');
-    fs.writeFileSync(staleCss, '.stale{}');
-
-    const r = await buildAssets(dir, {});
-
-    expect(r.removed.sort()).toEqual(['dist/css/styles.00000000.css', 'dist/js/a.00000000.min.js']);
-    expect(fs.existsSync(staleJs)).toBe(false);
-    expect(fs.existsSync(staleCss)).toBe(false);
-    // arquivos do build atual continuam lá
-    expect(fs.existsSync(path.join(dir, r.manifest.js['js/a.js']))).toBe(true);
-    expect(fs.existsSync(path.join(dir, r.manifest.css['css/styles.css']))).toBe(true);
-    // nenhum alerta de build por causa da limpeza
-    expect(r.warnings).toEqual([]);
+    const stale = path.join(dir, 'build', 'assets', 'js', 'a.00000000.min.js');
+    fs.mkdirSync(path.dirname(stale), { recursive: true });
+    fs.writeFileSync(stale, '// build antigo');
+    await buildAssets(dir, {});
+    expect(fs.existsSync(stale)).toBe(false);
   });
+
   it('shortHash estável e curto', () => {
     expect(shortHash('x')).toHaveLength(8);
     expect(shortHash('x')).toBe(shortHash('x'));

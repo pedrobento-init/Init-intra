@@ -21,13 +21,19 @@ function _filaClosed(status) {
  * Modelo puro da fila (testável): recebe listas já filtradas pelo escopo.
  * @returns {{ running: object|null, now: object[], week: object[], visits: object[], counts: object }}
  */
-function buildFilaModel(pens, visits, userName, todayISO, nowMs) {
-  const mine = (pens || []).filter((p) => p && !_filaClosed(p.status) && (p.responsible || '') === (userName || ''));
+// Mesma pessoa: por id quando o registro e o usuário têm (049); senão pelo nome.
+function _filaIsMe(recId, recName, userId, userName) {
+  if (recId && userId) return recId === userId;
+  return String(recName || '') !== '' && (recName || '') === (userName || '');
+}
+
+function buildFilaModel(pens, visits, userName, todayISO, nowMs, userId) {
+  const mine = (pens || []).filter((p) => p && !_filaClosed(p.status) && _filaIsMe(p.responsibleId, p.responsible, userId, userName));
   const tomorrow = _filaAddDays(todayISO, 1);
   const in7 = _filaAddDays(todayISO, 7);
   const weight = { critica: 4, alta: 3, media: 2, baixa: 1 };
 
-  const running = (pens || []).find((p) => p && p.timerRunning && (p.timerOperator || '') === (userName || '')) || null;
+  const running = (pens || []).find((p) => p && p.timerRunning && _filaIsMe(p.timerOperatorId, p.timerOperator, userId, userName)) || null;
 
   // "Agora": vencidas, vencendo hoje/amanhã, prioridade alta/crítica.
   const now = mine.filter((p) => {
@@ -48,13 +54,13 @@ function buildFilaModel(pens, visits, userName, todayISO, nowMs) {
     .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)));
 
   const myVisits = (visits || [])
-    .filter((v) => v && v.date === todayISO && (v.operator || '') === (userName || '') && v.status !== 'concluida' && v.status !== 'cancelada')
+    .filter((v) => v && v.date === todayISO && _filaIsMe(v.operatorId, v.operator, userId, userName) && v.status !== 'concluida' && v.status !== 'cancelada')
     .sort((a, b) => (a.allDay ? 0 : 1) - (b.allDay ? 0 : 1) || String(a.time || '').localeCompare(String(b.time || '')));
 
   const overdue = mine.filter((p) => p.deadline && p.deadline < todayISO).length;
   const forgotten = (pens || []).filter((p) => {
     if (!p || !p.timerRunning || !p.timerStartedAt) return false;
-    if ((p.timerOperator || '') !== (userName || '')) return false;
+    if (!_filaIsMe(p.timerOperatorId, p.timerOperator, userId, userName)) return false;
     return ((nowMs || Date.now()) - new Date(p.timerStartedAt).getTime()) / 1000 >= 10 * 3600;
   }).length;
 
@@ -79,7 +85,8 @@ function _filaScope() {
   const visits = team && typeof getVisitsByTeam === 'function' ? getVisitsByTeam(team) : (typeof getMyVisits === 'function' ? getMyVisits() : []);
   const user = (typeof getUser === 'function' && getUser()) || {};
   const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
-  return { pens, visits, userName: user.name || '', today };
+  const session = typeof getSession === 'function' ? getSession() : null;
+  return { pens, visits, userName: user.name || '', userId: (session && session.opId) || null, today };
 }
 
 function _filaDueLabel(p, today) {
@@ -94,7 +101,7 @@ function _filaDueLabel(p, today) {
 function _filaPenRow(p, today) {
   const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
-  return '<li class="fila-row" onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')">' +
+  return '<li class="fila-row" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
     '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(getPendenciaTitulo(p)) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(p.clientName || '—') + '</span></span>' +
@@ -108,7 +115,7 @@ function renderFila() {
   window._topbarAction = () => openPendenciaForm();
 
   const s = _filaScope();
-  const m = buildFilaModel(s.pens, s.visits, s.userName, s.today);
+  const m = buildFilaModel(s.pens, s.visits, s.userName, s.today, undefined, s.userId);
   const d = new Date(s.today + 'T12:00:00');
   const h = new Date().getHours();
   const hello = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
@@ -123,20 +130,20 @@ function renderFila() {
     timerHtml = '<section class="ov-panel fila-timer' + (forgot ? ' is-forgot' : '') + '" aria-label="Cronômetro ligado">' +
       '<div class="fila-timer-time"><span class="timer-display" data-format="compact" data-timer-id="' + id + '" data-running="true">' + fmt + '</span>' +
       '<small>' + (forgot ? 'Ligado há muito tempo — esqueceu ligado?' : 'Cronômetro ligado') + '</small></div>' +
-      '<div class="fila-timer-what" onclick="openPendenciaDetail(\'' + id + '\')"><b>' + escapeHtml(getPendenciaTitulo(m.running)) + '</b><span>' + escapeHtml(m.running.clientName || '') + '</span></div>' +
+      '<div class="fila-timer-what" data-action="openPendencia" data-arg="' + id + '" role="button" tabindex="0"><b>' + escapeHtml(getPendenciaTitulo(m.running)) + '</b><span>' + escapeHtml(m.running.clientName || '') + '</span></div>' +
       '<div class="fila-timer-acts">' +
         (forgot
-          ? '<button type="button" class="btn btn-primary btn-sm" onclick="openTimerAdjust(\'' + id + '\')">Parar e ajustar</button>'
-          : '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleTimer(\'pendencia\',\'' + id + '\',this);renderFila()">Pausar</button>') +
+          ? '<button type="button" class="btn btn-primary btn-sm" data-action="filaAdjust" data-arg="' + id + '">Parar e ajustar</button>'
+          : '<button type="button" class="btn btn-secondary btn-sm" data-action="filaPause" data-arg="' + id + '">Pausar</button>') +
       '</div></section>';
   }
 
   const nowHtml = m.now.length
     ? '<ul class="fila-list">' + m.now.map((p) => _filaPenRow(p, s.today)).join('') + '</ul>'
-    : '<div class="empty-state" style="padding:28px 12px"><p>Nada urgente com você agora. 🎉</p><button class="btn btn-secondary btn-sm" onclick="navigateTo(\'pendencias\')">Ver todas as pendências</button></div>';
+    : '<div class="empty-state" style="padding:28px 12px"><p>Nada urgente com você agora. 🎉</p><button class="btn btn-secondary btn-sm" data-action="nav" data-arg="pendencias">Ver todas as pendências</button></div>';
 
   const visitsHtml = m.visits.length
-    ? '<ul class="fila-list">' + m.visits.map((v) => '<li class="fila-row" onclick="openVisitDetail(\'' + escapeHtml(v.id) + '\')">' +
+    ? '<ul class="fila-list">' + m.visits.map((v) => '<li class="fila-row" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">' +
         '<span class="fila-dot" style="--c:var(--ds-cyan)" aria-hidden="true"></span>' +
         '<span class="fila-main"><span class="fila-title">' + escapeHtml(v.clientName || '—') + '</span>' +
         '<span class="fila-meta">' + escapeHtml(v.motivo || '') + '</span></span>' +
@@ -157,8 +164,8 @@ function renderFila() {
         '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Para fazer agora</h2><span class="ov-muted">' + m.now.length + '</span></div>' + nowHtml + '</section>' +
         '<div class="fila-side">' +
           (typeof roteiroPanelHtml === 'function'
-            ? roteiroPanelHtml(s.visits, s.today, s.userName)
-            : '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Visitas de hoje</h2><button class="btn btn-secondary btn-sm" onclick="openVisitForm()">+ Visita</button></div>' + visitsHtml + '</section>') +
+            ? roteiroPanelHtml(s.visits, s.today, s.userName, s.userId)
+            : '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Visitas de hoje</h2><button class="btn btn-secondary btn-sm" data-action="newVisit">+ Visita</button></div>' + visitsHtml + '</section>') +
           '<section class="ov-panel"><div class="ov-ph"><h2 class="ov-h2">Próximos 7 dias</h2></div>' + weekHtml + '</section>' +
         '</div>' +
       '</div>' +
@@ -175,10 +182,10 @@ function renderAlertStrip() {
   let text = '';
   try {
     const s = _filaScope();
-    const counts = buildFilaModel(s.pens, s.visits, s.userName, s.today).counts;
+    const counts = buildFilaModel(s.pens, s.visits, s.userName, s.today, undefined, s.userId).counts;
     // Vencimentos sob a responsabilidade do usuário (licença, SSL, domínio…).
     if (typeof countVencimentosUrgentes === 'function' && typeof getMyVencimentos === 'function') {
-      counts.vencimentos = countVencimentosUrgentes(getMyVencimentos(), s.today, s.userName);
+      counts.vencimentos = countVencimentosUrgentes(getMyVencimentos(), s.today, s.userName, s.userId);
     }
     text = buildAlertStripText(counts);
   } catch (_) { text = ''; }
@@ -187,12 +194,12 @@ function renderAlertStrip() {
   if (!text || dismissed) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
   el.innerHTML =
-    '<button type="button" class="alert-strip-main" onclick="navigateTo(\'fila\')" title="Abrir Minha fila">' +
+    '<button type="button" class="alert-strip-main" data-action="nav" data-arg="fila" title="Abrir Minha fila">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>' +
       // "Com você": a faixa conta só o que é do usuário (o aviso de prazos
       // do sistema conta a equipe toda).
       '<span>Com você: ' + escapeHtml(text) + '</span></button>' +
-    '<button type="button" class="alert-strip-close" aria-label="Dispensar alertas de hoje" onclick="dismissAlertStrip()">×</button>';
+    '<button type="button" class="alert-strip-close" aria-label="Dispensar alertas de hoje" data-action="dismissAlerts">×</button>';
   el.dataset.text = text;
 }
 
@@ -215,6 +222,14 @@ function dismissAlertStrip() {
   onDataChanged('pendencias', refresh);
   onDataChanged('visitas', refresh);
 })();
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    filaAdjust: (_el, id) => openTimerAdjust(id),
+    filaPause: (el, id) => { toggleTimer('pendencia', id, el); renderFila(); },
+    dismissAlerts: () => dismissAlertStrip(),
+  });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { buildFilaModel, buildAlertStripText };

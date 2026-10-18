@@ -15,7 +15,7 @@ function _syncBackoffDelay(retryN) {
   var base = 1000;
   var max = 30000;
   var d = Math.min(max, base * Math.pow(2, n));
-  try { d += Math.random() * 500; } catch (_) {}
+  try { d += Math.random() * 500; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   return d;
 }
 
@@ -59,14 +59,14 @@ var SyncManager = (function () {
     _status = s;
     var detail = { status: s };
     if (extra && typeof extra === 'object') {
-      for (var k in extra) { try { detail[k] = extra[k]; } catch (_) {} }
+      for (var k in extra) { try { detail[k] = extra[k]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
     }
     try {
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sync:update', { detail: detail }));
-    } catch (_) {}
-    try { if (typeof emitDataChanged === 'function') emitDataChanged('sync-status', detail); } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try { if (typeof emitDataChanged === 'function') emitDataChanged('sync-status', detail); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     for (var i = 0; i < _listeners.length; i++) {
-      try { _listeners[i](s, detail); } catch (_) {}
+      try { _listeners[i](s, detail); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     }
   }
 
@@ -90,7 +90,7 @@ var SyncManager = (function () {
     } catch (_) { meta = null; }
     if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
     var prevSuppress = false;
-    try { prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false; } catch (_) {}
+    try { prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     try {
       if (typeof window !== 'undefined') window._suppressPendingSync = true;
       var list = dbGet(meta.dbKey);
@@ -105,7 +105,7 @@ var SyncManager = (function () {
             if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
           }
         }
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
       if (event === 'DELETE') {
         if (!row || !row.id) return;
         list = list.filter(function (x) { return x.id !== row.id; });
@@ -115,7 +115,7 @@ var SyncManager = (function () {
           : ((typeof _mapFromRemote === 'function') ? _mapFromRemote(row, meta.fields) : row);
         try {
           if (meta.hasTeam && typeof mapped.team === 'string' && typeof canViewTeam === 'function' && !canViewTeam(mapped.team)) return;
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
         var idx = -1;
         for (var i = 0; i < list.length; i++) { if (list[i] && list[i].id === mapped.id) { idx = i; break; } }
         var enq = false;
@@ -126,11 +126,10 @@ var SyncManager = (function () {
         } catch (_) { enq = false; }
         if (idx !== -1) {
           if (shouldApplyRemote(list[idx], mapped, enq)) {
-            var prevPin = list[idx].pinHash;
-            var prevSalt = list[idx].pinSalt;
-            list[idx] = Object.assign({}, list[idx], mapped);
-            if (prevPin && !mapped.pinHash) list[idx].pinHash = prevPin;
-            if (prevSalt && !mapped.pinSalt) list[idx].pinSalt = prevSalt;
+            list[idx] = (typeof _keepLocalEdits === 'function')
+              ? _keepLocalEdits(Object.assign({}, list[idx], mapped), list[idx])
+              : Object.assign({}, list[idx], mapped);
+            delete list[idx].pinHash; delete list[idx].pinSalt; // hash de senha não é mais guardado
           }
         } else {
           list.unshift(mapped);
@@ -142,10 +141,10 @@ var SyncManager = (function () {
       else dbSet(meta.dbKey, list);
       // dbSet já emite `emitDataChanged(entidade)` (storage.js); o onChange
       // abaixo preserva o refresh legado por tela (kanban/dashboard/etc).
-      if (typeof meta.onChange === 'function') { try { meta.onChange(); } catch (_) {} }
+      if (typeof meta.onChange === 'function') { try { meta.onChange(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
       _retryN = 0;
-    } catch (_) {} finally {
-      try { if (typeof window !== 'undefined') window._suppressPendingSync = prevSuppress; } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } finally {
+      try { if (typeof window !== 'undefined') window._suppressPendingSync = prevSuppress; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     }
   }
 
@@ -159,7 +158,7 @@ var SyncManager = (function () {
 
   function connect() {
     if (!_canConnect()) return;
-    try { if (_channel) supabaseClient.removeChannel(_channel); } catch (_) {}
+    try { if (_channel) supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     _channel = null;
     _emit('connecting');
     var teamFilter = _syncTeamFilter();
@@ -167,7 +166,7 @@ var SyncManager = (function () {
     try {
       ch = supabaseClient.channel('public-changes-v2');
       var metas = [];
-      try { metas = (typeof ENTITIES !== 'undefined' ? ENTITIES : []).filter(function (e) { return e.realtime !== false; }); } catch (_) {}
+      try { metas = (typeof ENTITIES !== 'undefined' ? ENTITIES : []).filter(function (e) { return e.realtime !== false; }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
       metas.forEach(function (meta) {
         var opts = { event: '*', schema: 'public', table: meta.table };
         if (teamFilter && meta.hasTeam) opts.filter = 'team=eq.' + teamFilter;
@@ -192,25 +191,25 @@ var SyncManager = (function () {
               _lastFallbackAt = _nowFb;
               syncSupabaseToLocal({ reason: 'realtime-fallback' }).catch(function () {});
             }
-          } catch (_) {}
+          } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
           var d = _syncBackoffDelay(_retryN++);
           setTimeout(function () {
             try {
               if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
               if (_canConnect()) connect();
-            } catch (_) {}
+            } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
           }, d);
         }
       });
     } catch (_) {
       _emit('error');
       var d2 = _syncBackoffDelay(_retryN++);
-      setTimeout(function () { try { if (_canConnect()) connect(); } catch (_) {} }, d2);
+      setTimeout(function () { try { if (_canConnect()) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }, d2);
     }
   }
 
   function disconnect() {
-    try { if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel); } catch (_) {}
+    try { if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     _channel = null;
   }
 
@@ -220,10 +219,10 @@ var SyncManager = (function () {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'visible') return;
-        try { if (_canConnect() && !_channel) connect(); } catch (_) {}
+        try { if (_canConnect() && !_channel) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
       });
       window.addEventListener('pageshow', function (e) {
-        if (e && e.persisted) { try { if (_canConnect()) connect(); } catch (_) {} }
+        if (e && e.persisted) { try { if (_canConnect()) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
       });
     }
   }
@@ -243,17 +242,17 @@ var SyncManager = (function () {
 // sozinho quando SyncManager ou dbSet atualizarem a entidade.
 function subscribeLive(entity, render) {
   if (typeof render !== 'function') return function () {};
-  try { render(); } catch (e) { try { console.warn('subscribeLive render erro', e); } catch (_) {} }
+  try { render(); } catch (e) { try { console.warn('subscribeLive render erro', e); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
   try {
     if (typeof onDataChanged === 'function') {
       return onDataChanged(entity, function () {
         try {
           if (typeof preserveScrollAround === 'function') preserveScrollAround(function () { render(); });
           else render();
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
       });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   return function () {};
 }
 
@@ -279,13 +278,13 @@ function mountSyncStatus(el) {
 
   function _read() {
     var pend = 0;
-    try { if (typeof getPendingSyncCount === 'function') pend = Number(getPendingSyncCount()) || 0; } catch (_) {}
+    try { if (typeof getPendingSyncCount === 'function') pend = Number(getPendingSyncCount()) || 0; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     var off = false;
-    try { off = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_) {}
+    try { off = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     var st = 'idle';
-    try { st = (typeof SyncManager !== 'undefined' && SyncManager) ? SyncManager.getStatus() : 'idle'; } catch (_) {}
+    try { st = (typeof SyncManager !== 'undefined' && SyncManager) ? SyncManager.getStatus() : 'idle'; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     var local = false;
-    try { local = (typeof isSupabaseConnected === 'function' && !isSupabaseConnected()); } catch (_) {}
+    try { local = (typeof isSupabaseConnected === 'function' && !isSupabaseConnected()); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     return { pend: pend, off: off, st: st, local: local };
   }
   // O texto vai em .sync-label para o celular mostrar só o ponto colorido
@@ -302,7 +301,7 @@ function mountSyncStatus(el) {
     if (r.st === 'live' && !total) return { sync: 'live', key: 'live', html: _DOT + _lbl('Sincronizado'), title: 'Tempo real ativo' };
     return { sync: 'pending', key: 'pending|' + total, html: _DOT + _lbl('Sincronizando...') + (total ? ' (' + total + ')' : ''), title: 'Sincronizando com o servidor' };
   }
-  function _clearGrace() { try { if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null; } } catch (_) {} }
+  function _clearGrace() { try { if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null; } } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
   function _commit(d) {
     _paintedSync = d.sync;
     _paintedKey = d.key;
@@ -320,7 +319,7 @@ function mountSyncStatus(el) {
           _graceTimer = null;
           try {
             paintSync(function (x) { if (x.sync !== _paintedSync) _commit(x); });
-          } catch (_) {}
+          } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
         }, STABLE_MS);
       }
       return;
@@ -340,29 +339,29 @@ function mountSyncStatus(el) {
       if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.count === 'function') p = Outbox.count();
       else if (typeof outboxCount === 'function') p = outboxCount();
       if (p && typeof p.then === 'function') { p.then(function (c) { done(c); }).catch(function () { done(r.pend); }); return; }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     done(r.pend);
   }
   paintSync();
   var off1 = function () { paintSync(); };
   var off2 = function () { paintSync(); };
   var off3 = function () { paintSync(); };
-  try { window.addEventListener('online', off1); } catch (_) {}
-  try { window.addEventListener('offline', off2); } catch (_) {}
-  try { window.addEventListener('sync:update', off3); } catch (_) {}
+  try { window.addEventListener('online', off1); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  try { window.addEventListener('offline', off2); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  try { window.addEventListener('sync:update', off3); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   var unsub = function () {};
-  try { if (typeof onDataChanged === 'function') unsub = onDataChanged('sync-status', paintSync) || unsub; } catch (_) {}
+  try { if (typeof onDataChanged === 'function') unsub = onDataChanged('sync-status', paintSync) || unsub; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   try {
     if (typeof document !== 'undefined' && !document._syncStatusAutoTick) {
       document._syncStatusAutoTick = true;
-      setInterval(function () { try { paintSync(); } catch (_) {} }, 15000);
+      setInterval(function () { try { paintSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }, 15000);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   return function () {
-    try { window.removeEventListener('online', off1); } catch (_) {}
-    try { window.removeEventListener('offline', off2); } catch (_) {}
-    try { window.removeEventListener('sync:update', off3); } catch (_) {}
-    try { if (typeof unsub === 'function') unsub(); } catch (_) {}
+    try { window.removeEventListener('online', off1); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try { window.removeEventListener('offline', off2); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try { window.removeEventListener('sync:update', off3); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try { if (typeof unsub === 'function') unsub(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   };
 }
 
@@ -374,17 +373,17 @@ if (typeof window !== 'undefined') {
   // initSupabaseRealtime() — agora delega ao SyncManager com backoff.
   try {
     window._legacyInitSupabaseRealtime = (typeof initSupabaseRealtime === 'function') ? initSupabaseRealtime : null;
-    window.initSupabaseRealtime = function () { try { SyncManager.connect(); } catch (_) {} };
+    window.initSupabaseRealtime = function () { try { SyncManager.connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } };
     initSupabaseRealtime = window.initSupabaseRealtime;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
   try {
     document.addEventListener('DOMContentLoaded', function () {
       try {
         var el = document.getElementById('syncStatus');
         if (el && typeof mountSyncStatus === 'function') mountSyncStatus(el);
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { _syncBackoffDelay, shouldApplyRemote, SyncManager: (typeof SyncManager !== 'undefined' ? SyncManager : null), subscribeLive: (typeof subscribeLive !== 'undefined' ? subscribeLive : null), mountSyncStatus: (typeof mountSyncStatus !== 'undefined' ? mountSyncStatus : null) };

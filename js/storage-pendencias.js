@@ -66,7 +66,7 @@ function saveClient(data) {
   if (!data.team) data.team = getCurrentTeam();
   if (isEdit) {
     const i = clients.findIndex(c => c.id === data.id);
-    if (i !== -1) clients[i] = { ...clients[i], ...data, updatedAt: now };
+    if (i !== -1) clients[i] = _withDirtyFields(clients[i], { ...clients[i], ...data, updatedAt: now });
     else {
       // Undo/restauração: reinsere preservando o id (antes era perdido em silêncio).
       data.createdAt = data.createdAt || now;
@@ -175,16 +175,16 @@ function _penServerAvailable() {
 function _penPageScope() {
   // Retorna { team: string|null, adminSeeAll: boolean, canSeeGestao: boolean }.
   var canSeeGestao = false;
-  try { canSeeGestao = (typeof canViewGestao === 'function') ? !!canViewGestao() : false; } catch (_) {}
+  try { canSeeGestao = (typeof canViewGestao === 'function') ? !!canViewGestao() : false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   try {
     const admin = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
     const sel = (typeof _selectedTeam !== 'undefined') ? _selectedTeam : '';
     if (admin && sel) return { team: sel, adminSeeAll: false, canSeeGestao: canSeeGestao };
     if (admin) return { team: null, adminSeeAll: true, canSeeGestao: canSeeGestao };
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   try {
     if (typeof getCurrentTeam === 'function') return { team: getCurrentTeam(), adminSeeAll: false, canSeeGestao: canSeeGestao };
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   return { team: 'init', adminSeeAll: false, canSeeGestao: canSeeGestao };
 }
 
@@ -222,7 +222,7 @@ function _penFields() {
       const e = ENTITIES.find(x => x.table === 'pendencias');
       if (e && e.fields) return e.fields;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   return null;
 }
 
@@ -317,6 +317,9 @@ function savePendencia(data) {
     if (client) data.team = client.team || 'init';
   }
   if (!data.team) data.team = getCurrentTeam();
+  // Pessoas por id (049): o id acompanha o nome gravado.
+  if ('responsible' in data) data.responsibleId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.responsible) : null;
+  if ('timerOperator' in data) data.timerOperatorId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.timerOperator) : null;
   // Safety: status final nunca mantém timer rodando (evita tempo fantasma
   // quando a conclusão chega por kanban, reunião, import ou outro caller
   // que não passou pelo auto-stop de changePenStatus).
@@ -327,15 +330,16 @@ function savePendencia(data) {
       if (data.timerStartedAt) { _sEl = Math.max(0, Math.floor((Date.now() - new Date(data.timerStartedAt).getTime()) / 1000)); }
       data.timerTotalSeconds = (Number(data.timerTotalSeconds) || 0) + _sEl;
       if (typeof timerClosedSessionNote === 'function') data.notes = [...(data.notes || []), timerClosedSessionNote(data.timerOperator, _sEl, data.timerTotalSeconds)];
+      if (typeof recordTimeSession === 'function') recordTimeSession({ ...data }, _sEl, { source: 'conclusao' });
       data.timerRunning = false;
       data.timerStartedAt = null;
       data.timerOperator = null;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   let oldStatus = null;
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now };
+    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
     } else {
       // Undo/restauração: o id original já vem no snapshot — preservá-lo
       // mantém links, anexos e visitId. Só gera id novo quando não há um.
@@ -355,7 +359,7 @@ function savePendencia(data) {
   // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição
   // para resolvida dispara completedAt + próxima ocorrência recorrente.
   var _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   const justConcluded = _isResolvida(data.status) && !_isResolvida(oldStatus);
   if (justConcluded) {
     data.completedAt = now;
@@ -376,7 +380,7 @@ function savePendencia(data) {
   var _logDetails = (data.assunto || '').trim() || data.descricao;
   try {
     if (typeof isPendenciaGestao === 'function' && isPendenciaGestao(data)) _logDetails = '[Gestão – restrito]';
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, _logDetails);
 
   if (justConcluded && data.recurrence) {
@@ -472,8 +476,8 @@ function savePendencia(data) {
     try {
       if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', _full);
       else if (typeof outboxEnqueue === 'function') outboxEnqueue('pendencias', 'upsert', _full);
-    } catch (_) {}
-    try { if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted') markSyncPushFailed(); } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    try { if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted') markSyncPushFailed(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   }
   try {
     var _penOnline = !(typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -492,7 +496,7 @@ function savePendencia(data) {
         _enqueuePen('push-failed');
       });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
 
   return data;
 }
@@ -547,7 +551,7 @@ function updatePendenciaAssignee(penId, patch) {
   }
   if (Object.prototype.hasOwnProperty.call(p, 'completedBy')) {
     let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-    try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+    try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
     if (!_isResolvida(pen.status)) throw new Error('Só é possível informar quem concluiu em pendência concluída.');
     const v = (p.completedBy === null || p.completedBy === undefined) ? '' : String(p.completedBy).trim();
     if (v === (pen.completedBy || '')) { /* igual: sem mudança, sem log */ }
@@ -570,7 +574,7 @@ function updatePendenciaAssignee(penId, patch) {
       if (changed.responsible) addLog('Reatribuiu', 'Pendência', penId, (pen.responsible || '—') + ' → ' + (nextResponsible || '—'));
       if (changed.completedBy) addLog('Corrigiu conclusão', 'Pendência', penId, (pen.completedBy || '—') + ' → ' + (nextCompletedBy || '—'));
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   return { pen: saved, changed };
 }
 function deletePendencia(id) {
@@ -588,7 +592,7 @@ function deletePendencia(id) {
   var _delDesc = desc;
   try {
     if (typeof isPendenciaGestao === 'function' && pen && isPendenciaGestao(pen)) _delDesc = '[Gestão – restrito]';
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   addLog('Excluiu', 'Pendência', id, _delDesc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
@@ -603,7 +607,7 @@ function _getOperatorNamesList() {
     if (typeof globalThis !== 'undefined' && typeof globalThis.getOperatorNames === 'function') return globalThis.getOperatorNames();
     if (typeof getOperators === 'function') return getOperators().map(function(o){ return o.name; });
     if (typeof globalThis !== 'undefined' && typeof globalThis.getOperators === 'function') return globalThis.getOperators().map(function(o){ return o.name; });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   return [];
 }
 function _escapeHtmlLocal(str){
@@ -677,122 +681,4 @@ function addPendenciaNote(id, text, author) {
     }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
   return true;
-}
-
-// ── TICKETS ──
-function getTickets() { return dbGet(DB.TICKETS); }
-function getTicketsByTeam(team) {
-  const all = getTickets();
-  if (!team) return all;
-  return all.filter(t => (t.team || 'init') === team);
-}
-function getMyTickets() {
-  return filterByTeam(getTickets());
-}
-function getTicketById(id) { return getTickets().find(t => t.id === id) || null; }
-function saveTicket(data) {
-  const list = getTickets();
-  const isEdit = !!data.id;
-  // Herda team do cliente se não informado
-  if (!data.team && data.clientId) {
-    const client = getClientById(data.clientId);
-    if (client) data.team = client.team || 'init';
-  }
-  if (!data.team) data.team = getCurrentTeam();
-  let oldStatus = null;
-  var now = new Date().toISOString();
-  if (isEdit) {
-    const i = list.findIndex(t => t.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = { ...list[i], ...data, updatedAt: now };
-    } else {
-      data.id = nextId('TCK');
-      data.createdAt = now;
-      data.updatedAt = now;
-      data.status = data.status || 'aberto';
-      data.updates = [];
-      list.push(data);
-    }
-  } else {
-    data.id = nextId('TCK');
-    data.createdAt = now;
-    data.updatedAt = now;
-    data.status = data.status || 'aberto';
-    data.updates = [];
-    list.push(data);
-  }
-  if (data.status === 'concluido' && oldStatus !== 'concluido') {
-    data.completedAt = now;
-    const idx = list.findIndex(t => t.id === data.id);
-    if (idx !== -1) list[idx].completedAt = data.completedAt;
-  }
-  dbSet(DB.TICKETS, list);
-  addLog(isEdit ? 'Editou' : 'Criou', 'Chamado', data.id, data.title);
-
-  // Notificação por e-mail (não bloqueia a operação)
-  setTimeout(() => {
-    try {
-      if (isEdit && typeof notifyTicketUpdated === 'function') {
-        notifyTicketUpdated(data, oldStatus);
-      } else if (!isEdit && typeof notifyTicketCreated === 'function') {
-        notifyTicketCreated(data);
-      }
-    } catch (e) { console.warn('📧 Erro na notificação de chamado:', e); }
-  }, 100);
-
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('tickets').upsert({
-      id: data.id,
-      client_id: data.clientId,
-      client_name: data.clientName,
-      title: data.title,
-      description: data.description,
-      status: data.status,
-      priority: data.priority,
-      technician: data.technician,
-      updates: data.updates || [],
-      team: data.team || 'init',
-      attachments: data.attachments || [],
-      timer_running: data.timerRunning === true,
-      timer_started_at: data.timerStartedAt || null,
-      timer_total_seconds: data.timerTotalSeconds || 0,
-      timer_operator: data.timerOperator || null,
-      completed_at: data.completedAt || null,
-      created_at: data.createdAt || now,
-      updated_at: now
-    }).then(res => { if(res.error) { console.error('❌ Supabase chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
-  }
-
-  return data;
-}
-function deleteTicket(id) {
-  if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir chamados.', 'error');
-    return false;
-  }
-  const tck = getTicketById(id);
-  const title = tck ? tck.title : 'Desconhecido';
-  dbSet(DB.TICKETS, getTickets().filter(t => t.id !== id));
-  _addTombstone(DB.TICKETS, id);
-  addLog('Excluiu', 'Chamado', id, title);
-
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('tickets').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
-  }
-}
-function addTicketUpdate(id, text, author) {
-  const list = getTickets();
-  const i = list.findIndex(t => t.id === id);
-  if (i === -1) return;
-  if (!list[i].updates) list[i].updates = [];
-  list[i].updates.push({ text, author, createdAt: new Date().toISOString() });
-  var now = new Date().toISOString();
-  list[i].updatedAt = now;
-  dbSet(DB.TICKETS, list);
-
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('tickets').update({
-      updates: list[i].updates,
-      updated_at: now
-    }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar chamado:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
-  }
 }

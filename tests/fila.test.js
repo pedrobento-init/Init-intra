@@ -89,3 +89,15 @@ describe('contratos de navegação', () => {
     expect(fs.readFileSync('sw.js', 'utf8')).toContain("'js/fila.js'");
   });
 });
+
+describe('Minha fila por id (049)', () => {
+  it('registro com id é meu mesmo com nome antigo; sem id cai no nome', () => {
+    const pens = [
+      { id: 'a', status: 'aberto', responsible: 'Ana (antigo)', responsibleId: 'OP-1', deadline: '2026-10-10' },
+      { id: 'b', status: 'aberto', responsible: 'Ana', deadline: '2026-10-10' },
+      { id: 'c', status: 'aberto', responsible: 'Ana', responsibleId: 'OP-2', deadline: '2026-10-10' },
+    ];
+    const m = buildFilaModel(pens, [], 'Ana', '2026-10-15', Date.now(), 'OP-1');
+    expect(m.now.map((p) => p.id).sort()).toEqual(['a', 'b']);
+  });
+});

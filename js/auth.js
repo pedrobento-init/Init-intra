@@ -1,7 +1,7 @@
 // auth.js – Autenticação exclusiva via Supabase Auth
 // =====================================================================
 
-const OP_SAFE_COLS = 'id,name,initials,color,role,phone,email,is_admin,active,team,auth_user_id,created_at,updated_at';
+const OP_SAFE_COLS = 'id,name,initials,color,role,phone,email,is_admin,is_gestao,active,team,auth_user_id,created_at,updated_at';
 
 const _loginGuard = { fails: 0, lockUntil: 0 };
 
@@ -172,11 +172,9 @@ async function _refreshOperatorFromSupabase(localOp, authUser) {
 /**
  * Upsert de operador remoto no cache local (sem hashes de senha).
  */
-function _upsertOperatorFromRemote(remote, localFallback) {
+// localFallback: mantido na assinatura por compatibilidade com quem chama.
+function _upsertOperatorFromRemote(remote, _localFallback) {
   const list = getOperators();
-  const localById = localFallback || list.find(o => o.id === remote.id) ||
-                    list.find(o => o.auth_user_id === remote.auth_user_id) ||
-                    list.find(o => (o.email || '').toLowerCase() === (remote.email || '').toLowerCase());
   const merged = {
     id:           remote.id,
     name:         remote.name,
@@ -186,17 +184,18 @@ function _upsertOperatorFromRemote(remote, localFallback) {
     phone:        remote.phone,
     email:        remote.email,
     isAdmin:      remote.is_admin === true,
+    isGestao:     remote.is_gestao === true,
     active:       remote.active !== false,
     team:         remote.team || 'init',
     auth_user_id: remote.auth_user_id,
     createdAt:    remote.created_at,
     updatedAt:    remote.updated_at,
-    pinHash:      localById?.pinHash || null,
-    pinSalt:      localById?.pinSalt || null,
   };
   const idx = list.findIndex(o => o.id === merged.id);
   if (idx !== -1) list[idx] = { ...list[idx], ...merged };
   else list.push(merged);
+  // Hash de senha não é mais guardado (cópias antigas do aparelho saem aqui).
+  for (const o of list) { if (o) { delete o.pinHash; delete o.pinSalt; } }
   dbSet(DB.OPERATORS, list);
   return merged;
 }

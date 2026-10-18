@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -5,8 +7,7 @@ const require = createRequire(import.meta.url);
 describe('parseGoogleSheetId', () => {
   let clientsMod;
   beforeEach(() => {
-    delete require.cache[require.resolve('../js/clients.js')];
-    clientsMod = require('../js/clients.js');
+    clientsMod = requireParts('clients');
   });
   it('extrai o ID de URLs /edit, /view e com gid', () => {
     expect(clientsMod.parseGoogleSheetId('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing')).toBe('1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms');
@@ -28,8 +29,7 @@ describe('parseGoogleSheetId', () => {
 describe('parseGoogleSheetLink (publicado na web)', () => {
   let clientsMod;
   beforeEach(() => {
-    delete require.cache[require.resolve('../js/clients.js')];
-    clientsMod = require('../js/clients.js');
+    clientsMod = requireParts('clients');
   });
   it('extrai o ID publicado de URLs /d/e/.../pubhtml (não o literal "e")', () => {
     expect(clientsMod.parseGoogleSheetLink('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml'))
@@ -50,8 +50,7 @@ describe('parseGoogleSheetLink (publicado na web)', () => {
 describe('googleSheetEmbedUrl (publicado na web)', () => {
   let clientsMod;
   beforeEach(() => {
-    delete require.cache[require.resolve('../js/clients.js')];
-    clientsMod = require('../js/clients.js');
+    clientsMod = requireParts('clients');
   });
   it('gera pubhtml embed a partir do link publicado', () => {
     expect(clientsMod.googleSheetEmbedUrl('https://docs.google.com/spreadsheets/d/e/2PACX-1vQAbCdEfGhIjKlMnOpQrStUvWxYz/pubhtml'))
@@ -61,8 +60,7 @@ describe('googleSheetEmbedUrl (publicado na web)', () => {
 describe('googleSheetEmbedUrl', () => {
   let clientsMod;
   beforeEach(() => {
-    delete require.cache[require.resolve('../js/clients.js')];
-    clientsMod = require('../js/clients.js');
+    clientsMod = requireParts('clients');
   });
   it('converte qualquer URL válida para o formato embedded', () => {
     expect(clientsMod.googleSheetEmbedUrl('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing'))

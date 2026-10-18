@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -14,8 +16,7 @@ describe('buildClientNarrative', () => {
     globalThis.calculateAvgResolutionHours = () => 24;
     globalThis.formatDate = (iso) => new Date(iso).toLocaleDateString('pt-BR');
     globalThis.localDateISO = () => '2024-03-10';
-    delete require.cache[require.resolve('../js/clients.js')];
-    clientsMod = require('../js/clients.js');
+    clientsMod = requireParts('clients');
   });
   it('monta texto corrido com data, total, média e status', () => {
     const txt = clientsMod.buildClientNarrative('CLI-1');

@@ -1,3 +1,5 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { createRequire as __storageReq } from 'node:module';
 const { requireStorage, storageSource } = __storageReq(import.meta.url)('./_storage.cjs');
 import { describe, it, expect } from 'vitest';
@@ -22,7 +24,7 @@ vm.createContext(sandbox);
 const quiet = console.error; console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
-  vm.runInContext(fs.readFileSync('js/pendencias.js', 'utf8'), sandbox, { filename: 'pendencias.js' });
+  vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext('globalThis.__t = { nextRecurrenceDate, nextRecurrenceDateFrom, RECURRENCE_OPTIONS, templateStepsToChecklist, penQuickMenuModel, penKanbanCard };', sandbox);
 } finally { console.error = quiet; }
 const T = sandbox.__t;

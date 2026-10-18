@@ -1,9 +1,11 @@
+import { createRequire as __partsReq } from 'node:module';
+const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 // pendencias helpers are pure and exported via module
-const pend = require('../js/pendencias.js');
+const pend = requireParts('pendencias');
 const { suggestTemplateForDescription, _tokenizeWords } = pend;
 
 describe('_tokenizeWords', () => {
