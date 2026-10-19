@@ -176,6 +176,11 @@ function renderFila() {
 // Dispensável por dia: some até a meia-noite, ou antes se os números mudarem.
 function _alertStripKey(text) { return 'intra_alert_dismissed_' + (typeof localDateISO === 'function' ? localDateISO() : '') + '_' + text; }
 
+const ALERT_STRIP_PAGES = ['fila', 'dashboard'];
+function _alertStripPage() {
+  try { return (window.location.hash || '').replace('#', '') || 'dashboard'; } catch (_) { return 'dashboard'; }
+}
+
 function renderAlertStrip() {
   const el = document.getElementById('alertStrip');
   if (!el) return;
@@ -191,6 +196,9 @@ function renderAlertStrip() {
   } catch (_) { text = ''; }
   let dismissed = false;
   try { dismissed = !!sessionStorage.getItem(_alertStripKey(text)); } catch (_) {}
+  // Só nas telas de visão do dia (Minha fila, Dashboard): nas demais a faixa
+  // repetia o mesmo aviso em toda página; o selo do menu continua mostrando.
+  if (!ALERT_STRIP_PAGES.includes(_alertStripPage())) dismissed = true;
   if (!text || dismissed) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
   el.innerHTML =

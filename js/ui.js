@@ -1,12 +1,13 @@
 // ui.js – Componentes reutilizáveis
 
 const _loadedScripts = new Set();
-function loadScript(url) {
+function loadScript(url, integrity) {
   if (_loadedScripts.has(url)) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = url;
     s.crossOrigin = 'anonymous';
+    if (integrity) s.integrity = integrity;
     s.onload = () => { _loadedScripts.add(url); resolve(); };
     s.onerror = () => reject(new Error('Falha ao carregar: ' + url));
     document.head.appendChild(s);
@@ -15,12 +16,20 @@ function loadScript(url) {
 
 async function loadChartJs() {
   if (typeof Chart !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/chart.js');
+  // Versão fixa + SRI: sem versão o CDN entrega sempre a última e uma
+  // major nova pode quebrar os gráficos do dia para a noite.
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+    'sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ'
+  );
 }
 
 async function loadFullCalendar() {
   if (typeof FullCalendar !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js');
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
+    'sha384-RvFLqUoLENXxwOpLf9+DxOdYK1gR2w9NIQ7uN31j65tKiMpSD6qEJ8Rt6I2WQ/H/'
+  );
 }
 
 function debounce(func, wait) {
@@ -560,6 +569,41 @@ if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPro
     } catch (_) {}
   }).catch(() => {});
 }
+
+// Menu recolhido (só ícones): rótulo flutuante na hora, com o nome do item e
+// a seção (Dia a dia, Cadastros, Gestão). O `title` nativo demora ~1s e não
+// mostra a seção; ele vira aria-label para o leitor de tela continuar lendo.
+(function _initSidebarTips() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || typeof document.createElement !== 'function') return;
+  let tip = null;
+  let section = '';
+  Array.prototype.forEach.call(nav.children || [], (el) => {
+    if (el.classList && el.classList.contains('nav-section')) { section = (el.textContent || '').trim(); return; }
+    if (!el.classList || !el.classList.contains('nav-item')) return;
+    const label = el.querySelector('span:not(.badge)');
+    el.dataset.tip = (label && label.textContent.trim()) || el.getAttribute('title') || '';
+    el.dataset.tipSection = section;
+    if (el.getAttribute('title')) { el.setAttribute('aria-label', el.getAttribute('title')); el.removeAttribute('title'); }
+  });
+  const show = (item) => {
+    const sb = document.getElementById('sidebar');
+    if (!sb || !sb.classList.contains('collapsed') || !item.dataset.tip) return;
+    if (!tip) { tip = document.createElement('div'); tip.className = 'sidebar-tip'; tip.setAttribute('aria-hidden', 'true'); document.body.appendChild(tip); }
+    tip.innerHTML = escapeHtml(item.dataset.tip) + (item.dataset.tipSection ? '<small>' + escapeHtml(item.dataset.tipSection) + '</small>' : '');
+    const r = item.getBoundingClientRect();
+    tip.style.top = Math.round(r.top + r.height / 2) + 'px';
+    tip.style.left = Math.round(sb.getBoundingClientRect().right + 8) + 'px';
+    tip.classList.add('is-on');
+  };
+  const hide = () => { if (tip) tip.classList.remove('is-on'); };
+  nav.addEventListener('mouseover', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); else hide(); });
+  nav.addEventListener('mouseleave', hide);
+  nav.addEventListener('focusin', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); });
+  nav.addEventListener('focusout', hide);
+  nav.addEventListener('click', hide);
+  nav.addEventListener('scroll', hide);
+})();
 
 // Sidebar Mobile (Hamburger & Overlay)
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');

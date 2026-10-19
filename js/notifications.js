@@ -276,6 +276,17 @@ function collectPendenciaRecipients(pendencia) {
   return collectRecipients(pendencia.responsible);
 }
 
+// Mesmo aviso no celular (Web Push, js/push.js); o servidor tira quem enviou.
+function _pushPendencia(recipients, label, pendencia, body) {
+  if (typeof sendPushNotification !== 'function') return;
+  sendPushNotification({
+    to: recipients,
+    title: label + ': ' + getPendenciaTitulo(pendencia),
+    body: body || '',
+    url: '#pendencias',
+  });
+}
+
 // ── Templates de E-mail ──
 
 function notifyPendenciaCreated(pendencia) {
@@ -326,6 +337,7 @@ function notifyPendenciaCreated(pendencia) {
     subject: `[Init Intra] Nova Pendência: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Nova Pendência', pendencia, pendencia.clientName);
 }
 
 function notifyPendenciaUpdated(pendencia, oldStatus) {
@@ -377,6 +389,7 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
     subject: `[Init Intra] Pendência Atualizada: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Pendência Atualizada', pendencia, statusChanged ? oldStatusLabel + ' → ' + newStatusLabel : pendencia.clientName);
 }
 
 function notifyPendenciaNote(pendencia, note) {
@@ -407,6 +420,7 @@ function notifyPendenciaNote(pendencia, note) {
     subject: `[Init Intra] Nova nota em: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Nova nota', pendencia, (note.author ? note.author + ': ' : '') + (note.text || ''));
 }
 
 // Lembretes de prazo e avisos de vencimento: enviados pelo servidor, uma vez
@@ -422,7 +436,7 @@ function openNotifSettings() {
   body.innerHTML = `
     <div style="margin-bottom:16px">
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
-        Configure quais e-mails automáticos serão enviados pelo sistema.
+        Configure quais avisos automáticos o sistema envia (e-mail e celular).
       </p>
     </div>
 
@@ -440,6 +454,14 @@ function openNotifSettings() {
         <input type="checkbox" id="pref_pendNote" ${prefs.onPendenciaNote ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
         <span>Ao adicionar nota/ata</span>
       </label>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">No celular</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">
+        Os mesmos avisos chegam como notificação no aparelho, mesmo com o app fechado.
+      </p>
+      <div id="pushSettings"><p class="push-state">Verificando…</p></div>
     </div>
 
     <div style="margin-bottom:20px">
@@ -463,6 +485,7 @@ function openNotifSettings() {
   `;
 
   modal.style.display = 'flex';
+  if (typeof renderPushSettings === 'function') renderPushSettings();
 }
 
 function saveNotifSettings() {

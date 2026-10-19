@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v49';
-const CDN_CACHE_NAME = 'init-intra-cdn-v49';
+const CACHE_NAME = 'init-intra-v50';
+const CDN_CACHE_NAME = 'init-intra-cdn-v50';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -36,6 +36,7 @@ const STATIC_ASSETS = [
   'js/calendar.js',
   'js/visitas.js',
   'js/visit-photos.js',
+  'js/visit-signature.js',
   'js/ia-relatorio.js',
   'js/templates.js',
   'js/global-search.js',
@@ -60,6 +61,7 @@ const STATIC_ASSETS = [
   'js/milvus-devices.js',
   'js/milvus-tickets.js',
   'js/milvus-token-backfill.js',
+  'js/push.js',
   'js/app.js',
   'js/sw-register.js',
   'manifest.json',
@@ -69,11 +71,11 @@ const STATIC_ASSETS = [
 ];
 
 const CDN_ASSETS = [
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js',
   'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
   'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
   'https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js',
 ];
 
@@ -188,4 +190,34 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+});
+
+// ── Web Push (Edge Function send-push) ──
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = { title: 'Init Intra', body: event.data ? event.data.text() : '' }; }
+  const title = data.title || 'Init Intra';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    tag: data.tag || undefined,
+    data: { url: typeof data.url === 'string' && /^\/?#[a-z0-9_-]*$/i.test(data.url) ? data.url : '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin) {
+        await w.focus();
+        if ('navigate' in w) await w.navigate(url);
+        return;
+      }
+    }
+    await self.clients.openWindow(url);
+  })());
 });

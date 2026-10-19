@@ -494,6 +494,8 @@ function openVisitDetail(id) {
 
     ${typeof visitPhotosSectionHtml === 'function' ? visitPhotosSectionHtml(id) : ''}
 
+    ${typeof visitSignatureSectionHtml === 'function' ? visitSignatureSectionHtml(v) : ''}
+
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
       if (!linked.length) return `<div style="margin-top:16px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
@@ -506,7 +508,8 @@ function openVisitDetail(id) {
         </select>
         <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar Status</button>
         ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="openConcludeVisitModal('${escapeHtml(id)}')">✅ Concluir com Relatório</button>` : ''}
-        <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar Tudo</button>
+${typeof printVisitReport === 'function' ? `<button type="button" class="btn btn-secondary btn-sm" data-action="visitPrint" data-arg="${escapeHtml(id)}" title="Relatório da visita com a assinatura (imprimir ou salvar em PDF)">🖨 Relatório</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar Tudo</button>
         <button class="btn btn-sm btn-danger" onclick="closeModal();deleteVisitConfirm('${escapeHtml(id)}')" title="Excluir visita">Excluir</button>
       </div>
     </div>
@@ -559,6 +562,10 @@ function openConcludeVisitModal(id) {
         </label>
         <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('concludeRelatorio', v.id) : ''}
       </div>
+      ${typeof signaturePadHtml === 'function' ? `<div class="form-group">
+        <label class="form-label">Assinatura do cliente (opcional)</label>
+        ${signaturePadHtml('concludeSig', v.assinaturaNome || '')}
+      </div>` : ''}
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)">
           <input type="checkbox" id="concludeCreatePendencia" style="width:16px;height:16px;accent-color:var(--accent)" />
@@ -574,7 +581,10 @@ function openConcludeVisitModal(id) {
       </div>
     </form>
   `);
-  setTimeout(() => document.getElementById('concludeRelatorio')?.focus(), 100);
+  setTimeout(() => {
+    document.getElementById('concludeRelatorio')?.focus();
+    if (typeof initSignaturePad === 'function') initSignaturePad('concludeSig');
+  }, 100);
 }
 
 function submitConcludeVisit(e, id) {
@@ -589,7 +599,8 @@ function submitConcludeVisit(e, id) {
   // Cópia destacada (não muta o cache antes do save): a transição
   // agendada/em_andamento → concluida é o que dispara a próxima ocorrência
   // recorrente em saveVisit.
-  saveVisit({ ...v, relatorio: rel, status: 'concluida' });
+  const sig = typeof readSignaturePad === 'function' ? signatureFields(readSignaturePad('concludeSig')) : {};
+  saveVisit({ ...v, ...sig, relatorio: rel, status: 'concluida' });
 
   if (document.getElementById('concludeCreatePendencia')?.checked && typeof savePendencia === 'function') {
     savePendencia({
