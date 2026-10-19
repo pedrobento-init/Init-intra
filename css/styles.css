@@ -189,7 +189,8 @@ body {
   flex-shrink: 0;
 }
 .sidebar.collapsed #teamSelectorWrap { display: none !important; }
-.btn-export {
+.btn-export,
+.btn-more {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px;
   background: none; border: none; cursor: pointer;
@@ -197,9 +198,36 @@ body {
   border-radius: var(--radius-sm); width: 100%; text-align: left;
   transition: background var(--transition), color var(--transition);
 }
-.btn-export:hover { background: var(--sidebar-hover); color: #fff; }
-.sidebar.collapsed .btn-export span { display: none; }
-.sidebar.collapsed .btn-export { justify-content: center; }
+.btn-export:hover,
+.btn-more:hover,
+.btn-more[aria-expanded="true"] { background: var(--sidebar-hover); color: #fff; }
+.sidebar.collapsed .btn-export span,
+.sidebar.collapsed .btn-more span { display: none; }
+.sidebar.collapsed .btn-export,
+.sidebar.collapsed .btn-more { justify-content: center; }
+/* Popover "Mais opções": fixed porque a sidebar tem overflow:hidden.
+   left/bottom são calculados em openSidebarMore() (ui.js). */
+.sidebar-more-menu {
+  position: fixed; z-index: 450;
+  min-width: 190px;
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: #1e2a3a;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.sidebar-more-menu[hidden] { display: none; }
+.sidebar-more-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: none; border: none; cursor: pointer;
+  color: var(--sidebar-text); font-size: 12px; font-family: inherit;
+  border-radius: var(--radius-sm); width: 100%; text-align: left;
+  transition: background var(--transition), color var(--transition);
+}
+.sidebar-more-item:hover,
+.sidebar-more-item:focus-visible { background: var(--sidebar-hover); color: #fff; outline: none; }
 .current-user {
   display: flex; align-items: center; gap: 10px;
   padding: 8px;
@@ -1643,6 +1671,7 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   }
   .sidebar .btn-logout,
   .sidebar .btn-export,
+  .sidebar .btn-more,
   .sidebar .current-user {
     justify-content: center;
     padding: 10px;
@@ -1851,6 +1880,10 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   .sidebar .btn-logout,
   .sidebar .btn-export {
     display: flex !important;
+    justify-content: flex-start;
+    padding: 10px 16px;
+  }
+  .sidebar .btn-more {
     justify-content: flex-start;
     padding: 10px 16px;
   }

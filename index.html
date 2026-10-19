@@ -124,17 +124,11 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button class="btn-export" onclick="exportData()" title="Exportar backup dos dados" aria-label="Exportar backup dos dados">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Exportar dados</span>
-        </button>
-        <button class="btn-export" onclick="importData()" title="Importar backup" aria-label="Importar backup de dados">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>Importar dados</span>
-        </button>
-        <button class="btn-export" id="installAppBtn" onclick="promptInstall()" title="Instalar o app no dispositivo" aria-label="Instalar o aplicativo" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Instalar app</span>
+        <!-- Exportar / Importar / Instalar ficam num único item "Mais opções"
+             (popover) para não ocupar três linhas do rodapé da sidebar. -->
+        <button class="btn-more" id="sidebarMoreBtn" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false" aria-controls="sidebarMoreMenu" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          <span>Mais opções</span>
         </button>
         <div class="current-user" id="userQuickBtn" title="Meu perfil">
           <div class="avatar" id="user-avatar" style="background:#1a56db">TI</div>
@@ -149,6 +143,20 @@
         </button>
       </div>
     </aside>
+    <div class="sidebar-more-menu" id="sidebarMoreMenu" role="menu" aria-label="Mais opções" hidden>
+      <button class="sidebar-more-item" id="exportDataBtn" type="button" role="menuitem" data-more-action="exportData" title="Exportar backup dos dados">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Exportar dados</span>
+      </button>
+      <button class="sidebar-more-item" id="importDataBtn" type="button" role="menuitem" data-more-action="importData" title="Importar backup de dados">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Importar dados</span>
+      </button>
+      <button class="sidebar-more-item" id="installAppBtn" type="button" role="menuitem" data-more-action="promptInstall" title="Instalar o app no dispositivo" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Instalar app</span>
+      </button>
+    </div>
 
     <main class="main-content" id="mainContent">
       <header class="topbar">
