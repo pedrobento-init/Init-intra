@@ -1,5 +1,5 @@
 // notifications.js – Sistema de Notificações por E-mail
-// Usa Supabase Edge Function + Resend como serviço de e-mail
+// Usa Supabase Edge Function + Gmail do Google Workspace (SMTP) para enviar
 
 const EMAIL_CONFIG = {
   edgeFunctionUrl: SUPABASE_URL
@@ -67,28 +67,108 @@ async function sendEmailNotification({ to, subject, html }) {
     });
 
     if (error) {
-      if (error.message && (error.message.includes('CORS') || error.message.includes('Failed to send') || error.message.includes('fetch'))) {
-        console.log('📧 [Notificação] Edge Function não disponível (não deployada?). Pulando...');
-      } else {
-        console.warn('📧 [Notificação] Erro na Edge Function:', error.message);
-      }
-      return { error: error.message };
+      const detail = await _emailErrorDetail(error);
+      _reportEmailFailure(detail);
+      return { error: detail.message, code: detail.code, status: detail.status };
+    }
+
+    // Resposta 200 com success:false (defesa: a função hoje devolve 502 nesse caso).
+    if (data && data.success === false) {
+      const detail = { status: 200, code: data.code || '', message: data.error || data.message || 'Falha no envio' };
+      _reportEmailFailure(detail);
+      return { error: detail.message, code: detail.code };
     }
 
     console.log('📧 [Notificação] E-mail enviado com sucesso para:', recipients.join(', '));
     return { success: true, data };
   } catch (err) {
-    const msg = err.message || String(err);
-    if (msg.includes('CORS') || msg.includes('Failed to send') || msg.includes('fetch') || msg.includes('Edge Function')) {
-      console.log('📧 [Notificação] Edge Function indisponível (verifique se está deployada). Silenciando...');
-    } else {
-      console.warn('📧 [Notificação] Falha:', msg);
-    }
-    return { error: msg };
+    const detail = { status: 0, code: 'network', message: err.message || String(err) };
+    _reportEmailFailure(detail);
+    return { error: detail.message, code: detail.code };
   }
 }
 
-// ── Helpers de Formatação de E-mail ──
+/** Lê o corpo do erro da Edge Function (status + mensagem do Gmail). */
+async function _emailErrorDetail(error) {
+  const out = { status: 0, code: '', message: (error && error.message) || 'Erro desconhecido' };
+  try {
+    const ctx = error && error.context;
+    if (ctx && typeof ctx.status === 'number') out.status = ctx.status;
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.json();
+      if (body && (body.error || body.message)) out.message = body.error || body.message;
+      if (body && body.code) out.code = body.code;
+    }
+  } catch (_) {}
+  if (!out.status && error && error.name === 'FunctionsFetchError') out.code = out.code || 'network';
+  return out;
+}
+
+/** Explica o erro de envio em português, com o que fazer. */
+function describeEmailError(detail) {
+  const d = detail || {};
+  const msg = String(d.message || '');
+  if (d.status === 404) return 'A função send-email não está publicada no Supabase (Edge Functions).';
+  if (d.code === 'unauthorized' || d.status === 401) return 'A função recusou o acesso: entre de novo no site.';
+  if (d.code === 'missing_credentials' || /GMAIL_USER|GMAIL_APP_PASSWORD/.test(msg)) {
+    return 'Faltam GMAIL_USER e GMAIL_APP_PASSWORD nos Secrets das Edge Functions do Supabase.';
+  }
+  if (d.code === 'EAUTH' || /535|Username and Password not accepted|Application-specific password required/i.test(msg)) {
+    return 'O Gmail recusou o login: confira GMAIL_USER e a senha de app (GMAIL_APP_PASSWORD).';
+  }
+  if (/limit exceeded|daily user sending limit|550[- ]5\.4\.5|421[- ]4\.7\.0/i.test(msg)) {
+    return 'Limite diário de envio do Gmail atingido.';
+  }
+  if (d.code === 'ETIMEDOUT' || d.code === 'ECONNECTION' || d.code === 'ESOCKET') {
+    return 'A função não conseguiu conectar no smtp.gmail.com.';
+  }
+  if (d.code === 'network' || /Failed to send|fetch/i.test(msg)) {
+    return 'Não foi possível chamar a função send-email (sem conexão ou função fora do ar).';
+  }
+  return 'Falha no envio: ' + msg;
+}
+
+// Antes as falhas só iam para o console. Agora vão para Histórico → Erros do app.
+function _reportEmailFailure(detail) {
+  const text = describeEmailError(detail);
+  console.warn('📧 [Notificação] ' + text, detail);
+  if (typeof _logSilent === 'function') {
+    _logSilent(new Error(text + (detail && detail.message ? ' [' + detail.message + ']' : '')), 'email');
+  }
+}
+
+/** Manda um e-mail de teste para o próprio usuário e mostra o resultado. */
+async function sendTestEmail() {
+  const out = document.getElementById('notifTestResult');
+  const btn = document.getElementById('notifTestBtn');
+  const show = (text, ok) => {
+    if (out) { out.textContent = text; out.style.color = ok ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)'; }
+  };
+  const session = typeof getSession === 'function' ? getSession() : null;
+  const me = session && typeof getOperators === 'function' ? getOperators().find((o) => o && o.id === session.opId) : null;
+  if (!me || !me.email) { show('Seu operador não tem e-mail cadastrado.', false); return; }
+  if (!EMAIL_CONFIG.edgeFunctionUrl || typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+    show('Sem conexão com o Supabase.', false);
+    return;
+  }
+  if (btn) btn.disabled = true;
+  show('Enviando...', true);
+  const res = await sendEmailNotification({
+    to: [me.email],
+    subject: '[Init Intra] E-mail de teste',
+    html: emailBody('<p style="font-size:14px;color:#475569">Se você recebeu esta mensagem, o envio de e-mails do Init Intra está funcionando.</p>'),
+  });
+  if (btn) btn.disabled = false;
+  if (res && res.success) show('Enviado para ' + me.email + '. Confira a caixa de entrada e o spam.', true);
+  else if (res && res.skipped) show('Envio de e-mail desligado neste site.', false);
+  else show(describeEmailError({ status: res && res.status, code: res && res.code, message: res && res.error }), false);
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({ sendTestEmail: () => sendTestEmail() });
+}
+
+// ── Layout do e-mail ──
 function emailHeader() {
   return `
     <div style="background:#1a56db;padding:20px 24px;border-radius:10px 10px 0 0">
@@ -498,6 +578,12 @@ function openNotifSettings() {
         <span style="color:var(--text-muted)">Dias antes do prazo:</span>
         <input type="number" id="pref_reminderDays" value="${prefs.reminderDaysBefore || 2}" min="1" max="14" style="width:60px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:center">
       </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Testar envio</div>
+      <button type="button" class="btn btn-secondary" id="notifTestBtn" data-action="sendTestEmail">Enviar e-mail de teste para mim</button>
+      <div id="notifTestResult" style="font-size:12px;margin-top:8px"></div>
     </div>
 
     <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
