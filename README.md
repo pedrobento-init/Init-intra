@@ -16,6 +16,7 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 - **Operadores**: cadastro com equipes (init, mam, bt), papéis e flags de admin/Gestão.
 - **Busca global**: `Ctrl+K` para clientes, pendências e ações.
 - **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
+- **Celular**: os mesmos avisos como notificação (Web Push), ativados por aparelho em Configurar notificações.
 
 ## Tecnologias
 
@@ -46,7 +47,8 @@ e2e/                  Testes de navegador (Playwright)
 | Função | Para quê |
 | --- | --- |
 | `send-email` | Envia e-mail pelo Gmail (SMTP). Só operador logado, só para e-mails de operadores ativos. |
-| `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). |
+| `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). Também por push, se configurado. |
+| `send-push` | Notificação no celular (Web Push). Só operador logado, só para operadores ativos; chaves VAPID nos secrets (migration 053). |
 | `agenda-ics` | Feed iCalendar da agenda do técnico (token secreto no link). |
 | `ia-relatorio` | Texto de relatório com IA. |
 | `update-user-password` | Admin troca a senha de um usuário. |

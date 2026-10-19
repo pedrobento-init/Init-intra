@@ -6287,3 +6287,8 @@ textarea[aria-busy="true"] { opacity: .6; }
   .cl-num { width: auto; }
   .cl-view-btn { padding: 6px 8px; }
 }
+
+/* Configurações de notificação: estado do push neste aparelho */
+.push-state { font-size: 13px; margin: 0 0 8px; color: var(--ds-muted); }
+.push-state.push-on { color: var(--st-ok); font-weight: 600; }
+.push-state.push-blocked { color: var(--st-danger); }

@@ -10,6 +10,8 @@
 //   supabase secrets set APP_URL=https://<endereço do Intra>   (opcional: botão no e-mail)
 //   supabase functions deploy avisos-prazo --no-verify-jwt
 // Usa os mesmos GMAIL_USER / GMAIL_APP_PASSWORD (/ GMAIL_FROM) da send-email.
+// Com VAPID_* configurados (ver send-push), o aviso também vai como
+// notificação para os celulares inscritos.
 //
 // SEGURANÇA: só responde com o header x-cron-secret correto. Lê e grava com
 // service_role; destinatários saem da tabela operators (nunca do pedido).
@@ -32,6 +34,8 @@ import {
   type Pendencia,
   type Vencimento,
 } from "./avisos.ts";
+import { buildPushPayload } from "../send-push/payload.ts";
+import { pushToEmails } from "../send-push/push.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -81,8 +85,15 @@ serve(async (req: Request) => {
   async function release(key: string) {
     await db.from("avisos_enviados").delete().eq("key", key);
   }
-  async function send(to: string[], mail: { subject: string; html: string }) {
+  async function send(to: string[], mail: { subject: string; html: string }, push?: { body: string; url: string }) {
     await transporter.sendMail({ from: { name: "Init Intra", address: GMAIL_FROM }, to, subject: mail.subject, html: mail.html });
+    // Push é extra: falha nele não desfaz o aviso já enviado por e-mail.
+    if (push) {
+      try {
+        const payload = buildPushPayload({ title: mail.subject.replace(/^\[Init Intra\]\s*/, ""), body: push.body, url: push.url });
+        if (payload) await pushToEmails(db, to, payload);
+      } catch (e) { console.error("avisos-prazo push:", (e as Error).message); }
+    }
   }
 
   try {
@@ -109,7 +120,7 @@ serve(async (req: Request) => {
       const key = pendenciaAvisoKey(p, due.tipo);
       if (!(await claim(key))) continue;
       try {
-        await send(to, pendenciaEmail(p, due.days, APP_URL));
+        await send(to, pendenciaEmail(p, due.days, APP_URL), { body: String(p.client_name ?? ""), url: "#pendencias" });
         result.pendencias++;
       } catch (e) {
         await release(key);
@@ -134,7 +145,7 @@ serve(async (req: Request) => {
       const to = recipientsFor(operators, { id: v.responsavel_id, name: v.responsavel });
       try {
         if (to.length) {
-          await send(to, vencimentoEmail(v, due.days, APP_URL));
+          await send(to, vencimentoEmail(v, due.days, APP_URL), { body: String(v.client_name ?? ""), url: "#vencimentos" });
           result.vencimentos++;
         }
         const avisos = [...new Set([...(Array.isArray(v.avisos) ? v.avisos.map(String) : []), ...due.marcar])];

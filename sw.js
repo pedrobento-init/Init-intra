@@ -60,6 +60,7 @@ const STATIC_ASSETS = [
   'js/milvus-devices.js',
   'js/milvus-tickets.js',
   'js/milvus-token-backfill.js',
+  'js/push.js',
   'js/app.js',
   'js/sw-register.js',
   'manifest.json',
@@ -188,4 +189,34 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+});
+
+// ── Web Push (Edge Function send-push) ──
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = { title: 'Init Intra', body: event.data ? event.data.text() : '' }; }
+  const title = data.title || 'Init Intra';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    tag: data.tag || undefined,
+    data: { url: typeof data.url === 'string' && /^\/?#[a-z0-9_-]*$/i.test(data.url) ? data.url : '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin) {
+        await w.focus();
+        if ('navigate' in w) await w.navigate(url);
+        return;
+      }
+    }
+    await self.clients.openWindow(url);
+  })());
 });
