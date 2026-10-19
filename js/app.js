@@ -1419,9 +1419,7 @@ function _startApp() {
     if (histNav) histNav.style.display = 'none';
   }
   if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
-  document.querySelectorAll('.btn-export').forEach(function (btn) {
-    btn.style.display = isAdmin ? '' : 'none';
-  });
+  if (typeof setSidebarMoreAdmin === 'function') setSidebarMoreAdmin(isAdmin);
 
   const hash  = window.location.hash.replace('#','');
   const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','calendario','operadores','relatorios','equipamentos','historico','templates','visitas','reuniao'];

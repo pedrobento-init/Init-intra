@@ -593,7 +593,7 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
   });
   sidebarOverlay.addEventListener('click', closeMobileMenu);
 
-  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user, .btn-export').forEach(item => {
+  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user').forEach(item => {
     item.addEventListener('click', () => {
       if (window.innerWidth <= 768) closeMobileMenu();
     });
@@ -1254,7 +1254,89 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 let _deferredInstall = null;
 function _setInstallBtnVisible(v) {
   try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_) {}
+  refreshSidebarMore();
 }
+
+// ── Menu "Mais opções" (rodapé da sidebar) ────────────────────────────────────
+// Exportar/Importar (só admin) e Instalar app (só quando o navegador oferece)
+// vivem num popover. Cada item controla a própria visibilidade; o botão
+// "Mais opções" só aparece se houver ao menos um item visível.
+function setSidebarMoreAdmin(isAdmin) {
+  ['exportDataBtn', 'importDataBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isAdmin ? '' : 'none';
+  });
+  refreshSidebarMore();
+}
+
+function refreshSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(el => el.style.display !== 'none');
+  btn.style.display = any ? '' : 'none';
+  if (!any) closeSidebarMore();
+}
+
+function closeSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function openSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  menu.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  // A sidebar tem overflow:hidden, então o popover é fixed e abre ao lado do
+  // botão, alinhado pela base (o botão fica no rodapé).
+  const r = btn.getBoundingClientRect();
+  const sidebar = document.getElementById('sidebar') || btn.closest('.sidebar');
+  const sr = sidebar ? sidebar.getBoundingClientRect() : r;
+  const mobile = window.innerWidth <= 768;
+  const left = mobile ? r.left : sr.right + 6;
+  const bottom = mobile ? window.innerHeight - r.top + 6 : window.innerHeight - r.bottom;
+  menu.style.left = Math.max(8, left) + 'px';
+  menu.style.bottom = Math.max(8, bottom) + 'px';
+  const first = Array.from(menu.querySelectorAll('.sidebar-more-item')).find(el => el.style.display !== 'none');
+  if (first) first.focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (menu.hidden) openSidebarMore(); else closeSidebarMore();
+  });
+  menu.addEventListener('click', e => {
+    const item = e.target.closest('.sidebar-more-item');
+    if (!item) return;
+    closeSidebarMore();
+    if (window.innerWidth <= 768 && typeof window.closeMobileMenu === 'function') window.closeMobileMenu();
+    const fn = window[item.dataset.moreAction];
+    if (typeof fn === 'function') fn();
+  });
+  menu.addEventListener('keydown', e => {
+    const items = Array.from(menu.querySelectorAll('.sidebar-more-item')).filter(el => el.style.display !== 'none');
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) closeSidebarMore();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !menu.hidden) { closeSidebarMore(); btn.focus(); }
+  });
+  window.addEventListener('resize', closeSidebarMore);
+  refreshSidebarMore();
+});
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   _deferredInstall = e;
