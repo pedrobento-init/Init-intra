@@ -1179,31 +1179,33 @@ document.addEventListener('keydown', e => {
 });
 
 // ── ALERTAS PROATIVOS DE PRAZOS ──
+// Só avisa do que vence hoje ou amanhã. Pendência já vencida/atrasada não gera
+// mais alerta (pedido do Pedro); ela segue aparecendo no dashboard e nas listas.
 function checkOverdueAlerts() {
   if (typeof getSession === 'function' && !getSession()) return;
   if (typeof getPendencias !== 'function') return;
   const pens = typeof getMyPendencias === 'function' ? getMyPendencias() : getPendencias();
   const now = new Date();
   const todayStr = localDateISO(now);
-  
+
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = localDateISO(tomorrow);
 
-  const overdue = pens.filter(p => p.deadline && p.deadline <= todayStr && !isPendenciaClosed(p.status));
+  const dueToday = pens.filter(p => p.deadline && p.deadline === todayStr && !isPendenciaClosed(p.status));
   const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !isPendenciaClosed(p.status));
 
-  if (overdue.length > 0 || dueTomorrow.length > 0) {
+  if (dueToday.length > 0 || dueTomorrow.length > 0) {
     let msg = '';
-    if (overdue.length > 0 && dueTomorrow.length > 0) {
-      msg = `⚠️ ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} e ${dueTomorrow.length} vencendo amanhã!`;
-    } else if (overdue.length > 0) {
-      msg = `⚠️ Você possui ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} ou vencendo hoje!`;
+    if (dueToday.length > 0 && dueTomorrow.length > 0) {
+      msg = `⏰ ${plural(dueToday.length, 'pendência vence', 'pendências vencem')} hoje e ${dueTomorrow.length} amanhã!`;
+    } else if (dueToday.length > 0) {
+      msg = `⏰ Você possui ${plural(dueToday.length, 'pendência', 'pendências')} vencendo hoje!`;
     } else {
       msg = `⏰ Você possui ${plural(dueTomorrow.length, 'pendência', 'pendências')} vencendo amanhã!`;
     }
 
-    showToast(msg, overdue.length > 0 ? 'error' : 'info');
+    showToast(msg, 'info');
 
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Init Intra – Alerta de Prazos', {
@@ -1216,14 +1218,14 @@ function checkOverdueAlerts() {
   }
 
   // Render persistent banner if on dashboard or pendencias page
-  renderOverdueBanner(overdue.length, dueTomorrow.length);
+  renderOverdueBanner(dueToday.length, dueTomorrow.length);
 }
 
-function renderOverdueBanner(overdueCount, dueTomorrowCount) {
+function renderOverdueBanner(dueTodayCount, dueTomorrowCount) {
   const existing = document.getElementById('overdueBanner');
   if (existing) existing.remove();
 
-  if (overdueCount === 0 && dueTomorrowCount === 0) return;
+  if (dueTodayCount === 0 && dueTomorrowCount === 0) return;
 
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   if (!['dashboard', 'pendencias', 'calendario'].includes(hash)) return;
@@ -1236,9 +1238,9 @@ function renderOverdueBanner(overdueCount, dueTomorrowCount) {
   banner.className = 'overdue-banner';
   banner.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:16px">${overdueCount > 0 ? '🚨' : '⏰'}</span>
+      <span style="font-size:16px">⏰</span>
       <span>
-        ${overdueCount > 0 ? `<strong>${plural(overdueCount, 'pendência vencida', 'pendências vencidas')}</strong>.` : ''}
+        ${dueTodayCount > 0 ? `<strong>${plural(dueTodayCount, 'pendência vence', 'pendências vencem')} hoje</strong>.` : ''}
         ${dueTomorrowCount > 0 ? ` ${plural(dueTomorrowCount, 'pendência', 'pendências')} vencendo amanhã.` : ''}
       </span>
     </div>
