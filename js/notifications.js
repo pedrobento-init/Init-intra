@@ -19,16 +19,12 @@ function getNotifPrefs() {
       onPendenciaCreate: true,
       onPendenciaUpdate: true,
       onPendenciaNote: true,
-      onDeadlineReminder: true,
-      reminderDaysBefore: 2,
     };
   } catch {
     return {
       onPendenciaCreate: true,
       onPendenciaUpdate: true,
       onPendenciaNote: true,
-      onDeadlineReminder: true,
-      reminderDaysBefore: 2,
     };
   }
 }
@@ -110,6 +106,7 @@ function describeEmailError(detail) {
   const msg = String(d.message || '');
   if (d.status === 404) return 'A função send-email não está publicada no Supabase (Edge Functions).';
   if (d.code === 'unauthorized' || d.status === 401) return 'A função recusou o acesso: entre de novo no site.';
+  if (d.code === 'recipient_not_allowed') return 'Só é possível enviar para e-mails de operadores ativos cadastrados.';
   if (d.code === 'missing_credentials' || /GMAIL_USER|GMAIL_APP_PASSWORD/.test(msg)) {
     return 'Faltam GMAIL_USER e GMAIL_APP_PASSWORD nos Secrets das Edge Functions do Supabase.';
   }
@@ -412,86 +409,9 @@ function notifyPendenciaNote(pendencia, note) {
   });
 }
 
-// ── Lembrete de Prazo (chamado pelo cron job ou manualmente) ──
-function notifyDeadlineReminder(pendencia, daysLeft) {
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
-  if (!recipients.length) return;
-
-  const urgency = daysLeft <= 0 ? 'vence HOJE' : daysLeft === 1 ? 'vence AMANHÃ' : `vence em ${daysLeft} dias`;
-  const urgencyColor = daysLeft <= 0 ? '#dc2626' : daysLeft <= 1 ? '#d97706' : '#1a56db';
-  const urgencyBg = daysLeft <= 0 ? '#fef2f2' : daysLeft <= 1 ? '#fffbeb' : '#eff6ff';
-
-  const html = emailBody(`
-    <div style="margin-bottom:16px">
-      <div style="display:inline-block;background:${urgencyColor}15;color:${urgencyColor};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">⏰ Lembrete de Prazo</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
-    </div>
-    <div style="background:${urgencyBg};border:1px solid ${urgencyColor}30;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
-      <div style="font-size:24px;font-weight:800;color:${urgencyColor};margin-bottom:4px">${urgency}</div>
-      <div style="font-size:13px;color:#64748b">Prazo: ${formatDate(parseDeadline(pendencia.deadline))}</div>
-    </div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
-      <tr>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b;width:120px"><strong>Cliente</strong></td>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(pendencia.clientName || '—')}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;font-size:12px;color:#64748b"><strong>Responsável</strong></td>
-        <td style="padding:8px 12px;font-size:13px">${escapeHtml(pendencia.responsible || '—')}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b"><strong>Prioridade</strong></td>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px;color:${priorityColor(pendencia.priority)};font-weight:600">${priorityLabel(pendencia.priority)}</td>
-      </tr>
-    </table>
-    <div style="text-align:center;margin-top:20px">
-      <a href="${window.location.origin}${window.location.pathname}#pendencias" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
-    </div>
-  `);
-
-  sendEmailNotification({
-    to: recipients,
-    subject: `[Init Intra] ⏰ Prazo ${urgency}: ${getPendenciaTitulo(pendencia)}`,
-    html,
-  });
-}
-
-// ── Verificação de Prazos (chamado no init e periodicamente) ──
-function checkDeadlineReminders() {
-  if (typeof getSession === 'function' && !getSession()) return;
-  const prefs = getNotifPrefs();
-  if (!prefs.onDeadlineReminder) return;
-
-  const pens = (typeof getMyPendencias === 'function') ? getMyPendencias() : getPendencias();
-  const today = new Date();
-
-  const reminderDays = prefs.reminderDaysBefore || 2;
-
-  pens.forEach(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return; } catch (_) {}
-    if (!p.deadline || isPendenciaClosed(p.status)) return;
-
-    const deadline = parseDeadline(p.deadline);
-    const diffMs = deadline - today;
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    // Só antes do prazo (até o dia). Vencida/atrasada não gera mais e-mail.
-    if (diffDays <= reminderDays && diffDays >= 0) {
-      const sentKey = `notif_sent_${p.id}_${p.deadline}`;
-      if (!sessionStorage.getItem(sentKey)) {
-        notifyDeadlineReminder(p, diffDays);
-        sessionStorage.setItem(sentKey, '1');
-      }
-    }
-  });
-}
-
-// Auto-check reminders on load
-if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => setTimeout(() => {
-    checkDeadlineReminders();
-  }, 3000));
-}
+// Lembretes de prazo e avisos de vencimento: enviados pelo servidor, uma vez
+// por dia (Edge Function avisos-prazo + cron, migration 051). Antes o
+// navegador de quem abria o site disparava, e o mesmo e-mail se repetia.
 
 // ── UI: Modal de Configurações de Notificação ──
 function openNotifSettings() {
@@ -524,14 +444,10 @@ function openNotifSettings() {
 
     <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Lembretes de Prazo</div>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_deadline" ${prefs.onDeadlineReminder ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
-        <span>Enviar lembretes automáticos</span>
-      </label>
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 0 0 26px;font-size:13px">
-        <span style="color:var(--text-muted)">Dias antes do prazo:</span>
-        <input type="number" id="pref_reminderDays" value="${prefs.reminderDaysBefore || 2}" min="1" max="14" style="width:60px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:center">
-      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0">
+        Enviados automaticamente pelo servidor às 8h: pendências 2 dias antes e no dia do prazo,
+        vencimentos 30 e 7 dias antes e no dia. Cada lembrete sai uma vez só.
+      </p>
     </div>
 
     <div style="margin-bottom:20px">
@@ -554,8 +470,6 @@ function saveNotifSettings() {
     onPendenciaCreate: document.getElementById('pref_pendCreate').checked,
     onPendenciaUpdate: document.getElementById('pref_pendUpdate').checked,
     onPendenciaNote: document.getElementById('pref_pendNote').checked,
-    onDeadlineReminder: document.getElementById('pref_deadline').checked,
-    reminderDaysBefore: parseInt(document.getElementById('pref_reminderDays').value) || 2,
   };
   saveNotifPrefs(prefs);
   document.getElementById('notifModalOverlay').style.display = 'none';

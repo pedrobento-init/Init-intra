@@ -16,6 +16,9 @@
 // SEGURANÇA: só um operador ativo logado envia. A anon key é pública (vai no
 // site), então sem esta checagem qualquer um usaria o domínio para mandar
 // e-mail para qualquer endereço. O remetente é fixo (o app não escolhe).
+// Destinatário só pode ser e-mail de operador ativo cadastrado (lido com
+// service_role, sem depender do RLS): nem um login válido manda e-mail para
+// fora da empresa em nome do Init Intra.
 // DIAGNÓSTICO: o erro do Gmail volta (code + mensagem) para o app, que mostra
 // no "Enviar e-mail de teste" e grava em Erros do app.
 
@@ -29,6 +32,7 @@ const GMAIL_FROM = Deno.env.get("GMAIL_FROM") || GMAIL_USER;
 const FROM_NAME = "Init Intra";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +83,17 @@ serve(async (req: Request) => {
       return json({ error: "Destinatário inválido" }, 400);
     }
     if (!subject || !html) return json({ error: "Assunto e corpo do e-mail obrigatórios" }, 400);
+
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data: ops, error: opsErr } = await admin.from("operators").select("email, active").not("email", "is", null);
+    if (opsErr) return json({ error: "Não foi possível conferir os destinatários", code: "recipients_check" }, 500);
+    const allowed = new Set(
+      (ops ?? []).filter((o) => o.active !== false).map((o) => String(o.email || "").trim().toLowerCase()).filter(Boolean),
+    );
+    const blocked = recipients.filter((r) => !allowed.has(r.toLowerCase()));
+    if (blocked.length) {
+      return json({ error: "Destinatário fora da lista de operadores ativos: " + blocked.join(", "), code: "recipient_not_allowed" }, 403);
+    }
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
