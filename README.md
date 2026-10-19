@@ -1,77 +1,80 @@
 # Init Intra
 
-Portal intranet para gestao de clientes, pendencias e procedimentos de TI.
+Intranet da Init para gestão de clientes, pendências, visitas e procedimentos de TI.
+SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e publicada na Vercel.
 
 ## Funcionalidades
 
-- **Dashboard** — Visao geral com graficos de prioridade, carga de trabalho, evolucao e ranking
-- **Clientes** — Cadastro completo com dados de servidor, hospedagem, backup, email, licencas e documentos
-- **Pendencias** — Kanban e tabela com status, prioridade, prazo, checklist, notas, anexos e timer
-- **Calendario** — Visualizacao de prazos com filtros por cliente, responsavel, status e prioridade
-- **Procedimentos** — Procedimentos por cliente com templates reutilizaveis
-- **Operadores** — Cadastro de tecnicos com equipes, permissoes e PIN de acesso
-- **Templates** — Modelos de procedimentos aplicaveis a multiplos clientes
-- **Busca global** — `Ctrl+K` para pesquisar clientes e pendencias
+- **Dashboard**: visão geral por perfil (prioridade, carga, evolução, ranking).
+- **Pendências**: quadro kanban e tabela, assunto/descrição, checklist, notas, anexos, timer e horas trabalhadas; pendências de Gestão visíveis só para quem é Gestão.
+- **Visitas**: agenda com recorrência, número da visita, checklist, fotos, relatório e roteiro; feed iCalendar por técnico (Google Agenda, Outlook, iPhone).
+- **Clientes**: ficha completa, abas de inventário, acessos cifrados, equipamentos e relatório do cliente.
+- **Calendário e prazos**: prazos e visitas com filtros.
+- **Vencimentos**: licenças, SSL, domínios, garantias, backup e contratos, com aviso 30 e 7 dias antes e no dia.
+- **Reuniões**, **Base de conhecimento**, **Modelos de procedimento** e **Checklists**.
+- **Milvus**: chamados, atendimentos, dispositivos e importação de clientes.
+- **Operadores**: cadastro com equipes (init, mam, bt), papéis e flags de admin/Gestão.
+- **Busca global**: `Ctrl+K` para clientes, pendências e ações.
+- **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
 
 ## Tecnologias
 
-- **Frontend**: Vanilla JS (SPA), CSS customizado com temas claro/escuro
-- **Calendario**: FullCalendar 6.x
-- **Graficos**: Chart.js
-- **Banco local**: IndexedDB via Dexie.js (offline-first)
-- **Nuvem**: Supabase (PostgreSQL + Realtime WebSockets)
-- **Email**: Gmail do Google Workspace (SMTP) via Supabase Edge Function `send-email`
-- **PWA**: Service Worker com cache offline, instavel como app
+- **Frontend**: JavaScript puro (sem framework), CSS próprio com tema claro/escuro, ações por delegação (`js/actions.js`).
+- **Banco local**: IndexedDB via Dexie.js, com fila de envio (`js/outbox.js`) e sincronização (`js/sync-manager.js`).
+- **Nuvem**: Supabase (PostgreSQL com RLS por equipe, Auth, Realtime, Storage e Edge Functions).
+- **Login**: Supabase Auth (e-mail e senha).
+- **Deploy**: Vercel (`npm run build` gera `build/` com assets minificados e com hash).
+- **PWA**: service worker com cache offline, instalável como app.
 
 ## Estrutura
 
 ```
-Init-intra/
-├── index.html          # Entrada da SPA
-├── manifest.json       # PWA manifest
-├── sw.js               # Service Worker
-├── icon.svg            # Icone do app
-├── css/
-│   └── styles.css      # Todos os estilos (temas, responsivo)
-├── js/
-│   ├── app.js          # Roteador, dashboard, badges
-│   ├── auth.js         # Autenticacao (Supabase Auth + PIN local)
-│   ├── calendar.js     # Pagina de calendario (FullCalendar)
-│   ├── clients.js      # Pagina de clientes + procedimentos
-│   ├── db.js           # IndexedDB (Dexie) + cache em memoria
-│   ├── global-search.js# Busca global (Ctrl+K)
-│   ├── notifications.js# Notificacoes e lembretes de prazo
-│   ├── operadores.js   # Pagina de operadores/tecnicos
-│   ├── pendencias.js   # Pagina de pendencias (kanban + tabela)
-│   ├── storage.js      # Camada de dados (CRUD + sync Supabase)
-│   ├── supabase-config.js # Conexao Supabase + realtime
-│   ├── templates.js    # Modelos de procedimentos
-│   ├── timer.js        # Timer play/pause para pendencias
-│   ├── ui.js           # Componentes reutilizaveis
-│   └── sw-register.js  # Registro do Service Worker
-├── supabase/
-│   ├── functions/
-│   │   └── send-email/ # Edge Function para envio de email
-│   └── migrations/     # Migrations SQL do banco
-└── tests/
-    └── test-validators.js
+index.html            Entrada da SPA (sem handlers inline)
+sw.js                 Service worker
+css/styles.css        Estilos
+js/                   Um arquivo por tela/módulo (storage*, sync*, pendencias*, visitas, clients*, milvus-*, ...)
+tools/                Build (build-config.js gera js/config.js; build-assets.js monta build/)
+supabase/migrations/  Migrations SQL numeradas (aplicar em ordem no SQL Editor)
+supabase/functions/   Edge Functions (Deno)
+tests/                Testes unitários (Vitest)
+e2e/                  Testes de navegador (Playwright)
+.github/workflows/    CI: lint, testes e validação do build em cada PR
 ```
 
-## Instalacao
+### Edge Functions
 
-1. Clone o repositorio
-2. Sirva os arquivos estaticos com qualquer servidor HTTP (ex: `npx serve .`)
-3. Acesse `http://localhost:3000`
-4. Opcional: configure Supabase em Configuracoes → Conexao Cloud para sincronizacao
+| Função | Para quê |
+| --- | --- |
+| `send-email` | Envia e-mail pelo Gmail (SMTP). Só operador logado, só para e-mails de operadores ativos. |
+| `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). |
+| `agenda-ics` | Feed iCalendar da agenda do técnico (token secreto no link). |
+| `ia-relatorio` | Texto de relatório com IA. |
+| `update-user-password` | Admin troca a senha de um usuário. |
+| `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
 
-## Modo Offline
+## Desenvolvimento
 
-O sistema funciona totalmente offline usando IndexedDB local. Ao configurar o Supabase, os dados sincronizam automaticamente entre dispositivos via WebSockets.
+```bash
+npm ci
+cp js/config.example.js js/config.js   # coloque a URL e a anon key do Supabase
+npm run dev                            # vercel dev
+npm test                               # testes unitários
+npm run test:e2e                       # testes de navegador
+npm run lint
+```
 
-## Icones PWA
+Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 
-Abra `tools/generate-icons.html` no navegador para baixar os PNGs (192x192 e 512x512). Coloque os arquivos `icon-192.png` e `icon-512.png` na raiz do projeto e atualize o `manifest.json`.
+## Deploy
 
-## Licenca
+- **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
+- **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
+- **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
+
+## Ícones PWA
+
+Abra `tools/generate-icons.html` no navegador para gerar `icon-192.png` e `icon-512.png`.
+
+## Licença
 
 MIT
