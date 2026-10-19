@@ -5399,6 +5399,20 @@ body.dark-theme #penSlaSummary {
 .pen-board .kanban-cards { padding: 0; gap: 10px; background: transparent; }
 .pen-board .kanban-cards .empty-state p { color: var(--kb-muted); font-size: 13px; margin-bottom: 8px; }
 
+.pen-board .kb-col-empty {
+  border: 1px dashed var(--kb-line); border-radius: 10px;
+  padding: 16px 10px; text-align: center; font-size: 12.5px; line-height: 1.5; color: var(--kb-muted);
+}
+.pen-board .kb-col-new {
+  display: block; margin: 8px auto 0; background: none; border: 0; padding: 2px 6px;
+  font: 600 12.5px Manrope, system-ui, sans-serif; color: var(--kb-accent); cursor: pointer;
+}
+.pen-board .kb-col-new:hover { text-decoration: underline; }
+/* Colunas vazias estreitas no desktop: as com cards ganham a largura. */
+@media (min-width: 769px) {
+  .pen-board .kanban-col.is-empty { flex: 0 0 210px; min-width: 210px; }
+}
+
 /* ── Card da pendência ── */
 .pen-board .kanban-card {
   background: var(--kb-raised);

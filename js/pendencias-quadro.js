@@ -177,7 +177,9 @@ function renderPenKanban(area) {
       // decorativo fixo ao lado do botão, que também mostrava um relógio).
       var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : PEN_ICO_CLK;
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : 'Ordenado por criação';
-      return '<section class="kanban-col" style="--c:' + penColColor(col.id) + '"' +
+      // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
+      // as colunas com cards caberem na tela sem rolagem lateral.
+      return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" style="--c:' + penColColor(col.id) + '"' +
         ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
         ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
         ' ondragleave="this.classList.remove(\'drag-over\')"' +
@@ -189,13 +191,13 @@ function renderPenKanban(area) {
           '</h2>' +
           '<span class="kanban-col-aside">' +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' +
+            (cards.length ? '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' : '') +
           '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
           (cards.length
             ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-            : '<div class="empty-state" style="padding:18px 10px"><p>Nenhuma pendência</p><button class="btn btn-secondary btn-sm" onclick="openPendenciaForm()">+ Nova Pendência</button></div>') +
+            : '<div class="kb-col-empty">Nenhuma pendência.<br>Arraste um card para cá.<button type="button" class="kb-col-new" onclick="openPendenciaForm()">+ Nova</button></div>') +
         '</div>' +
       '</section>';
     }).join('') +
