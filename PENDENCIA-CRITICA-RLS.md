@@ -30,6 +30,9 @@ SELECT table_name, privilege_type FROM information_schema.role_table_grants
 
 Tudo como esperado: nada a fazer. Algo diferente: siga o passo 2.
 
+Se a consulta d) mostrar só `v_notification_stats`, rode a migration
+`052_view_notificacoes_fechada.sql` (a view antiga da 003 ficou aberta).
+
 ## 2. Aplicar (só se a conferência falhar)
 
 1. Faça um backup (Database → Backups) e guarde as policies atuais:
