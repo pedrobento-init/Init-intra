@@ -1485,11 +1485,7 @@ function showLoginScreen() {
 
   content.innerHTML = `
     <div class="login-header">
-      <div class="login-logo">
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-          <text x="50%" y="54%" dominant-baseline="central" text-anchor="middle" fill="#fff" font-family="Manrope,sans-serif" font-weight="800" font-size="22">I</text>
-        </svg>
-      </div>
+      <img src="logo-initnet.svg" alt="InitNET" class="login-brand" width="176" height="56" />
       <div class="login-title">Init Intra</div>
       <div class="login-subtitle">Acesso restrito — identifique-se</div>
     </div>
