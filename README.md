@@ -20,7 +20,7 @@ Portal intranet para gestao de clientes, pendencias e procedimentos de TI.
 - **Graficos**: Chart.js
 - **Banco local**: IndexedDB via Dexie.js (offline-first)
 - **Nuvem**: Supabase (PostgreSQL + Realtime WebSockets)
-- **Email**: Resend API via Supabase Edge Functions
+- **Email**: Gmail do Google Workspace (SMTP) via Supabase Edge Function `send-email`
 - **PWA**: Service Worker com cache offline, instavel como app
 
 ## Estrutura
