@@ -129,7 +129,17 @@ body {
 .sidebar.collapsed .user-info { display: none; }
 .sidebar.collapsed .logo { display: none; }
 .sidebar.collapsed .sidebar-nav a { padding: 10px; justify-content: center; }
-.sidebar.collapsed .badge { display: none; }
+/* Recolhido: o contador vira um ponto no canto do ícone (antes sumia). */
+.sidebar.collapsed .nav-item { position: relative; }
+.sidebar.collapsed .badge { position: absolute; top: 5px; right: 9px; width: 8px; height: 8px; min-width: 0; padding: 0; font-size: 0; border: 2px solid #1d2737; box-sizing: content-box; }
+.sidebar-tip {
+  position: fixed; z-index: 1000; transform: translateY(-50%); pointer-events: none;
+  background: #0f172a; color: #fff; font: 600 12.5px/1.25 Manrope, system-ui, sans-serif;
+  padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(15, 23, 42, .25);
+  opacity: 0; transition: opacity .12s; white-space: nowrap;
+}
+.sidebar-tip.is-on { opacity: 1; }
+.sidebar-tip small { display: block; font-size: 10.5px; font-weight: 600; color: rgba(203, 213, 225, .7); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
 .sidebar.collapsed .sidebar-header { padding: 16px 12px; justify-content: center; }
 .sidebar.collapsed .sidebar-toggle { transform: rotate(180deg); }
 
