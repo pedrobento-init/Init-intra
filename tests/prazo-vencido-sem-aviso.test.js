@@ -40,3 +40,9 @@ describe('alerta na tela', () => {
     expect(UI).toMatch(/p\.deadline === todayStr/);
   });
 });
+
+describe('pendência parada', () => {
+  it('não existe mais e-mail de pendência parada', () => {
+    expect(NOTIF).not.toMatch(/checkStalePendencias|notifyStalePendencia/);
+  });
+});
