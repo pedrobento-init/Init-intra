@@ -260,8 +260,22 @@ function _vencEmail(v, days) {
   return { subject: '[Init Intra] ⏰ ' + (VENC_TIPOS[v.tipo] || 'Vencimento') + ' ' + quando + ': ' + (v.descricao || ''), html: typeof emailBody === 'function' ? emailBody(body) : body };
 }
 
-/** Manda os avisos devidos (uma vez por aviso, marcado no próprio registro). */
-function checkVencimentoReminders() {
+/** Marca no registro os avisos já dados (lê o registro atual: pode ter mudado no meio do envio). */
+function _vencMarcarAvisos(id, marcar) {
+  const cur = (typeof getVencimentoById === 'function' ? getVencimentoById(id) : null) || { avisos: [] };
+  saveVencimento({ id, avisos: [...new Set([...(cur.avisos || []).map(String), ...marcar])] }, { silent: true });
+}
+
+// Avisos em envio ou que falharam nesta sessão: não repete a cada sync.
+// Falhou → tenta de novo na próxima vez que o Intra for aberto.
+const _vencAvisoTentado = new Set();
+
+/**
+ * Manda os avisos devidos (uma vez por aviso, marcado no próprio registro).
+ * Só marca depois que o e-mail sai: antes marcava antes de enviar, e um envio
+ * com falha deixava o aviso como dado sem ninguém receber.
+ */
+async function checkVencimentoReminders() {
   try {
     if (typeof getSession === 'function' && !getSession()) return;
     if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return; // marca precisa sincronizar
@@ -274,12 +288,14 @@ function checkVencimentoReminders() {
     for (const v of (typeof getMyVencimentos === 'function' ? getMyVencimentos() : [])) {
       const due = vencAvisoDevido(v, today);
       if (!due) continue;
+      const key = v.id + ':' + due.aviso + ':' + v.dataVencimento;
+      if (_vencAvisoTentado.has(key)) continue;
       const to = collectRecipients(v.responsavel || '', true);
-      // Marca antes de enviar: outro aparelho que sincronize no meio não repete.
-      saveVencimento({ id: v.id, avisos: [...new Set([...(v.avisos || []).map(String), ...due.marcar])] }, { silent: true });
-      if (!to.length) continue;
+      if (!to.length) { _vencMarcarAvisos(v.id, due.marcar); continue; } // ninguém para avisar
+      _vencAvisoTentado.add(key);
       const mail = _vencEmail(v, vencDaysLeft(v, today));
-      sendEmailNotification({ to, subject: mail.subject, html: mail.html });
+      const res = await sendEmailNotification({ to, subject: mail.subject, html: mail.html });
+      if (res && res.success) _vencMarcarAvisos(v.id, due.marcar);
     }
   } catch (_) {}
 }
@@ -298,7 +314,7 @@ if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !win
   onDataChanged('vencimentos', function () {
     try { updateVencimentosBadge(); } catch (_) {}
     try { if (typeof renderAlertStrip === 'function') renderAlertStrip(); } catch (_) {}
-    // Chegou dado do servidor: confere avisos (debounce; a marca evita repetição).
+    // Chegou dado do servidor: confere avisos (debounce; a marca e _vencAvisoTentado evitam repetição).
     if (_vencCheckTimer) clearTimeout(_vencCheckTimer);
     _vencCheckTimer = setTimeout(checkVencimentoReminders, 5000);
   });
