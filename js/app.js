@@ -794,10 +794,10 @@ function renderDashboard() {
             <svg class="ov-ico ov-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </summary>
           <div class="ov-export-menu" role="menu">
-            ${_dashCanManage ? `<button type="button" role="menuitem" onclick="this.closest('details').open=false;exportClientsCSV()">CSV de clientes</button>` : ''}
-            ${_dashCanManage ? `<button type="button" role="menuitem" onclick="this.closest('details').open=false;exportPendenciasCSV()">CSV de pendências</button>` : ''}
-            ${_dashCanManage ? `<button type="button" role="menuitem" onclick="this.closest('details').open=false;openHoursReport()">Relatório de horas</button>` : ''}
-            <button type="button" role="menuitem" onclick="this.closest('details').open=false;window.print()">Imprimir / PDF</button>
+            ${_dashCanManage ? `<button type="button" role="menuitem" data-action="dashExport" data-arg="exportClientsCSV">CSV de clientes</button>` : ''}
+            ${_dashCanManage ? `<button type="button" role="menuitem" data-action="dashExport" data-arg="exportPendenciasCSV">CSV de pendências</button>` : ''}
+            ${_dashCanManage ? `<button type="button" role="menuitem" data-action="dashExport" data-arg="openHoursReport">Relatório de horas</button>` : ''}
+            <button type="button" role="menuitem" data-action="dashExport" data-arg="print">Imprimir / PDF</button>
           </div>
         </details>
         ${_dashCanManage ? `<button type="button" class="btn btn-primary btn-sm ov-btn" onclick="generateMonthlyReport()">
@@ -1127,6 +1127,15 @@ function renderDashboard() {
     }
   })();
   
+  if (typeof registerActions === 'function' && !window._ovExportOutsideBound) {
+    registerActions({
+      dashExport: (el, what) => {
+        const d = el.closest('details'); if (d) d.open = false;
+        if (what === 'print') window.print();
+        else if (['exportClientsCSV', 'exportPendenciasCSV', 'openHoursReport'].includes(what) && typeof window[what] === 'function') window[what]();
+      },
+    });
+  }
   if (!window._ovExportOutsideBound) {
     window._ovExportOutsideBound = true;
     document.addEventListener('click', (e) => {

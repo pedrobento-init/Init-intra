@@ -197,7 +197,7 @@ function renderPenKanban(area) {
         '<div class="kanban-cards">' +
           (cards.length
             ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-            : '<div class="kb-col-empty">Nenhuma pendência.<br>Arraste um card para cá.<button type="button" class="kb-col-new" onclick="openPendenciaForm()">+ Nova</button></div>') +
+            : '<div class="kb-col-empty">Nenhuma pendência.<br>Arraste um card para cá.<button type="button" class="kb-col-new" data-action="newPendencia">+ Nova</button></div>') +
         '</div>' +
       '</section>';
     }).join('') +

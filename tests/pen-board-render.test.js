@@ -88,7 +88,7 @@ describe('renderPenKanban (modo local)', () => {
     expect(html).not.toContain('Alternar tema');
     expect(html).not.toContain("getElementById('themeToggleBtn').click()");
     expect(html).not.toContain('class="btn btn-primary"');
-    expect(html).toContain('openPendenciaForm()');
+    expect(html).toContain('data-action="newPendencia"');
   });
 
   it('linha-resumo com total, colunas e vencidas', () => {

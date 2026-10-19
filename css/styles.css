@@ -6249,3 +6249,36 @@ textarea[aria-busy="true"] { opacity: .6; }
 .err-count { font-weight: 800; color: var(--st-danger); white-space: nowrap; }
 .err-meta { font-size: 12px; color: var(--ds-muted); margin-top: 2px; }
 .err-list pre { font-size: 11px; white-space: pre-wrap; margin: 6px 0 0; max-height: 200px; overflow: auto; }
+
+/* ── Clientes: lista (padrão) ou cartões ── */
+.cl-view { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--ds-line); border-radius: 10px; background: var(--ds-panel); }
+.cl-view-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; border-radius: 7px; padding: 6px 10px; font: 600 13px Manrope, system-ui, sans-serif; color: var(--ds-muted); cursor: pointer; }
+.cl-view-btn:hover { color: var(--ds-text); }
+.cl-view-btn.is-on { background: var(--ds-raised); color: var(--ds-text); }
+.cl-list .table-wrapper { overflow-x: auto; }
+.cl-table th { background: transparent; }
+.cl-table th .cl-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.cl-table th .cl-sort:hover { color: var(--ds-text); }
+.cl-table td { padding: 10px 12px; }
+.cl-table tbody tr:last-child td { border-bottom: 0; }
+.cl-row { cursor: pointer; }
+.cl-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cl-title { font-weight: 700; color: var(--ds-text); }
+.cl-seg { font-size: 12px; color: var(--ds-muted); }
+.cl-num { text-align: right; font-variant-numeric: tabular-nums; width: 90px; }
+.cl-num.is-over { color: var(--st-danger); font-weight: 700; }
+.cl-health { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--c); white-space: nowrap; }
+.cl-health i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.cl-acts { width: 1%; white-space: nowrap; text-align: right; }
+/* Excluir separado do Editar, discreto até o hover (confirmação + desfazer continuam). */
+.cl-del { width: 1%; padding-left: 20px !important; }
+.cl-del-btn { display: inline-flex; padding: 6px; border: 0; background: none; border-radius: 6px; color: var(--ds-muted); cursor: pointer; opacity: .55; }
+.cl-row:hover .cl-del-btn, .cl-del-btn:focus-visible { opacity: 1; }
+.cl-del-btn:hover { color: var(--st-danger); background: color-mix(in srgb, var(--st-danger) 10%, transparent); }
+@media (max-width: 768px) {
+  /* Celular: nome + números; editar/excluir pela ficha ou no modo cartões. */
+  .cl-table th:nth-child(2), .cl-table td:nth-child(2),
+  .cl-table th:nth-child(n+5), .cl-table td:nth-child(n+5) { display: none; }
+  .cl-num { width: auto; }
+  .cl-view-btn { padding: 6px 8px; }
+}
