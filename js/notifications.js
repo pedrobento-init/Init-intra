@@ -417,7 +417,7 @@ function notifyDeadlineReminder(pendencia, daysLeft) {
   const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
-  const urgency = daysLeft <= 0 ? 'VENCIDA' : daysLeft === 1 ? 'vence AMANHÃ' : `vence em ${daysLeft} dias`;
+  const urgency = daysLeft <= 0 ? 'vence HOJE' : daysLeft === 1 ? 'vence AMANHÃ' : `vence em ${daysLeft} dias`;
   const urgencyColor = daysLeft <= 0 ? '#dc2626' : daysLeft <= 1 ? '#d97706' : '#1a56db';
   const urgencyBg = daysLeft <= 0 ? '#fef2f2' : daysLeft <= 1 ? '#fffbeb' : '#eff6ff';
 
@@ -475,7 +475,8 @@ function checkDeadlineReminders() {
     const diffMs = deadline - today;
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays <= reminderDays && diffDays >= -1) {
+    // Só antes do prazo (até o dia). Vencida/atrasada não gera mais e-mail.
+    if (diffDays <= reminderDays && diffDays >= 0) {
       const sentKey = `notif_sent_${p.id}_${p.deadline}`;
       if (!sessionStorage.getItem(sentKey)) {
         notifyDeadlineReminder(p, diffDays);
