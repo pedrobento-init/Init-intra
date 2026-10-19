@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v49';
-const CDN_CACHE_NAME = 'init-intra-cdn-v49';
+const CACHE_NAME = 'init-intra-v50';
+const CDN_CACHE_NAME = 'init-intra-cdn-v50';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -69,11 +69,11 @@ const STATIC_ASSETS = [
 ];
 
 const CDN_ASSETS = [
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js',
   'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
   'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
   'https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js',
 ];
 

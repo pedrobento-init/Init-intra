@@ -42,3 +42,21 @@ describe('SRI dos scripts de terceiros no index.html', () => {
     }
   });
 });
+
+// Scripts carregados sob demanda (Chart.js, FullCalendar) também precisam de
+// versão fixa e SRI: `npm/chart.js` sem versão entrega sempre a última.
+describe('scripts carregados sob demanda (js/ui.js)', () => {
+  const ui = fs.readFileSync(fileURLToPath(new URL('../js/ui.js', import.meta.url)), 'utf8');
+  const calls = [...ui.matchAll(/loadScript\(\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)/g)];
+
+  it('há chamadas para validar', () => {
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('cada URL tem versão exata e integrity sha384', () => {
+    for (const [, url, sri] of calls) {
+      expect(url, url).toMatch(/@\d+\.\d+\.\d+\//);
+      expect(sri || '', url).toMatch(/^sha384-[A-Za-z0-9+/=]+$/);
+    }
+  });
+});

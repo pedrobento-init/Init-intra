@@ -1,12 +1,13 @@
 // ui.js – Componentes reutilizáveis
 
 const _loadedScripts = new Set();
-function loadScript(url) {
+function loadScript(url, integrity) {
   if (_loadedScripts.has(url)) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = url;
     s.crossOrigin = 'anonymous';
+    if (integrity) s.integrity = integrity;
     s.onload = () => { _loadedScripts.add(url); resolve(); };
     s.onerror = () => reject(new Error('Falha ao carregar: ' + url));
     document.head.appendChild(s);
@@ -15,12 +16,20 @@ function loadScript(url) {
 
 async function loadChartJs() {
   if (typeof Chart !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/chart.js');
+  // Versão fixa + SRI: sem versão o CDN entrega sempre a última e uma
+  // major nova pode quebrar os gráficos do dia para a noite.
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+    'sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ'
+  );
 }
 
 async function loadFullCalendar() {
   if (typeof FullCalendar !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js');
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
+    'sha384-RvFLqUoLENXxwOpLf9+DxOdYK1gR2w9NIQ7uN31j65tKiMpSD6qEJ8Rt6I2WQ/H/'
+  );
 }
 
 function debounce(func, wait) {
