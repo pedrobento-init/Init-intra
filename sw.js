@@ -36,6 +36,7 @@ const STATIC_ASSETS = [
   'js/calendar.js',
   'js/visitas.js',
   'js/visit-photos.js',
+  'js/visit-signature.js',
   'js/ia-relatorio.js',
   'js/templates.js',
   'js/global-search.js',
