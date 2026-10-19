@@ -4325,10 +4325,21 @@ body.dark-theme .ov-wrap {
 @media (max-width: 768px) {
   /* Ações do dashboard numa faixa rolável (antes: 3 linhas de botões
      empurrando o conteúdo para baixo). */
-  .ov-bar .ov-acts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; padding-bottom: 2px; }
+  /* Com as exportações num menu só, os botões cabem em 1-2 linhas; sem
+     overflow para o menu "Exportar" não ser cortado. */
+  .ov-bar .ov-acts { flex-wrap: wrap; max-width: 100%; }
   .ov-bar .ov-acts::-webkit-scrollbar { display: none; }
   .ov-bar .dash-export-btns .btn { flex: none; }
 }
+/* Menu "Exportar" do dashboard (CSV, horas, PDF num botão só) */
+.ov-export { position: relative; }
+.ov-export > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.ov-export > summary::-webkit-details-marker { display: none; }
+.ov-export[open] > summary .ov-caret { transform: rotate(180deg); }
+.ov-export-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 200px; display: flex; flex-direction: column; padding: 6px; background: var(--ov-panel); border: 1px solid var(--ov-line); border-radius: 10px; box-shadow: 0 10px 30px rgba(15, 23, 42, .14); }
+.ov-export-menu button { text-align: left; background: none; border: 0; border-radius: 6px; padding: 9px 10px; font: 600 13px Manrope, system-ui, sans-serif; color: var(--ov-text); cursor: pointer; }
+.ov-export-menu button:hover, .ov-export-menu button:focus-visible { background: var(--ov-raised); }
+.ov-sec-t.ov-sec-first { margin-top: 0; }
 .ov-ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .ov-wrap .btn.ov-btn { border-radius: 8px; font-family: Manrope, system-ui, sans-serif; font-weight: 600; font-size: 13px; box-shadow: none; transition: background .15s, border-color .15s, color .15s; }
 .ov-wrap .btn-secondary.ov-btn { background: var(--ov-panel); border: 1px solid var(--ov-line); color: var(--ov-text); }
