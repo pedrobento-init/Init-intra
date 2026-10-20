@@ -10,6 +10,8 @@ test.describe('Pendências', () => {
   test('criar pendência pelo formulário aparece em "Aberto"', async ({ page }) => {
     await page.locator('#topbarActionBtn').click();
     const modal = page.locator('#modal');
+    // O botão abre a versão rápida; o formulário completo fica a um clique.
+    await modal.getByRole('button', { name: 'Formulário completo' }).click();
     await expect(modal.locator('#modalTitle')).toHaveText('Nova Pendência');
     await modal.locator('[name="assunto"]').fill('E2E — trocar nobreak');
     await modal.locator('[name="descricao"]').fill('Criada pelo teste ponta a ponta.');
@@ -56,6 +58,7 @@ test.describe('Pendências', () => {
   test('nova pendência a partir de modelo já nasce com checklist', async ({ page }) => {
     await page.locator('#topbarActionBtn').click();
     const modal = page.locator('#modal');
+    await modal.getByRole('button', { name: 'Formulário completo' }).click();
     const tplValue = await modal.locator('#penTemplateSel option', { hasText: 'Onboarding' }).first().getAttribute('value');
     await modal.locator('#penTemplateSel').selectOption(tplValue);
     await expect(modal.locator('#penTemplateHint')).toContainText('checklist');

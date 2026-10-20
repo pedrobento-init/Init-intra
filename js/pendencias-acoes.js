@@ -273,7 +273,12 @@ function _penFriendlyTime(p) {
 function quickUpdatePendenciaField(id, field, value) {
   var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
   if (!p) return;
-  if (['priority', 'deadline', 'responsible'].indexOf(field) === -1) return;
+  // Cópia: o registro guardado só muda via savePendencia (que compara antes/depois, ex.: SLA da 1ª resposta).
+  p = Object.assign({}, p);
+  if (['priority', 'deadline', 'responsible', 'canal', 'categoria', 'solicitante'].indexOf(field) === -1) return;
+  if (field === 'canal' && value && typeof PEN_CANAIS !== 'undefined' && !PEN_CANAIS.some(function (c) { return c.value === value; })) return;
+  if (field === 'categoria' && value && typeof PEN_CATEGORIAS !== 'undefined' && !PEN_CATEGORIAS.some(function (c) { return c.value === value; })) return;
+  if (field === 'solicitante') value = String(value || '').trim().slice(0, 120);
   if (field === 'priority' && ['baixa', 'media', 'alta', 'critica'].indexOf(value) === -1) {
     if (typeof showToast === 'function') showToast('Prioridade inválida.', 'error');
     openPendenciaDetail(id);

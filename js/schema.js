@@ -45,10 +45,14 @@ const ENTITIES = [
       reviewed_in_meeting: 'reviewedInMeeting',
       timer_running: 'timerRunning', timer_started_at: 'timerStartedAt', timer_total_seconds: 'timerTotalSeconds',
       timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt',
-      responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId'
+      responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId',
+      solicitante: 'solicitante', canal: 'canal', categoria: 'categoria',
+      first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy'
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
-    optionalFields: ['responsible_id', 'timer_operator_id'],
+    // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
+    optionalFields: ['responsible_id', 'timer_operator_id', 'solicitante', 'canal', 'categoria',
+      'first_response_due', 'first_response_at', 'first_response_by'],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);

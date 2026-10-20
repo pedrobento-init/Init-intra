@@ -917,7 +917,7 @@ function renderDashboard() {
           <div class="ov-ph"><h2 class="ov-h2" id="ov-acoes">Ações rápidas</h2>${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="dashGoPresentation()"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>Apresentar reunião</button>` : ''}</div>
           <div class="ov-acts-big">
             ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button type="button" class="btn btn-primary ov-btn ov-big" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Novo cliente</button>` : ''}
-            <button type="button" class="btn btn-secondary ov-btn ov-big" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaForm(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova pendência</button>
+            <button type="button" class="btn btn-secondary ov-btn ov-big" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaRapida(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova pendência</button>
             <button type="button" class="btn btn-secondary ov-btn ov-big" onclick="navigateTo('visitas');setTimeout(()=>openVisitForm(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova visita</button>
           </div>
         </section>
