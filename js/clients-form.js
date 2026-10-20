@@ -492,6 +492,7 @@ async function handleImportFile(input) {
     reader.onload = async function(e) {
       try {
         const arrayBuffer = e.target.result;
+        const mammoth = await loadLib('mammoth');
         const result = await mammoth.convertToHtml({ arrayBuffer });
         const html = result.value;
         _importRows = extractRowsFromHtmlTable(html);

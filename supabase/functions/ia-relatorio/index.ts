@@ -19,7 +19,7 @@
 // - Sem rate limit próprio (como as outras funções, SEC-16): monitorar uso.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
 import Anthropic from "npm:@anthropic-ai/sdk@0.131.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";

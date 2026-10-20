@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v51';
-const CDN_CACHE_NAME = 'init-intra-cdn-v51';
+const CACHE_NAME = 'init-intra-v52';
+const CDN_CACHE_NAME = 'init-intra-cdn-v52';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   'css/styles.css',
   'js/schema.js',
   'js/error-log.js',
+  'js/lazy-libs.js',
   'js/actions.js',
   'js/supabase-config.js',
   'js/db.js',
@@ -75,11 +76,13 @@ const STATIC_ASSETS = [
 const CDN_ASSETS = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js',
   'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
-  'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js',
+  // Agenda e gráficos (carregados sob demanda por js/ui.js) seguem aqui para
+  // funcionar offline mesmo antes do primeiro uso.
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js',
 ];
+// xlsx, mammoth e motion vêm sob demanda (js/lazy-libs.js) e entram no cache
+// na primeira vez que são usados (importar/exportar planilha e .docx pede rede).
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

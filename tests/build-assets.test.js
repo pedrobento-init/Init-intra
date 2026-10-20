@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 const require = createRequire(import.meta.url);
-const { buildAssets, shortHash, parseLocalScripts } = require('../tools/build-assets.js');
+const { buildAssets, shortHash, parseLocalScripts, minifyCss } = require('../tools/build-assets.js');
 
 const INDEX = '<html><head><link rel="stylesheet" href="css/styles.css" /></head><body>\n' +
   '<script src="https://cdn.jsdelivr.net/npm/x@1/x.min.js"></script>\n' +
@@ -75,5 +75,33 @@ describe('build-assets', () => {
   it('shortHash estável e curto', () => {
     expect(shortHash('x')).toHaveLength(8);
     expect(shortHash('x')).toBe(shortHash('x'));
+  });
+});
+
+describe('minifyCss', () => {
+  it('tira comentários e espaços sem mudar o significado', () => {
+    const src = `/* topo */
+.a , .b {
+  color : red ;
+  margin: 0 auto;  /* fim */
+}
+@media (max-width: 768px) {
+  .c > .d { padding: 4px 8px; }
+}
+`;
+    expect(minifyCss(src)).toBe('.a,.b{color :red;margin:0 auto}@media (max-width:768px){.c > .d{padding:4px 8px}}');
+  });
+
+  it('preserva o espaço antes de ":" (seletor descendente), calc e textos entre aspas', () => {
+    expect(minifyCss('.x :hover { width: calc(100% - 10px); }')).toBe('.x :hover{width:calc(100% - 10px)}');
+    expect(minifyCss('.q::after { content: "a ; b  { c }  /* d */"; font-family: "Open Sans", sans-serif; }'))
+      .toBe('.q::after{content:"a ; b  { c }  /* d */";font-family:"Open Sans",sans-serif}');
+    expect(minifyCss("a[title='x  y'] { grid-template-areas: 'a b' 'c d'; }")).toBe("a[title='x  y']{grid-template-areas:'a b' 'c d'}");
+  });
+
+  it('o build publica o CSS minificado', async () => {
+    const dir = fixture();
+    const r = await buildAssets(dir, { check: true });
+    expect(r.manifest.css['css/styles.css']).toMatch(/^assets\/css\/styles\.[0-9a-f]{8}\.min\.css$/);
   });
 });

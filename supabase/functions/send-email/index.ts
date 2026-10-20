@@ -23,7 +23,7 @@
 // no "Enviar e-mail de teste" e grava em Erros do app.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
 import nodemailer from "npm:nodemailer@6.9.16";
 
 const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
