@@ -294,6 +294,20 @@ function uniquePendenciaId(list) {
   } while (list.some(p => p.id === id));
   return id;
 }
+// Colunas da 056 (remoto, local). Antes da migration o banco não as tem.
+const _PEN_056_COLS = [['solicitante', 'solicitante'], ['canal', 'canal'], ['categoria', 'categoria'],
+  ['first_response_due', 'firstResponseDue'], ['first_response_at', 'firstResponseAt'], ['first_response_by', 'firstResponseBy']];
+let _penWarned056 = false;
+function _penMissingColumn(err) {
+  return !!err && (err.code === 'PGRST204' || err.code === '42703' || /column/i.test(err.message || ''));
+}
+function _penHas056(row) { return _PEN_056_COLS.some(function (c) { return c[0] in row; }); }
+function _penWithout056(row) {
+  const out = Object.assign({}, row);
+  _PEN_056_COLS.forEach(function (c) { delete out[c[0]]; });
+  return out;
+}
+
 function savePendencia(data) {
   // Gestão: só Felipe/Joarli criam ou convertem para Gestão.
   try {
@@ -337,9 +351,17 @@ function savePendencia(data) {
     }
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   let oldStatus = null;
+  // SLA (056): prazo da 1ª resposta e registro da 1ª resposta (js/sla.js).
+  var _slaActor = '';
+  try { _slaActor = typeof getUser === 'function' ? (getUser().name || '') : ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  var _sla = function (prev, cur) {
+    try { if (typeof slaOnSave === 'function') slaOnSave(prev, cur, now, _slaActor); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    ['firstResponseDue', 'firstResponseAt', 'firstResponseBy'].forEach(function (k) { if (cur[k] && cur !== data) data[k] = cur[k]; });
+    return cur;
+  };
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
+    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], _sla(list[i], { ...list[i], ...data, updatedAt: now }));
     } else {
       // Undo/restauração: o id original já vem no snapshot — preservá-lo
       // mantém links, anexos e visitId. Só gera id novo quando não há um.
@@ -354,6 +376,7 @@ function savePendencia(data) {
     data.createdAt = now;
     data.updatedAt = now;
     data.status = data.status || 'em_andamento';
+    _sla(null, data);
     list.push(data);
   }
   // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição
@@ -414,6 +437,7 @@ function savePendencia(data) {
           tags: data.tags || [],
           team: data.team || 'init',
           recurrence: data.recurrence,
+          solicitante: data.solicitante, canal: data.canal, categoria: data.categoria,
           // O checklist da rotina (ex.: passos do backup) segue para a próxima,
           // desmarcado — antes a nova ocorrência nascia sem checklist.
           checklist: (Array.isArray(data.checklist) ? data.checklist : [])
@@ -472,6 +496,9 @@ function savePendencia(data) {
     created_at: _full.createdAt || now,
     updated_at: now
   };
+  // Atendimento e SLA (056): só vão quando o registro tem o campo, e caem
+  // fora num 2º envio se o banco ainda não tiver as colunas (PGRST204).
+  _PEN_056_COLS.forEach(function (c) { if (_full[c[1]] !== undefined) _remotePen[c[0]] = _full[c[1]] || null; });
   function _enqueuePen(reason) {
     try {
       if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', _full);
@@ -486,7 +513,13 @@ function savePendencia(data) {
       _enqueuePen('offline-counted'); // dbSet acima já contou 1 pendência
     } else if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
       supabaseClient.from('pendencias').upsert(_remotePen).then(res => {
-        if (res.error) {
+        if (res && res.error && _penMissingColumn(res.error) && _penHas056(_remotePen)) {
+          if (!_penWarned056) { _penWarned056 = true; console.warn('⚠️ Supabase pendências sem as colunas da migration 056 — enviando sem solicitante/canal/categoria/SLA.'); }
+          return supabaseClient.from('pendencias').upsert(_penWithout056(_remotePen));
+        }
+        return res;
+      }).then(res => {
+        if (res && res.error) {
           console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message);
           if (typeof _isConnectivityError === 'function' && _isConnectivityError(res.error)) _enqueuePen('push-failed');
           else if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
@@ -661,8 +694,12 @@ function addPendenciaNote(id, text, author) {
   if (!list[i].notes) list[i].notes = [];
   var mentionedOperators = parseMentionedOperators(text);
   const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators };
+  const _prevSla = { ...list[i], notes: list[i].notes.slice() };
   list[i].notes.push(note);
   list[i].updatedAt = new Date().toISOString();
+  // 1ª resposta (056): a primeira nota da equipe conta como resposta.
+  try { if (typeof slaOnSave === 'function') slaOnSave(_prevSla, list[i], list[i].updatedAt, author); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  const _respondeuAgora = !_prevSla.firstResponseAt && !!list[i].firstResponseAt;
   dbSet(DB.PENDENCIAS, list);
 
   // Notificação por e-mail (não bloqueia a operação)
@@ -679,6 +716,12 @@ function addPendenciaNote(id, text, author) {
       notes: list[i].notes,
       updated_at: list[i].updatedAt
     }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    // Separado da nota: se o banco ainda não tiver a 056, só isto falha.
+    if (_respondeuAgora) {
+      supabaseClient.from('pendencias').update({ first_response_at: list[i].firstResponseAt, first_response_by: list[i].firstResponseBy || null })
+        .eq('id', id).then(res => { if (res.error && !_penMissingColumn(res.error) && typeof _logSilent === 'function') _logSilent(new Error(res.error.message), 'storage-pendencias:1a-resposta'); })
+        .catch(() => {});
+    }
   }
   return true;
 }

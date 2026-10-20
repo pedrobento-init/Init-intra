@@ -1,5 +1,5 @@
-const CACHE_NAME = 'init-intra-v50';
-const CDN_CACHE_NAME = 'init-intra-cdn-v50';
+const CACHE_NAME = 'init-intra-v51';
+const CDN_CACHE_NAME = 'init-intra-cdn-v51';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
@@ -31,6 +31,8 @@ const STATIC_ASSETS = [
   'js/pendencias-acoes.js',
   'js/pendencias-detalhe.js',
   'js/pendencias-comando.js',
+  'js/sla.js',
+  'js/pendencias-rapida.js',
   'js/operadores.js',
   'js/notifications.js',
   'js/calendar.js',

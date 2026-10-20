@@ -119,12 +119,12 @@ function _prazosLoadGroup() {
   if (_prazosGroupBy) return _prazosGroupBy;
   let v = 'responsavel';
   try { v = localStorage.getItem(PRAZOS_GROUP_KEY) || v; } catch (_) {}
-  _prazosGroupBy = v === 'cliente' ? 'cliente' : 'responsavel';
+  _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   return _prazosGroupBy;
 }
 
 function setPrazosGroup(v) {
-  _prazosGroupBy = v === 'cliente' ? 'cliente' : 'responsavel';
+  _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   _prazosOpen = new Set();
   try { localStorage.setItem(PRAZOS_GROUP_KEY, _prazosGroupBy); } catch (_) {}
   renderPrazos();
@@ -181,6 +181,80 @@ function _prazosPct(pct) {
   return '<span class="pz-pct ' + cls + '">' + pct + '%</span>';
 }
 
+const _pzKpi = (n, label, cls, extra) => '<div class="ov-k ov-k-static ' + (cls || '') + '"><b>' + n + '</b><span>' + label + (extra ? ' <small>' + extra + '</small>' : '') + '</span></div>';
+
+// ── 1ª resposta (056) ──
+function _prazosRespostaHtml(pens) {
+  if (typeof buildRespostaKpis !== 'function') return '';
+  const now = Date.now();
+  const r = buildRespostaKpis(pens, now, 30);
+  if (!r.aguardando && !r.respondidas) return '';
+  const esperando = pens.map((p) => ({ p, st: slaRespostaEstado(p, now) }))
+    .filter((x) => ['atrasada', 'vence_logo', 'no_prazo'].includes(x.st.estado))
+    .sort((a, b) => String(a.p.firstResponseDue).localeCompare(String(b.p.firstResponseDue)));
+  const row = (x) => {
+    const p = x.p;
+    const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
+    const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
+    const quando = x.st.estado === 'atrasada'
+      ? '<span class="fila-due is-over">Atrasada ' + slaDuracaoCurta(x.st.minutos) + '</span>'
+      : '<span class="fila-due' + (x.st.estado === 'vence_logo' ? ' is-soon' : '') + '">Responder em ' + slaDuracaoCurta(x.st.minutos) + '</span>';
+    const meta = (p.clientName || 'Interno') + (p.solicitante ? ' · ' + p.solicitante : '') + ' · ' + (p.responsible || 'Sem responsável');
+    return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
+      '<span class="fila-dot" style="--c:' + (typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)') + '" aria-hidden="true"></span>' +
+      '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
+      '<span class="fila-meta">' + escapeHtml(meta) + '</span></span>' + quando + '</li>';
+  };
+  return '<section class="card ov-panel pz-resposta">' +
+    '<div class="ov-ph"><h2 class="ov-h2">1ª resposta</h2><span class="ov-sub">Prazo pela prioridade, em horário comercial</span></div>' +
+    '<div class="ov-kpis pz-kpis">' +
+      _pzKpi(r.aguardando, 'Aguardando resposta', r.aguardando ? 'amber' : '') +
+      _pzKpi(r.atrasadas, 'Resposta atrasada', r.atrasadas ? 'red' : '') +
+      _pzKpi(r.pctNoPrazo === null ? '—' : r.pctNoPrazo + '%', 'Respondidas no prazo', '', '(' + r.respondidas + ', 30 dias)') +
+      _pzKpi(r.medianaMin === null ? '—' : slaDuracaoCurta(r.medianaMin), 'Tempo típico de resposta', '', '(mediana)') +
+    '</div>' +
+    (esperando.length ? '<ul class="fila-list">' + esperando.slice(0, 15).map(row).join('') + '</ul>' : '') +
+  '</section>';
+}
+
+// ── Problemas recorrentes (056) ──
+function _prazosRecorrentesHtml(pens, today) {
+  if (typeof buildRecorrentesModel !== 'function') return '';
+  const m = buildRecorrentesModel(pens, today, { dias: 90, minimo: 3 });
+  const barras = (lista, labelFn) => {
+    const max = lista.length ? lista[0].total : 1;
+    return '<ul class="rc-bars">' + lista.map((x) =>
+      '<li><span class="rc-lbl">' + escapeHtml(labelFn(x.value) || x.value) + '</span>' +
+      '<span class="rc-track" aria-hidden="true"><i style="width:' + Math.max(4, Math.round((x.total / max) * 100)) + '%"></i></span>' +
+      '<b>' + x.total + '</b></li>').join('') + '</ul>';
+  };
+  const item = (it) => '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(it.id) + '">' +
+    '<span class="fila-main"><span class="fila-title">' + escapeHtml(it.assunto) + '</span></span>' +
+    '<span class="fila-due">' + escapeHtml(formatDate(it.createdAt)) + '</span></li>';
+  const recHtml = m.recorrentes.length
+    ? '<ul class="rc-list">' + m.recorrentes.map((g) =>
+      '<li class="rc-item"><div class="rc-head"><b>' + escapeHtml(g.clientName || 'Cliente') + '</b><span>' + escapeHtml(penCategoriaLabel(g.categoria)) + '</span>' +
+        '<span class="pz-chip is-over">' + g.total + 'x em ' + m.dias + ' dias</span>' +
+        (g.abertas ? '<span class="pz-chip">' + g.abertas + ' aberta' + (g.abertas === 1 ? '' : 's') + '</span>' : '') + '</div>' +
+        '<ul class="fila-list">' + g.itens.map(item).join('') + '</ul></li>').join('') + '</ul>'
+    : '<div class="empty-state"><p>Nenhum cliente com o mesmo tipo de problema ' + m.minimo + ' ou mais vezes nos últimos ' + m.dias + ' dias.</p></div>';
+  return '<section class="card ov-panel">' +
+      '<div class="ov-ph"><h2 class="ov-h2">Problemas que se repetem</h2><span class="ov-sub">Mesmo cliente e categoria ' + m.minimo + '+ vezes em ' + m.dias + ' dias: vale atacar a causa</span></div>' +
+      recHtml +
+    '</section>' +
+    '<div class="rc-grid">' +
+      '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por categoria</h2><span class="ov-sub">' + m.total + ' pendências em ' + m.dias + ' dias</span></div>' +
+        (m.porCategoria.length ? barras(m.porCategoria, penCategoriaLabel) : '<p class="ov-empty">Nenhuma pendência com categoria ainda.</p>') +
+        (m.semCategoria ? '<p class="sla-muted">' + m.semCategoria + ' sem categoria. Preencha ao abrir para o relatório ficar completo.</p>' : '') +
+      '</section>' +
+      '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por canal</h2></div>' +
+        (m.porCanal.length ? barras(m.porCanal, penCanalLabel) : '<p class="ov-empty">Nenhuma pendência com canal ainda.</p>') +
+        (m.solicitantes.length ? '<h3 class="rc-sub">Quem mais pede</h3><ul class="rc-bars">' + m.solicitantes.map((x) =>
+          '<li><span class="rc-lbl">' + escapeHtml(x.nome) + ' <small>' + escapeHtml(x.clientName || '') + '</small></span><b>' + x.total + '</b></li>').join('') + '</ul>' : '') +
+      '</section>' +
+    '</div>';
+}
+
 function renderPrazos() {
   document.getElementById('pageTitle').textContent = 'Prazos e SLA';
   const groupBy = _prazosLoadGroup();
@@ -213,15 +287,23 @@ function renderPrazos() {
     '</li>';
   }).join('');
 
+  const segBtn = (v, label) => '<button type="button" class="period-btn' + (groupBy === v ? ' active' : '') + '" aria-pressed="' + (groupBy === v) + '" data-action="pzGroup" data-arg="' + v + '">' + label + '</button>';
+  const bar = '<div class="ov-bar">' +
+      '<div class="ov-seg" role="group" aria-label="Agrupar por">' +
+        segBtn('responsavel', 'Por responsável') + segBtn('cliente', 'Por cliente') +
+        (typeof buildRecorrentesModel === 'function' ? segBtn('recorrentes', 'Problemas recorrentes') : '') +
+      '</div>' +
+      (groupBy === 'recorrentes' ? '' : '<label class="pz-toggle"><input type="checkbox"' + (_prazosOnlyRisk ? ' checked' : '') + ' data-change="pzRisk"> Só com risco</label>') +
+    '</div>';
+  if (groupBy === 'recorrentes') {
+    document.getElementById('contentArea').innerHTML = '<div class="ov-wrap prazos">' + bar + _prazosRecorrentesHtml(s.pens, s.today) + '</div>';
+    return;
+  }
+
   document.getElementById('contentArea').innerHTML =
     '<div class="ov-wrap prazos">' +
-      '<div class="ov-bar">' +
-        '<div class="ov-seg" role="group" aria-label="Agrupar por">' +
-          '<button type="button" class="period-btn' + (groupBy === 'responsavel' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'responsavel') + '" data-action="pzGroup" data-arg="responsavel">Por responsável</button>' +
-          '<button type="button" class="period-btn' + (groupBy === 'cliente' ? ' active' : '') + '" aria-pressed="' + (groupBy === 'cliente') + '" data-action="pzGroup" data-arg="cliente">Por cliente</button>' +
-        '</div>' +
-        '<label class="pz-toggle"><input type="checkbox"' + (_prazosOnlyRisk ? ' checked' : '') + ' data-change="pzRisk"> Só com risco</label>' +
-      '</div>' +
+      bar +
+      _prazosRespostaHtml(s.pens) +
       '<div class="ov-kpis pz-kpis">' +
         kpi(k.vencidas, 'Vencidas', k.vencidas ? 'red' : '') +
         kpi(k.hoje, 'Vencem hoje', k.hoje ? 'amber' : '') +

@@ -11,10 +11,10 @@ test('prazos: KPIs, agrupar por cliente e abrir a pendência pela lista', async 
   });
   await page.evaluate(() => navigateTo('prazos'));
   await expect(page.locator('#pageTitle')).toHaveText('Prazos e SLA');
-  await expect(page.locator('.pz-kpis .ov-k').first()).not.toContainText(/^0/);
+  await expect(page.locator('.ov-wrap > .pz-kpis .ov-k').first()).not.toContainText(/^0/);
 
   await page.getByRole('button', { name: 'Por cliente' }).click();
-  await expect(page.locator('.ov-h2')).toHaveText('Por cliente');
+  await expect(page.getByRole('heading', { name: 'Por cliente' })).toBeVisible();
   const group = page.locator('.pz-group', { hasText: await page.evaluate(() => getClients()[0].name) });
   await group.locator('.pz-head').click();
   await expect(group).toHaveClass(/is-open/);

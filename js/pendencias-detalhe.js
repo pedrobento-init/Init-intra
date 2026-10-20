@@ -98,6 +98,11 @@ function openPendenciaDetail(id) {
           <dl class="pen-props pen-cmd-props">
             <div class="pen-prop"><dt>Cliente</dt><dd>${c?`<span class="pen-client">${clientAvatar(c,22)}<span>${escapeHtml(p.clientName)}</span></span>`:escapeHtml(p.clientName)||'—'}</dd></div>
             <div class="pen-prop"><dt>Tipo</dt><dd>${escapeHtml(p.tipo)||'—'}</dd></div>
+            ${typeof penCategoriaOptionsHtml === 'function' ? `
+            <div class="pen-prop"><dt>Solicitante</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.solicitante)||'—'}<button class="pen-inline-edit" title="Alterar solicitante" aria-label="Alterar solicitante" data-action="penEditSolicitante" data-arg="${escapeHtml(id)}">✏️</button></span></dd></div>
+            <div class="pen-prop"><dt>Canal</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCanalLabel(p.canal))||'—'}<select class="pen-inline-select" title="Alterar canal" aria-label="Alterar canal" data-change="penSetField" data-field="canal" data-id="${escapeHtml(id)}">${penCanalOptionsHtml(p.canal||'')}</select></span></dd></div>
+            <div class="pen-prop"><dt>Categoria</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCategoriaLabel(p.categoria))||'—'}<select class="pen-inline-select" title="Alterar categoria" aria-label="Alterar categoria" data-change="penSetField" data-field="categoria" data-id="${escapeHtml(id)}">${penCategoriaOptionsHtml(p.categoria||'')}</select></span></dd></div>
+            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>` : ''}
             <div class="pen-prop"><dt>Responsável</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.responsible)||'—'}<button class="pen-inline-edit" title="Alterar responsável" onclick="openReassignPendencia('${escapeHtml(id)}')">✏️</button></span></dd></div>
             <div class="pen-prop"><dt>Prioridade</dt><dd><span class="pen-inline-wrap">${priorityTag(p.priority)}<select class="pen-inline-select" title="Alterar prioridade" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','priority',this.value)">${['baixa','media','alta','critica'].map(v=>`<option value="${v}" ${p.priority===v?'selected':''}>${v==='baixa'?'Baixa':v==='media'?'Média':v==='alta'?'Alta':'Crítica'}</option>`).join('')}</select></span></dd></div>
             <div class="pen-prop${_isOverdue?' is-alert':''}"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" value="${escapeHtml(p.deadline||'')}" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','deadline',this.value)" /></span>${_isOverdue?'<span class="pen-cmd-flag">⚠️ Vencido</span>':''}${(!p.deadline && _isHighPri)?'<span class="pen-cmd-flag warn">⚠ Sem prazo · prioridade '+escapeHtml(p.priority)+'</span>':''}</dd></div>
@@ -222,8 +227,9 @@ function submitPenNote(id) {
   renderPenView(false);
 }
 
-function openPendenciaForm(id = null, preClientId = null, preDate = null) {
-  const p           = id ? getPendenciaById(id) : {};
+// pre: valores iniciais de uma pendência nova (ex.: vindos da abertura rápida).
+function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = null) {
+  const p           = id ? getPendenciaById(id) : Object.assign({}, pre || {});
   // Gestão: quem não é Gestão não abre edição de Gestão (link direto/ID).
   try {
     if (id && typeof canViewPendencia === 'function' && p && !canViewPendencia(p)) {
@@ -234,6 +240,10 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
   const clients     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   const opNames     = getOperatorNames(isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam());
   const currentResp = p.responsible || getUser().name;
+  // Prazo pelo SLA da prioridade (só em pendência nova sem data escolhida).
+  const _slaOn = typeof slaPrazoSugerido === 'function';
+  const _prazoAuto = !id && !p.deadline && !preDate && _slaOn;
+  const _prazoVal = p.deadline || preDate || (_prazoAuto ? slaPrazoSugerido(p.priority || 'media', localDateISO()) : '');
   // Gestão: esconde a opção Gestão de quem não é Gestão (Felipe/Joarli).
   var _canGest = true;
   try { _canGest = (typeof canViewGestao === 'function') ? canViewGestao() : true; } catch (_) {}
@@ -268,6 +278,13 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
             ${_tiposVisiveis.map(t=>`<option ${p.tipo===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
           </select></div>
       </div>
+      ${_slaOn ? `<div class="form-row">
+        <div class="form-group"><label class="form-label" for="penSolicitante">Solicitante</label>
+          <input class="form-input" id="penSolicitante" name="solicitante" maxlength="120" list="penSolicitanteList" autocomplete="off" placeholder="Quem pediu, no cliente" value="${escapeHtml(p.solicitante||'')}" />
+          ${penSolicitanteDatalistHtml('penSolicitanteList', p.clientId || preClientId)}</div>
+        <div class="form-group"><label class="form-label" for="penCanal">Canal</label>
+          <select class="form-select" id="penCanal" name="canal">${penCanalOptionsHtml(p.canal || '')}</select></div>
+      </div>` : ''}
       <div class="form-group"><label class="form-label">Assunto *</label>
         <input class="form-input" name="assunto" maxlength="120" placeholder="Título/resumo da pendência..." value="${escapeHtml(p.assunto||'')}" required /></div>
       <div class="form-group"><label class="form-label">Descrição da Pendência *</label>
@@ -294,24 +311,34 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null) {
             <option value="critica"${p.priority==='critica'?'selected':''}>Crítica</option>
           </select></div>
         <div class="form-group"><label class="form-label">Prazo Limite</label>
-          <input type="date" class="form-input" name="deadline" value="${escapeHtml(p.deadline||preDate||'')}" /></div>
+          <input type="date" class="form-input" name="deadline" value="${escapeHtml(_prazoVal)}" data-sla-auto="${_prazoAuto ? '1' : '0'}" /></div>
       </div>
+      ${_slaOn ? '<p class="sla-hint" data-sla-hint></p>' : ''}
       <div class="form-row">
+        ${_slaOn ? `<div class="form-group"><label class="form-label" for="penCategoria">Categoria</label>
+          <select class="form-select" id="penCategoria" name="categoria">${penCategoriaOptionsHtml(p.categoria || '')}</select></div>` : ''}
         <div class="form-group"><label class="form-label">Recorrência</label>
           <select class="form-select" name="recurrence">
             ${RECURRENCE_OPTIONS.map(o => `<option value="${o.value}" ${(p.recurrence||'')===o.value?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}
           </select></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label class="form-label">Link Útil (opcional)</label>
           <input class="form-input" name="linkUtil" value="${escapeHtml(p.linkUtil||'')}" placeholder="https://..." /></div>
+        <div class="form-group"><label class="form-label">Tags (separadas por vírgula)</label>
+          <input class="form-input" name="tags" value="${escapeHtml((p.tags||[]).join(', '))}" placeholder="Ex: urgente, firewall, vpn" /></div>
       </div>
-      <div class="form-group"><label class="form-label">Tags (separadas por vírgula)</label>
-        <input class="form-input" name="tags" value="${escapeHtml((p.tags||[]).join(', '))}" placeholder="Ex: urgente, firewall, vpn" /></div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`);
   setTimeout(function(){
+    try {
+      var _f = document.querySelector('#modalBody form');
+      if (_f && typeof slaBindPrazoAuto === 'function') slaBindPrazoAuto(_f);
+      if (_f && typeof slaBindSolicitante === 'function') slaBindSolicitante(_f, 'penSolicitanteList');
+    } catch (_) {}
     var ta=document.querySelector('textarea[name="descricao"]');
     var sug=document.getElementById('templateSuggestion');
     if(!ta||!sug) return;
@@ -393,6 +420,8 @@ function submitPendenciaForm(e, id) {
       tags: tagsRaw,
       recurrence: g('recurrence'),
     };
+    // Atendimento (056): só entra no registro quando o formulário tem o campo.
+    ['solicitante', 'canal', 'categoria'].forEach(function (k) { if (fd.has(k)) data[k] = String(fd.get(k) || '').trim(); });
     // Criada a partir de um modelo: nasce com o checklist dos passos.
     if (!id && g('templateChecklist')) {
       try {

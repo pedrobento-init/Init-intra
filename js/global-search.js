@@ -90,7 +90,7 @@ function _normSearch(s) {
 function getSearchActions() {
   const go = (page, label, kw) => ({ id: 'go-' + page, label: 'Ir para ' + label, kw: 'ir abrir tela ' + kw, run: () => navigateTo(page) });
   const list = [
-    { id: 'new-pen', label: 'Nova pendência', kw: 'nova criar adicionar pendencia chamado tarefa', run: () => { if (typeof openPendenciaForm === 'function') openPendenciaForm(); } },
+    { id: 'new-pen', label: 'Nova pendência', kw: 'nova criar adicionar pendencia chamado tarefa', run: () => { if (typeof openPendenciaRapida === 'function') openPendenciaRapida(); else if (typeof openPendenciaForm === 'function') openPendenciaForm(); } },
     { id: 'new-visit', label: 'Nova visita', kw: 'nova criar agendar visita tecnica', run: () => { if (typeof openVisitForm === 'function') openVisitForm(); } },
     go('fila', 'Minha fila', 'fila minha hoje urgente'),
     go('pendencias', 'Pendências', 'pendencias quadro kanban'),

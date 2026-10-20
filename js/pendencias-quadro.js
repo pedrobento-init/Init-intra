@@ -389,6 +389,8 @@ function penKanbanCard(p) {
   var sla = (typeof slaCountdown === 'function') ? slaCountdown(p, 48) : null;
   var slaHtml = (sla && !sla.expired && sla.label)
     ? '<span class="kc-sla" title="SLA restante">' + sla.label + '</span>' : '';
+  // 1ª resposta (056): só aparece quando está atrasada ou vence em até 1h.
+  if (typeof penRespostaBadge === 'function') slaHtml += penRespostaBadge(p);
 
   // Vencida aparece só aqui (data vermelha + ⚠), não repetida no meio do card.
   var deadlineHtml = p.deadline
