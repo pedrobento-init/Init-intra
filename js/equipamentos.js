@@ -882,7 +882,7 @@ function applyAcertoDesign(ws, meta) {
   return ws;
 }
 
-function exportEquipamentosPlanilha() {
+async function exportEquipamentosPlanilha() {
   try {
     if (typeof canExport === 'function' && !canExport()) {
       if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
@@ -896,9 +896,10 @@ function exportEquipamentosPlanilha() {
   }
   const sheet = buildEquipAcertoSheet(list);
   const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
-  // .xlsx real quando o SheetJS (CDN) está carregado; senão CSV (offline).
+  // .xlsx real com o SheetJS (carregado agora, sob demanda); offline cai no CSV.
   try {
-    if (typeof XLSX !== 'undefined' && XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
+    const XLSX = await loadLib('xlsx').catch(() => null);
+    if (XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
       const ws = XLSX.utils.aoa_to_sheet([[sheet.title], sheet.header, ...sheet.rows]);
       applyAcertoDesign(ws, { dataCount: sheet.rows.length - 1 });
       const wb = XLSX.utils.book_new();

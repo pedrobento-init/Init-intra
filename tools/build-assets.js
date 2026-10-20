@@ -10,7 +10,7 @@
 //   build/sw.js                      (STATIC_ASSETS → assets + CACHE_NAME do build)
 //   build/assets/js/<nome>.<hash8>.min.js   (terser; toplevel:false p/ preservar
 //                                            os globais — o app não usa módulos)
-//   build/assets/css/<nome>.<hash8>.css
+//   build/assets/css/<nome>.<hash8>.min.css   (minifyCss: comentários e espaços)
 //   build/<ícones, logo, manifest.json>
 // Antes do build a pasta é zerada (nada de hash antigo acumulado).
 //
@@ -60,6 +60,39 @@ async function minifyJs(code, filename) {
   return { code: res.code, minified: true };
 }
 
+// CSS: minificação conservadora, sem dependência. Tira comentários e
+// espaços que não mudam nada; textos entre aspas ficam intactos. Não mexe
+// no espaço ANTES de ":" (em seletor, ".a :hover" ≠ ".a:hover") nem em
+// volta de + e - (calc). Conferido em tests/build-assets.test.js.
+function minifyCss(src) {
+  const s = String(src);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < s.length && s[j] !== ch) { if (s[j] === '\\') j++; j++; }
+      out += s.slice(i, j + 1);
+      i = j;
+    } else if (ch === '/' && s[i + 1] === '*') {
+      const end = s.indexOf('*/', i + 2);
+      i = end === -1 ? s.length : end + 1;
+      out += ' ';
+    } else if (/\s/.test(ch)) {
+      if (out && out[out.length - 1] !== ' ') out += ' ';
+    } else {
+      out += ch;
+    }
+  }
+  // Fora das aspas, já com espaços simples: tira os que sobram em volta de { } ; , e depois de :.
+  const parts = out.split(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/);
+  return parts.map((p, k) => (k % 2 ? p : p
+    .replace(/ ?([{};,]) ?/g, '$1')
+    .replace(/: /g, ':')
+    .replace(/;}/g, '}')
+  )).join('').trim();
+}
+
 async function buildAssets(rootDir, opts) {
   const root = rootDir || process.cwd();
   const dry = !!(opts && opts.check);
@@ -83,12 +116,12 @@ async function buildAssets(rootDir, opts) {
     files[outRel] = code;
   }
 
-  // 2. CSS → assets/css/<base>.<hash>.css (só hash, sem minify)
+  // 2. CSS → assets/css/<base>.<hash>.min.css
   for (const rel of cssFiles) {
     const abs = path.join(root, rel);
     if (!fs.existsSync(abs)) { warnings.push('ausente (link mantido): ' + rel); continue; }
-    const src = fs.readFileSync(abs);
-    const outRel = 'assets/css/' + path.basename(rel, '.css') + '.' + shortHash(src) + '.css';
+    const src = minifyCss(fs.readFileSync(abs, 'utf8'));
+    const outRel = 'assets/css/' + path.basename(rel, '.css') + '.' + shortHash(src) + '.min.css';
     manifest.css[rel] = outRel;
     files[outRel] = src;
   }
@@ -139,5 +172,5 @@ if (require.main === module) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildAssets, shortHash, parseLocalScripts, OUT_DIR };
+  module.exports = { buildAssets, shortHash, parseLocalScripts, minifyCss, OUT_DIR };
 }

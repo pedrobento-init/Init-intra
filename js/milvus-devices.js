@@ -506,7 +506,8 @@ async function exportClientInventory(clientId) {
   const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
   const base = `inventario_${_inventoryExportSlug(client.name)}_${stamp}`;
   try {
-    if (typeof XLSX !== 'undefined' && XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
+    const XLSX = await loadLib('xlsx').catch(() => null);
+    if (XLSX && XLSX.utils && typeof XLSX.writeFile === 'function') {
       const ws = XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Inventário');
@@ -538,12 +539,12 @@ async function exportClientInventory(clientId) {
 }
 
 // Lê o .xlsx no navegador (SheetJS via CDN) → linhas (objetos por cabeçalho).
-function readMilvusExportFile(file) {
+async function readMilvusExportFile(file) {
+  if (!file) throw new Error('Nenhum arquivo selecionado.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('Arquivo excede 10MB.');
+  const XLSX = await loadLib('xlsx'); // sob demanda (js/lazy-libs.js)
   return new Promise((resolve, reject) => {
     try {
-      if (!file) { reject(new Error('Nenhum arquivo selecionado.')); return; }
-      if (file.size > 10 * 1024 * 1024) { reject(new Error('Arquivo excede 10MB.')); return; }
-      if (typeof XLSX === 'undefined') { reject(new Error('Leitor de planilha indisponível. Recarregue a página.')); return; }
       const reader = new FileReader();
       reader.onload = () => {
         try {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 // SRI (Subresource Integrity): todo <script> externo precisa de integrity +
 // crossorigin, senão um CDN comprometido executa no contexto do app.
@@ -27,7 +28,7 @@ describe('SRI dos scripts de terceiros no index.html', () => {
   const scripts = externalScripts(html);
 
   it('há scripts externos para validar', () => {
-    expect(scripts.length).toBeGreaterThanOrEqual(5);
+    expect(scripts.length).toBeGreaterThanOrEqual(2); // supabase-js e dexie; o resto vem sob demanda
   });
 
   it('todos declaram integrity sha384-...', () => {
@@ -58,5 +59,25 @@ describe('scripts carregados sob demanda (js/ui.js)', () => {
       expect(url, url).toMatch(/@\d+\.\d+\.\d+\//);
       expect(sri || '', url).toMatch(/^sha384-[A-Za-z0-9+/=]+$/);
     }
+  });
+});
+
+// xlsx, mammoth e motion saíram do index.html (eram baixados em todo acesso)
+// e vêm sob demanda por js/lazy-libs.js — com a mesma exigência de SRI.
+describe('bibliotecas sob demanda (js/lazy-libs.js)', () => {
+  const require = createRequire(import.meta.url);
+  const { LAZY_LIBS } = require('../js/lazy-libs.js');
+
+  it('cada uma tem versão exata, integrity sha384 e o global esperado', () => {
+    expect(Object.keys(LAZY_LIBS).sort()).toEqual(['mammoth', 'motion', 'xlsx']);
+    for (const [name, lib] of Object.entries(LAZY_LIBS)) {
+      expect(lib.src, name).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/npm\/[^/]+@\d+\.\d+\.\d+\//);
+      expect(lib.integrity, name).toMatch(/^sha384-[A-Za-z0-9+/=]+$/);
+      expect(lib.global, name).toMatch(/^[A-Za-z]+$/);
+    }
+  });
+
+  it('nenhuma delas volta a ser carregada direto no index.html', () => {
+    for (const lib of Object.values(LAZY_LIBS)) expect(html, lib.src).not.toContain(lib.src);
   });
 });

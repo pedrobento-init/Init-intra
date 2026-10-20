@@ -11,7 +11,7 @@
 //   o técnico já vê no app). Nada de acessos/IDs remotos.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
 import { buildIcs } from "./ics.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
