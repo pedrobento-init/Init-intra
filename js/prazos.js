@@ -168,7 +168,7 @@ function _prazosItemRow(it, today, groupBy) {
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
   const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
   const other = groupBy === 'cliente' ? (p.responsible || 'Sem responsável') : (p.clientName || 'Sem cliente');
-  return '<li class="fila-row" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
+  return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
     '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(other) + '</span></span>' +

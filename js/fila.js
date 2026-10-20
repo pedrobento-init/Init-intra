@@ -101,7 +101,7 @@ function _filaDueLabel(p, today) {
 function _filaPenRow(p, today) {
   const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
-  return '<li class="fila-row" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
+  return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
     '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(getPendenciaTitulo(p)) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(p.clientName || '—') + '</span></span>' +
@@ -143,7 +143,7 @@ function renderFila() {
     : '<div class="empty-state" style="padding:28px 12px"><p>Nada urgente com você agora. 🎉</p><button class="btn btn-secondary btn-sm" data-action="nav" data-arg="pendencias">Ver todas as pendências</button></div>';
 
   const visitsHtml = m.visits.length
-    ? '<ul class="fila-list">' + m.visits.map((v) => '<li class="fila-row" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">' +
+    ? '<ul class="fila-list">' + m.visits.map((v) => '<li class="fila-row" tabindex="0" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">' +
         '<span class="fila-dot" style="--c:var(--ds-cyan)" aria-hidden="true"></span>' +
         '<span class="fila-main"><span class="fila-title">' + escapeHtml(v.clientName || '—') + '</span>' +
         '<span class="fila-meta">' + escapeHtml(v.motivo || '') + '</span></span>' +
@@ -176,6 +176,11 @@ function renderFila() {
 // Dispensável por dia: some até a meia-noite, ou antes se os números mudarem.
 function _alertStripKey(text) { return 'intra_alert_dismissed_' + (typeof localDateISO === 'function' ? localDateISO() : '') + '_' + text; }
 
+const ALERT_STRIP_PAGES = ['fila', 'dashboard'];
+function _alertStripPage() {
+  try { return (window.location.hash || '').replace('#', '') || 'dashboard'; } catch (_) { return 'dashboard'; }
+}
+
 function renderAlertStrip() {
   const el = document.getElementById('alertStrip');
   if (!el) return;
@@ -191,6 +196,9 @@ function renderAlertStrip() {
   } catch (_) { text = ''; }
   let dismissed = false;
   try { dismissed = !!sessionStorage.getItem(_alertStripKey(text)); } catch (_) {}
+  // Só nas telas de visão do dia (Minha fila, Dashboard): nas demais a faixa
+  // repetia o mesmo aviso em toda página; o selo do menu continua mostrando.
+  if (!ALERT_STRIP_PAGES.includes(_alertStripPage())) dismissed = true;
   if (!text || dismissed) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
   el.innerHTML =

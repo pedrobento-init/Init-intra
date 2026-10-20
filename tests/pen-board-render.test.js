@@ -88,7 +88,7 @@ describe('renderPenKanban (modo local)', () => {
     expect(html).not.toContain('Alternar tema');
     expect(html).not.toContain("getElementById('themeToggleBtn').click()");
     expect(html).not.toContain('class="btn btn-primary"');
-    expect(html).toContain('openPendenciaForm()');
+    expect(html).toContain('data-action="newPendencia"');
   });
 
   it('linha-resumo com total, colunas e vencidas', () => {
@@ -102,8 +102,10 @@ describe('renderPenKanban (modo local)', () => {
     expect(html).toContain('class="kanban-col" style="--c:var(--kb-accent)"');
     expect(html).toContain('class="kanban-col" style="--c:var(--kb-cyan)"');
     expect(html).toContain('class="kanban-col" style="--c:var(--kb-amber)"');
-    expect(html).toContain('class="kanban-col" style="--c:var(--kb-violet)"');
-    expect(html).toContain('class="kanban-col" style="--c:var(--kb-green)"');
+    // Sem cards: coluna estreita (is-empty), sem botão de ordenar.
+    expect(html).toContain('class="kanban-col is-empty" style="--c:var(--kb-violet)"');
+    expect(html).toContain('class="kanban-col is-empty" style="--c:var(--kb-green)"');
+    expect(html).not.toContain("cyclePenColSort('aguardando')");
     expect(html).toContain('aria-label="Coluna Em Andamento, 1 pendência"');
     expect(html).toContain('class="kanban-col-count"');
   });

@@ -1,5 +1,5 @@
 // notifications.js – Sistema de Notificações por E-mail
-// Usa Supabase Edge Function + Resend como serviço de e-mail
+// Usa Supabase Edge Function + Gmail do Google Workspace (SMTP) para enviar
 
 const EMAIL_CONFIG = {
   edgeFunctionUrl: SUPABASE_URL
@@ -19,16 +19,12 @@ function getNotifPrefs() {
       onPendenciaCreate: true,
       onPendenciaUpdate: true,
       onPendenciaNote: true,
-      onDeadlineReminder: true,
-      reminderDaysBefore: 2,
     };
   } catch {
     return {
       onPendenciaCreate: true,
       onPendenciaUpdate: true,
       onPendenciaNote: true,
-      onDeadlineReminder: true,
-      reminderDaysBefore: 2,
     };
   }
 }
@@ -67,28 +63,109 @@ async function sendEmailNotification({ to, subject, html }) {
     });
 
     if (error) {
-      if (error.message && (error.message.includes('CORS') || error.message.includes('Failed to send') || error.message.includes('fetch'))) {
-        console.log('📧 [Notificação] Edge Function não disponível (não deployada?). Pulando...');
-      } else {
-        console.warn('📧 [Notificação] Erro na Edge Function:', error.message);
-      }
-      return { error: error.message };
+      const detail = await _emailErrorDetail(error);
+      _reportEmailFailure(detail);
+      return { error: detail.message, code: detail.code, status: detail.status };
+    }
+
+    // Resposta 200 com success:false (defesa: a função hoje devolve 502 nesse caso).
+    if (data && data.success === false) {
+      const detail = { status: 200, code: data.code || '', message: data.error || data.message || 'Falha no envio' };
+      _reportEmailFailure(detail);
+      return { error: detail.message, code: detail.code };
     }
 
     console.log('📧 [Notificação] E-mail enviado com sucesso para:', recipients.join(', '));
     return { success: true, data };
   } catch (err) {
-    const msg = err.message || String(err);
-    if (msg.includes('CORS') || msg.includes('Failed to send') || msg.includes('fetch') || msg.includes('Edge Function')) {
-      console.log('📧 [Notificação] Edge Function indisponível (verifique se está deployada). Silenciando...');
-    } else {
-      console.warn('📧 [Notificação] Falha:', msg);
-    }
-    return { error: msg };
+    const detail = { status: 0, code: 'network', message: err.message || String(err) };
+    _reportEmailFailure(detail);
+    return { error: detail.message, code: detail.code };
   }
 }
 
-// ── Helpers de Formatação de E-mail ──
+/** Lê o corpo do erro da Edge Function (status + mensagem do Gmail). */
+async function _emailErrorDetail(error) {
+  const out = { status: 0, code: '', message: (error && error.message) || 'Erro desconhecido' };
+  try {
+    const ctx = error && error.context;
+    if (ctx && typeof ctx.status === 'number') out.status = ctx.status;
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.json();
+      if (body && (body.error || body.message)) out.message = body.error || body.message;
+      if (body && body.code) out.code = body.code;
+    }
+  } catch (_) {}
+  if (!out.status && error && error.name === 'FunctionsFetchError') out.code = out.code || 'network';
+  return out;
+}
+
+/** Explica o erro de envio em português, com o que fazer. */
+function describeEmailError(detail) {
+  const d = detail || {};
+  const msg = String(d.message || '');
+  if (d.status === 404) return 'A função send-email não está publicada no Supabase (Edge Functions).';
+  if (d.code === 'unauthorized' || d.status === 401) return 'A função recusou o acesso: entre de novo no site.';
+  if (d.code === 'recipient_not_allowed') return 'Só é possível enviar para e-mails de operadores ativos cadastrados.';
+  if (d.code === 'missing_credentials' || /GMAIL_USER|GMAIL_APP_PASSWORD/.test(msg)) {
+    return 'Faltam GMAIL_USER e GMAIL_APP_PASSWORD nos Secrets das Edge Functions do Supabase.';
+  }
+  if (d.code === 'EAUTH' || /535|Username and Password not accepted|Application-specific password required/i.test(msg)) {
+    return 'O Gmail recusou o login: confira GMAIL_USER e a senha de app (GMAIL_APP_PASSWORD).';
+  }
+  if (/limit exceeded|daily user sending limit|550[- ]5\.4\.5|421[- ]4\.7\.0/i.test(msg)) {
+    return 'Limite diário de envio do Gmail atingido.';
+  }
+  if (d.code === 'ETIMEDOUT' || d.code === 'ECONNECTION' || d.code === 'ESOCKET') {
+    return 'A função não conseguiu conectar no smtp.gmail.com.';
+  }
+  if (d.code === 'network' || /Failed to send|fetch/i.test(msg)) {
+    return 'Não foi possível chamar a função send-email (sem conexão ou função fora do ar).';
+  }
+  return 'Falha no envio: ' + msg;
+}
+
+// Antes as falhas só iam para o console. Agora vão para Histórico → Erros do app.
+function _reportEmailFailure(detail) {
+  const text = describeEmailError(detail);
+  console.warn('📧 [Notificação] ' + text, detail);
+  if (typeof _logSilent === 'function') {
+    _logSilent(new Error(text + (detail && detail.message ? ' [' + detail.message + ']' : '')), 'email');
+  }
+}
+
+/** Manda um e-mail de teste para o próprio usuário e mostra o resultado. */
+async function sendTestEmail() {
+  const out = document.getElementById('notifTestResult');
+  const btn = document.getElementById('notifTestBtn');
+  const show = (text, ok) => {
+    if (out) { out.textContent = text; out.style.color = ok ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)'; }
+  };
+  const session = typeof getSession === 'function' ? getSession() : null;
+  const me = session && typeof getOperators === 'function' ? getOperators().find((o) => o && o.id === session.opId) : null;
+  if (!me || !me.email) { show('Seu operador não tem e-mail cadastrado.', false); return; }
+  if (!EMAIL_CONFIG.edgeFunctionUrl || typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+    show('Sem conexão com o Supabase.', false);
+    return;
+  }
+  if (btn) btn.disabled = true;
+  show('Enviando...', true);
+  const res = await sendEmailNotification({
+    to: [me.email],
+    subject: '[Init Intra] E-mail de teste',
+    html: emailBody('<p style="font-size:14px;color:#475569">Se você recebeu esta mensagem, o envio de e-mails do Init Intra está funcionando.</p>'),
+  });
+  if (btn) btn.disabled = false;
+  if (res && res.success) show('Enviado para ' + me.email + '. Confira a caixa de entrada e o spam.', true);
+  else if (res && res.skipped) show('Envio de e-mail desligado neste site.', false);
+  else show(describeEmailError({ status: res && res.status, code: res && res.code, message: res && res.error }), false);
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({ sendTestEmail: () => sendTestEmail() });
+}
+
+// ── Layout do e-mail ──
 function emailHeader() {
   return `
     <div style="background:#1a56db;padding:20px 24px;border-radius:10px 10px 0 0">
@@ -199,6 +276,17 @@ function collectPendenciaRecipients(pendencia) {
   return collectRecipients(pendencia.responsible);
 }
 
+// Mesmo aviso no celular (Web Push, js/push.js); o servidor tira quem enviou.
+function _pushPendencia(recipients, label, pendencia, body) {
+  if (typeof sendPushNotification !== 'function') return;
+  sendPushNotification({
+    to: recipients,
+    title: label + ': ' + getPendenciaTitulo(pendencia),
+    body: body || '',
+    url: '#pendencias',
+  });
+}
+
 // ── Templates de E-mail ──
 
 function notifyPendenciaCreated(pendencia) {
@@ -249,6 +337,7 @@ function notifyPendenciaCreated(pendencia) {
     subject: `[Init Intra] Nova Pendência: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Nova Pendência', pendencia, pendencia.clientName);
 }
 
 function notifyPendenciaUpdated(pendencia, oldStatus) {
@@ -300,6 +389,7 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
     subject: `[Init Intra] Pendência Atualizada: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Pendência Atualizada', pendencia, statusChanged ? oldStatusLabel + ' → ' + newStatusLabel : pendencia.clientName);
 }
 
 function notifyPendenciaNote(pendencia, note) {
@@ -330,134 +420,12 @@ function notifyPendenciaNote(pendencia, note) {
     subject: `[Init Intra] Nova nota em: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
+  _pushPendencia(recipients, 'Nova nota', pendencia, (note.author ? note.author + ': ' : '') + (note.text || ''));
 }
 
-// ── Lembrete de Prazo (chamado pelo cron job ou manualmente) ──
-function notifyDeadlineReminder(pendencia, daysLeft) {
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
-  if (!recipients.length) return;
-
-  const urgency = daysLeft <= 0 ? 'VENCIDA' : daysLeft === 1 ? 'vence AMANHÃ' : `vence em ${daysLeft} dias`;
-  const urgencyColor = daysLeft <= 0 ? '#dc2626' : daysLeft <= 1 ? '#d97706' : '#1a56db';
-  const urgencyBg = daysLeft <= 0 ? '#fef2f2' : daysLeft <= 1 ? '#fffbeb' : '#eff6ff';
-
-  const html = emailBody(`
-    <div style="margin-bottom:16px">
-      <div style="display:inline-block;background:${urgencyColor}15;color:${urgencyColor};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">⏰ Lembrete de Prazo</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
-    </div>
-    <div style="background:${urgencyBg};border:1px solid ${urgencyColor}30;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
-      <div style="font-size:24px;font-weight:800;color:${urgencyColor};margin-bottom:4px">${urgency}</div>
-      <div style="font-size:13px;color:#64748b">Prazo: ${formatDate(parseDeadline(pendencia.deadline))}</div>
-    </div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
-      <tr>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b;width:120px"><strong>Cliente</strong></td>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(pendencia.clientName || '—')}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;font-size:12px;color:#64748b"><strong>Responsável</strong></td>
-        <td style="padding:8px 12px;font-size:13px">${escapeHtml(pendencia.responsible || '—')}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b"><strong>Prioridade</strong></td>
-        <td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px;color:${priorityColor(pendencia.priority)};font-weight:600">${priorityLabel(pendencia.priority)}</td>
-      </tr>
-    </table>
-    <div style="text-align:center;margin-top:20px">
-      <a href="${window.location.origin}${window.location.pathname}#pendencias" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
-    </div>
-  `);
-
-  sendEmailNotification({
-    to: recipients,
-    subject: `[Init Intra] ⏰ Prazo ${urgency}: ${getPendenciaTitulo(pendencia)}`,
-    html,
-  });
-}
-
-// ── Verificação de Prazos (chamado no init e periodicamente) ──
-function checkDeadlineReminders() {
-  if (typeof getSession === 'function' && !getSession()) return;
-  const prefs = getNotifPrefs();
-  if (!prefs.onDeadlineReminder) return;
-
-  const pens = (typeof getMyPendencias === 'function') ? getMyPendencias() : getPendencias();
-  const today = new Date();
-
-  const reminderDays = prefs.reminderDaysBefore || 2;
-
-  pens.forEach(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return; } catch (_) {}
-    if (!p.deadline || isPendenciaClosed(p.status)) return;
-
-    const deadline = parseDeadline(p.deadline);
-    const diffMs = deadline - today;
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= reminderDays && diffDays >= -1) {
-      const sentKey = `notif_sent_${p.id}_${p.deadline}`;
-      if (!sessionStorage.getItem(sentKey)) {
-        notifyDeadlineReminder(p, diffDays);
-        sessionStorage.setItem(sentKey, '1');
-      }
-    }
-  });
-}
-
-function notifyStalePendencia(p, days) {
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(p) : collectRecipients(p.responsible);
-  if (!recipients.length) return;
-  const status = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.label) || p.status;
-  const html = emailBody(`
-    <div style="margin-bottom:16px">
-      <div style="display:inline-block;background:#d9770615;color:#d97706;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">🕓 Pendência parada</div>
-      <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(p))}</h2>
-    </div>
-    <p style="font-size:14px;color:#475569;margin:0 0 16px">Esta pendência está sem atualização há <strong>${days} dias</strong>.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
-      <tr><td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b;width:120px"><strong>Cliente</strong></td><td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(p.clientName || '—')}</td></tr>
-      <tr><td style="padding:8px 12px;font-size:12px;color:#64748b"><strong>Responsável</strong></td><td style="padding:8px 12px;font-size:13px">${escapeHtml(p.responsible || '—')}</td></tr>
-      <tr><td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b"><strong>Status</strong></td><td style="padding:8px 12px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:13px">${escapeHtml(status)}</td></tr>
-    </table>
-    <div style="text-align:center;margin-top:20px">
-      <a href="${window.location.origin}${window.location.pathname}#pendencias" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
-    </div>
-  `);
-  sendEmailNotification({
-    to: recipients,
-    subject: `[Init Intra] 🕓 Pendência parada há ${days} dias: ${getPendenciaTitulo(p)}`,
-    html,
-  });
-}
-
-function checkStalePendencias() {
-  if (typeof getSession === 'function' && !getSession()) return;
-  const prefs = getNotifPrefs();
-  if (!prefs.onDeadlineReminder) return;
-  getPendencias().forEach(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return; } catch (_) {}
-    if (isPendenciaClosed(p.status)) return;
-    const ref = p.updatedAt || p.createdAt;
-    if (!ref) return;
-    const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
-    if (days >= 7) {
-      const sentKey = `notif_stale_${p.id}_${ref}`;
-      if (!sessionStorage.getItem(sentKey)) {
-        notifyStalePendencia(p, days);
-        sessionStorage.setItem(sentKey, '1');
-      }
-    }
-  });
-}
-
-// Auto-check reminders on load
-if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => setTimeout(() => {
-    checkDeadlineReminders();
-    checkStalePendencias();
-  }, 3000));
-}
+// Lembretes de prazo e avisos de vencimento: enviados pelo servidor, uma vez
+// por dia (Edge Function avisos-prazo + cron, migration 051). Antes o
+// navegador de quem abria o site disparava, e o mesmo e-mail se repetia.
 
 // ── UI: Modal de Configurações de Notificação ──
 function openNotifSettings() {
@@ -468,7 +436,7 @@ function openNotifSettings() {
   body.innerHTML = `
     <div style="margin-bottom:16px">
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
-        Configure quais e-mails automáticos serão enviados pelo sistema.
+        Configure quais avisos automáticos o sistema envia (e-mail e celular).
       </p>
     </div>
 
@@ -489,15 +457,25 @@ function openNotifSettings() {
     </div>
 
     <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">No celular</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">
+        Os mesmos avisos chegam como notificação no aparelho, mesmo com o app fechado.
+      </p>
+      <div id="pushSettings"><p class="push-state">Verificando…</p></div>
+    </div>
+
+    <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Lembretes de Prazo</div>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_deadline" ${prefs.onDeadlineReminder ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
-        <span>Enviar lembretes automáticos</span>
-      </label>
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 0 0 26px;font-size:13px">
-        <span style="color:var(--text-muted)">Dias antes do prazo:</span>
-        <input type="number" id="pref_reminderDays" value="${prefs.reminderDaysBefore || 2}" min="1" max="14" style="width:60px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:center">
-      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0">
+        Enviados automaticamente pelo servidor às 8h: pendências 2 dias antes e no dia do prazo,
+        vencimentos 30 e 7 dias antes e no dia. Cada lembrete sai uma vez só.
+      </p>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Testar envio</div>
+      <button type="button" class="btn btn-secondary" id="notifTestBtn" data-action="sendTestEmail">Enviar e-mail de teste para mim</button>
+      <div id="notifTestResult" style="font-size:12px;margin-top:8px"></div>
     </div>
 
     <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
@@ -507,6 +485,7 @@ function openNotifSettings() {
   `;
 
   modal.style.display = 'flex';
+  if (typeof renderPushSettings === 'function') renderPushSettings();
 }
 
 function saveNotifSettings() {
@@ -514,8 +493,6 @@ function saveNotifSettings() {
     onPendenciaCreate: document.getElementById('pref_pendCreate').checked,
     onPendenciaUpdate: document.getElementById('pref_pendUpdate').checked,
     onPendenciaNote: document.getElementById('pref_pendNote').checked,
-    onDeadlineReminder: document.getElementById('pref_deadline').checked,
-    reminderDaysBefore: parseInt(document.getElementById('pref_reminderDays').value) || 2,
   };
   saveNotifPrefs(prefs);
   document.getElementById('notifModalOverlay').style.display = 'none';

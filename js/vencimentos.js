@@ -11,7 +11,6 @@ const VENC_TIPOS = {
   contrato: 'Contrato',
   outro: 'Outro',
 };
-const VENC_AVISOS = [30, 7, 0];
 
 function _vencDays(fromISO, toISO) {
   const a = Date.UTC(+fromISO.slice(0, 4), +fromISO.slice(5, 7) - 1, +fromISO.slice(8, 10));
@@ -30,23 +29,6 @@ function vencBand(days) {
   if (days <= 7) return 'semana';
   if (days <= 30) return 'mes';
   return 'depois';
-}
-
-/**
- * Qual aviso por e-mail cabe agora (puro): o mais urgente ainda não enviado.
- * Entrando direto na janela de 7 dias, o de 30 não sai atrasado — some junto.
- * @returns {{ aviso: string, marcar: string[] }|null}
- */
-function vencAvisoDevido(v, todayISO) {
-  if (!v || v.status === 'encerrado' || !v.dataVencimento) return null;
-  const days = vencDaysLeft(v, todayISO);
-  if (days < -7) return null; // vencido há mais de uma semana: não insiste por e-mail
-  const sent = new Set((v.avisos || []).map(String));
-  const due = VENC_AVISOS.filter((d) => days <= d).map(String); // ex.: 5 dias → ['30','7']
-  if (!due.length) return null;
-  const aviso = due[due.length - 1]; // o mais urgente
-  if (sent.has(aviso)) return null;
-  return { aviso, marcar: due.filter((d) => !sent.has(d)) };
 }
 
 /** Data + n meses (dia ajustado ao fim do mês). */
@@ -248,41 +230,8 @@ function confirmRenovarVencimento(id) {
   renderVencimentos();
 }
 
-// ── Avisos por e-mail (30 / 7 / no dia) ─────────────────────────────────
-
-function _vencEmail(v, days) {
-  const quando = days < 0 ? 'VENCIDO há ' + (-days) + (days === -1 ? ' dia' : ' dias') : days === 0 ? 'vence HOJE' : 'vence em ' + days + ' dias';
-  const body = '<h2 style="margin:0 0 8px;font-size:18px;color:#1e293b">' + escapeHtml(v.descricao || '') + '</h2>' +
-    '<p style="margin:0 0 12px;font-size:14px;color:#475569">' + escapeHtml(VENC_TIPOS[v.tipo] || 'Vencimento') + ' · ' + escapeHtml(v.clientName || 'Interno') + '</p>' +
-    '<p style="font-size:20px;font-weight:800;color:' + (days <= 7 ? '#dc2626' : '#1a56db') + ';margin:0 0 6px">' + quando + '</p>' +
-    '<p style="font-size:13px;color:#64748b;margin:0 0 16px">Data: ' + escapeHtml(formatDate(v.dataVencimento)) + (v.renovacaoAuto ? ' · renovação automática (confira se renovou)' : '') + '</p>' +
-    '<a href="' + window.location.origin + window.location.pathname + '#vencimentos" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>';
-  return { subject: '[Init Intra] ⏰ ' + (VENC_TIPOS[v.tipo] || 'Vencimento') + ' ' + quando + ': ' + (v.descricao || ''), html: typeof emailBody === 'function' ? emailBody(body) : body };
-}
-
-/** Manda os avisos devidos (uma vez por aviso, marcado no próprio registro). */
-function checkVencimentoReminders() {
-  try {
-    if (typeof getSession === 'function' && !getSession()) return;
-    if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return; // marca precisa sincronizar
-    // Só com dados frescos: aparelho com cópia velha não reenvia aviso já dado por outro.
-    const syncedAt = typeof _getLastSyncAt === 'function' ? Date.parse(_getLastSyncAt('vencimentos') || '') : NaN;
-    if (!(Date.now() - syncedAt < 10 * 60 * 1000)) return;
-    if (typeof getNotifPrefs === 'function' && getNotifPrefs().onDeadlineReminder === false) return;
-    if (typeof sendEmailNotification !== 'function' || typeof collectRecipients !== 'function') return;
-    const today = _vencToday();
-    for (const v of (typeof getMyVencimentos === 'function' ? getMyVencimentos() : [])) {
-      const due = vencAvisoDevido(v, today);
-      if (!due) continue;
-      const to = collectRecipients(v.responsavel || '', true);
-      // Marca antes de enviar: outro aparelho que sincronize no meio não repete.
-      saveVencimento({ id: v.id, avisos: [...new Set([...(v.avisos || []).map(String), ...due.marcar])] }, { silent: true });
-      if (!to.length) continue;
-      const mail = _vencEmail(v, vencDaysLeft(v, today));
-      sendEmailNotification({ to, subject: mail.subject, html: mail.html });
-    }
-  } catch (_) {}
-}
+// Avisos por e-mail (30 / 7 / no dia): enviados pelo servidor, uma vez só
+// (Edge Function avisos-prazo + cron, migration 051).
 
 function updateVencimentosBadge() {
   const el = document.getElementById('badge-vencimentos');
@@ -294,15 +243,10 @@ function updateVencimentosBadge() {
 
 if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !window._vencAutoRefresh) {
   window._vencAutoRefresh = true;
-  let _vencCheckTimer = null;
   onDataChanged('vencimentos', function () {
     try { updateVencimentosBadge(); } catch (_) {}
     try { if (typeof renderAlertStrip === 'function') renderAlertStrip(); } catch (_) {}
-    // Chegou dado do servidor: confere avisos (debounce; a marca evita repetição).
-    if (_vencCheckTimer) clearTimeout(_vencCheckTimer);
-    _vencCheckTimer = setTimeout(checkVencimentoReminders, 5000);
   });
-  window.addEventListener('load', () => setTimeout(checkVencimentoReminders, 15000));
 }
 
 if (typeof registerActions === 'function') {
@@ -321,5 +265,5 @@ if (typeof registerActions === 'function') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { VENC_TIPOS, vencDaysLeft, vencBand, vencAvisoDevido, vencAddMonths, buildVencimentosModel, countVencimentosUrgentes };
+  module.exports = { VENC_TIPOS, vencDaysLeft, vencBand, vencAddMonths, buildVencimentosModel, countVencimentosUrgentes };
 }

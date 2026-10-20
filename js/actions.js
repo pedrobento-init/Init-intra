@@ -40,7 +40,9 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   // Teclado: elementos não-botão com data-action (ex.: <a role="link">) respondem a Enter/Espaço.
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    const el = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; // digitando
+    const el = t && t.closest ? t.closest('[data-action]') : null;
     if (!el || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') return;
     ev.preventDefault();
     _runAction(el.dataset.action, el, el.dataset.arg, ev);
@@ -79,6 +81,30 @@ registerActions({
   newVisit: () => { if (typeof openVisitForm === 'function') openVisitForm(); },
   newPendencia: () => { if (typeof openPendenciaForm === 'function') openPendenciaForm(); },
   closeModal: () => { if (typeof closeModal === 'function') closeModal(); },
+});
+
+// Moldura do app (index.html): topo, menu, busca e modais fixos.
+// data-arg="closeMore" fecha o menu "Mais ações" depois de agir.
+const _actCall = (name, ...args) => { if (typeof globalThis[name] === 'function') return globalThis[name](...args); };
+const _thenCloseMore = (fn) => (el, arg, ev) => { fn(el, arg, ev); if (arg === 'closeMore') _actCall('closeTopbarMoreMenu'); };
+registerActions({
+  focusContent: () => { const c = document.getElementById('contentArea'); if (c) c.focus(); },
+  openSearch: () => _actCall('openGlobalSearch'),
+  closeSearch: () => _actCall('closeGlobalSearch'),
+  closeSearchOverlay: (_el, _arg, ev) => _actCall('closeGlobalSearch', ev),
+  teamChange: (_el, value) => _actCall('onTeamChange', value),
+  logout: () => _actCall('doLogout'),
+  syncNow: () => _actCall('syncNow'),
+  topbarMore: (_el, _arg, ev) => _actCall('toggleTopbarMoreMenu', ev),
+  topbarAction: _thenCloseMore(() => _actCall('topbarAction')),
+  notifSettings: _thenCloseMore(() => _actCall('openNotifSettings')),
+  refreshPage: _thenCloseMore(() => _actCall('refreshPage')),
+  themeToggle: _thenCloseMore(() => { const b = document.getElementById('themeToggleBtn'); if (b) b.click(); }),
+  mobileMenu: () => { const b = document.getElementById('mobileMenuBtn'); if (b) b.click(); },
+  hideOverlay: (_el, id) => { const o = document.getElementById(id); if (o) o.style.display = 'none'; },
+  saveUserConfig: () => _actCall('saveUserConfig'),
+  closeCrop: () => _actCall('closeCropModal'),
+  applyCrop: () => _actCall('applyCrop'),
 });
 
 if (typeof module !== 'undefined' && module.exports) {

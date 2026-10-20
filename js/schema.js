@@ -128,7 +128,7 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     optional: true,
-    optionalFields: ['operator_id'], // 049
+    optionalFields: ['operator_id', 'assinatura', 'assinatura_nome', 'assinatura_em'], // 049, 054
     fields: {
       id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
       time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
@@ -139,6 +139,7 @@ const ENTITIES = [
       milvus_finalizar_status: 'milvusFinalizarStatus', milvus_finalizar_erro: 'milvusFinalizarErro',
       milvus_finalizar_tentativas: 'milvusFinalizarTentativas',
       operator_id: 'operatorId',
+      assinatura: 'assinatura', assinatura_nome: 'assinaturaNome', assinatura_em: 'assinaturaEm',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     mapRow: r => ({
@@ -155,6 +156,7 @@ const ENTITIES = [
       milvusFinalizarErro: r.milvus_finalizar_erro ?? null,
       milvusFinalizarTentativas: r.milvus_finalizar_tentativas ?? 0,
       operatorId: r.operator_id ?? null,
+      assinatura: r.assinatura ?? null, assinaturaNome: r.assinatura_nome ?? null, assinaturaEm: r.assinatura_em ?? null,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
     // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem

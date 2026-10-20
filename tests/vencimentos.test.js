@@ -15,23 +15,6 @@ describe('vencimentos', () => {
     expect(V.vencBand(31)).toBe('depois');
   });
 
-  it('aviso de 30 dias sai uma vez', () => {
-    const a = v({ dataVencimento: '2026-11-10' }); // 23 dias
-    expect(V.vencAvisoDevido(a, TODAY)).toEqual({ aviso: '30', marcar: ['30'] });
-    expect(V.vencAvisoDevido({ ...a, avisos: ['30'] }, TODAY)).toBeNull();
-  });
-
-  it('cadastrado já dentro dos 7 dias: manda só o de 7 e marca o de 30 junto', () => {
-    expect(V.vencAvisoDevido(v({ dataVencimento: '2026-10-21' }), TODAY)).toEqual({ aviso: '7', marcar: ['30', '7'] });
-  });
-
-  it('no dia (ou vencido há até 7 dias) manda o aviso "0"; depois para de insistir', () => {
-    expect(V.vencAvisoDevido(v({ dataVencimento: TODAY, avisos: ['30', '7'] }), TODAY)).toEqual({ aviso: '0', marcar: ['0'] });
-    expect(V.vencAvisoDevido(v({ dataVencimento: '2026-10-01' }), TODAY)).toBeNull();
-    expect(V.vencAvisoDevido(v({ dataVencimento: '2026-12-31' }), TODAY)).toBeNull();
-    expect(V.vencAvisoDevido(v({ dataVencimento: TODAY, status: 'encerrado' }), TODAY)).toBeNull();
-  });
-
   it('renovar soma meses ajustando fim de mês', () => {
     expect(V.vencAddMonths('2026-01-31', 1)).toBe('2026-02-28');
     expect(V.vencAddMonths('2026-10-18', 12)).toBe('2027-10-18');

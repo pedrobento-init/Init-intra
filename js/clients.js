@@ -37,6 +37,8 @@ function renderClients() {
   document.getElementById('pageTitle').textContent = 'Clientes';
   const filterState = loadFilterState('clients', {});
   _clientPage = filterState._clientPage || 1;
+  _clientView = filterState.view === 'cartoes' ? 'cartoes' : 'lista';
+  _clientSort = filterState.sort || 'nome';
   // Criação restrita a admin (não-admin edita, mas não cadastra).
   if (typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
     setTopbarAction('Novo Cliente', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
@@ -59,11 +61,15 @@ function renderClients() {
           <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
         </div>
         <div class="pt-actions">
+        <div class="cl-view" role="group" aria-label="Modo de exibição">
+          <button type="button" class="cl-view-btn${_clientView === 'lista' ? ' is-on' : ''}" aria-pressed="${_clientView === 'lista'}" data-action="clientView" data-arg="lista" title="Lista"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Lista</button>
+          <button type="button" class="cl-view-btn${_clientView === 'cartoes' ? ' is-on' : ''}" aria-pressed="${_clientView === 'cartoes'}" data-action="clientView" data-arg="cartoes" title="Cartões"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Cartões</button>
+        </div>
         <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
         ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Milvus</button>` : ''}
         </div>
       </div>
-      <div class="client-cards-grid" id="clientGrid"></div>
+      <div class="${_clientView === 'lista' ? 'cl-list' : 'client-cards-grid'}" id="clientGrid"></div>
     </div>`;
   showSkeleton('clientGrid', 8);
   renderClientGrid();
@@ -74,10 +80,75 @@ if (typeof window !== 'undefined') window.debouncedFilterClientCards = debounce(
 function filterClientCards() {
   _clientPage = 1;
   const q = document.getElementById('clientSearch').value.toLowerCase();
-  saveFilterState('clients', {search: document.getElementById('clientSearch').value, _clientPage: _clientPage});
+  _saveClientFilterState();
   const all = typeof getMyClients === 'function' ? getMyClients() : getClients();
   _filteredClients = q ? all.filter(c => c.name?.toLowerCase().includes(q) || c.segment?.toLowerCase().includes(q)) : all;
   renderClientGrid();
+}
+
+// Lista (padrão) ou cartões; ordenação da lista por nome, abertas ou vencidas.
+var _clientView = 'lista';
+var _clientSort = 'nome';
+function _saveClientFilterState() {
+  var el = document.getElementById('clientSearch');
+  saveFilterState('clients', { search: el ? el.value : '', _clientPage: _clientPage, view: _clientView, sort: _clientSort });
+}
+function setClientView(view) {
+  _clientView = view === 'cartoes' ? 'cartoes' : 'lista';
+  _saveClientFilterState();
+  var grid = document.getElementById('clientGrid');
+  if (grid) grid.className = _clientView === 'lista' ? 'cl-list' : 'client-cards-grid';
+  document.querySelectorAll('.cl-view-btn').forEach(function(b, i) {
+    var on = (i === 0) === (_clientView === 'lista');
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  renderClientGrid();
+}
+function setClientSort(key) {
+  _clientSort = _clientSort === key && key !== 'nome' ? 'nome' : key;
+  _clientPage = 1;
+  _saveClientFilterState();
+  renderClientGrid();
+}
+if (typeof registerActions === 'function') {
+  registerActions({
+    clientView: (_el, v) => setClientView(v),
+    clientSort: (_el, k) => setClientSort(k),
+    clientEdit: (_el, id) => openClientForm(id),
+    clientDelete: (_el, id) => deleteClientConfirm(id),
+  });
+}
+function _clientRowStats(c, pens, today) {
+  var sla = typeof getSlaStatsForClient === 'function' ? getSlaStatsForClient(pens, c.id, today) : { totalAbertas: pens.filter(function(p) { return p.clientId === c.id && !isPendenciaClosed(p.status); }).length, vencidas: 0, dentroPrazo: 0 };
+  var health = typeof getHealthForClient === 'function' ? getHealthForClient(pens, c.id, today) : null;
+  return { abertas: sla.totalAbertas || 0, vencidas: sla.vencidas || 0, health: health };
+}
+function _renderClientTable(grid, pageClients, statsById) {
+  var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
+  var arrow = function(k) { return _clientSort === k ? ' <span aria-hidden="true">↓</span>' : ''; };
+  var sortAttr = function(k) { return _clientSort === k ? ' aria-sort="descending"' : ''; };
+  var rows = pageClients.map(function(c) {
+    var st = statsById[c.id];
+    var h = st.health;
+    var lvl = h ? (h.level === 'red' ? 'danger' : h.level === 'yellow' ? 'warn' : 'ok') : '';
+    return '<tr class="cl-row" tabindex="0" data-action="openClient" data-arg="' + escapeHtml(c.id) + '">' +
+      '<td><div class="cl-name">' + clientAvatar(c, 30) + '<div><div class="cl-title">' + escapeHtml(c.name) + '</div>' +
+        (c.segment ? '<div class="cl-seg">' + escapeHtml(c.segment) + '</div>' : '') + '</div></div></td>' +
+      '<td>' + (h ? '<span class="cl-health" style="--c:var(--st-' + lvl + ')"><i aria-hidden="true"></i>' + escapeHtml(h.label) + '</span>' : '—') + '</td>' +
+      '<td class="cl-num">' + st.abertas + '</td>' +
+      '<td class="cl-num' + (st.vencidas ? ' is-over' : '') + '">' + st.vencidas + '</td>' +
+      '<td class="cl-acts"><button class="btn btn-sm btn-secondary" data-action="clientEdit" data-arg="' + escapeHtml(c.id) + '">Editar</button></td>' +
+      (isAdmin ? '<td class="cl-del"><button type="button" class="cl-del-btn" title="Excluir cliente" aria-label="Excluir ' + escapeHtml(c.name) + '" data-action="clientDelete" data-arg="' + escapeHtml(c.id) + '"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg></button></td>' : '') +
+    '</tr>';
+  }).join('');
+  grid.innerHTML = '<div class="table-wrapper"><table class="cl-table"><thead><tr>' +
+    '<th' + sortAttr('nome') + '><button type="button" class="cl-sort" data-action="clientSort" data-arg="nome">Cliente' + arrow('nome') + '</button></th>' +
+    '<th>Saúde</th>' +
+    '<th class="cl-num"' + sortAttr('abertas') + '><button type="button" class="cl-sort" data-action="clientSort" data-arg="abertas">Abertas' + arrow('abertas') + '</button></th>' +
+    '<th class="cl-num"' + sortAttr('vencidas') + '><button type="button" class="cl-sort" data-action="clientSort" data-arg="vencidas">Vencidas' + arrow('vencidas') + '</button></th>' +
+    '<th><span class="sr-only">Editar</span></th>' + (isAdmin ? '<th><span class="sr-only">Excluir</span></th>' : '') +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function renderClientGrid() {
@@ -92,7 +163,33 @@ function renderClientGrid() {
     if (_clientPage < 1) _clientPage = 1;
 
     const startIdx = (_clientPage - 1) * CLIENT_PAGE_SIZE;
-    const pageClients = clients.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
+    const _today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
+    const _pens = _getPendenciasList();
+    const statsById = {};
+    clients.forEach(c => { statsById[c.id] = _clientRowStats(c, _pens, _today); });
+    const sorted = clients.slice().sort((a, b) => {
+      if (_clientSort === 'abertas' || _clientSort === 'vencidas') {
+        const d = statsById[b.id][_clientSort] - statsById[a.id][_clientSort];
+        if (d) return d;
+      }
+      return String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    });
+    const pageClients = sorted.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
+    const _pager = totalPages > 1 ? `
+    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
+      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} onclick="_clientPage--;renderClientGrid()">← Anterior</button>
+        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
+        <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} onclick="_clientPage++;renderClientGrid()">Próxima →</button>
+      </div>
+    </div>
+  ` : '';
+    if (_clientView === 'lista') {
+      _renderClientTable(grid, pageClients, statsById);
+      if (_pager) grid.insertAdjacentHTML('beforeend', _pager);
+      return;
+    }
 
     grid.innerHTML = pageClients.map(c => {
       const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0,10);
@@ -114,16 +211,7 @@ function renderClientGrid() {
         </div>
       </div>
     </div>`;
-    }).join('') + (totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
-      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} onclick="_clientPage--;renderClientGrid()">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} onclick="_clientPage++;renderClientGrid()">Próxima →</button>
-      </div>
-    </div>
-  ` : '');
+    }).join('') + _pager;
   }, 10);
 }
 

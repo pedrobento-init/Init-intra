@@ -1,63 +1,48 @@
-# 🔴 CRÍTICO — RLS permissivo: qualquer autenticado lê/escreve quase tudo via API
+# Trava de acesso por equipe (RLS): como conferir
 
-- **Prioridade:** CRÍTICA
-- **Status:** PENDENTE (aguardando DBA)
-- **Origem:** auditoria do Dashboard por perfil (2026). Esconder blocos no
-  frontend NÃO blinda os dados — o app sincroniza tudo para o Dexie local e
-  qualquer console/anon-key alcança a API.
+- **Status:** a correção existe na migration `042_rls_completo.sql` (substitui
+  a `021` e a `024`). Falta só confirmar que ela está aplicada em produção.
+- **Por que importa:** esconder blocos na tela não protege os dados. Sem RLS,
+  qualquer técnico logado lê e edita dados de outras equipes direto pela API.
+- As migrations `045` em diante usam funções criadas pela `042`
+  (`can_see_team`, `current_op_is_admin`). Se `vencimentos` funciona em
+  produção, a `042` provavelmente já rodou, mas confira com os comandos abaixo.
 
-## Evidência (código)
+## 1. Conferir (somente leitura, SQL Editor do Supabase)
 
-- Baseline `supabase/migration.sql` criou policies `"operators all"`,
-  `"clients all"`, `"pendencias all"` com `FOR ALL USING (true)` (sem `TO`
-  = vale até p/ anon).
-- Auditoria interna `supabase/migrations/021_rls_remediation.sql` (marcada
-  "NÃO APLICAR / revisão") confirma via `pg_policies`: policies `"X all"`
-  em 8 tabelas anulam por OU permissivo todas as policies por equipe/admin.
-- `024_teams_mam_bt_isolation.sql` ("PODE APLICAR") faz o recorte mínimo
-  operators/clients/pendencias — verificar se foi aplicada em produção.
-- Já travados: `audit_logs` só-admin (`010`), writes de `operators`
-  (`011`/`014`). Aberto por desenho: `procedure_templates` global.
+```sql
+-- a) a 042 está aplicada? (esperado: true)
+SELECT to_regprocedure('public.can_see_team(text)') IS NOT NULL AS tem_042;
 
-## Impacto
+-- b) nenhuma policy aberta ou para anon (esperado: 0 linhas)
+SELECT tablename, policyname, roles, qual FROM pg_policies
+ WHERE schemaname = 'public' AND (qual = 'true' OR with_check = 'true'
+    OR NOT (roles @> ARRAY['authenticated']::name[]));
 
-Técnico autenticado pode ler (e em várias tabelas escrever/excluir) dados de
-outras equipes — pendências, clientes, operadores, visitas — direto pela API
-ou DevTools, independente dos gates visuais do Dashboard.
+-- c) nenhuma tabela sem RLS (esperado: 0 linhas)
+SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity;
 
-## Verificação (rodar com os próprios olhos)
+-- d) anon sem privilégio em tabela (esperado: 0 linhas)
+SELECT table_name, privilege_type FROM information_schema.role_table_grants
+ WHERE grantee = 'anon' AND table_schema = 'public';
+```
 
-1. **SQL Editor (Supabase, como postgres):**
-   ```sql
-   SELECT tablename, policyname, cmd FROM pg_policies
-   WHERE schemaname='public' AND policyname ILIKE '% all %'
-   ORDER BY tablename;
-   ```
-   Se retornar linhas em `clients/pendencias/operators/visits` → exposição
-   confirmada.
-2. **Console do app (logado como operador NÃO-admin, sem dados — só conta):**
-   ```js
-   (async () => ({
-     pendencias: (await supabaseClient.from('pendencias').select('id', { count: 'exact', head: true })),
-     operators: (await supabaseClient.from('operators').select('id', { count: 'exact', head: true })),
-     clients: (await supabaseClient.from('clients').select('id', { count: 'exact', head: true })),
-   }))();
-   ```
-   `count` numérico = leitura liberada além do time do operador.
+Tudo como esperado: nada a fazer. Algo diferente: siga o passo 2.
 
-## Remediação (DBA, tarefa separada do frontend)
+Se a consulta d) mostrar só `v_notification_stats`, rode a migration
+`052_view_notificacoes_fechada.sql` (a view antiga da 003 ficou aberta).
 
-1. Backup/snapshot do projeto Supabase.
-2. Aplicar `024_teams_mam_bt_isolation.sql` (blocos §0→§5, nessa ordem).
-3. Avaliar/aplicar `021_rls_remediation.sql` (cobre visits/reunioes/
-   procedures/templates; tem pré-requisitos e Q-ORFÃS no cabeçalho).
-4. Re-rodar a verificação acima: esperado zero policies `% all` vindas do app.
-5. Re-testar sync offline-first em aparelho de operador (login, pull, push,
-   realtime) antes de considerar encerrado.
+## 2. Aplicar (só se a conferência falhar)
 
-## Critério de aceite
+1. Faça um backup (Database → Backups) e guarde as policies atuais:
+   `SELECT * FROM pg_policies WHERE schemaname = 'public';`
+2. Rode a pré-checagem do cabeçalho da `042` e veja o que vai sumir para não-admin.
+3. Cole e rode o arquivo `supabase/migrations/042_rls_completo.sql` inteiro
+   (é idempotente: pode rodar de novo).
+4. Rode a conferência do passo 1 de novo.
+5. Teste com um técnico que não é admin: login, lista de pendências, criar e
+   editar uma pendência, e que dados de outra equipe não aparecem.
 
-- Query do item 1 sem policies `% all` em tabelas de dados.
-- Probe do item 2 como não-admin retorna só contagens do próprio time
-  (ou 403 onde não houver acesso).
-- Nenhuma regressão no sync (suíte `npm test` + smoke em 2 aparelhos).
+A `042` é testada em Postgres real em `tests/rls.test.js` (anon, técnico,
+outra equipe, Gestão e admin).

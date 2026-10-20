@@ -17,15 +17,15 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
 </head>
 <body>
-  <a href="#contentArea" class="skip-link" onclick="document.getElementById('contentArea').focus();">Pular para o conteúdo</a>
+  <a href="#contentArea" class="skip-link" data-action="focusContent">Pular para o conteúdo</a>
 
   <!-- Busca Global Modal (Sprint 7) -->
-  <div id="globalSearchModal" class="global-search-modal" style="display:none" onclick="closeGlobalSearch(event)">
+  <div id="globalSearchModal" class="global-search-modal" style="display:none" data-action="closeSearchOverlay">
     <div class="global-search-box" role="dialog" aria-modal="true" aria-label="Busca global">
       <div class="global-search-input-row">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="globalSearchInput" type="search" aria-label="Buscar ou digitar uma ação" enterkeyhint="search" placeholder="Buscar ou digitar uma ação (ex.: nova visita)…" autocomplete="off" />
-        <button type="button" class="esc-key" onclick="closeGlobalSearch()" aria-label="Fechar busca">ESC</button>
+        <button type="button" class="esc-key" data-action="closeSearch" aria-label="Fechar busca">ESC</button>
       </div>
       <div class="search-results-container" id="searchResultsContainer">
         <div class="search-empty">Digite para pesquisar…</div>
@@ -52,7 +52,7 @@
       </div>
 
       <div id="teamSelectorWrap" style="display:none;padding:8px 12px;border-bottom:1px solid var(--sidebar-border)">
-        <select id="teamSelector" class="form-select" style="width:100%;font-size:12px" onchange="onTeamChange(this.value)">
+        <select id="teamSelector" class="form-select" style="width:100%;font-size:12px" data-change="teamChange">
           <option value="">Todas as equipes</option>
         </select>
       </div>
@@ -124,17 +124,11 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button class="btn-export" onclick="exportData()" title="Exportar backup dos dados" aria-label="Exportar backup dos dados">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Exportar dados</span>
-        </button>
-        <button class="btn-export" onclick="importData()" title="Importar backup" aria-label="Importar backup de dados">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>Importar dados</span>
-        </button>
-        <button class="btn-export" id="installAppBtn" onclick="promptInstall()" title="Instalar o app no dispositivo" aria-label="Instalar o aplicativo" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Instalar app</span>
+        <!-- Exportar / Importar / Instalar ficam num único item "Mais opções"
+             (popover) para não ocupar três linhas do rodapé da sidebar. -->
+        <button class="btn-more" id="sidebarMoreBtn" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false" aria-controls="sidebarMoreMenu" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          <span>Mais opções</span>
         </button>
         <div class="current-user" id="userQuickBtn" title="Meu perfil" role="button" tabindex="0" aria-label="Meu perfil">
           <div class="avatar" id="user-avatar" style="background:#1a56db">TI</div>
@@ -143,12 +137,26 @@
             <span class="user-role" id="user-role-display">Técnico</span>
           </div>
         </div>
-        <button class="btn-logout" id="logoutBtn" onclick="doLogout()" title="Sair" aria-label="Sair do sistema">
+        <button class="btn-logout" id="logoutBtn" data-action="logout" title="Sair" aria-label="Sair do sistema">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span>Sair</span>
         </button>
       </div>
     </aside>
+    <div class="sidebar-more-menu" id="sidebarMoreMenu" role="menu" aria-label="Mais opções" hidden>
+      <button class="sidebar-more-item" id="exportDataBtn" type="button" role="menuitem" data-more-action="exportData" title="Exportar backup dos dados">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Exportar dados</span>
+      </button>
+      <button class="sidebar-more-item" id="importDataBtn" type="button" role="menuitem" data-more-action="importData" title="Importar backup de dados">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Importar dados</span>
+      </button>
+      <button class="sidebar-more-item" id="installAppBtn" type="button" role="menuitem" data-more-action="promptInstall" title="Instalar o app no dispositivo" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Instalar app</span>
+      </button>
+    </div>
 
     <main class="main-content" id="mainContent">
       <header class="topbar">
@@ -165,18 +173,18 @@
         <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
           <!-- Busca Global -->
           <div class="global-search-wrap" id="globalSearchWrap">
-            <button class="global-search-trigger" id="globalSearchTrigger" onclick="openGlobalSearch()" title="Buscar (Ctrl+K)">
+            <button class="global-search-trigger" id="globalSearchTrigger" data-action="openSearch" title="Buscar (Ctrl+K)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               Buscar…
               <span class="kbd">Ctrl+K</span>
             </button>
           </div>
           <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
-          <button type="button" class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" onclick="syncNow()" aria-live="polite"><i class="sync-dot" aria-hidden="true"></i><span class="sync-label">Sincronizando…</span></button>
-          <button class="theme-toggle-btn" id="notifSettingsBtn" title="Configurar notificações" onclick="openNotifSettings()" aria-label="Configurar notificações">
+          <button type="button" class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" data-action="syncNow" aria-live="polite"><i class="sync-dot" aria-hidden="true"></i><span class="sync-label">Sincronizando…</span></button>
+          <button class="theme-toggle-btn" id="notifSettingsBtn" title="Configurar notificações" data-action="notifSettings" aria-label="Configurar notificações">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </button>
-          <button class="theme-toggle-btn" id="refreshBtn" title="Recarregar página" onclick="refreshPage()" aria-label="Recarregar página atual">
+          <button class="theme-toggle-btn" id="refreshBtn" title="Recarregar página" data-action="refreshPage" aria-label="Recarregar página atual">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
           <button class="theme-toggle-btn" id="themeToggleBtn" title="Alternar tema" aria-label="Alternar tema claro/escuro">
@@ -184,26 +192,26 @@
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
           </button>
-          <button class="btn btn-primary btn-sm" id="topbarActionBtn" style="display:none" onclick="topbarAction()" aria-label="Criar novo registro">
+          <button class="btn btn-primary btn-sm" id="topbarActionBtn" style="display:none" data-action="topbarAction" aria-label="Criar novo registro">
             <svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span class="topbar-action-text">Novo</span>
           </button>
           <!-- Menu suspenso mobile: agrupa as ações do topbar (visível só ≤768px) -->
           <div class="topbar-more-wrap">
-            <button class="theme-toggle-btn" id="topbarMoreBtn" onclick="toggleTopbarMoreMenu(event)" aria-label="Mais ações" aria-expanded="false" aria-controls="topbarMoreMenu" title="Mais ações">
+            <button class="theme-toggle-btn" id="topbarMoreBtn" data-action="topbarMore" aria-label="Mais ações" aria-expanded="false" aria-controls="topbarMoreMenu" title="Mais ações">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
             </button>
             <nav class="topbar-more-menu" id="topbarMoreMenu" data-open="0" hidden aria-label="Ações">
-              <button class="topbar-more-item topbar-more-item--action" id="topbarMoreAction" onclick="topbarAction();closeTopbarMoreMenu()">
+              <button class="topbar-more-item topbar-more-item--action" id="topbarMoreAction" data-action="topbarAction" data-arg="closeMore">
                 <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="topbar-more-action-text">Novo</span>
               </button>
-              <button class="topbar-more-item" onclick="openNotifSettings();closeTopbarMoreMenu()">
+              <button class="topbar-more-item" data-action="notifSettings" data-arg="closeMore">
                 <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Notificações</span>
               </button>
-              <button class="topbar-more-item" onclick="refreshPage();closeTopbarMoreMenu()">
+              <button class="topbar-more-item" data-action="refreshPage" data-arg="closeMore">
                 <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Recarregar</span>
               </button>
-              <button class="topbar-more-item" onclick="document.getElementById('themeToggleBtn').click();closeTopbarMoreMenu()">
+              <button class="topbar-more-item" data-action="themeToggle" data-arg="closeMore">
                 <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span>Alternar tema</span>
               </button>
             </nav>
@@ -231,7 +239,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <span>Agenda</span>
     </button>
-    <button type="button" class="bottom-nav-item" data-page="__more" onclick="document.getElementById('mobileMenuBtn').click()" aria-label="Mais opções do menu">
+    <button type="button" class="bottom-nav-item" data-page="__more" data-action="mobileMenu" aria-label="Mais opções do menu">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
       <span>Mais</span>
     </button>
@@ -245,7 +253,7 @@
     <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="modalTitle"></h2>
-        <button class="modal-close" onclick="closeModal()" aria-label="Fechar modal">&times;</button>
+        <button class="modal-close" data-action="closeModal" aria-label="Fechar modal">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
     </div>
@@ -256,12 +264,12 @@
     <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="userModalTitle">Meu Perfil</h2>
-        <button class="modal-close" onclick="document.getElementById('userModalOverlay').style.display='none'" aria-label="Fechar configurações">&times;</button>
+        <button class="modal-close" data-action="hideOverlay" data-arg="userModalOverlay" aria-label="Fechar configurações">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group"><label class="form-label" for="userNameInput">Seu nome</label><input type="text" class="form-input" id="userNameInput" autocomplete="name" placeholder="Ex: João Silva" /></div>
         <div class="form-group"><label class="form-label" for="userInitialsInput">Iniciais (avatar)</label><input autocomplete="off" type="text" class="form-input" id="userInitialsInput" maxlength="2" placeholder="Ex: JS" /></div>
-        <button class="btn btn-primary" style="width:100%" onclick="saveUserConfig()">Salvar</button>
+        <button class="btn btn-primary" style="width:100%" data-action="saveUserConfig">Salvar</button>
       </div>
     </div>
   </div>
@@ -273,7 +281,7 @@
     <div class="modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="cropModalTitle">Recortar Logo</h2>
-        <button class="modal-close" onclick="closeCropModal()" aria-label="Fechar recorte de imagem">&times;</button>
+        <button class="modal-close" data-action="closeCrop" aria-label="Fechar recorte de imagem">&times;</button>
       </div>
       <div class="modal-body" style="padding:16px">
         <div class="crop-container" id="cropContainer">
@@ -282,8 +290,8 @@
         </div>
         <div class="crop-actions">
           <div style="display:flex;gap:8px">
-            <button type="button" class="btn btn-secondary" onclick="closeCropModal()" aria-label="Cancelar recorte">Cancelar</button>
-            <button type="button" class="btn btn-primary" onclick="applyCrop()" aria-label="Aplicar recorte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><path d="M6 21V9m0 0h12M18 3v12m0 0H6"/></svg> Aplicar Recorte</button>
+            <button type="button" class="btn btn-secondary" data-action="closeCrop" aria-label="Cancelar recorte">Cancelar</button>
+            <button type="button" class="btn btn-primary" data-action="applyCrop" aria-label="Aplicar recorte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><path d="M6 21V9m0 0h12M18 3v12m0 0H6"/></svg> Aplicar Recorte</button>
           </div>
         </div>
       </div>
@@ -294,8 +302,8 @@
   <div class="modal-overlay" id="notifModalOverlay" style="display:none">
     <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title" id="notifModalTitle">Configurar Notificações por E-mail</h2>
-        <button class="modal-close" onclick="document.getElementById('notifModalOverlay').style.display='none'" aria-label="Fechar notificações">&times;</button>
+        <h2 class="modal-title" id="notifModalTitle">Configurar notificações</h2>
+        <button class="modal-close" data-action="hideOverlay" data-arg="notifModalOverlay" aria-label="Fechar notificações">&times;</button>
       </div>
       <div class="modal-body" id="notifModalBody"></div>
     </div>
@@ -362,9 +370,11 @@
   <script defer src="js/pendencias-comando.js"></script>
   <script defer src="js/operadores.js"></script>
   <script defer src="js/notifications.js"></script>
+  <script defer src="js/push.js"></script>
   <script defer src="js/calendar.js"></script>
   <script defer src="js/visitas.js"></script>
   <script defer src="js/visit-photos.js"></script>
+  <script defer src="js/visit-signature.js"></script>
   <script defer src="js/ia-relatorio.js"></script>
   <script defer src="js/templates.js"></script>
   <script defer src="js/global-search.js"></script>

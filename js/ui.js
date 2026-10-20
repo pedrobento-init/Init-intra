@@ -1,12 +1,13 @@
 // ui.js – Componentes reutilizáveis
 
 const _loadedScripts = new Set();
-function loadScript(url) {
+function loadScript(url, integrity) {
   if (_loadedScripts.has(url)) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = url;
     s.crossOrigin = 'anonymous';
+    if (integrity) s.integrity = integrity;
     s.onload = () => { _loadedScripts.add(url); resolve(); };
     s.onerror = () => reject(new Error('Falha ao carregar: ' + url));
     document.head.appendChild(s);
@@ -15,12 +16,20 @@ function loadScript(url) {
 
 async function loadChartJs() {
   if (typeof Chart !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/chart.js');
+  // Versão fixa + SRI: sem versão o CDN entrega sempre a última e uma
+  // major nova pode quebrar os gráficos do dia para a noite.
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+    'sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ'
+  );
 }
 
 async function loadFullCalendar() {
   if (typeof FullCalendar !== 'undefined') return;
-  await loadScript('https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js');
+  await loadScript(
+    'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js',
+    'sha384-RvFLqUoLENXxwOpLf9+DxOdYK1gR2w9NIQ7uN31j65tKiMpSD6qEJ8Rt6I2WQ/H/'
+  );
 }
 
 function debounce(func, wait) {
@@ -579,6 +588,41 @@ if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPro
   }).catch(() => {});
 }
 
+// Menu recolhido (só ícones): rótulo flutuante na hora, com o nome do item e
+// a seção (Dia a dia, Cadastros, Gestão). O `title` nativo demora ~1s e não
+// mostra a seção; ele vira aria-label para o leitor de tela continuar lendo.
+(function _initSidebarTips() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || typeof document.createElement !== 'function') return;
+  let tip = null;
+  let section = '';
+  Array.prototype.forEach.call(nav.children || [], (el) => {
+    if (el.classList && el.classList.contains('nav-section')) { section = (el.textContent || '').trim(); return; }
+    if (!el.classList || !el.classList.contains('nav-item')) return;
+    const label = el.querySelector('span:not(.badge)');
+    el.dataset.tip = (label && label.textContent.trim()) || el.getAttribute('title') || '';
+    el.dataset.tipSection = section;
+    if (el.getAttribute('title')) { el.setAttribute('aria-label', el.getAttribute('title')); el.removeAttribute('title'); }
+  });
+  const show = (item) => {
+    const sb = document.getElementById('sidebar');
+    if (!sb || !sb.classList.contains('collapsed') || !item.dataset.tip) return;
+    if (!tip) { tip = document.createElement('div'); tip.className = 'sidebar-tip'; tip.setAttribute('aria-hidden', 'true'); document.body.appendChild(tip); }
+    tip.innerHTML = escapeHtml(item.dataset.tip) + (item.dataset.tipSection ? '<small>' + escapeHtml(item.dataset.tipSection) + '</small>' : '');
+    const r = item.getBoundingClientRect();
+    tip.style.top = Math.round(r.top + r.height / 2) + 'px';
+    tip.style.left = Math.round(sb.getBoundingClientRect().right + 8) + 'px';
+    tip.classList.add('is-on');
+  };
+  const hide = () => { if (tip) tip.classList.remove('is-on'); };
+  nav.addEventListener('mouseover', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); else hide(); });
+  nav.addEventListener('mouseleave', hide);
+  nav.addEventListener('focusin', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); });
+  nav.addEventListener('focusout', hide);
+  nav.addEventListener('click', hide);
+  nav.addEventListener('scroll', hide);
+})();
+
 // Sidebar Mobile (Hamburger & Overlay)
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
@@ -611,7 +655,7 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
   });
   sidebarOverlay.addEventListener('click', closeMobileMenu);
 
-  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user, .btn-export').forEach(item => {
+  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user').forEach(item => {
     item.addEventListener('click', () => {
       if (window.innerWidth <= 768) closeMobileMenu();
     });
@@ -1196,31 +1240,33 @@ document.addEventListener('keydown', e => {
 });
 
 // ── ALERTAS PROATIVOS DE PRAZOS ──
+// Só avisa do que vence hoje ou amanhã. Pendência já vencida/atrasada não gera
+// mais alerta (pedido do Pedro); ela segue aparecendo no dashboard e nas listas.
 function checkOverdueAlerts() {
   if (typeof getSession === 'function' && !getSession()) return;
   if (typeof getPendencias !== 'function') return;
   const pens = typeof getMyPendencias === 'function' ? getMyPendencias() : getPendencias();
   const now = new Date();
   const todayStr = localDateISO(now);
-  
+
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = localDateISO(tomorrow);
 
-  const overdue = pens.filter(p => p.deadline && p.deadline <= todayStr && !isPendenciaClosed(p.status));
+  const dueToday = pens.filter(p => p.deadline && p.deadline === todayStr && !isPendenciaClosed(p.status));
   const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !isPendenciaClosed(p.status));
 
-  if (overdue.length > 0 || dueTomorrow.length > 0) {
+  if (dueToday.length > 0 || dueTomorrow.length > 0) {
     let msg = '';
-    if (overdue.length > 0 && dueTomorrow.length > 0) {
-      msg = `⚠️ ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} e ${dueTomorrow.length} vencendo amanhã!`;
-    } else if (overdue.length > 0) {
-      msg = `⚠️ Você possui ${plural(overdue.length, 'pendência vencida', 'pendências vencidas')} ou vencendo hoje!`;
+    if (dueToday.length > 0 && dueTomorrow.length > 0) {
+      msg = `⏰ ${plural(dueToday.length, 'pendência vence', 'pendências vencem')} hoje e ${dueTomorrow.length} amanhã!`;
+    } else if (dueToday.length > 0) {
+      msg = `⏰ Você possui ${plural(dueToday.length, 'pendência', 'pendências')} vencendo hoje!`;
     } else {
       msg = `⏰ Você possui ${plural(dueTomorrow.length, 'pendência', 'pendências')} vencendo amanhã!`;
     }
 
-    showToast(msg, overdue.length > 0 ? 'error' : 'info');
+    showToast(msg, 'info');
 
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Init Intra – Alerta de Prazos', {
@@ -1233,14 +1279,14 @@ function checkOverdueAlerts() {
   }
 
   // Render persistent banner if on dashboard or pendencias page
-  renderOverdueBanner(overdue.length, dueTomorrow.length);
+  renderOverdueBanner(dueToday.length, dueTomorrow.length);
 }
 
-function renderOverdueBanner(overdueCount, dueTomorrowCount) {
+function renderOverdueBanner(dueTodayCount, dueTomorrowCount) {
   const existing = document.getElementById('overdueBanner');
   if (existing) existing.remove();
 
-  if (overdueCount === 0 && dueTomorrowCount === 0) return;
+  if (dueTodayCount === 0 && dueTomorrowCount === 0) return;
 
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   if (!['dashboard', 'pendencias', 'calendario'].includes(hash)) return;
@@ -1253,9 +1299,9 @@ function renderOverdueBanner(overdueCount, dueTomorrowCount) {
   banner.className = 'overdue-banner';
   banner.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:16px">${overdueCount > 0 ? '🚨' : '⏰'}</span>
+      <span style="font-size:16px">⏰</span>
       <span>
-        ${overdueCount > 0 ? `<strong>${plural(overdueCount, 'pendência vencida', 'pendências vencidas')}</strong>.` : ''}
+        ${dueTodayCount > 0 ? `<strong>${plural(dueTodayCount, 'pendência vence', 'pendências vencem')} hoje</strong>.` : ''}
         ${dueTomorrowCount > 0 ? ` ${plural(dueTomorrowCount, 'pendência', 'pendências')} vencendo amanhã.` : ''}
       </span>
     </div>
@@ -1271,7 +1317,89 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 let _deferredInstall = null;
 function _setInstallBtnVisible(v) {
   try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_) {}
+  refreshSidebarMore();
 }
+
+// ── Menu "Mais opções" (rodapé da sidebar) ────────────────────────────────────
+// Exportar/Importar (só admin) e Instalar app (só quando o navegador oferece)
+// vivem num popover. Cada item controla a própria visibilidade; o botão
+// "Mais opções" só aparece se houver ao menos um item visível.
+function setSidebarMoreAdmin(isAdmin) {
+  ['exportDataBtn', 'importDataBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isAdmin ? '' : 'none';
+  });
+  refreshSidebarMore();
+}
+
+function refreshSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(el => el.style.display !== 'none');
+  btn.style.display = any ? '' : 'none';
+  if (!any) closeSidebarMore();
+}
+
+function closeSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function openSidebarMore() {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  menu.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  // A sidebar tem overflow:hidden, então o popover é fixed e abre ao lado do
+  // botão, alinhado pela base (o botão fica no rodapé).
+  const r = btn.getBoundingClientRect();
+  const sidebar = document.getElementById('sidebar') || btn.closest('.sidebar');
+  const sr = sidebar ? sidebar.getBoundingClientRect() : r;
+  const mobile = window.innerWidth <= 768;
+  const left = mobile ? r.left : sr.right + 6;
+  const bottom = mobile ? window.innerHeight - r.top + 6 : window.innerHeight - r.bottom;
+  menu.style.left = Math.max(8, left) + 'px';
+  menu.style.bottom = Math.max(8, bottom) + 'px';
+  const first = Array.from(menu.querySelectorAll('.sidebar-more-item')).find(el => el.style.display !== 'none');
+  if (first) first.focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const menu = document.getElementById('sidebarMoreMenu');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (menu.hidden) openSidebarMore(); else closeSidebarMore();
+  });
+  menu.addEventListener('click', e => {
+    const item = e.target.closest('.sidebar-more-item');
+    if (!item) return;
+    closeSidebarMore();
+    if (window.innerWidth <= 768 && typeof window.closeMobileMenu === 'function') window.closeMobileMenu();
+    const fn = window[item.dataset.moreAction];
+    if (typeof fn === 'function') fn();
+  });
+  menu.addEventListener('keydown', e => {
+    const items = Array.from(menu.querySelectorAll('.sidebar-more-item')).filter(el => el.style.display !== 'none');
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) closeSidebarMore();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !menu.hidden) { closeSidebarMore(); btn.focus(); }
+  });
+  window.addEventListener('resize', closeSidebarMore);
+  refreshSidebarMore();
+});
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   _deferredInstall = e;
