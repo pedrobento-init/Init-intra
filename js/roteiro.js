@@ -76,7 +76,7 @@ function roteiroPanelHtml(visits, todayISO, userName, userId) {
     } else {
       place = '<button type="button" class="link-btn rt-noaddr" data-action="openClient" data-stop="1" data-arg="' + escapeHtml(v.clientId || '') + '">Sem endereço — adicionar</button>';
     }
-    return '<li class="rt-stop' + (s.done ? ' is-done' : '') + '" data-action="rtOpenVisit" data-arg="' + id + '">' +
+    return '<li class="rt-stop' + (s.done ? ' is-done' : '') + '" tabindex="0" data-action="rtOpenVisit" data-arg="' + id + '">' +
       '<span class="rt-num" aria-hidden="true">' + num + '</span>' +
       '<span class="rt-main"><span class="rt-top"><b>' + escapeHtml(v.clientName || '—') + '</b><span class="rt-when">' + escapeHtml(when) + '</span></span>' +
       (v.motivo ? '<span class="rt-why">' + escapeHtml(v.motivo) + '</span>' : '') +

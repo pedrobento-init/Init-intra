@@ -220,7 +220,7 @@ function _renderOpGrid() {
     }
 
     return `
-      <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" onclick="openOpPendencias('${escapeHtml(op.id)}')">
+      <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" role="button" tabindex="0" onclick="openOpPendencias('${escapeHtml(op.id)}')">
         <div class="op-card-header">
           <div class="op-avatar" style="background:${color}">${escapeHtml(initials)}</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">

@@ -436,7 +436,7 @@ function openCalendarDaySheet(dateStr) {
       html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Visitas (${allVisits.length})</div>`;
       html += allVisits.map(v => {
         const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
-        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
+        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" role="button" tabindex="0" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
           ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${escapeHtml(v.clientName||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
       }).join('');
     }
@@ -444,7 +444,7 @@ function openCalendarDaySheet(dateStr) {
       html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Pendências (${allPens.length})</div>`;
       html += allPens.map(p => {
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
+        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" role="button" tabindex="0" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
           ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div style="display:flex;gap:4px">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
       }).join('');
     }
@@ -610,7 +610,7 @@ function renderAgendaSide() {
   if (overdue.length) {
     html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
       overdue.map(function (o) {
-        return '<li onclick="openPendenciaDetail(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
+        return '<li role="button" tabindex="0" onclick="openPendenciaDetail(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }
@@ -620,7 +620,7 @@ function renderAgendaSide() {
       ? '<ul class="plist">' + next7.map(function (o) {
         var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaDetail';
         var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
-        return '<li onclick="' + fn + '(\'' + esc(o.id) + '\')"><div class="pbar" style="background:' + o.dot + '"></div>' +
+        return '<li role="button" tabindex="0" onclick="' + fn + '(\'' + esc(o.id) + '\')"><div class="pbar" style="background:' + o.dot + '"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul>'
       : '<div class="empty-state" style="padding:12px 4px 4px"><p>Nada nos próximos 7 dias 🎉</p></div>') +
@@ -629,7 +629,7 @@ function renderAgendaSide() {
   if (rec.length) {
     html += '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
       rec.map(function (g) {
-        return '<li onclick="openVisitDetail(\'' + esc(g.visitId) + '\')"><div class="pbar" style="background:#0ea5e9"></div>' +
+        return '<li role="button" tabindex="0" onclick="openVisitDetail(\'' + esc(g.visitId) + '\')"><div class="pbar" style="background:#0ea5e9"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(g.clientName) + '</div><div class="tmeta">' + esc(g.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }

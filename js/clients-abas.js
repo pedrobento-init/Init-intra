@@ -173,7 +173,7 @@ async function loadClientMilvusTicketsUI(clientId) {
     return;
   }
   wrap.innerHTML = `<div class="mticket-list">` + tickets.slice(0, 10).map((t) => `
-    <div class="mticket-row" onclick="openMilvusTicketDetail('${escapeHtml(clientId)}','${escapeHtml(t.id)}')" title="Ver detalhes">
+    <div class="mticket-row" role="button" tabindex="0" onclick="openMilvusTicketDetail('${escapeHtml(clientId)}','${escapeHtml(t.id)}')" title="Ver detalhes">
       <div class="mticket-top">
         <strong class="mticket-code">#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))}</strong>
         <span class="mticket-subject">${escapeHtml(t.assunto || 'Sem assunto')}</span>

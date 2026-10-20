@@ -847,7 +847,7 @@ body.dark-theme .template-suggestion {
 
 /* ── TABS ── */
 .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
-.tab { padding: 9px 18px; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all var(--transition); }
+.tab { padding: 9px 18px; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; background: none; border: 0; border-bottom: 2px solid transparent; font-family: inherit; transition: color var(--transition), border-color var(--transition); }
 .tab:hover { color: var(--text-primary); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
@@ -2728,7 +2728,10 @@ body,
     box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Controles nativos (select, date, barras de rolagem) seguem o tema. */
+:root { color-scheme: light; }
 body.dark-theme {
+  color-scheme: dark;
   /* Core palette - premium dark slate — WCAG AA contrast (8) */
   --bg-base: #0b0f19;
   --bg-surface: #131c2e;
@@ -3647,7 +3650,9 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   padding: 2px 7px;
   color: var(--text-muted);
   cursor: pointer;
+  font-family: inherit;
 }
+.global-search-input-row input::-webkit-search-cancel-button { display: none; }
 .search-results-container {
   max-height: 420px;
   overflow-y: auto;
@@ -4692,11 +4697,12 @@ body.dark-theme .ov-wrap {
 
 /* ── SYNC STATUS (feedback realtime 🟢🟡🔴) ── */
 .sync-status {
+  font-family: inherit; cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; white-space: nowrap;
   padding: 5px 11px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-secondary);
-  font-variant-numeric: tabular-nums; cursor: default;
+  font-variant-numeric: tabular-nums;
 }
 .sync-status[data-sync="live"] { background: var(--green-dim); color: var(--green); border-color: rgba(22,163,74,.35); }
 .sync-status[data-sync="offline"] { background: var(--red-dim); color: var(--red); border-color: rgba(220,38,38,.35); }

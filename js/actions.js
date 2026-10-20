@@ -47,6 +47,15 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     ev.preventDefault();
     _runAction(el.dataset.action, el, el.dataset.arg, ev);
   });
+  // Cards e linhas clicáveis (role="button" com onclick) respondem a Enter/Espaço como um botão.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const t = ev.target;
+    if (!t || !t.getAttribute || t.getAttribute('role') !== 'button' || t.hasAttribute('data-action')) return;
+    if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    ev.preventDefault();
+    t.click();
+  });
   document.addEventListener('change', (ev) => {
     const el = ev.target && ev.target.closest ? ev.target.closest('[data-change]') : null;
     if (el) _runAction(el.dataset.change, el, el.type === 'checkbox' ? el.checked : el.value, ev);

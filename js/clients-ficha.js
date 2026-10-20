@@ -730,7 +730,7 @@ function renderClientTab(tab, id) {
       </div>
       ${procs.length ? procs.map(p => `
         <div class="proc-card" id="proc-${escapeHtml(p.id)}">
-          <div class="proc-card-header" onclick="toggleProcCard('${escapeHtml(p.id)}')">
+          <div class="proc-card-header" role="button" tabindex="0" onclick="toggleProcCard('${escapeHtml(p.id)}')">
             <div style="flex:1;min-width:0">
               <div class="proc-card-title">${escapeHtml(p.title)}</div>
               ${p.category ? `<span class="tag tag-blue" style="margin-top:4px">${escapeHtml(p.category)}</span>` : ''}

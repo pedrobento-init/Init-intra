@@ -275,7 +275,7 @@ function _penReducedMotion() {
 }
 
 function _applyPenCardMotion(area) {
-  if (typeof Motion === 'undefined') return;
+  if (typeof _canAnimate === 'function' ? !_canAnimate() : typeof Motion === 'undefined') return;
   if (_penReducedMotion()) return;
   area.querySelectorAll('.kanban-card').forEach(function(card) {
     if (card.dataset.motionHoverBound) return;

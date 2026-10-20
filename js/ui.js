@@ -124,12 +124,29 @@ function safeUrl(url) {
 }
 
 let _prevFocus = null;
+// Animações via Motion (JS) só quando o sistema não pede movimento reduzido —
+// o @media (prefers-reduced-motion) do CSS não alcança essas animações.
+function _canAnimate() {
+  if (typeof Motion === 'undefined') return false;
+  try { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return true; }
+}
+// Formulário do modal com campo alterado: Esc ou toque fora pedem confirmação
+// antes de fechar (os botões Cancelar/× e o salvar continuam fechando direto).
+let _modalDirty = false;
+function _markModalDirty(e) {
+  if (e && e.target && e.target.closest && e.target.closest('.form-group')) _modalDirty = true;
+}
+function requestCloseModal() {
+  if (_modalDirty && !window.confirm('Descartar as alterações deste formulário?')) return;
+  closeModal();
+}
 let _modalTrapHandler = null;
 let _modalHideTimer = null;
 
 function openModal(title, bodyHTML, size = '') {
   if (_modalHideTimer) { clearTimeout(_modalHideTimer); _modalHideTimer = null; }
   _prevFocus = document.activeElement;
+  _modalDirty = false;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = bodyHTML;
   document.getElementById('modal').className = 'modal' + (size ? ' ' + size : '');
@@ -148,7 +165,7 @@ function openModal(title, bodyHTML, size = '') {
   };
   modal.addEventListener('keydown', _modalTrapHandler);
 
-  if (typeof Motion !== 'undefined') {
+  if (_canAnimate()) {
     overlay.style.animation = 'none';
     modal.style.animation = 'none';
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -170,9 +187,10 @@ function openModal(title, bodyHTML, size = '') {
 function closeModal() {
   const modal = document.getElementById('modal');
   const overlay = document.getElementById('modalOverlay');
+  _modalDirty = false;
   if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
   const hide = () => { overlay.style.display = 'none'; overlay.dataset.drawerOpen = '0'; };
-  if (typeof Motion !== 'undefined' && overlay.style.display !== 'none') {
+  if (_canAnimate() && overlay.style.display !== 'none') {
     Motion.animate(modal, { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] }, { duration: 0.14, ease: 'easeIn' });
     Motion.animate(overlay, { opacity: [1, 0] }, { duration: 0.14, ease: 'easeIn' });
     _modalHideTimer = setTimeout(() => { hide(); _modalHideTimer = null; }, 150);
@@ -217,19 +235,19 @@ function showToast(message, type = 'info') {
   t.appendChild(iconSpan);
   t.appendChild(msgSpan);
   c.appendChild(t);
-  if (typeof Motion !== 'undefined') {
+  if (_canAnimate()) {
     t.style.animation = 'none';
     Motion.animate(t, { opacity: [0, 1], x: [24, 0] }, { duration: 0.35, ease: 'easeOut' });
   }
   setTimeout(() => {
-    if (typeof Motion !== 'undefined') {
+    if (_canAnimate()) {
       Motion.animate(t, { opacity: [1, 0], x: [0, -24] }, { duration: 0.22, ease: 'easeIn' });
       setTimeout(() => t.remove(), 230);
     } else {
       t.classList.add('removing');
       setTimeout(() => t.remove(), 300);
     }
-  }, 3500);
+  }, type === 'error' ? 7000 : 4000);
 }
 
 function showUndoToast(message, onUndo) {
@@ -658,8 +676,9 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
 
 // Modal close on overlay click
 document.getElementById('modalOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalOverlay')) closeModal();
+  if (e.target === document.getElementById('modalOverlay')) requestCloseModal();
 });
+['input', 'change'].forEach((t) => document.getElementById('modalBody').addEventListener(t, _markModalDirty));
 
 // Esc fecha modais
 document.addEventListener('keydown', e => {
@@ -672,7 +691,7 @@ document.addEventListener('keydown', e => {
       return;
     }
   } catch (_) {}
-  if (document.getElementById('modalOverlay').style.display !== 'none') closeModal();
+  if (document.getElementById('modalOverlay').style.display !== 'none') requestCloseModal();
   if (document.getElementById('userModalOverlay').style.display !== 'none')
     document.getElementById('userModalOverlay').style.display = 'none';
   if (document.getElementById('cropModalOverlay').style.display !== 'none' &&
@@ -1196,10 +1215,8 @@ function exportLogsCSV() {
 
 // ── ATALHOS DE TECLADO GLOBAIS ──
 document.addEventListener('keydown', e => {
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
-    if (e.key === 'Escape') closeModal();
-    return;
-  }
+  // Esc dentro de campo já é tratado pelo handler "Esc fecha modais" (com confirmação).
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 
   // Alt + 1..9 -> Navegar entre abas
   if (e.altKey && !e.ctrlKey && !e.metaKey) {
