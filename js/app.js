@@ -875,7 +875,7 @@ function renderDashboard() {
           const _lbl = _ovRiskLabel[r.health && r.health.level] || (r.health && r.health.label) || '—';
           const _pct = (r.health && r.health.totalAbertas) ? Math.min(100, Math.round((r.health.vencidas / r.health.totalAbertas) * 100)) : 0;
           return `
-          <div class="ov-row" onclick="viewClient('${escapeHtml(r.clientId)}')">
+          <div class="ov-row" role="button" tabindex="0" onclick="viewClient('${escapeHtml(r.clientId)}')">
             <div class="ov-client"><div class="ov-name">${escapeHtml(r.clientName)}</div><div class="ov-st ov-${_lvl}">${escapeHtml(_lbl)}</div></div>
             <div class="ov-track ov-${_lvl}" aria-hidden="true"><i style="width:${_pct}%"></i></div>
             <div class="ov-num">${r.health.totalAbertas}</div>
@@ -888,7 +888,7 @@ function renderDashboard() {
         ${_dashHideBtn('silencio')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-silencio">Silêncio do cliente</h2><span class="ov-sub">Mais de 30 dias</span></div>
         ${_silent.length ? _silent.map(s => `
-          <div class="ov-li" onclick="viewClient('${escapeHtml(s.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(s.clientId)}')">
             <span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(s.clientName))}</span>
             <span class="ov-name">${escapeHtml(s.clientName)}</span>
             <small>${s.daysSince >= 9999 ? 'Sem contato registrado' : `há ${s.daysSince} dias`}</small>
@@ -899,7 +899,7 @@ function renderDashboard() {
         ${_dashHideBtn('recorrentes')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-rec">Pendência recorrente</h2><span class="ov-sub">Top 5</span></div>
         ${_recurrent.length ? _recurrent.map(r => `
-          <div class="ov-li" onclick="viewClient('${escapeHtml(r.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(r.clientId)}')">
             <span class="ov-name">${escapeHtml(r.clientName)}</span>
             <small>${r.streak} meses seguidos</small>
           </div>`).join('') : `<p class="ov-empty">Nenhum cliente recorrente.</p>`}
@@ -909,7 +909,7 @@ function renderDashboard() {
         ${_dashHideBtn('aniversarios')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-aniv">Aniversários de clientes</h2><span class="ov-sub">Mês atual</span></div>
         ${_anniv.length ? _anniv.map(a => `
-          <div class="ov-li" onclick="viewClient('${escapeHtml(a.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(a.clientId)}')">
             <span class="ov-name">${escapeHtml(a.clientName)}</span>
             <small>${a.years} ${a.years === 1 ? 'ano' : 'anos'}</small>
           </div>`).join('') : `<p class="ov-empty">Nenhum aniversário neste mês.</p>`}
@@ -919,10 +919,10 @@ function renderDashboard() {
     <h2 class="ov-sec-t" id="ov-ind">Indicadores</h2>
     
     ${!_dashIsHidden('stats') ? `<section class="dash-widget ov-kpis" aria-label="Resumo de indicadores" style="position:relative">${_dashHideBtn('stats')}` : '<div style="display:none"><div>'}
-      <div class="ov-k" onclick="navigateTo('clientes')">
+      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('clientes')">
         <b class="stat-value">${clients.length}</b><span>Clientes${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
-      <div class="ov-k" onclick="navigateTo('visitas')">
+      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('visitas')">
         <b class="stat-value">${visits.length}</b><span>Visitas${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
       <div class="ov-k ov-k-static">
@@ -931,19 +931,19 @@ function renderDashboard() {
       <div class="ov-k ov-k-static">
         <b class="stat-value">${completionRate}%</b><span>Taxa de conclusão ${_deltaComp ? _dashDeltaBadge(_deltaComp) : ''}</span>
       </div>
-      <div class="ov-k" onclick="navigateTo('pendencias')">
+      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('pendencias')">
         <b class="stat-value">${open.length + inProg.length + paused.length}</b><span>Pendências abertas${_dashPeriod!=='all'?' (período)':''} ${_deltaOpen ? _dashDeltaBadge(_deltaOpen) : ''}</span>
       </div>
-      <div class="ov-k amber" onclick="navigateTo('pendencias')">
+      <div class="ov-k amber" role="button" tabindex="0" onclick="navigateTo('pendencias')">
         <b class="stat-value">${critical.length}</b><span>Alta prioridade${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
-      <div class="ov-k red" onclick="navigateTo('prazos')" title="Ver por responsável e cliente em Prazos e SLA">
+      <div class="ov-k red" role="button" tabindex="0" onclick="navigateTo('prazos')" title="Ver por responsável e cliente em Prazos e SLA">
         <b class="stat-value">${_pz ? _pz.vencidas : overdue.length}</b><span>Pendências vencidas →</span>
       </div>
-      <div class="ov-k amber" onclick="navigateTo('prazos')" title="Ver em Prazos e SLA">
+      <div class="ov-k amber" role="button" tabindex="0" onclick="navigateTo('prazos')" title="Ver em Prazos e SLA">
         <b class="stat-value">${_pz ? _pz.hoje : dueToday.length}</b><span>Vencem hoje →</span>
       </div>
-      ${_dashCanManage ? `<div class="ov-k" onclick="navigateTo('pendencias')">
+      ${_dashCanManage ? `<div class="ov-k" role="button" tabindex="0" onclick="navigateTo('pendencias')">
         <b class="stat-value">${unassigned.length}</b><span>Sem responsável</span>
       </div>` : ''}
     ${!_dashIsHidden('stats') ? `</section>` : '</div></div>'}
@@ -1009,7 +1009,7 @@ function renderDashboard() {
         const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
         const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : escapeHtml(v.time + (v.timeEnd ? ' – ' + v.timeEnd : ''));
         const vstTag = typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : '';
-        return `<li class="ov-it" onclick="openVisitDetail('${v.id}')">
+        return `<li class="ov-it" role="button" tabindex="0" onclick="openVisitDetail('${v.id}')">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
           <div style="min-width:0">
             <div class="ov-tt">${escapeHtml(v.clientName)||'—'}</div>
@@ -1024,7 +1024,7 @@ function renderDashboard() {
         const isStale = typeof isStalePendencia === 'function' ? isStalePendencia(p) : false;
         const priTag = typeof priorityTag === 'function' ? priorityTag(p.priority) : '';
         const stTag = typeof statusTag === 'function' ? statusTag(p.status) : '';
-        return `<li class="ov-it" onclick="navigateTo('pendencias');setTimeout(function(){ openPendenciaDetail('${p.id}'); },100)">
+        return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('pendencias');setTimeout(function(){ openPendenciaDetail('${p.id}'); },100)">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
           <div style="min-width:0">
             <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
@@ -1046,7 +1046,7 @@ function renderDashboard() {
               const c = getClientById(p.clientId);
                const _isClosedR = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s || ''); };
                const isOverdue = p.deadline && p.deadline < localDateISO() && !_isClosedR(p.status);
-              return `<li class="ov-it" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
+              return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
                 <div style="min-width:0">
                   <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
@@ -1066,7 +1066,7 @@ function renderDashboard() {
             ${upcomingVisits.map(v => {
               const c = getClientById(v.clientId);
               const isToday = v.date === today;
-              return `<li class="ov-it" onclick="navigateTo('visitas');setTimeout(()=>openVisitDetail('${v.id}'),100)">
+              return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('visitas');setTimeout(()=>openVisitDetail('${v.id}'),100)">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
                 <div style="min-width:0">
                   <div class="ov-tt">${escapeHtml(v.motivo)||'(sem motivo)'}</div>
@@ -1134,7 +1134,7 @@ function renderDashboard() {
 }
 
 function animateDashboardCounters() {
-  if (typeof Motion === 'undefined') return;
+  if (typeof _canAnimate === 'function' ? !_canAnimate() : typeof Motion === 'undefined') return;
   document.querySelectorAll('.stat-value').forEach(el => {
     const m = (el.textContent || '').match(/^([\d.,]+)(.*)$/);
     if (!m) return;

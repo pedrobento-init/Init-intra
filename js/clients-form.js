@@ -21,7 +21,7 @@ function openClientForm(id = null) {
           <div style="flex:1">
             <div class="form-group" style="margin-bottom:8px"><label class="form-label">Cor do avatar</label>
               <div style="display:flex;gap:6px;flex-wrap:wrap" id="colorPicker">
-                ${COLORS.map(col=>`<div onclick="selectColor('${col}')" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
+                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" onclick="selectColor('${col}')" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
               </div>
             </div>
           <div class="form-row">
@@ -45,11 +45,11 @@ function openClientForm(id = null) {
             <div class="form-group" style="margin-top:8px">
               <label class="form-label">Formato da Logo</label>
               <div style="display:flex;gap:8px" id="shapePicker">
-                <div class="logo-shape-option ${(c.logoShape||'circle')==='circle'?'selected':''}" onclick="selectLogoShape('circle')" data-shape="circle">
+                <div class="logo-shape-option ${(c.logoShape||'circle')==='circle'?'selected':''}" role="button" tabindex="0" onclick="selectLogoShape('circle')" data-shape="circle">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
                   Redondo
                 </div>
-                <div class="logo-shape-option ${(c.logoShape||'circle')==='square'?'selected':''}" onclick="selectLogoShape('square')" data-shape="square">
+                <div class="logo-shape-option ${(c.logoShape||'circle')==='square'?'selected':''}" role="button" tabindex="0" onclick="selectLogoShape('square')" data-shape="square">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
                   Quadrado
                 </div>

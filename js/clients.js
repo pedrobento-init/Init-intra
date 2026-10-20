@@ -102,7 +102,7 @@ function renderClientGrid() {
       const pending = sla.totalAbertas;
       const vencidas = sla.vencidas;
       const dentro = sla.dentroPrazo;
-      return `<div class="client-card" onclick="viewClient('${escapeHtml(c.id)}')">
+      return `<div class="client-card" role="button" tabindex="0" onclick="viewClient('${escapeHtml(c.id)}')">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
       <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
@@ -158,16 +158,16 @@ function viewClient(id) {
   openModal(c.name, `
     ${clientSummaryHtml(c)}
     <div class="cs-actions"><button type="button" class="link-btn" onclick="openClientReport('${id}')">Relatório do mês (PDF)</button></div>
-    <div class="tabs" id="clientTabs">
-      <div class="tab active" onclick="switchClientTab('ficha','${id}')">Ficha TI</div>
-      <div class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</div>
-      <div class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</div>
-      <div class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</div>
-      <div class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</div>
-      <div class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</div>
-      <div class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</div>
-      <div class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</div>
-      <div class="tab" onclick="switchClientTab('historico','${id}')">Histórico</div>
+    <div class="tabs" id="clientTabs" role="tablist" aria-label="Seções do cliente">
+      <button type="button" role="tab" aria-selected="true" class="tab active" onclick="switchClientTab('ficha','${id}')">Ficha TI</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('historico','${id}')">Histórico</button>
     </div>
     <div id="clientTabContent"></div>`, 'lg');
   // Cabeçalho: nome + "Atualizada em DD/MM/AAAA por <usuário>" (updated_at/updated_by).
@@ -180,6 +180,6 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => t.classList.toggle('active', ['ficha','procedimentos','pendencias','visitas','inventario','chamados','checklist','documentos','historico'][i]===tab));
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => { const on = ['ficha','procedimentos','pendencias','visitas','inventario','chamados','checklist','documentos','historico'][i]===tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
   renderClientTab(tab, id);
 }

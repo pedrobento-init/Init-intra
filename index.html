@@ -21,11 +21,11 @@
 
   <!-- Busca Global Modal (Sprint 7) -->
   <div id="globalSearchModal" class="global-search-modal" style="display:none" onclick="closeGlobalSearch(event)">
-    <div class="global-search-box">
+    <div class="global-search-box" role="dialog" aria-modal="true" aria-label="Busca global">
       <div class="global-search-input-row">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="globalSearchInput" type="text" placeholder="Buscar ou digitar uma ação (ex.: nova visita)…" autocomplete="off" />
-        <span class="esc-key" onclick="closeGlobalSearch()">ESC</span>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="globalSearchInput" type="search" aria-label="Buscar ou digitar uma ação" enterkeyhint="search" placeholder="Buscar ou digitar uma ação (ex.: nova visita)…" autocomplete="off" />
+        <button type="button" class="esc-key" onclick="closeGlobalSearch()" aria-label="Fechar busca">ESC</button>
       </div>
       <div class="search-results-container" id="searchResultsContainer">
         <div class="search-empty">Digite para pesquisar…</div>
@@ -136,7 +136,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Instalar app</span>
         </button>
-        <div class="current-user" id="userQuickBtn" title="Meu perfil">
+        <div class="current-user" id="userQuickBtn" title="Meu perfil" role="button" tabindex="0" aria-label="Meu perfil">
           <div class="avatar" id="user-avatar" style="background:#1a56db">TI</div>
           <div class="user-info">
             <span class="user-name" id="user-name-display">Suporte TI</span>
@@ -172,7 +172,7 @@
             </button>
           </div>
           <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
-          <span class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" onclick="syncNow()" role="status"><i class="sync-dot" aria-hidden="true"></i><span class="sync-label">Sincronizando...</span></span>
+          <button type="button" class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" onclick="syncNow()" aria-live="polite"><i class="sync-dot" aria-hidden="true"></i><span class="sync-label">Sincronizando…</span></button>
           <button class="theme-toggle-btn" id="notifSettingsBtn" title="Configurar notificações" onclick="openNotifSettings()" aria-label="Configurar notificações">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </button>
@@ -253,31 +253,31 @@
 
   <!-- Modal usuário -->
   <div class="modal-overlay" id="userModalOverlay" style="display:none">
-    <div class="modal sm">
+    <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title">Meu Perfil</h2>
+        <h2 class="modal-title" id="userModalTitle">Meu Perfil</h2>
         <button class="modal-close" onclick="document.getElementById('userModalOverlay').style.display='none'" aria-label="Fechar configurações">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-group"><label class="form-label">Seu nome</label><input type="text" class="form-input" id="userNameInput" placeholder="Ex: João Silva" /></div>
-        <div class="form-group"><label class="form-label">Iniciais (avatar)</label><input type="text" class="form-input" id="userInitialsInput" maxlength="2" placeholder="Ex: JS" /></div>
-        <button class="btn btn-primary" style="width:100%" onclick="saveUserConfig()" aria-label="Salvar configurações">Salvar</button>
+        <div class="form-group"><label class="form-label" for="userNameInput">Seu nome</label><input type="text" class="form-input" id="userNameInput" autocomplete="name" placeholder="Ex: João Silva" /></div>
+        <div class="form-group"><label class="form-label" for="userInitialsInput">Iniciais (avatar)</label><input autocomplete="off" type="text" class="form-input" id="userInitialsInput" maxlength="2" placeholder="Ex: JS" /></div>
+        <button class="btn btn-primary" style="width:100%" onclick="saveUserConfig()">Salvar</button>
       </div>
     </div>
   </div>
 
-  <div class="toast-container" id="toastContainer"></div>
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
   <!-- Modal de recorte de imagem -->
   <div class="modal-overlay" id="cropModalOverlay" style="display:none">
-    <div class="modal" style="max-width:560px">
+    <div class="modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title">Recortar Logo</h2>
+        <h2 class="modal-title" id="cropModalTitle">Recortar Logo</h2>
         <button class="modal-close" onclick="closeCropModal()" aria-label="Fechar recorte de imagem">&times;</button>
       </div>
       <div class="modal-body" style="padding:16px">
         <div class="crop-container" id="cropContainer">
-          <img id="cropImage" src="" alt="Recortar" />
+          <img id="cropImage" alt="Imagem a recortar" />
           <div id="cropSelection" class="crop-selection" hidden></div>
         </div>
         <div class="crop-actions">
@@ -292,9 +292,9 @@
 
   <!-- Modal de Configurações de Notificação -->
   <div class="modal-overlay" id="notifModalOverlay" style="display:none">
-    <div class="modal sm">
+    <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title">Configurar Notificações por E-mail</h2>
+        <h2 class="modal-title" id="notifModalTitle">Configurar Notificações por E-mail</h2>
         <button class="modal-close" onclick="document.getElementById('notifModalOverlay').style.display='none'" aria-label="Fechar notificações">&times;</button>
       </div>
       <div class="modal-body" id="notifModalBody"></div>
