@@ -3430,6 +3430,23 @@ body.dark-theme .overdue-banner {
 .vis-monthrow h2 { margin:0; font-size:13px; font-weight:700; color:var(--text-muted); }
 .vis-monthrow button { background:none; border:none; font-size:13px; font-weight:700; color:var(--accent); cursor:pointer; padding:4px 2px; font-family:inherit; }
 .vis-monthrow button:hover { text-decoration:underline; }
+.vis-monthrow span { display:flex; gap:14px; }
+
+/* ── O que levar (visita-levar.js) ── */
+.levar-box { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg-base); }
+.levar-list { list-style:none; margin:0 0 8px; padding:0; display:grid; gap:4px; }
+.levar-item { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
+.levar-item label { display:flex; align-items:center; gap:8px; cursor:pointer; flex:1; min-width:0; }
+.levar-item input { width:16px; height:16px; accent-color:var(--accent); flex:none; }
+.levar-item.is-ok span { text-decoration:line-through; color:var(--text-muted); }
+.levar-rm { background:none; border:none; color:var(--text-muted); font-size:18px; line-height:1; cursor:pointer; padding:2px 6px; }
+.levar-rm:hover { color:var(--red, #dc2626); }
+.levar-vazio { font-size:12.5px; color:var(--text-muted); }
+.levar-add { display:flex; gap:8px; }
+.levar-hint { margin:6px 0 0; font-size:12px; color:var(--text-muted); }
+.levar-conta { font-weight:400; font-size:12px; color:var(--text-muted); margin-left:6px; }
+.levar-regra { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+.levar-regra-acoes { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; }
 .vis-list { display:grid; gap:10px; }
 @media (min-width:1100px) {
   .vis-list { grid-template-columns:repeat(auto-fill, minmax(440px, 1fr)); align-items:start; }
@@ -6215,6 +6232,10 @@ textarea[aria-busy="true"] { opacity: .6; }
 .feed-opts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .feed-steps { margin: 0 0 10px; padding-left: 18px; font-size: 12.5px; color: var(--ds-muted); display: grid; gap: 4px; }
 .feed-warn { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--st-warn); }
+.gcal-box { border: 1px solid var(--ds-line); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+.gcal-box h4 { margin: 0 0 6px; font-size: 14px; }
+.gcal-box .feed-lead { margin-bottom: 10px; }
+.gcal-err { margin: 0 0 10px; font-size: 12.5px; color: var(--st-warn); }
 
 /* ── Chamado Milvus no detalhe da visita (antes estilo inline) ── */
 .mchip-box { margin: 12px 0 0; }
