@@ -91,6 +91,80 @@ async function _uploadAttachmentToStorage(type, itemId, attId, file) {
   } catch (e) { console.warn('Storage upload exception:', e); return null; }
 }
 
+// ── Links assinados (bucket privado desde a 022) ────────────────────────────
+// O link público gravado em `url` não abre mais. Para mostrar ou baixar, o
+// app pede um link assinado (1 h) a partir do caminho no bucket, em lote e
+// com cache: re-renderizar não pede de novo. Fotos da visita usam o mesmo.
+const STORAGE_URL_TTL = 3600;
+const _storageUrlCache = new Map(); // bucket/path → { url, exp }
+
+/** Caminho no bucket: `path` gravado ou, em anexo antigo, tirado do link público. */
+function attachmentStoragePath(a) {
+  if (!a) return null;
+  if (a.path) return a.path;
+  const m = typeof a.url === 'string' && a.url.match(/\/storage\/v1\/object\/public\/attachments\/([^?#]+)/);
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch (_) { return m[1]; }
+}
+
+/** { path: signedUrl } para os caminhos pedidos (os que falharem ficam de fora). */
+async function signedStorageUrls(paths, bucket) {
+  const b = bucket || 'attachments';
+  const now = Date.now();
+  const out = {};
+  const missing = [];
+  for (const p of new Set(paths || [])) {
+    if (!p) continue;
+    const c = _storageUrlCache.get(b + '/' + p);
+    if (c && c.exp > now) out[p] = c.url; else missing.push(p);
+  }
+  if (!missing.length || typeof supabaseClient === 'undefined' || !supabaseClient
+      || typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()
+      || (typeof window !== 'undefined' && !window._supabaseAuthActive)) return out;
+  try {
+    const { data, error } = await supabaseClient.storage.from(b).createSignedUrls(missing, STORAGE_URL_TTL);
+    if (!error && Array.isArray(data)) {
+      for (const d of data) {
+        if (!d || !d.path || !d.signedUrl) continue;
+        out[d.path] = d.signedUrl;
+        _storageUrlCache.set(b + '/' + d.path, { url: d.signedUrl, exp: now + (STORAGE_URL_TTL - 300) * 1000 });
+      }
+    }
+  } catch (e) { if (typeof _logSilent === 'function') _logSilent(e, 'storage-anexos'); }
+  return out;
+}
+
+function forgetSignedStorageUrl(path, bucket) { _storageUrlCache.delete((bucket || 'attachments') + '/' + path); }
+
+/** Imagem ou link de um anexo: data URL (ainda não enviado) ou link assinado preenchido depois. */
+function _attachmentLinkAttrs(a) {
+  if (a.data) return { src: a.data, signed: '' };
+  const path = attachmentStoragePath(a);
+  if (path) return { src: '', signed: ' data-att-path="' + escapeHtml(path) + '"' };
+  return { src: a.url || '', signed: '' };
+}
+
+/** Preenche imagens e links de download marcados com data-att-path. */
+async function fillSignedAttachmentLinks(container) {
+  if (!container || !container.querySelectorAll) return;
+  const els = Array.from(container.querySelectorAll('[data-att-path]'));
+  if (!els.length) return;
+  const urls = await signedStorageUrls(els.map((el) => el.getAttribute('data-att-path')));
+  for (const el of els) {
+    const u = urls[el.getAttribute('data-att-path')];
+    if (el.tagName === 'IMG') {
+      if (u) el.src = u;
+    } else if (u) {
+      // download= faz o Storage mandar o arquivo com o nome original.
+      el.href = u + '&download=' + encodeURIComponent(el.getAttribute('data-att-name') || '');
+      el.removeAttribute('aria-disabled');
+      el.title = 'Baixar';
+    } else {
+      el.title = 'Disponível quando estiver online';
+    }
+  }
+}
+
 // ── FASE 2: backfill incremental base64 → Storage (compatível) ──────────────
 // Anexos antigos (ou criados offline) têm só `data` (dataURL embutido, pesado:
 // viaja em todo select/sync/cache). Quando ONLINE, sobe o conteúdo p/ o mesmo
@@ -198,8 +272,10 @@ function removeAttachment(type, itemId, attachmentId) {
   list[idx].updatedAt = new Date().toISOString();
   dbSet(key, list);
   addLog('Removeu anexo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, attName);
-  if (att.path && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.storage.from('attachments').remove([att.path]).then(res => { if (res.error) console.warn('Storage remove error:', res.error.message); }).catch(() => {});
+  const attPath = attachmentStoragePath(att);
+  if (attPath && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    forgetSignedStorageUrl(attPath);
+    supabaseClient.storage.from('attachments').remove([attPath]).then(res => { if (res.error) console.warn('Storage remove error:', res.error.message); }).catch(() => {});
   }
   return true;
 }
@@ -263,19 +339,21 @@ function renderAttachmentList(type, itemId, containerId) {
     const isImage = a.mimeType && a.mimeType.startsWith('image/');
     const sizeKB = (a.size / 1024).toFixed(1);
     const icon = isImage ? '🖼️' : a.mimeType?.includes('pdf') ? '📄' : '📎';
-    const src = a.url || a.data || '';
+    const l = _attachmentLinkAttrs(a);
+    const href = l.signed ? `aria-disabled="true" title="Carregando…"` : `href="${escapeHtml(l.src)}" title="Baixar"`;
     return `<div class="attachment-item">
-      ${isImage ? `<img src="${src}" class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="window.open(this.src,'_blank','noopener')" />` : `<div class="attachment-icon">${icon}</div>`}
+      ${isImage ? `<img src="${escapeHtml(l.src)}"${l.signed} class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="if(this.src)window.open(this.src,'_blank','noopener')" />` : `<div class="attachment-icon">${icon}</div>`}
       <div class="attachment-info">
         <div class="attachment-name">${escapeHtml(a.name)}</div>
         <div class="attachment-meta">${sizeKB} KB · ${escapeHtml(a.uploadedBy)} · ${formatDateTime(a.uploadedAt)}</div>
       </div>
       <div class="attachment-actions">
-        <a href="${src}" download="${escapeHtml(a.name)}" class="btn btn-sm btn-secondary" title="Baixar">⬇</a>
+        <a ${href}${l.signed} data-att-name="${escapeHtml(a.name)}" download="${escapeHtml(a.name)}" class="btn btn-sm btn-secondary">⬇</a>
         <button class="btn btn-sm btn-danger" onclick="removeAttachmentUI('${type}','${itemId}','${a.id}','${containerId}')" title="Remover">✕</button>
       </div>
     </div>`;
   }).join('');
+  fillSignedAttachmentLinks(container);
 }
 
 function removeAttachmentUI(type, itemId, attId, containerId) {
@@ -335,8 +413,10 @@ function removeClientDocument(clientId, docId) {
   list[idx].updatedAt = new Date().toISOString();
   dbSet(DB.CLIENTS, list);
   addLog('Removeu documento', 'Cliente', clientId, docName);
-  if (doc.path && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.storage.from('attachments').remove([doc.path]).then(function(res){ if(res.error) console.warn('Storage remove error:', res.error.message); }).catch(function(){});
+  var docPath = attachmentStoragePath(doc);
+  if (docPath && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    forgetSignedStorageUrl(docPath);
+    supabaseClient.storage.from('attachments').remove([docPath]).then(function(res){ if(res.error) console.warn('Storage remove error:', res.error.message); }).catch(function(){});
   }
   return true;
 }
@@ -350,12 +430,14 @@ function renderClientDocumentsList(clientId, containerId) {
     var isImage = a.mimeType && a.mimeType.startsWith('image/');
     var sizeKB = (a.size / 1024).toFixed(1);
     var icon = isImage ? '🖼️' : a.mimeType && a.mimeType.includes('pdf') ? '📄' : '📎';
-    var src = a.url || a.data || '';
+    var l = _attachmentLinkAttrs(a);
+    var href = l.signed ? 'aria-disabled="true" title="Carregando…"' : 'href="' + escapeHtml(l.src) + '" title="Baixar"';
     return '<div class="attachment-item">' +
-      (isImage ? '<img src="' + src + '" class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="window.open(this.src,\'_blank\',\'noopener\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
+      (isImage ? '<img src="' + escapeHtml(l.src) + '"' + l.signed + ' class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="if(this.src)window.open(this.src,\'_blank\',\'noopener\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
       '<div class="attachment-info"><div class="attachment-name">' + escapeHtml(a.name) + '</div><div class="attachment-meta">' + sizeKB + ' KB · ' + escapeHtml(a.uploadedBy) + ' · ' + formatDateTime(a.uploadedAt) + '</div></div>' +
-      '<div class="attachment-actions"><a href="' + src + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary" title="Baixar">⬇</a><button class="btn btn-sm btn-danger" onclick="removeClientDocumentUI(\'' + clientId + '\',\'' + a.id + '\',\'' + containerId + '\')" title="Remover">✕</button></div></div>';
+      '<div class="attachment-actions"><a ' + href + l.signed + ' data-att-name="' + escapeHtml(a.name) + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary">⬇</a><button class="btn btn-sm btn-danger" onclick="removeClientDocumentUI(\'' + clientId + '\',\'' + a.id + '\',\'' + containerId + '\')" title="Remover">✕</button></div></div>';
   }).join('');
+  fillSignedAttachmentLinks(container);
 }
 
 function removeClientDocumentUI(clientId, docId, containerId) {

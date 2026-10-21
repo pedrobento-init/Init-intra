@@ -95,30 +95,6 @@ async function flushVisitPhotos() {
   return { sent };
 }
 
-// Links assinados (1 h) em lote, com cache: re-renderizar não pede de novo.
-const VISIT_PHOTO_URL_TTL = 3600;
-const _vpUrlCache = new Map(); // path → { url, exp }
-async function _vpSignedUrls(paths) {
-  const now = Date.now();
-  const out = {};
-  const missing = [];
-  for (const p of paths) {
-    const c = _vpUrlCache.get(p);
-    if (c && c.exp > now) out[p] = c.url; else missing.push(p);
-  }
-  if (missing.length) {
-    const { data, error } = await supabaseClient.storage.from(VISIT_PHOTO_BUCKET).createSignedUrls(missing, VISIT_PHOTO_URL_TTL);
-    if (!error && Array.isArray(data)) {
-      for (const d of data) {
-        if (!d || !d.path || !d.signedUrl) continue;
-        out[d.path] = d.signedUrl;
-        _vpUrlCache.set(d.path, { url: d.signedUrl, exp: now + (VISIT_PHOTO_URL_TTL - 300) * 1000 });
-      }
-    }
-  }
-  return out;
-}
-
 /** Fotos da visita: enviadas (Storage) + aguardando envio (fila local). */
 async function listVisitPhotos(visitId) {
   const pending = _vpQueue().filter((x) => x.visitId === visitId)
@@ -130,8 +106,8 @@ async function listVisitPhotos(visitId) {
       if (!error && Array.isArray(data)) {
         const objs = data.filter((o) => o && o.name && !o.name.startsWith('.'));
         const paths = objs.map((o) => 'visits/' + visitId + '/' + o.name);
-        // Bucket privado (022): link público não abre; vale o link assinado.
-        const urls = await _vpSignedUrls(paths);
+        // Bucket privado (022): link público não abre; vale o link assinado (storage-anexos.js).
+        const urls = await signedStorageUrls(paths, VISIT_PHOTO_BUCKET);
         remote = objs.map((o, i) => ({ id: o.name.replace(/\.jpg$/i, ''), name: o.name, url: urls[paths[i]] || '', path: paths[i], pending: false, createdAt: o.created_at }));
       }
     } catch (_) { remote = []; }
@@ -149,7 +125,7 @@ async function deleteVisitPhoto(visitId, photoId, path) {
     const { data, error } = await supabaseClient.storage.from(VISIT_PHOTO_BUCKET).remove([path]);
     // Sem permissão, o Storage não dá erro: só não remove nada.
     if (error || !Array.isArray(data) || !data.length) { showToast('Não foi possível excluir a foto.', 'error'); return; }
-    _vpUrlCache.delete(path);
+    forgetSignedStorageUrl(path, VISIT_PHOTO_BUCKET);
   } else {
     showToast('Sem conexão: tente excluir quando estiver online.', 'error');
     return;
