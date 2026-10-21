@@ -370,6 +370,24 @@ describe('P-19 — payload remoto da visita (SYNC-07)', () => {
     expect(local.milvusChamadoCodigo).toBe(7);
   });
 
+  it('assinatura do cliente sobe junto com a visita (054)', () => {
+    const png = 'data:image/png;base64,iVBORw0KGgo=';
+    const v = getVisits().find((x) => x.id === 'VIS-1');
+    saveVisit({ ...v, status: 'concluida', assinatura: png, assinaturaNome: 'João', assinaturaEm: '2026-02-10T12:00:00.000Z' });
+
+    const push = _pushOf('visits');
+    expect(push.payload.assinatura).toBe(png);
+    expect(push.payload.assinatura_nome).toBe('João');
+    expect(push.payload.assinatura_em).toBe('2026-02-10T12:00:00.000Z');
+  });
+
+  it('visita sem assinatura não manda as colunas (banco sem a 054 não quebra)', () => {
+    const v = getVisits().find((x) => x.id === 'VIS-1');
+    saveVisit({ ...v, motivo: 'x' });
+    const push = _pushOf('visits');
+    expect('assinatura' in push.payload).toBe(false);
+  });
+
   it('visita inédita sem numero ganha numero novo (sem exceção)', () => {
     saveVisit({
       id: null, // form novo envia id nulo (visitas.js:400)

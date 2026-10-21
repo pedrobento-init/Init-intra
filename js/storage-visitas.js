@@ -257,6 +257,11 @@ function saveVisit(data) {
       // 060: idem para Cheguei/Saí.
       ...(_fullV.checkinAt ? { checkin_at: _fullV.checkinAt } : {}),
       ...(_fullV.checkoutAt ? { checkout_at: _fullV.checkoutAt } : {}),
+      // 054: assinatura do cliente (sem ela aqui, o servidor ficava sem a
+      // assinatura e o próximo sync apagava a cópia local).
+      ...(_fullV.assinatura ? { assinatura: _fullV.assinatura, assinatura_nome: _fullV.assinaturaNome || '', assinatura_em: _fullV.assinaturaEm || null } : {}),
+      // 049: id do técnico acompanha o nome.
+      ...(_fullV.operatorId ? { operator_id: _fullV.operatorId } : {}),
       created_at: _fullV.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
