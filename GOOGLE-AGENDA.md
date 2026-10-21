@@ -122,25 +122,27 @@ Detalhes:
 
 ## IA pelo Make (um cenário, três rotas)
 
-Toda a IA do Intra passa por **um único cenário no Make**, chamado **"Init Intra — IA (briefing, triagem, relatório)"**. Não existe chave de IA no projeto: o Make usa o provedor de IA que já vem com ele (conexão "Make's AI Provider", modelo **GPT-5 mini**).
+Toda a IA do Intra passa por **um único cenário no Make**, chamado **"Init Intra — IA (briefing, triagem, relatório, o que levar)"**. Não existe chave de IA no projeto: o Make usa o provedor de IA que já vem com ele (conexão "Make's AI Provider", modelo **GPT-5 mini**).
 
 ```
 Custom webhook → Router → briefing   → Simple Text Prompt            → Webhook response (texto)
                         → triagem    → Extract → Transform to JSON   → Webhook response (JSON)
                         → relatorio  → Simple Text Prompt            → Webhook response (texto)
+                        → levar      → Simple Text Prompt            → Webhook response (texto)
 ```
 
-O Intra manda sempre `{ "tarefa": "briefing" | "triagem" | "relatorio", ... }` e o **Router escolhe a rota pelo campo `tarefa`** (filtro "Text equal"). Uma URL só, um secret só:
+O Intra manda sempre `{ "tarefa": "briefing" | "triagem" | "relatorio" | "levar", ... }` e o **Router escolhe a rota pelo campo `tarefa`** (filtro "Text equal"). Uma URL só, um secret só:
 
 ```bash
 supabase secrets set IA_WEBHOOK_URL=<URL do Custom webhook>
 supabase functions deploy robo --no-verify-jwt
 supabase functions deploy ia-relatorio
+supabase functions deploy ia-levar
 ```
 
-Cada rota está descrita na seção da função que a usa: briefing abaixo, [triagem](#triagem-de-e-mail-make) e [relatório](#relatório-da-visita-com-ia-make).
+Cada rota está descrita na seção da função que a usa: briefing abaixo, [triagem](#triagem-de-e-mail-make), [relatório](#relatório-da-visita-com-ia-make) e [o que levar](#o-que-levar-com-ia-make).
 
-**Por que um cenário só:** o plano Free da Make deixa **2 cenários ativos** e **1.000 operações por mês**. Um cenário com Router gasta um slot só, e o Router não consome operação — cada chamada custa 3 (webhook + IA + resposta), ou seja, cerca de **330 chamadas por mês** somando briefing, triagem e relatório. Se o limite apertar, o plano Core sobe para 10.000 operações. O consumo aparece em *Organization → Usage*.
+**Por que um cenário só:** o plano Free da Make deixa **2 cenários ativos** e **1.000 operações por mês**. Um cenário com Router gasta um slot só, e o Router não consome operação — cada chamada custa 3 (webhook + IA + resposta), ou seja, cerca de **330 chamadas por mês** somando as quatro rotas. Se o limite apertar, o plano Core sobe para 10.000 operações. O consumo aparece em *Organization → Usage*.
 
 **Modelo:** no provedor da Make, os modelos GPT-4o, GPT-4o mini e GPT-4.1 mini **não são liberados** (erro "Model not allowed"); use **GPT-5 mini**. Trocar o modelo é no módulo de IA de cada rota.
 
@@ -207,6 +209,22 @@ A rota `relatorio` recebe `{ "tarefa", "contexto" }` e responde o relatório em 
 Limites e erros ficam na Edge Function [`ia-relatorio`](supabase/functions/ia-relatorio/index.ts): anotações de 10 a 6.000 caracteres, 60 s de espera, e mensagem clara no app se o Make demorar ou falhar. Nada é salvo nem registrado no log além dos tamanhos.
 
 > Privacidade: as anotações do técnico passam pelo Make e pelo provedor da IA. O aviso no botão pede para não escrever senhas; se escrever, a IA troca por `[credencial omitida]`, mas o texto original já passou pelo caminho.
+
+## O que levar com IA (Make)
+
+O "O que levar" da visita (migration 058) continua funcionando como sempre: as regras **palavras-chave → itens** (tabela `levar_regras`, tela "Regras do que levar") sugerem na hora, offline e sem custo, agora lendo o **motivo e as observações**. O botão **✨ Sugerir com IA**, no mesmo bloco do formulário, é a segunda opinião para a visita atípica — aquela em que o problema está descrito sem nenhuma palavra-chave ("não puxa papel", sem a palavra "impressora").
+
+A rota `levar` recebe `{ "tarefa", "contexto" }` e responde **um item por linha**. Além do motivo e das observações, a Edge Function [`ia-levar`](supabase/functions/ia-levar/index.ts) monta o contexto com:
+
+- as **3 últimas visitas concluídas** daquele cliente, com 300 caracteres de cada relatório — é assim que entra o "faltou conector RJ45 na visita passada";
+- o **inventário ativo** do cliente (até 10 dispositivos: apelido, marca e sistema), que permite item específico como "toner da HP LaserJet M428";
+- a **lista que o técnico já montou**, para a IA não repetir.
+
+O que volta é tratado como sugestão: no máximo 6 itens, de 120 caracteres, sem numeração nem repetido, mesclados com `levarMescla` — **item que o técnico tirou não volta** e item já marcado continua marcado. Quem decide é ele.
+
+O botão só aparece com operador logado e conexão (mesma regra do relatório). Sem cliente escolhido ainda, a IA trabalha só com o motivo e as observações; o cliente é lido do formulário no momento do clique, então trocar o cliente antes de clicar funciona.
+
+> Privacidade: nome do cliente, motivo, observações, relatórios das últimas visitas e o inventário resumido passam pelo Make e pelo provedor da IA. IP, MAC e número de série do inventário não são enviados.
 
 ## No site
 

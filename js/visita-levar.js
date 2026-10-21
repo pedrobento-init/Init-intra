@@ -122,6 +122,7 @@ function levarFormHtml(v) {
   if (!(v && v.id) && !base.length && levarNormaliza(levarTexto(v))) {
     _levarForm.itens = levarMescla([], levarSugestoes(levarTexto(v), getLevarRegras()));
   }
+  _levarForm.cliente = { id: (v && v.clientId) || '', nome: (v && v.clientName) || '' };
   loadLevarRegras();  // atualiza o cache para a próxima digitação
   return `
     <div class="form-group levar-box">
@@ -132,7 +133,59 @@ function levarFormHtml(v) {
         <button type="button" class="btn btn-secondary btn-sm" data-levar-add>Adicionar</button>
       </div>
       <p class="levar-hint">Os itens aparecem conforme o motivo e as observações. Tire o que não precisar.</p>
+      ${_levarIaHtml()}
     </div>`;
+}
+
+/** Botão da IA: só com login e conexão, como o "Escrever com IA" do relatório. */
+function _levarIaHtml() {
+  try {
+    if (typeof iaReportAvailable !== 'function' || !iaReportAvailable()) return '';
+  } catch (_e) { return ''; }
+  return `
+    <div class="ia-bar">
+      <button type="button" class="btn btn-secondary btn-sm" data-levar-ia>✨ Sugerir com IA</button>
+      <span class="ia-hint">Olha as últimas visitas e o inventário do cliente. Confira antes de sair.</span>
+    </div>`;
+}
+
+/** Sugestões da IA mescladas na lista; o que o técnico já tirou não volta. */
+async function _levarSugerirIa(btn) {
+  if (!_levarForm || !document.getElementById('levarList')) return;
+  const campo = (nome) => {
+    const el = document.querySelector('[name="' + nome + '"]');
+    return el ? String(el.value || '').trim() : '';
+  };
+  const motivo = campo('motivo'), observacoes = campo('observacoes');
+  if (!motivo && !observacoes) { showToast('Escreva o motivo ou as observações primeiro.', 'warning'); return; }
+  // O cliente pode ter sido trocado no select depois de abrir o formulário.
+  const sel = document.querySelector('[name="clientId"]');
+  const cli = {
+    id: (sel && sel.value) || (_levarForm.cliente && _levarForm.cliente.id) || '',
+    nome: (sel && sel.selectedOptions && sel.selectedOptions[0] && sel.selectedOptions[0].textContent.trim())
+      || (_levarForm.cliente && _levarForm.cliente.nome) || '',
+  };
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Pensando…'; }
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('ia-levar', {
+      body: { client_id: cli.id, cliente: cli.nome, motivo, observacoes, lista: _levarForm.itens.map((i) => i.t) },
+    });
+    if (error || !data || !Array.isArray(data.itens)) {
+      let msg = (data && data.error) || '';
+      try { if (!msg && error && error.context && typeof error.context.json === 'function') msg = (await error.context.json()).error || ''; } catch (_e) { /* sem corpo */ }
+      throw new Error(msg || 'Não foi possível sugerir agora.');
+    }
+    const antes = _levarForm.itens.length;
+    _levarForm.itens = levarMescla(_levarForm.itens, data.itens, _levarForm.ignorados);
+    _levarRenderForm();
+    const novos = _levarForm.itens.length - antes;
+    showToast(novos ? `${novos} ${novos === 1 ? 'item sugerido' : 'itens sugeridos'}. Confira e tire o que não precisar.` : 'A IA não viu nada a acrescentar.', novos ? 'success' : 'info');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 
 /** Lista do formulário para gravar na visita (undefined = formulário sem o bloco). */
@@ -271,6 +324,8 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (!t || !t.closest) return;
     if (t.closest('[data-levar-regras]')) { openLevarRegras(); return; }
     if (t.closest('[data-levar-add]')) { _levarAdicionar(); return; }
+    const ia = t.closest('[data-levar-ia]');
+    if (ia) { _levarSugerirIa(ia); return; }
     const rm = t.closest('[data-levar-rm]');
     if (rm && _levarForm) {
       const n = Number(rm.dataset.levarRm);
