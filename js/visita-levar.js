@@ -31,10 +31,11 @@ function levarNormaliza(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-/** Itens sugeridos para o motivo. Palavra-chave casa como palavra inteira,
- *  aceitando plural: "impressora" pega "impressoras", "rede" não pega "redefinir". */
-function levarSugestoes(motivo, regras) {
-  const m = levarNormaliza(motivo);
+/** Itens sugeridos para o texto da visita (motivo + observações prévias).
+ *  Palavra-chave casa como palavra inteira, aceitando plural: "impressora"
+ *  pega "impressoras", "rede" não pega "redefinir". */
+function levarSugestoes(texto, regras) {
+  const m = levarNormaliza(texto);
   if (!m) return [];
   const out = [];
   const seen = new Set();
@@ -100,11 +101,27 @@ function levarPodeEditarRegras() {
 
 // ── Formulário da visita ────────────────────────────────────────────────────
 
-/** Bloco do formulário. Visita nova com motivo já preenchido já vem com sugestões. */
+/** Texto que alimenta as sugestões: motivo + observações prévias. */
+function levarTexto(v) {
+  return [(v && v.motivo) || '', (v && v.observacoes) || ''].join('\n');
+}
+
+/** O mesmo texto, lido do formulário aberto (o técnico ainda está digitando). */
+function _levarTextoDoForm(form) {
+  const campo = (nome) => {
+    const el = (form || document).querySelector('[name="' + nome + '"]');
+    return el ? el.value : '';
+  };
+  return levarTexto({ motivo: campo('motivo'), observacoes: campo('observacoes') });
+}
+
+/** Bloco do formulário. Visita nova com motivo/observações já preenchidos já vem com sugestões. */
 function levarFormHtml(v) {
   const base = Array.isArray(v && v.levar) ? v.levar : [];
   _levarForm = { itens: base.map((i) => ({ t: i.t, ok: i.ok === true })), ignorados: new Set() };
-  if (!(v && v.id) && !base.length && v && v.motivo) _levarForm.itens = levarMescla([], levarSugestoes(v.motivo, getLevarRegras()));
+  if (!(v && v.id) && !base.length && levarNormaliza(levarTexto(v))) {
+    _levarForm.itens = levarMescla([], levarSugestoes(levarTexto(v), getLevarRegras()));
+  }
   loadLevarRegras();  // atualiza o cache para a próxima digitação
   return `
     <div class="form-group levar-box">
@@ -114,7 +131,7 @@ function levarFormHtml(v) {
         <input class="form-input" id="levarNovo" placeholder="Adicionar item (ex.: cabo HDMI)" maxlength="120" />
         <button type="button" class="btn btn-secondary btn-sm" data-levar-add>Adicionar</button>
       </div>
-      <p class="levar-hint">Os itens aparecem conforme o motivo. Tire o que não precisar.</p>
+      <p class="levar-hint">Os itens aparecem conforme o motivo e as observações. Tire o que não precisar.</p>
     </div>`;
 }
 
@@ -299,18 +316,19 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (e.key === 'Enter' && e.target && e.target.id === 'levarNovo') { e.preventDefault(); _levarAdicionar(); }
   });
 
-  // Motivo digitado → sugestões (só com o bloco aberto no formulário).
+  // Motivo ou observações digitados → sugestões (só com o bloco aberto no formulário).
   document.addEventListener('input', (e) => {
     const t = e.target;
-    if (!t || t.name !== 'motivo' || !_levarForm || !document.getElementById('levarList')) return;
+    if (!t || (t.name !== 'motivo' && t.name !== 'observacoes') || !_levarForm || !document.getElementById('levarList')) return;
+    const texto = _levarTextoDoForm(t.form);
     clearTimeout(_levarMotivoTimer);
     _levarMotivoTimer = setTimeout(() => {
-      _levarForm.itens = levarMescla(_levarForm.itens, levarSugestoes(t.value, getLevarRegras()), _levarForm.ignorados);
+      _levarForm.itens = levarMescla(_levarForm.itens, levarSugestoes(texto, getLevarRegras()), _levarForm.ignorados);
       _levarRenderForm();
     }, 350);
   });
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { levarNormaliza, levarSugestoes, levarMescla, LEVAR_REGRAS_PADRAO };
+  module.exports = { levarNormaliza, levarSugestoes, levarMescla, levarTexto, LEVAR_REGRAS_PADRAO };
 }
