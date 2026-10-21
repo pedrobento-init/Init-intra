@@ -326,3 +326,21 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,
   };
 }
+
+/** Itens que o Make devolveu para o "O que levar": um por linha, sem numeração nem repetido. */
+export function itensDaIa(body: string, jaTem: string[] = [], max = 8): string[] {
+  const texto = textoDaIa(body, 2000);
+  if (!texto) return [];
+  const vistos = new Set(jaTem.map((t) => norm(t)));
+  const out: string[] = [];
+  for (const linha of texto.split("\n")) {
+    const t = linha.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/\s+/g, " ").replace(/\.$/, "").trim().slice(0, 120);
+    if (t.length < 2 || /^(nada|nenhum|sem item|n\/a)\b/i.test(t)) continue;
+    const k = norm(t);
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    out.push(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}

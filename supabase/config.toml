@@ -6,6 +6,8 @@ project_id = "esticiaufganuxhcwxzq"
 # Chamadas do app, com o JWT do operador (o código também confere operators).
 [functions.ia-relatorio]
 verify_jwt = true
+[functions.ia-levar]
+verify_jwt = true
 
 # Chamadas de fora do app, que se autenticam por secret no header:
 # o robô do Apps Script (x-agenda-secret) e o cron do banco (x-cron-secret).

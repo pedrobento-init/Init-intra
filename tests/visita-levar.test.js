@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { PGlite } from '@electric-sql/pglite';
 import { visitHash, visitToEvent } from '../supabase/functions/google-agenda/mapping.ts';
 
-const { levarSugestoes, levarMescla, levarNormaliza, LEVAR_REGRAS_PADRAO } = createRequire(import.meta.url)('../js/visita-levar.js');
+const { levarSugestoes, levarMescla, levarNormaliza, levarTexto, LEVAR_REGRAS_PADRAO } = createRequire(import.meta.url)('../js/visita-levar.js');
 
 describe('o que levar: sugestões pelo motivo', () => {
   it('formatação sugere pendrive e HD de backup, sem ligar para acento/maiúscula', () => {
@@ -20,6 +20,20 @@ describe('o que levar: sugestões pelo motivo', () => {
     const s = levarSugestoes('Formatação e backup', LEVAR_REGRAS_PADRAO);
     expect(s.filter((t) => t === 'HD externo para backup')).toHaveLength(1);
     expect(levarSugestoes('backup', [{ palavras: 'backup', itens: ['HD'], ativo: false }])).toEqual([]);
+  });
+  it('observações prévias também sugerem, não só o motivo', () => {
+    const v = { motivo: 'Visita de rotina', observacoes: 'Ver a impressora do faturamento, que parou de puxar papel' };
+    expect(levarSugestoes(v.motivo, LEVAR_REGRAS_PADRAO)).toEqual([]);
+    expect(levarSugestoes(levarTexto(v), LEVAR_REGRAS_PADRAO)).toContain('Cabo USB de impressora');
+  });
+  it('palavra que só existe nas observações não vaza para outra regra', () => {
+    const v = { motivo: 'Conversar com o cliente', observacoes: 'Ele quer redefinir a senha do e-mail' };
+    expect(levarSugestoes(levarTexto(v), LEVAR_REGRAS_PADRAO)).toEqual([]);
+  });
+  it('texto junta motivo e observações mesmo com um dos dois vazio', () => {
+    expect(levarNormaliza(levarTexto({ motivo: 'Formatação' }))).toBe('formatacao');
+    expect(levarNormaliza(levarTexto({ observacoes: 'Levar switch' }))).toBe('levar switch');
+    expect(levarNormaliza(levarTexto(null))).toBe('');
   });
   it('mescla mantém o que já está (e marcado), e respeita o que o técnico tirou', () => {
     const lista = [{ t: 'HD externo para backup', ok: true }];

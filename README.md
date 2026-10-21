@@ -53,6 +53,7 @@ e2e/                  Testes de navegador (Playwright)
 | `robo` | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores e backup no Drive (migration 059). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `ia-relatorio` | Texto de relatório com IA. |
+| `ia-levar` | Sugere o que levar para a visita (IA). |
 | `update-user-password` | Admin troca a senha de um usuário. |
 | `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
 

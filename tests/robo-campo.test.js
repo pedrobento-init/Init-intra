@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
-  primeiraRespostaDue, textoDaIa, triagemDaIa,
+  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -181,5 +181,24 @@ describe('triagem de e-mail', () => {
       categoria: 'impressora', tipo: 'Suporte', assunto: 'Impressora não imprime', tags: ['triagem-automatica'] });
     expect(p.descricao).toContain('Assunto original: Re: Enc: impressora parada');
     expect(p.first_response_due).toBe('2026-10-21T17:30:00.000Z');  // 10:30 + 4 h úteis = 14:30 de Brasília
+  });
+});
+
+describe('o que levar sugerido pela IA', () => {
+  it('uma linha por item, sem numeração, hífen, repetido nem o que já está na lista', () => {
+    const resposta = '- Cabo de rede\n1) Alicate de crimpar\n* Cabo de rede\nConectores RJ45.\n\n  Testador de cabo  ';
+    expect(itensDaIa(resposta, ['alicate de crimpar']))
+      .toEqual(['Cabo de rede', 'Conectores RJ45', 'Testador de cabo']);
+  });
+  it('resposta vazia, "Accepted" ou "nada a levar" não sugere nada', () => {
+    expect(itensDaIa('Accepted')).toEqual([]);
+    expect(itensDaIa('')).toEqual([]);
+    expect(itensDaIa('Nada além do básico')).toEqual([]);
+  });
+  it('corta no máximo de itens e no tamanho do campo', () => {
+    const muitos = Array.from({ length: 20 }, (_, i) => 'Item ' + (i + 1)).join('\n');
+    expect(itensDaIa(muitos)).toHaveLength(8);
+    expect(itensDaIa(muitos, [], 3)).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    expect(itensDaIa('x'.repeat(200))[0]).toHaveLength(120);
   });
 });
