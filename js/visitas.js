@@ -37,7 +37,7 @@ function renderVisitas() {
       </div>
       <div class="vis-kpis" id="visitStats"></div>
       <div class="vis-chips" id="visitChips" role="group" aria-label="Filtrar por status"></div>
-      <div class="vis-monthrow"><h2 id="visitCount"></h2><span>${typeof levarPodeEditarRegras === 'function' && levarPodeEditarRegras() ? '<button type="button" data-levar-regras>O que levar</button> ' : ''}<button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></span></div>
+      <div class="vis-monthrow"><h2 id="visitCount"></h2><span><button type="button" data-campo-rota>Rota de hoje</button> ${typeof levarPodeEditarRegras === 'function' && levarPodeEditarRegras() ? '<button type="button" data-levar-regras>O que levar</button> ' : ''}<button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></span></div>
       <div class="vis-list" id="visitViewArea"></div>
       <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova Visita">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -472,8 +472,9 @@ function openVisitDetail(id) {
       if (ms.kind === 'sem_token') return box(`<span class="mchip">Cliente sem integração Milvus</span>`);
       return box(`<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusChamado('${escapeHtml(id)}')">↻ Tentar novamente</button>`);
     })()}
+    ${typeof visitaCampoHtml === 'function' ? visitaCampoHtml(v) : ''}
     <hr class="divider"/>
-    
+
     <div class="form-group"><label class="form-label">Motivo</label>
       <div class="timeline-text">${escapeHtml(v.motivo)||'—'}</div></div>
     

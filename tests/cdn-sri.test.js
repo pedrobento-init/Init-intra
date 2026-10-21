@@ -69,7 +69,7 @@ describe('bibliotecas sob demanda (js/lazy-libs.js)', () => {
   const { LAZY_LIBS } = require('../js/lazy-libs.js');
 
   it('cada uma tem versão exata, integrity sha384 e o global esperado', () => {
-    expect(Object.keys(LAZY_LIBS).sort()).toEqual(['mammoth', 'motion', 'xlsx']);
+    expect(Object.keys(LAZY_LIBS).sort()).toEqual(['mammoth', 'motion', 'qrcode', 'xlsx']);
     for (const [name, lib] of Object.entries(LAZY_LIBS)) {
       expect(lib.src, name).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/npm\/[^/]+@\d+\.\d+\.\d+\//);
       expect(lib.integrity, name).toMatch(/^sha384-[A-Za-z0-9+/=]+$/);

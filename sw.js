@@ -1,4 +1,4 @@
-const CACHE_NAME = 'init-intra-v53';
+const CACHE_NAME = 'init-intra-v54';
 const CDN_CACHE_NAME = 'init-intra-cdn-v52';
 const MAX_CDN_ENTRIES = 40;
 
@@ -38,6 +38,9 @@ const STATIC_ASSETS = [
   'js/notifications.js',
   'js/calendar.js',
   'js/visita-levar.js',
+  'js/visita-campo.js',
+  'js/cliente-saude.js',
+  'js/etiquetas-qr.js',
   'js/visitas.js',
   'js/visit-photos.js',
   'js/visit-signature.js',

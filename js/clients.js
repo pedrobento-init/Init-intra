@@ -201,7 +201,7 @@ function renderClientGrid() {
       const dentro = sla.dentroPrazo;
       return `<div class="client-card" role="button" tabindex="0" onclick="viewClient('${escapeHtml(c.id)}')">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
-      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
+      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
@@ -231,12 +231,12 @@ function clientSummaryHtml(c) {
     const tone = !health ? 'ok' : health.level === 'red' ? 'danger' : health.level === 'yellow' ? 'warn' : 'ok';
     const item = (label, value, cls) => `<div class="cs-item${cls ? ' ' + cls : ''}"><span>${label}</span><b>${value}</b></div>`;
     return `<div class="client-summary">
-      ${item('Saúde', health ? escapeHtml(health.label || '—') : '—', 'is-' + tone)}
+      ${item('Saúde', health ? escapeHtml((health.label || '—') + (health.nota != null ? ' · ' + health.nota : '')) : '—', 'is-' + tone)}
       ${item('Abertas', String(sla.totalAbertas || 0), '')}
       ${item('Vencidas', String(sla.vencidas || 0), sla.vencidas ? 'is-danger' : '')}
       ${item('Última visita', past ? escapeHtml(formatDate(past.date)) : '—', '')}
       ${item('Próxima visita', next ? escapeHtml(formatDate(next.date)) : '—', '')}
-    </div>`;
+    </div>${typeof saudeMotivosHtml === 'function' ? saudeMotivosHtml(health) : ''}`;
   } catch (_) { return ''; }
 }
 
@@ -252,6 +252,7 @@ function viewClient(id) {
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-client-tab="backups" data-client-id="${escapeHtml(id)}">Backups</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</button>
@@ -268,6 +269,6 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => { const on = ['ficha','procedimentos','pendencias','visitas','inventario','chamados','checklist','documentos','historico'][i]===tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => { const on = ['ficha','procedimentos','pendencias','visitas','inventario','backups','chamados','checklist','documentos','historico'][i]===tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
   renderClientTab(tab, id);
 }

@@ -1,0 +1,313 @@
+// Init Intra — tarefas do robô além da agenda das visitas (Google Apps Script).
+// Arquivo à parte ("Robo.gs") no mesmo projeto do Código.gs, com as mesmas
+// propriedades SYNC_URL / SYNC_SECRET. Não depende de nada do Código.gs.
+// A regra fica na Edge Function "robo"; aqui só se fala com o Google.
+//
+//   roboVencimentos  de hora em hora   agenda "Vencimentos Init" (só leitura p/ a equipe)
+//   roboResumo       por volta das 8h  e-mail "Seu dia" (o servidor envia) + Google Chat opcional
+//   roboNoite        de madrugada      domínios (RDAP), planilha de indicadores, backup no Drive
+//   roboBackupsEmail de 30 em 30 min   e-mails do rótulo "Backups" do Gmail → status dos backups dos clientes
+//   roboPendenciasEmail de 15 em 15 min e-mails do rótulo "Pendências" do Gmail → pendência já preenchida
+//
+// INSTALAÇÃO: cole este arquivo como "Robo.gs" e rode instalarRobo() uma vez.
+// Opcional: propriedade CHAT_WEBHOOK com o webhook de um espaço do Google Chat.
+// Os IDs da agenda, planilha e pasta ficam nas propriedades VENC_CAL_ID,
+// IND_SHEET_ID e BACKUP_FOLDER_ID (criados sozinhos na 1ª vez).
+
+var ROBO_TAREFAS = ['roboVencimentos', 'roboResumo', 'roboNoite', 'roboBackupsEmail', 'roboPendenciasEmail'];
+var ROTULO_BACKUPS = 'Backups';
+var ROTULO_PENDENCIAS = 'Pendências';
+var BACKUP_DIAS = 30;
+
+function instalarRobo() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (ROBO_TAREFAS.indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('roboVencimentos').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('roboResumo').timeBased().everyDays(1).atHour(7).nearMinute(45).create();
+  ScriptApp.newTrigger('roboNoite').timeBased().everyDays(1).atHour(2).create();
+  ScriptApp.newTrigger('roboBackupsEmail').timeBased().everyMinutes(30).create();
+  ScriptApp.newTrigger('roboPendenciasEmail').timeBased().everyMinutes(15).create();
+  roboVencimentos();
+  roboNoite();
+  roboBackupsEmail();
+  roboPendenciasEmail();
+  var p = PropertiesService.getScriptProperties();
+  Logger.log('Agenda: https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(p.getProperty('VENC_CAL_ID')));
+  Logger.log('Planilha: https://docs.google.com/spreadsheets/d/' + p.getProperty('IND_SHEET_ID'));
+  Logger.log('Backups: https://drive.google.com/drive/folders/' + p.getProperty('BACKUP_FOLDER_ID'));
+}
+
+/** Teste do resumo sem mandar e-mail: mostra no log o texto que iria para o Chat. */
+function testarResumo() {
+  Logger.log(roboChamar_('resumo', { enviar: false }).chat);
+}
+
+function roboChamar_(action, body) {
+  var p = PropertiesService.getScriptProperties();
+  body = body || {};
+  body.action = action;
+  var segredo = String(p.getProperty('SYNC_SECRET') || '').trim();
+  if (!segredo) throw new Error('Preencha SYNC_SECRET nas Propriedades do script DESTE projeto (as propriedades não passam de um projeto para outro).');
+  var res = UrlFetchApp.fetch(roboUrl_(p.getProperty('SYNC_URL')), {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-agenda-secret': segredo },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() === 401) {
+    throw new Error('SYNC_SECRET deste projeto não confere com o AGENDA_SYNC_SECRET do Supabase. Use o mesmo valor do projeto que sincroniza as visitas.');
+  }
+  if (res.getResponseCode() !== 200) {
+    throw new Error('Intra respondeu ' + res.getResponseCode() + ' em ' + action + ': ' + res.getContentText().slice(0, 200));
+  }
+  return JSON.parse(res.getContentText());
+}
+
+/** SYNC_URL (raiz do projeto ou .../functions/v1/google-agenda) → .../functions/v1/robo. */
+function roboUrl_(raw) {
+  var u = String(raw || '').trim().replace(/\/+$/, '');
+  if (!u) throw new Error('Preencha SYNC_URL em Configurações do projeto → Propriedades do script.');
+  var m = /^(.*?)\/functions\/v1(\/.*)?$/.exec(u);
+  return (m ? m[1] : u) + '/functions/v1/robo';
+}
+
+function roboCodigo_(e) {
+  if (e && e.details && e.details.code) return Number(e.details.code);
+  var m = String(e && e.message || e);
+  if (/not found/i.test(m)) return 404;
+  if (/deleted|gone/i.test(m)) return 410;
+  if (/already exists|duplicate/i.test(m)) return 409;
+  var n = /\b(4\d\d|5\d\d)\b/.exec(m);
+  return n ? Number(n[1]) : 0;
+}
+
+function roboGravar_(cal, ev) {
+  var q = { sendUpdates: 'none' };
+  try {
+    Calendar.Events.patch(ev, cal, ev.id, q);
+  } catch (e) {
+    var c = roboCodigo_(e);
+    if (c !== 404 && c !== 410) throw e;
+    try {
+      Calendar.Events.insert(ev, cal, q);
+    } catch (e2) {
+      if (roboCodigo_(e2) !== 409) throw e2;  // já existiu e foi apagado: restaura
+      Calendar.Events.update(ev, cal, ev.id, q);
+    }
+  }
+}
+
+function roboApagar_(cal, eventId) {
+  try {
+    Calendar.Events.remove(cal, eventId, { sendUpdates: 'none' });
+  } catch (e) {
+    var c = roboCodigo_(e);
+    if (c !== 404 && c !== 410) throw e;
+  }
+}
+
+// ── Agenda de vencimentos ───────────────────────────────────────────────────
+
+function roboVencimentos() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return;
+  try {
+    var plan = roboChamar_('vencimentos');
+    var calId = agendaVencimentos_(plan.calendario);
+    compartilhar_(calId, plan.leitores);
+
+    var atuais = {};
+    var pageToken = null;
+    do {
+      var page = Calendar.Events.list(calId, { maxResults: 2500, pageToken: pageToken, showDeleted: false });
+      (page.items || []).forEach(function (ev) { if (/^vc[0-9a-f]+$/.test(ev.id)) atuais[ev.id] = ev; });
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+
+    plan.eventos.forEach(function (ev) {
+      var cur = atuais[ev.id];
+      delete atuais[ev.id];
+      var h = ev.extendedProperties.private.h;
+      if (cur && cur.extendedProperties && cur.extendedProperties.private && cur.extendedProperties.private.h === h) return;
+      roboGravar_(calId, ev);
+    });
+    // Vencimento encerrado ou excluído no site: sai da agenda.
+    Object.keys(atuais).forEach(function (id) { roboApagar_(calId, id); });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function agendaVencimentos_(nome) {
+  var p = PropertiesService.getScriptProperties();
+  var id = p.getProperty('VENC_CAL_ID');
+  if (id) {
+    try { Calendar.Calendars.get(id); return id; } catch (e) { /* apagada: cria de novo */ }
+  }
+  id = Calendar.Calendars.insert({ summary: nome, timeZone: 'America/Sao_Paulo',
+    description: 'Licenças, SSL, domínios e garantias do Init Intra. Atualizada pelo robô; edite pelo site.' }).id;
+  p.setProperty('VENC_CAL_ID', id);
+  return id;
+}
+
+/** Equipe ativa vê a agenda (só leitura); quem saiu perde o acesso. */
+function compartilhar_(calId, leitores) {
+  var quer = {};
+  leitores.forEach(function (e) { quer[e] = true; });
+  var eu = Session.getEffectiveUser().getEmail().toLowerCase();
+  (Calendar.Acl.list(calId).items || []).forEach(function (a) {
+    if (!a.scope || a.scope.type !== 'user') return;
+    var email = String(a.scope.value || '').toLowerCase();
+    if (quer[email]) { delete quer[email]; return; }
+    if (a.role === 'reader' && email !== eu) Calendar.Acl.remove(calId, a.id);
+  });
+  Object.keys(quer).forEach(function (email) {
+    if (email === eu) return;
+    try {
+      Calendar.Acl.insert({ role: 'reader', scope: { type: 'user', value: email } }, calId, { sendNotifications: false });
+    } catch (e) {
+      Logger.log('Não compartilhou com ' + email + ': ' + e.message);  // ex.: domínio externo bloqueado
+    }
+  });
+}
+
+// ── Resumo diário ───────────────────────────────────────────────────────────
+
+function roboResumo() {
+  var r = roboChamar_('resumo', { enviar: true });
+  Logger.log('Resumos enviados: ' + r.enviados + (r.falhas ? ' (falhas: ' + r.falhas + ')' : ''));
+  var hook = PropertiesService.getScriptProperties().getProperty('CHAT_WEBHOOK');
+  if (hook && r.chat) {
+    UrlFetchApp.fetch(hook, { method: 'post', contentType: 'application/json; charset=UTF-8', payload: JSON.stringify({ text: r.chat }) });
+  }
+}
+
+// ── Backups dos clientes (e-mails no rótulo "Backups") ─────────────────────
+
+/** Manda ao Intra os e-mails novos do rótulo; o Intra acha o cliente, grava o status e abre pendência se falhar. */
+function roboBackupsEmail() {
+  var p = PropertiesService.getScriptProperties();
+  if (!GmailApp.getUserLabelByName(ROTULO_BACKUPS)) GmailApp.createLabel(ROTULO_BACKUPS);
+  var desde = Number(p.getProperty('BACKUP_EMAIL_DESDE')) || (Date.now() - 3 * 86400000);
+  var mensagens = [], maisNovo = desde;
+  GmailApp.search('label:' + ROTULO_BACKUPS + ' after:' + Math.floor(desde / 1000), 0, 100).forEach(function (th) {
+    th.getMessages().forEach(function (m) {
+      var t = m.getDate().getTime();
+      if (t <= desde) return;
+      if (t > maisNovo) maisNovo = t;
+      mensagens.push({ id: m.getId(), de: m.getFrom(), assunto: m.getSubject() || '', data: m.getDate().toISOString(),
+        trecho: (m.getPlainBody() || '').slice(0, 2000) });
+    });
+  });
+  // Mesmo sem e-mail novo chama: é aqui que o silêncio além do limite vira pendência.
+  var r = roboChamar_('backups', { mensagens: mensagens });
+  p.setProperty('BACKUP_EMAIL_DESDE', String(maisNovo));
+  if (mensagens.length || r.alertas) Logger.log('Backups: ' + mensagens.length + ' e-mail(s), ' + r.casadas + ' de clientes, ' + r.alertas + ' pendência(s) aberta(s)');
+}
+
+// ── Triagem: e-mails do rótulo "Pendências" ────────────────────────────────
+
+/**
+ * Manda ao Intra os e-mails novos do rótulo; o Intra acha o cliente, pede a
+ * classificação ao Make e abre a pendência. Marque o e-mail do cliente com o
+ * rótulo (na mão ou por filtro do Gmail) e ele entra na próxima rodada.
+ */
+function roboPendenciasEmail() {
+  var p = PropertiesService.getScriptProperties();
+  if (!GmailApp.getUserLabelByName(ROTULO_PENDENCIAS)) GmailApp.createLabel(ROTULO_PENDENCIAS);
+  var desde = Number(p.getProperty('TRIAGEM_EMAIL_DESDE')) || (Date.now() - 86400000);
+  var mensagens = [], maisNovo = desde;
+  GmailApp.search('label:"' + ROTULO_PENDENCIAS + '" after:' + Math.floor(desde / 1000), 0, 50).forEach(function (th) {
+    th.getMessages().forEach(function (m) {
+      var t = m.getDate().getTime();
+      if (t <= desde) return;
+      if (t > maisNovo) maisNovo = t;
+      mensagens.push({ id: m.getId(), de: m.getFrom(), assunto: m.getSubject() || '', data: m.getDate().toISOString(),
+        trecho: (m.getPlainBody() || '').slice(0, 2000) });
+    });
+  });
+  if (!mensagens.length) return;  // ao contrário dos backups, silêncio aqui não é notícia
+  var r = roboChamar_('triagem', { mensagens: mensagens });
+  p.setProperty('TRIAGEM_EMAIL_DESDE', String(maisNovo));
+  Logger.log('Triagem: ' + mensagens.length + ' e-mail(s), ' + r.abertas + ' pendência(s), '
+    + r.ignorados + ' ignorado(s)' + ((r.sem_cliente || []).length ? ', sem cliente: ' + r.sem_cliente.join(' | ') : ''));
+}
+
+// ── Madrugada: domínios, indicadores, backup ────────────────────────────────
+
+function roboNoite() {
+  var erros = [];
+  [['domínios', roboDominios], ['indicadores', roboIndicadores], ['backup', roboBackup]].forEach(function (t) {
+    try { t[1](); } catch (e) { erros.push(t[0] + ': ' + e.message); }
+  });
+  if (erros.length) throw new Error(erros.join(' | '));  // aparece em Execuções
+}
+
+function roboDominios() {
+  var r = roboChamar_('dominios');
+  Logger.log('Domínios verificados: ' + r.verificados);
+}
+
+function roboIndicadores() {
+  var r = roboChamar_('indicadores');
+  var ss = planilha_();
+  Object.keys(r.abas).forEach(function (nome) {
+    var linhas = r.abas[nome].map(function (l) { return l.map(function (c) { return c === null ? '' : c; }); });
+    var sh = ss.getSheetByName(nome) || ss.insertSheet(nome);
+    sh.clearContents();
+    if (!linhas.length) return;
+    sh.getRange(1, 1, linhas.length, linhas[0].length).setValues(linhas);
+    sh.getRange(1, 1, 1, linhas[0].length).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  });
+  var sobre = ss.getSheetByName('Atualização') || ss.insertSheet('Atualização');
+  sobre.getRange(1, 1, 2, 2).setValues([['Atualizado em', new Date(r.atualizado_em)],
+    ['Origem', 'Init Intra (robô). Não edite: tudo é reescrito toda madrugada.']]);
+  ['Página1', 'Sheet1'].forEach(function (n) {
+    var s = ss.getSheetByName(n);
+    if (s && ss.getSheets().length > 1) ss.deleteSheet(s);
+  });
+}
+
+function planilha_() {
+  var p = PropertiesService.getScriptProperties();
+  var id = p.getProperty('IND_SHEET_ID');
+  if (id) {
+    try { return SpreadsheetApp.openById(id); } catch (e) { /* apagada: cria de novo */ }
+  }
+  var ss = SpreadsheetApp.create('Init Intra — Indicadores');
+  p.setProperty('IND_SHEET_ID', ss.getId());
+  return ss;
+}
+
+function roboBackup() {
+  var r = roboChamar_('backup');
+  var nomes = Object.keys(r.erros || {});
+  if (nomes.length) Logger.log('Tabelas fora do backup: ' + nomes.join(', '));
+  var pasta = pastaBackup_();
+  var dia = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var nome = 'init-intra-backup-' + dia + '.json';
+  var mesmos = pasta.getFilesByName(nome);
+  while (mesmos.hasNext()) mesmos.next().setTrashed(true);  // rodou 2× no dia: fica o último
+  pasta.createFile(nome, JSON.stringify(r), 'application/json');
+
+  var limite = Date.now() - BACKUP_DIAS * 86400000;
+  var files = pasta.getFiles();
+  while (files.hasNext()) {
+    var f = files.next();
+    if (/^init-intra-backup-/.test(f.getName()) && f.getDateCreated().getTime() < limite) f.setTrashed(true);
+  }
+}
+
+function pastaBackup_() {
+  var p = PropertiesService.getScriptProperties();
+  var id = p.getProperty('BACKUP_FOLDER_ID');
+  if (id) {
+    try { var f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) { /* apagada: cria de novo */ }
+  }
+  var pasta = DriveApp.createFolder('Init Intra — Backups');
+  p.setProperty('BACKUP_FOLDER_ID', pasta.getId());
+  return pasta;
+}
