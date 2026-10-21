@@ -290,14 +290,15 @@ function renderVisitTable(area) {
   if (typeof scheduleMilvusStatusRefresh === 'function') scheduleMilvusStatusRefresh();
 }
 
-function openVisitForm(id = null, preClientId = null, preDate = null) {
+function openVisitForm(id = null, preClientId = null, preDate = null, preTime = null) {
   const v = id ? getVisitById(id) : {};
   const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   const team    = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
   const opNames = getOperatorNames(team);
   const currentOp = v.operator || getUser().name;
   const allDay = v.allDay === true;
-  const timeStart = (v.time || '').toString().slice(0, 5);
+  // Hora clicada na Agenda (visão Semana) só vale para visita nova.
+  const timeStart = (v.time || (!id && /^\d{2}:\d{2}$/.test(preTime || '') ? preTime : '')).toString().slice(0, 5);
   const timeEnd = (v.timeEnd || '').toString().slice(0, 5);
 
   openModal(id ? ('Editar ' + visitDisplayTitle(v)) : 'Nova Visita', `

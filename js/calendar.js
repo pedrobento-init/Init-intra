@@ -421,7 +421,8 @@ function mapVisitsToEvents(visits) {
 }
 
 // ── Bottom-sheet do dia ─────────────────────────────────────────────────────
-function openCalendarDaySheet(dateStr) {
+function openCalendarDaySheet(dateStr, hora = '') {
+  if (!/^\d{2}:\d{2}$/.test(hora)) hora = '';
   const type = document.getElementById('calType')?.value || 'all';
   const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
   const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
@@ -450,7 +451,7 @@ function openCalendarDaySheet(dateStr) {
     }
   }
   html += `</div>`;
-  html += `<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><button class="btn btn-primary btn-sm" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Pendência em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="background:#0ea5e9;border-color:#0ea5e9;color:#fff" onclick="closeModal();openVisitForm(null,'${escapeHtml(dateStr)}')">+ Visita em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="closeModal()">Fechar</button></div>`;
+  html += `<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><button class="btn btn-primary btn-sm" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Pendência em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="background:#0ea5e9;border-color:#0ea5e9;color:#fff" onclick="closeModal();openVisitForm(null,null,'${escapeHtml(dateStr)}','${hora}')">+ Visita em ${escapeHtml(dateStr)}${hora ? ' às ' + hora : ''}</button><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="closeModal()">Fechar</button></div>`;
 
   openModal(title, html, 'sm');
   // Acessibilidade: bottom-sheet em mobile
@@ -535,11 +536,14 @@ async function initFullCalendar() {
       }
     },
     dateClick: function(info) {
-      openCalendarDaySheet(info.dateStr);
+      // Na Semana o clique vem com hora ("2026-10-21T10:00:00-03:00"): o dia
+      // vai para o sheet e a hora vira o início da visita nova.
+      const hora = !info.allDay && info.dateStr.length > 10 ? info.dateStr.slice(11, 16) : '';
+      openCalendarDaySheet(info.dateStr.slice(0, 10), hora);
     },
     moreLinkClick: function(info){
       info.jsEvent.preventDefault();
-      openCalendarDaySheet(info.date.toISOString().slice(0,10));
+      openCalendarDaySheet(localDateISO(info.date));
       return 'none';
     },
     dayCellDidMount: function(info){
