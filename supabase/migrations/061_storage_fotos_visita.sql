@@ -10,6 +10,8 @@
 -- (admin: tudo; demais: só objetos de registros da própria equipe) e
 -- ganham o ramo visits/* pela equipe da visita (visits.team).
 -- Funções entre (SELECT ...) para avaliar uma vez por consulta (055).
+-- objects.name qualificado: na 022, dentro do EXISTS em clients, `name`
+-- era clients.name (não o caminho do arquivo) e o ramo nunca casava.
 --
 -- Verificação (somente leitura):
 --   SELECT policyname, cmd FROM pg_policies
@@ -25,26 +27,26 @@ DECLARE
     AND (
       (SELECT public.current_op_is_admin())
       OR (
-        split_part(name, '/', 1) = 'pendencias'
+        split_part(objects.name, '/', 1) = 'pendencias'
         AND EXISTS (
           SELECT 1 FROM public.pendencias p
-          WHERE p.id = split_part(name, '/', 2)
+          WHERE p.id = split_part(objects.name, '/', 2)
             AND COALESCE(p.team, 'init') = (SELECT public.current_op_team())
         )
       )
       OR (
-        split_part(name, '/', 1) = 'clients'
+        split_part(objects.name, '/', 1) = 'clients'
         AND EXISTS (
           SELECT 1 FROM public.clients c
-          WHERE c.id = split_part(name, '/', 2)
+          WHERE c.id = split_part(objects.name, '/', 2)
             AND COALESCE(c.team, 'init') = (SELECT public.current_op_team())
         )
       )
       OR (
-        split_part(name, '/', 1) = 'visits'
+        split_part(objects.name, '/', 1) = 'visits'
         AND EXISTS (
           SELECT 1 FROM public.visits v
-          WHERE v.id = split_part(name, '/', 2)
+          WHERE v.id = split_part(objects.name, '/', 2)
             AND COALESCE(v.team, 'init') = (SELECT public.current_op_team())
         )
       )
