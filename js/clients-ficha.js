@@ -659,7 +659,7 @@ function cfHealthHtml(clientId, c) {
         <div class="cf-progress-top"><span>Ficha preenchida</span><b id="cfPct">${pct}%</b></div>
         <div class="cf-track"><i id="cfFill" style="width:${pct}%"></i></div>
       </div>
-    </div>`;
+    </div>${typeof saudeMotivosHtml === 'function' ? saudeMotivosHtml(health) : ''}`;
 }
 
 // ── Resumo copiável (whitelist; sem token/senha/chave) ─────────────────────
@@ -791,6 +791,8 @@ function renderClientTab(tab, id) {
       </tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma visita registrada para este cliente.</p></div>`}`;
   } else if (tab === 'inventario') {
     renderClientInventoryTab(id);
+  } else if (tab === 'backups') {
+    if (typeof renderClientBackupsTab === 'function') renderClientBackupsTab(id);
   } else if (tab === 'chamados') {
     renderClientMilvusTicketsTab(id);
   } else if (tab === 'checklist') {

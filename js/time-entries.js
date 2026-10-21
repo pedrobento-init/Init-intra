@@ -5,7 +5,7 @@
 // existindo só como histórico legível. timerTotalSeconds da pendência segue
 // como o total exibido no card e acompanha as correções feitas aqui.
 
-const TIME_SOURCES = { timer: 'Cronômetro', ajuste: 'Ajuste', conclusao: 'Conclusão', manual: 'Manual', notas: 'Histórico' };
+const TIME_SOURCES = { timer: 'Cronômetro', ajuste: 'Ajuste', conclusao: 'Conclusão', manual: 'Manual', notas: 'Histórico', visita: 'Visita' };
 
 function getTimeEntries() { return typeof dbGet === 'function' ? dbGet(DB.TIME_ENTRIES) : []; }
 function getTimeEntriesByPendencia(penId) {

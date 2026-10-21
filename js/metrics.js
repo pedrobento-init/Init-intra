@@ -91,7 +91,10 @@ function getHealthForClient(pendencias, clientId, todayISO, isClosedFn) {
   const sla = getSlaStatsForClient(pendencias, clientId, todayISO, isClosedFn);
   const concluidas = pendencias.filter(p => p.clientId === clientId && isPendenciaResolvida(p.status));
   const avg = calculateAvgResolutionHours(concluidas);
-  return calculateHealthScore({ totalAbertas: sla.totalAbertas, vencidas: sla.vencidas, avgHours: avg });
+  const base = calculateHealthScore({ totalAbertas: sla.totalAbertas, vencidas: sla.vencidas, avgHours: avg });
+  // No navegador, cliente-saude.js soma vencimentos, backups, dispositivos e
+  // tempo sem visita (nota 0–100 + motivos). Sem ele (testes), só pendências.
+  return typeof ajustarSaudeCliente === 'function' ? ajustarSaudeCliente(base, clientId, todayISO) : base;
 }
 
 // ── Carga por operador (timer.js) ───────────────────────────────────────────
@@ -426,6 +429,7 @@ function getRiskRanking(clients, pendencias, todayISO, limit, isClosedFn) {
     const wa = rankWeight[a.health.level] ?? 9;
     const wb = rankWeight[b.health.level] ?? 9;
     if (wa !== wb) return wa - wb;
+    if (a.health.nota != null && b.health.nota != null && a.health.nota !== b.health.nota) return a.health.nota - b.health.nota;
     if (b.health.vencidas !== a.health.vencidas) return b.health.vencidas - a.health.vencidas;
     if (b.health.totalAbertas !== a.health.totalAbertas) return b.health.totalAbertas - a.health.totalAbertas;
     const avgA = a.health.avgHours || 0; const avgB = b.health.avgHours || 0;
@@ -434,7 +438,8 @@ function getRiskRanking(clients, pendencias, todayISO, limit, isClosedFn) {
   });
   // Mantém apenas quem tem algo aberto (evita poluir com saudáveis zerados),
   // mas se ninguém tiver pendência, retorna os primeiros mesmo assim.
-  const withOpen = rows.filter((r) => r.health.totalAbertas > 0);
+  // Backup com falha ou vencimento estourado também é risco, mesmo sem pendência.
+  const withOpen = rows.filter((r) => r.health.totalAbertas > 0 || r.health.level !== 'green');
   return (withOpen.length ? withOpen : rows).slice(0, lim);
 }
 

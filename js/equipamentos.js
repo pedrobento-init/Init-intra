@@ -546,6 +546,7 @@ function toggleEquipMenu(e, id) {
   menu.innerHTML = `
     <button onclick="closeEquipMenu();openEquipForm('${q(id)}')">✏️ Editar</button>
     <button onclick="closeEquipMenu();openEquipLinkModal('${q(id)}')">🔗 Vincular pendência</button>
+    <button type="button" data-qr-equip="${escapeHtml(id)}">🏷️ Etiqueta QR</button>
     ${(() => { try { const eq = getEquipamentoById(id); const penId = getEquipPendenciaId(eq); return penId ? `<button onclick="closeEquipMenu();goToEquipOS('${q(penId)}')">↗ Ver pendência</button>` : ''; } catch (_) { return ''; } })()}
     <button class="danger" onclick="closeEquipMenu();deleteEquipFlow('${q(id)}')">🗑️ Excluir</button>`;
   menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';

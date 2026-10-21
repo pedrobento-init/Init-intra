@@ -1,0 +1,19 @@
+# Config do Supabase CLI. Só o que o projeto realmente usa: quem pode chamar
+# cada Edge Function. Sem isto, um deploy feito com --no-verify-jwt deixa a
+# função aberta para sempre (o CLI guarda a última opção usada).
+project_id = "esticiaufganuxhcwxzq"
+
+# Chamadas do app, com o JWT do operador (o código também confere operators).
+[functions.ia-relatorio]
+verify_jwt = true
+
+# Chamadas de fora do app, que se autenticam por secret no header:
+# o robô do Apps Script (x-agenda-secret) e o cron do banco (x-cron-secret).
+[functions.robo]
+verify_jwt = false
+[functions.google-agenda]
+verify_jwt = false
+[functions.avisos-prazo]
+verify_jwt = false
+[functions.agenda-ics]
+verify_jwt = false

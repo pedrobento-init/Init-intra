@@ -254,6 +254,9 @@ function saveVisit(data) {
       milvus_finalizar_tentativas: _fullV.milvusFinalizarTentativas ?? 0,
       // 058: só vai quando a visita tem a lista (banco sem a coluna não quebra).
       ...(Array.isArray(_fullV.levar) ? { levar: _fullV.levar } : {}),
+      // 060: idem para Cheguei/Saí.
+      ...(_fullV.checkinAt ? { checkin_at: _fullV.checkinAt } : {}),
+      ...(_fullV.checkoutAt ? { checkout_at: _fullV.checkoutAt } : {}),
       created_at: _fullV.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());

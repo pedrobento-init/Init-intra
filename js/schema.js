@@ -132,7 +132,7 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     optional: true,
-    optionalFields: ['operator_id', 'assinatura', 'assinatura_nome', 'assinatura_em', 'levar'], // 049, 054, 058
+    optionalFields: ['operator_id', 'assinatura', 'assinatura_nome', 'assinatura_em', 'levar', 'checkin_at', 'checkout_at'], // 049, 054, 058, 060
     fields: {
       id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
       time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
@@ -144,7 +144,7 @@ const ENTITIES = [
       milvus_finalizar_tentativas: 'milvusFinalizarTentativas',
       operator_id: 'operatorId',
       assinatura: 'assinatura', assinatura_nome: 'assinaturaNome', assinatura_em: 'assinaturaEm',
-      levar: 'levar',
+      levar: 'levar', checkin_at: 'checkinAt', checkout_at: 'checkoutAt',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     mapRow: r => ({
@@ -163,6 +163,9 @@ const ENTITIES = [
       operatorId: r.operator_id ?? null,
       assinatura: r.assinatura ?? null, assinaturaNome: r.assinatura_nome ?? null, assinaturaEm: r.assinatura_em ?? null,
       levar: Array.isArray(r.levar) ? r.levar : null,
+      checkinAt: r.checkin_at ?? null, checkoutAt: r.checkout_at ?? null,
+      // Só leitura: quem grava é o robô (fora de `fields`, o app nunca reenvia).
+      briefingIa: r.briefing_ia ?? null, briefingEm: r.briefing_em ?? null,
       createdAt: r.created_at, updatedAt: r.updated_at
     }),
     // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem

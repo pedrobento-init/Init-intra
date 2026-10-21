@@ -3447,6 +3447,40 @@ body.dark-theme .overdue-banner {
 .levar-conta { font-weight:400; font-size:12px; color:var(--text-muted); margin-left:6px; }
 .levar-regra { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
 .levar-regra-acoes { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; }
+
+/* ── Saúde do cliente e backups (cliente-saude.js) ── */
+.saude-motivos { margin:6px 0 10px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
+.saude-motivos b { color:var(--text-primary); }
+.bk-card { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+.bk-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.bk-acts { margin-left:auto; }
+.bk-meta { font-size:12.5px; color:var(--text-muted); margin-top:4px; }
+.bk-hist { margin:4px 0 0; padding-left:18px; font-size:12px; color:var(--text-muted); }
+
+/* ── Visita em campo (visita-campo.js) ── */
+.campo-box { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg-base); margin-top:12px; }
+.campo-acts { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.campo-st { font-size:13px; }
+.campo-brief { margin-top:10px; }
+.campo-ia { font-size:13px; padding:8px 10px; border-radius:6px; background:var(--accent-dim, rgba(59,130,246,.12)); margin-bottom:6px; }
+.campo-atencao { font-size:12.5px; color:var(--st-warn, #d97706); }
+
+/* ── Etiquetas QR (etiquetas-qr.js) ── */
+.qr-lista { max-height:45vh; overflow-y:auto; display:grid; gap:4px; margin-bottom:8px; }
+.qr-item { display:flex; gap:8px; align-items:flex-start; font-size:13px; }
+#qrPrint { display:none; }
+@media print {
+  @page { size:A4; margin:15mm 7mm 0 7mm; }
+  body.printing-qr > *:not(#qrPrint) { display:none !important; }
+  body.printing-qr #qrPrint { display:grid; grid-template-columns:repeat(3, 63.5mm); grid-auto-rows:38.1mm; column-gap:2.5mm; }
+  .qr-etq { display:flex; gap:2.5mm; align-items:center; padding:2.5mm; box-sizing:border-box; overflow:hidden; break-inside:avoid; color:#000; }
+  .qr-etq-code { width:28mm; height:28mm; flex:none; }
+  .qr-etq-code svg { width:100%; height:100%; }
+  .qr-etq-txt { display:flex; flex-direction:column; gap:.6mm; font:7.5pt/1.2 Arial, sans-serif; min-width:0; }
+  .qr-etq-txt b { font-size:9pt; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qr-etq-txt span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qr-etq-txt small { font-size:6.5pt; color:#444; margin-top:1mm; }
+}
 .vis-list { display:grid; gap:10px; }
 @media (min-width:1100px) {
   .vis-list { grid-template-columns:repeat(auto-fill, minmax(440px, 1fr)); align-items:start; }

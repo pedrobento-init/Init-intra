@@ -19,6 +19,12 @@ const LAZY_LIBS = {
     integrity: 'sha384-H2nNDydHmZprp4CMCumnXEUZpWPr9ifgL1W1PkhJj8awdAZ3QfvsGho12tqLeeBI',
     global: 'Motion',
   },
+  // Etiquetas QR dos equipamentos (etiquetas-qr.js), 57 KB.
+  qrcode: {
+    src: 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js',
+    integrity: 'sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k',
+    global: 'qrcode',
+  },
 };
 
 const _lazyLibPending = {};
