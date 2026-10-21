@@ -50,6 +50,7 @@ e2e/                  Testes de navegador (Playwright)
 | `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). Também por push, se configurado. |
 | `send-push` | Notificação no celular (Web Push). Só operador logado, só para operadores ativos; chaves VAPID nos secrets (migration 053). |
 | `agenda-ics` | Feed iCalendar da agenda do técnico (token secreto no link). |
+| `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `ia-relatorio` | Texto de relatório com IA. |
 | `update-user-password` | Admin troca a senha de um usuário. |
 | `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |

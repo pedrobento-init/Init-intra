@@ -37,7 +37,7 @@ function renderVisitas() {
       </div>
       <div class="vis-kpis" id="visitStats"></div>
       <div class="vis-chips" id="visitChips" role="group" aria-label="Filtrar por status"></div>
-      <div class="vis-monthrow"><h2 id="visitCount"></h2><button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></div>
+      <div class="vis-monthrow"><h2 id="visitCount"></h2><span>${typeof levarPodeEditarRegras === 'function' && levarPodeEditarRegras() ? '<button type="button" data-levar-regras>O que levar</button> ' : ''}<button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></span></div>
       <div class="vis-list" id="visitViewArea"></div>
       <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova Visita">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -336,7 +336,8 @@ function openVisitForm(id = null, preClientId = null, preDate = null) {
         <input class="form-input" name="motivo" value="${escapeHtml(v.motivo || '')}" placeholder="Ex: Manutenção preventiva, instalação de equipamento..." required /></div>
       <div class="form-group"><label class="form-label">Observações prévias / Instruções</label>
         <textarea class="form-textarea" name="observacoes" rows="2" placeholder="Orientações prévias, localização, contato local...">${escapeHtml(v.observacoes || '')}</textarea></div>
-      
+      ${typeof levarFormHtml === 'function' ? levarFormHtml(v) : ''}
+
       <div class="form-group" style="margin-top:12px;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
         <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);font-weight:700">
           <span>Relatório de Atendimento (O que foi feito na visita)</span>
@@ -417,6 +418,8 @@ function submitVisitForm(e, id) {
       status: g('status') || 'agendada',
       recurrence: g('recurrence'),
     };
+    const levar = typeof levarFormValor === 'function' ? levarFormValor() : undefined;
+    if (levar !== undefined) data.levar = levar;
     saveVisit(data);
     closeModal();
     if (document.getElementById('visitViewArea')) renderVisitView();
@@ -474,6 +477,7 @@ function openVisitDetail(id) {
       <div class="timeline-text">${escapeHtml(v.motivo)||'—'}</div></div>
     
     ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações prévias</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
+    ${typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : ''}
 
     <div class="form-group" style="margin-top:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">

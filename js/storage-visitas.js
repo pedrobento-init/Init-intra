@@ -215,6 +215,8 @@ function saveVisit(data) {
           status: 'agendada',
           team: data.team || 'init',
           recurrence: data.recurrence,
+          // A próxima ocorrência leva a mesma lista, toda por separar.
+          ...(Array.isArray(data.levar) ? { levar: data.levar.map(i => ({ t: i.t, ok: false })) } : {}),
         });
       }
     } catch (e) { console.warn('⚠️ Erro ao gerar visita recorrente:', e); }
@@ -250,6 +252,8 @@ function saveVisit(data) {
       milvus_finalizar_status: _fullV.milvusFinalizarStatus ?? null,
       milvus_finalizar_erro: _fullV.milvusFinalizarErro ?? null,
       milvus_finalizar_tentativas: _fullV.milvusFinalizarTentativas ?? 0,
+      // 058: só vai quando a visita tem a lista (banco sem a coluna não quebra).
+      ...(Array.isArray(_fullV.levar) ? { levar: _fullV.levar } : {}),
       created_at: _fullV.createdAt,
       updated_at: now
     }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
