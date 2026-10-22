@@ -69,9 +69,9 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 
 | ID      | Sev.     | Conf. | Achado                                                                                                                                                                                                                | Local                                                                                                                                                            | Status                                    |
 | ------- | -------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| SEC-01  | CRÍTICO  | ALTA  | Bucket `attachments` **público** + policy `attachments public read` sem `TO` → leitura anônima de documentos de clientes; app grava `getPublicUrl` no banco                                                           | `supabase/migrations/017_storage_attachments.sql:1-8`, `js/storage.js:1160-1162`                                                                                 | PROPOSTA (P-1)                            |
-| SEC-02  | CRÍTICO  | ALTA  | Policies `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (aplicam-se a `anon`) em 8 tabelas                                                                                                                     | `supabase/migrations/004_procedure_templates.sql:25-27`, `018_reunioes.sql:33`, `035_equipamentos.sql:49`, diagnóstico próprio em `021_rls_remediation.sql:5-14` | PROPOSTA (P-2) / DBA                      |
-| SEC-03  | ALTO     | ALTA  | Edge Function `send-email` **sem verificação de JWT/role**: aceita `from`/`to`/`html` arbitrários → relay/spoofing                                                                                                    | `supabase/functions/send-email/index.ts:24-60`                                                                                                                   | PROPOSTA (P-3)                            |
+| SEC-01  | CRÍTICO  | ALTA  | Bucket `attachments` **público** + policy `attachments public read` sem `TO` → leitura anônima de documentos de clientes; app grava `getPublicUrl` no banco                                                           | `supabase/migrations/017_storage_attachments.sql:1-8`, `js/storage.js:1160-1162`                                                                                 | **CÓDIGO FEITO** `0c4f5bf` · falta confirmar o bucket (§12) |
+| SEC-02  | CRÍTICO  | ALTA  | Policies `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (aplicam-se a `anon`) em 8 tabelas                                                                                                                     | `supabase/migrations/004_procedure_templates.sql:25-27`, `018_reunioes.sql:33`, `035_equipamentos.sql:49`, diagnóstico próprio em `021_rls_remediation.sql:5-14` | PROPOSTA (P-2) / DBA · não verificado (§12) |
+| SEC-03  | ALTO     | ALTA  | Edge Function `send-email` **sem verificação de JWT/role**: aceita `from`/`to`/`html` arbitrários → relay/spoofing                                                                                                    | `supabase/functions/send-email/index.ts:24-60`                                                                                                                   | **CORRIGIDO** — código valida operador e destinatários; `verify_jwt` ligado (§12) |
 | SEC-04  | ALTO     | ALTA  | Service Worker cacheava GETs autenticados do Supabase na Cache Storage (chave = URL, ignora `Authorization`) → dados de um usuário servidos a outra sessão                                                            | `sw.js` (handler `fetch`)                                                                                                                                        | **CORRIGIDO** `24d9160`                   |
 | SEC-05  | MÉDIO    | ALTA  | CDN `motion@13.1.1` carregado **sem `integrity`** (SRI)                                                                                                                                                               | `index.html:294`                                                                                                                                                 | **CORRIGIDO** `6ca1acc`                   |
 | SEC-06  | MÉDIO    | ALTA  | URL/chave do Supabase sobrescrevíveis via `localStorage` (`intra_supabase_url`/`intra_supabase_key`)                                                                                                                  | `js/supabase-config.js:12-14,38-39`                                                                                                                              | PROPOSTA (P-4)                            |
@@ -132,6 +132,7 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | CONS-19 | MÉDIO    | MÉDIA | Exportação `.ics` ignora `timeEnd`/`end` — nenhum `VEVENT` tem `DTEND`/`DURATION` (evento termina no início, duração zero)                                                                                            | `js/calendar.js:705-718`                                                                                                                                         | NOVO (Fase 8)                             |
 | CONS-20 | BAIXO    | MÉDIA | “Tentar novamente” do FullCalendar injeta uma 2ª `<script>` da mesma URL (`loadScript` só cacheia em `onload`) → download duplo e reexecução                                                                          | `js/calendar.js:464,469` + `js/ui.js:5,10`                                                                                                                       | NOVO (Fase 8)                             |
 | CONS-21 | SUSPEITA | MÉDIA | `moreLinkClick` monta a data via `toISOString()` (UTC) enquanto `dateClick` usa `dateStr` (local) → dia errado a leste de UTC (em pt-BR, UTC-3)                                                                       | `js/calendar.js:522` vs `:518`                                                                                                                                   | NOVO (Fase 8)                             |
+| SEC-21  | MÉDIO    | ALTA  | Edge Function órfã `resend-email` ativa em produção **sem fonte no repositório**: template de exemplo do Supabase (`from: "you@example.com"`), sem checagem de operador nem allowlist de destinatário — qualquer usuário logado enviava e-mail arbitrário pela conta Resend | produção (não versionada); secret `RESEND_API_KEY` desde 22/07                                                                                                    | **CORRIGIDO** (§12) — função e secret removidos |
 
 ---
 
@@ -221,6 +222,10 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 
 Aplicadas nesta sessão: **P-17** (commit `53c9fe7`, fecha SEC-15 e CONS-08), **P-18** (commits `3a3c13e` e `5b68c86`, fecha SEC-17 e SEC-18) e **P-19** (commit `812ab0d`, fecha SYNC-06 e SYNC-07) — ver §6 e §11. As demais seguem não aplicadas.
 
+> **Revisão de 22/10 (§12):** a metade de código da **P-1** já está em produção
+> (`0c4f5bf`); falta só confirmar o bucket. A **P-3** está corrigida — a descrição
+> do achado estava velha. A **P-2** segue intacta e continua sendo o bloqueador.
+
 | #    | Proposta                                                                                                                                                                                         | Prós                                                                                   | Contras / risco                                                                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | P-1  | Aplicar `022_storage_private.sql` + migrar o app para signed URLs (`js/storage.js:1162`)                                                                                                         | Fecha leitura anônima de anexos (SEC-01)                                               | Requer backup, conferência de paths (Q-INV1/2/3), código de signed URLs antes da migração; sem isso anexos quebram. **DBA + deploy atômico** |
@@ -251,7 +256,10 @@ Aplicadas nesta sessão: **P-17** (commit `53c9fe7`, fecha SEC-15 e CONS-08), **
 1. **Urgente (DBA + staging):** P-1 e P-2 — as duas exposições CRÍTICO; rodar backup →
    `021` → conferir `pg_policies` → `022` (somente com signed URLs já em produção).
    **Atenção:** aplicar a `021` sozinha **não** fecha `equipamentos` (SEC-13/P-15).
-2. **Alto:** P-3 (`send-email`) e P-6 (`vitest@5`) — correções pontuais, alto valor/baixo custo.
+   **Revisado em 22/10 (§12):** os signed URLs da P-1 já estão em produção (`0c4f5bf`)
+   e o bucket provavelmente já é privado — começar pela consulta ao `pg_policies`,
+   que decide se a `021` ainda é necessária, antes de agendar o DBA.
+2. **Alto:** ~~P-3 (`send-email`)~~ **já corrigido**, ver §12.3 · P-6 (`vitest@5`).
 3. **Verificação (somente leitura):** confirmar `Max rows` da API Supabase e
    `select count(*)` das tabelas grandes (valida/refuta SYNC-01).
 4. **Continuidade:** P-9 (pull paginado), P-13/P-14 (limpeza de código) e P-16
@@ -469,3 +477,90 @@ erro original), `CONS-09` (`js/global-search.js:162,169`, `return true` inalcan�
 - “Pull vaza pendências de Gestão”: RLS server-side (`005`/`024`/`037`), não é client-side.
 - `operators` sem filtro de time no pull: por design (`ops_select USING (true)`, `024:95-96`)
   e `pin_hash`/`pin_salt` não são mapeados (`js/schema.js:80-97`).
+
+---
+
+## 12. Fase 9 — estado real verificado em produção (22/10/2026)
+
+Esta fase não leu código novo: ligou o repositório ao que está **rodando**, via
+Supabase CLI (`functions list`, `functions download`, `secrets list`) e requisições
+anônimas. Duas conclusões da auditoria estavam desatualizadas e uma exposição nova
+apareceu.
+
+### 12.1 P-1 / SEC-01 — o código já está feito
+
+`0c4f5bf` (PR #27) implementou os links assinados que a P-1 exigia:
+`signedStorageUrls` com TTL de 1 h, cache e fallback que extrai o caminho de anexos
+antigos (`js/storage-anexos.js:93-130`). O `getPublicUrl` que sobrou (`:89`) só grava
+a URL legada junto do `path`; a leitura passa pelo link assinado.
+
+**O que falta é confirmar o bucket.** Requisição anônima a
+`/storage/v1/object/public/attachments/<inexistente>` devolve `Bucket not found` —
+consistente com bucket privado, **mas não é prova**: um bucket inexistente devolve a
+mesma mensagem (controle feito). Como o `attachments` existe, a leitura provável é
+que a `022` foi aplicada. Confirmar com:
+
+```sql
+select id, public from storage.buckets where id = 'attachments';
+```
+
+### 12.2 P-2 / SEC-02 — segue aberto, e segue sendo o bloqueador
+
+A `021_rls_remediation.sql` tem no cabeçalho **"ARQUIVO PARA REVISÃO. NÃO APLICAR"** —
+não é uma migration pronta. Continua valendo o que a §8 diz: DBA, staging, backup, a
+bateria de testes e a decisão sobre `tickets`.
+
+Não foi possível verificar daqui: o CLI conecta ao banco, mas nenhum relatório de
+`inspect db` lista policies e o `db dump` exige Docker. A consulta que decide:
+
+```sql
+select tablename, policyname, roles, cmd
+from pg_policies
+where schemaname = 'public' and qual = 'true'
+order by tablename;
+```
+
+Vazia → SEC-02 foi fechado por outro caminho e a migração para `@supabase/server`
+(Fases 3 e 5) destrava. Com as 8 tabelas → é o trabalho de DBA da §8, e tem
+prioridade sobre a migração.
+
+### 12.3 SEC-03 — corrigido, a descrição estava velha
+
+A `send-email` **não** aceita mais `from`/`to`/`html` arbitrários: valida o operador
+(`getUser` + `operators.active`), restringe destinatários a e-mails de operadores
+ativos (`recipient_not_allowed`, HTTP 403) e usa `from` fixo do secret `GMAIL_FROM`.
+Além disso, estava deployada com `verify_jwt = false` — a única das 17 nessa
+situação — e passou a `true` no deploy de 22/10 (v26).
+
+### 12.4 SEC-21 — função órfã removida
+
+`resend-email` estava **ACTIVE em produção sem fonte no repositório**. O download
+mostrou o template de exemplo do Supabase, com `from: "you@example.com"` intacto:
+`auth: "user"`, nenhuma checagem de operador, nenhuma allowlist de destinatário.
+Qualquer usuário logado podia enviar e-mail arbitrário pela conta Resend.
+
+Removidos a função (endpoint devolve 404) e o secret `RESEND_API_KEY`.
+**Pendente:** revogar a chave no painel da Resend — removê-la do Supabase não a
+invalida.
+
+### 12.5 Deploy — a lacuna que a §8 não cobria
+
+O `config.toml` cobria 6 das 17 functions; as outras 11 dependiam da última opção
+usada no deploy (`--no-verify-jwt` fica grudado). Declaradas e, após o redeploy de
+22/10, todas as 17 estão coerentes: `verify_jwt = true` nas 13 que validam JWT do
+operador, `false` nas 4 que se autenticam por segredo próprio.
+
+Duas functions **nunca tinham sido deployadas** e o frontend as chamava:
+`agenda-ics` (feed de calendário, `js/agenda-feed.js:47`) e `send-push`
+(notificação no celular, `js/push.js:45,78`). A `send-push` dependia dos secrets
+`VAPID_*`, que não existiam — o push estava inoperante por inteiro, inclusive os
+lembretes de prazo da `avisos-prazo`. Par VAPID gerado e configurado; as duas estão
+no ar.
+
+### 12.6 O que não foi verificado
+
+- Se as migrations `046` (`calendar_feeds`) e `053` (`push_subscriptions`) estão
+  aplicadas. A `046` está — o modal do feed gera o link, que depende da RPC
+  `my_calendar_feed_token`. A `053` segue sem confirmação.
+- `supabase migration list` mostra remoto só até a `005`: as migrations são aplicadas
+  à mão no SQL Editor, então a tabela de controle do CLI **não** reflete o banco.
