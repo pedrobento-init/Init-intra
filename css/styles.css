@@ -1614,6 +1614,21 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 .kanban-col.drag-over .kanban-cards {
   background: rgba(26,86,219,0.04);
 }
+/* Ordem manual (062): linha mostrando ONDE o card vai cair — acima do alvo. */
+.kanban-card.kb-drop-before {
+  position: relative;
+}
+.kanban-card.kb-drop-before::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
 
 /* ==========================================================================
    📱 3. RESPONSIVE DESIGN & VISUAL POLISH SYSTEM

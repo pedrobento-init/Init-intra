@@ -47,12 +47,15 @@ const ENTITIES = [
       timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt',
       responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId',
       solicitante: 'solicitante', canal: 'canal', categoria: 'categoria',
-      first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy'
+      first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy',
+      position: 'position'
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
     // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
+    // Ordem manual do quadro (062): idem — sem a coluna, o app ignora e ordena
+    // por criação/prazo/prioridade como antes.
     optionalFields: ['responsible_id', 'timer_operator_id', 'solicitante', 'canal', 'categoria',
-      'first_response_due', 'first_response_at', 'first_response_by'],
+      'first_response_due', 'first_response_at', 'first_response_by', 'position'],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);

@@ -89,18 +89,39 @@ function penRecurrenceLabel(r) {
   return o ? o.label : 'Recorrente';
 }
 const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
+// Ordem manual (062): setas para cima e para baixo, a convenção de "reordenar".
+const PEN_ICO_DRAG = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18"/></svg>';
 
 let penView = 'kanban';
 let penScope = 'active';
 let _filteredPens = [];
 
 // ── 6. ORDENAÇÃO POR COLUNA ────────────────────────────────────────────────
-var _penColSort = {}; // colId -> 'criacao'|'prazo'|'prioridade'
+var _penColSort = {}; // colId -> 'criacao'|'prazo'|'prioridade'|'manual'
 const _PEN_PRIORITY_WEIGHT = { critica:4, alta:3, media:2, baixa:1 };
+// Ordem manual (062): `position` fracionária, menor primeiro. Quem nunca foi
+// arrastado tem position null e cai no fim, em ordem de criação — assim a
+// coluna não embaralha quando só alguns cards foram ordenados à mão.
+function _penPos(p){
+  // Cuidado: Number(null) é 0 e 0 é finito — sem este guard, quem nunca foi
+  // ordenado viraria posição zero e iria para o TOPO em vez do fim.
+  if(!p || p.position === null || p.position === undefined || p.position === '') return null;
+  var n = Number(p.position);
+  return Number.isFinite(n) ? n : null;
+}
 function _penSortCards(cards, colId){
   var mode = _penColSort[colId] || 'criacao';
   var arr = cards.slice();
-  if(mode==='prazo'){
+  if(mode==='manual'){
+    arr.sort(function(a,b){
+      var pa = _penPos(a), pb = _penPos(b);
+      if(pa===null && pb===null) return String(a.createdAt||'').localeCompare(String(b.createdAt||''));
+      if(pa===null) return 1;
+      if(pb===null) return -1;
+      if(pa!==pb) return pa-pb;
+      return String(a.createdAt||'').localeCompare(String(b.createdAt||''));
+    });
+  } else if(mode==='prazo'){
     arr.sort(function(a,b){
       var da = a.deadline || '9999-12-31';
       var db = b.deadline || '9999-12-31';
@@ -126,7 +147,7 @@ function setPenColSort(colId, mode){
 }
 function cyclePenColSort(colId){
   var cur=_penColSort[colId]||'criacao';
-  var next= cur==='criacao' ? 'prazo' : cur==='prazo' ? 'prioridade' : 'criacao';
+  var next= cur==='criacao' ? 'prazo' : cur==='prazo' ? 'prioridade' : cur==='prioridade' ? 'manual' : 'criacao';
   setPenColSort(colId,next);
 }
 

@@ -162,6 +162,7 @@ function penStatusSummary(pens) {
 
 function renderPenKanban(area) {
   var pens = _filteredPens;
+  _bindPenBoardDrag(); // idempotente: liga a delegação de arrasto uma vez só
   _primePenRenderCache();
   try {
   // FASE 3: no modo servidor o resumo por status refletiria só a página;
@@ -175,8 +176,8 @@ function renderPenKanban(area) {
       var sortMode = _penColSort[col.id] || 'criacao';
       // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
       // decorativo fixo ao lado do botão, que também mostrava um relógio).
-      var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : PEN_ICO_CLK;
-      var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : 'Ordenado por criação';
+      var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : sortMode==='manual' ? PEN_ICO_DRAG : PEN_ICO_CLK;
+      var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
       // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
       // as colunas com cards caberem na tela sem rolagem lateral.
       return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" style="--c:' + penColColor(col.id) + '"' +
@@ -191,7 +192,7 @@ function renderPenKanban(area) {
           '</h2>' +
           '<span class="kanban-col-aside">' +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            (cards.length ? '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' : '') +
+            (cards.length ? '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' : '') +
           '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
@@ -404,6 +405,11 @@ function penKanbanCard(p) {
     ' draggable="true"' +
     ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
     ' ondragend="onPenKanbanDragEnd(event)"' +
+    // Ordem manual (062): só data-*, sem handler inline. Os eventos de arrasto
+    // são tratados por delegação em _bindPenBoardDrag() — a catraca de CSP
+    // (tests/no-inline-handlers.test.js) não pode crescer.
+    ' data-pen-id="' + escapeHtml(p.id) + '"' +
+    ' data-pen-col="' + escapeHtml(p.status) + '"' +
     ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')"' +
     ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
     '<div class="kanban-card-title" title="' + escapeHtml(title) + '">' +
@@ -444,7 +450,97 @@ function onPenKanbanDragEnd(e) {
 function onPenKanbanDrop(e, colId) {
   e.preventDefault();
   document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
-  penMoveTo(e.dataTransfer.getData('penId'), colId);
+  var id = e.dataTransfer.getData('penId');
+  var p = getPendenciaById(id);
+  // Soltar no fundo da coluna, já estando nela e em ordem manual: vai p/ o fim.
+  // (penMoveTo sozinho não faria nada, porque o status não mudou.)
+  if (p && p.status === colId && (_penColSort[colId] || 'criacao') === 'manual') {
+    penReorder(id, null, colId);
+    return;
+  }
+  penMoveTo(id, colId);
+}
+
+// ── Ordem manual dentro da coluna (migration 062) ──────────────────────────
+// Só vale no modo 'manual'; nos outros a ordem é derivada e arrastar dentro da
+// coluna não deve mudar nada (o card volta para o lugar e um toast explica).
+function _penCardsOfCol(colId) {
+  var pens = Array.isArray(_filteredPens) ? _filteredPens : [];
+  return _penSortCards(pens.filter(function(p) { return p.status === colId; }), colId);
+}
+
+/** Nova `position` para cair ENTRE os vizinhos — sem renumerar a coluna. */
+function _penPositionBetween(before, after) {
+  // _penPos trata null/''/NaN como "sem posição" — Number(null) seria 0.
+  var a = _penPos(before);
+  var b = _penPos(after);
+  if (a !== null && b !== null) return (a + b) / 2;
+  if (a !== null) return a + 1;
+  if (b !== null) return b - 1;
+  return 0;
+}
+
+/**
+ * Move `id` para antes de `targetId` na mesma coluna. `targetId` null = fim.
+ * Só a pendência arrastada é salva: os vizinhos não mudam de position.
+ */
+function penReorder(id, targetId, colId) {
+  if (!id || id === targetId) return;
+  var p = getPendenciaById(id);
+  if (!p || p.status !== colId) return;
+  var ordem = _penCardsOfCol(colId).filter(function(c) { return c.id !== id; });
+  var alvo = targetId ? ordem.findIndex(function(c) { return c.id === targetId; }) : ordem.length;
+  if (alvo === -1) return;
+  var pos = _penPositionBetween(ordem[alvo - 1] || null, ordem[alvo] || null);
+  if (Number(p.position) === pos) return;
+  var next = { ...p, position: pos };
+  savePendencia(next);
+  _optimisticPenUpsert(next);
+  renderPenView(false);
+}
+
+// Arrasto sobre os cards por DELEGAÇÃO (sem handler inline: a catraca de CSP
+// em tests/no-inline-handlers.test.js só pode diminuir). Fora do modo manual
+// os eventos passam direto e a coluna trata a mudança de status.
+var _penDragBound = false;
+function _penDropCard(ev) {
+  var el = ev.target && ev.target.closest ? ev.target.closest('.kanban-card[data-pen-id]') : null;
+  if (!el) return null;
+  var colId = el.getAttribute('data-pen-col') || '';
+  return (_penColSort[colId] || 'criacao') === 'manual' ? el : null;
+}
+function _penClearDropMark() {
+  document.querySelectorAll('.kanban-card.kb-drop-before').forEach(function(c) { c.classList.remove('kb-drop-before'); });
+}
+function _bindPenBoardDrag() {
+  if (_penDragBound || typeof document === 'undefined' || !document.addEventListener) return;
+  _penDragBound = true;
+  document.addEventListener('dragover', function(ev) {
+    var el = _penDropCard(ev);
+    if (!el) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!el.classList.contains('kb-drop-before')) { _penClearDropMark(); el.classList.add('kb-drop-before'); }
+  });
+  document.addEventListener('dragleave', function(ev) {
+    var el = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
+    if (el) el.classList.remove('kb-drop-before');
+  });
+  document.addEventListener('drop', function(ev) {
+    var el = _penDropCard(ev);
+    if (!el) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    _penClearDropMark();
+    document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
+    var id = ev.dataTransfer ? ev.dataTransfer.getData('penId') : '';
+    var alvo = el.getAttribute('data-pen-id');
+    var colId = el.getAttribute('data-pen-col') || '';
+    var p = getPendenciaById(id);
+    if (!p) return;
+    if (p.status !== colId) { penMoveTo(id, colId); return; } // veio de outra coluna
+    penReorder(id, alvo, colId);
+  });
 }
 
 // Muda o status (arrastar no quadro ou menu ⋯ do card).
