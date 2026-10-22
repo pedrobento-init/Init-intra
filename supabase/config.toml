@@ -9,6 +9,31 @@ verify_jwt = true
 [functions.ia-levar]
 verify_jwt = true
 
+# Idem: chamadas do app com o JWT do operador. Cada função confere operators
+# (equipe, is_admin, active) antes de ler o Milvus ou escrever no banco.
+[functions.milvus-atendimentos]
+verify_jwt = true
+[functions.milvus-chamado-create]
+verify_jwt = true
+[functions.milvus-chamado-status]
+verify_jwt = true
+[functions.milvus-client-names]
+verify_jwt = true
+[functions.milvus-clients-import]
+verify_jwt = true
+[functions.milvus-devices]
+verify_jwt = true
+[functions.milvus-tickets]
+verify_jwt = true
+[functions.milvus-token-backfill]
+verify_jwt = true
+[functions.send-email]
+verify_jwt = true
+[functions.send-push]
+verify_jwt = true
+[functions.update-user-password]
+verify_jwt = true
+
 # Chamadas de fora do app, que se autenticam por secret no header:
 # o robô do Apps Script (x-agenda-secret) e o cron do banco (x-cron-secret).
 [functions.robo]
