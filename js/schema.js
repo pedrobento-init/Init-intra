@@ -48,14 +48,16 @@ const ENTITIES = [
       responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId',
       solicitante: 'solicitante', canal: 'canal', categoria: 'categoria',
       first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy',
-      position: 'position'
+      position: 'position', events: 'events'
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
     // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
     // Ordem manual do quadro (062): idem — sem a coluna, o app ignora e ordena
     // por criação/prazo/prioridade como antes.
+    // Linha do tempo (063): idem — sem a coluna os eventos ficam só no
+    // aparelho (não viajam nem sobrevivem a um pull).
     optionalFields: ['responsible_id', 'timer_operator_id', 'solicitante', 'canal', 'categoria',
-      'first_response_due', 'first_response_at', 'first_response_by', 'position'],
+      'first_response_due', 'first_response_at', 'first_response_by', 'position', 'events'],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);

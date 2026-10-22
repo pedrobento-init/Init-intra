@@ -3,6 +3,19 @@
 // clássicos: carregam logo depois de storage.js e compartilham os mesmos globais.
 // Nos testes, tests/_storage.cjs junta as partes na mesma ordem.
 
+// ── LINHA DO TEMPO DA PENDÊNCIA (migration 063) ──
+// Campos cujo movimento vira evento. Texto, anexos e cronômetro ficam de
+// fora de propósito: a linha conta a história do chamado, não cada toque.
+const PEN_EVENT_FIELDS = [
+  { key: 'status', type: 'status' },
+  { key: 'responsible', type: 'responsavel' },
+  { key: 'priority', type: 'prioridade' },
+  { key: 'deadline', type: 'prazo' },
+];
+// Teto: a coluna viaja junto do registro em todo sync; um chamado de anos
+// não pode engordar o payload sem limite. Corta os mais antigos.
+const PEN_MAX_EVENTS = 200;
+
 // ── CLIENTS ──
 // Lookup O(1) por id + ordenação memoizados por identidade do array
 // (setCacheStore troca a referência a cada escrita): getClients/getClientById
@@ -351,6 +364,26 @@ function savePendencia(data) {
     }
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   let oldStatus = null;
+  // Linha do tempo (063): o que ACONTECEU, complementar a `notes`, que é o
+  // que a equipe ESCREVEU. Só campos que contam uma história — texto, anexos
+  // e cronômetro ficam de fora para a linha não virar ruído.
+  var _penEventos = function (antes, depois, quando, quem) {
+    var out = [];
+    PEN_EVENT_FIELDS.forEach(function (f) {
+      var de = antes ? (antes[f.key] ?? null) : null;
+      var para = depois ? (depois[f.key] ?? null) : null;
+      if (de === para) return;
+      if ((de === null || de === '') && (para === null || para === '')) return;
+      out.push({ at: quando, by: quem || '', type: f.type, de: de, para: para });
+    });
+    return out;
+  };
+  var _penComEventos = function (registro, novos) {
+    if (!novos || !novos.length) return registro;
+    var atual = Array.isArray(registro.events) ? registro.events : [];
+    registro.events = atual.concat(novos).slice(-PEN_MAX_EVENTS);
+    return registro;
+  };
   // SLA (056): prazo da 1ª resposta e registro da 1ª resposta (js/sla.js).
   var _slaActor = '';
   try { _slaActor = typeof getUser === 'function' ? (getUser().name || '') : ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
@@ -361,7 +394,15 @@ function savePendencia(data) {
   };
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], _sla(list[i], { ...list[i], ...data, updatedAt: now }));
+    if (i !== -1) {
+      oldStatus = list[i].status;
+      var _antes = list[i];
+      var _depois = _sla(_antes, { ...list[i], ...data, updatedAt: now });
+      _penComEventos(_depois, _penEventos(_antes, _depois, now, _slaActor));
+      // O payload remoto nasce do registro mesclado (812ab0d) — sem isto os
+      // eventos novos ficariam só no cache local.
+      data.events = _depois.events;
+      list[i] = _withDirtyFields(_antes, _depois);
     } else {
       // Undo/restauração: o id original já vem no snapshot — preservá-lo
       // mantém links, anexos e visitId. Só gera id novo quando não há um.
@@ -377,6 +418,7 @@ function savePendencia(data) {
     data.updatedAt = now;
     data.status = data.status || 'em_andamento';
     _sla(null, data);
+    _penComEventos(data, [{ at: now, by: _slaActor || '', type: 'criado', de: null, para: data.status }]);
     list.push(data);
   }
   // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição

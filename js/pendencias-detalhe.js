@@ -67,7 +67,8 @@ function openPendenciaDetail(id) {
         <div class="pen-cmd-card pen-cmd-feed-card">
           <div class="section-header pen-sec-head"><span class="section-title">💬 Feed de atividade</span><span class="pen-count">${(p.notes||[]).length ? (p.notes||[]).length+' msgs' : '0 msgs'}</span></div>
           <div class="pen-cmd-feed" id="penTimeline">
-            ${(p.notes||[]).length ? (p.notes).map(function(n){
+            ${_penFeedItens(p).length ? _penFeedItens(p).map(function(n){
+              if (n._evento) return _penEventoHtml(n);
               var _isMe = _me && n.author === _me;
               var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
               // Sem o campo = nota anterior à separação: lida como interna.
@@ -224,6 +225,60 @@ function changePenStatus(id) {
   openPendenciaDetail(id);
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+}
+
+// ── Linha do tempo (063): notas e eventos no MESMO fio, em ordem ──────────
+// Quem lê o chamado quer a história inteira, não duas listas para cruzar.
+
+/** Notas + eventos ordenados por data. Evento vem marcado com `_evento`. */
+function _penFeedItens(p) {
+  var notas = Array.isArray(p && p.notes) ? p.notes : [];
+  var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
+    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para };
+  });
+  return notas.concat(eventos).sort(function(a, b) {
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+}
+
+/** Rótulo legível de um valor, resolvido AGORA (renomear status não reescreve o histórico). */
+function _penValorLabel(tipo, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (tipo === 'status') {
+    try { return (STATUS_PEN_MAP && STATUS_PEN_MAP[v] && STATUS_PEN_MAP[v].label) || v; } catch (_) { return v; }
+  }
+  if (tipo === 'prioridade') {
+    try { return typeof penPriLabel === 'function' ? penPriLabel(v) : v; } catch (_) { return v; }
+  }
+  if (tipo === 'prazo') {
+    try { return typeof formatDate === 'function' ? formatDate(parseDeadline(v)) : v; } catch (_) { return v; }
+  }
+  return v;
+}
+
+const _PEN_EVENT_VERBO = {
+  criado: 'abriu a pendência',
+  status: 'mudou o status',
+  responsavel: 'passou para',
+  prioridade: 'mudou a prioridade',
+  prazo: 'mudou o prazo',
+};
+
+/** Marcador discreto no meio do fio — não é balão de mensagem. */
+function _penEventoHtml(e) {
+  var quem = e.author ? escapeHtml(e.author) : 'Sistema';
+  var corpo;
+  if (e.type === 'criado') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.criado;
+  } else if (e.type === 'responsavel') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.responsavel + ' <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  } else {
+    corpo = quem + ' ' + (_PEN_EVENT_VERBO[e.type] || 'mudou algo')
+      + ': <span class="pen-ev-de">' + escapeHtml(_penValorLabel(e.type, e.de)) + '</span>'
+      + ' → <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  }
+  return '<div class="pen-ev" role="note"><span class="pen-ev-txt">' + corpo
+    + '</span><span class="pen-ev-at">' + formatDateTime(e.createdAt) + '</span></div>';
 }
 
 /** Alterna Resposta × Anotação interna no compositor (delegado por data-action). */

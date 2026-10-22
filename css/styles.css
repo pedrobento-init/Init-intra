@@ -1656,6 +1656,34 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   letter-spacing: .3px;
 }
 
+/* Linha do tempo (063): evento é marcador no fio, não balão de mensagem —
+   precisa ler como "aconteceu isto" e não competir com as falas. */
+.pen-ev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.pen-ev::before,
+.pen-ev::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  opacity: .5;
+}
+.pen-ev-txt { white-space: nowrap; }
+.pen-ev-de { text-decoration: line-through; opacity: .7; }
+.pen-ev-at { white-space: nowrap; opacity: .7; }
+@media screen and (max-width: 640px) {
+  .pen-ev { flex-wrap: wrap; }
+  .pen-ev::before, .pen-ev::after { display: none; }
+  .pen-ev-txt { white-space: normal; }
+}
+
 /* Ordem manual (062): linha mostrando ONDE o card vai cair — acima do alvo. */
 .kanban-card.kb-drop-before {
   position: relative;
