@@ -64,7 +64,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/visitas.js', 'utf8'), sandbox, { filename: 'visitas.js' });
   vm.runInContext(
-    'globalThis.__t = { visitInitials, VISIT_STATUS_CHIPS, setVisitStatusFilter, getFilteredVisits, visitCardHtml, openVisitFiltersSheet, applyVisitFiltersSheet, clearVisitFiltersSheet, updateVisitFilterDot };',
+    'globalThis.__t = { visitInitials, VISIT_STATUS_CHIPS, setVisitStatusFilter, getFilteredVisits, visitCardHtml, openVisitFiltersSheet, applyVisitFiltersSheet, clearVisitFiltersSheet, updateVisitFilterDot, visitGroupKey, groupVisitsByPeriod };',
     sandbox
   );
 } finally {
@@ -210,5 +210,56 @@ describe('contrato do template e do CSS', () => {
     expect(html).not.toContain('Schibsted+Grotesk');
     expect(html).not.toContain('family=Inter');
     expect(css).toContain('font-family: var(--font-sans)');
+  });
+});
+
+describe('lista agrupada por período', () => {
+  const HOJE = '2026-10-21';
+  const v = (id, date, status, extra) => ({ id, date, status, time: '', ...extra });
+
+  it('grupo de cada visita em relação a hoje', () => {
+    expect(T.visitGroupKey(v('a', '2026-10-20', 'agendada'), HOJE)).toBe('atrasadas');
+    expect(T.visitGroupKey(v('b', '2026-10-19', 'em_andamento'), HOJE)).toBe('atrasadas');
+    expect(T.visitGroupKey(v('c', '2026-10-20', 'concluida'), HOJE)).toBe('anteriores');
+    expect(T.visitGroupKey(v('d', '2026-10-01', 'cancelada'), HOJE)).toBe('anteriores');
+    expect(T.visitGroupKey(v('e', HOJE, 'concluida'), HOJE)).toBe('hoje');
+    expect(T.visitGroupKey(v('f', '2026-10-22', 'agendada'), HOJE)).toBe('amanha');
+    expect(T.visitGroupKey(v('g', '2026-10-28', 'agendada'), HOJE)).toBe('semana');
+    expect(T.visitGroupKey(v('h', '2026-10-29', 'agendada'), HOJE)).toBe('depois');
+    expect(T.visitGroupKey(v('i', '', 'agendada'), HOJE)).toBe('depois');
+  });
+
+  it('virada de mês e de ano', () => {
+    expect(T.visitGroupKey(v('a', '2026-11-01', 'agendada'), '2026-10-31')).toBe('amanha');
+    expect(T.visitGroupKey(v('b', '2027-01-03', 'agendada'), '2026-12-31')).toBe('semana');
+  });
+
+  it('ordem dos grupos e das visitas dentro deles', () => {
+    const g = T.groupVisitsByPeriod([
+      v('ant1', '2026-10-10', 'concluida'),
+      v('ant2', '2026-10-15', 'concluida'),
+      v('am', '2026-10-22', 'agendada'),
+      v('h2', HOJE, 'agendada', { time: '14:00' }),
+      v('hdia', HOJE, 'agendada', { allDay: true }),
+      v('h1', HOJE, 'agendada', { time: '09:00' }),
+      v('atr', '2026-10-18', 'agendada'),
+      v('sem2', '2026-10-27', 'agendada'),
+      v('sem1', '2026-10-24', 'agendada'),
+    ], HOJE);
+    expect(g.map((x) => x.key)).toEqual(['atrasadas', 'hoje', 'amanha', 'semana', 'anteriores']);
+    expect(g[1].visits.map((x) => x.id)).toEqual(['h1', 'h2', 'hdia']);
+    expect(g[3].visits.map((x) => x.id)).toEqual(['sem1', 'sem2']);
+    expect(g[4].visits.map((x) => x.id)).toEqual(['ant2', 'ant1']);
+    expect(g[1].label).toBe('Hoje');
+  });
+
+  it('sem visitas: nenhum grupo', () => {
+    expect(T.groupVisitsByPeriod([], HOJE)).toEqual([]);
+  });
+
+  it('cartão mostra o motivo', () => {
+    expect(T.visitCardHtml(FAKE_VISITS[2])).toContain('vis-why');
+    expect(T.visitCardHtml(FAKE_VISITS[2])).toContain('Instalação');
+    expect(T.visitCardHtml({ ...FAKE_VISITS[2], motivo: '' })).not.toContain('vis-why');
   });
 });

@@ -250,9 +250,52 @@ function visitCardHtml(v) {
     + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
     + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span>'
     + (typeof milvusStatusChipHtml === 'function' ? milvusStatusChipHtml(v) : '') + '</div>'
+    + (v.motivo ? '<div class="vis-why">' + escapeHtml(v.motivo) + '</div>' : '')
     + '<div class="vis-meta"><span class="vis-who"><i>' + escapeHtml(visitInitials(v.operator)) + '</i>' + escapeHtml(v.operator || '—') + '</span>'
     + '<span>' + escapeHtml(timeLabel) + '</span></div>'
     + '</button>';
+}
+
+// ── Grupos da lista: o que pede ação primeiro, o passado no fim ───────────
+const VISIT_GROUPS = [
+  { key: 'atrasadas', label: 'Atrasadas' },
+  { key: 'hoje', label: 'Hoje' },
+  { key: 'amanha', label: 'Amanhã' },
+  { key: 'semana', label: 'Próximos 7 dias' },
+  { key: 'depois', label: 'Mais adiante' },
+  { key: 'anteriores', label: 'Anteriores' },
+];
+
+function _visitIsoAddDays(iso, n) {
+  const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Grupo de uma visita em relação a hoje (puro). Passada e ainda aberta = atrasada. */
+function visitGroupKey(v, todayISO) {
+  const d = (v && v.date) || '';
+  if (!d) return 'depois';
+  if (d === todayISO) return 'hoje';
+  if (d < todayISO) return (v.status === 'agendada' || v.status === 'em_andamento') ? 'atrasadas' : 'anteriores';
+  if (d === _visitIsoAddDays(todayISO, 1)) return 'amanha';
+  if (d <= _visitIsoAddDays(todayISO, 7)) return 'semana';
+  return 'depois';
+}
+
+/**
+ * Visitas agrupadas e ordenadas para a lista (puro): só grupos com visitas,
+ * na ordem de VISIT_GROUPS. Do hoje em diante, da mais próxima para a mais
+ * distante (dia inteiro por último no dia); anteriores, da mais recente.
+ */
+function groupVisitsByPeriod(visits, todayISO) {
+  const by = {};
+  for (const v of visits || []) { const k = visitGroupKey(v, todayISO); (by[k] = by[k] || []).push(v); }
+  const hora = (v) => (v.allDay || !v.time ? '99:99' : String(v.time));
+  const asc = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) || hora(a).localeCompare(hora(b));
+  return VISIT_GROUPS.filter((g) => by[g.key]).map((g) => ({
+    ...g,
+    visits: by[g.key].slice().sort(g.key === 'anteriores' ? (a, b) => asc(b, a) : asc),
+  }));
 }
 
 function renderVisitTable(area) {
@@ -274,9 +317,20 @@ function renderVisitTable(area) {
   if (_visitPage > totalPages) _visitPage = totalPages;
   if (_visitPage < 1) _visitPage = 1;
   const startIdx = (_visitPage - 1) * VISIT_PAGE_SIZE;
-  const pageVisits = visits.slice(startIdx, startIdx + VISIT_PAGE_SIZE);
+  // Paginação sobre a lista já agrupada; o título do grupo se repete se ele
+  // continuar na página seguinte.
+  const groups = groupVisitsByPeriod(visits, localDateISO());
+  const rows = [];
+  for (const g of groups) for (const v of g.visits) rows.push({ v, g });
+  let lastGroup = null;
+  const pageHtml = rows.slice(startIdx, startIdx + VISIT_PAGE_SIZE).map(({ v, g }) => {
+    const head = g.key === lastGroup ? '' :
+      '<h3 class="vis-group vis-group--' + g.key + '">' + escapeHtml(g.label) + '<span>' + g.visits.length + '</span></h3>';
+    lastGroup = g.key;
+    return head + visitCardHtml(v);
+  }).join('');
 
-  wrap.innerHTML = pageVisits.map(visitCardHtml).join('')
+  wrap.innerHTML = pageHtml
   + (totalPages > 1 ? `
     <div class="vis-pager">
       <div>Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
