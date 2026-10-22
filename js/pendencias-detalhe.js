@@ -70,13 +70,23 @@ function openPendenciaDetail(id) {
             ${(p.notes||[]).length ? (p.notes).map(function(n){
               var _isMe = _me && n.author === _me;
               var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
-              return '<div class="feed-msg'+(_isMe?' is-me':'')+'">'
+              // Sem o campo = nota anterior à separação: lida como interna.
+              var _interna = n.visibility !== 'resposta';
+              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+'">'
                 + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
-                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span></div>'
+                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
+                + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
+                + '</div>'
                 + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
             }).join('') : '<p class="text-muted pen-cmd-empty">Nenhuma nota ainda. Poste a primeira atualização abaixo 👇</p>'}
           </div>
-          <div class="pen-cmd-composer">
+          <div class="pen-cmd-composer" id="penComposer" data-vis="resposta">
+            <div class="pen-cmd-vis" role="tablist" aria-label="Destino da mensagem">
+              <button type="button" class="pen-vis-tab is-on" role="tab" aria-selected="true" data-action="penNoteVis" data-arg="resposta"
+                title="Fica visível para quem pediu e conta como 1ª resposta no SLA">Resposta</button>
+              <button type="button" class="pen-vis-tab" role="tab" aria-selected="false" data-action="penNoteVis" data-arg="interna"
+                title="Só a equipe vê; não conta como 1ª resposta">🔒 Anotação interna</button>
+            </div>
             <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)"></textarea>
             <div class="pen-cmd-composer-bar">
               <div class="pen-cmd-tools">
@@ -216,13 +226,38 @@ function changePenStatus(id) {
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
 }
 
+/** Alterna Resposta × Anotação interna no compositor (delegado por data-action). */
+function penNoteVis(vis) {
+  var box = document.getElementById('penComposer');
+  if (!box) return;
+  var alvo = vis === 'interna' ? 'interna' : 'resposta';
+  box.setAttribute('data-vis', alvo);
+  box.querySelectorAll('.pen-vis-tab').forEach(function(b) {
+    var on = b.getAttribute('data-arg') === alvo;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  var ta = document.getElementById('newNoteText');
+  if (ta) {
+    ta.placeholder = alvo === 'interna'
+      ? 'Só a equipe vê. Contexto, combinados, o que não vai para o cliente. (@nome menciona)'
+      : 'O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)';
+  }
+}
+
+function _penComposerVis() {
+  var box = document.getElementById('penComposer');
+  return box && box.getAttribute('data-vis') === 'interna' ? 'interna' : 'resposta';
+}
+
 function submitPenNote(id) {
   const ta = document.getElementById('newNoteText');
   const text = (ta ? ta.value : '').trim();
   if (!text) { showToast('Escreva a atualização antes de postar.', 'error'); return; }
-  const ok = addPendenciaNote(id, text, getUser().name);
+  const vis = _penComposerVis();
+  const ok = addPendenciaNote(id, text, getUser().name, vis);
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
-  showToast('Atualização postada!', 'success');
+  showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
   openPendenciaDetail(id);
   renderPenView(false);
 }
@@ -517,5 +552,12 @@ function deletePendenciaConfirm(id) {
       updateBadges();
       showToast('Pendência restaurada.', 'success');
     });
+  });
+}
+
+// Compositor: alternar Resposta × Anotação interna (delegação, sem onclick).
+if (typeof registerActions === 'function') {
+  registerActions({
+    penNoteVis: (_el, vis) => penNoteVis(vis),
   });
 }

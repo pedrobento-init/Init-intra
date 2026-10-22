@@ -55,7 +55,7 @@ describe('1ª resposta ao gravar', () => {
 
   it('responde com nota, cronômetro ou status saindo de Aberto — só a primeira vez', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const nota = sla.slaOnSave(base, { ...base, notes: [{ text: 'vi' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    const nota = sla.slaOnSave(base, { ...base, notes: [{ text: 'vi', visibility: 'resposta' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
     expect([nota.firstResponseAt, nota.firstResponseBy]).toEqual([iso(2026, 10, 21, 10, 0), 'Beto']);
     const depois = sla.slaOnSave(nota, { ...nota, status: 'em_andamento' }, iso(2026, 10, 21, 11, 0), 'Gil');
     expect(depois.firstResponseBy).toBe('Beto');
@@ -64,6 +64,24 @@ describe('1ª resposta ao gravar', () => {
     expect(timer.firstResponseAt).toBe(iso(2026, 10, 21, 9, 30));
     const status = sla.slaOnSave(base, { ...base, status: 'aguardando_cliente' }, iso(2026, 10, 21, 9, 45), 'Gil');
     expect(status.firstResponseAt).toBe(iso(2026, 10, 21, 9, 45));
+  });
+
+  // Separação resposta × anotação interna: o SLA de 1ª resposta mede "o
+  // solicitante foi respondido". Conversa da equipe não é resposta — se
+  // contasse, o número deixaria de significar isso.
+  it('anotação interna NÃO conta como 1ª resposta', () => {
+    const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
+    const interna = sla.slaOnSave(base, { ...base, notes: [{ text: 'cliente é chato', visibility: 'interna' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    expect(interna.firstResponseAt).toBeUndefined();
+    // e a resposta seguinte conta normalmente
+    const resp = sla.slaOnSave(interna, { ...interna, notes: [...interna.notes, { text: 'bom dia', visibility: 'resposta' }] }, iso(2026, 10, 21, 11, 0), 'Beto');
+    expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 11, 0), 'Beto']);
+  });
+
+  it('nota antiga, sem o campo visibility, não conta (fail-closed)', () => {
+    const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
+    const velha = sla.slaOnSave(base, { ...base, notes: [{ text: 'sem campo' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    expect(velha.firstResponseAt).toBeUndefined();
   });
 
   it('editar o texto ou o prazo não conta como resposta', () => {
@@ -76,7 +94,7 @@ describe('1ª resposta ao gravar', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
     const crit = sla.slaOnSave(base, { ...base, priority: 'critica' }, iso(2026, 10, 21, 9, 5), 'Ana');
     expect(crit.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
-    const resp = sla.slaOnSave(crit, { ...crit, notes: [{ text: 'ok' }] }, iso(2026, 10, 21, 9, 30), 'Ana');
+    const resp = sla.slaOnSave(crit, { ...crit, notes: [{ text: 'ok', visibility: 'resposta' }] }, iso(2026, 10, 21, 9, 30), 'Ana');
     const baixa = sla.slaOnSave(resp, { ...resp, priority: 'baixa' }, iso(2026, 10, 21, 9, 40), 'Ana');
     expect(baixa.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
   });

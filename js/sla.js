@@ -96,6 +96,19 @@ function _slaAberta(status) { return !['resolvido', 'concluido', 'cancelado', 'f
  * status saindo de "Aberto", cronômetro iniciado ou nota nova.
  * prev = registro antes (null na criação); cur = registro gravado (alterado aqui).
  */
+/**
+ * A nota conta como 1ª RESPOSTA? Só a que vai para quem pediu.
+ * Anotação interna é conversa da equipe — se contasse, o número de SLA
+ * deixaria de significar "o solicitante foi respondido".
+ *
+ * Nota antiga, sem o campo, NÃO conta: fail-closed. Elas já têm o
+ * firstResponseAt gravado de quando foram escritas, então nada é
+ * recalculado — este caminho só vale para nota nova.
+ */
+function slaNotaEhResposta(n) {
+  return !!n && n.visibility === 'resposta';
+}
+
 function slaOnSave(prev, cur, nowIso, actor) {
   if (!cur) return cur;
   if (!prev) {
@@ -105,12 +118,12 @@ function slaOnSave(prev, cur, nowIso, actor) {
   }
   if (cur.firstResponseAt || !cur.firstResponseDue) return cur;
   const notasAntes = prev && Array.isArray(prev.notes) ? prev.notes.length : 0;
-  const notasAgora = Array.isArray(cur.notes) ? cur.notes.length : 0;
+  const notasNovas = (Array.isArray(cur.notes) ? cur.notes : []).slice(notasAntes);
   const respondeu = !prev
     ? (cur.status && cur.status !== 'aberto')
     : ((prev.status || 'aberto') === 'aberto' && cur.status && cur.status !== 'aberto')
       || (cur.timerRunning === true && prev.timerRunning !== true)
-      || notasAgora > notasAntes;
+      || notasNovas.some(slaNotaEhResposta);
   if (respondeu) {
     cur.firstResponseAt = nowIso;
     if (actor) cur.firstResponseBy = actor;

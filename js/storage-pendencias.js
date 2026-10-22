@@ -687,17 +687,26 @@ function highlightMentions(text) {
   });
 }
 
-function addPendenciaNote(id, text, author) {
+/**
+ * Acrescenta uma mensagem ao feed.
+ * @param visibility 'resposta' (vai para quem pediu) | 'interna' (só a equipe).
+ *   Default 'resposta': é o que o time já fazia antes da separação existir,
+ *   então o hábito de hoje continua valendo e o SLA não muda de sentido.
+ *   Nota sem o campo (anterior a esta mudança) é lida como INTERNA — fail-closed
+ *   para o dia em que o solicitante enxergar o chamado.
+ */
+function addPendenciaNote(id, text, author, visibility) {
   const list = getPendencias();
   const i = list.findIndex(p => p.id === id);
   if (i === -1) return false;
   if (!list[i].notes) list[i].notes = [];
   var mentionedOperators = parseMentionedOperators(text);
-  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators };
+  var _vis = visibility === 'interna' ? 'interna' : 'resposta';
+  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators, visibility: _vis };
   const _prevSla = { ...list[i], notes: list[i].notes.slice() };
   list[i].notes.push(note);
   list[i].updatedAt = new Date().toISOString();
-  // 1ª resposta (056): a primeira nota da equipe conta como resposta.
+  // 1ª resposta (056): só a nota marcada como resposta conta — ver slaOnSave.
   try { if (typeof slaOnSave === 'function') slaOnSave(_prevSla, list[i], list[i].updatedAt, author); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   const _respondeuAgora = !_prevSla.firstResponseAt && !!list[i].firstResponseAt;
   dbSet(DB.PENDENCIAS, list);
