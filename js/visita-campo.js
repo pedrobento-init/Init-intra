@@ -55,9 +55,12 @@ function _duracao(seg) {
 function visitaCampoHtml(v) {
   if (!v || v.status === 'cancelada') return '';
   const id = escapeHtml(v.id);
+  // Atendimento guiado (visita-guiada.js): o caminho principal no celular.
+  const guiada = v.status !== 'concluida' && typeof openVisitaGuiada === 'function'
+    ? `<button type="button" class="btn btn-primary btn-sm" data-action="visitaGuiada" data-arg="${id}">▶ ${v.checkinAt ? 'Continuar atendimento' : 'Iniciar atendimento'}</button>` : '';
   let presenca;
   if (!v.checkinAt) {
-    presenca = v.status === 'concluida' ? '' : `<button type="button" class="btn btn-primary btn-sm" data-campo-checkin="${id}">📍 Cheguei</button>`;
+    presenca = v.status === 'concluida' ? '' : `<button type="button" class="btn btn-${guiada ? 'secondary' : 'primary'} btn-sm" data-campo-checkin="${id}">📍 Cheguei</button>`;
   } else if (!v.checkoutAt) {
     presenca = `<span class="campo-st">Chegou às <b>${_hhmm(v.checkinAt)}</b></span> <button type="button" class="btn btn-secondary btn-sm" data-campo-checkout="${id}">🚪 Saí</button>`;
   } else {
@@ -72,28 +75,38 @@ function visitaCampoHtml(v) {
   const atencao = health && health.motivos && health.motivos.length
     ? `<div class="campo-atencao">⚠️ No cliente: ${health.motivos.map(escapeHtml).join(' · ')}</div>` : '';
   const ia = v.briefingIa ? `<div class="campo-ia">💡 ${escapeHtml(v.briefingIa).replace(/\n/g, '<br>')}</div>` : '';
-  if (!presenca && !rota && !atencao && !ia) return '';
+  if (!guiada && !presenca && !rota && !atencao && !ia) return '';
   return `<div class="form-group campo-box">
-      ${presenca || rota ? `<div class="campo-acts">${presenca}${rota}</div>` : ''}
+      ${guiada || presenca || rota ? `<div class="campo-acts">${guiada}${presenca}${rota}</div>` : ''}
       ${ia || atencao ? `<div class="campo-brief"><label class="form-label">Briefing</label>${ia}${atencao}</div>` : ''}
     </div>`;
 }
 
-function _campoCheckin(id) {
+/** Grava a chegada (a visita agendada passa a em andamento). true se gravou. */
+function registrarChegadaVisita(id) {
   const v = getVisitById(id);
-  if (!v || v.checkinAt) return;
+  if (!v || v.checkinAt) return false;
   saveVisit({ ...v, checkinAt: new Date().toISOString(), status: v.status === 'agendada' ? 'em_andamento' : v.status });
   showToast('Chegada registrada.', 'success');
-  openVisitDetail(id);
+  return true;
+}
+
+function _campoCheckin(id) {
+  if (registrarChegadaVisita(id)) openVisitDetail(id);
 }
 
 function _campoCheckout(id) {
+  if (registrarSaidaVisita(id)) openVisitDetail(id);
+}
+
+/** Grava a saída e lança as horas no cliente. Segundos lançados, ou 0 se não gravou. */
+function registrarSaidaVisita(id) {
   const v = getVisitById(id);
-  if (!v || !v.checkinAt || v.checkoutAt) return;
+  if (!v || !v.checkinAt || v.checkoutAt) return 0;
   const agora = new Date();
   const seg = Math.round((agora.getTime() - Date.parse(v.checkinAt)) / 1000);
-  if (seg <= 0) return;
-  if (seg > 12 * 3600 && !window.confirm(`A chegada foi há ${_duracao(seg)}. Registrar a saída assim mesmo?`)) return;
+  if (seg <= 0) return 0;
+  if (seg > 12 * 3600 && !window.confirm(`A chegada foi há ${_duracao(seg)}. Registrar a saída assim mesmo?`)) return 0;
   saveVisit({ ...v, checkoutAt: agora.toISOString() });
   if (typeof saveTimeEntry === 'function') {
     saveTimeEntry({
@@ -106,7 +119,7 @@ function _campoCheckout(id) {
     });
   }
   showToast(`Saída registrada: ${_duracao(seg)} lançadas nas horas.`, 'success');
-  openVisitDetail(id);
+  return seg;
 }
 
 if (typeof document !== 'undefined' && document.addEventListener) {
