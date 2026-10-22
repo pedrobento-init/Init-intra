@@ -656,13 +656,30 @@ function submitConcludeVisit(e, id) {
     showToast('Descreva o que foi feito para concluir a visita.', 'error');
     return;
   }
+  const sig = typeof readSignaturePad === 'function' ? signatureFields(readSignaturePad('concludeSig')) : {};
+  concludeVisit(id, { relatorio: rel, sig, criarPendencia: !!document.getElementById('concludeCreatePendencia')?.checked });
+
+  closeModal();
+  showToast('Visita concluída com relatório salvo!', 'success');
+  // Reabre o detalhe como changeVisitStatus faz: o usuário vê o relatório
+  // salvo em vez de cair na lista sem contexto.
+  openVisitDetail(id);
+}
+
+/**
+ * Conclui a visita com o relatório (e a assinatura, se houver) e, se pedido,
+ * cria a pendência de acompanhamento. Usado pelo modal "Concluir" e pela
+ * visita guiada (visita-guiada.js).
+ */
+function concludeVisit(id, { relatorio, sig, criarPendencia } = {}) {
+  const v = getVisitById(id);
+  if (!v) return false;
   // Cópia destacada (não muta o cache antes do save): a transição
   // agendada/em_andamento → concluida é o que dispara a próxima ocorrência
   // recorrente em saveVisit.
-  const sig = typeof readSignaturePad === 'function' ? signatureFields(readSignaturePad('concludeSig')) : {};
-  saveVisit({ ...v, ...sig, relatorio: rel, status: 'concluida' });
+  saveVisit({ ...v, ...(sig || {}), relatorio, status: 'concluida' });
 
-  if (document.getElementById('concludeCreatePendencia')?.checked && typeof savePendencia === 'function') {
+  if (criarPendencia && typeof savePendencia === 'function') {
     savePendencia({
       clientId: v.clientId,
       clientName: v.clientName,
@@ -677,14 +694,10 @@ function submitConcludeVisit(e, id) {
     });
   }
 
-  closeModal();
-  showToast('Visita concluída com relatório salvo!', 'success');
-  // Reabre o detalhe como changeVisitStatus faz: o usuário vê o relatório
-  // salvo em vez de cair na lista sem contexto.
-  openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
+  return true;
 }
 
 function openEditVisitReportModal(id) {

@@ -90,7 +90,13 @@ function roteiroPanelHtml(visits, todayISO, userName, userId) {
 
 if (typeof registerActions === 'function') {
   // Clique no link de Maps/Waze (dentro da parada) não abre a visita.
-  registerActions({ rtOpenVisit: (_el, id, ev) => { if (ev && ev.target && ev.target.closest && ev.target.closest('[data-rt-link]')) return; openVisitDetail(id); } });
+  // Parada em aberto abre o atendimento guiado (visita-guiada.js); concluída, o detalhe.
+  registerActions({ rtOpenVisit: (_el, id, ev) => {
+    if (ev && ev.target && ev.target.closest && ev.target.closest('[data-rt-link]')) return;
+    const v = typeof getVisitById === 'function' ? getVisitById(id) : null;
+    if (v && v.status !== 'concluida' && typeof openVisitaGuiada === 'function') openVisitaGuiada(id);
+    else openVisitDetail(id);
+  } });
 }
 
 if (typeof module !== 'undefined' && module.exports) {
