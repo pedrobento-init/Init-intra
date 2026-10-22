@@ -145,6 +145,31 @@ function slaRespostaEstado(p, nowMs) {
   return { estado: falta <= 60 ? 'vence_logo' : 'no_prazo', minutos: falta };
 }
 
+/**
+ * Situação da RESOLUÇÃO: resolvida | estourada | vence_logo (≤1 dia) |
+ * no_prazo | sem_sla. Simétrica à de 1ª resposta, mas lendo o que já existe:
+ * `deadline` é o prazo (slaPrazoSugerido o preenche pela prioridade, em dias
+ * úteis) e `completedAt` é a entrega. Nenhuma coluna nova.
+ *
+ * O prazo é um DIA, não um instante: vale até o fim dele (23:59), senão
+ * resolver às 15h do próprio dia do vencimento contaria como atraso.
+ */
+function slaResolucaoEstado(p, nowMs) {
+  if (!p || !p.deadline) return { estado: 'sem_sla' };
+  const due = new Date(String(p.deadline).slice(0, 10) + 'T23:59:59').getTime();
+  if (isNaN(due)) return { estado: 'sem_sla' };
+  const inicio = new Date(p.createdAt || nowMs).getTime();
+  if (!_slaAberta(p.status)) {
+    // Sem completedAt (legado ou cancelada) não dá para julgar a entrega.
+    if (!p.completedAt) return { estado: 'sem_sla' };
+    const at = new Date(p.completedAt).getTime();
+    return { estado: 'resolvida', noPrazo: at <= due, minutos: Math.max(0, Math.round((at - inicio) / 60000)) };
+  }
+  const falta = Math.round((due - nowMs) / 60000);
+  if (falta < 0) return { estado: 'estourada', minutos: -falta };
+  return { estado: falta <= 1440 ? 'vence_logo' : 'no_prazo', minutos: falta };
+}
+
 function slaDuracaoCurta(min) {
   const m = Math.max(0, Math.round(min));
   if (m < 60) return m + ' min';
@@ -263,6 +288,24 @@ function penRespostaBadge(p, nowMs, opts) {
   return '<span class="sla-muted">Sem SLA de resposta (pendência antiga)</span>';
 }
 
+/**
+ * Selo da resolução, par do penRespostaBadge. Sem `full`, só fala quando
+ * exige ação (estourada ou vencendo) — no quadro o silêncio é informação.
+ */
+function penResolucaoBadge(p, nowMs, opts) {
+  const st = slaResolucaoEstado(p, nowMs == null ? Date.now() : nowMs);
+  const full = opts && opts.full;
+  if (st.estado === 'estourada') return '<span class="sla-badge is-late" title="Prazo de resolução passou">Vencida · ' + slaDuracaoCurta(st.minutos) + ' atrasada</span>';
+  if (st.estado === 'vence_logo') return '<span class="sla-badge is-soon" title="Prazo de resolução">Resolver em ' + slaDuracaoCurta(st.minutos) + '</span>';
+  if (!full) return '';
+  if (st.estado === 'no_prazo') return '<span class="sla-badge">Resolver em ' + slaDuracaoCurta(st.minutos) + '</span>';
+  if (st.estado === 'resolvida') {
+    return '<span class="sla-badge ' + (st.noPrazo ? 'is-ok' : 'is-late') + '">Resolvida em ' + slaDuracaoCurta(st.minutos) +
+      (st.noPrazo ? '' : ' (fora do prazo)') + '</span>';
+  }
+  return '<span class="sla-muted">Sem prazo de resolução</span>';
+}
+
 /** Sugestões de solicitante acompanham o cliente escolhido no formulário. */
 function slaBindSolicitante(form, listId) {
   if (!form || !form.clientId) return;
@@ -297,5 +340,6 @@ if (typeof module !== 'undefined' && module.exports) {
     SLA_PRIORIDADE, SLA_EXPEDIENTE, PEN_CANAIS, PEN_CATEGORIAS, penCanalLabel, penCategoriaLabel,
     slaAddBusinessHours, slaAddBusinessDays, slaPrazoSugerido, slaRespostaAte, slaResumo, slaOnSave,
     slaRespostaEstado, slaDuracaoCurta, buildRespostaKpis, buildRecorrentesModel, solicitantesDoCliente, penRespostaBadge,
+    slaResolucaoEstado, penResolucaoBadge, slaNotaEhResposta,
   };
 }

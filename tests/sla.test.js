@@ -189,3 +189,57 @@ describe('abertura rápida', () => {
     expect([d.priority, d.descricao, d.deadline]).toEqual(['media', 'erro 0x1', '2026-10-26']);
   });
 });
+
+// SLA de resolução: lê o que já existia — `deadline` (preenchido por
+// slaPrazoSugerido, em dias úteis pela prioridade) e `completedAt`.
+// Nenhuma coluna nova; é o par do SLA de 1ª resposta.
+describe('situação da resolução', () => {
+  const aberta = (over = {}) => ({
+    id: 'P1', status: 'em_andamento', priority: 'alta',
+    createdAt: iso(2026, 10, 20, 9, 0), deadline: '2026-10-23', ...over,
+  });
+  const agora = (y, m, d, h, min) => local(y, m, d, h, min).getTime();
+
+  it('sem prazo não há SLA de resolução', () => {
+    expect(sla.slaResolucaoEstado(aberta({ deadline: null }), agora(2026, 10, 21, 9, 0)).estado).toBe('sem_sla');
+  });
+
+  it('faltando mais de um dia: no prazo', () => {
+    expect(sla.slaResolucaoEstado(aberta(), agora(2026, 10, 21, 9, 0)).estado).toBe('no_prazo');
+  });
+
+  it('faltando menos de um dia: vence logo', () => {
+    expect(sla.slaResolucaoEstado(aberta(), agora(2026, 10, 23, 9, 0)).estado).toBe('vence_logo');
+  });
+
+  it('passou do prazo e segue aberta: estourada', () => {
+    const st = sla.slaResolucaoEstado(aberta(), agora(2026, 10, 24, 9, 0));
+    expect(st.estado).toBe('estourada');
+    expect(st.minutos).toBeGreaterThan(0);
+  });
+
+  // O prazo é um DIA, não um instante: resolver às 15h do próprio dia do
+  // vencimento tem que contar como no prazo.
+  it('resolver no próprio dia do vencimento conta como no prazo', () => {
+    const p = aberta({ status: 'resolvido', completedAt: iso(2026, 10, 23, 15, 0) });
+    const st = sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0));
+    expect(st.estado).toBe('resolvida');
+    expect(st.noPrazo).toBe(true);
+  });
+
+  it('resolver depois do prazo marca fora do prazo', () => {
+    const p = aberta({ status: 'resolvido', completedAt: iso(2026, 10, 24, 10, 0) });
+    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0))).toMatchObject({ estado: 'resolvida', noPrazo: false });
+  });
+
+  it('fechada sem completedAt (legado) não é julgada', () => {
+    const p = aberta({ status: 'resolvido' });
+    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0)).estado).toBe('sem_sla');
+  });
+
+  it('o selo só fala sozinho quando exige ação', () => {
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0))).toBe('');
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 24, 9, 0))).toContain('Vencida');
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0), { full: true })).toContain('Resolver em');
+  });
+});
