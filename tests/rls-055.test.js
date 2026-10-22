@@ -230,7 +230,7 @@ describe('055 mantém as mesmas regras de acesso', () => {
     expect(porLinha.map((p) => p.tablename + '.' + p.policyname)).toEqual([]);
     expect(r.rows.length).toBeGreaterThan(60);
     // A consulta de VERIFICAÇÃO (a) do fim da migration, como o admin vai rodar no painel.
-    const check = M055.match(/-- a\)[^\n]*\n((?:--[^\n]*\n)*?--[^\n]*;)\n/)[1].replace(/^--\s?/gm, '').trim().replace(/;$/, '');
+    const check = M055.match(/-- a\)[^\n]*\r?\n((?:--[^\n]*\r?\n)*?--[^\n]*;)\r?\n/)[1].replace(/^--\s?/gm, '').trim().replace(/;$/, '');
     expect((await db.query(check)).rows).toEqual([]);
     // ...e ela acusa uma policy por linha, se alguém criar uma.
     await db.exec('CREATE POLICY teste_por_linha ON public.tickets FOR SELECT TO authenticated USING (public.current_op_is_admin())');
