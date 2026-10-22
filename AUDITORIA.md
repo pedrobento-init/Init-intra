@@ -102,12 +102,12 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | CONS-06 | INFO     | ALTA  | Código morto: `_daySummary` é calculado (`buildDaySummary`) mas **nunca lido** — o sink do resumo diário não existe mais desde o redesign do dashboard                                                                | `js/app.js:705-710`, `js/metrics.js:453`                                                                                                                         | MONITORAR                                 |
 | CONS-07 | INFO     | ALTA  | `clients.milvus_client_token` (identificador por cliente, não o API token) é sincronizado ao navegador e fica no IndexedDB; visível só p/ a equipe dona via RLS                                                       | `js/schema.js:22`, `js/clients.js:190,1513`                                                                                                                      | MONITORAR                                 |
 | CONS-08 | INFO     | MÉDIA | Exportação de `.ics` escapa `,` `;` e `\n`, mas não `\` nem CR solto (`_icsEscape`) — permite injeção de escape no arquivo de calendário                                                                              | `js/calendar.js:683-685`                                                                                                                                         | **CORRIGIDO** `53c9fe7`                   |
-| SEC-17  | ALTO     | ALTA  | XSS armazenado no badge de timer: nome do operador (editável no próprio perfil) interpolado cru no atributo `title` e injetado via `innerHTML`                                                                        | `js/timer.js:69` (origem `js/operadores.js:361,539`, `js/storage.js:3240-3255`, `js/timer.js:153,188`)                                                           | NOVO (Fase 8)                             |
-| SEC-18  | ALTO     | ALTA  | XSS por atributo na logo do cliente: `_safeLogoUrl` só valida o prefixo `http(s)://` e não escapa aspa; o campo “URL da Logo” é texto livre                                                                           | `js/ui.js:450` (`_safeLogoUrl`), `js/clients.js:1462,1629,1842`                                                                                                  | NOVO (Fase 8)                             |
+| SEC-17  | ALTO     | ALTA  | XSS armazenado no badge de timer: nome do operador (editável no próprio perfil) interpolado cru no atributo `title` e injetado via `innerHTML`                                                                        | `js/timer.js:69` (origem `js/operadores.js:361,539`, `js/storage.js:3240-3255`, `js/timer.js:153,188`)                                                           | NOVO (Fase 8)                              **CORRIGIDO** `3a3c13e`|
+| SEC-18  | ALTO     | ALTA  | XSS por atributo na logo do cliente: `_safeLogoUrl` só valida o prefixo `http(s)://` e não escapa aspa; o campo “URL da Logo” é texto livre                                                                           | `js/ui.js:450` (`_safeLogoUrl`), `js/clients.js:1462,1629,1842`                                                                                                  | NOVO (Fase 8)                              **CORRIGIDO** `5b68c86`|
 | SEC-19  | BAIXO    | MÉDIA | Busca persistida (`localStorage`) injetada cru em `value="..."` (self-XSS) e, ao entrar na tela, o filtro restaurado **não** é aplicado à grade                                                                       | `js/clients.js:60,51` + `js/ui.js:222-230`                                                                                                                       | NOVO (Fase 8)                             |
 | SEC-20  | BAIXO    | MÉDIA | Criar/editar modelos de procedimento compartilhados não tem gate de papel, enquanto excluir exige admin                                                                                                               | `js/templates.js:127,161` vs `:262-275`                                                                                                                          | NOVO (Fase 8)                             |
-| SYNC-06 | CRÍTICO  | ALTA  | Editar pendência pelo formulário principal zera no **servidor** anexos, notas/feed, checklist, `visit_id`, conclusão e timers: o payload montado no form não leva esses campos e o `upsert` os envia como `[]`/`null` | `js/pendencias.js:1351-1358` + `js/storage.js:1878-1906` (merge local `:1788`)                                                                                   | NOVO (Fase 8)                             |
-| SYNC-07 | ALTO     | ALTA  | Mesmo padrão em visitas: `upsert` zera `categories`/`checklist` e os 8 campos `milvus_*` e reatribui `numero` (`_visitNumeroOf`)                                                                                      | `js/visitas.js:399-414` + `js/storage.js:2452-2478`                                                                                                              | NOVO (Fase 8)                             |
+| SYNC-06 | CRÍTICO  | ALTA  | Editar pendência pelo formulário principal zera no **servidor** anexos, notas/feed, checklist, `visit_id`, conclusão e timers: o payload montado no form não leva esses campos e o `upsert` os envia como `[]`/`null` | `js/pendencias.js:1351-1358` + `js/storage.js:1878-1906` (merge local `:1788`)                                                                                   | NOVO (Fase 8)                              **CORRIGIDO** `812ab0d`|
+| SYNC-07 | ALTO     | ALTA  | Mesmo padrão em visitas: `upsert` zera `categories`/`checklist` e os 8 campos `milvus_*` e reatribui `numero` (`_visitNumeroOf`)                                                                                      | `js/visitas.js:399-414` + `js/storage.js:2452-2478`                                                                                                              | NOVO (Fase 8)                              **CORRIGIDO** `812ab0d`|
 | SYNC-08 | MÉDIO    | MÉDIA | Se `CHANNEL_ERROR`/`TIMED_OUT` acontece com a aba oculta, o backoff aborta e `visibilitychange` não reconecta (`!_channel` continua verdadeiro) → canal realtime morto até `online`/reload                            | `js/sync-manager.js:196-202,223`                                                                                                                                 | NOVO (Fase 8)                             |
 | SYNC-09 | MÉDIO    | ALTA  | Fila offline sem `max-attempts`/dead-letter: `attempts` é incrementado e nunca lido; uma entrada que falha sempre quebra o drain e bloqueia a fila inteira para sempre                                                | `js/outbox.js:100-108` (campo `:21`)                                                                                                                             | NOVO (Fase 8)                             |
 | SYNC-10 | MÉDIO    | MÉDIA | `deletePendencia` não remove a entrada já enfileirada para o mesmo id → o próximo drain recria o registro no servidor (e broadcast nos demais aparelhos)                                                              | `js/storage.js:2019-2031` vs `js/outbox.js:41-46`                                                                                                                | NOVO (Fase 8)                             |
@@ -206,8 +206,11 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 | 3   | `6ca1acc` `fix(security)` | `integrity` + `crossorigin` em `motion@13.1.1` no `index.html`                                                                                                                                                                                                                                             | **novo teste** `tests/cdn-sri.test.js` (3): falha se qualquer script externo sair sem SRI                          |
 | 4   | `24d9160` `fix(pwa)`      | SW não intercepta/cacheia GETs com `apikey`/`authorization`                                                                                                                                                                                                                                                | **novo teste** `tests/sw-cache.test.js` (5, sandbox `vm`): Supabase bypassado, mesmo-origem e CDN seguem cacheados |
 | 5   | `53c9fe7` `fix(security)` | Helper único de célula CSV (`csvCell`/`csvRow` em `js/ui.js`) nos 4 exportadores: escape de `;`, aspa e quebra de linha + prefixo `'` em célula iniciada por `=`/`+`/`-`/`@`/tab/CR (número negativo puro preservado); `_icsEscape` escapa barra invertida e normaliza CRLF/CR/LF — fecha SEC-15 e CONS-08 | **novo teste** `tests/csv-export.test.js` (18) ✓ `npm test` 564/564 ✓                                              |
+| 6   | `3a3c13e` `fix(security)` | `escapeHtml(worker)` no atributo `title` do badge de timer (`js/timer.js:69`) — fecha SEC-17; teste `tests/xss-attrs.test.js` |
+| 7   | `5b68c86` `fix(security)` | `_safeLogoUrl` com `new URL()` + `escapeHtml` no `src` do avatar (`js/ui.js`) — fecha SEC-18 |
+| 8   | `812ab0d` `fix(sync)`     | payload remoto de `savePendencia`/`saveVisit` lido do registro mesclado (`_full`/`_fullV`), inclusive outbox e `numero` da visita — fecha SYNC-06/SYNC-07; teste `tests/push-payload.test.js` |
 
-**Estado final:** `npm test` **564/564** · `npm run lint` **0 erros / 838 warnings** ·
+**Estado final:** `npm test` **579/579** · `npm run lint` **0 erros / 838 warnings** ·
 `npm run build` ok (com minify) · `index.html`/`sw.js` restaurados ao modo dev após validar o build ·
 `git status` limpo (exceto `supabase/functions/milvus-chamado-create/index.ts`, debug, e
 `referencia/`, fora do escopo — **não commitados**).
@@ -216,7 +219,7 @@ Branch `audit/2026-10-09`, **sem push**, 1 commit por correção, testes/lint/bu
 
 ## 7. Propostas (não aplicadas) — prós e contras
 
-Aplicada nesta sessão: **P-17** (commit `53c9fe7`) — fecha SEC-15 e CONS-08; ver §6 e §9. As demais seguem não aplicadas.
+Aplicadas nesta sessão: **P-17** (commit `53c9fe7`, fecha SEC-15 e CONS-08), **P-18** (commits `3a3c13e` e `5b68c86`, fecha SEC-17 e SEC-18) e **P-19** (commit `812ab0d`, fecha SYNC-06 e SYNC-07) — ver §6 e §11. As demais seguem não aplicadas.
 
 | #    | Proposta                                                                                                                                                                                         | Prós                                                                                   | Contras / risco                                                                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -236,16 +239,14 @@ Aplicada nesta sessão: **P-17** (commit `53c9fe7`) — fecha SEC-15 e CONS-08; 
 | P-14 | Limpar `no-unused-vars` (838) em lotes                                                                                                                                                           | Lint zerado, morte reduzida (CONS-02)                                                  | Trabalho mecânico; risco de apagar variáveis “usadas por string/`window`”                                                                    |
 | P-15 | Nova migration (ex.: `042_equipamentos_rls`) copiando o modelo da `021` para `equipamentos` (remover `"equipamentos all"`, policies por equipe/admin)                                            | Fecha SEC-13 — `equipamentos` continua aberto mesmo **depois** da `021`                | Exige DBA/staging; tabela nova em relação ao escopo da `021`, precisa do mesmo rollback documentado                                          |
 | P-16 | Isolar `checklists`/`checklist_modelo_itens` por equipe (padrão `ckmarc`) ou manter leitura global                                                                                               | Fecha SEC-14 se for vazamento; mantém o fluxo atual se modelos são globais por desenho | **Decisão de produto**: mudar pode esconder modelos de quem precisa vê-los                                                                   |
-| P-18 | Escapar os atributos interpolados do badge de timer e da logo do cliente (`escapeHtml` no `title` de `js/timer.js:69` + `_safeLogoUrl` com `new URL()` e allowlist de esquema em `js/ui.js:450`) | Fecha SEC-17 e SEC-18 — os dois XSS armazenados da Fase 8                              | Toca renderização usada em 15 pontos do app; conferir logos legadas com query string/`data:` e nomes de operador com aspa                    |
-| P-19 | Montar o payload remoto de `savePendencia`/`saveVisit` a partir do registro **mesclado** (e não do objeto parcial montado no form)                                                               | Fecha SYNC-06 e SYNC-07 — perda de anexos/feed/checklist/campos Milvus na edição       | Muda o contrato do push; exige regressão com pendência que tenha anexos + feed + checklist e com visita numerada/vinculada ao Milvus         |
 
 ---
 
 ## 8. Próximos passos
 
-0. **Imediato (Fase 8):** SYNC-06/SYNC-07 — a edição pelo formulário apaga anexos,
-   feed e campos Milvus **no servidor** (perda de dados silenciosa); SEC-17/SEC-18 —
-   XSS armazenado em badge de timer e na logo de cliente (ambos exigem fix pontual).
+0. ~~**Imediato (Fase 8):** SYNC-06/SYNC-07 (perda de dados na edição) e SEC-17/SEC-18~~
+   **Concluído** — commits `812ab0d` (SYNC-06/SYNC-07), `3a3c13e` e `5b68c86` (SEC-17/SEC-18);
+   ver §6 e §11.
 
 1. **Urgente (DBA + staging):** P-1 e P-2 — as duas exposições CRÍTICO; rodar backup →
    `021` → conferir `pg_policies` → `022` (somente com signed URLs já em produção).
@@ -403,9 +404,9 @@ de fora dois pontos em que o valor interpolado **não** passa por `escapeHtml`:
    `:1629,1842`). `https://x/"onerror="...` passa no filtro e fecha o atributo. `clientAvatar`
    é chamado em 15 pontos do app (clientes, agenda, pendências, visitas, operadores…).
 
-Correção sugerida (baixo risco): envolver os dois com `escapeHtml` (e trocar o teste do
-`_safeLogoUrl` por `new URL()` + allowlist de esquema). Fora do escopo automático por
-mudar renderização — vira **PROPOSTA P-18**.
+**Aplicado** (commits `3a3c13e` e `5b68c86`; testes `tests/xss-attrs.test.js`): `escapeHtml`
+no `title` do badge e `_safeLogoUrl` com `new URL()` (aspa vira `%22`) + `escapeHtml` no `src`
+do avatar; esquemas hostis seguem bloqueados. Fecha **SEC-17** e **SEC-18**.
 
 ### 11.2 SYNC-06 / SYNC-07 — perda de dados na edição (CRÍTICO/ALTO)
 
@@ -433,8 +434,9 @@ O mesmo vale para visitas: `js/visitas.js:399-414` não envia `numero`, `categor
 como `[]`/`null` — o `numero: _visitNumeroOf(data)` ainda gera **outro número** e
 `maintainVisitNumeros` reatribui mais um por aparelho.
 
-Correção sugerida (P-19): em `savePendencia`/`saveVisit`, montar o payload remoto a partir
-de `list[i]`/`visit` (o registro mesclado) em vez do objeto parcial do form.
+**Aplicado** (commit `812ab0d`; testes `tests/push-payload.test.js`): o payload remoto passa
+a ler do registro mesclado (`_full`/`_fullV`), inclusive o enqueue da outbox (`_enqueuePen`) e
+o `numero` da visita. Fecha **SYNC-06** e **SYNC-07**.
 
 ### 11.3 Demais achados de sincronização (SYNC-08..SYNC-14)
 
