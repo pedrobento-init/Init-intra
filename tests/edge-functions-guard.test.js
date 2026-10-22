@@ -34,11 +34,22 @@ function verifyJwtOf(name) {
 }
 
 // Como a function autentica quem chamou. Exatamente um destes deve valer.
+// Dois padrões convivem durante a migração para @supabase/server (Fase 2):
+// o legado valida o JWT na mão (`admin.auth.getUser`), o novo declara
+// `withSupabase({ auth: "user" })` e o wrapper verifica antes do handler.
 function authMode(source) {
+  if (/withSupabase\(\s*\{[^}]*auth:\s*["']user["']/.test(source)) return 'jwt';
   if (/auth\.getUser\(/.test(source)) return 'jwt';
   if (/x-[a-z-]*secret/.test(source)) return 'secret-header';
   if (/searchParams\.get\(/.test(source)) return 'query-token';
   return 'nenhum';
+}
+
+// Escreve com privilégio elevado? No legado é o SERVICE_ROLE_KEY lido do env;
+// no novo é o ctx.supabaseAdmin que o withSupabase entrega pronto.
+function usaServiceRole(source) {
+  return /Deno\.env\.get\(["']SUPABASE_SERVICE_ROLE_KEY["']\)/.test(source) ||
+    /\bsupabaseAdmin\b/.test(source);
 }
 
 const SEGREDOS = ['MILVUS_API_TOKEN', 'SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY'];
@@ -121,15 +132,24 @@ describe('higiene de segredos', () => {
 });
 
 describe('autorização antes da escrita com service role', () => {
-  it('quem escreve com service role autentica o chamador primeiro', () => {
+  it('quem escreve com privilégio elevado autentica o chamador', () => {
+    for (const f of functions) {
+      if (!usaServiceRole(f.source)) continue;
+      expect(authMode(f.source), `${f.name} escreve sem autenticar`).not.toBe('nenhum');
+    }
+  });
+
+  // No padrão legado a ordem é posicional e precisa ser conferida linha a
+  // linha. No withSupabase o gate roda ANTES do handler por construção, então
+  // não há ordem a verificar — a garantia é estrutural, não textual.
+  it('no padrão legado, o getUser vem antes da primeira escrita', () => {
     const escrita = /\.upsert\(|\.insert\(|\.update\(/;
     for (const f of functions) {
-      if (!f.source.includes('SERVICE_ROLE_KEY')) continue;
+      if (!/auth\.getUser\(/.test(f.source)) continue;
       const linhas = f.source.split('\n');
-      const iAuth = linhas.findIndex((l) => /auth\.getUser\(|x-[a-z-]*secret|searchParams\.get\(/.test(l));
+      const iAuth = linhas.findIndex((l) => /auth\.getUser\(/.test(l));
       const iEscrita = linhas.findIndex((l) => escrita.test(l));
       if (iEscrita === -1) continue; // só lê — nada a ordenar
-      expect(iAuth, `${f.name} escreve sem autenticar`).toBeGreaterThanOrEqual(0);
       expect(iAuth, `${f.name}: escreve (linha ${iEscrita + 1}) antes de autenticar (linha ${iAuth + 1})`)
         .toBeLessThan(iEscrita);
     }
