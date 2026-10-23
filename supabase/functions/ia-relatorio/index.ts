@@ -22,45 +22,34 @@
 //   IA dele — não coloque senhas nas anotações (o app avisa no botão).
 // - Sem rate limit próprio (como as outras funções, SEC-16): monitorar uso.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { textoDaIa } from "../robo/campo.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const IA_WEBHOOK_URL = Deno.env.get("IA_WEBHOOK_URL") ?? "";
 
 const MAX_CHARS = 6000;
 const TIMEOUT_MS = 60000;  // o Make leva ~10 s; o técnico espera olhando a tela
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+// CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !IA_WEBHOOK_URL) {
+  if (!IA_WEBHOOK_URL) {
     console.error("ia-relatorio: secrets ausentes");
     return json({ error: "IA não configurada" }, 500);
   }
 
-  const callerToken = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!callerToken) return json({ error: "Não autenticado" }, 401);
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: userData } = await admin.auth.getUser(callerToken);
-  const uid = userData?.user?.id ?? null;
+  // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
+  // pronto no contexto.
+  const admin = ctx.supabaseAdmin;
+  const uid = ctx.userClaims?.id ?? null;
   if (!uid) return json({ error: "Não autenticado" }, 401);
   const { data: op } = await admin.from("operators").select("id, active").eq("auth_user_id", uid).maybeSingle();
   if (!op || op.active === false) return json({ error: "Operador sem acesso" }, 403);
@@ -109,4 +98,6 @@ serve(async (req: Request) => {
   if (!relatorio) return json({ error: "Resposta vazia da IA." }, 502);
   console.log(`ia-relatorio: op=${op.id} in_chars=${notas.length} out_chars=${relatorio.length}`);
   return json({ success: true, relatorio });
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };
