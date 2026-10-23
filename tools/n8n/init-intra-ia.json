@@ -1,0 +1,304 @@
+{
+  "name": "Init Intra — IA (briefing, triagem, relatorio, levar)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "init-intra-ia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-400, 300],
+      "webhookId": "init-intra-ia",
+      "notes": "A URL de producao deste no e o IA_WEBHOOK_URL do Supabase. responseMode TEM de ser responseNode: no modo padrao o n8n responde na hora com {\"message\":\"Workflow was started\"} e o Intra trata como falha — a mesma armadilha do \"Accepted\" do Make."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-briefing",
+                    "leftValue": "={{ $json.body.tarefa }}",
+                    "rightValue": "briefing",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "briefing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-triagem",
+                    "leftValue": "={{ $json.body.tarefa }}",
+                    "rightValue": "triagem",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "triagem"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-relatorio",
+                    "leftValue": "={{ $json.body.tarefa }}",
+                    "rightValue": "relatorio",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "relatorio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-levar",
+                    "leftValue": "={{ $json.body.tarefa }}",
+                    "rightValue": "levar",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "levar"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra", "renameFallbackOutput": "desconhecida" }
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Rota pela tarefa",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-180, 300],
+      "notes": "Equivale ao Router do Make: escolhe a rota pelo campo \"tarefa\"."
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "mode": "list", "value": "claude-sonnet-5-5" },
+        "options": { "maxTokensToSample": 1024, "temperature": 0.3 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Claude Sonnet",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [240, 560],
+      "notes": "Texto corrido: briefing, relatorio e levar. O Make usava o provedor dele (GPT-5 mini); aqui a chave de IA e sua, numa credencial do n8n."
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "mode": "list", "value": "claude-haiku-5-5" },
+        "options": { "maxTokensToSample": 800, "temperature": 0 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Claude Haiku",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [240, 60],
+      "notes": "Classificacao da triagem: volume maior, tarefa fechada, temperatura 0."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Fatos:\n{{ $json.body.contexto }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Você ajuda técnicos de suporte de TI de uma empresa que atende pequenas e médias empresas.\nAntes de uma visita técnica, leia os fatos do cliente abaixo e escreva um briefing curto para o técnico.\n\nRegras:\n- Português do Brasil, direto, no máximo 5 frases curtas ou 5 tópicos com hífen.\n- Diga o que o técnico deve verificar ou aproveitar a visita para resolver: pendências atrasadas, backups com problema, dispositivos que pararam de comunicar, vencimentos próximos, algo que se repete nas últimas visitas.\n- Se o motivo da visita tiver relação com algum fato (ex.: visita de rede e um switch trocado na última visita), aponte a relação.\n- Use só os fatos recebidos. Não invente equipamentos, causas, nomes ou números. Se não houver nada relevante além do motivo, responda apenas: \"Nada a destacar além do motivo da visita.\"\n- Sem saudação, sem título, sem Markdown (nada de asteriscos ou #)."
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Briefing",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [120, 300],
+      "notes": "Prompt copiado de GOOGLE-AGENDA.md. O robo espera ate 25 s; falha ou demora e o e-mail \"Seu dia\" sai so com os fatos."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=De: {{ $json.body.de }}\nAssunto: {{ $json.body.assunto }}\nData: {{ $json.body.data }}\nCliente: {{ $json.body.cliente }}\n\nTexto do e-mail:\n{{ $json.body.trecho }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Você faz a triagem de e-mails que chegam no suporte de TI de uma empresa que atende pequenas e médias empresas. Leia o e-mail e classifique o pedido.\n\nResponda APENAS um objeto JSON, sem cercas de código, sem comentários, sem texto antes ou depois, com exatamente estas chaves:\n\n- \"assunto\": título curto do chamado, até 140 caracteres, em português, dizendo o problema — não \"Re:\" nem \"Enc.:\".\n- \"descricao\": o pedido resumido em até 600 caracteres, só com o que está no e-mail. Não invente equipamento, causa, nome ou número.\n- \"categoria\": uma destas, exatamente como escrito: \"rede\", \"email\", \"impressora\", \"hardware\", \"software\", \"acesso\", \"backup\", \"servidor\", \"seguranca\", \"telefonia\", \"outro\".\n- \"prioridade\": uma destas, exatamente como escrito: \"baixa\", \"media\", \"alta\". Use \"alta\" só quando o e-mail indicar parada de trabalho, perda de dados ou risco de segurança. Nunca responda \"critica\": o SLA de 1 hora é decisão da equipe.\n- \"tipo\": um destes, exatamente como escrito: \"Projeto\", \"Operacional / Interno\", \"Manutenção\", \"Suporte\", \"Gestão\", \"Outro\".\n- \"solicitante\": o nome da pessoa que escreveu, até 120 caracteres. Só o nome, sem o e-mail; se não aparecer, string vazia.\n- \"ignorar\": true quando o e-mail NÃO é um pedido de suporte — propaganda, newsletter, aviso automático, cobrança, nota fiscal, confirmação de recebimento ou só agradecimento. Caso contrário, false.\n\nNa dúvida entre atender e ignorar, responda \"ignorar\": false — pedido perdido é pior que chamado a mais."
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Triagem",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [120, 60],
+      "notes": "Faz o papel do \"Extract information from text\" do Make. As listas sao as da migration 056; o Intra revalida tudo em campo.ts (umaDe), entao prompt malfeito nao suja o banco."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Anotações do técnico e contexto da visita:\n{{ $json.body.contexto }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Você organiza o relatório de uma visita técnica de TI para o cliente final ler.\n\nEscreva o relatório em três partes, nesta ordem, cada título em uma linha própria:\nResumo\nO que foi feito\nPendências e recomendações\n\nRegras:\n- Português do Brasil, texto simples. Sem Markdown: nada de asteriscos, # ou tabelas.\n- Use SÓ o que está nas anotações. Não invente serviço, peça, causa, número ou horário. Parte sem informação recebe uma linha dizendo que não houve registro.\n- Termo técnico aparece explicado entre parênteses na primeira vez que for usado.\n- Senha, token, chave ou credencial que apareça nas anotações sai como [credencial omitida]. Nunca repita o valor.\n- Sem saudação e sem despedida."
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Relatorio",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [120, 440],
+      "notes": "A ia-relatorio espera ate 60 s e manda no maximo 6.000 caracteres de anotacao."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Contexto da visita:\n{{ $json.body.contexto }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Você sugere o que um técnico de TI deve levar para uma visita, lendo o motivo, as observações, as últimas visitas e o inventário do cliente.\n\nResponda UM ITEM POR LINHA, no máximo 6 linhas, cada linha com até 120 caracteres.\n\nRegras:\n- Português do Brasil. Sem numeração, sem hífen no começo, sem título, sem Markdown, sem explicação.\n- Cada linha é uma coisa que se leva na mala ou no carro: peça, cabo, adaptador, consumível, ferramenta, mídia de instalação.\n- Seja específico quando o inventário permitir (\"toner HP LaserJet M428\" em vez de \"toner\").\n- Não repita item que já está na lista que o técnico montou.\n- Use só o contexto recebido. Não invente equipamento nem marca.\n- Nada relevante a acrescentar: responda uma linha vazia."
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Levar",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [120, 580],
+      "notes": "A ia-levar corta em 6 itens de 120 caracteres e mescla com o que o tecnico ja marcou (levarMescla)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Garante que a rota triagem devolva JSON *parseavel*. O Intra ja valida os\n// valores (campo.ts -> umaDe), mas se o corpo nao for JSON ele cai no plano B e\n// abre a pendencia com a etiqueta sem-classificacao-ia. Modelo que responde com\n// cerca de codigo custaria justamente isso.\nconst CATEGORIAS = ['rede', 'email', 'impressora', 'hardware', 'software', 'acesso',\n  'backup', 'servidor', 'seguranca', 'telefonia', 'outro'];\nconst PRIORIDADES = ['baixa', 'media', 'alta'];  // critica nao: o teto da triagem e alta\nconst TIPOS = ['Projeto', 'Operacional / Interno', 'Manutenção', 'Suporte', 'Gestão', 'Outro'];\n\nconst bruto = String($json.text ?? $json.response ?? '').trim();\nconst semCerca = bruto.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nconst ini = semCerca.indexOf('{');\nconst fim = semCerca.lastIndexOf('}');\n\nlet j = null;\nif (ini !== -1 && fim > ini) {\n  try { j = JSON.parse(semCerca.slice(ini, fim + 1)); } catch (e) { j = null; }\n}\n\n// Nao deu para entender a resposta: estourar e o certo. O webhook responde 500,\n// o Intra trata como falha da IA e abre o chamado com a etiqueta\n// sem-classificacao-ia — o aviso de \"confira isto antes de responder\".\n// Devolver um objeto vazio e valido seria pior: o chamado pareceria\n// classificado, sem ninguem ter classificado nada.\nif (!j || typeof j !== 'object' || Array.isArray(j)) {\n  throw new Error('A rota triagem nao devolveu JSON: ' + bruto.slice(0, 200));\n}\n\nconst texto = (v, max) => String(v ?? '').replace(/\\s+/g, ' ').trim().slice(0, max);\nconst umaDe = (v, lista, padrao) => {\n  const alvo = texto(v, 60).toLowerCase();\n  return lista.find((x) => x.toLowerCase() === alvo) ?? padrao;\n};\n\n// \"critica\" nao e invalida, e acima do teto: rebaixa para alta, como o Intra\n// faz em campo.ts. Mandar para o padrao \"media\" perderia a urgencia do e-mail.\nconst prioridade = texto(j.prioridade, 60).toLowerCase() === 'critica'\n  ? 'alta'\n  : umaDe(j.prioridade, PRIORIDADES, 'media');\n\nreturn [{\n  json: {\n    assunto: texto(j.assunto, 140),\n    descricao: texto(j.descricao, 600),\n    categoria: umaDe(j.categoria, CATEGORIAS, 'outro'),\n    prioridade,\n    tipo: umaDe(j.tipo, TIPOS, 'Suporte'),\n    solicitante: texto(j.solicitante, 120),\n    ignorar: j.ignorar === true || texto(j.ignorar, 10).toLowerCase() === 'true',\n  },\n}];\n"
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Garante JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Content-Type", "value": "application/json" }]
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000a",
+      "name": "Responde JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [620, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-00000000000b",
+      "name": "Responde texto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [400, 440],
+      "notes": "briefing, relatorio e levar devolvem texto puro — o Intra le o corpo como esta."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ JSON.stringify({ error: 'tarefa desconhecida' }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-00000000000c",
+      "name": "Tarefa desconhecida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [400, 760]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Rota pela tarefa", "type": "main", "index": 0 }]] },
+    "Rota pela tarefa": {
+      "main": [
+        [{ "node": "Briefing", "type": "main", "index": 0 }],
+        [{ "node": "Triagem", "type": "main", "index": 0 }],
+        [{ "node": "Relatorio", "type": "main", "index": 0 }],
+        [{ "node": "Levar", "type": "main", "index": 0 }],
+        [{ "node": "Tarefa desconhecida", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Haiku": {
+      "ai_languageModel": [[{ "node": "Triagem", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Claude Sonnet": {
+      "ai_languageModel": [
+        [
+          { "node": "Briefing", "type": "ai_languageModel", "index": 0 },
+          { "node": "Relatorio", "type": "ai_languageModel", "index": 0 },
+          { "node": "Levar", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Triagem": { "main": [[{ "node": "Garante JSON", "type": "main", "index": 0 }]] },
+    "Garante JSON": { "main": [[{ "node": "Responde JSON", "type": "main", "index": 0 }]] },
+    "Briefing": { "main": [[{ "node": "Responde texto", "type": "main", "index": 0 }]] },
+    "Relatorio": { "main": [[{ "node": "Responde texto", "type": "main", "index": 0 }]] },
+    "Levar": { "main": [[{ "node": "Responde texto", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "instanceId": "init-intra" },
+  "tags": []
+}
