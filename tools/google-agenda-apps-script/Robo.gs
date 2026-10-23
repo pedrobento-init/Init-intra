@@ -224,8 +224,10 @@ function roboPendenciasEmail() {
       var t = m.getDate().getTime();
       if (t <= desde) return;
       if (t > maisNovo) maisNovo = t;
+      // message_id é o cabeçalho RFC 5322, não o id interno do Gmail: a
+      // resposta do Intra devolve ele em In-Reply-To e fica na mesma conversa.
       mensagens.push({ id: m.getId(), de: m.getFrom(), assunto: m.getSubject() || '', data: m.getDate().toISOString(),
-        trecho: (m.getPlainBody() || '').slice(0, 2000) });
+        message_id: m.getHeader('Message-ID') || '', trecho: (m.getPlainBody() || '').slice(0, 2000) });
     });
   });
   if (!mensagens.length) return;  // ao contrário dos backups, silêncio aqui não é notícia

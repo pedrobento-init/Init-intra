@@ -27,6 +27,8 @@ verify_jwt = true
 verify_jwt = true
 [functions.milvus-token-backfill]
 verify_jwt = true
+[functions.pendencia-responder]
+verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 [functions.send-push]

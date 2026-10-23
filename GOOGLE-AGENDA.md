@@ -189,6 +189,18 @@ E-mail de cliente marcado com o rótulo **"Pendências"** no Gmail do robô vira
 
 **Prioridade crítica** a IA não dá sozinha — o SLA de 1 h fica para a equipe decidir, então o teto é Alta. Para liberar, mude `TRIAGEM_PRIORIDADE_MAX` em [`supabase/functions/robo/campo.ts`](supabase/functions/robo/campo.ts).
 
+### Responder ao cliente pela tela (migration 064)
+
+O caminho de volta: no chamado aberto pela triagem, a caixa **"Enviar por e-mail para ..."** aparece abaixo do campo de texto, já marcada. A nota postada como **Resposta** vai para quem escreveu, **na mesma conversa de e-mail** — então a resposta cai na thread original dele, não numa mensagem solta.
+
+- **Quem recebe não é escolha do app.** A tela manda só o `pendencia_id`; a function [`pendencia-responder`](supabase/functions/pendencia-responder/index.ts) lê o `solicitante_email` daquele chamado com a chave de serviço. É a mesma preocupação da `send-email` (a chave pública vai no site), com outro critério: lá, só operador ativo; aqui, só quem está no chamado.
+- **Na mesma conversa** porque a triagem guarda o `Message-ID` do e-mail (`email_message_id`), que volta como `In-Reply-To`/`References`. E-mail antigo, anterior a esta mudança, não tem o cabeçalho guardado: a resposta sai assim mesmo, como conversa nova, e o aviso na tela diz isso.
+- **Anotação interna nunca vira e-mail** — ao trocar para interna, a caixa some.
+- **E-mail que não sai não desfaz a nota.** Ela já está salva quando o envio acontece; falha vira aviso, não perda do que o técnico escreveu.
+- **Chamado sem `solicitante_email`** (aberto por telefone, por exemplo) não mostra a caixa.
+
+Deploy: `supabase functions deploy pendencia-responder`. Usa os mesmos secrets da `send-email` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM` opcional) — sem secret novo.
+
 ### A rota `triagem` no Make
 Recebe `{ "tarefa", "email_id", "de", "assunto", "data", "trecho", "cliente" }` e responde um JSON com `assunto`, `descricao`, `categoria`, `prioridade`, `tipo`, `solicitante` e `ignorar`.
 
