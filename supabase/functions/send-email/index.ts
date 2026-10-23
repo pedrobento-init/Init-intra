@@ -22,51 +22,36 @@
 // DIAGNÓSTICO: o erro do Gmail volta (code + mensagem) para o app, que mostra
 // no "Enviar e-mail de teste" e grava em Erros do app.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import nodemailer from "npm:nodemailer@6.9.16";
 
 const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
 const GMAIL_APP_PASSWORD = (Deno.env.get("GMAIL_APP_PASSWORD") ?? "").replace(/\s+/g, "");
 const GMAIL_FROM = Deno.env.get("GMAIL_FROM") || GMAIL_USER;
 const FROM_NAME = "Init Intra";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+// CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   try {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    // Só operador ativo logado (o JWT da anon key não tem usuário).
-    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-      auth: { persistSession: false },
-    });
-    const { data: userData } = await sb.auth.getUser();
-    const { data: op } = userData?.user
-      ? await sb.from("operators").select("id,active").eq("auth_user_id", userData.user.id).maybeSingle()
+    // Só operador ativo logado. ctx.supabase é o client DO CHAMADOR (RLS
+    // aplica), equivalente ao antigo anon + Authorization repassado;
+    // ctx.supabaseAdmin, mais abaixo, é o que bypassa.
+    const uid = ctx.userClaims?.id ?? null;
+    const { data: op } = uid
+      ? await ctx.supabase.from("operators").select("id,active").eq("auth_user_id", uid).maybeSingle()
       : { data: null };
     if (!op || op.active === false) return json({ error: "Não autorizado", code: "unauthorized" }, 401);
 
@@ -84,7 +69,7 @@ serve(async (req: Request) => {
     }
     if (!subject || !html) return json({ error: "Assunto e corpo do e-mail obrigatórios" }, 400);
 
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+    const admin = ctx.supabaseAdmin;
     const { data: ops, error: opsErr } = await admin.from("operators").select("email, active").not("email", "is", null);
     if (opsErr) return json({ error: "Não foi possível conferir os destinatários", code: "recipients_check" }, 500);
     const allowed = new Set(
@@ -126,4 +111,6 @@ serve(async (req: Request) => {
     console.error("Erro na Edge Function:", err);
     return json({ error: (err as Error).message || "Erro interno" }, 500);
   }
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };
