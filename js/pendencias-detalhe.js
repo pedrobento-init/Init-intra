@@ -67,16 +67,27 @@ function openPendenciaDetail(id) {
         <div class="pen-cmd-card pen-cmd-feed-card">
           <div class="section-header pen-sec-head"><span class="section-title">💬 Feed de atividade</span><span class="pen-count">${(p.notes||[]).length ? (p.notes||[]).length+' msgs' : '0 msgs'}</span></div>
           <div class="pen-cmd-feed" id="penTimeline">
-            ${(p.notes||[]).length ? (p.notes).map(function(n){
+            ${_penFeedItens(p).length ? _penFeedItens(p).map(function(n){
+              if (n._evento) return _penEventoHtml(n);
               var _isMe = _me && n.author === _me;
               var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
-              return '<div class="feed-msg'+(_isMe?' is-me':'')+'">'
+              // Sem o campo = nota anterior à separação: lida como interna.
+              var _interna = n.visibility !== 'resposta';
+              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+'">'
                 + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
-                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span></div>'
+                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
+                + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
+                + '</div>'
                 + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
             }).join('') : '<p class="text-muted pen-cmd-empty">Nenhuma nota ainda. Poste a primeira atualização abaixo 👇</p>'}
           </div>
-          <div class="pen-cmd-composer">
+          <div class="pen-cmd-composer" id="penComposer" data-vis="resposta">
+            <div class="pen-cmd-vis" role="tablist" aria-label="Destino da mensagem">
+              <button type="button" class="pen-vis-tab is-on" role="tab" aria-selected="true" data-action="penNoteVis" data-arg="resposta"
+                title="Fica visível para quem pediu e conta como 1ª resposta no SLA">Resposta</button>
+              <button type="button" class="pen-vis-tab" role="tab" aria-selected="false" data-action="penNoteVis" data-arg="interna"
+                title="Só a equipe vê; não conta como 1ª resposta">🔒 Anotação interna</button>
+            </div>
             <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)"></textarea>
             <div class="pen-cmd-composer-bar">
               <div class="pen-cmd-tools">
@@ -102,7 +113,8 @@ function openPendenciaDetail(id) {
             <div class="pen-prop"><dt>Solicitante</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.solicitante)||'—'}<button class="pen-inline-edit" title="Alterar solicitante" aria-label="Alterar solicitante" data-action="penEditSolicitante" data-arg="${escapeHtml(id)}">✏️</button></span></dd></div>
             <div class="pen-prop"><dt>Canal</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCanalLabel(p.canal))||'—'}<select class="pen-inline-select" title="Alterar canal" aria-label="Alterar canal" data-change="penSetField" data-field="canal" data-id="${escapeHtml(id)}">${penCanalOptionsHtml(p.canal||'')}</select></span></dd></div>
             <div class="pen-prop"><dt>Categoria</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCategoriaLabel(p.categoria))||'—'}<select class="pen-inline-select" title="Alterar categoria" aria-label="Alterar categoria" data-change="penSetField" data-field="categoria" data-id="${escapeHtml(id)}">${penCategoriaOptionsHtml(p.categoria||'')}</select></span></dd></div>
-            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>` : ''}
+            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>
+            <div class="pen-prop"><dt>Resolução</dt><dd>${typeof penResolucaoBadge === 'function' ? penResolucaoBadge(p, Date.now(), { full: true }) : ''}</dd></div>` : ''}
             <div class="pen-prop"><dt>Responsável</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.responsible)||'—'}<button class="pen-inline-edit" title="Alterar responsável" onclick="openReassignPendencia('${escapeHtml(id)}')">✏️</button></span></dd></div>
             <div class="pen-prop"><dt>Prioridade</dt><dd><span class="pen-inline-wrap">${priorityTag(p.priority)}<select class="pen-inline-select" title="Alterar prioridade" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','priority',this.value)">${['baixa','media','alta','critica'].map(v=>`<option value="${v}" ${p.priority===v?'selected':''}>${v==='baixa'?'Baixa':v==='media'?'Média':v==='alta'?'Alta':'Crítica'}</option>`).join('')}</select></span></dd></div>
             <div class="pen-prop${_isOverdue?' is-alert':''}"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" value="${escapeHtml(p.deadline||'')}" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','deadline',this.value)" /></span>${_isOverdue?'<span class="pen-cmd-flag">⚠️ Vencido</span>':''}${(!p.deadline && _isHighPri)?'<span class="pen-cmd-flag warn">⚠ Sem prazo · prioridade '+escapeHtml(p.priority)+'</span>':''}</dd></div>
@@ -216,13 +228,92 @@ function changePenStatus(id) {
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
 }
 
+// ── Linha do tempo (063): notas e eventos no MESMO fio, em ordem ──────────
+// Quem lê o chamado quer a história inteira, não duas listas para cruzar.
+
+/** Notas + eventos ordenados por data. Evento vem marcado com `_evento`. */
+function _penFeedItens(p) {
+  var notas = Array.isArray(p && p.notes) ? p.notes : [];
+  var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
+    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para };
+  });
+  return notas.concat(eventos).sort(function(a, b) {
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+}
+
+/** Rótulo legível de um valor, resolvido AGORA (renomear status não reescreve o histórico). */
+function _penValorLabel(tipo, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (tipo === 'status') {
+    try { return (STATUS_PEN_MAP && STATUS_PEN_MAP[v] && STATUS_PEN_MAP[v].label) || v; } catch (_) { return v; }
+  }
+  if (tipo === 'prioridade') {
+    try { return typeof penPriLabel === 'function' ? penPriLabel(v) : v; } catch (_) { return v; }
+  }
+  if (tipo === 'prazo') {
+    try { return typeof formatDate === 'function' ? formatDate(parseDeadline(v)) : v; } catch (_) { return v; }
+  }
+  return v;
+}
+
+const _PEN_EVENT_VERBO = {
+  criado: 'abriu a pendência',
+  status: 'mudou o status',
+  responsavel: 'passou para',
+  prioridade: 'mudou a prioridade',
+  prazo: 'mudou o prazo',
+};
+
+/** Marcador discreto no meio do fio — não é balão de mensagem. */
+function _penEventoHtml(e) {
+  var quem = e.author ? escapeHtml(e.author) : 'Sistema';
+  var corpo;
+  if (e.type === 'criado') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.criado;
+  } else if (e.type === 'responsavel') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.responsavel + ' <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  } else {
+    corpo = quem + ' ' + (_PEN_EVENT_VERBO[e.type] || 'mudou algo')
+      + ': <span class="pen-ev-de">' + escapeHtml(_penValorLabel(e.type, e.de)) + '</span>'
+      + ' → <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  }
+  return '<div class="pen-ev" role="note"><span class="pen-ev-txt">' + corpo
+    + '</span><span class="pen-ev-at">' + formatDateTime(e.createdAt) + '</span></div>';
+}
+
+/** Alterna Resposta × Anotação interna no compositor (delegado por data-action). */
+function penNoteVis(vis) {
+  var box = document.getElementById('penComposer');
+  if (!box) return;
+  var alvo = vis === 'interna' ? 'interna' : 'resposta';
+  box.setAttribute('data-vis', alvo);
+  box.querySelectorAll('.pen-vis-tab').forEach(function(b) {
+    var on = b.getAttribute('data-arg') === alvo;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  var ta = document.getElementById('newNoteText');
+  if (ta) {
+    ta.placeholder = alvo === 'interna'
+      ? 'Só a equipe vê. Contexto, combinados, o que não vai para o cliente. (@nome menciona)'
+      : 'O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)';
+  }
+}
+
+function _penComposerVis() {
+  var box = document.getElementById('penComposer');
+  return box && box.getAttribute('data-vis') === 'interna' ? 'interna' : 'resposta';
+}
+
 function submitPenNote(id) {
   const ta = document.getElementById('newNoteText');
   const text = (ta ? ta.value : '').trim();
   if (!text) { showToast('Escreva a atualização antes de postar.', 'error'); return; }
-  const ok = addPendenciaNote(id, text, getUser().name);
+  const vis = _penComposerVis();
+  const ok = addPendenciaNote(id, text, getUser().name, vis);
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
-  showToast('Atualização postada!', 'success');
+  showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
   openPendenciaDetail(id);
   renderPenView(false);
 }
@@ -517,5 +608,12 @@ function deletePendenciaConfirm(id) {
       updateBadges();
       showToast('Pendência restaurada.', 'success');
     });
+  });
+}
+
+// Compositor: alternar Resposta × Anotação interna (delegação, sem onclick).
+if (typeof registerActions === 'function') {
+  registerActions({
+    penNoteVis: (_el, vis) => penNoteVis(vis),
   });
 }

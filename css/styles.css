@@ -1614,6 +1614,76 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 .kanban-col.drag-over .kanban-cards {
   background: rgba(26,86,219,0.04);
 }
+/* ── Feed: resposta ao solicitante × anotação interna ─────────────────────
+   A interna precisa ser reconhecível de relance, sem gritar: fundo âmbar
+   discreto e barra lateral. Tudo em tokens, para o tema escuro acompanhar. */
+.pen-cmd-vis {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pen-vis-tab {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pen-vis-tab:hover { background: var(--bg-hover); }
+.pen-vis-tab.is-on {
+  background: var(--accent-dim2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pen-vis-tab.is-on[data-arg="interna"] {
+  background: var(--yellow-dim);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+.feed-msg.is-interna .feed-bubble {
+  background: var(--yellow-dim);
+  border-left: 3px solid var(--yellow);
+}
+.feed-tag-interna {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+
+/* Linha do tempo (063): evento é marcador no fio, não balão de mensagem —
+   precisa ler como "aconteceu isto" e não competir com as falas. */
+.pen-ev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.pen-ev::before,
+.pen-ev::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  opacity: .5;
+}
+.pen-ev-txt { white-space: nowrap; }
+.pen-ev-de { text-decoration: line-through; opacity: .7; }
+.pen-ev-at { white-space: nowrap; opacity: .7; }
+@media screen and (max-width: 640px) {
+  .pen-ev { flex-wrap: wrap; }
+  .pen-ev::before, .pen-ev::after { display: none; }
+  .pen-ev-txt { white-space: normal; }
+}
+
 /* Ordem manual (062): linha mostrando ONDE o card vai cair — acima do alvo. */
 .kanban-card.kb-drop-before {
   position: relative;

@@ -55,7 +55,7 @@ describe('1ª resposta ao gravar', () => {
 
   it('responde com nota, cronômetro ou status saindo de Aberto — só a primeira vez', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const nota = sla.slaOnSave(base, { ...base, notes: [{ text: 'vi' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    const nota = sla.slaOnSave(base, { ...base, notes: [{ text: 'vi', visibility: 'resposta' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
     expect([nota.firstResponseAt, nota.firstResponseBy]).toEqual([iso(2026, 10, 21, 10, 0), 'Beto']);
     const depois = sla.slaOnSave(nota, { ...nota, status: 'em_andamento' }, iso(2026, 10, 21, 11, 0), 'Gil');
     expect(depois.firstResponseBy).toBe('Beto');
@@ -64,6 +64,24 @@ describe('1ª resposta ao gravar', () => {
     expect(timer.firstResponseAt).toBe(iso(2026, 10, 21, 9, 30));
     const status = sla.slaOnSave(base, { ...base, status: 'aguardando_cliente' }, iso(2026, 10, 21, 9, 45), 'Gil');
     expect(status.firstResponseAt).toBe(iso(2026, 10, 21, 9, 45));
+  });
+
+  // Separação resposta × anotação interna: o SLA de 1ª resposta mede "o
+  // solicitante foi respondido". Conversa da equipe não é resposta — se
+  // contasse, o número deixaria de significar isso.
+  it('anotação interna NÃO conta como 1ª resposta', () => {
+    const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
+    const interna = sla.slaOnSave(base, { ...base, notes: [{ text: 'cliente é chato', visibility: 'interna' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    expect(interna.firstResponseAt).toBeUndefined();
+    // e a resposta seguinte conta normalmente
+    const resp = sla.slaOnSave(interna, { ...interna, notes: [...interna.notes, { text: 'bom dia', visibility: 'resposta' }] }, iso(2026, 10, 21, 11, 0), 'Beto');
+    expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 11, 0), 'Beto']);
+  });
+
+  it('nota antiga, sem o campo visibility, não conta (fail-closed)', () => {
+    const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
+    const velha = sla.slaOnSave(base, { ...base, notes: [{ text: 'sem campo' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    expect(velha.firstResponseAt).toBeUndefined();
   });
 
   it('editar o texto ou o prazo não conta como resposta', () => {
@@ -76,7 +94,7 @@ describe('1ª resposta ao gravar', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
     const crit = sla.slaOnSave(base, { ...base, priority: 'critica' }, iso(2026, 10, 21, 9, 5), 'Ana');
     expect(crit.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
-    const resp = sla.slaOnSave(crit, { ...crit, notes: [{ text: 'ok' }] }, iso(2026, 10, 21, 9, 30), 'Ana');
+    const resp = sla.slaOnSave(crit, { ...crit, notes: [{ text: 'ok', visibility: 'resposta' }] }, iso(2026, 10, 21, 9, 30), 'Ana');
     const baixa = sla.slaOnSave(resp, { ...resp, priority: 'baixa' }, iso(2026, 10, 21, 9, 40), 'Ana');
     expect(baixa.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
   });
@@ -169,5 +187,59 @@ describe('abertura rápida', () => {
   it('prioridade inválida vira média e detalhes digitados ficam na descrição', () => {
     const d = penRapidaData({ assunto: 'x', priority: '???', descricao: 'erro 0x1' }, '2026-10-21');
     expect([d.priority, d.descricao, d.deadline]).toEqual(['media', 'erro 0x1', '2026-10-26']);
+  });
+});
+
+// SLA de resolução: lê o que já existia — `deadline` (preenchido por
+// slaPrazoSugerido, em dias úteis pela prioridade) e `completedAt`.
+// Nenhuma coluna nova; é o par do SLA de 1ª resposta.
+describe('situação da resolução', () => {
+  const aberta = (over = {}) => ({
+    id: 'P1', status: 'em_andamento', priority: 'alta',
+    createdAt: iso(2026, 10, 20, 9, 0), deadline: '2026-10-23', ...over,
+  });
+  const agora = (y, m, d, h, min) => local(y, m, d, h, min).getTime();
+
+  it('sem prazo não há SLA de resolução', () => {
+    expect(sla.slaResolucaoEstado(aberta({ deadline: null }), agora(2026, 10, 21, 9, 0)).estado).toBe('sem_sla');
+  });
+
+  it('faltando mais de um dia: no prazo', () => {
+    expect(sla.slaResolucaoEstado(aberta(), agora(2026, 10, 21, 9, 0)).estado).toBe('no_prazo');
+  });
+
+  it('faltando menos de um dia: vence logo', () => {
+    expect(sla.slaResolucaoEstado(aberta(), agora(2026, 10, 23, 9, 0)).estado).toBe('vence_logo');
+  });
+
+  it('passou do prazo e segue aberta: estourada', () => {
+    const st = sla.slaResolucaoEstado(aberta(), agora(2026, 10, 24, 9, 0));
+    expect(st.estado).toBe('estourada');
+    expect(st.minutos).toBeGreaterThan(0);
+  });
+
+  // O prazo é um DIA, não um instante: resolver às 15h do próprio dia do
+  // vencimento tem que contar como no prazo.
+  it('resolver no próprio dia do vencimento conta como no prazo', () => {
+    const p = aberta({ status: 'resolvido', completedAt: iso(2026, 10, 23, 15, 0) });
+    const st = sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0));
+    expect(st.estado).toBe('resolvida');
+    expect(st.noPrazo).toBe(true);
+  });
+
+  it('resolver depois do prazo marca fora do prazo', () => {
+    const p = aberta({ status: 'resolvido', completedAt: iso(2026, 10, 24, 10, 0) });
+    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0))).toMatchObject({ estado: 'resolvida', noPrazo: false });
+  });
+
+  it('fechada sem completedAt (legado) não é julgada', () => {
+    const p = aberta({ status: 'resolvido' });
+    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0)).estado).toBe('sem_sla');
+  });
+
+  it('o selo só fala sozinho quando exige ação', () => {
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0))).toBe('');
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 24, 9, 0))).toContain('Vencida');
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0), { full: true })).toContain('Resolver em');
   });
 });
