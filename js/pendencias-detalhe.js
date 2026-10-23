@@ -22,6 +22,9 @@ function openPendenciaDetail(id) {
   const _checkList = Array.isArray(p.checklist) ? p.checklist : [];
   const _checkDone = _checkList.filter(function(it){ return it && it.done; }).length;
   const _me = (typeof getUser === 'function' && getUser()) ? getUser().name : '';
+  // Chamado aberto pela triagem de e-mail (064): dá para responder a quem
+  // pediu sem sair daqui. Sem endereço, a opção nem aparece.
+  const _emailDestino = String(p.solicitanteEmail || '').trim();
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="pen-detail pen-cmd" data-status="${escapeHtml(p.status||'')}">
     <!-- ══ CABEÇALHO COMANDO: badge + timer primário + editar sutil ══ -->
@@ -89,6 +92,10 @@ function openPendenciaDetail(id) {
                 title="Só a equipe vê; não conta como 1ª resposta">🔒 Anotação interna</button>
             </div>
             <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)"></textarea>
+            ${_emailDestino ? `<label class="pen-cmd-email" id="penNoteEmailWrap" title="Vai na mesma conversa de e-mail em que ${escapeHtml(_emailDestino)} escreveu">
+              <input type="checkbox" id="penNoteEmail" checked>
+              <span>Enviar por e-mail para <strong>${escapeHtml(_emailDestino)}</strong></span>
+            </label>` : ''}
             <div class="pen-cmd-composer-bar">
               <div class="pen-cmd-tools">
                 <label class="btn btn-secondary btn-sm pen-cmd-tool" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">📎 Anexar
@@ -293,6 +300,9 @@ function penNoteVis(vis) {
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-selected', on ? 'true' : 'false');
   });
+  // Anotação interna não vai para o cliente: o envio por e-mail some junto.
+  var emailWrap = document.getElementById('penNoteEmailWrap');
+  if (emailWrap) emailWrap.style.display = alvo === 'interna' ? 'none' : '';
   var ta = document.getElementById('newNoteText');
   if (ta) {
     ta.placeholder = alvo === 'interna'
@@ -311,11 +321,47 @@ function submitPenNote(id) {
   const text = (ta ? ta.value : '').trim();
   if (!text) { showToast('Escreva a atualização antes de postar.', 'error'); return; }
   const vis = _penComposerVis();
+  // Lido antes de salvar: openPendenciaDetail logo abaixo redesenha o modal
+  // inteiro, e a caixinha deixa de existir.
+  const _box = document.getElementById('penNoteEmail');
+  const _mandarEmail = vis === 'resposta' && !!(_box && _box.checked);
   const ok = addPendenciaNote(id, text, getUser().name, vis);
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
   showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
+  if (_mandarEmail) penResponderPorEmail(id, text);
   openPendenciaDetail(id);
   renderPenView(false);
+}
+
+/**
+ * Manda a nota pública por e-mail a quem abriu o chamado, na mesma conversa.
+ * A nota JÁ está salva quando isto roda: e-mail que não sai não desfaz o
+ * registro, só avisa — o contrário perderia o trabalho do técnico.
+ * O destinatário não vai daqui: a function lê o `solicitante_email` do
+ * próprio chamado (ver supabase/functions/pendencia-responder/index.ts).
+ */
+function penResponderPorEmail(id, text) {
+  var online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  if (!online) {
+    showToast('A nota foi salva, mas o e-mail não saiu: sem conexão com o servidor.', 'error');
+    return;
+  }
+  supabaseClient.functions.invoke('pendencia-responder', { body: { pendencia_id: id, text: text } })
+    .then(function (r) {
+      var d = r && r.data;
+      if ((r && r.error) || !d || d.success !== true) {
+        var msg = (d && d.error) || (r && r.error && r.error.message) || 'erro desconhecido';
+        showToast('A nota foi salva, mas o e-mail não saiu: ' + msg, 'error');
+        return;
+      }
+      showToast(d.threaded
+        ? 'E-mail enviado para ' + d.to + '.'
+        : 'E-mail enviado para ' + d.to + ' — como conversa nova (o original não trouxe Message-ID).', 'success');
+    })
+    .catch(function (e) {
+      showToast('A nota foi salva, mas o e-mail não saiu.', 'error');
+      if (typeof _logSilent === 'function') _logSilent(e, 'pendencias-detalhe:responder-email');
+    });
 }
 
 // pre: valores iniciais de uma pendência nova (ex.: vindos da abertura rápida).

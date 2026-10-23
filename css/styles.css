@@ -1746,6 +1746,25 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   background: var(--yellow-dim);
   border-left: 3px solid var(--yellow);
 }
+
+/* Enviar a resposta por e-mail a quem pediu (064). Fica logo abaixo da caixa
+   de texto, não escondido na barra de botões: sair do Intra e chegar na caixa
+   de outra pessoa merece ser lido antes de clicar em postar. */
+.pen-cmd-email {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-dim2);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.pen-cmd-email input { cursor: pointer; margin: 0; }
+.pen-cmd-email strong { color: var(--text); font-weight: 600; word-break: break-all; }
 .feed-tag-interna {
   margin-left: 6px;
   font-size: 10px;

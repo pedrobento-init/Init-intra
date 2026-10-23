@@ -182,6 +182,21 @@ describe('triagem de e-mail', () => {
     expect(p.descricao).toContain('Assunto original: Re: Enc: impressora parada');
     expect(p.first_response_due).toBe('2026-10-21T17:30:00.000Z');  // 10:30 + 4 h úteis = 14:30 de Brasília
   });
+
+  // Caminho de volta (064): sem estes dois a resposta pela tela não existe.
+  it('guarda o endereço de quem pediu e o Message-ID, para responder na mesma conversa', () => {
+    const comId = { ...email, message_id: '<CAF123@mail.gmail.com>' };
+    const p = pendenciaDaTriagem(triagemDaIa('Accepted', comId), comId, clientes[0], 'PEN-3');
+    expect(p.solicitante_email).toBe('marcia@filial.paoquente.com.br');
+    expect(p.email_message_id).toBe('<CAF123@mail.gmail.com>');
+  });
+
+  it('e-mail antigo, sem Message-ID, abre pendência do mesmo jeito', () => {
+    const p = pendenciaDaTriagem(triagemDaIa('Accepted', email), email, clientes[0], 'PEN-4');
+    expect(p.email_message_id).toBeNull();
+    expect(p.solicitante_email).toBe('marcia@filial.paoquente.com.br');
+    expect(p.status).toBe('aberto');
+  });
 });
 
 describe('o que levar sugerido pela IA', () => {

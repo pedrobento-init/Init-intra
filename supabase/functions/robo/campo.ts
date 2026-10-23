@@ -192,8 +192,14 @@ export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; h
 
 // ── Triagem de e-mail (pendência aberta pelo Intra) ─────────────────────────
 
-/** Mesmo pacote que vem do Gmail no monitor de backup. */
-export type EmailEntrada = EmailBackup;
+/**
+ * Mesmo pacote que vem do Gmail no monitor de backup, mais o `message_id`:
+ * o cabeçalho Message-ID do RFC 5322, não o id interno do Gmail. É ele que a
+ * resposta devolve em In-Reply-To para cair na mesma conversa do cliente.
+ * Opcional: e-mail antigo (antes do Robo.gs mandar o cabeçalho) abre
+ * pendência igual, só não dá para responder pela tela.
+ */
+export type EmailEntrada = EmailBackup & { message_id?: string | null };
 export type Cliente = {
   id: string; name: string; team?: string | null; technician?: string | null;
   emails?: Record<string, unknown> | null;
@@ -321,6 +327,8 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     id, client_id: c.id, client_name: c.name || "", team: c.team || "init",
     tipo: t.tipo, assunto: t.assunto, descricao: t.descricao + origem,
     responsible: c.technician || "", solicitante: t.solicitante,
+    solicitante_email: enderecoDoRemetente(e.de) || null,
+    email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
     status: "aberto", priority: t.prioridade, canal: "email", categoria: t.categoria,
     first_response_due: primeiraRespostaDue(t.prioridade, agora),
     attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,
