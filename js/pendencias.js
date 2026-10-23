@@ -89,10 +89,27 @@ function penRecurrenceLabel(r) {
   return o ? o.label : 'Recorrente';
 }
 const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
+// Alternador de visualização: colunas (quadro) × linhas (fila).
+const PEN_ICO_BOARD = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="8" rx="1"/></svg>';
+const PEN_ICO_ROWS = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>';
 // Ordem manual (062): setas para cima e para baixo, a convenção de "reordenar".
 const PEN_ICO_DRAG = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18"/></svg>';
 
-let penView = 'kanban';
+// Visualização: 'kanban' (trabalhar o dia) ou 'fila' (tabela: prazo, quem
+// pediu, com quem está). A escolha é pessoal e fica no aparelho.
+const PEN_VIEW_KEY = 'intra_pen_view';
+let penView = (function () {
+  try { var v = localStorage.getItem(PEN_VIEW_KEY); return v === 'fila' ? 'fila' : 'kanban'; } catch (_) { return 'kanban'; }
+})();
+
+/** Troca a visualização e redesenha (delegado por data-action). */
+function penSetView(v) {
+  var alvo = v === 'fila' ? 'fila' : 'kanban';
+  if (alvo === penView) return;
+  penView = alvo;
+  try { localStorage.setItem(PEN_VIEW_KEY, alvo); } catch (_) {}
+  if (typeof renderPendencias === 'function') renderPendencias();
+}
 let penScope = 'active';
 let _filteredPens = [];
 
@@ -143,7 +160,7 @@ function _penSortCards(cards, colId){
 function setPenColSort(colId, mode){
   _penColSort[colId]=mode;
   var area=document.getElementById('penViewArea');
-  if(area) renderPenKanban(area);
+  if(area) _penRenderAtual(area);
 }
 function cyclePenColSort(colId){
   var cur=_penColSort[colId]||'criacao';
@@ -312,6 +329,12 @@ function renderPendencias() {
         <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
         <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas${penScope==='archived' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
       </div>
+      <div class="view-toggles pen-view-tabs" role="tablist" aria-label="Visualização">
+        <button role="tab" data-action="penSetView" data-arg="kanban" aria-selected="${penView==='kanban'}"
+          class="pen-view-tab ${penView==='kanban'?'is-active':''}" title="Quadro: trabalhar o dia">${PEN_ICO_BOARD} Quadro</button>
+        <button role="tab" data-action="penSetView" data-arg="fila" aria-selected="${penView==='fila'}"
+          class="pen-view-tab ${penView==='fila'?'is-active':''}" title="Fila: enxergar prazo, quem pediu e com quem está">${PEN_ICO_ROWS} Fila</button>
+      </div>
     </div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <div id="penViewArea"></div>`;
@@ -449,12 +472,12 @@ function renderPenView(resetPage) {
       _penTotal = arr[0].total;
       _penCounts = arr[1];
       _renderPendenciaSlaSummary();
-      renderPenKanban(area);
+      _penRenderAtual(area);
     }).catch(function () {
       _penServerMode = false; _penTotal = null; _penCounts = null;
       _filteredPens = getFilteredPendencias();
       _renderPendenciaSlaSummary();
-      renderPenKanban(area);
+      _penRenderAtual(area);
     });
     return;
   }
@@ -462,6 +485,6 @@ function renderPenView(resetPage) {
   setTimeout(function() {
     _filteredPens = getFilteredPendencias();
     _renderPendenciaSlaSummary();
-    renderPenKanban(area);
+    _penRenderAtual(area);
   }, 10);
 }

@@ -1614,6 +1614,105 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 .kanban-col.drag-over .kanban-cards {
   background: rgba(26,86,219,0.04);
 }
+/* ══ FILA DE ATENDIMENTO (tabela) ═══════════════════════════════════════
+   O quadro é de quem trabalha o dia; a fila é de quem olha o conjunto.
+   Densidade maior de propósito: a pergunta aqui é "o que está vencendo e
+   com quem está", e isso se responde varrendo linhas, não lendo cards. */
+.pen-view-tabs { margin-left: auto; }
+.pen-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pen-view-tab:first-child { border-radius: 8px 0 0 8px; }
+.pen-view-tab:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.pen-view-tab:hover { background: var(--bg-hover); }
+.pen-view-tab.is-active {
+  background: var(--accent-dim2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pf-wrap {
+  overflow-x: auto;              /* telas estreitas rolam a tabela */
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+.pf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 920px;              /* abaixo disso as colunas se esmagam */
+}
+.pf-table thead th {
+  position: sticky;              /* cabeçalho fixo ao rolar listas longas */
+  top: 0;
+  z-index: 1;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.pf-th {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pf-th:hover { color: var(--text-primary); }
+.pf-table th.is-sorted .pf-th { color: var(--accent); }
+.pf-seta { opacity: .45; font-size: 10px; }
+.pf-seta.is-on { opacity: 1; }
+
+.pf-row { border-bottom: 1px solid var(--border); cursor: pointer; }
+.pf-row:last-child { border-bottom: 0; }
+.pf-row:hover { background: var(--bg-hover); }
+.pf-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pf-table td { padding: 9px 12px; vertical-align: middle; }
+
+.pf-num { white-space: nowrap; }
+.pf-data { white-space: nowrap; color: var(--text-secondary); }
+.pf-titulo {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.pf-cliente, .pf-solic, .pf-resp { color: var(--text-secondary); white-space: nowrap; }
+.pf-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.pf-prazo { white-space: nowrap; }
+.pf-prazo-data.is-late { color: var(--red); font-weight: 700; }
+.pf-selos { margin-left: 6px; }
+.pf-vazio { padding: 28px 12px; text-align: center; color: var(--text-muted); }
+
 /* ── Feed: resposta ao solicitante × anotação interna ─────────────────────
    A interna precisa ser reconhecível de relance, sem gritar: fundo âmbar
    discreto e barra lateral. Tudo em tokens, para o tema escuro acompanhar. */

@@ -92,7 +92,7 @@ function _optimisticPenUpsert(next, opts) {
       }
     }
     var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
-    if (area) renderPenKanban(area);
+    if (area) _penRenderAtual(area);
   } catch (_) {}
 }
 function _optimisticPenRemove(id) {
@@ -102,7 +102,7 @@ function _optimisticPenRemove(id) {
     _penOptimisticRemoved[id] = Date.now();
     if (Array.isArray(_filteredPens)) _filteredPens = _filteredPens.filter(function(x) { return !x || x.id !== id; });
     var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
-    if (area) renderPenKanban(area);
+    if (area) _penRenderAtual(area);
   } catch (_) {}
 }
 function _clearOptimisticPenRemove(id) {
