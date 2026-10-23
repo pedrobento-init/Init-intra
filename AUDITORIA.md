@@ -69,8 +69,8 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 
 | ID      | Sev.     | Conf. | Achado                                                                                                                                                                                                                | Local                                                                                                                                                            | Status                                    |
 | ------- | -------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| SEC-01  | CRÍTICO  | ALTA  | Bucket `attachments` **público** + policy `attachments public read` sem `TO` → leitura anônima de documentos de clientes; app grava `getPublicUrl` no banco                                                           | `supabase/migrations/017_storage_attachments.sql:1-8`, `js/storage.js:1160-1162`                                                                                 | **CÓDIGO FEITO** `0c4f5bf` · falta confirmar o bucket (§12) |
-| SEC-02  | CRÍTICO  | ALTA  | Policies `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (aplicam-se a `anon`) em 8 tabelas                                                                                                                     | `supabase/migrations/004_procedure_templates.sql:25-27`, `018_reunioes.sql:33`, `035_equipamentos.sql:49`, diagnóstico próprio em `021_rls_remediation.sql:5-14` | PROPOSTA (P-2) / DBA · não verificado (§12) |
+| SEC-01  | CRÍTICO  | ALTA  | Bucket `attachments` **público** + policy `attachments public read` sem `TO` → leitura anônima de documentos de clientes; app grava `getPublicUrl` no banco                                                           | `supabase/migrations/017_storage_attachments.sql:1-8`, `js/storage.js:1160-1162`                                                                                 | **FECHADO** — código `0c4f5bf` + bucket `public=false` verificado (§13) |
+| SEC-02  | CRÍTICO  | ALTA  | Policies `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (aplicam-se a `anon`) em 8 tabelas                                                                                                                     | `supabase/migrations/004_procedure_templates.sql:25-27`, `018_reunioes.sql:33`, `035_equipamentos.sql:49`, diagnóstico próprio em `021_rls_remediation.sql:5-14` | **FECHADO** pela `042` — verificado em produção (§13) |
 | SEC-03  | ALTO     | ALTA  | Edge Function `send-email` **sem verificação de JWT/role**: aceita `from`/`to`/`html` arbitrários → relay/spoofing                                                                                                    | `supabase/functions/send-email/index.ts:24-60`                                                                                                                   | **CORRIGIDO** — código valida operador e destinatários; `verify_jwt` ligado (§12) |
 | SEC-04  | ALTO     | ALTA  | Service Worker cacheava GETs autenticados do Supabase na Cache Storage (chave = URL, ignora `Authorization`) → dados de um usuário servidos a outra sessão                                                            | `sw.js` (handler `fetch`)                                                                                                                                        | **CORRIGIDO** `24d9160`                   |
 | SEC-05  | MÉDIO    | ALTA  | CDN `motion@13.1.1` carregado **sem `integrity`** (SRI)                                                                                                                                                               | `index.html:294`                                                                                                                                                 | **CORRIGIDO** `6ca1acc`                   |
@@ -81,8 +81,8 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | SEC-10  | BAIXO    | ALTA  | Upload de anexos valida **apenas tamanho** (2 MB); sem allowlist de tipo/extensão                                                                                                                                     | `js/storage.js:1145,1227,1374,1444`                                                                                                                              | PROPOSTA (P-8)                            |
 | SEC-11  | INFO     | ALTA  | Credenciais antigas já estiveram no histórico Git (papel `anon`, removidas em `9ea37ad`); nenhum `service_role` vazado                                                                                                | histórico Git                                                                                                                                                    | MONITORAR (rotacionar se exposto)         |
 | SEC-12  | INFO     | MÉDIA | XSS: varredura dos 93 `${...}` em `innerHTML`; todos os pontos com dado do usuário conferidos escapam (`escapeHtml`/`esc`/`_richEsc`/`textContent`)                                                                   | `js/*`                                                                                                                                                           | **RESOLVIDO** — nenhum XSS (§9)           |
-| SEC-13  | ALTO     | ALTA  | `equipamentos all` — `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (`anon` lê e escreve) e criada **depois** da `021`, que só derruba 8 tabelas → aplicar `021` **não fecha esta**                            | `supabase/migrations/035_equipamentos.sql:49`, `021_rls_remediation.sql:68-75`                                                                                   | PROPOSTA (P-15) / DBA                     |
-| SEC-14  | MÉDIO    | ALTA  | `checklists` e `checklist_modelo_itens` com `SELECT ... USING (true)` **sem isolamento por equipe** (escrita é admin-only); `checklist_marcacoes` já é team-scoped                                                    | `supabase/migrations/041_checklists.sql:157-158,174-176`, `040_checklist.sql:62-63`                                                                              | PROPOSTA (P-16) — decisão de produto      |
+| SEC-13  | ALTO     | ALTA  | `equipamentos all` — `FOR ALL USING (true) WITH CHECK (true)` **sem `TO`** (`anon` lê e escreve) e criada **depois** da `021`, que só derruba 8 tabelas → aplicar `021` **não fecha esta**                            | `supabase/migrations/035_equipamentos.sql:49`, `021_rls_remediation.sql:68-75`                                                                                   | **FECHADO** pela `042` (§13)              |
+| SEC-14  | MÉDIO    | ALTA  | `checklists` e `checklist_modelo_itens` com `SELECT ... USING (true)` **sem isolamento por equipe** (escrita é admin-only); `checklist_marcacoes` já é team-scoped                                                    | `supabase/migrations/041_checklists.sql:157-158,174-176`, `040_checklist.sql:62-63`                                                                              | **FECHADO** pela `042` (§13)              |
 | SEC-15  | MÉDIO    | ALTA  | **CSV/XLSX injection**: 4 exportadores não neutralizam células iniciadas por `=`/`+`/`-`/`@`; o `exportCSV` genérico também não escapa `;`/quebra de linha (quebra colunas)                                           | `js/ui.js:836-839`, `js/visitas.js:685-687`, `js/equipamentos.js:905`, `js/milvus-devices.js:520`                                                                | **CORRIGIDO** `53c9fe7`                   |
 | SEC-16  | BAIXO    | ALTA  | Nenhuma das 9 Edge Functions tem rate limit/quotas; autenticadas, podem ser chamadas em loop (consumo da API Milvus/Resend)                                                                                           | `supabase/functions/*/index.ts`                                                                                                                                  | MONITORAR                                 |
 | SYNC-01 | MÉDIO    | MÉDIA | **SUSPEITA** — `pull` sem `.range()`: se o PostgREST `max-rows` (padrão 1000) truncar, linhas ausentes são tratadas como “deletadas no servidor” e **descartadas do merged** → perda local                            | `js/storage.js:834`, `js/schema.js:295-297`                                                                                                                      | PROPOSTA (P-9)                            |
@@ -253,12 +253,13 @@ Aplicadas nesta sessão: **P-17** (commit `53c9fe7`, fecha SEC-15 e CONS-08), **
    **Concluído** — commits `812ab0d` (SYNC-06/SYNC-07), `3a3c13e` e `5b68c86` (SEC-17/SEC-18);
    ver §6 e §11.
 
-1. **Urgente (DBA + staging):** P-1 e P-2 — as duas exposições CRÍTICO; rodar backup →
-   `021` → conferir `pg_policies` → `022` (somente com signed URLs já em produção).
-   **Atenção:** aplicar a `021` sozinha **não** fecha `equipamentos` (SEC-13/P-15).
-   **Revisado em 22/10 (§12):** os signed URLs da P-1 já estão em produção (`0c4f5bf`)
-   e o bucket provavelmente já é privado — começar pela consulta ao `pg_policies`,
-   que decide se a `021` ainda é necessária, antes de agendar o DBA.
+1. ~~**Urgente (DBA + staging):** P-1 e P-2 — as duas exposições CRÍTICO~~
+   **SEM OBJETO (23/10, §13).** Conferido no banco: nenhuma policy permissiva em
+   20 tabelas (a `042` fechou SEC-02/13/14) e `attachments.public = false`.
+   **Nenhum trabalho de DBA está pendente por segurança.** As migrations `021` e
+   `022` estão obsoletas — considerar removê-las para ninguém aplicar por engano.
+   Em aberto nessa frente, só o SYNC-04 (`tickets` sem policy, fail-closed), que é
+   decisão de produto, não exposição.
 2. **Alto:** ~~P-3 (`send-email`)~~ **já corrigido**, ver §12.3 · P-6 (`vitest@5`).
 3. **Verificação (somente leitura):** confirmar `Max rows` da API Supabase e
    `select count(*)` das tabelas grandes (valida/refuta SYNC-01).
@@ -487,7 +488,10 @@ Supabase CLI (`functions list`, `functions download`, `secrets list`) e requisi�
 anônimas. Duas conclusões da auditoria estavam desatualizadas e uma exposição nova
 apareceu.
 
-### 12.1 P-1 / SEC-01 — o código já está feito
+### 12.1 P-1 / SEC-01 — o código já está feito → **e o bucket também, ver §13.3**
+
+> A sondagem anônima abaixo era indício, não prova. Em 23/10 a consulta ao
+> banco confirmou: `attachments.public = false`.
 
 `0c4f5bf` (PR #27) implementou os links assinados que a P-1 exigia:
 `signedStorageUrls` com TTL de 1 h, cache e fallback que extrai o caminho de anexos
@@ -504,7 +508,11 @@ que a `022` foi aplicada. Confirmar com:
 select id, public from storage.buckets where id = 'attachments';
 ```
 
-### 12.2 P-2 / SEC-02 — segue aberto, e segue sendo o bloqueador
+### 12.2 P-2 / SEC-02 — ~~segue aberto~~ → **fechado, ver §13.1**
+
+> Escrito em 22/10, quando não havia como consultar o banco. A consulta foi
+> feita em 23/10 e deu o oposto: zero policies permissivas, fechadas pela
+> `042`. O texto abaixo fica como registro do que se sabia na época.
 
 A `021_rls_remediation.sql` tem no cabeçalho **"ARQUIVO PARA REVISÃO. NÃO APLICAR"** —
 não é uma migration pronta. Continua valendo o que a §8 diz: DBA, staging, backup, a
@@ -564,3 +572,76 @@ no ar.
   `my_calendar_feed_token`. A `053` segue sem confirmação.
 - `supabase migration list` mostra remoto só até a `005`: as migrations são aplicadas
   à mão no SQL Editor, então a tabela de controle do CLI **não** reflete o banco.
+
+---
+
+## 13. Fase 10 — RLS e bucket conferidos no banco (23/10/2026)
+
+A §12 deixou duas perguntas em aberto por não haver como respondê-las do
+código. Foram respondidas no SQL Editor, e **as duas mudam o quadro**: não
+há mais nenhum CRÍTICO em aberto.
+
+### 13.1 SEC-02 / P-2 — fechado pela `042`, não pela `021`
+
+```sql
+select tablename, count(*) as policies,
+       count(*) filter (where qual = 'true') as permissivas
+from pg_policies where schemaname = 'public' group by tablename;
+```
+
+**20 tabelas, 3 a 4 policies cada, ZERO permissivas.** As oito que a `021`
+corrigiria estão com o conjunto completo por operação, incluindo os buracos
+que a própria `021` diagnosticava: `visits` tem `visits_select/insert/update`
+(que ela dizia faltar) e `reunioes` tem as quatro (ela dizia ter só a aberta).
+
+Quem fechou foi a **`042_rls_completo.sql`**, que já declara no título
+"substitui 021 e fecha SEC-02/13/14". O raciocínio dela é melhor: a `021`
+remove policies **pelo nome**, então qualquer policy aberta com nome
+diferente sobreviveria — e como permissivas se somam por OU, **uma aberta
+anula todas as outras**. A `042` varre o `pg_policies` e recria tudo, então o
+resultado não depende do histórico do banco.
+
+**`021` e `022` estão obsoletas.** Considerar removê-las de
+`supabase/migrations/` para ninguém aplicar por engano.
+
+### 13.2 SEC-13 e SEC-14 — fechados junto
+
+`equipamentos` tem `equipamentos_delete/insert/select/update`; `checklists` e
+`checklist_modelo_itens` idem. A `042` cobriu os dois, como o título dela diz.
+As propostas **P-15** e **P-16** não têm mais objeto.
+
+### 13.3 SEC-01 / P-1 — fechado
+
+```sql
+select id, public from storage.buckets where id = 'attachments';
+-- attachments | false
+```
+
+Bucket **privado**. Somado ao `0c4f5bf`, que já pôs os signed URLs em
+produção, o SEC-01 está encerrado — e a sondagem anônima da §12.1, que era
+só indício, agora tem confirmação direta.
+
+### 13.4 O que isso derruba na §8
+
+O item 1 ("Urgente: DBA + staging — P-1 e P-2, as duas exposições CRÍTICO")
+**não tem mais objeto**. Nenhum trabalho de DBA está pendente por segurança,
+e a Fase 3 da migração para `@supabase/server`, que esperava por isso, está
+liberada.
+
+### 13.5 O que continua aberto
+
+**`tickets` não aparece na lista de policies.** RLS ligado sem policy nenhuma
+= *fail-closed*: ninguém acessa e o sync nega tudo. É o SYNC-04, com a mesma
+decisão de produto de sempre — ou tirar `tickets` do `SYNC_ENTITIES`, ou dar
+a ela coluna `team` e policies. Hoje é código morto que falha em silêncio.
+
+Seguem abertos também os SYNC-08 a SYNC-14 e as propostas de manutenção
+(P-6, P-9, P-13, P-14).
+
+### 13.6 Lição para a próxima auditoria
+
+Três achados CRÍTICO/ALTO ficaram marcados como pendentes por meses depois de
+terem sido corrigidos, porque o documento media o **código e as migrations do
+repositório**, não o **estado do banco**. Uma consulta de dez segundos ao
+`pg_policies` teria evitado isso. Vale repetir as consultas desta seção a cada
+auditoria, antes de classificar qualquer achado de RLS.
