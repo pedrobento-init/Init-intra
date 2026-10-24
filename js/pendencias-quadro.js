@@ -177,6 +177,10 @@ function renderPenKanban(area) {
       // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
       // decorativo fixo ao lado do botão, que também mostrava um relógio).
       var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : sortMode==='manual' ? PEN_ICO_DRAG : PEN_ICO_CLK;
+      // O ícone muda, o rótulo acessível não mudava: o leitor de tela só
+      // ouvia "Ordenar Aberto" e nunca a ordem em vigor. O aria-label
+      // sobrepõe o title, então a ordem atual precisa estar nele.
+      var sortAria = 'Ordem de ' + col.label + ': ' + penColSortLabel(sortMode) + '. Clique para mudar.';
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
       // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
       // as colunas com cards caberem na tela sem rolagem lateral.
@@ -192,7 +196,7 @@ function renderPenKanban(area) {
           '</h2>' +
           '<span class="kanban-col-aside">' +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            (cards.length ? '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' : '') +
+            (cards.length ? '<button class="kanban-col-sort" data-action="penColSort" data-arg="'+escapeHtml(col.id)+'" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="'+escapeHtml(sortAria)+'">'+sortIcon+'</button>' : '') +
           '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
@@ -410,12 +414,16 @@ function penKanbanCard(p) {
     // (tests/no-inline-handlers.test.js) não pode crescer.
     ' data-pen-id="' + escapeHtml(p.id) + '"' +
     ' data-pen-col="' + escapeHtml(p.status) + '"' +
-    ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')"' +
+    ' data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '"' +
     ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
-    '<div class="kanban-card-title" title="' + escapeHtml(title) + '">' +
+    // O título é um <button> de verdade porque é ele que recebe o foco do
+    // teclado — antes o card era uma <article> com onclick e quem navega por
+    // Tab não abria chamado nenhum pelo quadro. A <article> não pode virar
+    // role="button": ela tem outros botões dentro (⋯, cronômetro).
+    '<button type="button" class="kanban-card-title kc-open" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '" title="' + escapeHtml(title) + '">' +
       '<span class="pen-display-num">' + num + '</span>' + escapeHtml(title) +
       (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
-    '</div>' +
+    '</button>' +
     '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +
       ' onclick="openPenQuickMenu(event,\'' + escapeHtml(p.id) + '\')" ondragstart="event.preventDefault()">' + PEN_ICO_DOTS + '</button>' +
     '<div class="kanban-card-meta">' +
@@ -543,10 +551,19 @@ function _bindPenBoardDrag() {
   });
 }
 
+// Ordenação da coluna por delegação (a catraca de CSP só pode diminuir).
+if (typeof registerActions === 'function') {
+  registerActions({
+    penColSort: (_el, colId) => cyclePenColSort(colId),
+  });
+}
+
 // Muda o status (arrastar no quadro ou menu ⋯ do card).
-function penMoveTo(id, colId) {
+// `opts.semDesfazer` existe para o próprio desfazer não oferecer outro.
+function penMoveTo(id, colId, opts) {
   var p = getPendenciaById(id);
   if (!p || p.status === colId) return;
+  var antes = p.status;
   // Cópia destacada: getPendenciaById devolve a referência viva do cache e
   // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
   // gera a próxima ocorrência recorrente em savePendencia.
@@ -556,5 +573,25 @@ function penMoveTo(id, colId) {
   updateBadges();
   renderPenView(false);
   var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
-  showToast('Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"', 'success');
+  var msg = 'Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"';
+  // Arrastar erra fácil e o card some da coluna de origem na hora: sem
+  // desfazer, só sobra refazer o caminho à mão.
+  // Concluir/fechar fica de fora de propósito — a transição pode ter gerado
+  // a próxima ocorrência recorrente, e voltar o status não desfaz aquele
+  // nascimento. Um "Desfazer" que desfaz pela metade mente.
+  var fechado = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(colId) : false;
+  if ((opts && opts.semDesfazer) || fechado || typeof showUndoToast !== 'function') {
+    showToast(msg, 'success');
+    return;
+  }
+  showUndoToast(msg, function() {
+    // Entre o toast e o clique cabem 5s de outros gestos: se o status mudou,
+    // este desfazer é de outra história e não pode engolir o movimento novo.
+    var agora = getPendenciaById(id);
+    if (!agora || agora.status !== colId) {
+      showToast('O status mudou depois disso — nada a desfazer.', 'info');
+      return;
+    }
+    penMoveTo(id, antes, { semDesfazer: true });
+  });
 }

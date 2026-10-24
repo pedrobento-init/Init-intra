@@ -4434,6 +4434,23 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-more-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; line-height:1; }
 .pen-more-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); min-width:280px; max-width:100%; }
 .pen-search-bar .pen-more-panel, .equip-search-bar .pen-more-panel { right:auto; left:0; }
+
+/* ── Selos dos filtros ativos ──────────────────────────────────────────── */
+/* Ficam entre a barra e a lista: é onde o olho procura "por que só tem 3
+   chamados aqui?". Cada selo carrega o próprio ✕; o último limpa todos. */
+.pen-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 10px; }
+.pen-chips:empty { display:none; }
+.pen-chips-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-right:2px; }
+.pen-chip { display:inline-flex; align-items:center; gap:4px; max-width:260px; padding:3px 4px 3px 9px; border:1px solid var(--border); border-radius:999px; background:var(--bg-surface); font-size:12px; color:var(--text-primary); line-height:1.4; }
+.pen-chip-nome { color:var(--text-muted); font-weight:600; }
+.pen-chip-nome::after { content:":"; margin-right:3px; }
+.pen-chip-x { display:inline-grid; place-items:center; width:18px; height:18px; flex-shrink:0; border:0; border-radius:50%; background:transparent; color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer; transition:background var(--transition), color var(--transition); }
+.pen-chip-x:hover { background:var(--accent); color:#fff; }
+.pen-chips-all { border:0; background:none; padding:3px 6px; font-size:12px; font-weight:600; color:var(--accent); cursor:pointer; border-radius:6px; }
+.pen-chips-all:hover { text-decoration:underline; }
+.pen-chip-x:focus-visible, .pen-chips-all:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* Saída do beco sem saída na fila vazia. */
+.pen-vazio-limpar { margin-left:8px; }
 @media(max-width:640px){ .pen-more-panel{ left:0; right:0; min-width:0; } }
 /* Celular: "Mais filtros" e "Limpar" lado a lado (antes, uma linha cheia
    para cada botão empurrava o quadro ~50px para baixo). */
@@ -6227,6 +6244,18 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 @media (hover: none) { .kc-menu { opacity: 1; } }
 .kc-recur { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--kb-muted); }
 .kc-recur .kb-ico { width: 13px; height: 13px; }
+/* Título do card é um <button>: precisa perder a cara de botão e manter o
+   recorte de 3 linhas que .kanban-card-title já define. Só a família da
+   fonte é reposta — tamanho, peso e cor vêm daquelas regras. */
+.kc-open {
+  appearance: none; -webkit-appearance: none; background: none; border: 0;
+  padding: 0; margin: 0; width: 100%; text-align: left;
+  font-family: inherit; cursor: pointer;
+}
+.pen-board .kanban-card-title.kc-open { padding-right: 24px; }
+.kc-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+/* O anel fica no título, mas quem está em foco é o card inteiro. */
+.kanban-card:has(.kc-open:focus-visible) { border-color: var(--accent); }
 .pen-quick-menu {
   position: fixed; z-index: 400; min-width: 220px; max-width: 280px; padding: 6px;
   background: var(--ds-panel); color: var(--ds-text); border: 1px solid var(--ds-line); border-radius: 10px;

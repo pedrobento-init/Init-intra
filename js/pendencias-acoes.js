@@ -73,11 +73,28 @@ function openPenQuickMenu(ev, id) {
   if (first) first.focus();
 }
 
-function penQuickAssign(id, name) {
+// `opts.semDesfazer` existe para o próprio desfazer não oferecer outro.
+function penQuickAssign(id, name, opts) {
+  // Trocar o dono de um chamado por engano no menu ⋯ é um clique só; o
+  // nome anterior precisa ser lido ANTES da gravação para o desfazer.
+  var antes = '';
+  try { var atual = getPendenciaById(id); antes = (atual && atual.responsible) || ''; } catch (_) {}
   try {
     var res = updatePendenciaAssignee(id, { responsible: name });
     try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {}
-    showToast(name ? 'Atribuída a ' + name + '.' : 'Responsável removido.', 'success');
+    var msg = name ? 'Atribuída a ' + name + '.' : 'Responsável removido.';
+    if ((opts && opts.semDesfazer) || typeof showUndoToast !== 'function') showToast(msg, 'success');
+    else showUndoToast(msg, function() {
+      // Mesma janela de 5s do desfazer do card: sem revalidar, clicar no
+      // toast antigo restauraria o nome de antes do último gesto, não deste.
+      var depois = null;
+      try { depois = getPendenciaById(id); } catch (_) {}
+      if (((depois && depois.responsible) || '') !== (name || '')) {
+        showToast('O responsável mudou depois disso — nada a desfazer.', 'info');
+        return;
+      }
+      penQuickAssign(id, antes, { semDesfazer: true });
+    });
   } catch (err) {
     showToast((err && err.message) || 'Não foi possível atribuir.', 'error');
     return;

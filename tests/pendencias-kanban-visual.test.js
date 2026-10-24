@@ -41,7 +41,7 @@ try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
-    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
+    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip, penColSortLabel };',
     sandbox
   );
 } finally {
@@ -136,6 +136,43 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
     expect(html).toContain('class="kb-go"');
     expect(html).toContain('Iniciar');
     expect(html).toContain('kb-play');
+  });
+});
+
+describe('card do quadro: abrir pelo teclado', () => {
+  // O card era uma <article> com onclick: clique funcionava, Tab não
+  // chegava nele e quem navega por teclado não abria chamado nenhum.
+  it('o título é um <button>, que é o que recebe o foco', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).toMatch(/<button type="button" class="kanban-card-title kc-open"/);
+    expect(html).not.toContain('onclick="openPendenciaDetail');
+  });
+
+  it('card e título abrem o detalhe por delegação, não por handler inline', () => {
+    const html = T.penKanbanCard(basePen({ id: 'PEN-9' }));
+    const abre = html.match(/data-action="openPendencia" data-arg="PEN-9"/g) || [];
+    expect(abre.length).toBe(2); // a <article> inteira e o título
+  });
+
+  it('a <article> não vira role="button": ela tem botões dentro', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).not.toMatch(/<article[^>]*role="button"/);
+    expect(html).toContain('class="kc-menu"');
+  });
+});
+
+describe('botão de ordenar a coluna', () => {
+  // O ícone trocava a cada clique, mas o rótulo acessível era sempre
+  // "Ordenar <coluna>": quem usa leitor de tela nunca sabia a ordem atual.
+  it('o rótulo acessível diz a ordem em vigor, não só o nome da coluna', () => {
+    expect(T.penColSortLabel('prazo')).toBe('por prazo');
+    expect(T.penColSortLabel('prioridade')).toBe('por prioridade');
+    expect(T.penColSortLabel('manual')).toContain('arrastando');
+    expect(T.penColSortLabel('criacao')).toBe('por criação');
+  });
+
+  it('modo desconhecido cai em criação, a ordem padrão da coluna', () => {
+    expect(T.penColSortLabel('')).toBe('por criação');
   });
 });
 
