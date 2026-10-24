@@ -548,9 +548,11 @@ function _bindPenBoardDrag() {
 }
 
 // Muda o status (arrastar no quadro ou menu ⋯ do card).
-function penMoveTo(id, colId) {
+// `opts.semDesfazer` existe para o próprio desfazer não oferecer outro.
+function penMoveTo(id, colId, opts) {
   var p = getPendenciaById(id);
   if (!p || p.status === colId) return;
+  var antes = p.status;
   // Cópia destacada: getPendenciaById devolve a referência viva do cache e
   // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
   // gera a próxima ocorrência recorrente em savePendencia.
@@ -560,5 +562,16 @@ function penMoveTo(id, colId) {
   updateBadges();
   renderPenView(false);
   var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
-  showToast('Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"', 'success');
+  var msg = 'Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"';
+  // Arrastar erra fácil e o card some da coluna de origem na hora: sem
+  // desfazer, só sobra refazer o caminho à mão.
+  // Concluir/fechar fica de fora de propósito — a transição pode ter gerado
+  // a próxima ocorrência recorrente, e voltar o status não desfaz aquele
+  // nascimento. Um "Desfazer" que desfaz pela metade mente.
+  var fechado = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(colId) : false;
+  if ((opts && opts.semDesfazer) || fechado || typeof showUndoToast !== 'function') {
+    showToast(msg, 'success');
+    return;
+  }
+  showUndoToast(msg, function() { penMoveTo(id, antes, { semDesfazer: true }); });
 }
