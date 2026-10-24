@@ -555,7 +555,10 @@ function renderPenView(resetPage) {
       responsible: document.getElementById('penResponsible')?.value || '',
       status: document.getElementById('penStatus')?.value || '',
       priority: document.getElementById('penPriority')?.value || '',
-      search: document.getElementById('penSearch')?.value || ''
+      search: document.getElementById('penSearch')?.value || '',
+      // Só a fila manda ordem: o quadro ordena por coluna, dentro da coluna,
+      // e espera a ordem de criação padrão vinda do banco.
+      sort: (penView === 'fila' && typeof _penFilaSort !== 'undefined') ? _penFilaSort : null
     });
     // FASE 6: totais por status vêm do banco (só coluna status), não da página.
     var countReq = (typeof fetchPendenciaStatusCounts === 'function')

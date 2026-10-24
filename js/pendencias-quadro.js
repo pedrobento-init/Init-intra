@@ -44,6 +44,10 @@ function _penViewSig() {
     resp: document.getElementById('penResponsible')?.value || '',
     st: document.getElementById('penStatus')?.value || '',
     pr: document.getElementById('penPriority')?.value || '',
+    // A ordem entra na assinatura: trocar de coluna volta para a primeira
+    // página, senão a página 3 de uma ordem viraria a página 3 de outra.
+    sort: (typeof penView !== 'undefined' && penView === 'fila' && typeof _penFilaSort !== 'undefined')
+      ? (_penFilaSort.col + ':' + _penFilaSort.dir) : '',
     team: team
   });
 }
