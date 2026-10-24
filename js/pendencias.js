@@ -238,6 +238,9 @@ function _penActiveFilterCount(){
 }
 function _penUpdateMoreFiltersBadge(){
   var badge=document.getElementById('penMoreFiltersBadge');
+  // A barra de selos acompanha o badge: todo caminho que mexe em filtro
+  // passa por aqui, então os dois nunca saem de sincronia.
+  try { _penRenderFiltrosAtivos(); } catch (_) {}
   if(!badge) return;
   var n=_penActiveFilterCount();
   badge.textContent=n?String(n):'';
@@ -271,6 +274,80 @@ if(typeof window!=='undefined' && !window._penMoreFiltersBound){
   document.addEventListener('click', _closePenMoreFiltersOnOutside);
 }
 
+// ── Filtros ativos à vista ────────────────────────────────────────────────
+// Quase todo filtro mora dentro de "Mais filtros", que fecha. O único sinal
+// de que algo estava preso era um número no badge: a lista encolhia e não
+// dava para saber QUAL filtro fazia isso sem reabrir o painel. Cada filtro
+// ativo agora é um selo com rótulo e ✕ próprio.
+const PEN_FILTRO_CHIPS = [
+  { campo: 'penSearch', nome: 'Busca' },
+  { campo: 'penClient', nome: 'Cliente' },
+  { campo: 'penResponsible', nome: 'Responsável' },
+  { campo: 'penStatus', nome: 'Status' },
+  { campo: 'penPriority', nome: 'Prioridade' },
+  { campo: 'penSavedFilter', nome: 'Filtro salvo' },
+];
+
+/** Texto do selo: num select, o rótulo da opção — nunca o id cru do cliente. */
+function _penFiltroTexto(valor, el) {
+  try {
+    if (el && el.tagName === 'SELECT' && el.selectedOptions && el.selectedOptions[0]) {
+      return String(el.selectedOptions[0].textContent || '').trim() || valor;
+    }
+  } catch (_) {}
+  return valor;
+}
+
+/** Filtros preenchidos agora, na ordem da barra. */
+function penFiltrosAtivos() {
+  var out = [];
+  PEN_FILTRO_CHIPS.forEach(function (f) {
+    var el = (typeof document !== 'undefined') ? document.getElementById(f.campo) : null;
+    var v = (el && el.value) || '';
+    if (!v) return;
+    out.push({ campo: f.campo, nome: f.nome, texto: _penFiltroTexto(v, el) });
+  });
+  return out;
+}
+
+/** Pura, para teste: a lista de filtros ativos vira a fila de selos. */
+function penFiltroChipsHtml(ativos) {
+  if (!ativos || !ativos.length) return '';
+  return '<div class="pen-chips" role="group" aria-label="Filtros ativos">'
+    + '<span class="pen-chips-label">Filtrando por</span>'
+    + ativos.map(function (f) {
+        var legivel = f.nome + ': ' + f.texto;
+        return '<span class="pen-chip">'
+          + '<span class="pen-chip-nome">' + escapeHtml(f.nome) + '</span>' + escapeHtml(f.texto)
+          + '<button type="button" class="pen-chip-x" data-action="penClearFilter" data-arg="' + escapeHtml(f.campo) + '"'
+          + ' aria-label="Remover filtro ' + escapeHtml(legivel) + '" title="Remover filtro">×</button>'
+          + '</span>';
+      }).join('')
+    + '<button type="button" class="pen-chips-all" data-action="penClearFilters">Limpar tudo</button>'
+    + '</div>';
+}
+
+function _penRenderFiltrosAtivos() {
+  var el = (typeof document !== 'undefined') ? document.getElementById('penFiltrosAtivos') : null;
+  if (el) el.innerHTML = penFiltroChipsHtml(penFiltrosAtivos());
+}
+
+/** ✕ de um selo: tira só aquele filtro e volta para a primeira página. */
+function penClearFilter(campo) {
+  var el = document.getElementById(campo);
+  if (!el) return;
+  el.value = '';
+  if (typeof savePenFilters === 'function') savePenFilters();
+  if (typeof renderPenView === 'function') renderPenView(true);
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    penClearFilter: (_el, campo) => penClearFilter(campo),
+    penClearFilters: () => { if (typeof clearPenFilters === 'function') clearPenFilters(); },
+  });
+}
+
 function renderPendencias() {
   document.getElementById('pageTitle').textContent = 'Pendências';
   setTopbarAction('Nova Pendência', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
@@ -286,7 +363,7 @@ function renderPendencias() {
     <div class="search-bar pen-search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="penSearch" placeholder="Buscar..." oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
+        <input class="form-input" id="penSearch" placeholder="Buscar por título, cliente ou quem pediu" oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
       </div>
       <select class="form-select filter-select-md pt-filter pt-full" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
         <option value="">Todos os clientes</option>
@@ -336,6 +413,7 @@ function renderPendencias() {
           class="pen-view-tab ${penView==='fila'?'is-active':''}" title="Fila: enxergar prazo, quem pediu e com quem está">${PEN_ICO_ROWS} Fila</button>
       </div>
     </div>
+    <div id="penFiltrosAtivos"></div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;

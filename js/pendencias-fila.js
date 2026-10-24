@@ -114,9 +114,16 @@ function renderPenFila(area) {
       + escapeHtml(c.label) + _penFilaSeta(c.id) + '</button></th>';
   }).join('');
 
+  // Fila vazia por causa de filtro é beco sem saída: o aviso precisa trazer
+  // a saída junto, não só constatar.
+  const temFiltro = typeof penFiltrosAtivos === 'function' && penFiltrosAtivos().length > 0;
+  const vazio = 'Nenhuma pendência com os filtros atuais.'
+    + (temFiltro
+      ? '<button type="button" class="btn btn-secondary btn-sm pen-vazio-limpar" data-action="penClearFilters">Limpar filtros</button>'
+      : '');
   const corpo = linhas.length
     ? linhas.map(_penFilaLinha).join('')
-    : '<tr><td class="pf-vazio" colspan="' + PEN_FILA_COLS.length + '">Nenhuma pendência com os filtros atuais.</td></tr>';
+    : '<tr><td class="pf-vazio" colspan="' + PEN_FILA_COLS.length + '">' + vazio + '</td></tr>';
 
   const resumo = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
 

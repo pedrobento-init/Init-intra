@@ -136,6 +136,21 @@ describe('renderPenFila (modo local)', () => {
   it('sem pendências, diz que o filtro não achou nada em vez de tabela vazia', () => {
     expect(render([])).toContain('Nenhuma pendência com os filtros atuais.');
   });
+
+  // Fila vazia por causa de filtro é beco sem saída: o aviso leva a saída.
+  it('com filtro ativo, o vazio traz o botão de limpar', () => {
+    const orig = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => (id === 'penStatus'
+      ? Object.assign(_el(), { tagName: 'SELECT', value: 'aberto', selectedOptions: [{ textContent: 'Aberto' }] })
+      : _el());
+    try {
+      expect(render([])).toContain('data-action="penClearFilters"');
+    } finally { sandbox.document.getElementById = orig; }
+  });
+
+  it('sem filtro, não oferece limpar o que não existe', () => {
+    expect(render([])).not.toContain('data-action="penClearFilters"');
+  });
 });
 
 describe('ordenação da fila', () => {
