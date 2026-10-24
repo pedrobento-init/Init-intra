@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
-  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa,
+  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -215,5 +215,143 @@ describe('o que levar sugerido pela IA', () => {
     expect(itensDaIa(muitos)).toHaveLength(8);
     expect(itensDaIa(muitos, [], 3)).toEqual(['Item 1', 'Item 2', 'Item 3']);
     expect(itensDaIa('x'.repeat(200))[0]).toHaveLength(120);
+  });
+});
+
+describe('corpoLimpo: só o que a pessoa escreveu agora', () => {
+  // O caso que abriu esta correção: resposta do Felipe (Init) na conversa da
+  // Beatriz. A descrição do chamado terminava no meio de "Em qui., 22 de".
+  const respostaReal = [
+    'Bom dia Beatriz, td bem e espero que também esteja tudo bem.',
+    'Desculpa a demora no retorno, mas ontem estava em visita a cliente fora de SP.',
+    '',
+    'Podemos agendar uma avaliação em seu notebook na segunda-feira (26/10) no período da manhã?',
+    '',
+    'Obrigado,',
+    'Felipe Ferezin',
+    '+55 (11) 4478 6171 | 4902 4359',
+    'http://www.initnet.com.br',
+    '',
+    'Em qui., 22 de out. de 2026 às 09:14, Beatriz Rangel <beatriz@diasrizzo.com.br>',
+    'escreveu:',
+    '',
+    '> Bom dia Felipe, consegue olhar meu notebook?',
+    '> Obrigada',
+  ].join('\n');
+
+  it('corta a conversa citada e a assinatura, e guarda a despedida', () => {
+    const limpo = corpoLimpo(respostaReal);
+    expect(limpo).toContain('Bom dia Beatriz');
+    expect(limpo).toContain('segunda-feira (26/10)');
+    expect(limpo.endsWith('Obrigado,')).toBe(true);
+  });
+
+  it('nada da conversa citada sobra', () => {
+    const limpo = corpoLimpo(respostaReal);
+    expect(limpo).not.toContain('Em qui., 22 de');
+    expect(limpo).not.toContain('escreveu:');
+    expect(limpo).not.toContain('consegue olhar meu notebook');
+  });
+
+  it('nem o telefone e o site da assinatura', () => {
+    const limpo = corpoLimpo(respostaReal);
+    expect(limpo).not.toContain('4478 6171');
+    expect(limpo).not.toContain('initnet.com.br');
+  });
+
+  it('o delimitador "-- " do RFC corta sozinho', () => {
+    const e = 'A impressora parou de imprimir hoje de manhã.\n\n-- \nAna Paula\nDias Rizzo';
+    expect(corpoLimpo(e)).toBe('A impressora parou de imprimir hoje de manhã.');
+  });
+
+  it('cabeçalho de encaminhamento do Outlook também é citação', () => {
+    const e = 'Segue abaixo o chamado que abrimos ontem, sem retorno.\n\n'
+      + 'De: Suporte <suporte@x.com.br>\nEnviada em: quarta-feira, 21 de outubro\nPara: Ana\nAssunto: Chamado';
+    expect(corpoLimpo(e)).toBe('Segue abaixo o chamado que abrimos ontem, sem retorno.');
+  });
+
+  it('linha citada com ">" corta a partir dali', () => {
+    const e = 'Continua sem acesso ao servidor de arquivos.\n\n> Pode testar de novo agora?';
+    expect(corpoLimpo(e)).toBe('Continua sem acesso ao servidor de arquivos.');
+  });
+
+  // Errar para MENOS: na dúvida o texto fica.
+  it('despedida seguida de TEXTO de verdade não é assinatura', () => {
+    const e = 'Obrigado,\n\nMas ainda preciso do orçamento do notebook novo antes de sexta.';
+    expect(corpoLimpo(e)).toContain('orçamento do notebook novo');
+  });
+
+  it('e-mail curto sem marcador nenhum atravessa inteiro', () => {
+    const e = 'A impressora do faturamento parou de novo, pode olhar?';
+    expect(corpoLimpo(e)).toBe(e);
+  });
+
+  it('se o corte não deixaria quase nada, devolve o original', () => {
+    // Tudo é citação: cortar deixaria uma descrição vazia no chamado.
+    const e = '> Bom dia, o servidor de arquivos continua fora do ar desde ontem.';
+    expect(corpoLimpo(e)).toContain('servidor de arquivos');
+  });
+
+  it('vazio continua vazio, sem inventar texto', () => {
+    expect(corpoLimpo('')).toBe('');
+    expect(corpoLimpo('   \n  ')).toBe('');
+  });
+
+  it('CRLF do Outlook não atrapalha o corte', () => {
+    const e = 'O notebook não liga mais.\r\n\r\nEm qui., 22 de out. de 2026, Ana <a@x.com> escreveu:\r\n> teste';
+    expect(corpoLimpo(e)).toBe('O notebook não liga mais.');
+  });
+});
+
+describe('triagem: e-mail da própria Init não vira chamado', () => {
+  // O robô varre a CONVERSA inteira do rótulo: a nossa resposta ao cliente
+  // chegava como mensagem nova e abria chamado com o técnico de solicitante.
+  const dominios = dominiosInternos('suporte@initnet.com.br');
+
+  it('o domínio de casa sai do GMAIL_USER, sem secret novo', () => {
+    expect(dominios).toEqual(['initnet.com.br']);
+    expect(dominiosInternos('')).toEqual([]);
+    expect(dominiosInternos('suporte')).toEqual([]);
+  });
+
+  it('resposta do técnico é interna', () => {
+    expect(remetenteInterno('Felipe Ferezin <ferezin@initnet.com.br>', dominios)).toBe(true);
+  });
+
+  it('subdomínio nosso também é interno', () => {
+    expect(remetenteInterno('robo <no-reply@mail.initnet.com.br>', dominios)).toBe(true);
+  });
+
+  it('cliente nunca é interno, nem com o nome parecido', () => {
+    expect(remetenteInterno('Beatriz <beatriz@diasrizzo.com.br>', dominios)).toBe(false);
+    // Domínio que só TERMINA parecido não pode passar por nosso.
+    expect(remetenteInterno('fulano <x@naoinitnet.com.br>', dominios)).toBe(false);
+  });
+
+  it('sem domínio configurado, ninguém é barrado', () => {
+    expect(remetenteInterno('Felipe <ferezin@initnet.com.br>', [])).toBe(false);
+  });
+
+  it('remetente sem e-mail nenhum não é interno', () => {
+    expect(remetenteInterno('Felipe Ferezin', dominios)).toBe(false);
+  });
+});
+
+describe('a descrição do chamado já nasce limpa', () => {
+  const email = { id: 'M9', de: 'Beatriz <beatriz@diasrizzo.com.br>', assunto: 'Re: Notebook',
+    data: '2026-10-24T13:05:00Z',
+    trecho: 'O notebook não liga desde ontem.\n\nAtenciosamente,\nBeatriz\n(11) 99999-0000\n\n'
+      + 'Em qua., 21 de out. de 2026, Suporte <suporte@initnet.com.br> escreveu:\n> Bom dia' };
+
+  it('sem IA, o fallback é o corpo limpo e não o e-mail cru', () => {
+    const t = triagemDaIa('Accepted', email);
+    expect(t.descricao).toContain('O notebook não liga desde ontem.');
+    expect(t.descricao).not.toContain('escreveu:');
+    expect(t.descricao).not.toContain('99999-0000');
+  });
+
+  it('com IA, quem manda segue sendo a descrição da IA', () => {
+    const t = triagemDaIa(JSON.stringify({ descricao: 'Notebook não liga.' }), email);
+    expect(t.descricao).toBe('Notebook não liga.');
   });
 });

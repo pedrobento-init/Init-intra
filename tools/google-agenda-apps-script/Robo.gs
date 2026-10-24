@@ -233,8 +233,11 @@ function roboPendenciasEmail() {
   if (!mensagens.length) return;  // ao contrário dos backups, silêncio aqui não é notícia
   var r = roboChamar_('triagem', { mensagens: mensagens });
   p.setProperty('TRIAGEM_EMAIL_DESDE', String(maisNovo));
+  // `internos` são as nossas próprias respostas dentro da conversa: o robô lê
+  // a thread inteira, e elas não são pedido novo.
   Logger.log('Triagem: ' + mensagens.length + ' e-mail(s), ' + r.abertas + ' pendência(s), '
-    + r.ignorados + ' ignorado(s)' + ((r.sem_cliente || []).length ? ', sem cliente: ' + r.sem_cliente.join(' | ') : ''));
+    + r.ignorados + ' ignorado(s)' + (r.internos ? ', ' + r.internos + ' da própria Init' : '')
+    + ((r.sem_cliente || []).length ? ', sem cliente: ' + r.sem_cliente.join(' | ') : ''));
 }
 
 // ── Madrugada: domínios, indicadores, backup ────────────────────────────────

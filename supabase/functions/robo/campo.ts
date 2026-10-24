@@ -236,6 +236,104 @@ export function nomeDoRemetente(de: string): string {
   return (enderecoDoRemetente(s).split("@")[0] || s).trim().slice(0, 120);
 }
 
+// ── Corpo do e-mail: só o que a pessoa escreveu agora ──────────────────────
+// Um e-mail de resposta carrega a conversa inteira citada embaixo e a
+// assinatura de quem escreveu. Isso ia cru para a IA e, sem IA, virava a
+// descrição do chamado — que terminava no meio de "Em qui., 22 de", porque o
+// corte de 600 caracteres caía dentro do trecho citado.
+//
+// A regra é errar para MENOS: na dúvida o texto fica. Nenhum corte depende de
+// adivinhar o formato do cliente; todos são marcadores que o próprio programa
+// de e-mail escreve.
+
+/** Início da conversa citada. O primeiro que casar manda. */
+const MARCAS_CITACAO: RegExp[] = [
+  // Gmail: "Em qui., 22 de out. de 2026 às 10:30, Fulano <f@x> escreveu:".
+  // A linha quebra no meio com frequência, por isso [\s\S] e não ponto.
+  /^[ \t]*Em[ \t][\s\S]{0,300}?escreveu:[ \t]*$/im,
+  /^[ \t]*On[ \t][\s\S]{0,300}?wrote:[ \t]*$/im,
+  // Outlook e clientes que encaminham com cabeçalho.
+  /^[ \t]*-{2,}[ \t]*(Mensagem original|Original Message|Mensagem encaminhada|Forwarded message)[ \t]*-{2,}/im,
+  /^[ \t]*_{10,}[ \t]*$/m,
+  /^[ \t]*(De|From):[ \t].*\n[ \t]*(Enviada em|Enviado em|Enviada|Sent|Data|Date):[ \t]/im,
+  // Primeira linha citada com ">".
+  /^[ \t]*>/m,
+];
+
+// O delimitador do RFC 3676 ("-- " sozinho na linha): sem ambiguidade nenhuma.
+const MARCA_SIG_RFC = /^-- ?[ \t]*$/m;
+const DESPEDIDAS = /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
+// Sinais de bloco de contato: telefone, site ou e-mail soltos.
+const SINAL_CONTATO = /(\+?\d[\d ().-]{7,}\d)|(https?:\/\/|www\.)|([^\s@]+@[^\s@]+\.[^\s@]{2,})/i;
+
+/** Menor índice entre os marcadores, ou -1. */
+function _primeiroCorte(s: string, marcas: RegExp[]): number {
+  let corte = -1;
+  for (const re of marcas) {
+    const m = re.exec(s);
+    if (m && m.index >= 0 && (corte === -1 || m.index < corte)) corte = m.index;
+  }
+  return corte;
+}
+
+/**
+ * Corta a assinatura. O delimitador "-- " do RFC vale sozinho. Uma despedida
+ * ("Obrigado,", "Atenciosamente") só corta quando o que vem depois PARECE
+ * bloco de contato: curto e com telefone, site ou e-mail. Despedida seguida de
+ * texto de verdade fica, porque ali a pessoa ainda estava falando.
+ */
+function _semAssinatura(s: string): string {
+  const rfc = MARCA_SIG_RFC.exec(s);
+  let corpo = rfc ? s.slice(0, rfc.index) : s;
+  const d = DESPEDIDAS.exec(corpo);
+  if (d) {
+    const depois = corpo.slice(d.index + d[0].length).trim();
+    if (depois.length <= 400 && SINAL_CONTATO.test(depois)) {
+      // A despedida em si fica: é a última coisa que a pessoa escreveu.
+      corpo = corpo.slice(0, d.index + d[0].length);
+    }
+  }
+  return corpo;
+}
+
+/**
+ * O que a pessoa escreveu agora: sem a conversa citada e sem a assinatura.
+ * Devolve o texto original quando o corte não deixaria quase nada — um e-mail
+ * de duas linhas não pode virar um chamado vazio.
+ */
+export function corpoLimpo(trecho: string): string {
+  const original = String(trecho || "").replace(/\r\n?/g, "\n");
+  if (!original.trim()) return "";
+  const corte = _primeiroCorte(original, MARCAS_CITACAO);
+  const semCitacao = corte > 0 ? original.slice(0, corte) : original;
+  const limpo = _semAssinatura(semCitacao).replace(/\n{3,}/g, "\n\n").trim();
+  // Sobrou pouco demais: algum marcador pegou texto de verdade.
+  if (limpo.length < 20 && original.trim().length >= 20) return original.trim();
+  return limpo;
+}
+
+/**
+ * Remetente do próprio domínio da Init. O robô varre a CONVERSA inteira do
+ * rótulo, então a nossa resposta ao cliente chega aqui como mensagem nova e
+ * abria um chamado com o técnico como solicitante — e responder naquele
+ * chamado devolveria o e-mail para a própria Init.
+ */
+export function remetenteInterno(de: string, dominios: string[]): boolean {
+  const d = (enderecoDoRemetente(de).split("@")[1] || "").trim();
+  if (!d) return false;
+  return (dominios || []).some((x) => {
+    const n = String(x || "").trim().toLowerCase().replace(/^@/, "");
+    return !!n && n.includes(".") && (d === n || d.endsWith("." + n));
+  });
+}
+
+/** Domínio da caixa do robô (GMAIL_USER): o domínio "de casa", sem secret novo. */
+export function dominiosInternos(gmailUser: string): string[] {
+  const d = (String(gmailUser || "").trim().toLowerCase().split("@")[1] || "").trim();
+  return d.includes(".") ? [d] : [];
+}
+
+
 /** Tira os Re:/Enc: empilhados do assunto. */
 export function assuntoLimpo(assunto: string): string {
   const prefixo = /^\s*(re|res|ref|enc|encaminhada|fwd|fw)\s*:\s*/i;
@@ -282,7 +380,10 @@ export function triagemDaIa(body: string, e: EmailEntrada): Triagem {
   return {
     ignorar: j?.ignorar === true || String(j?.ignorar ?? "").toLowerCase() === "true",
     assunto: texto(j?.assunto, 140) || assuntoLimpo(e.assunto) || "Pedido por e-mail",
-    descricao: texto(j?.descricao, 600) || texto(e.trecho, 600),
+    // Sem IA, a descrição é o e-mail: corpoLimpo tira a conversa citada e a
+    // assinatura antes do corte de 600, que era o que terminava no meio de
+    // "Em qui., 22 de".
+    descricao: texto(j?.descricao, 600) || texto(corpoLimpo(e.trecho || ""), 600),
     categoria: umaDe(j?.categoria, PEN_CATEGORIAS, "outro"),
     prioridade,
     tipo: umaDe(j?.tipo, PEN_TIPOS, "Suporte"),
