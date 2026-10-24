@@ -84,7 +84,17 @@ function penQuickAssign(id, name, opts) {
     try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {}
     var msg = name ? 'Atribuída a ' + name + '.' : 'Responsável removido.';
     if ((opts && opts.semDesfazer) || typeof showUndoToast !== 'function') showToast(msg, 'success');
-    else showUndoToast(msg, function() { penQuickAssign(id, antes, { semDesfazer: true }); });
+    else showUndoToast(msg, function() {
+      // Mesma janela de 5s do desfazer do card: sem revalidar, clicar no
+      // toast antigo restauraria o nome de antes do último gesto, não deste.
+      var depois = null;
+      try { depois = getPendenciaById(id); } catch (_) {}
+      if (((depois && depois.responsible) || '') !== (name || '')) {
+        showToast('O responsável mudou depois disso — nada a desfazer.', 'info');
+        return;
+      }
+      penQuickAssign(id, antes, { semDesfazer: true });
+    });
   } catch (err) {
     showToast((err && err.message) || 'Não foi possível atribuir.', 'error');
     return;

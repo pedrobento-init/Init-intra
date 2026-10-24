@@ -584,5 +584,14 @@ function penMoveTo(id, colId, opts) {
     showToast(msg, 'success');
     return;
   }
-  showUndoToast(msg, function() { penMoveTo(id, antes, { semDesfazer: true }); });
+  showUndoToast(msg, function() {
+    // Entre o toast e o clique cabem 5s de outros gestos: se o status mudou,
+    // este desfazer é de outra história e não pode engolir o movimento novo.
+    var agora = getPendenciaById(id);
+    if (!agora || agora.status !== colId) {
+      showToast('O status mudou depois disso — nada a desfazer.', 'info');
+      return;
+    }
+    penMoveTo(id, antes, { semDesfazer: true });
+  });
 }

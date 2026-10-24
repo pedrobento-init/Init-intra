@@ -17,6 +17,7 @@ const _dummyEl = {
 const STATUS = {
   aberto: { label: 'Aberto', dot: '#2563eb' },
   em_andamento: { label: 'Em andamento', dot: '#06b6d4' },
+  pausado: { label: 'Pausado', dot: '#f59e0b' },
   resolvido: { label: 'Resolvido', dot: '#16a34a' },
 };
 const FECHADOS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
@@ -102,6 +103,15 @@ describe('mover card de coluna', () => {
     expect(undos).toEqual([]);
     expect(toasts[0]).toContain('Resolvido');
   });
+
+  it('desfazer antigo não engole um movimento feito depois', () => {
+    sandbox.penMoveTo('PEN-1', 'em_andamento'); // toast 1
+    sandbox.penMoveTo('PEN-1', 'pausado');       // movimento novo, dentro dos 5s
+    expect(undos.length).toBe(2);
+    undos[0].onUndo(); // clique no toast do primeiro gesto
+    expect(salvos.map((s) => s.status)).toEqual(['em_andamento', 'pausado']);
+    expect(toasts[0]).toContain('nada a desfazer');
+  });
 });
 
 describe('atribuir responsável pelo menu ⋯', () => {
@@ -127,5 +137,14 @@ describe('atribuir responsável pelo menu ⋯', () => {
     sandbox.penQuickAssign('PEN-1', 'Lia');
     expect(undos).toEqual([]);
     expect(toasts).toEqual(['Operador afastado.']);
+  });
+
+  it('desfazer antigo não reverte o responsável que já mudou', () => {
+    sandbox.penQuickAssign('PEN-1', 'Beto'); // toast 1
+    sandbox.penQuickAssign('PEN-1', 'Cris');  // gesto novo, dentro dos 5s
+    expect(undos.length).toBe(2);
+    undos[0].onUndo(); // clique no toast do primeiro gesto
+    expect(salvos.map((s) => s.responsible)).toEqual(['Beto', 'Cris']);
+    expect(toasts[0]).toContain('nada a desfazer');
   });
 });
