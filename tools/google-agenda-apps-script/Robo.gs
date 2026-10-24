@@ -226,16 +226,22 @@ function roboPendenciasEmail() {
       if (t > maisNovo) maisNovo = t;
       // message_id é o cabeçalho RFC 5322, não o id interno do Gmail: a
       // resposta do Intra devolve ele em In-Reply-To e fica na mesma conversa.
+      // thread_id é a CONVERSA: por ele o Intra sabe que esta mensagem pertence
+      // a um chamado que já existe, e posta a resposta do cliente como nota ali
+      // em vez de abrir outro chamado do mesmo assunto.
       mensagens.push({ id: m.getId(), de: m.getFrom(), assunto: m.getSubject() || '', data: m.getDate().toISOString(),
-        message_id: m.getHeader('Message-ID') || '', trecho: (m.getPlainBody() || '').slice(0, 2000) });
+        message_id: m.getHeader('Message-ID') || '', thread_id: th.getId(),
+        trecho: (m.getPlainBody() || '').slice(0, 2000) });
     });
   });
   if (!mensagens.length) return;  // ao contrário dos backups, silêncio aqui não é notícia
   var r = roboChamar_('triagem', { mensagens: mensagens });
   p.setProperty('TRIAGEM_EMAIL_DESDE', String(maisNovo));
   // `internos` são as nossas próprias respostas dentro da conversa: o robô lê
-  // a thread inteira, e elas não são pedido novo.
+  // a thread inteira, e elas não são pedido novo. `notas` são as respostas do
+  // cliente que caíram no chamado que a conversa já tinha aberto.
   Logger.log('Triagem: ' + mensagens.length + ' e-mail(s), ' + r.abertas + ' pendência(s), '
+    + (r.notas ? r.notas + ' nota(s) em chamado aberto, ' : '')
     + r.ignorados + ' ignorado(s)' + (r.internos ? ', ' + r.internos + ' da própria Init' : '')
     + ((r.sem_cliente || []).length ? ', sem cliente: ' + r.sem_cliente.join(' | ') : ''));
 }

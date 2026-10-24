@@ -236,9 +236,40 @@ domínio de casa sai da caixa que o robô já usa. Sem `GMAIL_USER`, ninguém é
 barrado e o comportamento é o de antes. O log do Apps Script passa a contar
 esses e-mails (`N da própria Init`).
 
-**O que isto ainda não resolve:** a resposta do *cliente* numa conversa que já
-tem chamado continua abrindo chamado novo. Casar a thread pede coluna nova e
-migration — ficou de fora.
+A resposta do *cliente* na mesma conversa é tratada logo abaixo.
+
+
+### Resposta do cliente cai no chamado que a conversa já abriu
+
+O robô varre a conversa inteira, então a resposta do cliente chegava como
+mensagem nova e abria **outro** chamado do mesmo assunto — quem atende ficava
+com dois pela metade.
+
+O `Robo.gs` passa a mandar `thread_id` (o `th.getId()`, id da **conversa**, não
+o da mensagem), e a triagem guarda isso em `email_thread_id` (migration 065).
+Toda mensagem seguinte da conversa procura um chamado **aberto** com esse id:
+
+- **achou** → a mensagem vira **nota** nele, e nada de chamado novo. O
+  `email_message_id` do chamado é atualizado para a mensagem mais recente, para
+  a resposta da tela sair em cima dela e a conversa não desgrudar;
+- **não achou, ou o chamado está fechado** → abre chamado novo, como antes.
+  Resposta depois de concluir é pedido novo; ressuscitar o antigo esconderia
+  isso do SLA e da fila.
+
+A nota entra com **`visibility: "solicitante"`**, um valor novo. Só `"resposta"`
+conta como 1ª resposta no SLA (`js/sla.js`, `slaNotaEhResposta`), então a fala
+de quem pediu nunca marca que a gente respondeu — e isso é fail-closed: se
+alguém esquecer deste caminho, o pior que acontece é não contar. No feed do
+chamado ela aparece com o selo **✉ do solicitante**, não como 🔒 interna.
+
+Essas mensagens **não passam pela IA**: a conversa já tem assunto, cliente e
+prioridade, não há o que classificar — e é uma chamada a menos ao Make. O
+preço é que uma resposta automática do cliente ("Obrigado pelo contato") vira
+nota em vez de ser ignorada.
+
+> Sem a migration 065 nada quebra: `email_thread_id` é optionalField, a busca
+> falha em silêncio (fica no log da function) e a triagem volta a abrir um
+> chamado por mensagem.
 
 
 ### A rota `triagem` no Make
