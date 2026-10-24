@@ -162,12 +162,21 @@ function setPenColSort(colId, mode){
   var area=document.getElementById('penViewArea');
   if(area) _penRenderAtual(area);
 }
-/** Nome da ordem em vigor, para o rótulo acessível do botão da coluna. */
+// Nome da ordem da coluna. O substantivo serve ao selo visível do cabeçalho;
+// a frase, ao rótulo acessível do botão.
+const PEN_COL_SORT_NOMES = { prazo: 'prazo', prioridade: 'prioridade', manual: 'manual', criacao: 'criação' };
+function penColSortWord(mode){ return PEN_COL_SORT_NOMES[mode] || PEN_COL_SORT_NOMES.criacao; }
 function penColSortLabel(mode){
-  return mode==='prazo' ? 'por prazo'
-    : mode==='prioridade' ? 'por prioridade'
-    : mode==='manual' ? 'manual, arrastando os cards'
-    : 'por criação';
+  return mode === 'manual' ? 'manual, arrastando os cards' : 'por ' + penColSortWord(mode);
+}
+
+/** Há quantos dias a pendência não é tocada — o texto do selo "Parada". */
+function penParadaLabel(p){
+  var ref = p && (p.updatedAt || p.createdAt);
+  if (!ref) return 'Parada';
+  var dias = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+  if (!(dias > 0)) return 'Parada';
+  return 'Parada há ' + dias + ' dia' + (dias === 1 ? '' : 's');
 }
 function cyclePenColSort(colId){
   var cur=_penColSort[colId]||'criacao';

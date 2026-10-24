@@ -57,6 +57,7 @@ try {
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
     `globalThis.__t = { renderPenKanban, penStatusSummary,
+      setPenColSort,
       setData: function(pens, serverMode){ _filteredPens = pens; _penServerMode = !!serverMode; } };`,
     sandbox
   );
@@ -140,15 +141,58 @@ describe('renderPenKanban (modo local)', () => {
     expect(empty).toContain('<strong>0</strong> vencidas');
   });
 
-  it('SLA restante aparece no card; SLA vencido fica de fora', () => {
+  // A contagem solta ("12h", de slaCountdown com 48h chumbadas) saiu do card:
+  // número sem palavra nenhuma, com o sentido preso no title, e que nem era o
+  // SLA configurado. Quem fala agora são os selos de resposta e resolução.
+  it('o card não traz mais contagem solta de SLA', () => {
     const fresh = render([{
       id: 'PEN-9', status: 'aberto', clientId: 1, clientName: 'Acme', priority: 'alta',
       responsible: 'Ana', deadline: null, assunto: 'Nova pendência',
       createdAt: new Date().toISOString(), timerRunning: false,
     }]);
-    expect(fresh).toMatch(/<span class="kc-sla" title="SLA restante">\d+h<\/span>/);
+    expect(fresh).not.toContain('kc-sla');
+    expect(fresh).not.toMatch(/>[0-9]+h</);
+  });
 
-    const old = render(PENS);
-    expect(old).not.toContain('kc-sla');
+  it('o card usa os mesmos dois selos de SLA que a fila, com todas as letras', () => {
+    // Os selos vivem em sla.js, que este sandbox não carrega: os dublês provam
+    // que o card chama os dois, na ordem resposta → resolução.
+    sandbox.penRespostaBadge = () => '<span class="selo-resp">Responder em 40min</span>';
+    sandbox.penResolucaoBadge = () => '<span class="selo-resol">Vencida · 3h atrasada</span>';
+    try {
+      const html = render(PENS);
+      expect(html).toContain('Responder em 40min');
+      expect(html).toContain('Vencida · 3h atrasada');
+      expect(html.indexOf('selo-resp')).toBeLessThan(html.indexOf('selo-resol'));
+      // PENS[0] está vencida (prazo 01/01/2020): ali o selo de resolução cala,
+      // porque a data vermelha do rodapé já é o dono da violação de prazo.
+      const vencida = html.slice(html.indexOf('data-arg="PEN-1"'));
+      expect(vencida.slice(0, vencida.indexOf('</article>'))).not.toContain('selo-resol');
+    } finally {
+      delete sandbox.penRespostaBadge;
+      delete sandbox.penResolucaoBadge;
+    }
+  });
+});
+
+describe('cabeçalho da coluna: a ordem só ganha nome quando sai do padrão', () => {
+  // Cinco colunas repetindo "criação" seria ruído. O cabeçalho fala quando
+  // AQUELA coluna foge do resto, que é quando a pessoa precisa saber.
+  it('na ordem padrão (criação) o botão continua só o ícone', () => {
+    const html = render(PENS);
+    expect(html).toContain('class="kanban-col-sort"');
+    expect(html).not.toContain('kcs-word');
+    expect(html).not.toContain('is-custom');
+  });
+
+  it('fora do padrão, o botão vira pastilha com o nome da ordem', () => {
+    T.setPenColSort('aberto', 'prazo');
+    try {
+      const html = render(PENS);
+      expect(html).toContain('class="kanban-col-sort is-custom"');
+      expect(html).toContain('<span class="kcs-word">prazo</span>');
+      // Só a coluna mexida fala; as outras seguem caladas.
+      expect((html.match(/kcs-word/g) || []).length).toBe(1);
+    } finally { T.setPenColSort('aberto', 'criacao'); }
   });
 });

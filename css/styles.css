@@ -4482,9 +4482,7 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .kc-pri .tag { padding:1px 6px; font-size:10px; }
 .kc-resp { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--text-secondary); max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .kc-resp--empty { color:var(--text-muted); font-style:italic; }
-.kc-overdue, .kc-stale, .kc-sla { display:inline-flex; align-items:center; gap:2px; font-size:10.5px; font-weight:600; white-space:nowrap; }
-.kc-sla--muted { background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:10px; border:1px solid #fde68a; }
-body.dark-theme .kc-sla--muted { background:rgba(217,119,6,0.15); color:#fbbf24; border-color:rgba(217,119,6,0.3); }
+.kc-overdue, .kc-stale { display:inline-flex; align-items:center; gap:2px; font-size:10.5px; font-weight:600; white-space:nowrap; }
 .kc-deadline { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); }
 .kc-deadline.is-empty { color:var(--text-muted); }
 .kc-deadline.is-overdue { color:#dc2626; font-weight:600; }
@@ -5698,6 +5696,24 @@ body.dark-theme #penSlaSummary {
 .pen-board .kanban-col-sort:hover {
   border-color: var(--kb-line); background: var(--kb-raised); color: var(--kb-text);
 }
+/* A ordem da coluna só ganha nome visível quando sai do padrão (criação):
+   cinco cabeçalhos repetindo "criação" seria ruído, e o que o olho precisa
+   saber é quando AQUELA coluna foge do resto. No padrão o botão continua o
+   quadrado de 22px de sempre; fora dele vira pastilha na cor da coluna, a
+   mesma linguagem do contador ao lado. */
+.pen-board .kanban-col-sort.is-custom {
+  width: auto; gap: 5px; padding: 0 8px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border-color: transparent;
+}
+.pen-board .kanban-col-sort.is-custom:hover {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  border-color: transparent; color: var(--c);
+}
+.pen-board .kcs-word { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+/* O nome cede largura ao selo em vez de empurrar o cabeçalho para fora. */
+.pen-board .kct-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pen-board .kanban-cards { padding: 0; gap: 10px; background: transparent; }
 .pen-board .kanban-cards .empty-state p { color: var(--kb-muted); font-size: 13px; margin-bottom: 8px; }
 
@@ -5784,9 +5800,6 @@ body.dark-theme #penSlaSummary {
 }
 .pen-board .kb-timer-forgot .kb-timer { color: inherit; }
 .pen-board .kb-timer-forgot:hover { background: color-mix(in srgb, var(--kb-amber) 22%, transparent); }
-.pen-board .kc-sla {
-  font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
-}
 .pen-board .kc-overdue {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; font-weight: 700; color: var(--kb-red); white-space: nowrap;
