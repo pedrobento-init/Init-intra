@@ -75,10 +75,15 @@ function openPendenciaDetail(id) {
               var _isMe = _me && n.author === _me;
               var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
               // Sem o campo = nota anterior à separação: lida como interna.
-              var _interna = n.visibility !== 'resposta';
-              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+'">'
+              // 'solicitante' (065) é a fala de quem PEDIU, que chegou por e-mail
+              // na conversa do chamado: não é nossa nem é segredo da equipe, então
+              // não pode ler como 🔒 interna.
+              var _doSolic = n.visibility === 'solicitante';
+              var _interna = !_doSolic && n.visibility !== 'resposta';
+              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+(_doSolic?' is-solicitante':'')+'">'
                 + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
                 + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
+                + (_doSolic ? '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>' : '')
                 + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
                 + '</div>'
                 + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';

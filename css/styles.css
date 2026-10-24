@@ -1773,6 +1773,21 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
   text-transform: uppercase;
   letter-spacing: .3px;
 }
+/* Fala de quem pediu, chegada por e-mail (065). Lê como mensagem recebida,
+   não como anotação da equipe: a faixa é a do cliente, não o amarelo de
+   "só a equipe vê". */
+.feed-tag-solicitante {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.feed-msg.is-solicitante .feed-bubble {
+  background: var(--accent-dim2);
+  border-left: 3px solid var(--accent);
+}
 
 /* Linha do tempo (063): evento é marcador no fio, não balão de mensagem —
    precisa ler como "aconteceu isto" e não competir com as falas. */

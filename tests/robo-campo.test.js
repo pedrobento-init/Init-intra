@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
-  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos,
+  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -353,5 +353,60 @@ describe('a descrição do chamado já nasce limpa', () => {
   it('com IA, quem manda segue sendo a descrição da IA', () => {
     const t = triagemDaIa(JSON.stringify({ descricao: 'Notebook não liga.' }), email);
     expect(t.descricao).toBe('Notebook não liga.');
+  });
+});
+
+describe('resposta na conversa vira nota no chamado aberto', () => {
+  const email = { id: 'M20', de: 'Beatriz Rangel <beatriz@diasrizzo.com.br>', assunto: 'Re: Notebook',
+    data: '2026-10-24T13:05:36.000Z', message_id: '<abc@mail>', thread_id: 'THREAD-7',
+    trecho: 'Consigo na segunda de manhã sim, obrigada!\n\nEm qua., 23 de out., Suporte escreveu:\n> Podemos agendar?' };
+
+  it('a nota traz só o que a pessoa escreveu agora', () => {
+    const n = notaDoSolicitante(email);
+    expect(n.text).toBe('Consigo na segunda de manhã sim, obrigada!');
+    expect(n.author).toBe('Beatriz Rangel');
+  });
+
+  // Fail-closed: só "resposta" conta como 1ª resposta (js/sla.js,
+  // slaNotaEhResposta). A fala de quem PEDIU não pode marcar que respondemos.
+  it('visibility é "solicitante", que o SLA não conta como nossa resposta', () => {
+    expect(notaDoSolicitante(email).visibility).toBe('solicitante');
+    expect(notaDoSolicitante(email).visibility).not.toBe('resposta');
+  });
+
+  it('a data da nota é a do e-mail, não a de quando o robô rodou', () => {
+    expect(notaDoSolicitante(email).createdAt).toBe('2026-10-24T13:05:36.000Z');
+  });
+
+  it('data inválida cai no relógio, sem gravar Invalid Date', () => {
+    const n = notaDoSolicitante({ ...email, data: 'nada disso' }, new Date('2026-10-24T18:00:00Z'));
+    expect(n.createdAt).toBe('2026-10-24T18:00:00.000Z');
+  });
+
+  it('e-mail só com citação não vira nota vazia', () => {
+    const n = notaDoSolicitante({ ...email, trecho: '' });
+    expect(n.text).toBe('(mensagem sem texto)');
+  });
+
+  it('a nota tem o mesmo formato das que o app grava', () => {
+    expect(Object.keys(notaDoSolicitante(email)).sort())
+      .toEqual(['author', 'createdAt', 'mentionedOperators', 'text', 'visibility']);
+  });
+});
+
+describe('o chamado guarda a conversa que o abriu', () => {
+  const clientes = [{ id: 'C1', name: 'Dias Rizzo', team: 'init', technician: 'Ana',
+    emails: { domain: 'diasrizzo.com.br' } }];
+  const email = { id: 'M21', de: 'Beatriz <beatriz@diasrizzo.com.br>', assunto: 'Notebook',
+    data: '2026-10-24T13:05:00Z', message_id: '<abc@mail>', thread_id: 'THREAD-7', trecho: 'O notebook não liga.' };
+
+  it('email_thread_id vai junto, para a próxima mensagem achar o chamado', () => {
+    const p = pendenciaDaTriagem(triagemDaIa('Accepted', email), email, clientes[0], 'PEN-20');
+    expect(p.email_thread_id).toBe('THREAD-7');
+  });
+
+  it('e-mail sem thread_id (Robo.gs antigo) grava null, não string vazia', () => {
+    const p = pendenciaDaTriagem(triagemDaIa('Accepted', { ...email, thread_id: '' }), { ...email, thread_id: '' }, clientes[0], 'PEN-21');
+    expect(p.email_thread_id).toBe(null);
   });
 });

@@ -84,6 +84,16 @@ describe('1ª resposta ao gravar', () => {
     expect(velha.firstResponseAt).toBeUndefined();
   });
 
+  it('resposta do SOLICITANTE não é a nossa 1ª resposta (065)', () => {
+    // A triagem posta a fala de quem pediu como visibility "solicitante".
+    // Se ela contasse, o chamado apareceria respondido sem ninguém ter
+    // respondido — e o SLA ficaria verde por engano.
+    const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
+    const doCliente = sla.slaOnSave(base, { ...base, notes: [{ text: 'e aí?', visibility: 'solicitante' }] },
+      iso(2026, 10, 21, 10, 0), 'Beatriz');
+    expect(doCliente.firstResponseAt).toBeUndefined();
+  });
+
   it('editar o texto ou o prazo não conta como resposta', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
     const ed = sla.slaOnSave(base, { ...base, assunto: 'novo', deadline: '2026-10-30' }, iso(2026, 10, 21, 10, 0), 'Ana');

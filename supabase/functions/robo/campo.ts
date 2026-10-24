@@ -199,7 +199,11 @@ export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; h
  * Opcional: e-mail antigo (antes do Robo.gs mandar o cabeçalho) abre
  * pendência igual, só não dá para responder pela tela.
  */
-export type EmailEntrada = EmailBackup & { message_id?: string | null };
+// `thread_id` é o id da CONVERSA no Gmail (th.getId()), não o da mensagem:
+// é por ele que a triagem sabe que esta mensagem pertence a um chamado que
+// já existe. Opcional: e-mail de antes do Robo.gs mandar o campo abre
+// chamado novo, como antes.
+export type EmailEntrada = EmailBackup & { message_id?: string | null; thread_id?: string | null };
 export type Cliente = {
   id: string; name: string; team?: string | null; technician?: string | null;
   emails?: Record<string, unknown> | null;
@@ -430,9 +434,30 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     responsible: c.technician || "", solicitante: t.solicitante,
     solicitante_email: enderecoDoRemetente(e.de) || null,
     email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
+    email_thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
     status: "aberto", priority: t.prioridade, canal: "email", categoria: t.categoria,
     first_response_due: primeiraRespostaDue(t.prioridade, agora),
     attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,
+  };
+}
+
+
+/**
+ * Nota de uma mensagem que chegou na conversa de um chamado que já existe.
+ *
+ * `visibility: "solicitante"` é um valor novo, de propósito: só "resposta"
+ * conta como 1ª resposta no SLA (js/sla.js, slaNotaEhResposta), então a fala
+ * de quem PEDIU nunca pode marcar que a gente respondeu. Fail-closed — se um
+ * dia alguém esquecer deste caminho, o pior que acontece é não contar.
+ */
+export function notaDoSolicitante(e: EmailEntrada, agora: Date = new Date()) {
+  const texto = corpoLimpo(e.trecho || "").slice(0, 4000);
+  return {
+    text: texto || "(mensagem sem texto)",
+    author: nomeDoRemetente(e.de),
+    createdAt: (Date.parse(e.data) ? new Date(e.data) : agora).toISOString(),
+    mentionedOperators: [],
+    visibility: "solicitante",
   };
 }
 
