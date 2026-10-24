@@ -379,10 +379,14 @@ function penTimerCell(p) {
     if (forgotten) {
       var ago = (typeof formatDurationWords === 'function' && typeof getSessionSeconds === 'function')
         ? formatDurationWords(getSessionSeconds(p)) : '';
+      // "ligado há X" fica no texto do botão, não só no title: o sinal de
+      // esquecimento é o que importa e não pode depender do mouse (audit. #8).
+      var agoHtml = ago
+        ? '<span class="kb-timer-ago">ligado há ' + escapeHtml(ago) + '</span>' : '';
       return '<button type="button" class="kb-timer-forgot" onclick="event.stopPropagation();openTimerAdjust(\'' + escapeHtml(p.id) + '\')"' +
         ' title="Cronômetro ligado há ' + escapeHtml(ago) + ' — esqueceu ligado? Clique para parar e ajustar o tempo."' +
         ' aria-label="Cronômetro ligado há ' + escapeHtml(ago) + '. Parar e ajustar tempo">' +
-        PEN_ICO_WARN + display + '</button>';
+        PEN_ICO_WARN + display + agoHtml + '</button>';
     }
     return display;
   }

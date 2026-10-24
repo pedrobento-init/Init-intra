@@ -5802,6 +5802,8 @@ body.dark-theme #penSlaSummary {
   font: inherit;
 }
 .pen-board .kb-timer-forgot .kb-timer { color: inherit; }
+/* Idade da sessão no texto do botão âmbar: menor que o total, mas visível. */
+.pen-board .kb-timer-forgot .kb-timer-ago { font-size: 10.5px; font-weight: 600; opacity: .9; }
 .pen-board .kb-timer-forgot:hover { background: color-mix(in srgb, var(--kb-amber) 22%, transparent); }
 .pen-board .kc-overdue {
   display: inline-flex; align-items: center; gap: 4px;
