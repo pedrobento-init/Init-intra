@@ -410,12 +410,16 @@ function penKanbanCard(p) {
     // (tests/no-inline-handlers.test.js) não pode crescer.
     ' data-pen-id="' + escapeHtml(p.id) + '"' +
     ' data-pen-col="' + escapeHtml(p.status) + '"' +
-    ' onclick="openPendenciaDetail(\'' + escapeHtml(p.id) + '\')"' +
+    ' data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '"' +
     ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
-    '<div class="kanban-card-title" title="' + escapeHtml(title) + '">' +
+    // O título é um <button> de verdade porque é ele que recebe o foco do
+    // teclado — antes o card era uma <article> com onclick e quem navega por
+    // Tab não abria chamado nenhum pelo quadro. A <article> não pode virar
+    // role="button": ela tem outros botões dentro (⋯, cronômetro).
+    '<button type="button" class="kanban-card-title kc-open" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '" title="' + escapeHtml(title) + '">' +
       '<span class="pen-display-num">' + num + '</span>' + escapeHtml(title) +
       (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
-    '</div>' +
+    '</button>' +
     '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +
       ' onclick="openPenQuickMenu(event,\'' + escapeHtml(p.id) + '\')" ondragstart="event.preventDefault()">' + PEN_ICO_DOTS + '</button>' +
     '<div class="kanban-card-meta">' +

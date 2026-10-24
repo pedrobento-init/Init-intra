@@ -139,6 +139,28 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
   });
 });
 
+describe('card do quadro: abrir pelo teclado', () => {
+  // O card era uma <article> com onclick: clique funcionava, Tab não
+  // chegava nele e quem navega por teclado não abria chamado nenhum.
+  it('o título é um <button>, que é o que recebe o foco', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).toMatch(/<button type="button" class="kanban-card-title kc-open"/);
+    expect(html).not.toContain('onclick="openPendenciaDetail');
+  });
+
+  it('card e título abrem o detalhe por delegação, não por handler inline', () => {
+    const html = T.penKanbanCard(basePen({ id: 'PEN-9' }));
+    const abre = html.match(/data-action="openPendencia" data-arg="PEN-9"/g) || [];
+    expect(abre.length).toBe(2); // a <article> inteira e o título
+  });
+
+  it('a <article> não vira role="button": ela tem botões dentro', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).not.toMatch(/<article[^>]*role="button"/);
+    expect(html).toContain('class="kc-menu"');
+  });
+});
+
 describe('linha-resumo do quadro', () => {
   it('total + colunas + vencidas', () => {
     const html = T.penStatusSummary([

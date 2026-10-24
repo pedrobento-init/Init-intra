@@ -6227,6 +6227,18 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 @media (hover: none) { .kc-menu { opacity: 1; } }
 .kc-recur { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--kb-muted); }
 .kc-recur .kb-ico { width: 13px; height: 13px; }
+/* Título do card é um <button>: precisa perder a cara de botão e manter o
+   recorte de 3 linhas que .kanban-card-title já define. Só a família da
+   fonte é reposta — tamanho, peso e cor vêm daquelas regras. */
+.kc-open {
+  appearance: none; -webkit-appearance: none; background: none; border: 0;
+  padding: 0; margin: 0; width: 100%; text-align: left;
+  font-family: inherit; cursor: pointer;
+}
+.pen-board .kanban-card-title.kc-open { padding-right: 24px; }
+.kc-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+/* O anel fica no título, mas quem está em foco é o card inteiro. */
+.kanban-card:has(.kc-open:focus-visible) { border-color: var(--accent); }
 .pen-quick-menu {
   position: fixed; z-index: 400; min-width: 220px; max-width: 280px; padding: 6px;
   background: var(--ds-panel); color: var(--ds-text); border: 1px solid var(--ds-line); border-radius: 10px;
