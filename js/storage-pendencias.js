@@ -239,6 +239,33 @@ function _penFields() {
   return null;
 }
 
+// ── Ordenação da fila no servidor ─────────────────────────────────────────
+// A fila ordenava só as linhas já carregadas enquanto o cabeçalho prometia a
+// tabela inteira. Agora a coluna viaja para o ORDER BY — mas só as que o
+// banco ordena IGUAL ao comparador local. Ficam de fora, de propósito:
+//   · título, que é derivado (assunto, com a descrição como reserva);
+//   · status e prioridade, que pedem a ordem de negócio e não a alfabética
+//     ("alta" < "baixa" < "crítica" < "média" seria mentira).
+// Para essas três a ordem segue local, e a fila passa a dizer isso na tela.
+// Protocolo não é coluna nenhuma: o número de exibição é a posição na ordem
+// de criação, então ordenar por ele É ordenar por created_at.
+// Atenção: `solicitante` é optionalField — num banco sem a migration 056 o
+// ORDER BY falha e renderPenView cai no caminho local inteiro. Degrada para
+// a tela de antes, que é o mesmo destino de qualquer falha de consulta.
+const PEN_SORT_REMOTE = {
+  numero: 'created_at',
+  data: 'created_at',
+  cliente: 'client_name',
+  solicitante: 'solicitante',
+  responsavel: 'responsible',
+  prazo: 'deadline',
+};
+/** Coluna do banco para a coluna da fila, ou null se a ordem fica local. */
+function penSortRemoteCol(colId) {
+  if (!colId) return null;
+  return Object.prototype.hasOwnProperty.call(PEN_SORT_REMOTE, colId) ? PEN_SORT_REMOTE[colId] : null;
+}
+
 async function fetchPendenciasPage(opts) {
 
   const o = Object.assign({ scope: 'active', page: 0, pageSize: PEN_PAGE_DEFAULT_SIZE }, opts || {});
@@ -254,7 +281,15 @@ async function fetchPendenciasPage(opts) {
     clientId: o.clientId || '', responsible: o.responsible || '',
     status: o.status || '', priority: o.priority || '', search: o.search || ''
   });
-  q = q.order('created_at', { ascending: false }).order('id', { ascending: true });
+  const sortCol = penSortRemoteCol(o.sort && o.sort.col);
+  if (sortCol) {
+    // nullsFirst:false mantém o "vazio por último" que a fila faz local, nos
+    // dois sentidos; o id desempata para a página não variar entre consultas.
+    const asc = !(o.sort && o.sort.dir === 'desc');
+    q = q.order(sortCol, { ascending: asc, nullsFirst: false }).order('id', { ascending: true });
+  } else {
+    q = q.order('created_at', { ascending: false }).order('id', { ascending: true });
+  }
   const from = page * pageSize;
   const res = await q.range(from, from + pageSize - 1);
   if (res.error) throw new Error(res.error.message || 'Falha na consulta paginada');

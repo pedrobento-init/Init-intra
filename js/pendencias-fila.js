@@ -24,7 +24,10 @@ let _penFilaSort = (function () {
 // coluna → { label, classe, valor(p) para ordenar }.
 // `valor` devolve string ou número; null/'' vão para o fim em ordem crescente.
 const PEN_FILA_COLS = [
-  { id: 'numero', label: 'Protocolo', cls: 'pf-num', valor: (p) => Number(p.numero) || 0 },
+  // `numero` é campo de VISITA: em pendência vinha sempre undefined e a coluna
+  // Protocolo não ordenava nada. O número de exibição é a posição na ordem de
+  // criação (desempate por id) — ordenar por ele é ordenar por isso.
+  { id: 'numero', label: 'Protocolo', cls: 'pf-num', valor: (p) => String(p.createdAt || '') + '|' + String(p.id || '') },
   { id: 'data', label: 'Aberta', cls: 'pf-data', valor: (p) => String(p.createdAt || '') },
   { id: 'titulo', label: 'Título', cls: 'pf-titulo', valor: (p) => String(getPendenciaTitulo(p) || '').toLowerCase() },
   { id: 'cliente', label: 'Cliente', cls: 'pf-cliente', valor: (p) => String(p.clientName || '').toLowerCase() },
@@ -60,6 +63,13 @@ function penFilaSort(colId) {
     ? { col: colId, dir: atual.dir === 'asc' ? 'desc' : 'asc' }
     : { col: colId, dir: 'asc' };
   try { localStorage.setItem(PEN_FILA_SORT_KEY, JSON.stringify(_penFilaSort)); } catch (_) {}
+  // No servidor a ordem faz parte da consulta: trocar de coluna é refazer a
+  // busca pela primeira página, não reordenar as 50 linhas que estão na tela.
+  if (_penServerMode && typeof penSortRemoteCol === 'function' && penSortRemoteCol(colId)
+      && typeof renderPenView === 'function') {
+    renderPenView(true);
+    return;
+  }
   const area = document.getElementById('penViewArea');
   if (area) renderPenFila(area);
 }
@@ -100,11 +110,30 @@ function _penFilaLinha(p) {
     + '</tr>';
 }
 
+/**
+ * Aviso de alcance da ordenação. Só aparece quando a ordem REALMENTE não
+ * alcança a tabela: no servidor, com mais de uma página, numa coluna que o
+ * banco não ordena. Calado nos outros casos, porque aí a ordem é da tabela
+ * inteira e um aviso permanente viraria ruído.
+ */
+function _penFilaAvisoOrdem(nLinhas) {
+  if (!_penServerMode) return '';
+  if (_penTotal == null || _penTotal <= nLinhas) return '';
+  if (typeof penSortRemoteCol === 'function' && penSortRemoteCol(_penFilaSort.col)) return '';
+  const col = _penFilaCol(_penFilaSort.col);
+  return '<p class="pf-aviso" role="status">' + escapeHtml(col.label)
+    + ' ordena só as ' + nLinhas + ' linhas desta página, de ' + _penTotal + '.</p>';
+}
+
 function renderPenFila(area) {
   const pens = Array.isArray(_filteredPens) ? _filteredPens : [];
   // Concluído/Fechado continuam fora da VISUALIZAÇÃO, igual ao quadro.
   const visiveis = pens.filter(function (p) { return penColVisible(p.status); });
-  const linhas = _penFilaOrdena(visiveis);
+  // Quando a coluna viajou para o ORDER BY, as linhas já chegam na ordem:
+  // reordenar aqui embaralharia a página que o servidor escolheu.
+  const ordemNoBanco = _penServerMode && typeof penSortRemoteCol === 'function'
+    && !!penSortRemoteCol(_penFilaSort.col);
+  const linhas = ordemNoBanco ? visiveis : _penFilaOrdena(visiveis);
 
   const cabecalho = PEN_FILA_COLS.map(function (c) {
     const on = _penFilaSort.col === c.id;
@@ -128,6 +157,7 @@ function renderPenFila(area) {
   const resumo = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
 
   area.innerHTML = resumo
+    + _penFilaAvisoOrdem(linhas.length)
     + '<div class="pf-wrap">'
     + '<table class="pf-table"><caption class="sr-only">Fila de atendimento: '
     + linhas.length + ' pendência' + (linhas.length === 1 ? '' : 's') + '</caption>'

@@ -1,5 +1,5 @@
 import { createRequire as __partsReq } from 'node:module';
-const { partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
+const { partsSource, requireParts } = __partsReq(import.meta.url)('./_parts.cjs');
 // ── Smoke test do render da Fila de atendimento (tabela): colunas, uma linha
 // por pendência, ordenação clicável e os status ocultos fora da visão ───────
 import { describe, it, expect } from 'vitest';
@@ -75,12 +75,20 @@ try {
   vm.runInContext(
     `globalThis.__t = { renderPenFila, penFilaSort, _penFilaOrdena, _penRenderAtual, penSetView,
       PEN_FILA_COLS, getView: () => penView, getSort: () => _penFilaSort,
+      setTotal: function(n){ _penTotal = n; },
       setData: function(pens, serverMode){ _filteredPens = pens; _penServerMode = !!serverMode; } };`,
     sandbox
   );
 } finally {
   console.error = quiet;
 }
+
+// penSortRemoteCol mora em js/storage-pendencias.js, fora deste grupo. A fila
+// consulta o de VERDADE em vez de o teste repetir o mapa — dois mapas
+// discordariam em silêncio, que é justamente o bug que este teste cobre.
+globalThis.getOperatorNames = () => [];
+globalThis.escapeHtml = (s) => String(s ?? '');
+sandbox.penSortRemoteCol = requireParts('storage').penSortRemoteCol;
 
 const T = sandbox.__t;
 const area = _el();
@@ -206,5 +214,92 @@ describe('alternador de visualização', () => {
     area.innerHTML = '';
     T._penRenderAtual(area);
     expect(area.innerHTML).toContain('kanban-board');
+  });
+});
+
+describe('ordem que vem do banco', () => {
+  // Em modo servidor a coluna vira ORDER BY: reordenar de novo aqui
+  // embaralharia justamente a página que o servidor escolheu.
+  it('coluna do banco: a fila respeita a ordem recebida, sem reordenar', () => {
+    T.penFilaSort('prazo');
+    if (T.getSort().dir !== 'asc') T.penFilaSort('prazo');
+    // Chegam fora da ordem de prazo de propósito: é a ordem do servidor.
+    const doServidor = [PENS[2], PENS[0], PENS[1]];
+    T.setData(doServidor, true);
+    T.setTotal(3);
+    area.innerHTML = '';
+    T.renderPenFila(area);
+    const ordem = (area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || []);
+    expect(ordem).toEqual(['data-arg="PEN-3"', 'data-arg="PEN-1"', 'data-arg="PEN-2"']);
+  });
+
+  it('coluna que o banco não ordena: a fila ainda ordena a página', () => {
+    T.penFilaSort('prioridade');
+    T.setData([PENS[0], PENS[1], PENS[2]], true);
+    T.setTotal(3);
+    area.innerHTML = '';
+    T.renderPenFila(area);
+    const ordem = (area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || []);
+    expect(ordem).toEqual(['data-arg="PEN-3"', 'data-arg="PEN-1"', 'data-arg="PEN-2"']);
+    T.penFilaSort('prazo');
+  });
+});
+
+describe('aviso de alcance da ordenação', () => {
+  // O aviso só vale quando a ordem REALMENTE não alcança a tabela: no
+  // servidor, com mais de uma página, numa coluna que o banco não ordena.
+  const comAviso = (col, serverMode, total) => {
+    T.setData(PENS, serverMode);
+    T.setTotal(total);
+    if (T.getSort().col !== col) T.penFilaSort(col);
+    area.innerHTML = '';
+    T.renderPenFila(area);
+    return area.innerHTML;
+  };
+
+  it('prioridade em várias páginas: diz quantas linhas a ordem alcança', () => {
+    const html = comAviso('prioridade', true, 320);
+    expect(html).toContain('pf-aviso');
+    expect(html).toContain('ordena só as 3 linhas desta página, de 320.');
+    T.penFilaSort('prazo');
+  });
+
+  it('página única: a ordem alcança tudo, então nada a avisar', () => {
+    expect(comAviso('prioridade', true, 3)).not.toContain('pf-aviso');
+    T.penFilaSort('prazo');
+  });
+
+  it('coluna que o banco ordena: calado, porque a ordem é da tabela inteira', () => {
+    expect(comAviso('prazo', true, 320)).not.toContain('pf-aviso');
+  });
+
+  it('fora do modo servidor tudo está em mãos: nada a avisar', () => {
+    expect(comAviso('prioridade', false, null)).not.toContain('pf-aviso');
+    T.penFilaSort('prazo');
+  });
+});
+
+describe('coluna Protocolo', () => {
+  // `numero` é campo de VISITA: em pendência vinha sempre undefined e a
+  // coluna não ordenava nada. O protocolo é a posição na ordem de criação.
+  it('ordena pela ordem de criação, que é o que o número mostra', () => {
+    const fora = [
+      { id: 'PEN-B', status: 'aberto', assunto: 'B', createdAt: '2026-02-01T10:00:00Z' },
+      { id: 'PEN-A', status: 'aberto', assunto: 'A', createdAt: '2026-01-01T10:00:00Z' },
+      { id: 'PEN-C', status: 'aberto', assunto: 'C', createdAt: '2026-03-01T10:00:00Z' },
+    ];
+    if (T.getSort().col !== 'numero') T.penFilaSort('numero');
+    expect(T._penFilaOrdena(fora).map((p) => p.id)).toEqual(['PEN-A', 'PEN-B', 'PEN-C']);
+    T.penFilaSort('prazo');
+  });
+
+  it('mesma data desempata por id, como o número de exibição faz', () => {
+    const empate = [
+      { id: 'PEN-Z', status: 'aberto', assunto: 'Z', createdAt: '2026-01-01T10:00:00Z' },
+      { id: 'PEN-A', status: 'aberto', assunto: 'A', createdAt: '2026-01-01T10:00:00Z' },
+    ];
+    if (T.getSort().col !== 'numero') T.penFilaSort('numero');
+    expect(T._penFilaOrdena(empate).map((p) => p.id)).toEqual(['PEN-A', 'PEN-Z']);
+    T.penFilaSort('prazo');
   });
 });
