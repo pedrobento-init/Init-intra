@@ -177,6 +177,10 @@ function renderPenKanban(area) {
       // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
       // decorativo fixo ao lado do botão, que também mostrava um relógio).
       var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : sortMode==='manual' ? PEN_ICO_DRAG : PEN_ICO_CLK;
+      // O ícone muda, o rótulo acessível não mudava: o leitor de tela só
+      // ouvia "Ordenar Aberto" e nunca a ordem em vigor. O aria-label
+      // sobrepõe o title, então a ordem atual precisa estar nele.
+      var sortAria = 'Ordem de ' + col.label + ': ' + penColSortLabel(sortMode) + '. Clique para mudar.';
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
       // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
       // as colunas com cards caberem na tela sem rolagem lateral.
@@ -192,7 +196,7 @@ function renderPenKanban(area) {
           '</h2>' +
           '<span class="kanban-col-aside">' +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            (cards.length ? '<button class="kanban-col-sort" onclick="cyclePenColSort(\''+col.id+'\')" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="Ordenar '+escapeHtml(col.label)+'">'+sortIcon+'</button>' : '') +
+            (cards.length ? '<button class="kanban-col-sort" data-action="penColSort" data-arg="'+escapeHtml(col.id)+'" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="'+escapeHtml(sortAria)+'">'+sortIcon+'</button>' : '') +
           '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
@@ -544,6 +548,13 @@ function _bindPenBoardDrag() {
     if (!p) return;
     if (p.status !== colId) { penMoveTo(id, colId); return; } // veio de outra coluna
     penReorder(id, alvo, colId);
+  });
+}
+
+// Ordenação da coluna por delegação (a catraca de CSP só pode diminuir).
+if (typeof registerActions === 'function') {
+  registerActions({
+    penColSort: (_el, colId) => cyclePenColSort(colId),
   });
 }
 

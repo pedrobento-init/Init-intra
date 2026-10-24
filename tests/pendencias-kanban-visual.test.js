@@ -41,7 +41,7 @@ try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
-    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
+    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip, penColSortLabel };',
     sandbox
   );
 } finally {
@@ -158,6 +158,21 @@ describe('card do quadro: abrir pelo teclado', () => {
     const html = T.penKanbanCard(basePen());
     expect(html).not.toMatch(/<article[^>]*role="button"/);
     expect(html).toContain('class="kc-menu"');
+  });
+});
+
+describe('botão de ordenar a coluna', () => {
+  // O ícone trocava a cada clique, mas o rótulo acessível era sempre
+  // "Ordenar <coluna>": quem usa leitor de tela nunca sabia a ordem atual.
+  it('o rótulo acessível diz a ordem em vigor, não só o nome da coluna', () => {
+    expect(T.penColSortLabel('prazo')).toBe('por prazo');
+    expect(T.penColSortLabel('prioridade')).toBe('por prioridade');
+    expect(T.penColSortLabel('manual')).toContain('arrastando');
+    expect(T.penColSortLabel('criacao')).toBe('por criação');
+  });
+
+  it('modo desconhecido cai em criação, a ordem padrão da coluna', () => {
+    expect(T.penColSortLabel('')).toBe('por criação');
   });
 });
 

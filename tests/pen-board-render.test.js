@@ -115,7 +115,9 @@ describe('renderPenKanban (modo local)', () => {
     const aside = html.indexOf('class="kanban-col-aside"');
     expect(aside).toBeGreaterThan(-1);
     expect(html.indexOf('class="kanban-col-count"')).toBeGreaterThan(aside);
-    expect(html).toContain('cyclePenColSort');
+    expect(html).toContain('data-action="penColSort" data-arg="aberto"');
+    // O rótulo acessível carrega a ordem em vigor, não só o nome da coluna.
+    expect(html).toContain('aria-label="Ordem de Aberto: por criação. Clique para mudar."');
     // Ordenação padrão (criação) = relógio, só dentro do botão (sem relógio solto)
     const firstHeader = html.slice(aside, html.indexOf('</div>', aside));
     expect((firstHeader.match(/<circle cx="12" cy="12" r="9"\/>/g) || []).length).toBe(1);

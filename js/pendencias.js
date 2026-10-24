@@ -162,6 +162,13 @@ function setPenColSort(colId, mode){
   var area=document.getElementById('penViewArea');
   if(area) _penRenderAtual(area);
 }
+/** Nome da ordem em vigor, para o rótulo acessível do botão da coluna. */
+function penColSortLabel(mode){
+  return mode==='prazo' ? 'por prazo'
+    : mode==='prioridade' ? 'por prioridade'
+    : mode==='manual' ? 'manual, arrastando os cards'
+    : 'por criação';
+}
 function cyclePenColSort(colId){
   var cur=_penColSort[colId]||'criacao';
   var next= cur==='criacao' ? 'prazo' : cur==='prazo' ? 'prioridade' : cur==='prioridade' ? 'manual' : 'criacao';
