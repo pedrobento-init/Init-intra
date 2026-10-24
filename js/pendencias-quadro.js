@@ -181,6 +181,11 @@ function renderPenKanban(area) {
       // ouvia "Ordenar Aberto" e nunca a ordem em vigor. O aria-label
       // sobrepõe o title, então a ordem atual precisa estar nele.
       var sortAria = 'Ordem de ' + col.label + ': ' + penColSortLabel(sortMode) + '. Clique para mudar.';
+      // A ordem só ganha nome visível quando sai do padrão: cinco colunas
+      // repetindo "criação" seria ruído, e o que o olho precisa saber é quando
+      // AQUELA coluna foge do resto. O ícone sozinho era adivinhação.
+      var sortCustom = sortMode !== 'criacao';
+      var sortWord = sortCustom ? '<span class="kcs-word">' + escapeHtml(penColSortWord(sortMode)) + '</span>' : '';
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
       // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
       // as colunas com cards caberem na tela sem rolagem lateral.
@@ -192,11 +197,13 @@ function renderPenKanban(area) {
         '<div class="kanban-col-header">' +
           '<h2 class="kanban-col-title">' +
             '<span class="kb-dot" aria-hidden="true"></span>' +
-            escapeHtml(col.label) +
+            // Nome em span próprio para truncar com … e ceder largura ao selo
+            // da ordem, em vez de empurrar o cabeçalho para fora da coluna.
+            '<span class="kct-nome">' + escapeHtml(col.label) + '</span>' +
           '</h2>' +
           '<span class="kanban-col-aside">' +
             '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            (cards.length ? '<button class="kanban-col-sort" data-action="penColSort" data-arg="'+escapeHtml(col.id)+'" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="'+escapeHtml(sortAria)+'">'+sortIcon+'</button>' : '') +
+            (cards.length ? '<button class="kanban-col-sort'+(sortCustom ? ' is-custom' : '')+'" data-action="penColSort" data-arg="'+escapeHtml(col.id)+'" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="'+escapeHtml(sortAria)+'">'+sortIcon+sortWord+'</button>' : '') +
           '</span>' +
         '</div>' +
         '<div class="kanban-cards">' +
@@ -391,11 +398,18 @@ function penKanbanCard(p) {
   var isStale = isStalePendencia(p) && !p.timerRunning;
   var title = getPendenciaTitulo(p);
   var num = penDisplayNumber(p);
-  var sla = (typeof slaCountdown === 'function') ? slaCountdown(p, 48) : null;
-  var slaHtml = (sla && !sla.expired && sla.label)
-    ? '<span class="kc-sla" title="SLA restante">' + sla.label + '</span>' : '';
-  // 1ª resposta (056): só aparece quando está atrasada ou vence em até 1h.
+  // Aqui havia uma contagem solta ("12h") de slaCountdown com 48h chumbadas:
+  // um número sem palavra nenhuma, cujo sentido vivia só no title, e que nem
+  // era o SLA configurado. Os selos de resposta e resolução dizem a mesma
+  // coisa com todas as letras e, sem `full`, só falam quando exigem ação —
+  // no quadro o silêncio é informação. É o mesmo par que a fila já mostra.
+  var slaHtml = '';
   if (typeof penRespostaBadge === 'function') slaHtml += penRespostaBadge(p);
+  // A violação de prazo já tem dono no card: a data vermelha com ⚠ no rodapé
+  // (é o que o comentário do deadline abaixo combina). Por isso o selo de
+  // resolução só entra enquanto AINDA dá tempo — "Resolver em 2h" é o aviso
+  // que faltava; repetir "Vencida" no meio do card seria dizer duas vezes.
+  if (!isOverdue && typeof penResolucaoBadge === 'function') slaHtml += penResolucaoBadge(p);
 
   // Vencida aparece só aqui (data vermelha + ⚠), não repetida no meio do card.
   var deadlineHtml = p.deadline
@@ -435,7 +449,10 @@ function penKanbanCard(p) {
       (p.responsible
         ? '<span class="kc-resp" title="Responsável">' + PEN_ICO_USER + escapeHtml(p.responsible) + '</span>'
         : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
-      (isStale ? '<span class="kc-stale" title="Sem atualização há 7+ dias">Parada</span>' : '') +
+      // "Parada" sozinha dizia que algo estava errado sem dizer o tamanho do
+      // problema — 8 dias e 3 meses pediam a mesma atenção. O prazo agora está
+      // no texto, e o title some junto com a necessidade de passar o mouse.
+      (isStale ? '<span class="kc-stale">' + escapeHtml(penParadaLabel(p)) + '</span>' : '') +
       slaHtml +
     '</div>' +
     '<div class="kanban-card-foot">' +

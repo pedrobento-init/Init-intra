@@ -41,7 +41,7 @@ try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
-    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip, penColSortLabel };',
+    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip, penColSortLabel, penColSortWord, penParadaLabel };',
     sandbox
   );
 } finally {
@@ -240,5 +240,40 @@ describe('cards de cliente: toggle com estado pressionado', () => {
     expect(src).toContain('aria-pressed');
     const css = fs.readFileSync('css/styles.css', 'utf8').replace(/\s+/g, ' ');
     expect(css).toContain('.pen-cv-card.is-active');
+  });
+});
+
+describe('selo "Parada": o tamanho do problema no texto', () => {
+  // Antes era só "Parada", com o "há quanto tempo" preso no title: 8 dias e 3
+  // meses pediam a mesma atenção e o celular não alcançava nenhum dos dois.
+  it('diz há quantos dias a pendência não é tocada', () => {
+    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 12 * 86400000).toISOString() }))
+      .toBe('Parada há 12 dias');
+  });
+
+  it('um dia só não vira "1 dias"', () => {
+    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 1 * 86400000 - 1000).toISOString() }))
+      .toBe('Parada há 1 dia');
+  });
+
+  it('sem data de referência, cai no rótulo curto em vez de inventar prazo', () => {
+    expect(T.penParadaLabel({})).toBe('Parada');
+    expect(T.penParadaLabel(null)).toBe('Parada');
+  });
+
+  it('o selo no card carrega o texto e dispensa o title', () => {
+    const p = basePen({ updatedAt: new Date(Date.now() - 30 * 86400000).toISOString() });
+    const html = T.penKanbanCard(p);
+    expect(html).toContain('Parada há 30 dias');
+    expect(html).not.toContain('Sem atualização há 7+ dias');
+  });
+});
+
+describe('nome da ordem da coluna', () => {
+  it('o substantivo serve ao selo; a frase, ao rótulo acessível', () => {
+    expect(T.penColSortWord('prazo')).toBe('prazo');
+    expect(T.penColSortLabel('prazo')).toBe('por prazo');
+    expect(T.penColSortWord('manual')).toBe('manual');
+    expect(T.penColSortLabel('manual')).toContain('arrastando');
   });
 });
