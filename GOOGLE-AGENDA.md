@@ -201,6 +201,46 @@ O caminho de volta: no chamado aberto pela triagem, a caixa **"Enviar por e-mail
 
 Deploy: `supabase functions deploy pendencia-responder`. Usa os mesmos secrets da `send-email` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM` opcional) — sem secret novo.
 
+### O que o Intra tira do e-mail antes de abrir o chamado
+
+Um e-mail de resposta carrega a conversa citada embaixo e a assinatura de quem
+escreveu. Isso ia cru para a IA e, sem IA, virava a descrição do chamado — que
+terminava no meio de `Em qui., 22 de`, porque o corte de 600 caracteres caía
+dentro do trecho citado. O `corpoLimpo` (em `supabase/functions/robo/campo.ts`)
+corta, nesta ordem:
+
+- **a conversa citada**, pelo marcador que o próprio programa de e-mail escreve
+  (`Em ... escreveu:`, `On ... wrote:`, `-----Mensagem original-----`, o bloco
+  `De:/Enviada em:` do Outlook, a régua de sublinhados, a primeira linha com `>`);
+- **a assinatura**, pelo delimitador `-- ` do RFC 3676 ou por uma despedida
+  (`Obrigado,`, `Atenciosamente`) seguida de bloco de contato curto — telefone,
+  site ou e-mail. A despedida em si fica: é a última coisa que a pessoa escreveu.
+
+A regra é **errar para menos**: despedida seguida de texto de verdade não é
+assinatura, e se o corte não deixaria quase nada o texto original volta inteiro.
+Um e-mail de duas linhas nunca vira um chamado vazio.
+
+> Privacidade: isso também encolhe o que sai daqui — a conversa citada deixou de
+> passar pelo Make e pelo provedor da IA.
+
+### E-mail da própria Init não abre chamado
+
+O `roboPendenciasEmail` varre a **conversa inteira** do rótulo (`th.getMessages()`),
+então a nossa resposta ao cliente chegava como mensagem nova e abria um chamado
+com o técnico como solicitante — e o botão **"Enviar por e-mail"** daquele chamado
+devolveria a resposta para a própria Init.
+
+A triagem agora descarta o e-mail cujo remetente é do domínio do `GMAIL_USER`
+(subdomínios incluídos), antes de tocar no banco. **Não há secret novo**: o
+domínio de casa sai da caixa que o robô já usa. Sem `GMAIL_USER`, ninguém é
+barrado e o comportamento é o de antes. O log do Apps Script passa a contar
+esses e-mails (`N da própria Init`).
+
+**O que isto ainda não resolve:** a resposta do *cliente* numa conversa que já
+tem chamado continua abrindo chamado novo. Casar a thread pede coluna nova e
+migration — ficou de fora.
+
+
 ### A rota `triagem` no Make
 Recebe `{ "tarefa", "email_id", "de", "assunto", "data", "trecho", "cliente" }` e responde um JSON com `assunto`, `descricao`, `categoria`, `prioridade`, `tipo`, `solicitante` e `ignorar`.
 

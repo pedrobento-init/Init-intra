@@ -44,8 +44,8 @@ import {
 } from "./relatorios.ts";
 import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
-  type Cliente, clienteDoEmail, type Device, type EmailBackup, type EmailEntrada, type Monitor, monitorDoEmail,
-  pendenciaDaTriagem, pendenciaDoAlerta, textoDaIa, triagemDaIa,
+  type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
+  type Monitor, monitorDoEmail, pendenciaDaTriagem, pendenciaDoAlerta, remetenteInterno, textoDaIa, triagemDaIa,
 } from "./campo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -296,7 +296,9 @@ async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tarefa: "triagem", email_id: e.id, de: e.de, assunto: e.assunto, data: e.data,
-        trecho: String(e.trecho || "").slice(0, 2000), cliente: c.name || "",
+        // Vai o corpo limpo, não o e-mail cru: a IA classifica o que a pessoa
+        // escreveu agora, e a conversa citada deixa de passar pelo Make.
+        trecho: corpoLimpo(e.trecho || "").slice(0, 2000), cliente: c.name || "",
       }),
       signal: AbortSignal.timeout(25000),
     });
@@ -309,11 +311,17 @@ async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
 
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
-  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, sem_cliente: [] });
+  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, sem_cliente: [] });
   const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
   const abertas: string[] = [], semCliente: string[] = [];
-  let ignorados = 0;
+  const dominios = dominiosInternos(GMAIL_USER);
+  let ignorados = 0, internos = 0;
   for (const e of msgs) {
+    // O robô varre a CONVERSA inteira do rótulo: a nossa própria resposta ao
+    // cliente chega aqui como mensagem nova. Ela não é pedido novo — abria um
+    // chamado com o técnico como solicitante, e responder ali devolveria o
+    // e-mail para a própria Init. Sai antes de tocar no banco.
+    if (remetenteInterno(e.de, dominios)) { internos++; continue; }
     // Uma pendência por mensagem, mesmo que o robô mande o e-mail duas vezes.
     const key = `triagem:${e.id}`;
     const { error } = await db.from("avisos_enviados").insert({ key });
@@ -331,7 +339,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     }
     abertas.push(pen.id);
   }
-  return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, sem_cliente: semCliente });
+  return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, internos, sem_cliente: semCliente });
 }
 
 async function indicadores(db: SupabaseClient) {
