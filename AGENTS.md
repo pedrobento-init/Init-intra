@@ -109,6 +109,7 @@ termina, commita antes de passar a bola — o git é a única coordenação que 
 | ---------------------------------------------------- | ------------------------------------------------------------ |
 | [README.md](README.md)                               | funcionalidades, estrutura, Edge Functions, deploy           |
 | [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md)                 | robô Apps Script, triagem de e-mail e as rotas de IA no Make |
+| [WHATSAPP.md](WHATSAPP.md)                           | entrada de chamado por WhatsApp: passo a passo na Meta e o que o teste cobre |
 | [AUDITORIA.md](AUDITORIA.md)                         | achados de auditoria e o que já foi fechado                  |
 | [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                 |
 

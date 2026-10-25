@@ -46,3 +46,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.agenda-ics]
 verify_jwt = false
+
+# Webhook da Meta (WhatsApp). Quem chama é a Meta, que não tem como mandar
+# chave do Supabase: a autenticação é a assinatura HMAC do corpo
+# (X-Hub-Signature-256), conferida antes de ler o payload.
+[functions.whatsapp]
+verify_jwt = false

@@ -41,6 +41,10 @@ function authMode(source) {
   if (/withSupabase\(\s*\{[^}]*auth:\s*["']user["']/.test(source)) return 'jwt';
   if (/auth\.getUser\(/.test(source)) return 'jwt';
   if (/x-[a-z-]*secret/.test(source)) return 'secret-header';
+  // Webhook de fora (Meta): o provedor assina o corpo e a function confere o
+  // HMAC antes de ler o payload. Vem ANTES do query-token porque o handshake
+  // de cadastro também lê searchParams, e ali a query não autentica nada.
+  if (/assinaturaValida\(/.test(source)) return 'assinatura';
   if (/searchParams\.get\(/.test(source)) return 'query-token';
   return 'nenhum';
 }
@@ -85,9 +89,10 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
 
   it('quem se autentica por segredo próprio usa verify_jwt = false', () => {
     // robô do Apps Script (x-agenda-secret), cron do banco (x-cron-secret) e
-    // o feed .ics (token na query, porque app de calendário não manda header).
-    const proprio = functions.filter((f) => ['secret-header', 'query-token'].includes(authMode(f.source)));
-    expect(proprio.map((f) => f.name).sort()).toEqual(['agenda-ics', 'avisos-prazo', 'google-agenda', 'robo']);
+    // o feed .ics (token na query, porque app de calendário não manda header) e
+    // o webhook do WhatsApp (assinatura HMAC da Meta sobre o corpo cru).
+    const proprio = functions.filter((f) => ['secret-header', 'query-token', 'assinatura'].includes(authMode(f.source)));
+    expect(proprio.map((f) => f.name).sort()).toEqual(['agenda-ics', 'avisos-prazo', 'google-agenda', 'robo', 'whatsapp']);
     for (const f of proprio) {
       expect(verifyJwtOf(f.name), `${f.name} não valida JWT; verify_jwt deveria ser false`).toBe(false);
     }
