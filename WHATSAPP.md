@@ -77,6 +77,45 @@ A resposta traz `{ mensagens, abertas, notas, sem_cliente }`.
   nele. É o comportamento certo: no WhatsApp as pessoas mandam cinco mensagens
   seguidas, e cada uma não pode virar um chamado.
 
+## Testar sem depender da Meta
+
+Antes de existir app, número ou webhook, dá para exercitar a ponta inteira
+(assinatura → triagem → chamado) com o simulador:
+
+```bash
+export WHATSAPP_APP_SECRET=<App secret do app na Meta>
+node tools/whatsapp-simular.js --url https://<ref>.supabase.co/functions/v1/whatsapp \
+  --de 5511999990000 --nome "Beatriz Rangel" --texto "O notebook não liga"
+```
+
+O segredo vai pelo **ambiente, nunca por argumento**: argumento fica no
+histórico do shell e na lista de processos da máquina.
+
+Outros modos:
+
+```bash
+# só o handshake de cadastro (o GET que a Meta faz ao salvar o webhook)
+WHATSAPP_VERIFY_TOKEN=<seu token> node tools/whatsapp-simular.js --url <url> --verificar
+
+# conferir que assinatura errada é recusada — tem de responder 401
+node tools/whatsapp-simular.js --url <url> --assinatura errada
+
+# imprimir payload e assinatura sem mandar nada (para colar num curl)
+node tools/whatsapp-simular.js --mostrar --texto "teste"
+```
+
+Cada rodada sorteia um `id` de mensagem novo, porque a function guarda o id
+para não abrir o mesmo chamado duas vezes — com id fixo, a segunda rodada não
+faria nada e pareceria quebrada. Para testar justamente a repetição, passe
+`--id wamid.FIXO` duas vezes: a segunda deve responder sem abrir nada.
+
+> O simulador não é "mais ou menos" o formato da Meta:
+> `tests/whatsapp-simular.test.js` joga o payload dele no parser de verdade
+> (`mensagensDoWebhook`) e a assinatura no verificador de verdade
+> (`assinaturaValida`). Se os dois divergirem, o teste quebra em vez de o
+> simulador dar "tudo certo" numa coisa que a Meta de verdade não faria.
+
+
 ## O que este teste faz e não faz
 
 | Faz | Não faz |
