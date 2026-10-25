@@ -79,6 +79,12 @@ A resposta traz `{ mensagens, abertas, notas, sem_cliente }`.
 
 ## Testar sem depender da Meta
 
+**Para esta parte você não precisa da Meta ainda.** O `WHATSAPP_APP_SECRET` só
+precisa ser o MESMO dos dois lados — function e simulador. Então, enquanto é
+teste, pode ser uma string inventada por você; troque pelo App secret de
+verdade quando for ligar o webhook da Meta.
+
+
 Antes de existir app, número ou webhook, dá para exercitar a ponta inteira
 (assinatura → triagem → chamado) com o simulador:
 
