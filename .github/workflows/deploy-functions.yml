@@ -1,0 +1,71 @@
+# Deploy das Edge Functions.
+#
+# Por que este arquivo existe: a Vercel publica o front-end sozinha a cada
+# merge, mas Edge Function é Supabase e só sai do repositório com
+# `supabase functions deploy`. Sem isto, uma PR entra na main pela metade — o
+# front novo no ar chamando a função antiga. Já aconteceu: a PR da caixa de
+# triagem (#54) subiu a tela e o robô continuou descartando e-mail em silêncio,
+# porque o `robo` nunca foi reimplantado.
+#
+# Deploya TODAS as functions, não só as que mudaram, e é de propósito: o CLI
+# guarda a última opção de deploy por função, então função publicada um dia com
+# `--no-verify-jwt` fica aberta no servidor até ser reimplantada. Mandar o lote
+# inteiro reafirma o verify_jwt do config.toml em todas elas — é a dívida que a
+# PR #33 deixou anotada como "redeploy das 17 functions".
+#
+# Nunca passe --no-verify-jwt aqui: o config.toml é a fonte da verdade, e
+# tests/deploy-functions-guard.test.js tranca isso.
+#
+# SECRET NECESSÁRIO (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN — token pessoal em https://supabase.com/dashboard/account/tokens
+# O ref do projeto não é secret: sai do `project_id` do supabase/config.toml.
+
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      # Mudar só o verify_jwt de uma função também precisa de deploy: o valor
+      # vive no servidor, não no repositório.
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+
+# Dois deploys ao mesmo tempo podem publicar versões fora de ordem. O da frente
+# termina; o atrasado é cancelado, porque o seguinte já leva o código dele.
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Ref do projeto (do config.toml)
+        id: ref
+        run: |
+          ref=$(sed -n 's/^project_id = "\(.*\)"/\1/p' supabase/config.toml | tr -d '\r')
+          if [ -z "$ref" ]; then
+            echo "::error::project_id não encontrado em supabase/config.toml"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref "${{ steps.ref.outputs.ref }}"
+
+      - name: O que foi publicado
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions list --project-ref "${{ steps.ref.outputs.ref }}"

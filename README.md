@@ -74,7 +74,10 @@ Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 
 - **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
 - **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
-- **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
+- **Edge Functions**: automático. O workflow `.github/workflows/deploy-functions.yml` publica **todas** as functions quando um merge na `main` toca `supabase/functions/` ou `supabase/config.toml`, e dá para rodar à mão em Actions → Deploy Edge Functions → Run workflow. Manda o lote inteiro de propósito: o CLI guarda a última opção de deploy por função, então função publicada um dia com `--no-verify-jwt` só fecha quando é reimplantada.
+  - Secret necessário: **`SUPABASE_ACCESS_TOKEN`** em Settings → Secrets and variables → Actions, gerado em <https://supabase.com/dashboard/account/tokens>. O ref do projeto não é secret — sai do `project_id` do `supabase/config.toml`.
+  - Na mão, quando precisar: `supabase functions deploy <nome>`.
+  - Secrets das functions continuam manuais: `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
 
 ## Ícones PWA
 
