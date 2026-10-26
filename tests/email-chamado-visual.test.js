@@ -116,6 +116,29 @@ describe('separar o pedido do carimbo da triagem', () => {
     expect(origem.recebidoEm).toBe('');
     expect(origem.assuntoOriginal).toBe('');
   });
+
+  it('texto digitado DEPOIS do carimbo não some da tela de detalhe', () => {
+    // Editar o chamado, cursor cai no fim da descrição — que é depois do
+    // carimbo — e é ali que a pessoa anota. Antes, isso era descartado:
+    // não era corpo, não era campo do carimbo. Sumia da tela sem sumir do banco.
+    const d = DESC + '\nPrazo combinado: cliente volta na sexta.';
+    const r = _penOrigemTriagem(d);
+    expect(r.corpo).toBe('A impressora da recepção parou.');
+    expect(r.depois).toBe('Prazo combinado: cliente volta na sexta.');
+    expect(r.origem.assuntoOriginal).toBe('impressora não imprime');
+  });
+
+  it('linha que parece campo mas não é do carimbo também é texto da pessoa', () => {
+    const d = 'Pedido.\n\n— Aberta pela triagem de e-mail do Init Intra.\nDe: x@y.com\nRegra interna: não priorizar.';
+    const r = _penOrigemTriagem(d);
+    expect(r.origem.de).toBe('x@y.com');
+    expect(r.depois).toBe('Regra interna: não priorizar.');
+  });
+
+  it('sem carimbo, depois fica vazio — chamado à mão não muda', () => {
+    expect(_penOrigemTriagem('Trocar o cabo de rede da sala 2.').depois).toBe('');
+    expect(_penOrigemTriagem(null).depois).toBe('');
+  });
 });
 
 describe('o cartão de origem', () => {
@@ -172,8 +195,9 @@ describe('a caixa de entradas de e-mail', () => {
 
   it('a entrada só é marcada depois que o chamado existe', () => {
     // Marcar na abertura do formulário perderia o e-mail se a pessoa
-    // desistisse no meio.
-    expect(penSrc).toContain('emailTriagemMarcarAberta(data.id)');
+    // desistisse no meio. O id da entrada vem do hidden do formulário —
+    // morre no cancelar, em vez de sobreviver em window.
+    expect(penSrc).toContain('emailTriagemMarcarAberta(data.id,');
     expect(etrSrc).toContain("_emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId })");
   });
 

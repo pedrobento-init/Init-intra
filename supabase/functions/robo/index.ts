@@ -343,25 +343,30 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 /**
  * Guarda na caixa de triagem (066) o e-mail que não virou chamado.
  *
- * Banco sem a 066 não pode derrubar a triagem: o resto da rodada vale, e os
- * chamados de quem É cliente continuam abrindo. Mas a chave de dedupe volta,
- * para a mensagem ser tentada de novo na próxima rodada — assim, aplicar a
- * migration recupera sozinho o que chegou nesse meio-tempo, em vez de deixar
- * um buraco permanente.
+ * `team` vem do cliente no caminho ignorado_ia: a entrada da mam/bt tem de
+ * aparecer na caixa da mam/bt, senão some para quem é de lá. Sem cliente
+ * (sem_cliente) não há equipe para herdar — a 066 traz o padrão.
+ *
+ * Banco sem a 066 não derruba a triagem: o resto da rodada vale, e os
+ * chamados de quem É cliente continuam abrindo. A chave de dedupe NÃO volta
+ * para a fila neste erro — devolvê-la fazia a mesma mensagem ser
+ * reprocessada e reclassificada toda rodada enquanto o insert falhasse
+ * (com a 066 ausente, para sempre: gasto de IA no caminho ignorado_ia e o
+ * mesmo erro no log a cada ciclo). A mensagem é consumida e o erro fica no
+ * log, alto de propósito: 066 é obrigatória no deploy.
  */
 async function guardarEntrada(
   db: SupabaseClient,
   e: EmailEntrada,
   motivo: "sem_cliente" | "ignorado_ia",
-  key: string,
+  team = "init",
 ): Promise<boolean> {
-  const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), "init");
+  const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), team);
   const { error } = await db.from("emails_triagem").insert(linha);
   if (!error) return true;
   // Já registrado: a rodada anterior gravou e caiu antes de seguir.
   if (error.code === "23505") return true;
-  await db.from("avisos_enviados").delete().eq("key", key);
-  console.error(`robo triagem caixa ${e.id}:`, error.message);
+  console.error(`robo triagem caixa ${e.id} (a mensagem NÃO apareceu na caixa):`, error.message);
   return false;
 }
 
@@ -420,7 +425,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       // pessoal (que nunca casa, de propósito) são pedido de cliente tanto
       // quanto os outros — agora ficam na caixa de triagem (066).
       semCliente.push(String(e.assunto || "").slice(0, 80));
-      await guardarEntrada(db, e, "sem_cliente", key);
+      await guardarEntrada(db, e, "sem_cliente");
       continue;
     }
     const t = triagemDaIa(await classificarComIa(e, c), e);
@@ -429,7 +434,9 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       // um pedido de verdade. Virar contador escondia o erro da IA; agora a
       // mensagem fica para alguém conferir.
       ignorados++;
-      await guardarEntrada(db, e, "ignorado_ia", key);
+      // Com cliente na mão, a entrada nasce na equipe dele: senão a caixa da
+      // mam/bt nunca veria o que a IA ignorou de um cliente da mam/bt.
+      await guardarEntrada(db, e, "ignorado_ia", c.team);
       continue;
     }
     const pen = pendenciaDaTriagem(t, e, c, "PEN-" + crypto.randomUUID(), new Date());
