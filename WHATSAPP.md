@@ -127,12 +127,60 @@ faria nada e pareceria quebrada. Para testar justamente a repetição, passe
 | Faz | Não faz |
 | --- | --- |
 | Mensagem de texto vira chamado | Áudio, imagem e documento — virariam chamado sem texto |
-| Mensagem seguinte vira nota no chamado aberto | Responder pelo Intra (a janela de 24 h da Meta pede template aprovado) |
+| Mensagem seguinte vira nota no chamado aberto | Falar fora da janela de 24 h (pede template aprovado) |
 | Casa o cliente pelo telefone da ficha | Cadastrar cliente novo sozinho |
 | Classifica pela IA do Make, como o e-mail | Mandar aviso automático de volta |
+| Responder pelo Intra, dentro da janela de 24 h | |
 
 **Chamado fechado não recebe mensagem nova:** mensagem depois de concluir abre
 chamado novo, igual ao e-mail. Ressuscitar o antigo esconderia o pedido do SLA.
+
+## Responder pelo Intra
+
+A nota pública do chamado volta para o cliente pelo WhatsApp, na mesma
+conversa — igual ao botão de e-mail da triagem (064). Na tela do chamado
+aparece **"Enviar por WhatsApp para +55 (11) 99999-0000"** logo abaixo da caixa
+de texto, com o que resta da janela ao lado.
+
+Dois secrets a mais:
+
+```bash
+supabase secrets set WHATSAPP_TOKEN=<token de acesso do app na Meta>
+supabase secrets set WHATSAPP_PHONE_NUMBER_ID=<Phone number ID, em API Setup>
+supabase functions deploy whatsapp-responder
+```
+
+> `WHATSAPP_PHONE_NUMBER_ID` **não é o telefone**: é um id numérico longo que a
+> Meta mostra em WhatsApp → API Setup, ao lado do número. Pôr o telefone ali
+> dá `Unsupported post request` — erro que não diz qual campo está errado.
+
+> No teste, o token da Meta **vale 24 h**. Quando o envio começar a responder
+> `Invalid OAuth access token` do nada, é isso: gere outro, ou crie um token de
+> System User, que não expira.
+
+### A janela de 24 h
+
+A Meta só aceita texto livre nas **24 h seguintes à última mensagem do
+cliente**. Fora dela, só template aprovado — que é outro caminho inteiro
+(aprovação na Meta, variáveis, idioma) e não está aqui.
+
+A conta sai da última fala de quem pediu: a nota `visibility: "solicitante"`
+mais nova, ou, num chamado recém-aberto, a própria abertura — porque a primeira
+mensagem não virou nota, virou o chamado. **Resposta nossa não reabre a
+janela**: se reabrisse, cada mensagem nossa esticaria um prazo que a Meta não
+estica, e a tela mentiria.
+
+Fechada a janela, a caixa aparece desabilitada dizendo isso, e a function
+recusa com `window_closed` mesmo que alguém chame direto. A nota continua
+salva no chamado de qualquer jeito: envio que não sai não apaga o trabalho do
+técnico, só avisa.
+
+### Chamado cancelado
+
+Cancelar o chamado não impede responder — a janela é da conversa, não do
+chamado. Mas a **próxima** mensagem do cliente abre chamado novo, porque
+`cancelado` conta como fechado na casagem da conversa. Então, em duplicata,
+cancele um e deixe o outro aberto: a conversa fica num lugar só.
 
 ## Segurança
 
@@ -148,6 +196,17 @@ byte a byte.
 
 `verify_jwt = false` no `config.toml` é obrigatório — com ele ligado a
 plataforma barra a Meta antes de a function rodar.
+
+**O caminho de volta é o contrário, e por isso é outra function.** A
+`whatsapp-responder` é chamada pelo app, com o JWT do operador
+(`verify_jwt = true`, mais a conferência de `operators`). Juntar as duas numa
+só obrigaria a desligar o `verify_jwt` do caminho que o app usa — e aí o envio
+ficaria aberto a quem tem a chave pública, que vai no site.
+
+**O app nunca escolhe o destinatário.** Ele manda `pendencia_id`; o telefone
+sai do `email_thread_id` daquele chamado, relido com a chave de serviço. Sem
+essa trava, quem tivesse a chave pública mandaria WhatsApp em nome da Init para
+qualquer número — é a mesma regra da `pendencia-responder`.
 
 ## Casar o telefone
 

@@ -53,6 +53,7 @@ e2e/                  Testes de navegador (Playwright)
 | `robo` | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores e backup no Drive (migration 059). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `whatsapp` | Webhook da Meta: mensagem de WhatsApp do cliente vira chamado, com a mesma triagem do e-mail. Autentica pela assinatura HMAC do corpo. Passo a passo em [WHATSAPP.md](WHATSAPP.md). |
+| `whatsapp-responder` | Caminho de volta: a nota pública do chamado vai ao cliente por WhatsApp, na mesma conversa, dentro da janela de 24 h da Meta. O telefone sai do chamado, nunca do app. |
 | `ia-relatorio` | Texto de relatório com IA. |
 | `ia-levar` | Sugere o que levar para a visita (IA). |
 | `update-user-password` | Admin troca a senha de um usuário. |

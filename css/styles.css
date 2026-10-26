@@ -1765,6 +1765,14 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 }
 .pen-cmd-email input { cursor: pointer; margin: 0; }
 .pen-cmd-email strong { color: var(--text); font-weight: 600; word-break: break-all; }
+/* Quanto resta da janela de 24 h da Meta. Fica ao lado do número, e não num
+   aviso à parte, porque é condição do MESMO envio: fora da janela o WhatsApp
+   só aceita template aprovado. Fechada, a caixa vem desabilitada — daí o
+   estado apagado do rótulo inteiro. */
+.pen-wa-janela { color: var(--text-muted); font-size: 11.5px; }
+.pen-wa-janela.is-fechada { color: var(--red); }
+.pen-cmd-email:has(input:disabled) { opacity: 0.72; cursor: default; }
+.pen-cmd-email input:disabled { cursor: default; }
 .feed-tag-interna {
   margin-left: 6px;
   font-size: 10px;

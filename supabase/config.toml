@@ -52,3 +52,10 @@ verify_jwt = false
 # (X-Hub-Signature-256), conferida antes de ler o payload.
 [functions.whatsapp]
 verify_jwt = false
+
+# Caminho de volta do WhatsApp, chamado pelo APP com o JWT do operador (o
+# código também confere operators). Separado do webhook de propósito: aquele
+# precisa de verify_jwt = false para a Meta chegar, e juntar os dois abriria
+# o envio a quem tem a chave pública.
+[functions.whatsapp-responder]
+verify_jwt = true

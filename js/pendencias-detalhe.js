@@ -25,6 +25,10 @@ function openPendenciaDetail(id) {
   // Chamado aberto pela triagem de e-mail (064): dá para responder a quem
   // pediu sem sair daqui. Sem endereço, a opção nem aparece.
   const _emailDestino = String(p.solicitanteEmail || '').trim();
+  // Mesmo caminho pelo WhatsApp: o telefone sai da conversa que abriu o
+  // chamado, não de campo digitado. Sem conversa de WhatsApp, nada aparece.
+  const _waTelefone = _penWhatsTelefone(p);
+  const _waJanela = _waTelefone ? _penWhatsJanela(p) : null;
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="pen-detail pen-cmd" data-status="${escapeHtml(p.status||'')}">
     <!-- ══ CABEÇALHO COMANDO: badge + timer primário + editar sutil ══ -->
@@ -83,7 +87,9 @@ function openPendenciaDetail(id) {
               return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+(_doSolic?' is-solicitante':'')+'">'
                 + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
                 + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
-                + (_doSolic ? '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>' : '')
+                + (_doSolic ? (_waTelefone
+                    ? '<span class="feed-tag-solicitante" title="Chegou por WhatsApp, na conversa do chamado">💬 do solicitante</span>'
+                    : '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>') : '')
                 + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
                 + '</div>'
                 + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
@@ -100,6 +106,16 @@ function openPendenciaDetail(id) {
             ${_emailDestino ? `<label class="pen-cmd-email" id="penNoteEmailWrap" title="Vai na mesma conversa de e-mail em que ${escapeHtml(_emailDestino)} escreveu">
               <input type="checkbox" id="penNoteEmail" checked>
               <span>Enviar por e-mail para <strong>${escapeHtml(_emailDestino)}</strong></span>
+            </label>` : ''}
+            ${_waTelefone ? `<label class="pen-cmd-email" id="penNoteWhatsWrap" title="${_waJanela.aberta
+              ? 'Vai na mesma conversa de WhatsApp em que o cliente escreveu'
+              : 'A janela de 24 h do WhatsApp fechou: fora dela a Meta só aceita template aprovado'}">
+              <input type="checkbox" id="penNoteWhats" ${_waJanela.aberta ? 'checked' : 'disabled'}>
+              <span>Enviar por WhatsApp para <strong>${escapeHtml(_waTelefone.legivel)}</strong>${
+                _waJanela.aberta
+                  ? ` <span class="pen-wa-janela">· janela aberta por mais ${escapeHtml(_waJanela.restam)}</span>`
+                  : ' <span class="pen-wa-janela is-fechada">· janela de 24 h fechada</span>'
+              }</span>
             </label>` : ''}
             <div class="pen-cmd-composer-bar">
               <div class="pen-cmd-tools">
@@ -244,6 +260,52 @@ function changePenStatus(id) {
 // Quem lê o chamado quer a história inteira, não duas listas para cruzar.
 
 /** Notas + eventos ordenados por data. Evento vem marcado com `_evento`. */
+/**
+ * Telefone da conversa de WhatsApp que abriu este chamado, ou null.
+ *
+ * Lê o `emailThreadId` (065) com o prefixo de canal que a triagem grava. O
+ * campo só mostra: quem decide para onde o envio vai é a Edge Function, que
+ * relê a coluna com a chave de serviço (supabase/functions/whatsapp/resposta.ts).
+ * Se este cálculo errar, o pior que acontece é a caixa não aparecer.
+ */
+function _penWhatsTelefone(p) {
+  var t = String((p && p.emailThreadId) || '').trim();
+  if (t.indexOf('whatsapp:') !== 0) return null;
+  var d = t.slice(9).replace(/\D/g, '');
+  if (d.length < 12 || d.length > 15) return null;
+  var legivel = '+' + d;
+  if (d.indexOf('55') === 0 && d.length >= 12) {
+    var num = d.slice(4);
+    var corte = num.length > 8 ? 5 : 4;
+    legivel = '+55 (' + d.slice(2, 4) + ') ' + num.slice(0, corte) + '-' + num.slice(corte);
+  }
+  return { digitos: d, legivel: legivel };
+}
+
+// 24 h é regra da Meta, não nossa. A conta vive em dois lugares de propósito:
+// aqui só para a tela avisar ANTES de o técnico escrever, e na function
+// (resposta.ts), que é quem de fato recusa. Divergir faz a tela mentir por
+// alguns minutos; não faz mensagem sair fora da janela.
+var PEN_WHATS_JANELA_H = 24;
+
+/** Quanto resta da janela de 24 h desta conversa, para o aviso da tela. */
+function _penWhatsJanela(p, agora) {
+  var ref = (agora ? agora.getTime() : Date.now());
+  var maior = Date.parse(String((p && p.createdAt) || '')) || 0;
+  var notes = (p && Array.isArray(p.notes)) ? p.notes : [];
+  for (var i = 0; i < notes.length; i++) {
+    var n = notes[i];
+    if (!n || n.visibility !== 'solicitante') continue;
+    var t = Date.parse(String(n.createdAt || '')) || 0;
+    if (t > maior) maior = t;
+  }
+  if (!maior) return { aberta: false, restam: '' };
+  var faltaMin = Math.floor((maior + PEN_WHATS_JANELA_H * 3600000 - ref) / 60000);
+  if (faltaMin <= 0) return { aberta: false, restam: '' };
+  var h = Math.floor(faltaMin / 60);
+  return { aberta: true, restam: h >= 1 ? h + 'h' : faltaMin + ' min' };
+}
+
 function _penFeedItens(p) {
   var notas = Array.isArray(p && p.notes) ? p.notes : [];
   var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
@@ -305,9 +367,13 @@ function penNoteVis(vis) {
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-selected', on ? 'true' : 'false');
   });
-  // Anotação interna não vai para o cliente: o envio por e-mail some junto.
+  // Anotação interna não vai para o cliente: o envio some junto, nos dois
+  // canais. Deixar a caixa marcada numa aba "só a equipe vê" é a receita para
+  // mandar ao cliente o que era combinado interno.
   var emailWrap = document.getElementById('penNoteEmailWrap');
   if (emailWrap) emailWrap.style.display = alvo === 'interna' ? 'none' : '';
+  var whatsWrap = document.getElementById('penNoteWhatsWrap');
+  if (whatsWrap) whatsWrap.style.display = alvo === 'interna' ? 'none' : '';
   var ta = document.getElementById('newNoteText');
   if (ta) {
     ta.placeholder = alvo === 'interna'
@@ -330,10 +396,13 @@ function submitPenNote(id) {
   // inteiro, e a caixinha deixa de existir.
   const _box = document.getElementById('penNoteEmail');
   const _mandarEmail = vis === 'resposta' && !!(_box && _box.checked);
+  const _boxWa = document.getElementById('penNoteWhats');
+  const _mandarWhats = vis === 'resposta' && !!(_boxWa && _boxWa.checked && !_boxWa.disabled);
   const ok = addPendenciaNote(id, text, getUser().name, vis);
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
   showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
   if (_mandarEmail) penResponderPorEmail(id, text);
+  if (_mandarWhats) penResponderPorWhatsapp(id, text);
   openPendenciaDetail(id);
   renderPenView(false);
 }
@@ -366,6 +435,40 @@ function penResponderPorEmail(id, text) {
     .catch(function (e) {
       showToast('A nota foi salva, mas o e-mail não saiu.', 'error');
       if (typeof _logSilent === 'function') _logSilent(e, 'pendencias-detalhe:responder-email');
+    });
+}
+
+/**
+ * Manda a nota pública por WhatsApp a quem abriu o chamado, na mesma conversa.
+ * Par do penResponderPorEmail, e pelas mesmas regras: a nota JÁ está salva
+ * quando isto roda — envio que não sai não desfaz o registro, só avisa.
+ * O telefone não vai daqui: a function lê o `email_thread_id` do próprio
+ * chamado (ver supabase/functions/whatsapp-responder/index.ts).
+ */
+function penResponderPorWhatsapp(id, text) {
+  var online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  if (!online) {
+    showToast('A nota foi salva, mas o WhatsApp não saiu: sem conexão com o servidor.', 'error');
+    return;
+  }
+  supabaseClient.functions.invoke('whatsapp-responder', { body: { pendencia_id: id, text: text } })
+    .then(function (r) {
+      var d = r && r.data;
+      if ((r && r.error) || !d || d.success !== true) {
+        var msg = (d && d.error) || (r && r.error && r.error.message) || 'erro desconhecido';
+        showToast('A nota foi salva, mas o WhatsApp não saiu: ' + msg, 'error');
+        return;
+      }
+      // Quando sobra pouco da janela, dizer agora evita o técnico descobrir no
+      // erro da próxima mensagem.
+      var resta = Number(d.restam_min);
+      showToast(isFinite(resta) && resta > 0 && resta < 120
+        ? 'WhatsApp enviado para ' + d.to + ' — a janela fecha em ' + resta + ' min.'
+        : 'WhatsApp enviado para ' + d.to + '.', 'success');
+    })
+    .catch(function (e) {
+      showToast('A nota foi salva, mas o WhatsApp não saiu.', 'error');
+      if (typeof _logSilent === 'function') _logSilent(e, 'pendencias-detalhe:responder-whatsapp');
     });
 }
 
