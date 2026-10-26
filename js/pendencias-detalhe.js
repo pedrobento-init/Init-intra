@@ -22,6 +22,17 @@ function openPendenciaDetail(id) {
   const _checkList = Array.isArray(p.checklist) ? p.checklist : [];
   const _checkDone = _checkList.filter(function(it){ return it && it.done; }).length;
   const _me = (typeof getUser === 'function' && getUser()) ? getUser().name : '';
+  // Chamado aberto pela triagem de e-mail (064): dá para responder a quem
+  // pediu sem sair daqui. Sem endereço, a opção nem aparece.
+  const _emailDestino = String(p.solicitanteEmail || '').trim();
+  // O bloco de origem sai da descrição e vira cartão — inclusive nos chamados
+  // antigos, que é onde ele está feio hoje.
+  const _penDesc = _penOrigemTriagem(p.descricao);
+  // O e-mail inteiro (066) só ganha o "ver mais" quando tem o que mostrar: a
+  // descrição já é o começo dele, e repetir o mesmo texto duas vezes na tela
+  // é pior do que não ter o botão.
+  const _emailCorpo = String(p.emailCorpo || '').trim();
+  const _emailInteiro = _emailCorpo.length > _penDesc.corpo.length + 40 ? _emailCorpo : '';
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="pen-detail pen-cmd" data-status="${escapeHtml(p.status||'')}">
     <!-- ══ CABEÇALHO COMANDO: badge + timer primário + editar sutil ══ -->
@@ -59,7 +70,9 @@ function openPendenciaDetail(id) {
       <!-- ══ COLUNA ESQUERDA (65%): contexto + feed ══ -->
       <section class="pen-cmd-main">
         <div class="ticket-info-item pen-assunto pen-cmd-assunto"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
-        <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(p.descricao)||'—'}</div>
+        <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(_penDesc.corpo)||'—'}</div>
+        ${_penOrigemHtml(_penDesc.origem)}
+        ${_emailInteiro ? `<details class="pen-email-full"><summary>Ver o e-mail inteiro (${_emailInteiro.length.toLocaleString('pt-BR')} caracteres)</summary><div class="pen-email-corpo">${_penRichDesc(_emailInteiro)}</div></details>` : ''}
         ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div style="margin-top:10px"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
         </div>
         ${typeof kbPendenciaPanelHtml === 'function' ? kbPendenciaPanelHtml(p) : ''}
@@ -67,17 +80,37 @@ function openPendenciaDetail(id) {
         <div class="pen-cmd-card pen-cmd-feed-card">
           <div class="section-header pen-sec-head"><span class="section-title">💬 Feed de atividade</span><span class="pen-count">${(p.notes||[]).length ? (p.notes||[]).length+' msgs' : '0 msgs'}</span></div>
           <div class="pen-cmd-feed" id="penTimeline">
-            ${(p.notes||[]).length ? (p.notes).map(function(n){
+            ${_penFeedItens(p).length ? _penFeedItens(p).map(function(n){
+              if (n._evento) return _penEventoHtml(n);
               var _isMe = _me && n.author === _me;
               var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
-              return '<div class="feed-msg'+(_isMe?' is-me':'')+'">'
+              // Sem o campo = nota anterior à separação: lida como interna.
+              // 'solicitante' (065) é a fala de quem PEDIU, que chegou por e-mail
+              // na conversa do chamado: não é nossa nem é segredo da equipe, então
+              // não pode ler como 🔒 interna.
+              var _doSolic = n.visibility === 'solicitante';
+              var _interna = !_doSolic && n.visibility !== 'resposta';
+              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+(_doSolic?' is-solicitante':'')+'">'
                 + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
-                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span></div>'
+                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
+                + (_doSolic ? '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>' : '')
+                + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
+                + '</div>'
                 + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
             }).join('') : '<p class="text-muted pen-cmd-empty">Nenhuma nota ainda. Poste a primeira atualização abaixo 👇</p>'}
           </div>
-          <div class="pen-cmd-composer">
+          <div class="pen-cmd-composer" id="penComposer" data-vis="resposta">
+            <div class="pen-cmd-vis" role="tablist" aria-label="Destino da mensagem">
+              <button type="button" class="pen-vis-tab is-on" role="tab" aria-selected="true" data-action="penNoteVis" data-arg="resposta"
+                title="Fica visível para quem pediu e conta como 1ª resposta no SLA">Resposta</button>
+              <button type="button" class="pen-vis-tab" role="tab" aria-selected="false" data-action="penNoteVis" data-arg="interna"
+                title="Só a equipe vê; não conta como 1ª resposta">🔒 Anotação interna</button>
+            </div>
             <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)"></textarea>
+            ${_emailDestino ? `<label class="pen-cmd-email" id="penNoteEmailWrap" title="Vai na mesma conversa de e-mail em que ${escapeHtml(_emailDestino)} escreveu">
+              <input type="checkbox" id="penNoteEmail" checked>
+              <span>Enviar por e-mail para <strong>${escapeHtml(_emailDestino)}</strong></span>
+            </label>` : ''}
             <div class="pen-cmd-composer-bar">
               <div class="pen-cmd-tools">
                 <label class="btn btn-secondary btn-sm pen-cmd-tool" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">📎 Anexar
@@ -102,7 +135,8 @@ function openPendenciaDetail(id) {
             <div class="pen-prop"><dt>Solicitante</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.solicitante)||'—'}<button class="pen-inline-edit" title="Alterar solicitante" aria-label="Alterar solicitante" data-action="penEditSolicitante" data-arg="${escapeHtml(id)}">✏️</button></span></dd></div>
             <div class="pen-prop"><dt>Canal</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCanalLabel(p.canal))||'—'}<select class="pen-inline-select" title="Alterar canal" aria-label="Alterar canal" data-change="penSetField" data-field="canal" data-id="${escapeHtml(id)}">${penCanalOptionsHtml(p.canal||'')}</select></span></dd></div>
             <div class="pen-prop"><dt>Categoria</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCategoriaLabel(p.categoria))||'—'}<select class="pen-inline-select" title="Alterar categoria" aria-label="Alterar categoria" data-change="penSetField" data-field="categoria" data-id="${escapeHtml(id)}">${penCategoriaOptionsHtml(p.categoria||'')}</select></span></dd></div>
-            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>` : ''}
+            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>
+            <div class="pen-prop"><dt>Resolução</dt><dd>${typeof penResolucaoBadge === 'function' ? penResolucaoBadge(p, Date.now(), { full: true }) : ''}</dd></div>` : ''}
             <div class="pen-prop"><dt>Responsável</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.responsible)||'—'}<button class="pen-inline-edit" title="Alterar responsável" onclick="openReassignPendencia('${escapeHtml(id)}')">✏️</button></span></dd></div>
             <div class="pen-prop"><dt>Prioridade</dt><dd><span class="pen-inline-wrap">${priorityTag(p.priority)}<select class="pen-inline-select" title="Alterar prioridade" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','priority',this.value)">${['baixa','media','alta','critica'].map(v=>`<option value="${v}" ${p.priority===v?'selected':''}>${v==='baixa'?'Baixa':v==='media'?'Média':v==='alta'?'Alta':'Crítica'}</option>`).join('')}</select></span></dd></div>
             <div class="pen-prop${_isOverdue?' is-alert':''}"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" value="${escapeHtml(p.deadline||'')}" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','deadline',this.value)" /></span>${_isOverdue?'<span class="pen-cmd-flag">⚠️ Vencido</span>':''}${(!p.deadline && _isHighPri)?'<span class="pen-cmd-flag warn">⚠ Sem prazo · prioridade '+escapeHtml(p.priority)+'</span>':''}</dd></div>
@@ -216,15 +250,191 @@ function changePenStatus(id) {
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
 }
 
+// ── Linha do tempo (063): notas e eventos no MESMO fio, em ordem ──────────
+// Quem lê o chamado quer a história inteira, não duas listas para cruzar.
+
+/** Notas + eventos ordenados por data. Evento vem marcado com `_evento`. */
+// A triagem (robo/campo.ts) cola um bloco de origem no FIM da descrição:
+//
+//   — Aberta pela triagem de e-mail do Init Intra.
+//   De: Márcia <m@acme.com.br>
+//   Recebido em: 2026-10-26T09:00:00.000Z
+//   Assunto original: impressora não imprime
+//
+// Metadado como texto corrido é o que dá a cara de cru: entra na busca, entra
+// na prévia do card, e quem lê tem de pular aquilo para achar o pedido.
+// Separar na RENDERIZAÇÃO, e não na gravação, conserta também os chamados que
+// já existem — e são esses que estão feios hoje.
+var PEN_ORIGEM_MARCA = /\n*—[ \t]*Aberta pela triagem de ([^\n.]{1,40}?) do Init Intra\.?[ \t]*\n?/;
+
+/** Separa a descrição em { corpo, origem }. Sem o bloco, origem é null. */
+function _penOrigemTriagem(descricao) {
+  var s = String(descricao || '');
+  var m = PEN_ORIGEM_MARCA.exec(s);
+  if (!m) return { corpo: s.trim(), origem: null };
+  var campos = {};
+  s.slice(m.index + m[0].length).split('\n').forEach(function (linha) {
+    var mm = /^[ \t]*([^:]{2,30}):[ \t]*(.+?)[ \t]*$/.exec(linha);
+    if (mm) campos[mm[1].trim().toLowerCase()] = mm[2].trim();
+  });
+  return {
+    corpo: s.slice(0, m.index).trim(),
+    origem: {
+      canal: m[1].trim(),
+      de: campos['de'] || '',
+      recebidoEm: campos['recebido em'] || '',
+      assuntoOriginal: campos['assunto original'] || ''
+    }
+  };
+}
+
+/** Cartão de origem do chamado nascido de triagem. Vazio quando não houve. */
+function _penOrigemHtml(origem) {
+  if (!origem) return '';
+  var ehEmail = /e-?mail/i.test(origem.canal);
+  var linha = function (rot, val) {
+    return val ? '<div class="pen-origem-item"><dt>' + escapeHtml(rot) + '</dt><dd>' + escapeHtml(val) + '</dd></div>' : '';
+  };
+  // A data vem em ISO do robô; formatDateTime deixa legível, mas um registro
+  // antigo pode trazer qualquer coisa — então só formata o que o Date entende.
+  var quando = origem.recebidoEm;
+  try {
+    if (Date.parse(origem.recebidoEm) && typeof formatDateTime === 'function') {
+      quando = formatDateTime(origem.recebidoEm);
+    }
+  } catch (_) {}
+  return '<div class="pen-origem">'
+    + '<div class="pen-origem-head">' + (ehEmail ? '✉' : '💬') + ' Chegou por ' + escapeHtml(origem.canal) + '</div>'
+    + '<dl class="pen-origem-lista">'
+    + linha('De', origem.de)
+    + linha('Recebido', quando)
+    + linha('Assunto original', origem.assuntoOriginal)
+    + '</dl></div>';
+}
+
+function _penFeedItens(p) {
+  var notas = Array.isArray(p && p.notes) ? p.notes : [];
+  var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
+    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para };
+  });
+  return notas.concat(eventos).sort(function(a, b) {
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+}
+
+/** Rótulo legível de um valor, resolvido AGORA (renomear status não reescreve o histórico). */
+function _penValorLabel(tipo, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (tipo === 'status') {
+    try { return (STATUS_PEN_MAP && STATUS_PEN_MAP[v] && STATUS_PEN_MAP[v].label) || v; } catch (_) { return v; }
+  }
+  if (tipo === 'prioridade') {
+    try { return typeof penPriLabel === 'function' ? penPriLabel(v) : v; } catch (_) { return v; }
+  }
+  if (tipo === 'prazo') {
+    try { return typeof formatDate === 'function' ? formatDate(parseDeadline(v)) : v; } catch (_) { return v; }
+  }
+  return v;
+}
+
+const _PEN_EVENT_VERBO = {
+  criado: 'abriu a pendência',
+  status: 'mudou o status',
+  responsavel: 'passou para',
+  prioridade: 'mudou a prioridade',
+  prazo: 'mudou o prazo',
+};
+
+/** Marcador discreto no meio do fio — não é balão de mensagem. */
+function _penEventoHtml(e) {
+  var quem = e.author ? escapeHtml(e.author) : 'Sistema';
+  var corpo;
+  if (e.type === 'criado') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.criado;
+  } else if (e.type === 'responsavel') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO.responsavel + ' <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  } else {
+    corpo = quem + ' ' + (_PEN_EVENT_VERBO[e.type] || 'mudou algo')
+      + ': <span class="pen-ev-de">' + escapeHtml(_penValorLabel(e.type, e.de)) + '</span>'
+      + ' → <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
+  }
+  return '<div class="pen-ev" role="note"><span class="pen-ev-txt">' + corpo
+    + '</span><span class="pen-ev-at">' + formatDateTime(e.createdAt) + '</span></div>';
+}
+
+/** Alterna Resposta × Anotação interna no compositor (delegado por data-action). */
+function penNoteVis(vis) {
+  var box = document.getElementById('penComposer');
+  if (!box) return;
+  var alvo = vis === 'interna' ? 'interna' : 'resposta';
+  box.setAttribute('data-vis', alvo);
+  box.querySelectorAll('.pen-vis-tab').forEach(function(b) {
+    var on = b.getAttribute('data-arg') === alvo;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  // Anotação interna não vai para o cliente: o envio por e-mail some junto.
+  var emailWrap = document.getElementById('penNoteEmailWrap');
+  if (emailWrap) emailWrap.style.display = alvo === 'interna' ? 'none' : '';
+  var ta = document.getElementById('newNoteText');
+  if (ta) {
+    ta.placeholder = alvo === 'interna'
+      ? 'Só a equipe vê. Contexto, combinados, o que não vai para o cliente. (@nome menciona)'
+      : 'O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)';
+  }
+}
+
+function _penComposerVis() {
+  var box = document.getElementById('penComposer');
+  return box && box.getAttribute('data-vis') === 'interna' ? 'interna' : 'resposta';
+}
+
 function submitPenNote(id) {
   const ta = document.getElementById('newNoteText');
   const text = (ta ? ta.value : '').trim();
   if (!text) { showToast('Escreva a atualização antes de postar.', 'error'); return; }
-  const ok = addPendenciaNote(id, text, getUser().name);
+  const vis = _penComposerVis();
+  // Lido antes de salvar: openPendenciaDetail logo abaixo redesenha o modal
+  // inteiro, e a caixinha deixa de existir.
+  const _box = document.getElementById('penNoteEmail');
+  const _mandarEmail = vis === 'resposta' && !!(_box && _box.checked);
+  const ok = addPendenciaNote(id, text, getUser().name, vis);
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
-  showToast('Atualização postada!', 'success');
+  showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
+  if (_mandarEmail) penResponderPorEmail(id, text);
   openPendenciaDetail(id);
   renderPenView(false);
+}
+
+/**
+ * Manda a nota pública por e-mail a quem abriu o chamado, na mesma conversa.
+ * A nota JÁ está salva quando isto roda: e-mail que não sai não desfaz o
+ * registro, só avisa — o contrário perderia o trabalho do técnico.
+ * O destinatário não vai daqui: a function lê o `solicitante_email` do
+ * próprio chamado (ver supabase/functions/pendencia-responder/index.ts).
+ */
+function penResponderPorEmail(id, text) {
+  var online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  if (!online) {
+    showToast('A nota foi salva, mas o e-mail não saiu: sem conexão com o servidor.', 'error');
+    return;
+  }
+  supabaseClient.functions.invoke('pendencia-responder', { body: { pendencia_id: id, text: text } })
+    .then(function (r) {
+      var d = r && r.data;
+      if ((r && r.error) || !d || d.success !== true) {
+        var msg = (d && d.error) || (r && r.error && r.error.message) || 'erro desconhecido';
+        showToast('A nota foi salva, mas o e-mail não saiu: ' + msg, 'error');
+        return;
+      }
+      showToast(d.threaded
+        ? 'E-mail enviado para ' + d.to + '.'
+        : 'E-mail enviado para ' + d.to + ' — como conversa nova (o original não trouxe Message-ID).', 'success');
+    })
+    .catch(function (e) {
+      showToast('A nota foi salva, mas o e-mail não saiu.', 'error');
+      if (typeof _logSilent === 'function') _logSilent(e, 'pendencias-detalhe:responder-email');
+    });
 }
 
 // pre: valores iniciais de uma pendência nova (ex.: vindos da abertura rápida).
@@ -455,6 +665,13 @@ function submitPendenciaForm(e, id) {
       renderPenView(false);
     }
     updateBadges();
+    // Veio da caixa de entradas de e-mail (066): fecha o ciclo só agora, com
+    // o chamado já salvo — marcar na abertura do formulário perderia o e-mail
+    // se a pessoa desistisse no meio.
+    if (isNew) {
+      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id); }
+      catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:etr-marcar'); }
+    }
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
     if (_backToClient) {
       try {
@@ -517,5 +734,12 @@ function deletePendenciaConfirm(id) {
       updateBadges();
       showToast('Pendência restaurada.', 'success');
     });
+  });
+}
+
+// Compositor: alternar Resposta × Anotação interna (delegação, sem onclick).
+if (typeof registerActions === 'function') {
+  registerActions({
+    penNoteVis: (_el, vis) => penNoteVis(vis),
   });
 }

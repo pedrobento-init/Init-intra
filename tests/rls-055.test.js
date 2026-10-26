@@ -9,7 +9,9 @@ import { PGlite } from '@electric-sql/pglite';
 // (3) num projeto sem a liberação automática de tabelas (Supabase novo),
 //     o app passa a ter acesso só pelos GRANTs da 055;
 // (4) a leitura leve do sync fica bem mais rápida.
-const mig = (n) => fs.readFileSync(new URL('../supabase/migrations/' + n, import.meta.url), 'utf8');
+// Normaliza fim de linha: num checkout Windows (core.autocrlf) o .sql vem com
+// CRLF, e as buscas por fim de linha deste arquivo não casariam.
+const mig = (n) => fs.readFileSync(new URL('../supabase/migrations/' + n, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const BEFORE = ['042_rls_completo.sql', '045_vencimentos.sql', '048_time_entries.sql', '050_client_errors.sql', '053_push_subscriptions.sql'].map(mig);
 const M055 = mig('055_grants_rls_rapido.sql');
 

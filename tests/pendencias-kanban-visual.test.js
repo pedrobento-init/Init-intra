@@ -41,7 +41,7 @@ try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
   vm.runInContext(
-    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip };',
+    'globalThis.__t = { penKanbanCard, penStatusSummary, penColColor, penPriColor, _penPagerBar, STATUS_PEN_MAP, PEN_UI_PAGE_SIZE, penClientChipState, togglePenClientChip, penColSortLabel, penColSortWord, penParadaLabel };',
     sandbox
   );
 } finally {
@@ -139,6 +139,43 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
   });
 });
 
+describe('card do quadro: abrir pelo teclado', () => {
+  // O card era uma <article> com onclick: clique funcionava, Tab não
+  // chegava nele e quem navega por teclado não abria chamado nenhum.
+  it('o título é um <button>, que é o que recebe o foco', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).toMatch(/<button type="button" class="kanban-card-title kc-open"/);
+    expect(html).not.toContain('onclick="openPendenciaDetail');
+  });
+
+  it('card e título abrem o detalhe por delegação, não por handler inline', () => {
+    const html = T.penKanbanCard(basePen({ id: 'PEN-9' }));
+    const abre = html.match(/data-action="openPendencia" data-arg="PEN-9"/g) || [];
+    expect(abre.length).toBe(2); // a <article> inteira e o título
+  });
+
+  it('a <article> não vira role="button": ela tem botões dentro', () => {
+    const html = T.penKanbanCard(basePen());
+    expect(html).not.toMatch(/<article[^>]*role="button"/);
+    expect(html).toContain('class="kc-menu"');
+  });
+});
+
+describe('botão de ordenar a coluna', () => {
+  // O ícone trocava a cada clique, mas o rótulo acessível era sempre
+  // "Ordenar <coluna>": quem usa leitor de tela nunca sabia a ordem atual.
+  it('o rótulo acessível diz a ordem em vigor, não só o nome da coluna', () => {
+    expect(T.penColSortLabel('prazo')).toBe('por prazo');
+    expect(T.penColSortLabel('prioridade')).toBe('por prioridade');
+    expect(T.penColSortLabel('manual')).toContain('arrastando');
+    expect(T.penColSortLabel('criacao')).toBe('por criação');
+  });
+
+  it('modo desconhecido cai em criação, a ordem padrão da coluna', () => {
+    expect(T.penColSortLabel('')).toBe('por criação');
+  });
+});
+
 describe('linha-resumo do quadro', () => {
   it('total + colunas + vencidas', () => {
     const html = T.penStatusSummary([
@@ -203,5 +240,40 @@ describe('cards de cliente: toggle com estado pressionado', () => {
     expect(src).toContain('aria-pressed');
     const css = fs.readFileSync('css/styles.css', 'utf8').replace(/\s+/g, ' ');
     expect(css).toContain('.pen-cv-card.is-active');
+  });
+});
+
+describe('selo "Parada": o tamanho do problema no texto', () => {
+  // Antes era só "Parada", com o "há quanto tempo" preso no title: 8 dias e 3
+  // meses pediam a mesma atenção e o celular não alcançava nenhum dos dois.
+  it('diz há quantos dias a pendência não é tocada', () => {
+    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 12 * 86400000).toISOString() }))
+      .toBe('Parada há 12 dias');
+  });
+
+  it('um dia só não vira "1 dias"', () => {
+    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 1 * 86400000 - 1000).toISOString() }))
+      .toBe('Parada há 1 dia');
+  });
+
+  it('sem data de referência, cai no rótulo curto em vez de inventar prazo', () => {
+    expect(T.penParadaLabel({})).toBe('Parada');
+    expect(T.penParadaLabel(null)).toBe('Parada');
+  });
+
+  it('o selo no card carrega o texto e dispensa o title', () => {
+    const p = basePen({ updatedAt: new Date(Date.now() - 30 * 86400000).toISOString() });
+    const html = T.penKanbanCard(p);
+    expect(html).toContain('Parada há 30 dias');
+    expect(html).not.toContain('Sem atualização há 7+ dias');
+  });
+});
+
+describe('nome da ordem da coluna', () => {
+  it('o substantivo serve ao selo; a frase, ao rótulo acessível', () => {
+    expect(T.penColSortWord('prazo')).toBe('prazo');
+    expect(T.penColSortLabel('prazo')).toBe('por prazo');
+    expect(T.penColSortWord('manual')).toBe('manual');
+    expect(T.penColSortLabel('manual')).toContain('arrastando');
   });
 });

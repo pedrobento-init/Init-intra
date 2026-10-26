@@ -3,56 +3,31 @@
 // de outro operador. Requer a SERVICE ROLE KEY, que NUNCA deve ir para o cliente.
 //
 // CONFIGURAÇÃO:
-//   1. supabase secrets set SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxx
 //   2. supabase functions deploy update-user-password
 //   3. Garanta que o operador que chama tenha is_admin = true E auth_user_id vinculado.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+// CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.error("SUPABASE_SERVICE_ROLE_KEY não configurada");
-    return json({ error: "Service role key não configurada" }, 500);
-  }
 
-  const authHeader = req.headers.get("authorization") || "";
-  const callerToken = authHeader.replace(/^Bearer\s+/i, "");
+  // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
+  // pronto no contexto.
+  const admin = ctx.supabaseAdmin;
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // 1) Identificar quem está chamando (JWT do usuário logado)
-  let callerUid: string | null = null;
-  if (callerToken) {
-    const { data } = await admin.auth.getUser(callerToken);
-    callerUid = data?.user?.id ?? null;
-  }
+  // 1) Quem está chamando (claims do JWT do usuário logado)
+  const callerUid = ctx.userClaims?.id ?? null;
   if (!callerUid) {
     return json({ error: "Não autenticado" }, 401);
   }
@@ -99,4 +74,6 @@ serve(async (req: Request) => {
   }
 
   return json({ success: true });
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };

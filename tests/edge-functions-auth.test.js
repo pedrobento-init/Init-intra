@@ -80,6 +80,11 @@ const FUNCTIONS = [
   { nome: 'ia-relatorio', equipe: 'nenhum', body: {} },
   { nome: 'send-email', equipe: 'nenhum', body: {} },
   { nome: 'send-push', equipe: 'nenhum', body: {} },
+  {
+    nome: 'pendencia-responder',
+    equipe: 'nenhum',
+    body: { pendencia_id: 'p1', text: 'resposta de teste' },
+  },
 ];
 
 /** Status da resposta; se estourar DEPOIS do gate, o gate deixou passar. */
@@ -91,16 +96,19 @@ async function status(handler, req) {
   }
 }
 
-describe('Edge Functions: as 13 com JWT estão na lista', () => {
-  it('a lista cobre todas as functions que chamam auth.getUser', async () => {
+describe('Edge Functions: as 14 com JWT estão na lista', () => {
+  it('a lista cobre todas as functions que exigem usuário', async () => {
     const fs = await import('node:fs');
     const dir = new URL('../supabase/functions/', import.meta.url);
     const comJwt = fs
       .readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isDirectory() && fs.existsSync(new URL(`${e.name}/index.ts`, dir)))
-      .filter((e) =>
-        /auth\.getUser\(/.test(fs.readFileSync(new URL(`${e.name}/index.ts`, dir), 'utf8'))
-      )
+      .filter((e) => {
+        const src = fs.readFileSync(new URL(`${e.name}/index.ts`, dir), 'utf8');
+        // Forma nova (withSupabase faz o gate) ou a antiga, que ainda existe
+        // nas functions autenticadas por segredo próprio.
+        return /auth:\s*["']user["']/.test(src) || /auth\.getUser\(/.test(src);
+      })
       .map((e) => e.name)
       .sort();
     expect(FUNCTIONS.map((f) => f.nome).sort()).toEqual(comJwt);

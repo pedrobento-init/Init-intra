@@ -192,8 +192,18 @@ export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; h
 
 // ── Triagem de e-mail (pendência aberta pelo Intra) ─────────────────────────
 
-/** Mesmo pacote que vem do Gmail no monitor de backup. */
-export type EmailEntrada = EmailBackup;
+/**
+ * Mesmo pacote que vem do Gmail no monitor de backup, mais o `message_id`:
+ * o cabeçalho Message-ID do RFC 5322, não o id interno do Gmail. É ele que a
+ * resposta devolve em In-Reply-To para cair na mesma conversa do cliente.
+ * Opcional: e-mail antigo (antes do Robo.gs mandar o cabeçalho) abre
+ * pendência igual, só não dá para responder pela tela.
+ */
+// `thread_id` é o id da CONVERSA no Gmail (th.getId()), não o da mensagem:
+// é por ele que a triagem sabe que esta mensagem pertence a um chamado que
+// já existe. Opcional: e-mail de antes do Robo.gs mandar o campo abre
+// chamado novo, como antes.
+export type EmailEntrada = EmailBackup & { message_id?: string | null; thread_id?: string | null };
 export type Cliente = {
   id: string; name: string; team?: string | null; technician?: string | null;
   emails?: Record<string, unknown> | null;
@@ -229,6 +239,104 @@ export function nomeDoRemetente(de: string): string {
   if (m) return m[1].trim().slice(0, 120);
   return (enderecoDoRemetente(s).split("@")[0] || s).trim().slice(0, 120);
 }
+
+// ── Corpo do e-mail: só o que a pessoa escreveu agora ──────────────────────
+// Um e-mail de resposta carrega a conversa inteira citada embaixo e a
+// assinatura de quem escreveu. Isso ia cru para a IA e, sem IA, virava a
+// descrição do chamado — que terminava no meio de "Em qui., 22 de", porque o
+// corte de 600 caracteres caía dentro do trecho citado.
+//
+// A regra é errar para MENOS: na dúvida o texto fica. Nenhum corte depende de
+// adivinhar o formato do cliente; todos são marcadores que o próprio programa
+// de e-mail escreve.
+
+/** Início da conversa citada. O primeiro que casar manda. */
+const MARCAS_CITACAO: RegExp[] = [
+  // Gmail: "Em qui., 22 de out. de 2026 às 10:30, Fulano <f@x> escreveu:".
+  // A linha quebra no meio com frequência, por isso [\s\S] e não ponto.
+  /^[ \t]*Em[ \t][\s\S]{0,300}?escreveu:[ \t]*$/im,
+  /^[ \t]*On[ \t][\s\S]{0,300}?wrote:[ \t]*$/im,
+  // Outlook e clientes que encaminham com cabeçalho.
+  /^[ \t]*-{2,}[ \t]*(Mensagem original|Original Message|Mensagem encaminhada|Forwarded message)[ \t]*-{2,}/im,
+  /^[ \t]*_{10,}[ \t]*$/m,
+  /^[ \t]*(De|From):[ \t].*\n[ \t]*(Enviada em|Enviado em|Enviada|Sent|Data|Date):[ \t]/im,
+  // Primeira linha citada com ">".
+  /^[ \t]*>/m,
+];
+
+// O delimitador do RFC 3676 ("-- " sozinho na linha): sem ambiguidade nenhuma.
+const MARCA_SIG_RFC = /^-- ?[ \t]*$/m;
+const DESPEDIDAS = /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
+// Sinais de bloco de contato: telefone, site ou e-mail soltos.
+const SINAL_CONTATO = /(\+?\d[\d ().-]{7,}\d)|(https?:\/\/|www\.)|([^\s@]+@[^\s@]+\.[^\s@]{2,})/i;
+
+/** Menor índice entre os marcadores, ou -1. */
+function _primeiroCorte(s: string, marcas: RegExp[]): number {
+  let corte = -1;
+  for (const re of marcas) {
+    const m = re.exec(s);
+    if (m && m.index >= 0 && (corte === -1 || m.index < corte)) corte = m.index;
+  }
+  return corte;
+}
+
+/**
+ * Corta a assinatura. O delimitador "-- " do RFC vale sozinho. Uma despedida
+ * ("Obrigado,", "Atenciosamente") só corta quando o que vem depois PARECE
+ * bloco de contato: curto e com telefone, site ou e-mail. Despedida seguida de
+ * texto de verdade fica, porque ali a pessoa ainda estava falando.
+ */
+function _semAssinatura(s: string): string {
+  const rfc = MARCA_SIG_RFC.exec(s);
+  let corpo = rfc ? s.slice(0, rfc.index) : s;
+  const d = DESPEDIDAS.exec(corpo);
+  if (d) {
+    const depois = corpo.slice(d.index + d[0].length).trim();
+    if (depois.length <= 400 && SINAL_CONTATO.test(depois)) {
+      // A despedida em si fica: é a última coisa que a pessoa escreveu.
+      corpo = corpo.slice(0, d.index + d[0].length);
+    }
+  }
+  return corpo;
+}
+
+/**
+ * O que a pessoa escreveu agora: sem a conversa citada e sem a assinatura.
+ * Devolve o texto original quando o corte não deixaria quase nada — um e-mail
+ * de duas linhas não pode virar um chamado vazio.
+ */
+export function corpoLimpo(trecho: string): string {
+  const original = String(trecho || "").replace(/\r\n?/g, "\n");
+  if (!original.trim()) return "";
+  const corte = _primeiroCorte(original, MARCAS_CITACAO);
+  const semCitacao = corte > 0 ? original.slice(0, corte) : original;
+  const limpo = _semAssinatura(semCitacao).replace(/\n{3,}/g, "\n\n").trim();
+  // Sobrou pouco demais: algum marcador pegou texto de verdade.
+  if (limpo.length < 20 && original.trim().length >= 20) return original.trim();
+  return limpo;
+}
+
+/**
+ * Remetente do próprio domínio da Init. O robô varre a CONVERSA inteira do
+ * rótulo, então a nossa resposta ao cliente chega aqui como mensagem nova e
+ * abria um chamado com o técnico como solicitante — e responder naquele
+ * chamado devolveria o e-mail para a própria Init.
+ */
+export function remetenteInterno(de: string, dominios: string[]): boolean {
+  const d = (enderecoDoRemetente(de).split("@")[1] || "").trim();
+  if (!d) return false;
+  return (dominios || []).some((x) => {
+    const n = String(x || "").trim().toLowerCase().replace(/^@/, "");
+    return !!n && n.includes(".") && (d === n || d.endsWith("." + n));
+  });
+}
+
+/** Domínio da caixa do robô (GMAIL_USER): o domínio "de casa", sem secret novo. */
+export function dominiosInternos(gmailUser: string): string[] {
+  const d = (String(gmailUser || "").trim().toLowerCase().split("@")[1] || "").trim();
+  return d.includes(".") ? [d] : [];
+}
+
 
 /** Tira os Re:/Enc: empilhados do assunto. */
 export function assuntoLimpo(assunto: string): string {
@@ -276,7 +384,10 @@ export function triagemDaIa(body: string, e: EmailEntrada): Triagem {
   return {
     ignorar: j?.ignorar === true || String(j?.ignorar ?? "").toLowerCase() === "true",
     assunto: texto(j?.assunto, 140) || assuntoLimpo(e.assunto) || "Pedido por e-mail",
-    descricao: texto(j?.descricao, 600) || texto(e.trecho, 600),
+    // Sem IA, a descrição é o e-mail: corpoLimpo tira a conversa citada e a
+    // assinatura antes do corte de 600, que era o que terminava no meio de
+    // "Em qui., 22 de".
+    descricao: texto(j?.descricao, 600) || texto(corpoLimpo(e.trecho || ""), 600),
     categoria: umaDe(j?.categoria, PEN_CATEGORIAS, "outro"),
     prioridade,
     tipo: umaDe(j?.tipo, PEN_TIPOS, "Suporte"),
@@ -321,9 +432,80 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     id, client_id: c.id, client_name: c.name || "", team: c.team || "init",
     tipo: t.tipo, assunto: t.assunto, descricao: t.descricao + origem,
     responsible: c.technician || "", solicitante: t.solicitante,
+    // O e-mail inteiro (066). A `descricao` é resumo: a IA escreve em 600
+    // caracteres, e sem IA o corte de 600 come o fim do que a pessoa escreveu.
+    // Quem atende precisa do texto todo, e ir buscar no Gmail é o que fazia a
+    // triagem parecer meio caminho.
+    email_corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
+    solicitante_email: enderecoDoRemetente(e.de) || null,
+    email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
+    email_thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
     status: "aberto", priority: t.prioridade, canal: "email", categoria: t.categoria,
     first_response_due: primeiraRespostaDue(t.prioridade, agora),
     attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,
+  };
+}
+
+
+/**
+ * Nota de uma mensagem que chegou na conversa de um chamado que já existe.
+ *
+ * `visibility: "solicitante"` é um valor novo, de propósito: só "resposta"
+ * conta como 1ª resposta no SLA (js/sla.js, slaNotaEhResposta), então a fala
+ * de quem PEDIU nunca pode marcar que a gente respondeu. Fail-closed — se um
+ * dia alguém esquecer deste caminho, o pior que acontece é não contar.
+ */
+export function notaDoSolicitante(e: EmailEntrada, agora: Date = new Date()) {
+  const texto = corpoLimpo(e.trecho || "").slice(0, 4000);
+  return {
+    text: texto || "(mensagem sem texto)",
+    author: nomeDoRemetente(e.de),
+    createdAt: (Date.parse(e.data) ? new Date(e.data) : agora).toISOString(),
+    mentionedOperators: [],
+    visibility: "solicitante",
+  };
+}
+
+/** Por que um e-mail que chegou não virou chamado. */
+export type MotivoNaoAproveitado = "sem_cliente" | "ignorado_ia";
+
+/**
+ * Linha da caixa de triagem (066): o e-mail que chegou e NÃO virou chamado.
+ *
+ * Antes disto, os dois caminhos de descarte eram silenciosos — `semCliente`
+ * ia para um JSON que ninguém lê, e `ignorados` era só um contador. Os dois
+ * podem ser pedido de cliente: o domínio pode não estar na ficha, a pessoa
+ * pode ter escrito do Gmail pessoal, e o Make erra ao marcar `ignorar`.
+ *
+ * Guarda o corpo LIMPO, não o cru: é o que alguém vai ler para decidir em
+ * cinco segundos se aquilo era um chamado. O e-mail original continua no
+ * Gmail, que é o arquivo de verdade.
+ */
+export function entradaNaoAproveitada(
+  e: EmailEntrada,
+  motivo: MotivoNaoAproveitado,
+  id: string,
+  team = "init",
+  agora: Date = new Date(),
+) {
+  const recebido = Date.parse(String(e.data || "")) ? new Date(String(e.data)).toISOString() : agora.toISOString();
+  return {
+    id,
+    email_id: String(e.id || "").slice(0, 200),
+    thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
+    message_id: String(e.message_id || "").trim().slice(0, 500) || null,
+    de: String(e.de || "").slice(0, 300),
+    assunto: String(e.assunto || "").slice(0, 300),
+    corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
+    recebido_em: recebido,
+    motivo,
+    status: "pendente",
+    pendencia_id: null,
+    team: team || "init",
+    tratado_por: null,
+    tratado_em: null,
+    created_at: agora.toISOString(),
+    updated_at: agora.toISOString(),
   };
 }
 

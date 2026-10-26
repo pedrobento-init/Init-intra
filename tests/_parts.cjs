@@ -7,7 +7,7 @@ const Module = require('module');
 const GROUPS = {
   storage: ['storage.js', 'storage-anexos.js', 'storage-pendencias.js', 'storage-visitas.js', 'storage-operadores.js'],
   clients: ['clients.js', 'clients-ficha.js', 'clients-abas.js', 'clients-form.js'],
-  pendencias: ['pendencias.js', 'pendencias-quadro.js', 'pendencias-acoes.js', 'pendencias-detalhe.js', 'pendencias-comando.js'],
+  pendencias: ['pendencias.js', 'pendencias-quadro.js', 'pendencias-fila.js', 'pendencias-acoes.js', 'pendencias-detalhe.js', 'pendencias-comando.js'],
 };
 const filesOf = (g) => GROUPS[g].map((f) => path.join(__dirname, '..', 'js', f));
 

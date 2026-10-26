@@ -62,6 +62,15 @@ describe('card da pendência (contrato no código)', () => {
     expect(src).toContain('openTimerAdjust(');
     expect(src).toContain('kb-timer-forgot');
   });
+  it('cronômetro esquecido diz "ligado há X" no texto, não só no title', () => {
+    // audit. #8: o aviso de esquecimento tinha que depender do mouse pra ser lido.
+    expect(src).toContain('kb-timer-ago');
+    expect(src).toContain('ligado há ');
+    // forma antiga: ícone + total e o "há X" preso em title/aria-label.
+    expect(src).not.toContain("PEN_ICO_WARN + display + '</button>'");
+    // o title/aria-label continua, agora como reforço — nunca como única via.
+    expect(src).toContain('title="Cronômetro ligado há ');
+  });
   it('"Parada" some quando o cronômetro está rodando', () => {
     expect(src).toContain('isStalePendencia(p) && !p.timerRunning');
   });

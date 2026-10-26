@@ -1614,6 +1614,224 @@ body.dark-theme .op-badge-inactive { background: rgba(255,255,255,0.06); color: 
 .kanban-col.drag-over .kanban-cards {
   background: rgba(26,86,219,0.04);
 }
+/* ══ FILA DE ATENDIMENTO (tabela) ═══════════════════════════════════════
+   O quadro é de quem trabalha o dia; a fila é de quem olha o conjunto.
+   Densidade maior de propósito: a pergunta aqui é "o que está vencendo e
+   com quem está", e isso se responde varrendo linhas, não lendo cards. */
+.pen-view-tabs { margin-left: auto; }
+.pen-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pen-view-tab:first-child { border-radius: 8px 0 0 8px; }
+.pen-view-tab:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.pen-view-tab:hover { background: var(--bg-hover); }
+.pen-view-tab.is-active {
+  background: var(--accent-dim2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pf-wrap {
+  overflow-x: auto;              /* telas estreitas rolam a tabela */
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+.pf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 920px;              /* abaixo disso as colunas se esmagam */
+}
+.pf-table thead th {
+  position: sticky;              /* cabeçalho fixo ao rolar listas longas */
+  top: 0;
+  z-index: 1;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.pf-th {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pf-th:hover { color: var(--text-primary); }
+.pf-table th.is-sorted .pf-th { color: var(--accent); }
+.pf-seta { opacity: .45; font-size: 10px; }
+.pf-seta.is-on { opacity: 1; }
+
+.pf-row { border-bottom: 1px solid var(--border); cursor: pointer; }
+.pf-row:last-child { border-bottom: 0; }
+.pf-row:hover { background: var(--bg-hover); }
+.pf-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pf-table td { padding: 9px 12px; vertical-align: middle; }
+
+.pf-num { white-space: nowrap; }
+.pf-data { white-space: nowrap; color: var(--text-secondary); }
+.pf-titulo {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.pf-cliente, .pf-solic, .pf-resp { color: var(--text-secondary); white-space: nowrap; }
+.pf-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.pf-prazo { white-space: nowrap; }
+.pf-prazo-data.is-late { color: var(--red); font-weight: 700; }
+.pf-selos { margin-left: 6px; }
+.pf-vazio { padding: 28px 12px; text-align: center; color: var(--text-muted); }
+
+/* ── Feed: resposta ao solicitante × anotação interna ─────────────────────
+   A interna precisa ser reconhecível de relance, sem gritar: fundo âmbar
+   discreto e barra lateral. Tudo em tokens, para o tema escuro acompanhar. */
+.pen-cmd-vis {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pen-vis-tab {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pen-vis-tab:hover { background: var(--bg-hover); }
+.pen-vis-tab.is-on {
+  background: var(--accent-dim2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pen-vis-tab.is-on[data-arg="interna"] {
+  background: var(--yellow-dim);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+.feed-msg.is-interna .feed-bubble {
+  background: var(--yellow-dim);
+  border-left: 3px solid var(--yellow);
+}
+
+/* Enviar a resposta por e-mail a quem pediu (064). Fica logo abaixo da caixa
+   de texto, não escondido na barra de botões: sair do Intra e chegar na caixa
+   de outra pessoa merece ser lido antes de clicar em postar. */
+.pen-cmd-email {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-dim2);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.pen-cmd-email input { cursor: pointer; margin: 0; }
+.pen-cmd-email strong { color: var(--text); font-weight: 600; word-break: break-all; }
+.feed-tag-interna {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+/* Fala de quem pediu, chegada por e-mail (065). Lê como mensagem recebida,
+   não como anotação da equipe: a faixa é a do cliente, não o amarelo de
+   "só a equipe vê". */
+.feed-tag-solicitante {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.feed-msg.is-solicitante .feed-bubble {
+  background: var(--accent-dim2);
+  border-left: 3px solid var(--accent);
+}
+
+/* Linha do tempo (063): evento é marcador no fio, não balão de mensagem —
+   precisa ler como "aconteceu isto" e não competir com as falas. */
+.pen-ev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.pen-ev::before,
+.pen-ev::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  opacity: .5;
+}
+.pen-ev-txt { white-space: nowrap; }
+.pen-ev-de { text-decoration: line-through; opacity: .7; }
+.pen-ev-at { white-space: nowrap; opacity: .7; }
+@media screen and (max-width: 640px) {
+  .pen-ev { flex-wrap: wrap; }
+  .pen-ev::before, .pen-ev::after { display: none; }
+  .pen-ev-txt { white-space: normal; }
+}
+
+/* Ordem manual (062): linha mostrando ONDE o card vai cair — acima do alvo. */
+.kanban-card.kb-drop-before {
+  position: relative;
+}
+.kanban-card.kb-drop-before::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
 
 /* ==========================================================================
    📱 3. RESPONSIVE DESIGN & VISUAL POLISH SYSTEM
@@ -4142,7 +4360,123 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-inline-select:hover, .pen-inline-date:hover { border-color: var(--border); background: var(--bg-hover); }
 .pen-inline-select:focus, .pen-inline-date:focus { border-color: var(--accent); background: var(--bg-surface); outline: none; }
 /* Descrição como bloco de conteúdo principal. */
+/* ── Caixa de entradas de e-mail sem chamado (066) ────────────────────────
+   Fica no topo das Pendências e some quando não há nada pendente: painel
+   vazio todo dia vira ruído, e aí ninguém lê no dia em que importa. */
+.etr-box {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--yellow);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+.etr-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.etr-head:hover { background: var(--accent-dim2); }
+.etr-head-title { flex: 1; }
+.etr-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #1b1403;
+  font-size: 12px;
+  text-align: center;
+}
+.etr-chevron { color: var(--text-muted); font-size: 11px; }
+.etr-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  display: grid;
+  gap: 10px;
+}
+.etr-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-dim2);
+}
+.etr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.etr-motivo {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--red-dim);
+  color: var(--red);
+  cursor: help;
+}
+.etr-motivo--ignorado_ia { background: var(--accent-dim2); color: var(--text-secondary); }
+.etr-quando { margin-left: auto; color: var(--text-muted); font-size: 11.5px; }
+.etr-assunto { font-weight: 600; font-size: 13.5px; word-break: break-word; }
+.etr-de { color: var(--text-secondary); font-size: 12px; word-break: break-all; }
+.etr-trecho {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.etr-acoes { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .etr-quando { margin-left: 0; width: 100%; }
+  .etr-top { flex-wrap: wrap; }
+  .etr-acoes > .btn { flex: 1; }
+}
+
 .pen-desc-block { margin-top: 14px; }
+/* Origem do chamado nascido de triagem (066). Antes isto era texto colado no
+   fim da descrição — metadado disfarçado de pedido. Como cartão, dá para
+   ignorar com os olhos, que é o que se faz com metadado 99% do tempo. */
+.pen-origem {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 12px;
+}
+.pen-origem-head { color: var(--text-secondary); font-weight: 600; margin-bottom: 5px; }
+.pen-origem-lista { margin: 0; display: grid; gap: 2px; }
+.pen-origem-item { display: flex; gap: 6px; }
+.pen-origem-item dt { color: var(--text-muted); min-width: 108px; flex: none; }
+.pen-origem-item dd { margin: 0; color: var(--text); word-break: break-word; }
+/* O e-mail inteiro fica fechado: ele é longo por natureza, e quem abre o
+   chamado quer primeiro o resumo. Aberto por padrão, empurraria o feed para
+   fora da tela. */
+.pen-email-full { margin-top: 10px; }
+.pen-email-full > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 0;
+}
+.pen-email-full > summary:hover { color: var(--text); }
+.pen-email-corpo {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--border);
+  background: var(--accent-dim2);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-height: 420px;
+  overflow: auto;
+}
 .pen-desc {
   font-size: 13.5px; line-height: 1.65; color: var(--text-primary);
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
@@ -4231,6 +4565,26 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-more-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; line-height:1; }
 .pen-more-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); min-width:280px; max-width:100%; }
 .pen-search-bar .pen-more-panel, .equip-search-bar .pen-more-panel { right:auto; left:0; }
+
+/* ── Selos dos filtros ativos ──────────────────────────────────────────── */
+/* Ficam entre a barra e a lista: é onde o olho procura "por que só tem 3
+   chamados aqui?". Cada selo carrega o próprio ✕; o último limpa todos. */
+.pen-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 10px; }
+.pen-chips:empty { display:none; }
+.pen-chips-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-right:2px; }
+.pen-chip { display:inline-flex; align-items:center; gap:4px; max-width:260px; padding:3px 4px 3px 9px; border:1px solid var(--border); border-radius:999px; background:var(--bg-surface); font-size:12px; color:var(--text-primary); line-height:1.4; }
+.pen-chip-nome { color:var(--text-muted); font-weight:600; }
+.pen-chip-nome::after { content:":"; margin-right:3px; }
+.pen-chip-x { display:inline-grid; place-items:center; width:18px; height:18px; flex-shrink:0; border:0; border-radius:50%; background:transparent; color:var(--text-muted); font-size:14px; line-height:1; cursor:pointer; transition:background var(--transition), color var(--transition); }
+.pen-chip-x:hover { background:var(--accent); color:#fff; }
+.pen-chips-all { border:0; background:none; padding:3px 6px; font-size:12px; font-weight:600; color:var(--accent); cursor:pointer; border-radius:6px; }
+.pen-chips-all:hover { text-decoration:underline; }
+.pen-chip-x:focus-visible, .pen-chips-all:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* Aviso de alcance da ordenação: aparece só quando a ordem não alcança a
+   tabela inteira, logo acima dela, onde o olho já está. */
+.pf-aviso { margin: 0 0 8px; font-size: 12px; color: var(--text-muted); }
+/* Saída do beco sem saída na fila vazia. */
+.pen-vazio-limpar { margin-left:8px; }
 @media(max-width:640px){ .pen-more-panel{ left:0; right:0; min-width:0; } }
 /* Celular: "Mais filtros" e "Limpar" lado a lado (antes, uma linha cheia
    para cada botão empurrava o quadro ~50px para baixo). */
@@ -4262,9 +4616,7 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .kc-pri .tag { padding:1px 6px; font-size:10px; }
 .kc-resp { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--text-secondary); max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .kc-resp--empty { color:var(--text-muted); font-style:italic; }
-.kc-overdue, .kc-stale, .kc-sla { display:inline-flex; align-items:center; gap:2px; font-size:10.5px; font-weight:600; white-space:nowrap; }
-.kc-sla--muted { background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:10px; border:1px solid #fde68a; }
-body.dark-theme .kc-sla--muted { background:rgba(217,119,6,0.15); color:#fbbf24; border-color:rgba(217,119,6,0.3); }
+.kc-overdue, .kc-stale { display:inline-flex; align-items:center; gap:2px; font-size:10.5px; font-weight:600; white-space:nowrap; }
 .kc-deadline { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); }
 .kc-deadline.is-empty { color:var(--text-muted); }
 .kc-deadline.is-overdue { color:#dc2626; font-weight:600; }
@@ -5478,6 +5830,24 @@ body.dark-theme #penSlaSummary {
 .pen-board .kanban-col-sort:hover {
   border-color: var(--kb-line); background: var(--kb-raised); color: var(--kb-text);
 }
+/* A ordem da coluna só ganha nome visível quando sai do padrão (criação):
+   cinco cabeçalhos repetindo "criação" seria ruído, e o que o olho precisa
+   saber é quando AQUELA coluna foge do resto. No padrão o botão continua o
+   quadrado de 22px de sempre; fora dele vira pastilha na cor da coluna, a
+   mesma linguagem do contador ao lado. */
+.pen-board .kanban-col-sort.is-custom {
+  width: auto; gap: 5px; padding: 0 8px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border-color: transparent;
+}
+.pen-board .kanban-col-sort.is-custom:hover {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  border-color: transparent; color: var(--c);
+}
+.pen-board .kcs-word { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+/* O nome cede largura ao selo em vez de empurrar o cabeçalho para fora. */
+.pen-board .kct-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pen-board .kanban-cards { padding: 0; gap: 10px; background: transparent; }
 .pen-board .kanban-cards .empty-state p { color: var(--kb-muted); font-size: 13px; margin-bottom: 8px; }
 
@@ -5563,10 +5933,9 @@ body.dark-theme #penSlaSummary {
   font: inherit;
 }
 .pen-board .kb-timer-forgot .kb-timer { color: inherit; }
+/* Idade da sessão no texto do botão âmbar: menor que o total, mas visível. */
+.pen-board .kb-timer-forgot .kb-timer-ago { font-size: 10.5px; font-weight: 600; opacity: .9; }
 .pen-board .kb-timer-forgot:hover { background: color-mix(in srgb, var(--kb-amber) 22%, transparent); }
-.pen-board .kc-sla {
-  font-size: 12px; font-weight: 600; color: var(--kb-muted); white-space: nowrap;
-}
 .pen-board .kc-overdue {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; font-weight: 700; color: var(--kb-red); white-space: nowrap;
@@ -6024,6 +6393,18 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 @media (hover: none) { .kc-menu { opacity: 1; } }
 .kc-recur { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--kb-muted); }
 .kc-recur .kb-ico { width: 13px; height: 13px; }
+/* Título do card é um <button>: precisa perder a cara de botão e manter o
+   recorte de 3 linhas que .kanban-card-title já define. Só a família da
+   fonte é reposta — tamanho, peso e cor vêm daquelas regras. */
+.kc-open {
+  appearance: none; -webkit-appearance: none; background: none; border: 0;
+  padding: 0; margin: 0; width: 100%; text-align: left;
+  font-family: inherit; cursor: pointer;
+}
+.pen-board .kanban-card-title.kc-open { padding-right: 24px; }
+.kc-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+/* O anel fica no título, mas quem está em foco é o card inteiro. */
+.kanban-card:has(.kc-open:focus-visible) { border-color: var(--accent); }
 .pen-quick-menu {
   position: fixed; z-index: 400; min-width: 220px; max-width: 280px; padding: 6px;
   background: var(--ds-panel); color: var(--ds-text); border: 1px solid var(--ds-line); border-radius: 10px;

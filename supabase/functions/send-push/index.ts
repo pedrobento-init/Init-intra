@@ -16,38 +16,25 @@
 // (lidos com service_role); quem envia não recebe o próprio push. O link
 // só pode ser uma rota do app ("#pendencias").
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { buildPushPayload, pushRecipients } from "./payload.ts";
 import { pushConfigured, pushToOperators, VAPID_PUBLIC_KEY } from "./push.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+// CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "GET" && req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    auth: { persistSession: false },
-  });
-  const { data: userData } = await sb.auth.getUser();
-  const { data: me } = userData?.user
-    ? await sb.from("operators").select("id,active").eq("auth_user_id", userData.user.id).maybeSingle()
+  // ctx.supabase é o client DO CHAMADOR (RLS aplica), equivalente ao antigo
+  // anon + Authorization repassado. ctx.supabaseAdmin, mais abaixo, é o que
+  // bypassa — a distinção importa e foi preservada.
+  const uid = ctx.userClaims?.id ?? null;
+  const { data: me } = uid
+    ? await ctx.supabase.from("operators").select("id,active").eq("auth_user_id", uid).maybeSingle()
     : { data: null };
   if (!me || me.active === false) return json({ error: "Não autorizado", code: "unauthorized" }, 401);
 
@@ -60,10 +47,12 @@ serve(async (req: Request) => {
   const payload = buildPushPayload(input);
   if (!payload || !to.length) return json({ error: "Destinatário e título obrigatórios" }, 400);
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const admin = ctx.supabaseAdmin;
   const { data: ops, error } = await admin.from("operators").select("id, email, active");
   if (error) return json({ error: "Não foi possível conferir os destinatários" }, 500);
   const ids = pushRecipients(ops ?? [], to, me.id);
   const result = await pushToOperators(admin, ids, payload);
   return json({ success: true, ...result });
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };

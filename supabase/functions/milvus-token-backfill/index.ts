@@ -6,8 +6,13 @@
 // CONFIGURAÇÃO (secrets — nunca no frontend, nunca no banco):
 //   supabase secrets set MILVUS_API_TOKEN=seu_token_aqui
 //   supabase secrets set MILVUS_API_URL=https://apiintegracao.milvus.com.br
-//   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxx
 //   supabase functions deploy milvus-token-backfill
+//
+// PILOTO @supabase/server (Fase 2 da migração): esta é a primeira function
+// a usar `withSupabase`, que resolve JWT, CORS e os dois clients a partir
+// das variáveis que a plataforma injeta — por isso não há mais
+// createClient/SERVICE_ROLE_KEY aqui. `verify_jwt = true` no config.toml
+// continua valendo (auth: "user"). O team/admin-check segue sendo nosso.
 //
 // REGRAS (sem fuzzy, sem sobrescrita):
 // - Match EXATO por nome_fantasia normalizado (trim + espaços + lower),
@@ -19,29 +24,21 @@
 // - Nome fora da lista do Milvus → não encontrado (fica p/ manual).
 // - Logs e erros nunca contêm valores de token (só contagens).
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MILVUS_API_URL =
   Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
 const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
 
 const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/cliente/busca`;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+// CORS e preflight ficam com o withSupabase. Sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — authorization, apikey,
+// x-client-info… — que são justamente os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -104,33 +101,21 @@ type PreviewRow = {
   status: "pronto" | "ja_preenchido" | "nao_encontrado" | "ambiguo";
 };
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
-  }
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.error("milvus-token-backfill: service role não configurada");
-    return json({ error: "Serviço indisponível" }, 500);
   }
   if (!MILVUS_API_TOKEN) {
     console.error("milvus-token-backfill: MILVUS_API_TOKEN não configurado");
     return json({ error: "Integração Milvus não configurada" }, 500);
   }
 
-  const authHeader = req.headers.get("authorization") || "";
-  const callerToken = authHeader.replace(/^Bearer\s+/i, "");
-  if (!callerToken) return json({ error: "Não autenticado" }, 401);
+  // JWT já verificado pelo withSupabase (auth: "user"): sem token válido a
+  // requisição não chega aqui, e o client admin vem pronto no contexto.
+  const admin = ctx.supabaseAdmin;
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // 1) Somente administradores ativos.
-  const { data: userData } = await admin.auth.getUser(callerToken);
-  const callerUid = userData?.user?.id ?? null;
+  // 1) Somente administradores ativos (regra de negócio — continua nossa).
+  const callerUid = ctx.userClaims?.id ?? null;
   if (!callerUid) return json({ error: "Não autenticado" }, 401);
 
   const { data: callerOp } = await admin
@@ -259,4 +244,6 @@ serve(async (req: Request) => {
   }
   console.log(`milvus-token-backfill: commit filled=${filled} skipped=${skipped.length}`);
   return json({ success: true, dryRun: false, filled, skipped });
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };

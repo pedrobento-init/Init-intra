@@ -3,6 +3,19 @@
 // clássicos: carregam logo depois de storage.js e compartilham os mesmos globais.
 // Nos testes, tests/_storage.cjs junta as partes na mesma ordem.
 
+// ── LINHA DO TEMPO DA PENDÊNCIA (migration 063) ──
+// Campos cujo movimento vira evento. Texto, anexos e cronômetro ficam de
+// fora de propósito: a linha conta a história do chamado, não cada toque.
+const PEN_EVENT_FIELDS = [
+  { key: 'status', type: 'status' },
+  { key: 'responsible', type: 'responsavel' },
+  { key: 'priority', type: 'prioridade' },
+  { key: 'deadline', type: 'prazo' },
+];
+// Teto: a coluna viaja junto do registro em todo sync; um chamado de anos
+// não pode engordar o payload sem limite. Corta os mais antigos.
+const PEN_MAX_EVENTS = 200;
+
 // ── CLIENTS ──
 // Lookup O(1) por id + ordenação memoizados por identidade do array
 // (setCacheStore troca a referência a cada escrita): getClients/getClientById
@@ -226,6 +239,33 @@ function _penFields() {
   return null;
 }
 
+// ── Ordenação da fila no servidor ─────────────────────────────────────────
+// A fila ordenava só as linhas já carregadas enquanto o cabeçalho prometia a
+// tabela inteira. Agora a coluna viaja para o ORDER BY — mas só as que o
+// banco ordena IGUAL ao comparador local. Ficam de fora, de propósito:
+//   · título, que é derivado (assunto, com a descrição como reserva);
+//   · status e prioridade, que pedem a ordem de negócio e não a alfabética
+//     ("alta" < "baixa" < "crítica" < "média" seria mentira).
+// Para essas três a ordem segue local, e a fila passa a dizer isso na tela.
+// Protocolo não é coluna nenhuma: o número de exibição é a posição na ordem
+// de criação, então ordenar por ele É ordenar por created_at.
+// Atenção: `solicitante` é optionalField — num banco sem a migration 056 o
+// ORDER BY falha e renderPenView cai no caminho local inteiro. Degrada para
+// a tela de antes, que é o mesmo destino de qualquer falha de consulta.
+const PEN_SORT_REMOTE = {
+  numero: 'created_at',
+  data: 'created_at',
+  cliente: 'client_name',
+  solicitante: 'solicitante',
+  responsavel: 'responsible',
+  prazo: 'deadline',
+};
+/** Coluna do banco para a coluna da fila, ou null se a ordem fica local. */
+function penSortRemoteCol(colId) {
+  if (!colId) return null;
+  return Object.prototype.hasOwnProperty.call(PEN_SORT_REMOTE, colId) ? PEN_SORT_REMOTE[colId] : null;
+}
+
 async function fetchPendenciasPage(opts) {
 
   const o = Object.assign({ scope: 'active', page: 0, pageSize: PEN_PAGE_DEFAULT_SIZE }, opts || {});
@@ -241,7 +281,15 @@ async function fetchPendenciasPage(opts) {
     clientId: o.clientId || '', responsible: o.responsible || '',
     status: o.status || '', priority: o.priority || '', search: o.search || ''
   });
-  q = q.order('created_at', { ascending: false }).order('id', { ascending: true });
+  const sortCol = penSortRemoteCol(o.sort && o.sort.col);
+  if (sortCol) {
+    // nullsFirst:false mantém o "vazio por último" que a fila faz local, nos
+    // dois sentidos; o id desempata para a página não variar entre consultas.
+    const asc = !(o.sort && o.sort.dir === 'desc');
+    q = q.order(sortCol, { ascending: asc, nullsFirst: false }).order('id', { ascending: true });
+  } else {
+    q = q.order('created_at', { ascending: false }).order('id', { ascending: true });
+  }
   const from = page * pageSize;
   const res = await q.range(from, from + pageSize - 1);
   if (res.error) throw new Error(res.error.message || 'Falha na consulta paginada');
@@ -351,6 +399,26 @@ function savePendencia(data) {
     }
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   let oldStatus = null;
+  // Linha do tempo (063): o que ACONTECEU, complementar a `notes`, que é o
+  // que a equipe ESCREVEU. Só campos que contam uma história — texto, anexos
+  // e cronômetro ficam de fora para a linha não virar ruído.
+  var _penEventos = function (antes, depois, quando, quem) {
+    var out = [];
+    PEN_EVENT_FIELDS.forEach(function (f) {
+      var de = antes ? (antes[f.key] ?? null) : null;
+      var para = depois ? (depois[f.key] ?? null) : null;
+      if (de === para) return;
+      if ((de === null || de === '') && (para === null || para === '')) return;
+      out.push({ at: quando, by: quem || '', type: f.type, de: de, para: para });
+    });
+    return out;
+  };
+  var _penComEventos = function (registro, novos) {
+    if (!novos || !novos.length) return registro;
+    var atual = Array.isArray(registro.events) ? registro.events : [];
+    registro.events = atual.concat(novos).slice(-PEN_MAX_EVENTS);
+    return registro;
+  };
   // SLA (056): prazo da 1ª resposta e registro da 1ª resposta (js/sla.js).
   var _slaActor = '';
   try { _slaActor = typeof getUser === 'function' ? (getUser().name || '') : ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
@@ -361,7 +429,15 @@ function savePendencia(data) {
   };
   if (isEdit) {
     const i = list.findIndex(p => p.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], _sla(list[i], { ...list[i], ...data, updatedAt: now }));
+    if (i !== -1) {
+      oldStatus = list[i].status;
+      var _antes = list[i];
+      var _depois = _sla(_antes, { ...list[i], ...data, updatedAt: now });
+      _penComEventos(_depois, _penEventos(_antes, _depois, now, _slaActor));
+      // O payload remoto nasce do registro mesclado (812ab0d) — sem isto os
+      // eventos novos ficariam só no cache local.
+      data.events = _depois.events;
+      list[i] = _withDirtyFields(_antes, _depois);
     } else {
       // Undo/restauração: o id original já vem no snapshot — preservá-lo
       // mantém links, anexos e visitId. Só gera id novo quando não há um.
@@ -377,6 +453,7 @@ function savePendencia(data) {
     data.updatedAt = now;
     data.status = data.status || 'em_andamento';
     _sla(null, data);
+    _penComEventos(data, [{ at: now, by: _slaActor || '', type: 'criado', de: null, para: data.status }]);
     list.push(data);
   }
   // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição
@@ -687,17 +764,26 @@ function highlightMentions(text) {
   });
 }
 
-function addPendenciaNote(id, text, author) {
+/**
+ * Acrescenta uma mensagem ao feed.
+ * @param visibility 'resposta' (vai para quem pediu) | 'interna' (só a equipe).
+ *   Default 'resposta': é o que o time já fazia antes da separação existir,
+ *   então o hábito de hoje continua valendo e o SLA não muda de sentido.
+ *   Nota sem o campo (anterior a esta mudança) é lida como INTERNA — fail-closed
+ *   para o dia em que o solicitante enxergar o chamado.
+ */
+function addPendenciaNote(id, text, author, visibility) {
   const list = getPendencias();
   const i = list.findIndex(p => p.id === id);
   if (i === -1) return false;
   if (!list[i].notes) list[i].notes = [];
   var mentionedOperators = parseMentionedOperators(text);
-  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators };
+  var _vis = visibility === 'interna' ? 'interna' : 'resposta';
+  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators, visibility: _vis };
   const _prevSla = { ...list[i], notes: list[i].notes.slice() };
   list[i].notes.push(note);
   list[i].updatedAt = new Date().toISOString();
-  // 1ª resposta (056): a primeira nota da equipe conta como resposta.
+  // 1ª resposta (056): só a nota marcada como resposta conta — ver slaOnSave.
   try { if (typeof slaOnSave === 'function') slaOnSave(_prevSla, list[i], list[i].updatedAt, author); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   const _respondeuAgora = !_prevSla.firstResponseAt && !!list[i].firstResponseAt;
   dbSet(DB.PENDENCIAS, list);

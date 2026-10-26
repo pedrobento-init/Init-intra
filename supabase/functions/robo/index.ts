@@ -29,8 +29,9 @@
 // pendência com canal "email" e a etiqueta "triagem-automatica"; o IA_WEBHOOK_URL
 // (Make) classifica assunto, descrição, tipo, prioridade e categoria. Sem o
 // Make — ou com ele fora do ar — a pendência abre com o texto do próprio
-// e-mail. Uma por mensagem (chave em avisos_enviados); e-mail de quem não é
-// cliente não abre nada.
+// e-mail. Uma por mensagem (chave em avisos_enviados). E-mail de quem não é
+// cliente, e e-mail que a IA marcou `ignorar`, não abrem chamado mas ficam na
+// caixa de triagem (066) para alguém olhar — antes sumiam em silêncio.
 // BACKUP: sem segredos (token Milvus do cliente, PIN dos operadores) e sem
 // as tabelas de credenciais/sincronização.
 
@@ -44,8 +45,10 @@ import {
 } from "./relatorios.ts";
 import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
-  type Cliente, clienteDoEmail, type Device, type EmailBackup, type EmailEntrada, type Monitor, monitorDoEmail,
-  pendenciaDaTriagem, pendenciaDoAlerta, textoDaIa, triagemDaIa,
+  type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
+  enderecoDoRemetente, entradaNaoAproveitada,
+  type Monitor, monitorDoEmail, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta, remetenteInterno,
+  textoDaIa, triagemDaIa,
 } from "./campo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -288,6 +291,9 @@ async function backups(db: SupabaseClient, input: { mensagens?: unknown }) {
   return json({ success: true, mensagens: msgs.length, casadas, alertas });
 }
 
+// Mesma lista de PEN_CLOSED_FOR_COUNT (campo.ts) e de isPendenciaClosed no app.
+const PEN_FECHADOS = ["concluido", "resolvido", "cancelado", "fechado"];
+
 /** Classificação do e-mail pelo Make; falhou ou não tem webhook, devolve "" (vale o e-mail). */
 async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
   if (!IA_WEBHOOK_URL) return "";
@@ -296,7 +302,9 @@ async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tarefa: "triagem", email_id: e.id, de: e.de, assunto: e.assunto, data: e.data,
-        trecho: String(e.trecho || "").slice(0, 2000), cliente: c.name || "",
+        // Vai o corpo limpo, não o e-mail cru: a IA classifica o que a pessoa
+        // escreveu agora, e a conversa citada deixa de passar pelo Make.
+        trecho: corpoLimpo(e.trecho || "").slice(0, 2000), cliente: c.name || "",
       }),
       signal: AbortSignal.timeout(25000),
     });
@@ -307,21 +315,123 @@ async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
   }
 }
 
+/**
+ * Chamado ABERTO que esta conversa já abriu, ou null.
+ *
+ * Fechado não conta: uma resposta depois de concluir é um pedido novo, e
+ * ressuscitar o chamado antigo esconderia isso do SLA e da fila. A busca é
+ * pelo id da conversa (índice parcial da migration 065); sem a coluna no
+ * banco, o erro volta aqui e a triagem segue abrindo chamado novo.
+ */
+async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
+  const t = String(threadId || "").trim();
+  if (!t) return null;
+  const { data, error } = await db.from("pendencias")
+    .select("id, status, notes, solicitante_email")
+    .eq("email_thread_id", t)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) {
+    console.error("robo triagem thread:", error.message);  // banco sem a 065
+    return null;
+  }
+  const aberto = (data || []).find((p) => !PEN_FECHADOS.includes(String(p.status)));
+  return aberto || null;
+}
+
+
+/**
+ * Guarda na caixa de triagem (066) o e-mail que não virou chamado.
+ *
+ * Banco sem a 066 não pode derrubar a triagem: o resto da rodada vale, e os
+ * chamados de quem É cliente continuam abrindo. Mas a chave de dedupe volta,
+ * para a mensagem ser tentada de novo na próxima rodada — assim, aplicar a
+ * migration recupera sozinho o que chegou nesse meio-tempo, em vez de deixar
+ * um buraco permanente.
+ */
+async function guardarEntrada(
+  db: SupabaseClient,
+  e: EmailEntrada,
+  motivo: "sem_cliente" | "ignorado_ia",
+  key: string,
+): Promise<boolean> {
+  const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), "init");
+  const { error } = await db.from("emails_triagem").insert(linha);
+  if (!error) return true;
+  // Já registrado: a rodada anterior gravou e caiu antes de seguir.
+  if (error.code === "23505") return true;
+  await db.from("avisos_enviados").delete().eq("key", key);
+  console.error(`robo triagem caixa ${e.id}:`, error.message);
+  return false;
+}
+
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
-  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, sem_cliente: [] });
+  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, sem_cliente: [] });
   const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
   const abertas: string[] = [], semCliente: string[] = [];
-  let ignorados = 0;
+  const dominios = dominiosInternos(GMAIL_USER);
+  let ignorados = 0, internos = 0, notas_em_aberto = 0;
   for (const e of msgs) {
+    // O robô varre a CONVERSA inteira do rótulo: a nossa própria resposta ao
+    // cliente chega aqui como mensagem nova. Ela não é pedido novo — abria um
+    // chamado com o técnico como solicitante, e responder ali devolveria o
+    // e-mail para a própria Init. Sai antes de tocar no banco.
+    if (remetenteInterno(e.de, dominios)) { internos++; continue; }
     // Uma pendência por mensagem, mesmo que o robô mande o e-mail duas vezes.
     const key = `triagem:${e.id}`;
     const { error } = await db.from("avisos_enviados").insert({ key });
     if (error) { if (error.code === "23505") continue; throw new Error("avisos_enviados: " + error.message); }
+    // Mensagem numa conversa que já abriu chamado: é a MESMA história, e um
+    // chamado por e-mail deixava quem atende com dois pela metade. Vira nota
+    // ali. Não passa pela IA: não há nada a classificar numa conversa que já
+    // tem assunto, cliente e prioridade — e é uma chamada a menos ao Make.
+    const aberto = await chamadoDaConversa(db, e.thread_id || "");
+    if (aberto) {
+      const notas = Array.isArray(aberto.notes) ? aberto.notes : [];
+      const agora = new Date().toISOString();
+      const patch: Record<string, unknown> = {
+        notes: [...notas, notaDoSolicitante(e)],
+        updated_at: agora,
+      };
+      // A resposta da tela sai em cima da ÚLTIMA mensagem da conversa: sem
+      // isto o In-Reply-To apontaria para o e-mail que abriu o chamado, lá
+      // atrás, e alguns clientes de e-mail desgrudam a conversa.
+      const mid = String(e.message_id || "").trim().slice(0, 500);
+      if (mid) patch.email_message_id = mid;
+      // Chamado antigo pode não ter endereço (aberto antes da 064).
+      if (!aberto.solicitante_email) {
+        const end = enderecoDoRemetente(e.de);
+        if (end) patch.solicitante_email = end;
+      }
+      const { error: erroNota } = await db.from("pendencias").update(patch).eq("id", aberto.id);
+      if (erroNota) {
+        await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo depois
+        console.error(`robo triagem nota ${e.id}:`, erroNota.message);
+        continue;
+      }
+      notas_em_aberto++;
+      continue;
+    }
     const c = clienteDoEmail(clientes, e);
-    if (!c) { semCliente.push(String(e.assunto || "").slice(0, 80)); continue; }
+    if (!c) {
+      // Antes isto era só `semCliente.push(assunto)`: o e-mail sumia e o
+      // assunto ia para um JSON que ninguém lê. Domínio fora da ficha e Gmail
+      // pessoal (que nunca casa, de propósito) são pedido de cliente tanto
+      // quanto os outros — agora ficam na caixa de triagem (066).
+      semCliente.push(String(e.assunto || "").slice(0, 80));
+      await guardarEntrada(db, e, "sem_cliente", key);
+      continue;
+    }
     const t = triagemDaIa(await classificarComIa(e, c), e);
-    if (t.ignorar) { ignorados++; continue; }  // propaganda, aviso automático, agradecimento
+    if (t.ignorar) {
+      // Propaganda, aviso automático, agradecimento — e, quando o Make erra,
+      // um pedido de verdade. Virar contador escondia o erro da IA; agora a
+      // mensagem fica para alguém conferir.
+      ignorados++;
+      await guardarEntrada(db, e, "ignorado_ia", key);
+      continue;
+    }
     const pen = pendenciaDaTriagem(t, e, c, "PEN-" + crypto.randomUUID(), new Date());
     const { error: erroPen } = await db.from("pendencias").insert(pen);
     if (erroPen) {
@@ -331,7 +441,8 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     }
     abertas.push(pen.id);
   }
-  return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, sem_cliente: semCliente });
+  return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, internos,
+    notas: notas_em_aberto, sem_cliente: semCliente });
 }
 
 async function indicadores(db: SupabaseClient) {

@@ -189,6 +189,89 @@ E-mail de cliente marcado com o rótulo **"Pendências"** no Gmail do robô vira
 
 **Prioridade crítica** a IA não dá sozinha — o SLA de 1 h fica para a equipe decidir, então o teto é Alta. Para liberar, mude `TRIAGEM_PRIORIDADE_MAX` em [`supabase/functions/robo/campo.ts`](supabase/functions/robo/campo.ts).
 
+### Responder ao cliente pela tela (migration 064)
+
+O caminho de volta: no chamado aberto pela triagem, a caixa **"Enviar por e-mail para ..."** aparece abaixo do campo de texto, já marcada. A nota postada como **Resposta** vai para quem escreveu, **na mesma conversa de e-mail** — então a resposta cai na thread original dele, não numa mensagem solta.
+
+- **Quem recebe não é escolha do app.** A tela manda só o `pendencia_id`; a function [`pendencia-responder`](supabase/functions/pendencia-responder/index.ts) lê o `solicitante_email` daquele chamado com a chave de serviço. É a mesma preocupação da `send-email` (a chave pública vai no site), com outro critério: lá, só operador ativo; aqui, só quem está no chamado.
+- **Na mesma conversa** porque a triagem guarda o `Message-ID` do e-mail (`email_message_id`), que volta como `In-Reply-To`/`References`. E-mail antigo, anterior a esta mudança, não tem o cabeçalho guardado: a resposta sai assim mesmo, como conversa nova, e o aviso na tela diz isso.
+- **Anotação interna nunca vira e-mail** — ao trocar para interna, a caixa some.
+- **E-mail que não sai não desfaz a nota.** Ela já está salva quando o envio acontece; falha vira aviso, não perda do que o técnico escreveu.
+- **Chamado sem `solicitante_email`** (aberto por telefone, por exemplo) não mostra a caixa.
+
+Deploy: `supabase functions deploy pendencia-responder`. Usa os mesmos secrets da `send-email` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM` opcional) — sem secret novo.
+
+### O que o Intra tira do e-mail antes de abrir o chamado
+
+Um e-mail de resposta carrega a conversa citada embaixo e a assinatura de quem
+escreveu. Isso ia cru para a IA e, sem IA, virava a descrição do chamado — que
+terminava no meio de `Em qui., 22 de`, porque o corte de 600 caracteres caía
+dentro do trecho citado. O `corpoLimpo` (em `supabase/functions/robo/campo.ts`)
+corta, nesta ordem:
+
+- **a conversa citada**, pelo marcador que o próprio programa de e-mail escreve
+  (`Em ... escreveu:`, `On ... wrote:`, `-----Mensagem original-----`, o bloco
+  `De:/Enviada em:` do Outlook, a régua de sublinhados, a primeira linha com `>`);
+- **a assinatura**, pelo delimitador `-- ` do RFC 3676 ou por uma despedida
+  (`Obrigado,`, `Atenciosamente`) seguida de bloco de contato curto — telefone,
+  site ou e-mail. A despedida em si fica: é a última coisa que a pessoa escreveu.
+
+A regra é **errar para menos**: despedida seguida de texto de verdade não é
+assinatura, e se o corte não deixaria quase nada o texto original volta inteiro.
+Um e-mail de duas linhas nunca vira um chamado vazio.
+
+> Privacidade: isso também encolhe o que sai daqui — a conversa citada deixou de
+> passar pelo Make e pelo provedor da IA.
+
+### E-mail da própria Init não abre chamado
+
+O `roboPendenciasEmail` varre a **conversa inteira** do rótulo (`th.getMessages()`),
+então a nossa resposta ao cliente chegava como mensagem nova e abria um chamado
+com o técnico como solicitante — e o botão **"Enviar por e-mail"** daquele chamado
+devolveria a resposta para a própria Init.
+
+A triagem agora descarta o e-mail cujo remetente é do domínio do `GMAIL_USER`
+(subdomínios incluídos), antes de tocar no banco. **Não há secret novo**: o
+domínio de casa sai da caixa que o robô já usa. Sem `GMAIL_USER`, ninguém é
+barrado e o comportamento é o de antes. O log do Apps Script passa a contar
+esses e-mails (`N da própria Init`).
+
+A resposta do *cliente* na mesma conversa é tratada logo abaixo.
+
+
+### Resposta do cliente cai no chamado que a conversa já abriu
+
+O robô varre a conversa inteira, então a resposta do cliente chegava como
+mensagem nova e abria **outro** chamado do mesmo assunto — quem atende ficava
+com dois pela metade.
+
+O `Robo.gs` passa a mandar `thread_id` (o `th.getId()`, id da **conversa**, não
+o da mensagem), e a triagem guarda isso em `email_thread_id` (migration 065).
+Toda mensagem seguinte da conversa procura um chamado **aberto** com esse id:
+
+- **achou** → a mensagem vira **nota** nele, e nada de chamado novo. O
+  `email_message_id` do chamado é atualizado para a mensagem mais recente, para
+  a resposta da tela sair em cima dela e a conversa não desgrudar;
+- **não achou, ou o chamado está fechado** → abre chamado novo, como antes.
+  Resposta depois de concluir é pedido novo; ressuscitar o antigo esconderia
+  isso do SLA e da fila.
+
+A nota entra com **`visibility: "solicitante"`**, um valor novo. Só `"resposta"`
+conta como 1ª resposta no SLA (`js/sla.js`, `slaNotaEhResposta`), então a fala
+de quem pediu nunca marca que a gente respondeu — e isso é fail-closed: se
+alguém esquecer deste caminho, o pior que acontece é não contar. No feed do
+chamado ela aparece com o selo **✉ do solicitante**, não como 🔒 interna.
+
+Essas mensagens **não passam pela IA**: a conversa já tem assunto, cliente e
+prioridade, não há o que classificar — e é uma chamada a menos ao Make. O
+preço é que uma resposta automática do cliente ("Obrigado pelo contato") vira
+nota em vez de ser ignorada.
+
+> Sem a migration 065 nada quebra: `email_thread_id` é optionalField, a busca
+> falha em silêncio (fica no log da function) e a triagem volta a abrir um
+> chamado por mensagem.
+
+
 ### A rota `triagem` no Make
 Recebe `{ "tarefa", "email_id", "de", "assunto", "data", "trecho", "cliente" }` e responde um JSON com `assunto`, `descricao`, `categoria`, `prioridade`, `tipo`, `solicitante` e `ignorar`.
 
@@ -199,6 +282,47 @@ O Intra confere tudo o que volta: categoria, prioridade e tipo fora das listas c
 No Apps Script, rode **`instalarRobo`** de novo depois de atualizar o `Robo.gs` (ele recria os gatilhos e inclui o de 15 minutos).
 
 > Privacidade: o remetente, o assunto e os primeiros 2.000 caracteres do e-mail passam pelo Make e pelo provedor da IA.
+
+## Quando o e-mail não vira chamado
+
+Dois caminhos da triagem não abrem chamado, e antes os dois sumiam em silêncio:
+
+| Motivo | O que aconteceu | O que fazer |
+| --- | --- | --- |
+| **Sem cliente** | O remetente não casou com ficha nenhuma: domínio fora do cadastro, ou Gmail/Hotmail pessoal — domínio público **nunca** casa, de propósito, porque o remetente pode ser qualquer um. | Cadastrar o cliente, ou pôr o domínio em `emails.domain` na ficha. |
+| **A IA ignorou** | O Make devolveu `ignorar: true` — propaganda, aviso automático, agradecimento. | Conferir. Quando o Make erra, é aqui que o pedido real aparece. |
+
+Agora os dois viram linha em `emails_triagem` (migration 066) e aparecem **no
+topo da tela de Pendências**, numa caixa que some sozinha quando não há nada
+pendente. Cada entrada traz dois botões: **Abrir chamado** (leva assunto,
+corpo, remetente e a conversa do Gmail para o formulário) e **Descartar**.
+
+Descartar não apaga: grava `status = 'descartado'` com quem decidiu e quando.
+Apagar de verdade é só do admin. A linha é o registro de que um pedido chegou
+— e sumir com registro de pedido é exatamente o defeito que isto conserta.
+
+> **O cliente fica em branco ao abrir o chamado, de propósito.** O motivo de a
+> entrada estar na caixa é ninguém saber de quem ela é; chutar poria o chamado
+> no cliente errado, que é pior do que pedir para escolher.
+
+Banco sem a 066 não quebra nada: a caixa não aparece e a triagem volta a
+descartar como antes. Mas o robô tenta de novo a cada rodada, então aplicar a
+migration recupera o que chegou nesse meio-tempo.
+
+## O e-mail inteiro no chamado
+
+A `descricao` é um resumo de 600 caracteres — a IA escreve nesse limite, e sem
+IA o corte cai no meio da frase. O e-mail completo, já sem conversa citada e
+sem assinatura, fica em `pendencias.email_corpo` (066) e aparece no detalhe do
+chamado atrás de **"Ver o e-mail inteiro"**.
+
+O botão só aparece quando há o que mostrar a mais: repetir o mesmo texto duas
+vezes na tela é pior do que não ter botão.
+
+O bloco de origem (`De:`, `Recebido em:`, `Assunto original:`) saiu do meio da
+descrição e virou cartão. A separação é feita **na hora de desenhar**, não na
+gravação — assim os chamados que já existem ficam apresentáveis também, sem
+mexer em dado nenhum.
 
 ## Relatório da visita com IA (Make)
 

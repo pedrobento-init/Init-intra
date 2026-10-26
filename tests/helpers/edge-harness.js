@@ -1,14 +1,23 @@
 // Carrega uma Edge Function de verdade dentro do vitest.
 //
-// O index.ts das functions não exporta nada (chama serve() na carga) e importa
-// de https://deno.land/..., https://esm.sh/... e npm:... — por isso a Fase 1 só
-// conseguiu travar o invariante estrutural (tests/edge-functions-guard.test.js).
+// As functions importam de https://deno.land/..., https://esm.sh/... e npm:...
+// — por isso a Fase 1 só conseguiu travar o invariante estrutural
+// (tests/edge-functions-guard.test.js).
 //
-// Aqui o esbuild (já vem com o vite) empacota o index.ts trocando esses três
+// Há duas formas de function no repositório, e o harness carrega as duas:
+//   - `withSupabase`: `export default { fetch: withSupabase({ auth }, handle) }`,
+//     a forma que o AGENTS.md manda usar. O wrapper é quem faz o gate de JWT,
+//     então o stub daqui emula esse gate e monta o `ctx` (supabaseAdmin,
+//     userClaims) a partir do dublê do teste.
+//   - `serve()`: a forma antiga, ainda nas 4 functions que autenticam por
+//     segredo próprio (agenda-ics, avisos-prazo, google-agenda, robo).
+//
+// Aqui o esbuild (já vem com o vite) empacota o index.ts trocando esses
 // especificadores por stubs: serve() guarda o handler em vez de abrir porta,
-// createClient() devolve o dublê do teste e nodemailer não manda e-mail. O
-// bundle roda dentro de uma função cujos parâmetros sombreiam `Deno` e `fetch`,
-// então nada escapa para a rede nem para o ambiente.
+// createClient() devolve o dublê do teste, withSupabase faz o gate e nodemailer
+// não manda e-mail. O bundle roda dentro de uma função cujos parâmetros
+// sombreiam `Deno` e `fetch`, então nada escapa para a rede nem para o
+// ambiente.
 //
 // O que isto cobre que o guarda estrutural não cobre: os 4 contratos de auth
 // (sem JWT → 401, inativo → bloqueado, outra equipe → 403, admin passa).
@@ -24,6 +33,8 @@ const STUBS = {
   supabase:
     'export function createClient(url, key, opts) { return __inject.createClient(url, key, opts); }',
   nodemailer: 'export default { createTransport: (opts) => __inject.createTransport(opts) };',
+  supabaseServer:
+    'export function withSupabase(cfg, handle) { return __inject.withSupabase(cfg, handle); }',
 };
 
 const stubPlugin = {
@@ -35,6 +46,10 @@ const stubPlugin = {
     }));
     build.onResolve({ filter: /^https:\/\/esm\.sh\// }, () => ({
       path: 'supabase',
+      namespace: 'stub',
+    }));
+    build.onResolve({ filter: /^npm:@supabase\/server/ }, () => ({
+      path: 'supabaseServer',
       namespace: 'stub',
     }));
     build.onResolve({ filter: /^npm:/ }, () => ({ path: 'nodemailer', namespace: 'stub' }));
@@ -75,13 +90,52 @@ export async function loadHandler(
 ) {
   const code = await bundleOf(name);
   const logs = [];
+  const injectCreateClient =
+    createClient ??
+    (() => {
+      throw new Error(`${name}: createClient() inesperado no teste`);
+    });
   const inject = {
     handler: null,
-    createClient:
-      createClient ??
-      (() => {
-        throw new Error(`${name}: createClient() inesperado no teste`);
-      }),
+    createClient: injectCreateClient,
+    // Emula o withSupabase real: ele é quem verifica o JWT (auth: "user") e
+    // entrega o ctx pronto. Sem isso o 401 do contrato 1 nunca aconteceria no
+    // teste, porque a function migrada não tem mais esse gate no próprio código.
+    withSupabase: (cfg, handle) => async (req) => {
+      let ctx = { supabaseAdmin: null, userClaims: null };
+      if (cfg?.auth === 'user') {
+        const token = String(req.headers.get('Authorization') ?? '').replace(
+          /^Bearer\s+/i,
+          ''
+        );
+        if (!token) return new Response('Unauthorized', { status: 401 });
+        const anon = injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {});
+        const { data } = await anon.auth.getUser(token);
+        if (!data?.user) return new Response('Unauthorized', { status: 401 });
+        ctx = {
+          supabase: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+            global: { headers: { Authorization: `Bearer ${token}` } },
+          }),
+          supabaseAdmin: injectCreateClient(
+            env.SUPABASE_URL,
+            env.SUPABASE_SERVICE_ROLE_KEY,
+            {}
+          ),
+          userClaims: { id: data.user.id },
+        };
+      } else {
+        ctx = {
+          supabase: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {}),
+          supabaseAdmin: injectCreateClient(
+            env.SUPABASE_URL,
+            env.SUPABASE_SERVICE_ROLE_KEY,
+            {}
+          ),
+          userClaims: null,
+        };
+      }
+      return handle(req, ctx);
+    },
     createTransport:
       createTransport ??
       (() => {
@@ -112,13 +166,16 @@ export async function loadHandler(
     'require',
     code
   );
-  run(inject, Deno, fakeFetch, fakeConsole, { exports: {} }, {}, (m) => {
+  const mod = { exports: {} };
+  run(inject, Deno, fakeFetch, fakeConsole, mod, mod.exports, (m) => {
     throw new Error(`${name}: require("${m}") inesperado`);
   });
-  if (typeof inject.handler !== 'function') {
-    throw new Error(`${name}: serve() não registrou handler`);
+  // `serve()` na forma antiga; `export default { fetch }` na forma withSupabase.
+  const handler = inject.handler ?? mod.exports?.default?.fetch;
+  if (typeof handler !== 'function') {
+    throw new Error(`${name}: nem serve() nem export default registraram handler`);
   }
-  return { handler: inject.handler, logs };
+  return { handler, logs };
 }
 
 /** Request POST com ou sem Bearer. */

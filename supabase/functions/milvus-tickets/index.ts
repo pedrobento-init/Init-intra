@@ -5,7 +5,6 @@
 // CONFIGURAÇÃO (secrets — nunca no frontend, nunca no banco):
 //   supabase secrets set MILVUS_API_TOKEN=seu_token_aqui
 //   supabase secrets set MILVUS_API_URL=https://apiintegracao.milvus.com.br
-//   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxx
 //   supabase functions deploy milvus-tickets
 //
 // FLUXO (1 cliente → 1 consulta → 10 chamados → upsert → prune):
@@ -27,11 +26,7 @@
 // - NÃO persiste: contato, e-mails, telefone, CPF/CNPJ, tokens,
 //   avaliações, HTML, logs extras e dados de dispositivo.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 const MILVUS_API_URL =
   Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
 const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
@@ -39,18 +34,12 @@ const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
 const TICKETS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/listagem`;
 const KEEP_TOP = 10;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+// CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
+// ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -177,16 +166,9 @@ async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknow
   throw new Error("Falha inesperada ao consultar o Milvus");
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
-  }
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.error("milvus-tickets: service role não configurada");
-    return json({ error: "Serviço indisponível" }, 500);
   }
   if (!MILVUS_API_TOKEN) {
     console.error("milvus-tickets: MILVUS_API_TOKEN não configurado");
@@ -194,17 +176,10 @@ serve(async (req: Request) => {
   }
 
   const startedAt = Date.now();
-  const authHeader = req.headers.get("authorization") || "";
-  const callerToken = authHeader.replace(/^Bearer\s+/i, "");
-  if (!callerToken) return json({ error: "Não autenticado" }, 401);
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // 1) Quem chama (JWT — mesma base do RLS).
-  const { data: userData } = await admin.auth.getUser(callerToken);
-  const callerUid = userData?.user?.id ?? null;
+  // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
+  // pronto no contexto.
+  const admin = ctx.supabaseAdmin;
+  const callerUid = ctx.userClaims?.id ?? null;
   if (!callerUid) return json({ error: "Não autenticado" }, 401);
 
   const { data: callerOp } = await admin
@@ -347,4 +322,6 @@ serve(async (req: Request) => {
     `created=${created} updated=${updated} pruned=${pruned} duration_ms=${durationMs} ok`,
   );
   return json({ success: true, clientId, via, synced: rows.length, created, updated, pruned, lastSyncAt });
-});
+}
+
+export default { fetch: withSupabase({ auth: "user" }, handle) };

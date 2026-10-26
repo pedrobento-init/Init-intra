@@ -89,18 +89,56 @@ function penRecurrenceLabel(r) {
   return o ? o.label : 'Recorrente';
 }
 const PEN_ICO_BOLT = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>';
+// Alternador de visualização: colunas (quadro) × linhas (fila).
+const PEN_ICO_BOARD = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="8" rx="1"/></svg>';
+const PEN_ICO_ROWS = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>';
+// Ordem manual (062): setas para cima e para baixo, a convenção de "reordenar".
+const PEN_ICO_DRAG = '<svg class="kb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18"/></svg>';
 
-let penView = 'kanban';
+// Visualização: 'kanban' (trabalhar o dia) ou 'fila' (tabela: prazo, quem
+// pediu, com quem está). A escolha é pessoal e fica no aparelho.
+const PEN_VIEW_KEY = 'intra_pen_view';
+let penView = (function () {
+  try { var v = localStorage.getItem(PEN_VIEW_KEY); return v === 'fila' ? 'fila' : 'kanban'; } catch (_) { return 'kanban'; }
+})();
+
+/** Troca a visualização e redesenha (delegado por data-action). */
+function penSetView(v) {
+  var alvo = v === 'fila' ? 'fila' : 'kanban';
+  if (alvo === penView) return;
+  penView = alvo;
+  try { localStorage.setItem(PEN_VIEW_KEY, alvo); } catch (_) {}
+  if (typeof renderPendencias === 'function') renderPendencias();
+}
 let penScope = 'active';
 let _filteredPens = [];
 
 // ── 6. ORDENAÇÃO POR COLUNA ────────────────────────────────────────────────
-var _penColSort = {}; // colId -> 'criacao'|'prazo'|'prioridade'
+var _penColSort = {}; // colId -> 'criacao'|'prazo'|'prioridade'|'manual'
 const _PEN_PRIORITY_WEIGHT = { critica:4, alta:3, media:2, baixa:1 };
+// Ordem manual (062): `position` fracionária, menor primeiro. Quem nunca foi
+// arrastado tem position null e cai no fim, em ordem de criação — assim a
+// coluna não embaralha quando só alguns cards foram ordenados à mão.
+function _penPos(p){
+  // Cuidado: Number(null) é 0 e 0 é finito — sem este guard, quem nunca foi
+  // ordenado viraria posição zero e iria para o TOPO em vez do fim.
+  if(!p || p.position === null || p.position === undefined || p.position === '') return null;
+  var n = Number(p.position);
+  return Number.isFinite(n) ? n : null;
+}
 function _penSortCards(cards, colId){
   var mode = _penColSort[colId] || 'criacao';
   var arr = cards.slice();
-  if(mode==='prazo'){
+  if(mode==='manual'){
+    arr.sort(function(a,b){
+      var pa = _penPos(a), pb = _penPos(b);
+      if(pa===null && pb===null) return String(a.createdAt||'').localeCompare(String(b.createdAt||''));
+      if(pa===null) return 1;
+      if(pb===null) return -1;
+      if(pa!==pb) return pa-pb;
+      return String(a.createdAt||'').localeCompare(String(b.createdAt||''));
+    });
+  } else if(mode==='prazo'){
     arr.sort(function(a,b){
       var da = a.deadline || '9999-12-31';
       var db = b.deadline || '9999-12-31';
@@ -122,11 +160,27 @@ function _penSortCards(cards, colId){
 function setPenColSort(colId, mode){
   _penColSort[colId]=mode;
   var area=document.getElementById('penViewArea');
-  if(area) renderPenKanban(area);
+  if(area) _penRenderAtual(area);
+}
+// Nome da ordem da coluna. O substantivo serve ao selo visível do cabeçalho;
+// a frase, ao rótulo acessível do botão.
+const PEN_COL_SORT_NOMES = { prazo: 'prazo', prioridade: 'prioridade', manual: 'manual', criacao: 'criação' };
+function penColSortWord(mode){ return PEN_COL_SORT_NOMES[mode] || PEN_COL_SORT_NOMES.criacao; }
+function penColSortLabel(mode){
+  return mode === 'manual' ? 'manual, arrastando os cards' : 'por ' + penColSortWord(mode);
+}
+
+/** Há quantos dias a pendência não é tocada — o texto do selo "Parada". */
+function penParadaLabel(p){
+  var ref = p && (p.updatedAt || p.createdAt);
+  if (!ref) return 'Parada';
+  var dias = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+  if (!(dias > 0)) return 'Parada';
+  return 'Parada há ' + dias + ' dia' + (dias === 1 ? '' : 's');
 }
 function cyclePenColSort(colId){
   var cur=_penColSort[colId]||'criacao';
-  var next= cur==='criacao' ? 'prazo' : cur==='prazo' ? 'prioridade' : 'criacao';
+  var next= cur==='criacao' ? 'prazo' : cur==='prazo' ? 'prioridade' : cur==='prioridade' ? 'manual' : 'criacao';
   setPenColSort(colId,next);
 }
 
@@ -200,6 +254,9 @@ function _penActiveFilterCount(){
 }
 function _penUpdateMoreFiltersBadge(){
   var badge=document.getElementById('penMoreFiltersBadge');
+  // A barra de selos acompanha o badge: todo caminho que mexe em filtro
+  // passa por aqui, então os dois nunca saem de sincronia.
+  try { _penRenderFiltrosAtivos(); } catch (_) {}
   if(!badge) return;
   var n=_penActiveFilterCount();
   badge.textContent=n?String(n):'';
@@ -233,6 +290,80 @@ if(typeof window!=='undefined' && !window._penMoreFiltersBound){
   document.addEventListener('click', _closePenMoreFiltersOnOutside);
 }
 
+// ── Filtros ativos à vista ────────────────────────────────────────────────
+// Quase todo filtro mora dentro de "Mais filtros", que fecha. O único sinal
+// de que algo estava preso era um número no badge: a lista encolhia e não
+// dava para saber QUAL filtro fazia isso sem reabrir o painel. Cada filtro
+// ativo agora é um selo com rótulo e ✕ próprio.
+const PEN_FILTRO_CHIPS = [
+  { campo: 'penSearch', nome: 'Busca' },
+  { campo: 'penClient', nome: 'Cliente' },
+  { campo: 'penResponsible', nome: 'Responsável' },
+  { campo: 'penStatus', nome: 'Status' },
+  { campo: 'penPriority', nome: 'Prioridade' },
+  { campo: 'penSavedFilter', nome: 'Filtro salvo' },
+];
+
+/** Texto do selo: num select, o rótulo da opção — nunca o id cru do cliente. */
+function _penFiltroTexto(valor, el) {
+  try {
+    if (el && el.tagName === 'SELECT' && el.selectedOptions && el.selectedOptions[0]) {
+      return String(el.selectedOptions[0].textContent || '').trim() || valor;
+    }
+  } catch (_) {}
+  return valor;
+}
+
+/** Filtros preenchidos agora, na ordem da barra. */
+function penFiltrosAtivos() {
+  var out = [];
+  PEN_FILTRO_CHIPS.forEach(function (f) {
+    var el = (typeof document !== 'undefined') ? document.getElementById(f.campo) : null;
+    var v = (el && el.value) || '';
+    if (!v) return;
+    out.push({ campo: f.campo, nome: f.nome, texto: _penFiltroTexto(v, el) });
+  });
+  return out;
+}
+
+/** Pura, para teste: a lista de filtros ativos vira a fila de selos. */
+function penFiltroChipsHtml(ativos) {
+  if (!ativos || !ativos.length) return '';
+  return '<div class="pen-chips" role="group" aria-label="Filtros ativos">'
+    + '<span class="pen-chips-label">Filtrando por</span>'
+    + ativos.map(function (f) {
+        var legivel = f.nome + ': ' + f.texto;
+        return '<span class="pen-chip">'
+          + '<span class="pen-chip-nome">' + escapeHtml(f.nome) + '</span>' + escapeHtml(f.texto)
+          + '<button type="button" class="pen-chip-x" data-action="penClearFilter" data-arg="' + escapeHtml(f.campo) + '"'
+          + ' aria-label="Remover filtro ' + escapeHtml(legivel) + '" title="Remover filtro">×</button>'
+          + '</span>';
+      }).join('')
+    + '<button type="button" class="pen-chips-all" data-action="penClearFilters">Limpar tudo</button>'
+    + '</div>';
+}
+
+function _penRenderFiltrosAtivos() {
+  var el = (typeof document !== 'undefined') ? document.getElementById('penFiltrosAtivos') : null;
+  if (el) el.innerHTML = penFiltroChipsHtml(penFiltrosAtivos());
+}
+
+/** ✕ de um selo: tira só aquele filtro e volta para a primeira página. */
+function penClearFilter(campo) {
+  var el = document.getElementById(campo);
+  if (!el) return;
+  el.value = '';
+  if (typeof savePenFilters === 'function') savePenFilters();
+  if (typeof renderPenView === 'function') renderPenView(true);
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    penClearFilter: (_el, campo) => penClearFilter(campo),
+    penClearFilters: () => { if (typeof clearPenFilters === 'function') clearPenFilters(); },
+  });
+}
+
 function renderPendencias() {
   document.getElementById('pageTitle').textContent = 'Pendências';
   setTopbarAction('Nova Pendência', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
@@ -248,7 +379,7 @@ function renderPendencias() {
     <div class="search-bar pen-search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="penSearch" placeholder="Buscar..." oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
+        <input class="form-input" id="penSearch" placeholder="Buscar por título, cliente ou quem pediu" oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
       </div>
       <select class="form-select filter-select-md pt-filter pt-full" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
         <option value="">Todos os clientes</option>
@@ -291,8 +422,19 @@ function renderPendencias() {
         <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
         <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas${penScope==='archived' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
       </div>
+      <div class="view-toggles pen-view-tabs" role="tablist" aria-label="Visualização">
+        <button role="tab" data-action="penSetView" data-arg="kanban" aria-selected="${penView==='kanban'}"
+          class="pen-view-tab ${penView==='kanban'?'is-active':''}" title="Quadro: trabalhar o dia">${PEN_ICO_BOARD} Quadro</button>
+        <button role="tab" data-action="penSetView" data-arg="fila" aria-selected="${penView==='fila'}"
+          class="pen-view-tab ${penView==='fila'?'is-active':''}" title="Fila: enxergar prazo, quem pediu e com quem está">${PEN_ICO_ROWS} Fila</button>
+      </div>
     </div>
+    <div id="penFiltrosAtivos"></div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
+    <!-- Caixa de entradas de e-mail que não viraram chamado (066). Fica FORA
+         do penViewArea porque renderPenView reescreve aquele nó inteiro a
+         cada filtro, e a caixa não depende de filtro nenhum. -->
+    <div id="penEntradasEmail"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;
@@ -305,6 +447,7 @@ function renderPendencias() {
     if(savedName && document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = savedName;
   }catch(_){}
   setTimeout(function(){ _penUpdateMoreFiltersBadge(); }, 30);
+  try { if (typeof renderEntradasEmail === 'function') renderEntradasEmail(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:entradas-email'); }
   showSkeleton('penViewArea', 6);
   renderPenView();
 }
@@ -417,7 +560,10 @@ function renderPenView(resetPage) {
       responsible: document.getElementById('penResponsible')?.value || '',
       status: document.getElementById('penStatus')?.value || '',
       priority: document.getElementById('penPriority')?.value || '',
-      search: document.getElementById('penSearch')?.value || ''
+      search: document.getElementById('penSearch')?.value || '',
+      // Só a fila manda ordem: o quadro ordena por coluna, dentro da coluna,
+      // e espera a ordem de criação padrão vinda do banco.
+      sort: (penView === 'fila' && typeof _penFilaSort !== 'undefined') ? _penFilaSort : null
     });
     // FASE 6: totais por status vêm do banco (só coluna status), não da página.
     var countReq = (typeof fetchPendenciaStatusCounts === 'function')
@@ -428,12 +574,12 @@ function renderPenView(resetPage) {
       _penTotal = arr[0].total;
       _penCounts = arr[1];
       _renderPendenciaSlaSummary();
-      renderPenKanban(area);
+      _penRenderAtual(area);
     }).catch(function () {
       _penServerMode = false; _penTotal = null; _penCounts = null;
       _filteredPens = getFilteredPendencias();
       _renderPendenciaSlaSummary();
-      renderPenKanban(area);
+      _penRenderAtual(area);
     });
     return;
   }
@@ -441,6 +587,6 @@ function renderPenView(resetPage) {
   setTimeout(function() {
     _filteredPens = getFilteredPendencias();
     _renderPendenciaSlaSummary();
-    renderPenKanban(area);
+    _penRenderAtual(area);
   }, 10);
 }
