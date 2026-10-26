@@ -40,9 +40,13 @@ function _emailTriagemSalvar(id, patch) {
   var i = lista.findIndex(function (e) { return e && e.id === id; });
   if (i === -1) return null;
   var agora = new Date().toISOString();
+  // Só quem DECIDIU leva nome e data. O desfazer devolve status 'pendente',
+  // e estampar tratadoPor/tratadoEm nela registraria um responsável numa
+  // decisão que ninguém tomou — a entrada volta exatamente como chegou.
+  var decidida = String((patch && patch.status) || lista[i].status || '') !== 'pendente';
   lista[i] = Object.assign({}, lista[i], patch, {
-    tratadoPor: (typeof getUser === 'function' && getUser()) ? getUser().name : '',
-    tratadoEm: agora,
+    tratadoPor: decidida ? ((typeof getUser === 'function' && getUser()) ? getUser().name : '') : null,
+    tratadoEm: decidida ? agora : null,
     // O sync resolve conflito por updatedAt: sem isto, duas abas decidindo a
     // mesma entrada não teriam como saber qual decisão é a mais nova.
     updatedAt: agora
@@ -74,8 +78,15 @@ function _emailTriagemSalvar(id, patch) {
 function emailTriagemAbrirChamado(id) {
   var e = getEmailsTriagem().find(function (x) { return x && x.id === id; });
   if (!e) { showToast('Entrada não encontrada.', 'error'); return; }
+  // Card velho na tela (sem realtime, outra aba, colega tratou primeiro):
+  // abrir o formulário em cima dele viraria um SEGUNDO chamado para a mesma
+  // mensagem. O status é conferido aqui, onde ainda dá para recusar.
+  if (e.status !== 'pendente') {
+    showToast('Esta entrada já foi tratada.', 'error');
+    if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
+    return;
+  }
   if (typeof openPendenciaForm !== 'function') return;
-  window._emailTriagemPendente = id;
   openPendenciaForm(null, null, null, {
     assunto: String(e.assunto || '').slice(0, 120),
     descricao: String(e.corpo || ''),
@@ -84,7 +95,13 @@ function emailTriagemAbrirChamado(id) {
     solicitanteEmail: _emailTriagemEndereco(e.de),
     emailThreadId: e.threadId || null,
     emailMessageId: e.messageId || null,
-    emailCorpo: e.corpo || null
+    emailCorpo: e.corpo || null,
+    // O id da entrada viaja NO formulário, não em window: o cancelar destrói
+    // o formulário, e com ele a pendência de marcá-la. Um id solto em
+    // window._emailTriagemPendente sobrevivia ao cancelamento, e o PRÓXIMO
+    // chamado criado pelo formulário marcava a entrada abandonada como
+    // virou_chamado — apontando para o chamado errado.
+    etrEntrada: id
   });
 }
 
@@ -103,11 +120,16 @@ function _emailTriagemNome(de) {
   return (_emailTriagemEndereco(s).split('@')[0] || s).trim().slice(0, 120);
 }
 
-/** Chamado criado a partir de uma entrada: fecha o ciclo. Chamado por pendencias. */
-function emailTriagemMarcarAberta(pendenciaId) {
-  var id = window._emailTriagemPendente;
+/** Chamado criado a partir de uma entrada: fecha o ciclo. Chamado por pendencias, com o id vindo do formulário. */
+function emailTriagemMarcarAberta(pendenciaId, id) {
   if (!id || !pendenciaId) return;
-  window._emailTriagemPendente = null;
+  var e = getEmailsTriagem().find(function (x) { return x && x.id === id; });
+  // Entre abrir o formulário e salvar, o colega pode ter tratado a entrada:
+  // por cima da decisão dele, o pendenciaId novo apontaria para o chamado errado.
+  if (!e || e.status !== 'pendente') {
+    if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
+    return;
+  }
   _emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId });
   renderEntradasEmail();
 }

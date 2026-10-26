@@ -72,6 +72,7 @@ function openPendenciaDetail(id) {
         <div class="ticket-info-item pen-assunto pen-cmd-assunto"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
         <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(_penDesc.corpo)||'—'}</div>
         ${_penOrigemHtml(_penDesc.origem)}
+        ${_penDesc.depois ? `<div class="pen-desc pen-desc-depois">${_penRichDesc(_penDesc.depois)}</div>` : ''}
         ${_emailInteiro ? `<details class="pen-email-full"><summary>Ver o e-mail inteiro (${_emailInteiro.length.toLocaleString('pt-BR')} caracteres)</summary><div class="pen-email-corpo">${_penRichDesc(_emailInteiro)}</div></details>` : ''}
         ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div style="margin-top:10px"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
         </div>
@@ -267,24 +268,39 @@ function changePenStatus(id) {
 // já existem — e são esses que estão feios hoje.
 var PEN_ORIGEM_MARCA = /\n*—[ \t]*Aberta pela triagem de ([^\n.]{1,40}?) do Init Intra\.?[ \t]*\n?/;
 
-/** Separa a descrição em { corpo, origem }. Sem o bloco, origem é null. */
+/** Só estes rótulos são do carimbo; qualquer outra linha depois dele é texto da pessoa. */
+var PEN_ORIGEM_CAMPOS = { 'de': 'de', 'recebido em': 'recebidoEm', 'assunto original': 'assuntoOriginal' };
+
+/**
+ * Separa a descrição em { corpo, origem, depois }. Sem o bloco, origem é null.
+ *
+ * `depois` é o texto que veio DEPOIS do carimbo: ao editar um chamado
+ * nascido de triagem, o cursor cai no fim da descrição — que é justamente
+ * depois do carimbo — e é ali que a pessoa digita. Antes disso, o que fosse
+ * escrito ali era descartado: não estava no corpo, e a linha não era um
+ * campo do carimbo. Desaparecia da tela de detalhe sem sumir do banco.
+ */
 function _penOrigemTriagem(descricao) {
   var s = String(descricao || '');
   var m = PEN_ORIGEM_MARCA.exec(s);
-  if (!m) return { corpo: s.trim(), origem: null };
-  var campos = {};
+  if (!m) return { corpo: s.trim(), origem: null, depois: '' };
+  var campos = { de: '', recebidoEm: '', assuntoOriginal: '' };
+  var depois = [];
   s.slice(m.index + m[0].length).split('\n').forEach(function (linha) {
     var mm = /^[ \t]*([^:]{2,30}):[ \t]*(.+?)[ \t]*$/.exec(linha);
-    if (mm) campos[mm[1].trim().toLowerCase()] = mm[2].trim();
+    var chave = mm ? mm[1].trim().toLowerCase() : '';
+    if (mm && PEN_ORIGEM_CAMPOS[chave]) campos[PEN_ORIGEM_CAMPOS[chave]] = mm[2].trim();
+    else depois.push(linha);
   });
   return {
     corpo: s.slice(0, m.index).trim(),
     origem: {
       canal: m[1].trim(),
-      de: campos['de'] || '',
-      recebidoEm: campos['recebido em'] || '',
-      assuntoOriginal: campos['assunto original'] || ''
-    }
+      de: campos.de,
+      recebidoEm: campos.recebidoEm,
+      assuntoOriginal: campos.assuntoOriginal
+    },
+    depois: depois.join('\n').trim()
   };
 }
 
@@ -469,14 +485,32 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
       <div class="form-group pen-tpl-field"><label class="form-label" for="penTemplateSel">Começar de um modelo</label>
         <select class="form-select" id="penTemplateSel" onchange="applyPenTemplate(this.value)">
           <option value="">Em branco</option>
-          ${_tpls.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title || '—')}${t.category ? ' · ' + escapeHtml(t.category) : ''}</option>`).join('')}
+          ${_tpls.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.title || '—')}${t.category ? ' · ' + escapeHtml(t.category) : ''}</option>`).join('')}
         </select>
         <input type="hidden" name="templateChecklist" id="penTemplateChecklist" value="" />
         <div class="pen-tpl-hint" id="penTemplateHint" hidden></div></div>` : '';
 
+  // Campos que vêm PRONTOS de fora (caixa de triagem, 066): o submit só
+  // persiste o que existe como input do formulário, então sem estes hidden
+  // solicitanteEmail, emailThreadId, emailMessageId e emailCorpo caem em
+  // silêncio — e o chamado nasce sem o endereço de resposta, sem o corpo do
+  // e-mail e sem o thread id que chamadoDaConversa usa para casar a conversa.
+  // Só na criação: na edição o savePendencia mescla com o registro antigo e
+  // nada se perde. O id da entrada também vem aqui — morre com o formulário
+  // no cancelar, em vez de sobreviver numa variável de window.
+  const _ocultos = !id
+    ? [['etrEntrada', p.etrEntrada], ['solicitanteEmail', p.solicitanteEmail],
+       ['emailThreadId', p.emailThreadId], ['emailMessageId', p.emailMessageId],
+       ['emailCorpo', p.emailCorpo]]
+      .filter(function (f) { return f[1] !== undefined && f[1] !== null && String(f[1]) !== ''; })
+      .map(function (f) { return '<input type="hidden" name="' + f[0] + '" value="' + escapeHtml(String(f[1])) + '">'; })
+      .join('')
+    : '';
+
   openModal(id ? 'Editar Pendência' : 'Nova Pendência', `
     <form onsubmit="submitPendenciaForm(event,'${escapeHtml(id||'')}')">
       ${_tplField}
+      ${_ocultos}
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cliente</label>
           <select class="form-select" name="clientId">
@@ -632,6 +666,12 @@ function submitPendenciaForm(e, id) {
     };
     // Atendimento (056): só entra no registro quando o formulário tem o campo.
     ['solicitante', 'canal', 'categoria'].forEach(function (k) { if (fd.has(k)) data[k] = String(fd.get(k) || '').trim(); });
+    // Campos da caixa de triagem (066), vindos como hidden: sem copiar aqui,
+    // o chamado nasce sem endereço de resposta, sem o corpo do e-mail e sem
+    // o thread id — e a próxima mensagem da conversa vira chamado novo.
+    ['solicitanteEmail', 'emailThreadId', 'emailMessageId', 'emailCorpo'].forEach(function (k) {
+      if (fd.has(k)) { const v = String(fd.get(k) || '').trim(); if (v) data[k] = v; }
+    });
     // Criada a partir de um modelo: nasce com o checklist dos passos.
     if (!id && g('templateChecklist')) {
       try {
@@ -667,9 +707,10 @@ function submitPendenciaForm(e, id) {
     updateBadges();
     // Veio da caixa de entradas de e-mail (066): fecha o ciclo só agora, com
     // o chamado já salvo — marcar na abertura do formulário perderia o e-mail
-    // se a pessoa desistisse no meio.
+    // se a pessoa desistisse no meio. O id da entrada vem do hidden: sem ele
+    // (formulário comum), a chamada é um no-op.
     if (isNew) {
-      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id); }
+      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || '')); }
       catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:etr-marcar'); }
     }
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
