@@ -213,8 +213,9 @@ $$ LANGUAGE plpgsql;
 -- INSTRUÇÕES DE DEPLOY
 -- ============================================================
 -- 1. Execute este SQL no Supabase SQL Editor
--- 2. Configure o RESEND_API_KEY como secret:
---    supabase secrets set RESEND_API_KEY=re_xxxxx
+-- 2. Configure os secrets do Gmail (o Resend saiu em 10/2026):
+--    supabase secrets set GMAIL_USER=conta@initnet.com.br
+--    supabase secrets set GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
 -- 3. Deploy a Edge Function:
 --    supabase functions deploy send-email
 -- 4. Verifique o cron job:

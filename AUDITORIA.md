@@ -260,7 +260,10 @@ Aplicadas nesta sessão: **P-17** (commit `53c9fe7`, fecha SEC-15 e CONS-08), **
    `022` estão obsoletas — considerar removê-las para ninguém aplicar por engano.
    Em aberto nessa frente, só o SYNC-04 (`tickets` sem policy, fail-closed), que é
    decisão de produto, não exposição.
-2. **Alto:** ~~P-3 (`send-email`)~~ **já corrigido**, ver §12.3 · P-6 (`vitest@5`).
+2. ~~**Alto:** P-3 (`send-email`) e P-6 (`vitest@5`)~~ **Concluído.**
+   P-3: fechado por remetente fixo + allowlist de destinatário, **sem** o gate de papel
+   (quebraria a notificação do operador comum); ver §12.3 e §14.3.
+   P-6: `vitest@5.0.5`, `npm audit` de 4 vulnerabilidades (2 críticas) para **0**.
 3. **Verificação (somente leitura):** confirmar `Max rows` da API Supabase e
    `select count(*)` das tabelas grandes (valida/refuta SYNC-01).
 4. **Continuidade:** P-9 (pull paginado), P-13/P-14 (limpeza de código) e P-16
@@ -367,11 +370,12 @@ cliente-alvo) → só então `service_role`.
 | `milvus-clients-import` | ✓       | **admin only** (`:141-150`)                            |                                                                                                  |
 | `milvus-token-backfill` | ✓       | **admin only** (`:132-141`)                            | duas fases (prévia → commit)                                                                     |
 | `update-user-password`  | ✓       | **admin only** (`:44-73`)                              | valida `password.length >= 8`                                                                    |
-| `send-email`            | **não** | **nenhum**                                             | **SEC-03** — única exceção                                                                       |
+| `send-email`            | ✓       | operador **ativo** (`:62-71`)                          | remetente fixo + destinatário só de operador ativo (SEC-03 fechado — ver §12)                    |
 
 Também verificado: nenhum valor de segredo aparece em log (só flags como
 `hasToken=${!!clientToken}` e nomes de tabela/coluna) e `MILVUS_API_TOKEN`/`SERVICE_ROLE_KEY`
-/`RESEND_API_KEY` vêm sempre de `Deno.env`.
+/`GMAIL_APP_PASSWORD` vêm sempre de `Deno.env` (o Resend saiu: a send-email e a avisos-prazo
+usam Gmail SMTP).
 
 Restrições registradas: **SEC-09** (`Access-Control-Allow-Origin: *` em todas — aceitável
 enquanto a resposta exigir JWT) e **SEC-16** (nenhuma tem rate limit).
@@ -645,3 +649,67 @@ terem sido corrigidos, porque o documento media o **código e as migrations do
 repositório**, não o **estado do banco**. Uma consulta de dez segundos ao
 `pg_policies` teria evitado isso. Vale repetir as consultas desta seção a cada
 auditoria, antes de classificar qualquer achado de RLS.
+
+---
+
+## 14. Fase 2 — contratos de auth das Edge Functions sob teste
+
+A Fase 0 declarou `verify_jwt` das 17 functions e a Fase 1 travou esse invariante por
+arquivo (`tests/edge-functions-guard.test.js`), deixando registrado que **4 contratos
+seguiam sem cobertura**: sem JWT → 401, operador inativo → bloqueado, operador de outra
+equipe → 403 e admin passa. Eles agora têm teste.
+
+### 14.1 Como as functions passaram a rodar no vitest
+
+O obstáculo era real: o `index.ts` chama `serve()` na carga e importa de
+`https://deno.land/…`, `https://esm.sh/…` e `npm:…`, que o vitest não resolve.
+`tests/helpers/edge-harness.js` empacota a function com o esbuild trocando **só** esses
+três especificadores por stubs — `serve()` guarda o handler em vez de abrir porta,
+`createClient()` devolve o dublê e o nodemailer não envia. O bundle roda dentro de uma
+função cujos parâmetros sombreiam `Deno`, `fetch` e `console`, então o teste não alcança
+rede nem ambiente. **É o `index.ts` de produção que executa**, não uma cópia da regra.
+
+Continua fora de alcance: o comportamento do runtime Deno em si (o `verify_jwt` do
+gateway, que é do Supabase, não da function) — por isso o guarda estrutural da Fase 1
+segue necessário e complementar.
+
+### 14.2 Cobertura
+
+`tests/edge-functions-auth.test.js` — 47 testes sobre as 13 functions que usam
+`auth.getUser`. A lista é conferida contra o diretório, então **uma function nova com JWT
+que não entre na tabela quebra o teste**.
+
+| Contrato | Vale para | Esperado |
+| --- | --- | --- |
+| sem JWT → 401 | as 13 | `401` |
+| operador inativo | as 13 | `401`/`403` |
+| cliente de outra equipe | `milvus-devices`, `milvus-tickets`, `milvus-chamado-create` | `403` |
+| exige admin | `milvus-client-names`, `milvus-clients-import`, `milvus-token-backfill`, `update-user-password` | `403` p/ operador comum |
+| admin passa o gate | as 13 | ≠ `401`/`403` |
+
+`milvus-atendimentos` e `milvus-chamado-status` não entram no contrato de equipe **por
+desenho**: elas não negam, filtram a lista pela equipe do operador.
+
+Capacidade de ficar vermelho verificada por mutação (5 mutantes, todos pegos): tirar os
+dois gates de token da `milvus-devices` (1 falha), aceitar inativo na `send-push` (2),
+remover o team-check da `milvus-tickets` (1), negar até o admin na `update-user-password`
+(1) e dispensar admin na `milvus-client-names` (2).
+
+Nota: remover **só** o `if (!callerToken)` da `milvus-devices` não derruba teste nenhum —
+e está certo, porque o `if (!callerUid)` logo abaixo devolve o mesmo 401. É redundância
+de defesa, não contrato.
+
+### 14.3 SEC-03 / P-3 — o que foi fechado e o que foi recusado
+
+`send-email` hoje exige JWT (`verify_jwt = true` + `auth.getUser`), aceita só **operador
+ativo**, usa remetente **fixo** (`GMAIL_FROM`, ignorando o `from` do corpo) e só entrega
+para e-mail de operador ativo (`403 recipient_not_allowed`). `tests/send-email-relay.test.js`
+trava as duas últimas — as que de fato impediam o relay — e ambas foram verificadas por
+mutação (usar o `from` do corpo derruba 2 testes; dispensar a allowlist derruba 3).
+
+**O papel `admin`/`gestao` que a P-3 pedia não foi implementado, de propósito.** As
+notificações de pendência saem de `js/storage-pendencias.js:455,457,709`
+(`notifyPendenciaCreated`/`Updated`/`Note`) no fluxo de **qualquer** técnico. Exigir papel
+na function calaria em silêncio o e-mail do operador comum — troca de um relay (já
+fechado por remetente fixo + allowlist) por uma regressão funcional. Fica como **decisão
+de produto**, ao lado da P-16.
