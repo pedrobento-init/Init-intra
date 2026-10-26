@@ -431,6 +431,10 @@ function renderPendencias() {
     </div>
     <div id="penFiltrosAtivos"></div>
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
+    <!-- Caixa de entradas de e-mail que não viraram chamado (066). Fica FORA
+         do penViewArea porque renderPenView reescreve aquele nó inteiro a
+         cada filtro, e a caixa não depende de filtro nenhum. -->
+    <div id="penEntradasEmail"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;
@@ -443,6 +447,7 @@ function renderPendencias() {
     if(savedName && document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = savedName;
   }catch(_){}
   setTimeout(function(){ _penUpdateMoreFiltersBadge(); }, 30);
+  try { if (typeof renderEntradasEmail === 'function') renderEntradasEmail(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:entradas-email'); }
   showSkeleton('penViewArea', 6);
   renderPenView();
 }

@@ -28,7 +28,10 @@ describe('ENTITIES (schema central)', () => {
 
   it('apenas as tabelas com RLS por equipe têm hasTeam=true', () => {
     const teamScoped = ENTITIES.filter((e) => e.hasTeam).map((e) => e.table).sort();
-    expect(teamScoped).toEqual(['clients', 'equipamentos', 'pendencias', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
+    // emails_triagem (066) entra aqui: a policy filtra por team igual às
+    // outras. E-mail sem cliente não tem equipe para herdar, então a entrada
+    // nasce com o team padrão — a caixa do robô é uma caixa só.
+    expect(teamScoped).toEqual(['clients', 'emails_triagem', 'equipamentos', 'pendencias', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
   });
 });
 
