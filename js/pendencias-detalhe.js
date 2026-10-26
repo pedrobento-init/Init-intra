@@ -25,6 +25,14 @@ function openPendenciaDetail(id) {
   // Chamado aberto pela triagem de e-mail (064): dá para responder a quem
   // pediu sem sair daqui. Sem endereço, a opção nem aparece.
   const _emailDestino = String(p.solicitanteEmail || '').trim();
+  // O bloco de origem sai da descrição e vira cartão — inclusive nos chamados
+  // antigos, que é onde ele está feio hoje.
+  const _penDesc = _penOrigemTriagem(p.descricao);
+  // O e-mail inteiro (066) só ganha o "ver mais" quando tem o que mostrar: a
+  // descrição já é o começo dele, e repetir o mesmo texto duas vezes na tela
+  // é pior do que não ter o botão.
+  const _emailCorpo = String(p.emailCorpo || '').trim();
+  const _emailInteiro = _emailCorpo.length > _penDesc.corpo.length + 40 ? _emailCorpo : '';
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="pen-detail pen-cmd" data-status="${escapeHtml(p.status||'')}">
     <!-- ══ CABEÇALHO COMANDO: badge + timer primário + editar sutil ══ -->
@@ -62,7 +70,9 @@ function openPendenciaDetail(id) {
       <!-- ══ COLUNA ESQUERDA (65%): contexto + feed ══ -->
       <section class="pen-cmd-main">
         <div class="ticket-info-item pen-assunto pen-cmd-assunto"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
-        <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(p.descricao)||'—'}</div>
+        <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(_penDesc.corpo)||'—'}</div>
+        ${_penOrigemHtml(_penDesc.origem)}
+        ${_emailInteiro ? `<details class="pen-email-full"><summary>Ver o e-mail inteiro (${_emailInteiro.length.toLocaleString('pt-BR')} caracteres)</summary><div class="pen-email-corpo">${_penRichDesc(_emailInteiro)}</div></details>` : ''}
         ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div style="margin-top:10px"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
         </div>
         ${typeof kbPendenciaPanelHtml === 'function' ? kbPendenciaPanelHtml(p) : ''}
@@ -244,6 +254,64 @@ function changePenStatus(id) {
 // Quem lê o chamado quer a história inteira, não duas listas para cruzar.
 
 /** Notas + eventos ordenados por data. Evento vem marcado com `_evento`. */
+// A triagem (robo/campo.ts) cola um bloco de origem no FIM da descrição:
+//
+//   — Aberta pela triagem de e-mail do Init Intra.
+//   De: Márcia <m@acme.com.br>
+//   Recebido em: 2026-10-26T09:00:00.000Z
+//   Assunto original: impressora não imprime
+//
+// Metadado como texto corrido é o que dá a cara de cru: entra na busca, entra
+// na prévia do card, e quem lê tem de pular aquilo para achar o pedido.
+// Separar na RENDERIZAÇÃO, e não na gravação, conserta também os chamados que
+// já existem — e são esses que estão feios hoje.
+var PEN_ORIGEM_MARCA = /\n*—[ \t]*Aberta pela triagem de ([^\n.]{1,40}?) do Init Intra\.?[ \t]*\n?/;
+
+/** Separa a descrição em { corpo, origem }. Sem o bloco, origem é null. */
+function _penOrigemTriagem(descricao) {
+  var s = String(descricao || '');
+  var m = PEN_ORIGEM_MARCA.exec(s);
+  if (!m) return { corpo: s.trim(), origem: null };
+  var campos = {};
+  s.slice(m.index + m[0].length).split('\n').forEach(function (linha) {
+    var mm = /^[ \t]*([^:]{2,30}):[ \t]*(.+?)[ \t]*$/.exec(linha);
+    if (mm) campos[mm[1].trim().toLowerCase()] = mm[2].trim();
+  });
+  return {
+    corpo: s.slice(0, m.index).trim(),
+    origem: {
+      canal: m[1].trim(),
+      de: campos['de'] || '',
+      recebidoEm: campos['recebido em'] || '',
+      assuntoOriginal: campos['assunto original'] || ''
+    }
+  };
+}
+
+/** Cartão de origem do chamado nascido de triagem. Vazio quando não houve. */
+function _penOrigemHtml(origem) {
+  if (!origem) return '';
+  var ehEmail = /e-?mail/i.test(origem.canal);
+  var linha = function (rot, val) {
+    return val ? '<div class="pen-origem-item"><dt>' + escapeHtml(rot) + '</dt><dd>' + escapeHtml(val) + '</dd></div>' : '';
+  };
+  // A data vem em ISO do robô; formatDateTime deixa legível, mas um registro
+  // antigo pode trazer qualquer coisa — então só formata o que o Date entende.
+  var quando = origem.recebidoEm;
+  try {
+    if (Date.parse(origem.recebidoEm) && typeof formatDateTime === 'function') {
+      quando = formatDateTime(origem.recebidoEm);
+    }
+  } catch (_) {}
+  return '<div class="pen-origem">'
+    + '<div class="pen-origem-head">' + (ehEmail ? '✉' : '💬') + ' Chegou por ' + escapeHtml(origem.canal) + '</div>'
+    + '<dl class="pen-origem-lista">'
+    + linha('De', origem.de)
+    + linha('Recebido', quando)
+    + linha('Assunto original', origem.assuntoOriginal)
+    + '</dl></div>';
+}
+
 function _penFeedItens(p) {
   var notas = Array.isArray(p && p.notes) ? p.notes : [];
   var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
@@ -597,6 +665,13 @@ function submitPendenciaForm(e, id) {
       renderPenView(false);
     }
     updateBadges();
+    // Veio da caixa de entradas de e-mail (066): fecha o ciclo só agora, com
+    // o chamado já salvo — marcar na abertura do formulário perderia o e-mail
+    // se a pessoa desistisse no meio.
+    if (isNew) {
+      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id); }
+      catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:etr-marcar'); }
+    }
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');
     if (_backToClient) {
       try {

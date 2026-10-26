@@ -10,7 +10,11 @@ import fs from 'node:fs';
 describe('contrato mobile do bloco pen-work no CSS', () => {
   const css = fs.readFileSync('css/styles.css', 'utf8');
   const norm = css.replace(/\s+/g, ' ');
-  const mobile640 = norm.split('@media (max-width: 640px)')[1] || '';
+  // Todos os blocos do breakpoint, não só o primeiro: o arquivo passou a ter
+  // mais de um @media 640px (a caixa de entradas de e-mail, 066), e pegar
+  // apenas `[1]` olhava o bloco errado — o teste falhava sem nada do pen-work
+  // ter mudado.
+  const mobile640 = norm.split('@media (max-width: 640px)').slice(1).join(' ');
 
   it('lado ocupa a linha cheia no mobile (não espreme o texto)', () => {
     expect(mobile640).toMatch(/\.pen-work-side\s*\{[^}]*flex-basis:\s*100%/);

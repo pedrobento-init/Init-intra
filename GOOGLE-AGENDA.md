@@ -283,6 +283,47 @@ No Apps Script, rode **`instalarRobo`** de novo depois de atualizar o `Robo.gs` 
 
 > Privacidade: o remetente, o assunto e os primeiros 2.000 caracteres do e-mail passam pelo Make e pelo provedor da IA.
 
+## Quando o e-mail não vira chamado
+
+Dois caminhos da triagem não abrem chamado, e antes os dois sumiam em silêncio:
+
+| Motivo | O que aconteceu | O que fazer |
+| --- | --- | --- |
+| **Sem cliente** | O remetente não casou com ficha nenhuma: domínio fora do cadastro, ou Gmail/Hotmail pessoal — domínio público **nunca** casa, de propósito, porque o remetente pode ser qualquer um. | Cadastrar o cliente, ou pôr o domínio em `emails.domain` na ficha. |
+| **A IA ignorou** | O Make devolveu `ignorar: true` — propaganda, aviso automático, agradecimento. | Conferir. Quando o Make erra, é aqui que o pedido real aparece. |
+
+Agora os dois viram linha em `emails_triagem` (migration 066) e aparecem **no
+topo da tela de Pendências**, numa caixa que some sozinha quando não há nada
+pendente. Cada entrada traz dois botões: **Abrir chamado** (leva assunto,
+corpo, remetente e a conversa do Gmail para o formulário) e **Descartar**.
+
+Descartar não apaga: grava `status = 'descartado'` com quem decidiu e quando.
+Apagar de verdade é só do admin. A linha é o registro de que um pedido chegou
+— e sumir com registro de pedido é exatamente o defeito que isto conserta.
+
+> **O cliente fica em branco ao abrir o chamado, de propósito.** O motivo de a
+> entrada estar na caixa é ninguém saber de quem ela é; chutar poria o chamado
+> no cliente errado, que é pior do que pedir para escolher.
+
+Banco sem a 066 não quebra nada: a caixa não aparece e a triagem volta a
+descartar como antes. Mas o robô tenta de novo a cada rodada, então aplicar a
+migration recupera o que chegou nesse meio-tempo.
+
+## O e-mail inteiro no chamado
+
+A `descricao` é um resumo de 600 caracteres — a IA escreve nesse limite, e sem
+IA o corte cai no meio da frase. O e-mail completo, já sem conversa citada e
+sem assinatura, fica em `pendencias.email_corpo` (066) e aparece no detalhe do
+chamado atrás de **"Ver o e-mail inteiro"**.
+
+O botão só aparece quando há o que mostrar a mais: repetir o mesmo texto duas
+vezes na tela é pior do que não ter botão.
+
+O bloco de origem (`De:`, `Recebido em:`, `Assunto original:`) saiu do meio da
+descrição e virou cartão. A separação é feita **na hora de desenhar**, não na
+gravação — assim os chamados que já existem ficam apresentáveis também, sem
+mexer em dado nenhum.
+
 ## Relatório da visita com IA (Make)
 
 No relatório da visita, o botão **✨ Escrever com IA** manda as anotações soltas do técnico (com o cliente, o motivo e os itens concluídos do checklist) e devolve o texto organizado para o cliente final: *Resumo*, *O que foi feito* e *Pendências e recomendações*. O técnico revisa e pode **Desfazer** — a IA nunca salva nada sozinha, e o botão só aparece para operador logado e online.

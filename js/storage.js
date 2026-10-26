@@ -11,6 +11,7 @@ const DB = {
   EQUIPAMENTOS: 'intra_equipamentos',
   VENCIMENTOS: 'intra_vencimentos',
   TIME_ENTRIES: 'intra_time_entries',
+  EMAILS_TRIAGEM: 'intra_emails_triagem',
   USER: 'intra_user',
   COUNTER: 'intra_counter',
   SESSION: 'intra_session',

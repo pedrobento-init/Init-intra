@@ -432,6 +432,11 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     id, client_id: c.id, client_name: c.name || "", team: c.team || "init",
     tipo: t.tipo, assunto: t.assunto, descricao: t.descricao + origem,
     responsible: c.technician || "", solicitante: t.solicitante,
+    // O e-mail inteiro (066). A `descricao` é resumo: a IA escreve em 600
+    // caracteres, e sem IA o corte de 600 come o fim do que a pessoa escreveu.
+    // Quem atende precisa do texto todo, e ir buscar no Gmail é o que fazia a
+    // triagem parecer meio caminho.
+    email_corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
     solicitante_email: enderecoDoRemetente(e.de) || null,
     email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
     email_thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
@@ -458,6 +463,49 @@ export function notaDoSolicitante(e: EmailEntrada, agora: Date = new Date()) {
     createdAt: (Date.parse(e.data) ? new Date(e.data) : agora).toISOString(),
     mentionedOperators: [],
     visibility: "solicitante",
+  };
+}
+
+/** Por que um e-mail que chegou não virou chamado. */
+export type MotivoNaoAproveitado = "sem_cliente" | "ignorado_ia";
+
+/**
+ * Linha da caixa de triagem (066): o e-mail que chegou e NÃO virou chamado.
+ *
+ * Antes disto, os dois caminhos de descarte eram silenciosos — `semCliente`
+ * ia para um JSON que ninguém lê, e `ignorados` era só um contador. Os dois
+ * podem ser pedido de cliente: o domínio pode não estar na ficha, a pessoa
+ * pode ter escrito do Gmail pessoal, e o Make erra ao marcar `ignorar`.
+ *
+ * Guarda o corpo LIMPO, não o cru: é o que alguém vai ler para decidir em
+ * cinco segundos se aquilo era um chamado. O e-mail original continua no
+ * Gmail, que é o arquivo de verdade.
+ */
+export function entradaNaoAproveitada(
+  e: EmailEntrada,
+  motivo: MotivoNaoAproveitado,
+  id: string,
+  team = "init",
+  agora: Date = new Date(),
+) {
+  const recebido = Date.parse(String(e.data || "")) ? new Date(String(e.data)).toISOString() : agora.toISOString();
+  return {
+    id,
+    email_id: String(e.id || "").slice(0, 200),
+    thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
+    message_id: String(e.message_id || "").trim().slice(0, 500) || null,
+    de: String(e.de || "").slice(0, 300),
+    assunto: String(e.assunto || "").slice(0, 300),
+    corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
+    recebido_em: recebido,
+    motivo,
+    status: "pendente",
+    pendencia_id: null,
+    team: team || "init",
+    tratado_por: null,
+    tratado_em: null,
+    created_at: agora.toISOString(),
+    updated_at: agora.toISOString(),
   };
 }
 

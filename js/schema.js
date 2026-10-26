@@ -50,7 +50,7 @@ const ENTITIES = [
       first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy',
       position: 'position', events: 'events',
       solicitante_email: 'solicitanteEmail', email_message_id: 'emailMessageId',
-      email_thread_id: 'emailThreadId'
+      email_thread_id: 'emailThreadId', email_corpo: 'emailCorpo'
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
     // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
@@ -62,9 +62,11 @@ const ENTITIES = [
     // chamado por mensagem, em vez de postar a resposta no que já existe.
     // Resposta por e-mail (064): idem — sem as colunas o chamado continua
     // aberto pela triagem, só não dá para responder ao cliente pela tela.
+    // E-mail inteiro (066): idem — sem a coluna o chamado mostra só a
+    // descrição de 600 caracteres, como antes.
     optionalFields: ['responsible_id', 'timer_operator_id', 'solicitante', 'canal', 'categoria',
       'first_response_due', 'first_response_at', 'first_response_by', 'position', 'events',
-      'solicitante_email', 'email_message_id', 'email_thread_id'],
+      'solicitante_email', 'email_message_id', 'email_thread_id', 'email_corpo'],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
       if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
@@ -295,6 +297,28 @@ const ENTITIES = [
     },
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'templates' && document.getElementById('templatesGridWrap') && typeof renderTemplatesGrid === 'function') renderTemplatesGrid();
+    }
+  },
+  {
+    table: 'emails_triagem',
+    dbKey: 'intra_emails_triagem',
+    label: 'Entradas de e-mail',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 066: banco sem a tabela não quebra o sync
+    fields: {
+      id: 'id', email_id: 'emailId', thread_id: 'threadId', message_id: 'messageId',
+      de: 'de', assunto: 'assunto', corpo: 'corpo', recebido_em: 'recebidoEm',
+      motivo: 'motivo', status: 'status', pendencia_id: 'pendenciaId', team: 'team',
+      tratado_por: 'tratadoPor', tratado_em: 'tratadoEm',
+      created_at: 'createdAt', updated_at: 'updatedAt'
+    },
+    onChange: () => {
+      // A caixa mora na tela de Pendências: e-mail que chega enquanto alguém
+      // está olhando aparece sozinho, que é o ponto de ela existir.
+      if ((window.location.hash.replace('#', '') || '') === 'pendencias'
+        && document.getElementById('penViewArea') && typeof renderEntradasEmail === 'function') renderEntradasEmail();
     }
   },
   {
