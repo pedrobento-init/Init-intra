@@ -88,7 +88,8 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
 - Datas comparadas como `Date` (o banco devolve `+00:00`, a constante pode usar
   `-03:00` ou `Z`).
 - Em `gravarResultadoPastas`, `cand` vira a união dos ids de `candidatos` e
-  `criar`.
+  `criar`. O link de `getUrl()` passa por `driveFolderUrl`, que já normaliza
+  para `https://drive.google.com/drive/folders/<id>`; nada muda ali.
 - `index.ts`: cabeçalho da linha 20 vira `"pastas" → { candidatos, vigiar,
   criar }`.
 
