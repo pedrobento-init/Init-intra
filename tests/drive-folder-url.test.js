@@ -50,3 +50,40 @@ describe('driveFolderUrl', () => {
     expect(mod.driveFolderUrl('')).toBe('');
   });
 });
+
+describe('saveDriveFolderLink', () => {
+  let mod;
+  beforeEach(() => {
+    mod = requireParts('clients');
+    global.getClientById = () => ({ id: 'cli-1', name: 'ACME' });
+  });
+
+  it('recusa quem não é admin', () => {
+    global.isCurrentAdmin = () => false;
+    const r = mod.saveDriveFolderLink('cli-1', BASE + ID);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/administrador/i);
+  });
+
+  it('recusa link inválido mesmo para admin', () => {
+    global.isCurrentAdmin = () => true;
+    expect(mod.saveDriveFolderLink('cli-1', 'https://example.com/x').ok).toBe(false);
+  });
+
+  it('salva a URL canônica, não a colada', () => {
+    global.isCurrentAdmin = () => true;
+    let salvo = null;
+    global.saveClient = (c) => { salvo = c; };
+    const r = mod.saveDriveFolderLink('cli-1', 'https://drive.google.com/drive/u/2/folders/' + ID + '?usp=sharing');
+    expect(r.ok).toBe(true);
+    expect(salvo.driveFolderUrl).toBe(BASE + ID);
+  });
+
+  it('campo vazio desvincula', () => {
+    global.isCurrentAdmin = () => true;
+    let salvo = null;
+    global.saveClient = (c) => { salvo = c; };
+    expect(mod.saveDriveFolderLink('cli-1', '  ').ok).toBe(true);
+    expect(salvo.driveFolderUrl).toBeNull();
+  });
+});

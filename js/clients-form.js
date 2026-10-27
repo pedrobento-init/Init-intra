@@ -619,6 +619,42 @@ function googleSheetEmbedUrl(v) {
   return 'https://docs.google.com/spreadsheets/d/' + p.id + '/edit?usp=sharing&embedded=true';
 }
 
+function _canManageClientDrive() {
+  try { return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false; }
+  catch (_) { return false; }
+}
+
+// Vincula ou desvincula a pasta do Drive do cliente. Devolve { ok, error } em
+// vez de lançar: quem chama é a interface, que mostra o erro no toast.
+// Grava sempre a URL remontada — nunca o texto colado.
+function saveDriveFolderLink(clientId, raw) {
+  if (!_canManageClientDrive()) return { ok: false, error: 'Apenas administradores podem vincular a pasta.' };
+  const existing = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  if (!existing) return { ok: false, error: 'Cliente não encontrado.' };
+  const s = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (!s) {
+    saveClient({ ...existing, id: clientId, driveFolderUrl: null });
+    return { ok: true };
+  }
+  const url = driveFolderUrl(s);
+  if (!url) return { ok: false, error: 'Link inválido. Cole o link de uma pasta do Google Drive (drive.google.com/drive/folders/...).' };
+  saveClient({ ...existing, id: clientId, driveFolderUrl: url });
+  return { ok: true };
+}
+
+function removeDriveFolderConfirm(clientId) {
+  if (!_canManageClientDrive()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem remover a pasta.', 'error');
+    return;
+  }
+  confirmAction('Desvincular a pasta do Drive deste cliente?', function() {
+    const r = saveDriveFolderLink(clientId, '');
+    if (!r.ok) { showToast(r.error, 'error'); return; }
+    renderClientDriveSection(clientId);
+    showToast('Pasta desvinculada.', 'success');
+  });
+}
+
 function _canManageClientSheet() {
   try { return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false; }
   catch (_) { return false; }
@@ -944,7 +980,7 @@ function _refreshClientsInPlace(){
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
-    parseDriveFolderId, driveFolderUrl,
+    parseDriveFolderId, driveFolderUrl, _canManageClientDrive, saveDriveFolderLink,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
     cfGet, cfSet, cfFilled, cfFormatWhen, cfDateTimeLocalValue, cfProgress, cfClientSince,
     cfSectionCount, cfUpdatedMeta, buildClientSummary, renderClientFicha, FICHA_SECTIONS, FICHA_QUICK_KEYS,
