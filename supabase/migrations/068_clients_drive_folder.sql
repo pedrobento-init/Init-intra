@@ -1,0 +1,30 @@
+-- ============================================================
+-- Migration 068: a ficha do cliente guarda o endereço da pasta no Drive
+-- ============================================================
+-- As pastas por cliente já existem no Google Drive, mas o Intra não sabia
+-- onde elas ficam: quem estava na ficha saía do sistema e procurava a pasta
+-- à mão. Esta coluna guarda a URL canônica da pasta, remontada pelo app a
+-- partir do ID (js/clients-form.js, parseDriveFolderId/driveFolderUrl) — o
+-- texto colado pelo usuário nunca é gravado como veio.
+--
+-- É texto simples, e de propósito: campo de array em `clients` entra na
+-- classe de bug do SYNC-06/07 (upsert montado em formulário que não carrega
+-- o array o envia como [] e zera no servidor). Uma coluna de texto não tem
+-- como ter esse bug.
+--
+-- O `schema.js` declara a coluna em `optionalFields`: enquanto esta migration
+-- não for aplicada, o app segue sincronizando clientes sem ela. Idempotente.
+--
+-- VERIFICAR:
+--   select column_name from information_schema.columns
+--    where table_name = 'clients' and column_name = 'drive_folder_url';
+--   -- esperado: 1 linha
+--
+-- REVERTER:
+--   alter table public.clients drop column if exists drive_folder_url;
+--
+-- RLS: nenhuma policy nova. A coluna viaja no registro do cliente, que já é
+-- restrito por equipe.
+-- ============================================================
+
+alter table public.clients add column if not exists drive_folder_url text;

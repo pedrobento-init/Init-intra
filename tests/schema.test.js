@@ -17,6 +17,14 @@ describe('ENTITIES (schema central)', () => {
     expect(new Set(dbKeys).size).toBe(dbKeys.length);
   });
 
+  // Banco sem a migration 068 aplicada derrubaria o sync de TODOS os clientes
+  // se a coluna não fosse opcional — é o que optionalFields protege.
+  it('clients mapeia drive_folder_url e o trata como coluna opcional', () => {
+    const clients = ENTITIES.find((e) => e.table === 'clients');
+    expect(clients.fields.drive_folder_url).toBe('driveFolderUrl');
+    expect(clients.optionalFields).toContain('drive_folder_url');
+  });
+
   it('toda entidade de sync tem id e updated_at no mapa de campos', () => {
     for (const e of SYNC_ENTITIES) {
       expect(e.fields, `fields ausentes em ${e.table}`).toBeTruthy();
