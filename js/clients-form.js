@@ -582,6 +582,27 @@ function parseGoogleSheetId(v) {
   return p ? p.id : null;
 }
 
+// Extrai o ID da pasta do Google Drive de uma URL de pasta ou do ID colado cru.
+// Puro e testável. O ID é aceito só como token seguro para URL: é isso que
+// recusa aspa, '<' e espaço — o vetor do SEC-18, em que uma URL de texto livre
+// virava atributo HTML. Não há suposição sobre o comprimento exato do ID, que o
+// Google já mudou com o tempo; o que identifica a pasta é o segmento /folders/.
+function parseDriveFolderId(v) {
+  const s = String(v === null || v === undefined ? '' : v).trim();
+  if (!s) return null;
+  const m = s.match(/^https?:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?$/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
+  return null;
+}
+
+// Remonta a URL canônica da pasta a partir do ID: o texto colado pelo usuário
+// nunca chega ao href. Retorna '' se inválido (puro, testável).
+function driveFolderUrl(v) {
+  const id = parseDriveFolderId(v);
+  return id ? 'https://drive.google.com/drive/folders/' + id : '';
+}
+
 // Monta a URL de embed a partir do link/ID salvo:
 // - sheet: .../edit?usp=sharing&embedded=true (a URL normal /edit é bloqueada
 //   em iframe pelo Google via X-Frame-Options — daí a conversão; exige a
@@ -923,6 +944,7 @@ function _refreshClientsInPlace(){
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
+    parseDriveFolderId, driveFolderUrl,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
     cfGet, cfSet, cfFilled, cfFormatWhen, cfDateTimeLocalValue, cfProgress, cfClientSince,
     cfSectionCount, cfUpdatedMeta, buildClientSummary, renderClientFicha, FICHA_SECTIONS, FICHA_QUICK_KEYS,
