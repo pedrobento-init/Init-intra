@@ -4360,7 +4360,123 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-inline-select:hover, .pen-inline-date:hover { border-color: var(--border); background: var(--bg-hover); }
 .pen-inline-select:focus, .pen-inline-date:focus { border-color: var(--accent); background: var(--bg-surface); outline: none; }
 /* Descrição como bloco de conteúdo principal. */
+/* ── Caixa de entradas de e-mail sem chamado (066) ────────────────────────
+   Fica no topo das Pendências e some quando não há nada pendente: painel
+   vazio todo dia vira ruído, e aí ninguém lê no dia em que importa. */
+.etr-box {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--yellow);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+.etr-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.etr-head:hover { background: var(--accent-dim2); }
+.etr-head-title { flex: 1; }
+.etr-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #1b1403;
+  font-size: 12px;
+  text-align: center;
+}
+.etr-chevron { color: var(--text-muted); font-size: 11px; }
+.etr-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  display: grid;
+  gap: 10px;
+}
+.etr-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-dim2);
+}
+.etr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.etr-motivo {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--red-dim);
+  color: var(--red);
+  cursor: help;
+}
+.etr-motivo--ignorado_ia { background: var(--accent-dim2); color: var(--text-secondary); }
+.etr-quando { margin-left: auto; color: var(--text-muted); font-size: 11.5px; }
+.etr-assunto { font-weight: 600; font-size: 13.5px; word-break: break-word; }
+.etr-de { color: var(--text-secondary); font-size: 12px; word-break: break-all; }
+.etr-trecho {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.etr-acoes { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .etr-quando { margin-left: 0; width: 100%; }
+  .etr-top { flex-wrap: wrap; }
+  .etr-acoes > .btn { flex: 1; }
+}
+
 .pen-desc-block { margin-top: 14px; }
+/* Origem do chamado nascido de triagem (066). Antes isto era texto colado no
+   fim da descrição — metadado disfarçado de pedido. Como cartão, dá para
+   ignorar com os olhos, que é o que se faz com metadado 99% do tempo. */
+.pen-origem {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 12px;
+}
+.pen-origem-head { color: var(--text-secondary); font-weight: 600; margin-bottom: 5px; }
+.pen-origem-lista { margin: 0; display: grid; gap: 2px; }
+.pen-origem-item { display: flex; gap: 6px; }
+.pen-origem-item dt { color: var(--text-muted); min-width: 108px; flex: none; }
+.pen-origem-item dd { margin: 0; color: var(--text); word-break: break-word; }
+/* O e-mail inteiro fica fechado: ele é longo por natureza, e quem abre o
+   chamado quer primeiro o resumo. Aberto por padrão, empurraria o feed para
+   fora da tela. */
+.pen-email-full { margin-top: 10px; }
+.pen-email-full > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 0;
+}
+.pen-email-full > summary:hover { color: var(--text); }
+.pen-email-corpo {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--border);
+  background: var(--accent-dim2);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-height: 420px;
+  overflow: auto;
+}
 .pen-desc {
   font-size: 13.5px; line-height: 1.65; color: var(--text-primary);
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;

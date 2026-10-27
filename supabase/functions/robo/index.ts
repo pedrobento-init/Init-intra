@@ -29,8 +29,9 @@
 // pendência com canal "email" e a etiqueta "triagem-automatica"; o IA_WEBHOOK_URL
 // (Make) classifica assunto, descrição, tipo, prioridade e categoria. Sem o
 // Make — ou com ele fora do ar — a pendência abre com o texto do próprio
-// e-mail. Uma por mensagem (chave em avisos_enviados); e-mail de quem não é
-// cliente não abre nada.
+// e-mail. Uma por mensagem (chave em avisos_enviados). E-mail de quem não é
+// cliente, e e-mail que a IA marcou `ignorar`, não abrem chamado mas ficam na
+// caixa de triagem (066) para alguém olhar — antes sumiam em silêncio.
 // BACKUP: sem segredos (token Milvus do cliente, PIN dos operadores) e sem
 // as tabelas de credenciais/sincronização.
 
@@ -45,7 +46,7 @@ import {
 import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
-  enderecoDoRemetente,
+  enderecoDoRemetente, entradaNaoAproveitada,
   type Monitor, monitorDoEmail, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta, remetenteInterno,
   textoDaIa, triagemDaIa,
 } from "./campo.ts";
@@ -339,6 +340,36 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 }
 
 
+/**
+ * Guarda na caixa de triagem (066) o e-mail que não virou chamado.
+ *
+ * `team` vem do cliente no caminho ignorado_ia: a entrada da mam/bt tem de
+ * aparecer na caixa da mam/bt, senão some para quem é de lá. Sem cliente
+ * (sem_cliente) não há equipe para herdar — a 066 traz o padrão.
+ *
+ * Banco sem a 066 não derruba a triagem: o resto da rodada vale, e os
+ * chamados de quem É cliente continuam abrindo. A chave de dedupe NÃO volta
+ * para a fila neste erro — devolvê-la fazia a mesma mensagem ser
+ * reprocessada e reclassificada toda rodada enquanto o insert falhasse
+ * (com a 066 ausente, para sempre: gasto de IA no caminho ignorado_ia e o
+ * mesmo erro no log a cada ciclo). A mensagem é consumida e o erro fica no
+ * log, alto de propósito: 066 é obrigatória no deploy.
+ */
+async function guardarEntrada(
+  db: SupabaseClient,
+  e: EmailEntrada,
+  motivo: "sem_cliente" | "ignorado_ia",
+  team = "init",
+): Promise<boolean> {
+  const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), team);
+  const { error } = await db.from("emails_triagem").insert(linha);
+  if (!error) return true;
+  // Já registrado: a rodada anterior gravou e caiu antes de seguir.
+  if (error.code === "23505") return true;
+  console.error(`robo triagem caixa ${e.id} (a mensagem NÃO apareceu na caixa):`, error.message);
+  return false;
+}
+
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
   if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, sem_cliente: [] });
@@ -388,9 +419,26 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       continue;
     }
     const c = clienteDoEmail(clientes, e);
-    if (!c) { semCliente.push(String(e.assunto || "").slice(0, 80)); continue; }
+    if (!c) {
+      // Antes isto era só `semCliente.push(assunto)`: o e-mail sumia e o
+      // assunto ia para um JSON que ninguém lê. Domínio fora da ficha e Gmail
+      // pessoal (que nunca casa, de propósito) são pedido de cliente tanto
+      // quanto os outros — agora ficam na caixa de triagem (066).
+      semCliente.push(String(e.assunto || "").slice(0, 80));
+      await guardarEntrada(db, e, "sem_cliente");
+      continue;
+    }
     const t = triagemDaIa(await classificarComIa(e, c), e);
-    if (t.ignorar) { ignorados++; continue; }  // propaganda, aviso automático, agradecimento
+    if (t.ignorar) {
+      // Propaganda, aviso automático, agradecimento — e, quando o Make erra,
+      // um pedido de verdade. Virar contador escondia o erro da IA; agora a
+      // mensagem fica para alguém conferir.
+      ignorados++;
+      // Com cliente na mão, a entrada nasce na equipe dele: senão a caixa da
+      // mam/bt nunca veria o que a IA ignorou de um cliente da mam/bt.
+      await guardarEntrada(db, e, "ignorado_ia", c.team);
+      continue;
+    }
     const pen = pendenciaDaTriagem(t, e, c, "PEN-" + crypto.randomUUID(), new Date());
     const { error: erroPen } = await db.from("pendencias").insert(pen);
     if (erroPen) {
