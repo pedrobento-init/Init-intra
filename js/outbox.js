@@ -22,11 +22,33 @@ function buildOutboxEntry(entity, op, payload) {
   };
 }
 
+// Teto de tentativas antes de considerar a entrada morta. Sem ele, uma entrada
+// que falha sempre (payload inválido, RLS nega) trava a fila inteira para
+// sempre, porque o drain para na primeira falha para preservar a ordem.
+var OUTBOX_MAX_ATTEMPTS = 5;
+
 function _outboxTable() {
   try {
     if (typeof idb !== 'undefined' && idb && idb.outbox) return idb.outbox;
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
   return null;
+}
+
+// Tira da fila tudo que estava enfileirado para um id. Serve ao enqueue
+// (última escrita vence) e à exclusão: deixar atrás um upsert pendente faz o
+// próximo drain recriar no servidor o registro que o usuário apagou.
+async function outboxRemoveTarget(targetId) {
+  if (!targetId) return 0;
+  var t = _outboxTable();
+  if (!t) return 0;
+  var removed = 0;
+  try {
+    var prev = await t.where('targetId').equals(String(targetId)).toArray();
+    for (var i = 0; i < prev.length; i++) {
+      try { await t.delete(prev[i].seq); removed++; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+    }
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+  return removed;
 }
 
 // Enfileira sem duplicar o mesmo alvo (última escrita vence na fila).
@@ -39,10 +61,7 @@ async function outboxEnqueue(entity, op, payload) {
     return null;
   }
   try {
-    var prev = await t.where('targetId').equals(entry.targetId).toArray();
-    for (var i = 0; i < prev.length; i++) {
-      try { await t.delete(prev[i].seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
-    }
+    await outboxRemoveTarget(entry.targetId);
     var seq = await t.add(entry);
     try { if (typeof incrementPendingSync === 'function') incrementPendingSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     try {
@@ -55,12 +74,16 @@ async function outboxEnqueue(entity, op, payload) {
   }
 }
 
+// Entrada morta não está mais a caminho do servidor: contá-la deixaria o
+// contador de pendências preso num número que nunca baixa.
+function _outboxAlive(r) { return !!r && !r.dead; }
+
 async function outboxHas(targetId) {
   if (!targetId) return false;
   var t = _outboxTable();
   if (!t) return false;
   try {
-    return (await t.where('targetId').equals(String(targetId)).count()) > 0;
+    return (await t.where('targetId').equals(String(targetId)).toArray()).some(_outboxAlive);
   } catch (_) { return false; }
 }
 
@@ -70,7 +93,7 @@ async function outboxCount() {
     try { if (typeof getPendingSyncCount === 'function') return getPendingSyncCount(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
     return 0;
   }
-  try { return await t.count(); } catch (_) { return 0; }
+  try { return (await t.orderBy('seq').toArray()).filter(_outboxAlive).length; } catch (_) { return 0; }
 }
 
 // Envio em lote ao reconectar: em ordem de criação, para no primeiro
@@ -90,6 +113,7 @@ async function outboxDrain() {
   var sent = 0;
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
+    if (r && r.dead) continue; // dead-letter: não tenta de novo nem bloqueia
     try {
       var meta = null;
       try {
@@ -97,14 +121,36 @@ async function outboxDrain() {
           ? ENTITIES.find(function (e) { return e.table === r.entity || e.dbKey === r.entity; })
           : null;
       } catch (_) { meta = null; }
-      if (!meta) { try { await t.delete(r.seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); } sent++; continue; }
-      var remote = (typeof _mapToRemote === 'function') ? _mapToRemote(r.payload || {}, meta.fields, meta.optionalFields) : (r.payload || {});
-      var res = await supabaseClient.from(meta.table).upsert(remote);
+      // Entidade que não existe no schema nunca vai subir: marcar como morta
+      // preserva o dado para inspeção. Apagar e contar como `sent` era perda
+      // silenciosa disfarçada de sucesso.
+      if (!meta) {
+        try { await t.update(r.seq, { dead: true, deadReason: 'entidade desconhecida: ' + r.entity }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+        continue;
+      }
+      // O `op` gravado no enqueue manda: um delete enfileirado que virasse
+      // upsert recriaria no servidor o registro que o usuário excluiu.
+      var res;
+      if (r.op === 'delete') {
+        res = await supabaseClient.from(meta.table).delete().eq('id', r.targetId);
+      } else {
+        var remote = (typeof _mapToRemote === 'function') ? _mapToRemote(r.payload || {}, meta.fields, meta.optionalFields) : (r.payload || {});
+        res = await supabaseClient.from(meta.table).upsert(remote);
+      }
       if (res && res.error) throw res.error;
       try { await t.delete(r.seq); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
       sent++;
     } catch (_) {
-      try { await t.update(r.seq, { attempts: (r.attempts || 0) + 1 }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+      var tries = (r.attempts || 0) + 1;
+      var patch = { attempts: tries };
+      if (tries >= OUTBOX_MAX_ATTEMPTS) {
+        patch.dead = true;
+        patch.deadReason = 'falhou ' + tries + ' vezes';
+      }
+      try { await t.update(r.seq, patch); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+      // Falha transitória para o drain para preservar a ordem; entrada morta
+      // sai da frente para o resto da fila andar.
+      if (patch.dead) continue;
       break;
     }
   }
@@ -119,7 +165,9 @@ async function outboxDrain() {
 
 // Aliases de compatibilidade (código proposto na discussão usava Outbox.*)
 var Outbox = {
+  MAX_ATTEMPTS: OUTBOX_MAX_ATTEMPTS,
   enqueue: outboxEnqueue,
+  removeTarget: outboxRemoveTarget,
   has: outboxHas,
   count: outboxCount,
   drain: outboxDrain,
@@ -138,5 +186,5 @@ if (typeof window !== 'undefined') {
   }
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildOutboxEntry, outboxEnqueue, outboxHas, outboxCount, outboxDrain, Outbox };
+  module.exports = { buildOutboxEntry, outboxEnqueue, outboxRemoveTarget, outboxHas, outboxCount, outboxDrain, Outbox, OUTBOX_MAX_ATTEMPTS };
 }
