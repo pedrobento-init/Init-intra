@@ -650,7 +650,10 @@ function removeDriveFolderConfirm(clientId) {
   confirmAction('Desvincular a pasta do Drive deste cliente?', function() {
     const r = saveDriveFolderLink(clientId, '');
     if (!r.ok) { showToast(r.error, 'error'); return; }
-    renderClientDriveSection(clientId);
+    // O confirmAction fecha o modal antes de rodar isto, e o modal É a ficha
+    // (viewClient usa openModal): redesenhar a seção não acharia o elemento.
+    viewClient(clientId);
+    switchClientTab('documentos', clientId);
     showToast('Pasta desvinculada.', 'success');
   });
 }
@@ -690,21 +693,24 @@ function openDriveFolderPrompt(clientId) {
   openModal('📁 Vincular pasta do Drive', `
     <div class="form-group"><label class="form-label">Link da pasta</label><input class="form-input" id="driveLinkInput" value="${escapeHtml(cur)}" placeholder="https://drive.google.com/drive/folders/..." /></div>
     <p style="font-size:12px;color:var(--text-muted)">Abra a pasta no Google Drive e copie o endereço da barra do navegador. Quem não tem acesso à pasta no Drive continua sem acesso — o vínculo aqui não compartilha nada. Para desvincular, apague o campo e salve.</p>
-    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" data-action="driveSave" data-arg="${escapeHtml(clientId)}">Salvar</button></div>
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="driveCancel" data-arg="${escapeHtml(clientId)}">Cancelar</button><button type="button" class="btn btn-primary" data-action="driveSave" data-arg="${escapeHtml(clientId)}">Salvar</button></div>
     <div id="driveLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
 }
 
 function submitDriveFolderLink(clientId) {
   const input = document.getElementById('driveLinkInput');
-  const r = saveDriveFolderLink(clientId, input ? input.value : '');
+  const raw = input ? String(input.value || '') : '';
+  const r = saveDriveFolderLink(clientId, raw);
   if (!r.ok) {
     const m = document.getElementById('driveLinkMsg');
     if (m) m.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(r.error)}</span>`;
     return;
   }
-  if (typeof closeModal === 'function') closeModal();
-  renderClientDriveSection(clientId);
-  showToast(String(input && input.value || '').trim() ? 'Pasta vinculada!' : 'Pasta desvinculada.', 'success');
+  // Volta para a ficha em vez de redesenhar a seção: este prompt substituiu o
+  // #modalBody, que era a própria ficha, então #cliDriveBody não existe mais.
+  viewClient(clientId);
+  switchClientTab('documentos', clientId);
+  showToast(raw.trim() ? 'Pasta vinculada!' : 'Pasta desvinculada.', 'success');
 }
 
 function _canManageClientSheet() {
@@ -1033,6 +1039,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
     parseDriveFolderId, driveFolderUrl, _canManageClientDrive, saveDriveFolderLink,
+    renderClientDriveSection, submitDriveFolderLink,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
     cfGet, cfSet, cfFilled, cfFormatWhen, cfDateTimeLocalValue, cfProgress, cfClientSince,
     cfSectionCount, cfUpdatedMeta, buildClientSummary, renderClientFicha, FICHA_SECTIONS, FICHA_QUICK_KEYS,
