@@ -777,7 +777,7 @@ function renderClientTab(tab, id) {
       <hr class="divider" />
       <div class="attachment-section" style="margin-top:0">
         <div class="section-header" style="margin-bottom:12px">
-          <span class="section-title">📁 Pasta no Drive</span>
+          <span class="section-title">🗂️ Pasta no Drive</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap" id="cliDriveActions"></div>
         </div>
         <div id="cliDriveBody"></div>

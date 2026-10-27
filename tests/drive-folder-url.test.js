@@ -1,6 +1,24 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+// Snapshot antes de qualquer teste: o que é devolvido é exatamente o que
+// existia. Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
+// O afterEach que devolve vem depois, no passo verde: escrito junto, o teste de
+// higiene nasce verde e não prova nada.
+const _globalKeys = [
+  'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
+  'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
+  'renderClientDocumentsList', 'renderAttachmentList',
+];
+const _keep = {};
+for (const k of _globalKeys) _keep[k] = globalThis[k];
+afterEach(() => {
+  for (const k of _globalKeys) {
+    if (_keep[k] === undefined) delete globalThis[k];
+    else globalThis[k] = _keep[k];
+  }
+});
 
 const ID = '1a2B3cD4eF5gH6iJ7kL8mN9oP0qR';
 const BASE = 'https://drive.google.com/drive/folders/';
@@ -20,6 +38,10 @@ describe('parseDriveFolderId', () => {
     expect(mod.parseDriveFolderId(ID)).toBe(ID);
   });
 
+  it('recusa ID cru de 14 caracteres — o piso é 15', () => {
+    expect(mod.parseDriveFolderId(ID.slice(0, 14))).toBeNull();
+  });
+
   it('recusa arquivo, planilha, outro domínio, vazio e nulo', () => {
     expect(mod.parseDriveFolderId('https://drive.google.com/file/d/' + ID + '/view')).toBeNull();
     expect(mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
@@ -33,6 +55,26 @@ describe('parseDriveFolderId', () => {
     expect(mod.parseDriveFolderId(BASE + ID + '" onmouseover=alert(1) x="')).toBeNull();
     expect(mod.parseDriveFolderId(BASE + '<script>')).toBeNull();
     expect(mod.parseDriveFolderId(ID + ' ' + ID)).toBeNull();
+  });
+});
+
+describe('parseDriveFolderId — normalização flexível', () => {
+  let mod;
+  beforeEach(() => { mod = requireParts('clients'); });
+
+  it('aceita host sem esquema, host em maiúsculas e a forma legada open?id=', () => {
+    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID)).toBe(ID);
+    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')).toBe(ID);
+    expect(mod.parseDriveFolderId('https://drive.google.com/open?id=' + ID)).toBe(ID);
+    expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID + '&usp=sharing')).toBe(ID);
+  });
+
+  it('a normalização preserva a caixa do ID e não abre porteira para não-pasta', () => {
+    expect(mod.driveFolderUrl('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID)).toBe(BASE + ID);
+    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/file/d/' + ID + '/view')).toBeNull();
+    expect(mod.parseDriveFolderId('docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
+    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')).toBeNull();
+    expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID.slice(0, 14))).toBeNull();
   });
 });
 
@@ -100,6 +142,14 @@ describe('seção da pasta na ficha', () => {
     expect(corpo).not.toMatch(/onclick=/);
     expect(corpo).toMatch(/data-action=/);
     expect(corpo).toMatch(/driveFolderUrl\(/);
+  });
+});
+
+describe('título da seção da pasta', () => {
+  it('usa 🗂️ para não repetir o 📁 das Anexos', () => {
+    const src = partsSource('clients').replace(/\r\n/g, '\n');
+    expect(src).toContain('🗂️ Pasta no Drive');
+    expect(src).toContain('📁 Anexos do Cliente');
   });
 });
 
@@ -182,14 +232,23 @@ describe('submitDriveFolderLink reabre a ficha', () => {
   // dentro do grupo concatenado, viewClient é declaração de função e não se
   // substitui por global. Reabrir a ficha significa o openModal receber de
   // novo o nome do cliente como título.
-  it('salvar leva de volta para a ficha do cliente', () => {
+  it('salvar leva de volta para a ficha do cliente', async () => {
     const els = _domFalso(['driveLinkInput'], true);
     els.driveLinkInput.value = BASE + ID;
     let titulo = null;
     global.openModal = (t) => { titulo = t; };
     global.getVisitsByClient = () => [];
     global.getPendenciasByClient = () => [];
+    // Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
+    // fora do grupo 'clients' que o teste compila: sem o stub, ReferenceError.
+    global.renderClientDocumentsList = () => {};
+    global.renderAttachmentList = () => {};
     mod.submitDriveFolderLink('cli-1');
+    // O viewClient agenda o setTimeout de 20 ms de clients-ficha.js:786, que
+    // chama quatro renderizadores. Sem este await o timer disputa com a
+    // desmontagem do worker e o erro só aparece em algumas execuções; com ele,
+    // o disparo acontece sempre dentro do teste.
+    await new Promise((r) => setTimeout(r, 30));
     expect(titulo).toBe('ACME');
   });
 });
@@ -229,5 +288,11 @@ describe('a coluna chega ao servidor', () => {
     expect(i).toBeGreaterThan(-1);
     const payload = src.slice(i, src.indexOf('})))', i));
     expect(payload).toMatch(/\.\.\.\(c\.driveFolderUrl \? \{ drive_folder_url/);
+  });
+});
+
+describe('higiene dos globais', () => {
+  it('nenhum global emprestado sobrevive ao teste que o atribuiu', () => {
+    for (const k of _globalKeys) expect(globalThis[k]).toBe(_keep[k]);
   });
 });

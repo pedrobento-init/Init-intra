@@ -583,15 +583,21 @@ function parseGoogleSheetId(v) {
 }
 
 // Extrai o ID da pasta do Google Drive de uma URL de pasta ou do ID colado cru.
-// Puro e testável. O ID é aceito só como token seguro para URL: é isso que
-// recusa aspa, '<' e espaço — o vetor do SEC-18, em que uma URL de texto livre
-// virava atributo HTML. Não há suposição sobre o comprimento exato do ID, que o
-// Google já mudou com o tempo; o que identifica a pasta é o segmento /folders/.
+// Puro e testável. O endereço é casado em caixa-insensitiva e aceito sem
+// esquema, porque "drive.google.com/..." colado da barra é o mesmo link — e
+// "open?id=" é a forma legada de compartilhamento. O ID é aceito só como token
+// seguro para URL: é isso que recusa aspa, '<' e espaço — o vetor do SEC-18, em
+// que uma URL de texto livre virava atributo HTML. O fallback de ID cru não
+// distingue pasta de arquivo (risco aceito: link que dá 404 é visível para quem
+// colou errado; o ID de planilha só chega aqui cru, sem a forma /spreadsheets/,
+// que continua recusada). Não há suposição sobre o comprimento exato do ID, que
+// o Google já mudou com o tempo; o piso de 15 é o que separa ID de resto de texto.
 function parseDriveFolderId(v) {
-  const s = String(v === null || v === undefined ? '' : v).trim();
+  let s = String(v === null || v === undefined ? '' : v).trim();
   if (!s) return null;
-  const m = s.match(/^https?:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?$/);
-  if (m) return m[1];
+  if (/^drive\.google\.com\//i.test(s)) s = 'https://' + s;
+  const m = s.match(/^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i);
+  if (m) return m[1] || m[2];
   if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
   return null;
 }
