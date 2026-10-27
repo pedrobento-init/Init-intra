@@ -17,6 +17,8 @@
 //
 //   "backups"     → { mensagens: [{ id, de, assunto, data, trecho }] } e-mails do rótulo "Backups"
 //   "triagem"     → { mensagens: [...] } e-mails do rótulo "Pendências" → pendência nova
+//   "pastas"      → { candidatos, vigiar }      planilha sem pasta / pasta a testar (069)
+//   "pastas-resultado" { achados, testes, erros } → { gravados, atualizados }
 //
 // RESUMO: um por pessoa por dia (chave em avisos_enviados, 051); dia sem
 // nada não manda e-mail; sábado/domingo só para quem tem visita. Cada visita
@@ -46,7 +48,7 @@ import {
 import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
-  enderecoDoRemetente, entradaNaoAproveitada,
+  enderecoDoRemetente, entradaNaoAproveitada, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
   type Monitor, monitorDoEmail, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta, remetenteInterno,
   textoDaIa, triagemDaIa,
 } from "./campo.ts";
@@ -477,12 +479,30 @@ async function backup(db: SupabaseClient) {
   return json({ gerado_em: new Date().toISOString(), tabelas, erros });
 }
 
+// PASTAS: o plano é refeito do banco nas duas chamadas; o robô só diz o que o Drive respondeu.
+const planoDoBanco = async (db: SupabaseClient) =>
+  planoPastas(await all<ClientePasta>(db, "clients", "id, google_sheet_url, drive_folder_url"));
+
+async function pastas(db: SupabaseClient) {
+  const plano = await planoDoBanco(db);
+  const log = await marcarPastasInvalidas(db, plano.invalidos, new Date().toISOString());
+  if (log) console.warn("robo pastas:", log);
+  return json({ candidatos: plano.candidatos, vigiar: plano.vigiar });
+}
+
+async function pastasResultado(db: SupabaseClient, input: { achados?: unknown; testes?: unknown; erros?: unknown }) {
+  const r = await gravarResultadoPastas(db, await planoDoBanco(db), input, new Date().toISOString());
+  if (r.log) console.warn("robo pastas:", r.log);
+  if (Array.isArray(input.erros) && input.erros.length) console.warn("robo pastas: erros do Drive", input.erros.slice(0, 20));
+  return json({ gravados: r.gravados, atualizados: r.atualizados });
+}
+
 serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return json({ error: "Indisponível" }, 500);
   if (!SECRET || !safeEqual(req.headers.get("x-agenda-secret") ?? "", SECRET)) return json({ error: "Não autorizado" }, 401);
 
-  let input: { action?: string; enviar?: unknown; mensagens?: unknown };
+  let input: { action?: string; enviar?: unknown; mensagens?: unknown; achados?: unknown; testes?: unknown; erros?: unknown };
   try { input = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
   try {
@@ -494,6 +514,8 @@ serve(async (req: Request) => {
       case "backup": return await backup(db);
       case "backups": return await backups(db, input);
       case "triagem": return await triagem(db, input);
+      case "pastas": return await pastas(db);
+      case "pastas-resultado": return await pastasResultado(db, input);
       default: return json({ error: "Ação desconhecida" }, 400);
     }
   } catch (e) {

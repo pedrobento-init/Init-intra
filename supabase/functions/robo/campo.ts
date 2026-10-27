@@ -526,3 +526,109 @@ export function itensDaIa(body: string, jaTem: string[] = [], max = 8): string[]
   }
   return out;
 }
+
+// ---- Pasta do Drive do cliente (069) ----
+// Espelho exato do parseDriveFolderId de js/clients-form.js: o servidor
+// revalida tudo que grava, porque o robô e o banco não confiam um no outro.
+export function parseDriveFolderId(v: unknown): string | null {
+  let s = String(v === null || v === undefined ? "" : v).trim();
+  if (!s) return null;
+  if (/^drive\.google\.com\//i.test(s)) s = "https://" + s;
+  const m = s.match(/^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i);
+  if (m) return m[1] || m[2];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
+  return null;
+}
+
+export function driveFolderUrl(v: unknown): string {
+  const id = parseDriveFolderId(v);
+  return id ? "https://drive.google.com/drive/folders/" + id : "";
+}
+
+// Só planilha "de verdade" (/d/<id>): a publicada (/d/e/...) não abre no DriveApp.
+function idDaPlanilha(v: unknown): string | null {
+  const s = String(v ?? "").trim();
+  const m = s.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m && m[1] !== "e") return m[1];
+  return /^[a-zA-Z0-9-_]{20,}$/.test(s) ? s : null;
+}
+
+export type ClientePasta = { id: string; google_sheet_url?: string | null; drive_folder_url?: string | null };
+
+/** O que o robô vai procurar (planilha sem pasta) e vigiar (pasta já vinculada). */
+export function planoPastas(clientes: ClientePasta[]) {
+  const candidatos: { client_id: string; sheet_id: string }[] = [];
+  const vigiar: { client_id: string; folder_id: string }[] = [];
+  const invalidos: string[] = [];
+  for (const c of clientes) {
+    if (c.drive_folder_url) {
+      const id = parseDriveFolderId(c.drive_folder_url);
+      if (id) vigiar.push({ client_id: c.id, folder_id: id });
+      else invalidos.push(c.id);
+    } else {
+      const sheet = idDaPlanilha(c.google_sheet_url);
+      if (sheet) candidatos.push({ client_id: c.id, sheet_id: sheet });
+    }
+  }
+  return { candidatos, vigiar, invalidos };
+}
+
+// 42703 com o nome da coluna nova: a 069 ainda não foi aplicada neste banco.
+export const AVISO_069 = "aplique a 069_clients_drive_folder_status.sql";
+const sem069 = (e: { code?: string; message?: string } | null) =>
+  !!e && e.code === "42703" && /drive_folder_(status|checked_at)/.test(e.message ?? "");
+
+// deno-lint-ignore no-explicit-any
+type Db = { from: (t: string) => any };
+
+/** Marca como "invalido" quem tem link que não é pasta; não vai ao Google. */
+export async function marcarPastasInvalidas(db: Db, ids: string[], agora: string): Promise<string | null> {
+  if (!ids.length) return null;
+  const { error } = await db.from("clients").update({ drive_folder_status: "invalido", drive_folder_checked_at: agora }).in("id", ids);
+  if (sem069(error)) return AVISO_069;
+  if (error) throw new Error(error.message);
+  return null;
+}
+
+/**
+ * Grava o que o robô achou e testou. Só aceita client_id que estava no plano
+ * (refeito agora a partir do banco) e só vincula pasta onde ainda não há uma:
+ * o .is(null) impede o robô de sobrescrever um vínculo feito por gente no meio tempo.
+ */
+export async function gravarResultadoPastas(
+  db: Db, plano: ReturnType<typeof planoPastas>,
+  input: { achados?: unknown; testes?: unknown }, agora: string,
+) {
+  const cand = new Set(plano.candidatos.map((c) => c.client_id));
+  const vig = new Set(plano.vigiar.map((c) => c.client_id));
+  const lista = (v: unknown) => (Array.isArray(v) ? v : []) as Record<string, unknown>[];
+  let gravados = 0, atualizados = 0, ignorados = 0, log: string | null = null;
+
+  for (const a of lista(input.achados)) {
+    const id = String(a?.client_id ?? ""), url = driveFolderUrl(a?.folder_url);
+    if (!cand.has(id) || !url) { ignorados++; continue; }
+    let r = await db.from("clients").update({ drive_folder_url: url, drive_folder_status: "ok", drive_folder_checked_at: agora })
+      .eq("id", id).is("drive_folder_url", null).select("id");
+    if (sem069(r.error)) {
+      log = AVISO_069;  // o vínculo vale mais que o selo: grava sem o status
+      r = await db.from("clients").update({ drive_folder_url: url }).eq("id", id).is("drive_folder_url", null).select("id");
+    }
+    if (r.error) throw new Error(r.error.message);
+    gravados += (r.data ?? []).length;
+  }
+
+  const porStatus: Record<string, string[]> = { ok: [], inacessivel: [] };
+  for (const t of lista(input.testes)) {
+    const id = String(t?.client_id ?? ""), st = String(t?.status ?? "");
+    if (!vig.has(id) || !porStatus[st]) { ignorados++; continue; }
+    porStatus[st].push(id);
+  }
+  for (const [st, ids] of Object.entries(porStatus)) {
+    if (!ids.length || log) continue;
+    const { error } = await db.from("clients").update({ drive_folder_status: st, drive_folder_checked_at: agora }).in("id", ids);
+    if (sem069(error)) { log = AVISO_069; continue; }
+    if (error) throw new Error(error.message);
+    atualizados += ids.length;
+  }
+  return { gravados, atualizados, ignorados, log };
+}

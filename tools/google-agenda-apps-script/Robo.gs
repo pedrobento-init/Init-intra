@@ -5,7 +5,7 @@
 //
 //   roboVencimentos  de hora em hora   agenda "Vencimentos Init" (só leitura p/ a equipe)
 //   roboResumo       por volta das 8h  e-mail "Seu dia" (o servidor envia) + Google Chat opcional
-//   roboNoite        de madrugada      domínios (RDAP), planilha de indicadores, backup no Drive
+//   roboNoite        de madrugada      domínios (RDAP), planilha de indicadores, backup no Drive, pastas dos clientes
 //   roboBackupsEmail de 30 em 30 min   e-mails do rótulo "Backups" do Gmail → status dos backups dos clientes
 //   roboPendenciasEmail de 15 em 15 min e-mails do rótulo "Pendências" do Gmail → pendência já preenchida
 //
@@ -41,6 +41,12 @@ function instalarRobo() {
 /** Teste do resumo sem mandar e-mail: mostra no log o texto que iria para o Chat. */
 function testarResumo() {
   Logger.log(roboChamar_('resumo', { enviar: false }).chat);
+}
+
+/** Mostra no log o que roboPastas faria, sem gravar nada. */
+function testarPastas() {
+  var r = roboChamar_('pastas');
+  Logger.log('Sem pasta, com planilha: ' + r.candidatos.length + ' | pastas a vigiar: ' + r.vigiar.length);
 }
 
 function roboChamar_(action, body) {
@@ -250,7 +256,7 @@ function roboPendenciasEmail() {
 
 function roboNoite() {
   var erros = [];
-  [['domínios', roboDominios], ['indicadores', roboIndicadores], ['backup', roboBackup]].forEach(function (t) {
+  [['domínios', roboDominios], ['indicadores', roboIndicadores], ['backup', roboBackup], ['pastas', roboPastas]].forEach(function (t) {
     try { t[1](); } catch (e) { erros.push(t[0] + ': ' + e.message); }
   });
   if (erros.length) throw new Error(erros.join(' | '));  // aparece em Execuções
@@ -321,4 +327,28 @@ function pastaBackup_() {
   var pasta = DriveApp.createFolder('Init Intra — Backups');
   p.setProperty('BACKUP_FOLDER_ID', pasta.getId());
   return pasta;
+}
+
+// Pasta do Drive de cada cliente (069). Quem tem planilha e não tem pasta ganha
+// a pasta-mãe da planilha; quem tem pasta é conferido. Só lê o Drive: a conta do
+// robô precisa enxergar as pastas (compartilhe a pasta raiz dos clientes com ela).
+function roboPastas() {
+  var r = roboChamar_('pastas');
+  var achados = [], testes = [], erros = [];
+  r.candidatos.forEach(function (c) {
+    try {
+      var pais = DriveApp.getFileById(c.sheet_id).getParents();
+      while (pais.hasNext()) {
+        var f = pais.next();
+        if (!f.isTrashed()) { achados.push({ client_id: c.client_id, folder_url: f.getUrl() }); break; }
+      }
+    } catch (e) { erros.push(c.client_id + ': ' + e.message); }  // planilha sem acesso: tenta de novo amanhã
+  });
+  r.vigiar.forEach(function (v) {
+    var ok = false;
+    try { ok = !DriveApp.getFolderById(v.folder_id).isTrashed(); } catch (e) { /* apagada ou sem acesso */ }
+    testes.push({ client_id: v.client_id, status: ok ? 'ok' : 'inacessivel' });
+  });
+  var g = roboChamar_('pastas-resultado', { achados: achados, testes: testes, erros: erros });
+  Logger.log('Pastas vinculadas: ' + g.gravados + ' | conferidas: ' + g.atualizados + (erros.length ? ' | erros: ' + erros.length : ''));
 }

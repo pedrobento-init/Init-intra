@@ -362,6 +362,13 @@ O botão só aparece com operador logado e conexão (mesma regra do relatório).
 1. Rode a migration `060_campo_backups_briefing.sql` e faça `supabase functions deploy robo --no-verify-jwt`.
 2. No Apps Script, cole o `Robo.gs` novo (que agora inclui `roboBackupsEmail`), cole também o `appsscript.json` se você o usa (ele agora pede acesso ao Gmail), rode **`instalarRobo`** de novo e autorize.
 
+### Instalar a pasta do Drive automática (robô da noite)
+Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está) e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
+1. Rode as migrations `068_clients_drive_folder.sql` e `069_clients_drive_folder_status.sql`.
+2. Compartilhe a pasta raiz dos clientes no Drive com a conta que roda o robô (leitura basta).
+3. No Apps Script, cole o `Robo.gs` novo e rode **`instalarRobo`** de novo (`testarPastas` mostra quantos clientes ele vai olhar).
+4. Faça `supabase functions deploy robo --no-verify-jwt`.
+
 ## Limites
 
 - O Apps Script de contas Workspace tem 6 h/dia de execução por acionador. Cada execução leva poucos segundos, o que dá folga.

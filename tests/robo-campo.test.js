@@ -3,6 +3,7 @@ import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
   itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
+  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -408,5 +409,111 @@ describe('o chamado guarda a conversa que o abriu', () => {
   it('e-mail sem thread_id (Robo.gs antigo) grava null, não string vazia', () => {
     const p = pendenciaDaTriagem(triagemDaIa('Accepted', { ...email, thread_id: '' }), { ...email, thread_id: '' }, clientes[0], 'PEN-21');
     expect(p.email_thread_id).toBe(null);
+  });
+});
+
+describe('pasta do Drive do cliente (069)', () => {
+  const F = '1AbCdEfGhIjKlMnOpQr';  // 19 chars
+  const S = '1ZyXwVuTsRqPoNmLkJiHgFeDcBa';
+
+  // Banco de mentira: aplica eq/in/is sobre as linhas e guarda cada update.
+  function fakeDb(rows, { semColuna = false } = {}) {
+    const updates = [];
+    return {
+      rows, updates,
+      from: () => ({
+        update(vals) {
+          const filtros = [];
+          const q = {
+            eq: (c, v) => (filtros.push((r) => r[c] === v), q),
+            in: (c, v) => (filtros.push((r) => v.includes(r[c])), q),
+            is: (c, v) => (filtros.push((r) => (r[c] ?? null) === v), q),
+            select: () => q,
+            then(ok) {
+              if (semColuna && 'drive_folder_status' in vals) {
+                return ok({ data: null, error: { code: '42703', message: 'column clients.drive_folder_status does not exist' } });
+              }
+              const hit = rows.filter((r) => filtros.every((f) => f(r)));
+              hit.forEach((r) => Object.assign(r, vals));
+              updates.push({ vals, ids: hit.map((r) => r.id) });
+              return ok({ data: hit.map((r) => ({ id: r.id })), error: null });
+            },
+          };
+          return q;
+        },
+      }),
+    };
+  }
+
+  it('parser aceita as formas do app e recusa o resto', () => {
+    for (const ok of [`https://drive.google.com/drive/folders/${F}`, `https://drive.google.com/drive/folders/${F}?usp=sharing`,
+      `https://drive.google.com/drive/u/0/folders/${F}`, `https://drive.google.com/open?id=${F}`, `drive.google.com/drive/folders/${F}`, F]) {
+      expect(parseDriveFolderId(ok)).toBe(F);
+    }
+    for (const no of [`https://drive.google.com/drive/folders/${F}"onmouseover`, `https://drive.google.com/drive/folders/${F} x`,
+      `https://drive.google.com/file/d/${F}/view`, `https://evil.com/drive/folders/${F}`, 'A'.repeat(14), '', null]) {
+      expect(parseDriveFolderId(no)).toBe(null);
+    }
+  });
+
+  it('plano: candidato só com planilha e sem pasta; vigia quem tem pasta; link ruim vira inválido', () => {
+    const p = planoPastas([
+      { id: 'a', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`, drive_folder_url: null },
+      { id: 'b', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`, drive_folder_url: `https://drive.google.com/drive/folders/${F}` },
+      { id: 'c', google_sheet_url: null, drive_folder_url: null },
+      { id: 'd', google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml', drive_folder_url: '' },
+      { id: 'e', drive_folder_url: 'https://exemplo.com/pasta' },
+    ]);
+    expect(p.candidatos).toEqual([{ client_id: 'a', sheet_id: S }]);
+    expect(p.vigiar).toEqual([{ client_id: 'b', folder_id: F }]);
+    expect(p.invalidos).toEqual(['e']);
+  });
+
+  it('marca inválidos com checked_at sem ir ao Google', async () => {
+    const db = fakeDb([{ id: 'e', drive_folder_url: 'x' }]);
+    expect(await marcarPastasInvalidas(db, ['e'], 'T')).toBe(null);
+    expect(db.rows[0]).toMatchObject({ drive_folder_status: 'invalido', drive_folder_checked_at: 'T' });
+    expect(await marcarPastasInvalidas(db, [], 'T')).toBe(null);
+    expect(db.updates).toHaveLength(1);
+  });
+
+  it('grava achado com status ok, não sobrescreve vínculo humano e ignora quem não estava no plano', async () => {
+    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }, { client_id: 'h', sheet_id: S }], vigiar: [], invalidos: [] };
+    // 'h' ganhou pasta à mão entre as duas chamadas do robô.
+    const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'h', drive_folder_url: 'https://drive.google.com/drive/folders/HUMANO123456789' }, { id: 'z', drive_folder_url: null }]);
+    const r = await gravarResultadoPastas(db, plano, { achados: [
+      { client_id: 'a', folder_url: F }, { client_id: 'h', folder_url: F }, { client_id: 'z', folder_url: F }, { client_id: 'a', folder_url: 'lixo' },
+    ] }, 'T');
+    expect(r).toMatchObject({ gravados: 1, ignorados: 2, log: null });
+    expect(db.rows[0]).toMatchObject({ drive_folder_url: `https://drive.google.com/drive/folders/${F}`, drive_folder_status: 'ok', drive_folder_checked_at: 'T' });
+    expect(db.rows[1].drive_folder_url).toBe('https://drive.google.com/drive/folders/HUMANO123456789');
+    expect(db.rows[2].drive_folder_url).toBe(null);
+  });
+
+  it('testes viram ok / inacessivel com checked_at; status desconhecido é ignorado', async () => {
+    const plano = { candidatos: [], vigiar: [{ client_id: 'b', folder_id: F }, { client_id: 'c', folder_id: F }], invalidos: [] };
+    const db = fakeDb([{ id: 'b' }, { id: 'c' }]);
+    const r = await gravarResultadoPastas(db, plano, { testes: [
+      { client_id: 'b', status: 'ok' }, { client_id: 'c', status: 'inacessivel' }, { client_id: 'c', status: 'invalido' }, { client_id: 'x', status: 'ok' },
+    ] }, 'T');
+    expect(r).toMatchObject({ atualizados: 2, ignorados: 2 });
+    expect(db.rows).toEqual([
+      { id: 'b', drive_folder_status: 'ok', drive_folder_checked_at: 'T' },
+      { id: 'c', drive_folder_status: 'inacessivel', drive_folder_checked_at: 'T' },
+    ]);
+  });
+
+  it('sem a 069: não lança, ainda vincula a pasta e devolve a instrução', async () => {
+    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }], vigiar: [{ client_id: 'b', folder_id: F }], invalidos: ['e'] };
+    const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'b' }], { semColuna: true });
+    expect(await marcarPastasInvalidas(db, ['e'], 'T')).toBe(AVISO_069);
+    const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'a', folder_url: F }], testes: [{ client_id: 'b', status: 'ok' }] }, 'T');
+    expect(r).toMatchObject({ gravados: 1, atualizados: 0, log: AVISO_069 });
+    expect(db.rows[0].drive_folder_url).toBe(`https://drive.google.com/drive/folders/${F}`);
+  });
+
+  it('outro erro do banco não é mascarado', async () => {
+    const db = { from: () => ({ update: () => ({ in: async () => ({ error: { code: '42501', message: 'permission denied' } }) }) }) };
+    await expect(marcarPastasInvalidas(db, ['e'], 'T')).rejects.toThrow('permission denied');
   });
 });
