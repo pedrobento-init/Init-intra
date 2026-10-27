@@ -685,8 +685,31 @@ function renderClientDriveSection(clientId) {
     }
   }
   body.innerHTML = url
-    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener">📁 Abrir pasta no Drive ↗</a>`
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener">📁 Abrir pasta no Drive ↗</a> <small class="text-muted" id="cliDriveSelo" data-client="${safeId}"></small>`
     : '<div class="empty-state"><p>Nenhuma pasta vinculada.</p></div>';
+  if (url) return _fillDriveBadge(clientId);
+}
+
+// Selo do que o robô viu na pasta (069). Texto puro; quem insere escapa.
+function driveFolderBadge(row) {
+  const st = row && row.drive_folder_status;
+  if (st === 'inacessivel') return '⚠️ pasta apagada ou sem acesso para o robô';
+  if (st === 'invalido') return '⚠️ link não é uma pasta do Drive';
+  if (st !== 'ok') return '';
+  const d = new Date(row.drive_folder_checked_at || '');
+  return isNaN(d) ? '✅ verificada' : '✅ verificada em ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// Consulta à parte, fora do schema.js: só o robô escreve essas colunas e o push
+// do app não pode devolvê-las nulas. Sem rede, sem a 069 ou com erro: sem selo.
+async function _fillDriveBadge(clientId) {
+  if (!(typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive === true)) return;
+  try {
+    const { data, error } = await supabaseClient.from('clients').select('drive_folder_status, drive_folder_checked_at').eq('id', clientId).maybeSingle();
+    const txt = error ? '' : driveFolderBadge(data);
+    const el = document.getElementById('cliDriveSelo');
+    if (txt && el && el.getAttribute('data-client') === String(clientId)) el.innerHTML = escapeHtml(txt);
+  } catch (_) { /* selo é opcional */ }
 }
 
 function openDriveFolderPrompt(clientId) {
@@ -1044,7 +1067,7 @@ function _refreshClientsInPlace(){
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
-    parseDriveFolderId, driveFolderUrl, _canManageClientDrive, saveDriveFolderLink,
+    parseDriveFolderId, driveFolderUrl, driveFolderBadge, _canManageClientDrive, saveDriveFolderLink,
     renderClientDriveSection, submitDriveFolderLink,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
     cfGet, cfSet, cfFilled, cfFormatWhen, cfDateTimeLocalValue, cfProgress, cfClientSince,

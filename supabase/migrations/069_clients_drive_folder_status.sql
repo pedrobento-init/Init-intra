@@ -1,0 +1,31 @@
+-- ============================================================
+-- Migration 069: o robô diz se a pasta do Drive do cliente ainda existe
+-- ============================================================
+-- O robô (tools/google-agenda-apps-script/Robo.gs, roboPastas, de madrugada)
+-- confere cada drive_folder_url (068) e grava aqui o resultado:
+--   ok          a pasta abre para a conta do robô
+--   inacessivel apagada, na lixeira ou sem acesso para o robô
+--   invalido    o link salvo não é uma pasta do Drive
+-- A ficha do cliente mostra isso como um selo discreto.
+--
+-- As colunas NÃO entram no js/schema.js: só o servidor escreve nelas, e o
+-- push do app não pode devolvê-las nulas. O app as lê com uma consulta à parte.
+-- Enquanto esta migration não for aplicada, o robô ainda vincula pastas e
+-- avisa no log da Edge Function. Idempotente.
+--
+-- VERIFICAR:
+--   select column_name from information_schema.columns
+--    where table_name = 'clients'
+--      and column_name in ('drive_folder_status', 'drive_folder_checked_at');
+--   -- esperado: 2 linhas
+--
+-- REVERTER:
+--   alter table public.clients drop column if exists drive_folder_status;
+--   alter table public.clients drop column if exists drive_folder_checked_at;
+--
+-- RLS: nenhuma policy nova. As colunas viajam no registro do cliente, que já
+-- é restrito por equipe.
+-- ============================================================
+
+alter table public.clients add column if not exists drive_folder_status text;
+alter table public.clients add column if not exists drive_folder_checked_at timestamptz;

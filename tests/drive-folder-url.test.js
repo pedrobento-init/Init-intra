@@ -1,5 +1,7 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Snapshot antes de qualquer teste: o que é devolvido é exatamente o que
@@ -9,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 const _globalKeys = [
   'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
   'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
-  'renderClientDocumentsList', 'renderAttachmentList',
+  'renderClientDocumentsList', 'renderAttachmentList', 'isSupabaseConnected', 'supabaseClient', 'window',
 ];
 const _keep = {};
 for (const k of _globalKeys) _keep[k] = globalThis[k];
@@ -288,6 +290,57 @@ describe('a coluna chega ao servidor', () => {
     expect(i).toBeGreaterThan(-1);
     const payload = src.slice(i, src.indexOf('})))', i));
     expect(payload).toMatch(/\.\.\.\(c\.driveFolderUrl \? \{ drive_folder_url/);
+  });
+});
+
+describe('selo da pasta (069)', () => {
+  let mod;
+  beforeEach(() => { mod = requireParts('clients'); global.isCurrentAdmin = () => false; });
+
+  it('texto por status; sem status ou desconhecido não tem selo', () => {
+    expect(mod.driveFolderBadge({ drive_folder_status: 'ok', drive_folder_checked_at: '2026-03-05T12:00:00' })).toBe('✅ verificada em 05/03');
+    expect(mod.driveFolderBadge({ drive_folder_status: 'inacessivel' })).toMatch(/apagada ou sem acesso/);
+    expect(mod.driveFolderBadge({ drive_folder_status: 'invalido' })).toMatch(/não é uma pasta/);
+    expect(mod.driveFolderBadge({ drive_folder_status: null })).toBe('');
+    expect(mod.driveFolderBadge({ drive_folder_status: 'x' })).toBe('');
+    expect(mod.driveFolderBadge(null)).toBe('');
+  });
+
+  it('online: preenche o selo do mesmo cliente, escapado', async () => {
+    const els = _domFalso(['cliDriveBody', 'cliDriveActions', 'cliDriveSelo']);
+    els.cliDriveSelo.getAttribute = () => 'cli-1';
+    global.getClientById = () => ({ id: 'cli-1', driveFolderUrl: BASE + ID });
+    global.isSupabaseConnected = () => true;
+    global.window = { _supabaseAuthActive: true };
+    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { drive_folder_status: 'invalido' }, error: null }) };
+    global.supabaseClient = { from: () => q };
+    await mod.renderClientDriveSection('cli-1');
+    expect(els.cliDriveSelo.innerHTML).toMatch(/não é uma pasta/);
+  });
+
+  it('erro na consulta (ex.: 069 ausente) não mostra selo nem quebra', async () => {
+    const els = _domFalso(['cliDriveBody', 'cliDriveActions', 'cliDriveSelo']);
+    els.cliDriveSelo.getAttribute = () => 'cli-1';
+    global.getClientById = () => ({ id: 'cli-1', driveFolderUrl: BASE + ID });
+    global.isSupabaseConnected = () => true;
+    global.window = { _supabaseAuthActive: true };
+    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: { code: '42703' } }) };
+    global.supabaseClient = { from: () => q };
+    await mod.renderClientDriveSection('cli-1');
+    expect(els.cliDriveSelo.innerHTML).toBe('');
+  });
+
+  it('sem pasta vinculada não há span de selo', () => {
+    const els = _domFalso(['cliDriveBody', 'cliDriveActions']);
+    global.getClientById = () => ({ id: 'cli-1' });
+    mod.renderClientDriveSection('cli-1');
+    expect(els.cliDriveBody.innerHTML).not.toMatch(/cliDriveSelo/);
+  });
+
+  // Só o robô escreve essas colunas; no schema.js o push do app as zeraria.
+  it('colunas do robô ficam fora do js/schema.js', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'schema.js'), 'utf8');
+    expect(src).not.toMatch(/drive_folder_status|driveFolderStatus|drive_folder_checked_at/);
   });
 });
 
