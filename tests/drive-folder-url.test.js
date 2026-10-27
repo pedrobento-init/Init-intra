@@ -1,6 +1,24 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+// Snapshot antes de qualquer teste: o que é devolvido é exatamente o que
+// existia. Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
+// O afterEach que devolve vem depois, no passo verde: escrito junto, o teste de
+// higiene nasce verde e não prova nada.
+const _globalKeys = [
+  'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
+  'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
+  'renderClientDocumentsList', 'renderAttachmentList',
+];
+const _keep = {};
+for (const k of _globalKeys) _keep[k] = globalThis[k];
+afterEach(() => {
+  for (const k of _globalKeys) {
+    if (_keep[k] === undefined) delete globalThis[k];
+    else globalThis[k] = _keep[k];
+  }
+});
 
 const ID = '1a2B3cD4eF5gH6iJ7kL8mN9oP0qR';
 const BASE = 'https://drive.google.com/drive/folders/';
@@ -262,5 +280,11 @@ describe('a coluna chega ao servidor', () => {
     expect(i).toBeGreaterThan(-1);
     const payload = src.slice(i, src.indexOf('})))', i));
     expect(payload).toMatch(/\.\.\.\(c\.driveFolderUrl \? \{ drive_folder_url/);
+  });
+});
+
+describe('higiene dos globais', () => {
+  it('nenhum global emprestado sobrevive ao teste que o atribuiu', () => {
+    for (const k of _globalKeys) expect(globalThis[k]).toBe(_keep[k]);
   });
 });
