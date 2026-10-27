@@ -1,6 +1,6 @@
 # Criação da pasta do Drive para cliente novo — design
 
-Data: 27/10/2026. Status: **aguardando aprovação do usuário**.
+Data: 27/10/2026. Status: **aprovado pelo usuário em 27/10/2026**.
 
 ## Intent
 
