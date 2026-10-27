@@ -77,7 +77,7 @@ cada uma fica presa à tarefa que tem o código.
 - Produz: `parseDriveFolderId(v): string|null` e `driveFolderUrl(v): string` em
   `js/clients-form.js`. As tarefas 3 e 4 consomem as duas.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```js
 import { createRequire as __partsReq } from 'node:module';
@@ -134,13 +134,13 @@ describe('driveFolderUrl', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Roda: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: FAIL — `mod.parseDriveFolderId is not a function`.
 
-- [ ] **Passo 3: implementar as duas funções em `js/clients-form.js`**
+- [x] **Passo 3: implementar as duas funções em `js/clients-form.js`**
 
 Logo após `parseGoogleSheetId` (atual linha 578), no estilo das vizinhas: `function` declarada,
 com um comentário de uma linha dizendo **por que** é pura e testável.
@@ -155,18 +155,18 @@ em qualquer outro caso, incluindo `/file/d/` e `/spreadsheets/`.
 `https://drive.google.com/drive/folders/` seguido do ID, ou string vazia quando o parser dá `null`.
 Nunca repassa a entrada.
 
-- [ ] **Passo 4: exportar para o teste**
+- [x] **Passo 4: exportar para o teste**
 
 Em `js/clients-form.js:925`, acrescentar `parseDriveFolderId, driveFolderUrl` à lista do
 `module.exports`, ao lado de `parseGoogleSheetId`.
 
-- [ ] **Passo 5: rodar e ver passar**
+- [x] **Passo 5: rodar e ver passar**
 
 Roda: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: PASS — 6 testes.
 
-- [ ] **Passo 6: commitar**
+- [x] **Passo 6: commitar**
 
 ```bash
 git add js/clients-form.js tests/drive-folder-url.test.js
@@ -184,7 +184,7 @@ git commit -m "feat(cliente): parser da pasta do Drive remonta a URL pelo ID"
 
 **Cobre:** critério de aceite 6; foco de revisão 5.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 Em `tests/schema.test.js`, no estilo dos `it()` que já estão lá:
 
@@ -196,13 +196,13 @@ it('clients mapeia drive_folder_url e o trata como coluna opcional', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Roda: `npx vitest run tests/schema.test.js`
 
 Esperado: FAIL — recebido `undefined`, esperado `'driveFolderUrl'`.
 
-- [ ] **Passo 3: a migration**
+- [x] **Passo 3: a migration**
 
 `supabase/migrations/068_clients_drive_folder.sql`, com o cabeçalho das recentes (ver a `067`): o
 que muda, por que, **VERIFICAR** e **REVERTER**. Idempotente.
@@ -214,24 +214,24 @@ VERIFICAR: consultar `information_schema.columns` por `table_name='clients'` e
 
 REVERTER: `alter table public.clients drop column if exists drive_folder_url;`
 
-- [ ] **Passo 4: o mapa de sync**
+- [x] **Passo 4: o mapa de sync**
 
 Em `js/schema.js:22`, acrescentar `drive_folder_url: 'driveFolderUrl',` ao lado de
 `google_sheet_url`. Em `optionalFields` (`:28`), acrescentar `'drive_folder_url'` — sem isso, um
 banco sem a 068 aplicada derruba o sync de **todos** os clientes.
 
-- [ ] **Passo 5: o payload de upsert**
+- [x] **Passo 5: o payload de upsert**
 
 Em `js/app.js:389`, acrescentar `drive_folder_url: c.driveFolderUrl || null,` ao lado de
 `google_sheet_url`.
 
-- [ ] **Passo 6: rodar a suíte inteira**
+- [x] **Passo 6: rodar a suíte inteira**
 
 Roda: `npm test`
 
-Esperado: PASS, 0 falhas; a contagem de arquivos sobe de 103 para 104.
+Esperado: PASS, 0 falhas; a contagem de arquivos sobe de 101 para 102.
 
-- [ ] **Passo 7: commitar**
+- [x] **Passo 7: commitar**
 
 ```bash
 git add supabase/migrations/068_clients_drive_folder.sql js/schema.js js/app.js tests/schema.test.js
@@ -256,7 +256,7 @@ git commit -m "feat(cliente): coluna drive_folder_url entra no sync como opciona
   `saveDriveFolderLink(clientId, raw): { ok: boolean, error?: string }` e
   `removeDriveFolderConfirm(clientId): void`. A Tarefa 4 chama as três.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```js
 describe('saveDriveFolderLink', () => {
@@ -297,13 +297,13 @@ describe('saveDriveFolderLink', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Roda: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: FAIL — `mod.saveDriveFolderLink is not a function`.
 
-- [ ] **Passo 3: implementar as três funções**
+- [x] **Passo 3: implementar as três funções**
 
 `_canManageClientDrive()` — espelha `_canManageClientSheet` (`:601-604`): `isCurrentAdmin()` dentro
 de try/catch, `false` no erro.
@@ -321,17 +321,17 @@ válido → `saveClient({ ...existing, id: clientId, driveFolderUrl: driveFolder
 `saveDriveFolderLink(clientId, '')`, `renderClientDriveSection(clientId)` (Tarefa 4) e
 `showToast('Pasta desvinculada.', 'success')`. Espelha `removeSheetLinkConfirm` (`:688-700`).
 
-- [ ] **Passo 4: exportar**
+- [x] **Passo 4: exportar**
 
 Acrescentar `_canManageClientDrive, saveDriveFolderLink` ao `module.exports` (`:925`).
 
-- [ ] **Passo 5: rodar e ver passar**
+- [x] **Passo 5: rodar e ver passar**
 
 Roda: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: PASS — 10 testes.
 
-- [ ] **Passo 6: commitar**
+- [x] **Passo 6: commitar**
 
 ```bash
 git add js/clients-form.js tests/drive-folder-url.test.js
@@ -357,7 +357,7 @@ git commit -m "feat(cliente): vincular e desvincular a pasta do Drive, só admin
 - Produz: `renderClientDriveSection(clientId): void` e `openDriveFolderPrompt(clientId): void`;
   `js/clients-ficha.js` chama a primeira, `js/clients.js` as duas.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 Guarda de fonte, no estilo de `tests/rls-055.test.js`, com CRLF normalizado:
 
@@ -375,13 +375,13 @@ describe('seção da pasta na ficha', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Roda: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: FAIL — `expect(i).toBeGreaterThan(-1)` recebe `-1`.
 
-- [ ] **Passo 3: `renderClientDriveSection(clientId)` e `openDriveFolderPrompt(clientId)`**
+- [x] **Passo 3: `renderClientDriveSection(clientId)` e `openDriveFolderPrompt(clientId)`**
 
 `renderClientDriveSection` lê `getClientById(clientId).driveFolderUrl` (cliente sem o campo → `''`,
 estado vazio, sem erro), passa por `driveFolderUrl()` e escreve em `#cliDriveBody` e
@@ -399,26 +399,26 @@ para a planilha (`openModal` com um `form-input`), **sem** criar um modal dedica
 corte da opção B. Na volta, chama `saveDriveFolderLink` e, quando `ok` é falso, mostra `r.error`
 com `showToast`; quando é verdadeiro, chama `renderClientDriveSection(clientId)`.
 
-- [ ] **Passo 4: a seção no markup da aba**
+- [x] **Passo 4: a seção no markup da aba**
 
 Em `js/clients-ficha.js`, depois do bloco da planilha (termina na linha 775) e antes do fechamento
 do template (`:777`), um bloco irmão com `<hr class="divider" />`, título `📁 Pasta no Drive`,
 `<div id="cliDriveActions"></div>` e `<div id="cliDriveBody"></div>`. Na linha 778, acrescentar
 `renderClientDriveSection(id);` ao `setTimeout` que já existe.
 
-- [ ] **Passo 5: registrar as ações**
+- [x] **Passo 5: registrar as ações**
 
 Em `js/clients.js:115-119`, acrescentar ao mapa:
 `driveLink: (_el, id) => openDriveFolderPrompt(id),` e
 `driveUnlink: (_el, id) => removeDriveFolderConfirm(id),`.
 
-- [ ] **Passo 6: rodar os três portões do CI**
+- [x] **Passo 6: rodar os três portões do CI**
 
 Roda: `npm test && npm run lint && node tools/build-assets.js --check`
 
 Esperado: PASS com 0 falhas; lint sem nenhuma saída; `✅ build-assets (check): 69 js, 1 css`.
 
-- [ ] **Passo 7: commitar**
+- [x] **Passo 7: commitar**
 
 ```bash
 git add js/clients-form.js js/clients-ficha.js js/clients.js tests/drive-folder-url.test.js
@@ -429,14 +429,14 @@ git commit -m "feat(cliente): ficha abre a pasta do Drive em um clique"
 
 ## Critérios de aceite
 
-- [ ] 1. O parser devolve o mesmo ID na URL de pasta, na forma `/u/<n>/` e no ID cru.
-- [ ] 2. O parser devolve `null` em URL de arquivo, de planilha e em texto com aspa, `<` ou espaço.
-- [ ] 3. `driveFolderUrl` remonta a URL a partir do ID e descarta a entrada.
-- [ ] 4. Quem não é admin não vincula nem remove.
-- [ ] 5. Campo vazio desvincula.
-- [ ] 6. O campo está no mapa de sync e em `optionalFields`.
-- [ ] 7. Cliente sem pasta mostra "Nenhuma pasta vinculada".
-- [ ] 8. A seção nova não tem `onclick`; as ações passam por `data-action`.
+- [x] 1. O parser devolve o mesmo ID na URL de pasta, na forma `/u/<n>/` e no ID cru.
+- [x] 2. O parser devolve `null` em URL de arquivo, de planilha e em texto com aspa, `<` ou espaço.
+- [x] 3. `driveFolderUrl` remonta a URL a partir do ID e descarta a entrada.
+- [x] 4. Quem não é admin não vincula nem remove.
+- [x] 5. Campo vazio desvincula.
+- [x] 6. O campo está no mapa de sync e em `optionalFields`.
+- [x] 7. Cliente sem pasta mostra "Nenhuma pasta vinculada".
+- [x] 8. A seção nova não tem `onclick`; as ações passam por `data-action`.
 
 ## Fora de escopo
 
