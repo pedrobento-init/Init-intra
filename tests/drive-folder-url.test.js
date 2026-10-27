@@ -20,6 +20,10 @@ describe('parseDriveFolderId', () => {
     expect(mod.parseDriveFolderId(ID)).toBe(ID);
   });
 
+  it('recusa ID cru de 14 caracteres — o piso é 15', () => {
+    expect(mod.parseDriveFolderId(ID.slice(0, 14))).toBeNull();
+  });
+
   it('recusa arquivo, planilha, outro domínio, vazio e nulo', () => {
     expect(mod.parseDriveFolderId('https://drive.google.com/file/d/' + ID + '/view')).toBeNull();
     expect(mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
@@ -33,6 +37,26 @@ describe('parseDriveFolderId', () => {
     expect(mod.parseDriveFolderId(BASE + ID + '" onmouseover=alert(1) x="')).toBeNull();
     expect(mod.parseDriveFolderId(BASE + '<script>')).toBeNull();
     expect(mod.parseDriveFolderId(ID + ' ' + ID)).toBeNull();
+  });
+});
+
+describe('parseDriveFolderId — normalização flexível', () => {
+  let mod;
+  beforeEach(() => { mod = requireParts('clients'); });
+
+  it('aceita host sem esquema, host em maiúsculas e a forma legada open?id=', () => {
+    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID)).toBe(ID);
+    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')).toBe(ID);
+    expect(mod.parseDriveFolderId('https://drive.google.com/open?id=' + ID)).toBe(ID);
+    expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID + '&usp=sharing')).toBe(ID);
+  });
+
+  it('a normalização preserva a caixa do ID e não abre porteira para não-pasta', () => {
+    expect(mod.driveFolderUrl('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID)).toBe(BASE + ID);
+    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/file/d/' + ID + '/view')).toBeNull();
+    expect(mod.parseDriveFolderId('docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
+    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')).toBeNull();
+    expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID.slice(0, 14))).toBeNull();
   });
 });
 
