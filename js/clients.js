@@ -117,6 +117,9 @@ if (typeof registerActions === 'function') {
     clientSort: (_el, k) => setClientSort(k),
     clientEdit: (_el, id) => openClientForm(id),
     clientDelete: (_el, id) => deleteClientConfirm(id),
+    driveLink: (_el, id) => openDriveFolderPrompt(id),
+    driveSave: (_el, id) => submitDriveFolderLink(id),
+    driveUnlink: (_el, id) => removeDriveFolderConfirm(id),
   });
 }
 function _clientRowStats(c, pens, today) {

@@ -774,8 +774,16 @@ function renderClientTab(tab, id) {
         </div>
         <div id="cliSheetBody"></div>
       </div>
+      <hr class="divider" />
+      <div class="attachment-section" style="margin-top:0">
+        <div class="section-header" style="margin-bottom:12px">
+          <span class="section-title">📁 Pasta no Drive</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="cliDriveActions"></div>
+        </div>
+        <div id="cliDriveBody"></div>
+      </div>
     `;
-    setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); renderClientSheetSection(id); }, 20);
+    setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); renderClientSheetSection(id); renderClientDriveSection(id); }, 20);
   } else if (tab === 'visitas') {
     const visits = getVisitsByClient(id);
     el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">

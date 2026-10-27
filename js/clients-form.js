@@ -655,6 +655,58 @@ function removeDriveFolderConfirm(clientId) {
   });
 }
 
+// A pasta por cliente já existe no Drive; aqui só guardamos onde ela fica.
+// Sem iframe de propósito: embutir a pasta exigiria deixá-la legível por
+// qualquer um com o link, que é a forma do SEC-01.
+function renderClientDriveSection(clientId) {
+  const body = document.getElementById('cliDriveBody');
+  const actions = document.getElementById('cliDriveActions');
+  if (!body) return;
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const url = driveFolderUrl(c ? c.driveFolderUrl : '');
+  const canManage = _canManageClientDrive();
+  const safeId = escapeHtml(clientId);
+  if (actions) {
+    if (!url) {
+      actions.innerHTML = canManage ? `<button class="btn btn-primary btn-sm" data-action="driveLink" data-arg="${safeId}">+ Vincular pasta</button>` : '';
+    } else {
+      actions.innerHTML = canManage
+        ? `<button class="btn btn-secondary btn-sm" data-action="driveLink" data-arg="${safeId}">Editar link</button><button class="btn btn-sm btn-danger" data-action="driveUnlink" data-arg="${safeId}">Remover</button>`
+        : '';
+    }
+  }
+  body.innerHTML = url
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener">📁 Abrir pasta no Drive ↗</a>`
+    : '<div class="empty-state"><p>Nenhuma pasta vinculada.</p></div>';
+}
+
+function openDriveFolderPrompt(clientId) {
+  if (!_canManageClientDrive()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem vincular a pasta.', 'error');
+    return;
+  }
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const cur = c ? String(c.driveFolderUrl || '') : '';
+  openModal('📁 Vincular pasta do Drive', `
+    <div class="form-group"><label class="form-label">Link da pasta</label><input class="form-input" id="driveLinkInput" value="${escapeHtml(cur)}" placeholder="https://drive.google.com/drive/folders/..." /></div>
+    <p style="font-size:12px;color:var(--text-muted)">Abra a pasta no Google Drive e copie o endereço da barra do navegador. Quem não tem acesso à pasta no Drive continua sem acesso — o vínculo aqui não compartilha nada. Para desvincular, apague o campo e salve.</p>
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" data-action="driveSave" data-arg="${escapeHtml(clientId)}">Salvar</button></div>
+    <div id="driveLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
+}
+
+function submitDriveFolderLink(clientId) {
+  const input = document.getElementById('driveLinkInput');
+  const r = saveDriveFolderLink(clientId, input ? input.value : '');
+  if (!r.ok) {
+    const m = document.getElementById('driveLinkMsg');
+    if (m) m.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(r.error)}</span>`;
+    return;
+  }
+  if (typeof closeModal === 'function') closeModal();
+  renderClientDriveSection(clientId);
+  showToast(String(input && input.value || '').trim() ? 'Pasta vinculada!' : 'Pasta desvinculada.', 'success');
+}
+
 function _canManageClientSheet() {
   try { return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false; }
   catch (_) { return false; }

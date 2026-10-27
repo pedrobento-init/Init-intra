@@ -87,3 +87,18 @@ describe('saveDriveFolderLink', () => {
     expect(salvo.driveFolderUrl).toBeNull();
   });
 });
+
+// Guarda de fonte: o AGENTS.md proíbe handler inline, e a seção vizinha (a da
+// planilha) ainda usa onclick. Sem este teste, copiar a vizinha passaria.
+// CRLF normalizado — comparação de texto de arquivo quebra em checkout Windows.
+describe('seção da pasta na ficha', () => {
+  it('não usa onclick e tira o href de driveFolderUrl', () => {
+    const src = partsSource('clients').replace(/\r\n/g, '\n');
+    const i = src.indexOf('function renderClientDriveSection');
+    expect(i).toBeGreaterThan(-1);
+    const corpo = src.slice(i, src.indexOf('\n}\n', i) + 3);
+    expect(corpo).not.toMatch(/onclick=/);
+    expect(corpo).toMatch(/data-action=/);
+    expect(corpo).toMatch(/driveFolderUrl\(/);
+  });
+});
