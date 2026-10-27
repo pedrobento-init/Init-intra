@@ -705,7 +705,20 @@ function deletePendencia(id) {
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   addLog('Excluiu', 'Pendência', id, _delDesc);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+  var _penConnected = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+
+  // O que estava enfileirado para este id não pode sobreviver à exclusão: o
+  // drain seguinte faria upsert e recriaria no servidor o registro apagado.
+  // Offline, o delete entra na fila no lugar do upsert (o enqueue deduplica
+  // por targetId), para a exclusão não depender só do tombstone.
+  try {
+    if (typeof Outbox !== 'undefined' && Outbox) {
+      if (_penConnected) Outbox.removeTarget(id);
+      else Outbox.enqueue('pendencias', 'delete', { id: id });
+    }
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+
+  if (_penConnected) {
     supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
   }
   return true;
