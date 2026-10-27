@@ -363,11 +363,14 @@ O botão só aparece com operador logado e conexão (mesma regra do relatório).
 2. No Apps Script, cole o `Robo.gs` novo (que agora inclui `roboBackupsEmail`), cole também o `appsscript.json` se você o usa (ele agora pede acesso ao Gmail), rode **`instalarRobo`** de novo e autorize.
 
 ### Instalar a pasta do Drive automática (robô da noite)
-Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está) e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
+Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está), cria a pasta do cliente novo que não tem pasta nem planilha e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
 1. Rode as migrations `068_clients_drive_folder.sql` e `069_clients_drive_folder_status.sql`.
-2. Compartilhe a pasta raiz dos clientes no Drive com a conta que roda o robô (leitura basta).
-3. No Apps Script, cole o `Robo.gs` novo e rode **`instalarRobo`** de novo (`testarPastas` mostra quantos clientes ele vai olhar).
-4. Faça `supabase functions deploy robo --no-verify-jwt`.
+2. No drive compartilhado dos clientes, dê à conta que roda o robô o papel **Colaborador** (leitura não basta: ele cria pastas).
+3. No Apps Script, em **Configurações do projeto → Propriedades do script**, crie `CLIENTES_ROOT_ID` com o ID da pasta raiz dos clientes (a parte do link depois de `/folders/`).
+4. Cole o `Robo.gs` novo e rode **`instalarRobo`** de novo. Antes da primeira noite, rode **`testarPastas`**: ele mostra quantos clientes vai olhar e o nome de quem ganharia pasta, sem criar nada.
+5. Faça `supabase functions deploy robo --no-verify-jwt`.
+
+Limites da criação: só ganha pasta o cliente cadastrado a partir de 27/10/2026 (os antigos podem já ter pasta com outro nome); a pasta leva só o nome do cliente, então dois clientes com o mesmo nome dividem a mesma pasta.
 
 ## Limites
 

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
   itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
-  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069,
+  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069, PASTAS_CRIAR_DESDE,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -515,5 +516,67 @@ describe('pasta do Drive do cliente (069)', () => {
   it('outro erro do banco não é mascarado', async () => {
     const db = { from: () => ({ update: () => ({ in: async () => ({ error: { code: '42501', message: 'permission denied' } }) }) }) };
     await expect(marcarPastasInvalidas(db, ['e'], 'T')).rejects.toThrow('permission denied');
+  });
+
+  describe('criar pasta do cliente novo', () => {
+    const novo = '2026-10-28T10:00:00-03:00';
+
+    it('entra só cliente novo, sem pasta, sem planilha e com nome (aparado)', () => {
+      const p = planoPastas([
+        { id: 'n', name: '  Acme Ltda  ', created_at: novo, google_sheet_url: null, drive_folder_url: null },
+        { id: 'branco', name: 'Beta', created_at: novo, google_sheet_url: '   ', drive_folder_url: '' },
+      ]);
+      expect(p.criar).toEqual([{ client_id: 'n', nome: 'Acme Ltda' }, { client_id: 'branco', nome: 'Beta' }]);
+    });
+
+    it('limite é inclusivo, com Z ou +00:00', () => {
+      expect(new Date(PASTAS_CRIAR_DESDE).toISOString()).toBe('2026-10-27T03:00:00.000Z');
+      const p = planoPastas([
+        { id: 'z', name: 'A', created_at: '2026-10-27T03:00:00Z' },
+        { id: 'o', name: 'B', created_at: '2026-10-27T03:00:00+00:00' },
+      ]);
+      expect(p.criar.map((c) => c.client_id)).toEqual(['z', 'o']);
+    });
+
+    it('cliente antigo nunca entra: pode já ter pasta no Drive sem vínculo', () => {
+      const p = planoPastas([{ id: 'v', name: 'Velho', created_at: '2026-10-26T23:59:59-03:00' }]);
+      expect(p.criar).toEqual([]);
+    });
+
+    it('fica de fora: planilha válida (vai a candidatos), link inválido, nome vazio, data nula ou inválida, já tem pasta', () => {
+      const p = planoPastas([
+        { id: 'pl', name: 'A', created_at: novo, google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit` },
+        { id: 'inv', name: 'A', created_at: novo, google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml' },
+        { id: 'vazio', name: '', created_at: novo },
+        { id: 'esp', name: '   ', created_at: novo },
+        { id: 'semnome', created_at: novo },
+        { id: 'nulo', name: 'A', created_at: null },
+        { id: 'lixo', name: 'A', created_at: 'ontem' },
+        { id: 'tem', name: 'A', created_at: novo, drive_folder_url: `https://drive.google.com/drive/folders/${F}` },
+      ]);
+      expect(p.criar).toEqual([]);
+      expect(p.candidatos).toEqual([{ client_id: 'pl', sheet_id: S }]);
+    });
+
+    it('grava a pasta criada como achado, com status ok', async () => {
+      const plano = { candidatos: [], vigiar: [], invalidos: [], criar: [{ client_id: 'n', nome: 'X' }] };
+      const db = fakeDb([{ id: 'n', drive_folder_url: null }]);
+      const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'n', folder_url: F }] }, 'T');
+      expect(r).toMatchObject({ gravados: 1, ignorados: 0 });
+      expect(db.rows[0]).toMatchObject({ drive_folder_url: `https://drive.google.com/drive/folders/${F}`, drive_folder_status: 'ok' });
+    });
+
+    const ler = (f) => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
+
+    it('index.ts lê nome e data e devolve criar', () => {
+      const src = ler('supabase/functions/robo/index.ts');
+      expect(src).toContain('name, created_at');
+      expect(src).toContain('criar: plano.criar');
+    });
+
+    it('Robo.gs cria na raiz configurada e não reusa pasta da lixeira', () => {
+      const src = ler('tools/google-agenda-apps-script/Robo.gs');
+      for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.criar || []']) expect(src).toContain(s);
+    });
   });
 });
