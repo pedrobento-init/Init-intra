@@ -18,6 +18,46 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 - **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
 - **Celular**: os mesmos avisos como notificação (Web Push), ativados por aparelho em Configurar notificações.
 
+## Como o trabalho anda
+
+Para quem está chegando. O detalhe de cada tela está no app; aqui fica o fluxo e
+o vocabulário.
+
+**Chamado é a pendência.** Não existe entidade separada: o que o cliente pede e o
+que a equipe anota vivem no mesmo registro, com o mesmo SLA, cronômetro, anexos e
+sincronização. Por isso um chamado pode estar ligado a cliente, visita,
+equipamento e chamado Milvus — é o que um helpdesk genérico não faz.
+
+**De onde nasce.** Pelo botão no app; por e-mail de cliente no rótulo "Pendências"
+do Gmail, que a triagem abre já preenchido; por mensagem de WhatsApp, que passa
+pela mesma triagem; pelo Milvus; e pelo robô, quando um backup monitorado falha
+ou fica em silêncio além do limite.
+
+**Os status** (`js/ui.js`, `STATUS_PEN_MAP`): Aberto → Em Andamento, podendo
+passar por Pausado, Aguard. Terceiro ou Aguard. Cliente, e terminando em
+Resolvido ou Cancelado. `concluido` e `fechado` saíram das opções, mas seguem
+sendo contados para não ressuscitar registro antigo.
+
+**O prazo sai da prioridade** (`js/sla.js`), em horas e dias **úteis**:
+
+| Prioridade | 1ª resposta | Resolução |
+| --- | --- | --- |
+| Crítica | 1 h | no mesmo dia |
+| Alta | 4 h | 1 dia útil |
+| Média | 8 h | 3 dias úteis |
+| Baixa | 24 h | 7 dias úteis |
+
+**O que conta como primeira resposta** é só a nota marcada como resposta ao
+solicitante (`visibility: 'resposta'`). Anotação interna não conta, e a nota que
+veio da resposta do cliente (`'solicitante'`) também não — senão o relógio
+pararia sozinho sem ninguém ter respondido.
+
+**Onde fica cada coisa:** **Pendências** alterna entre quadro e fila (a escolha e
+a ordenação ficam no aparelho); **Fila** é a tabela ordenada no servidor;
+**Calendário** junta prazos e visitas; o **⋯** guarda o resto — clientes,
+vencimentos, reuniões, base de conhecimento, checklists, Milvus, operadores e
+indicadores. `Ctrl+K` acha cliente, pendência ou ação de qualquer lugar.
+
 ## Tecnologias
 
 - **Frontend**: JavaScript puro (sem framework), CSS próprio com tema claro/escuro, ações por delegação (`js/actions.js`).
