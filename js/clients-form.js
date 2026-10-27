@@ -582,6 +582,27 @@ function parseGoogleSheetId(v) {
   return p ? p.id : null;
 }
 
+// Extrai o ID da pasta do Google Drive de uma URL de pasta ou do ID colado cru.
+// Puro e testável. O ID é aceito só como token seguro para URL: é isso que
+// recusa aspa, '<' e espaço — o vetor do SEC-18, em que uma URL de texto livre
+// virava atributo HTML. Não há suposição sobre o comprimento exato do ID, que o
+// Google já mudou com o tempo; o que identifica a pasta é o segmento /folders/.
+function parseDriveFolderId(v) {
+  const s = String(v === null || v === undefined ? '' : v).trim();
+  if (!s) return null;
+  const m = s.match(/^https?:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?$/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
+  return null;
+}
+
+// Remonta a URL canônica da pasta a partir do ID: o texto colado pelo usuário
+// nunca chega ao href. Retorna '' se inválido (puro, testável).
+function driveFolderUrl(v) {
+  const id = parseDriveFolderId(v);
+  return id ? 'https://drive.google.com/drive/folders/' + id : '';
+}
+
 // Monta a URL de embed a partir do link/ID salvo:
 // - sheet: .../edit?usp=sharing&embedded=true (a URL normal /edit é bloqueada
 //   em iframe pelo Google via X-Frame-Options — daí a conversão; exige a
@@ -596,6 +617,100 @@ function googleSheetEmbedUrl(v) {
     return 'https://docs.google.com/spreadsheets/d/e/' + p.id + '/pubhtml?widget=true&headers=false';
   }
   return 'https://docs.google.com/spreadsheets/d/' + p.id + '/edit?usp=sharing&embedded=true';
+}
+
+function _canManageClientDrive() {
+  try { return typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false; }
+  catch (_) { return false; }
+}
+
+// Vincula ou desvincula a pasta do Drive do cliente. Devolve { ok, error } em
+// vez de lançar: quem chama é a interface, que mostra o erro no toast.
+// Grava sempre a URL remontada — nunca o texto colado.
+function saveDriveFolderLink(clientId, raw) {
+  if (!_canManageClientDrive()) return { ok: false, error: 'Apenas administradores podem vincular a pasta.' };
+  const existing = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  if (!existing) return { ok: false, error: 'Cliente não encontrado.' };
+  const s = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (!s) {
+    saveClient({ ...existing, id: clientId, driveFolderUrl: null });
+    return { ok: true };
+  }
+  const url = driveFolderUrl(s);
+  if (!url) return { ok: false, error: 'Link inválido. Cole o link de uma pasta do Google Drive (drive.google.com/drive/folders/...).' };
+  saveClient({ ...existing, id: clientId, driveFolderUrl: url });
+  return { ok: true };
+}
+
+function removeDriveFolderConfirm(clientId) {
+  if (!_canManageClientDrive()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem remover a pasta.', 'error');
+    return;
+  }
+  confirmAction('Desvincular a pasta do Drive deste cliente?', function() {
+    const r = saveDriveFolderLink(clientId, '');
+    if (!r.ok) { showToast(r.error, 'error'); return; }
+    // O confirmAction fecha o modal antes de rodar isto, e o modal É a ficha
+    // (viewClient usa openModal): redesenhar a seção não acharia o elemento.
+    viewClient(clientId);
+    switchClientTab('documentos', clientId);
+    showToast('Pasta desvinculada.', 'success');
+  });
+}
+
+// A pasta por cliente já existe no Drive; aqui só guardamos onde ela fica.
+// Sem iframe de propósito: embutir a pasta exigiria deixá-la legível por
+// qualquer um com o link, que é a forma do SEC-01.
+function renderClientDriveSection(clientId) {
+  const body = document.getElementById('cliDriveBody');
+  const actions = document.getElementById('cliDriveActions');
+  if (!body) return;
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const url = driveFolderUrl(c ? c.driveFolderUrl : '');
+  const canManage = _canManageClientDrive();
+  const safeId = escapeHtml(clientId);
+  if (actions) {
+    if (!url) {
+      actions.innerHTML = canManage ? `<button class="btn btn-primary btn-sm" data-action="driveLink" data-arg="${safeId}">+ Vincular pasta</button>` : '';
+    } else {
+      actions.innerHTML = canManage
+        ? `<button class="btn btn-secondary btn-sm" data-action="driveLink" data-arg="${safeId}">Editar link</button><button class="btn btn-sm btn-danger" data-action="driveUnlink" data-arg="${safeId}">Remover</button>`
+        : '';
+    }
+  }
+  body.innerHTML = url
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener">📁 Abrir pasta no Drive ↗</a>`
+    : '<div class="empty-state"><p>Nenhuma pasta vinculada.</p></div>';
+}
+
+function openDriveFolderPrompt(clientId) {
+  if (!_canManageClientDrive()) {
+    if (typeof showToast === 'function') showToast('Apenas administradores podem vincular a pasta.', 'error');
+    return;
+  }
+  const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  const cur = c ? String(c.driveFolderUrl || '') : '';
+  openModal('📁 Vincular pasta do Drive', `
+    <div class="form-group"><label class="form-label">Link da pasta</label><input class="form-input" id="driveLinkInput" value="${escapeHtml(cur)}" placeholder="https://drive.google.com/drive/folders/..." /></div>
+    <p style="font-size:12px;color:var(--text-muted)">Abra a pasta no Google Drive e copie o endereço da barra do navegador. Quem não tem acesso à pasta no Drive continua sem acesso — o vínculo aqui não compartilha nada. Para desvincular, apague o campo e salve.</p>
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="driveCancel" data-arg="${escapeHtml(clientId)}">Cancelar</button><button type="button" class="btn btn-primary" data-action="driveSave" data-arg="${escapeHtml(clientId)}">Salvar</button></div>
+    <div id="driveLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
+}
+
+function submitDriveFolderLink(clientId) {
+  const input = document.getElementById('driveLinkInput');
+  const raw = input ? String(input.value || '') : '';
+  const r = saveDriveFolderLink(clientId, raw);
+  if (!r.ok) {
+    const m = document.getElementById('driveLinkMsg');
+    if (m) m.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(r.error)}</span>`;
+    return;
+  }
+  // Volta para a ficha em vez de redesenhar a seção: este prompt substituiu o
+  // #modalBody, que era a própria ficha, então #cliDriveBody não existe mais.
+  viewClient(clientId);
+  switchClientTab('documentos', clientId);
+  showToast(raw.trim() ? 'Pasta vinculada!' : 'Pasta desvinculada.', 'success');
 }
 
 function _canManageClientSheet() {
@@ -923,6 +1038,8 @@ function _refreshClientsInPlace(){
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
+    parseDriveFolderId, driveFolderUrl, _canManageClientDrive, saveDriveFolderLink,
+    renderClientDriveSection, submitDriveFolderLink,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
     cfGet, cfSet, cfFilled, cfFormatWhen, cfDateTimeLocalValue, cfProgress, cfClientSince,
     cfSectionCount, cfUpdatedMeta, buildClientSummary, renderClientFicha, FICHA_SECTIONS, FICHA_QUICK_KEYS,

@@ -126,7 +126,13 @@ function saveClient(data) {
       updated_by: data.updatedBy || null,
       updated_at: now,
       // Coluna da 044: só vai quando preenchida (banco sem a coluna segue salvando o resto).
-      ...(data.address ? { address: data.address } : {})
+      ...(data.address ? { address: data.address } : {}),
+      // Coluna da 068, condicionada à PRESENÇA da chave, não ao valor: só os
+      // fluxos que mexem na pasta mandam a coluna (banco sem a 068 segue
+      // salvando o resto), e desvincular precisa mandar null — o push genérico
+      // descarta null em coluna opcional (_mapToRemote), então este upsert é o
+      // único caminho que apaga o valor no servidor.
+      ...('driveFolderUrl' in data ? { drive_folder_url: data.driveFolderUrl || null } : {})
     }).then(res => {
       if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); }
     }).catch(err => {

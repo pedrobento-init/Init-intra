@@ -387,6 +387,11 @@ async function _pushImportToSupabase(data) {
       responsible: c.responsible, responsible_phone: c.responsiblePhone, technician: c.technician,
       server: c.server, hosting: c.hosting, backup: c.backup, licenses: c.licenses, emails: c.emails,
       google_sheet_url: c.googleSheetUrl || null, milvus_client_token: c.milvusClientToken || null, notes: c.notes, team: c.team || 'init',
+      // Coluna da 068, só quando há valor: a migration é aplicada à mão, e
+      // mandá-la sem condição derruba o envio de TODOS os clientes na janela
+      // entre o deploy e o SQL Editor. Mesmo tratamento do address, que
+      // também fica fora deste payload.
+      ...(c.driveFolderUrl ? { drive_folder_url: c.driveFolderUrl } : {}),
       attachments: c.attachments || [], created_at: c.createdAt || now, updated_at: c.updatedAt || now
     })));
   } catch (e) { errors.push('clients: ' + e.message); }

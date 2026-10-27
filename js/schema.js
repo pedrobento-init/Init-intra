@@ -19,13 +19,13 @@ const ENTITIES = [
       initials: 'initials', logo: 'logo', logo_shape: 'logoShape', owner: 'owner',
       owner_phone: 'ownerPhone', responsible: 'responsible', responsible_phone: 'responsiblePhone',
       technician: 'technician', server: 'server', hosting: 'hosting', backup: 'backup',
-      licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', milvus_client_token: 'milvusClientToken', team: 'team',
+      licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', drive_folder_url: 'driveFolderUrl', milvus_client_token: 'milvusClientToken', team: 'team',
       notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_by: 'updatedBy', updated_at: 'updatedAt',
       address: 'address'
     },
     // Colunas novas (migration 044+): só vão no upsert quando têm valor —
     // banco ainda sem a coluna não derruba o sync de todos os clientes.
-    optionalFields: ['address'],
+    optionalFields: ['address', 'drive_folder_url'],
     onChange: () => {
       if ((window.location.hash.replace('#', '') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
     }
