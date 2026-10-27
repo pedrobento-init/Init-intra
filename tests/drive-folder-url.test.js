@@ -145,6 +145,14 @@ describe('seção da pasta na ficha', () => {
   });
 });
 
+describe('título da seção da pasta', () => {
+  it('usa 🗂️ para não repetir o 📁 das Anexos', () => {
+    const src = partsSource('clients').replace(/\r\n/g, '\n');
+    expect(src).toContain('🗂️ Pasta no Drive');
+    expect(src).toContain('📁 Anexos do Cliente');
+  });
+});
+
 // DOM de mentira no estilo de tests/pen-fila-render.test.js: o que importa é o
 // innerHTML que a seção escreve.
 // catchAll: devolve um elemento para qualquer id, para o caso em que o teste
