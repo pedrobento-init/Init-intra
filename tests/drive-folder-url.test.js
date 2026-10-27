@@ -206,14 +206,23 @@ describe('submitDriveFolderLink reabre a ficha', () => {
   // dentro do grupo concatenado, viewClient é declaração de função e não se
   // substitui por global. Reabrir a ficha significa o openModal receber de
   // novo o nome do cliente como título.
-  it('salvar leva de volta para a ficha do cliente', () => {
+  it('salvar leva de volta para a ficha do cliente', async () => {
     const els = _domFalso(['driveLinkInput'], true);
     els.driveLinkInput.value = BASE + ID;
     let titulo = null;
     global.openModal = (t) => { titulo = t; };
     global.getVisitsByClient = () => [];
     global.getPendenciasByClient = () => [];
+    // Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
+    // fora do grupo 'clients' que o teste compila: sem o stub, ReferenceError.
+    global.renderClientDocumentsList = () => {};
+    global.renderAttachmentList = () => {};
     mod.submitDriveFolderLink('cli-1');
+    // O viewClient agenda o setTimeout de 20 ms de clients-ficha.js:786, que
+    // chama quatro renderizadores. Sem este await o timer disputa com a
+    // desmontagem do worker e o erro só aparece em algumas execuções; com ele,
+    // o disparo acontece sempre dentro do teste.
+    await new Promise((r) => setTimeout(r, 30));
     expect(titulo).toBe('ACME');
   });
 });
