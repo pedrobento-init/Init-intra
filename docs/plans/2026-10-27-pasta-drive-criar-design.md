@@ -184,15 +184,15 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
 
 ### Acceptance criteria
 
-- [ ] 1. Cliente novo sem pasta e sem planilha aparece em `criar` com nome aparado.
-- [ ] 2. O corte de data é inclusivo e compara instantes, não strings (`Z` × `+00:00`).
-- [ ] 3. Planilha válida, link inválido, nome vazio, `created_at` nulo e pasta já vinculada ficam fora de `criar`.
-- [ ] 4. O teste de plano existente passa sem alteração.
-- [ ] 5. `gravarResultadoPastas` grava id de `criar` com status `ok`.
-- [ ] 6. Link humano não é sobrescrito e id fora do plano é ignorado.
-- [ ] 7. `index.ts` seleciona `name, created_at` e responde `criar`.
-- [ ] 8. `Robo.gs` contém `CLIENTES_ROOT_ID`, `isTrashed()` e `r.criar || []`.
-- [ ] 9. `npm test`, `npm run lint` e `node tools/build-assets.js --check` passam.
+- [x] 1. Cliente novo sem pasta e sem planilha aparece em `criar` com nome aparado.
+- [x] 2. O corte de data é inclusivo e compara instantes, não strings (`Z` × `+00:00`).
+- [x] 3. Planilha válida, link inválido, nome vazio, `created_at` nulo e pasta já vinculada ficam fora de `criar`.
+- [x] 4. O teste de plano existente passa sem alteração.
+- [x] 5. `gravarResultadoPastas` grava id de `criar` com status `ok`.
+- [x] 6. Link humano não é sobrescrito e id fora do plano é ignorado.
+- [x] 7. `index.ts` seleciona `name, created_at` e responde `criar`.
+- [x] 8. `Robo.gs` contém `CLIENTES_ROOT_ID`, `isTrashed()` e `r.criar || []`.
+- [x] 9. `npm test`, `npm run lint` e `node tools/build-assets.js --check` passam.
 
 ### Out of scope
 
