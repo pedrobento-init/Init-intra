@@ -17,7 +17,7 @@
 //
 //   "backups"     → { mensagens: [{ id, de, assunto, data, trecho }] } e-mails do rótulo "Backups"
 //   "triagem"     → { mensagens: [...] } e-mails do rótulo "Pendências" → pendência nova
-//   "pastas"      → { candidatos, vigiar }      planilha sem pasta / pasta a testar (069)
+//   "pastas"      → { candidatos, vigiar, criar } planilha sem pasta / pasta a testar / cliente novo sem nada
 //   "pastas-resultado" { achados, testes, erros } → { gravados, atualizados }
 //
 // RESUMO: um por pessoa por dia (chave em avisos_enviados, 051); dia sem
@@ -481,13 +481,13 @@ async function backup(db: SupabaseClient) {
 
 // PASTAS: o plano é refeito do banco nas duas chamadas; o robô só diz o que o Drive respondeu.
 const planoDoBanco = async (db: SupabaseClient) =>
-  planoPastas(await all<ClientePasta>(db, "clients", "id, google_sheet_url, drive_folder_url"));
+  planoPastas(await all<ClientePasta>(db, "clients", "id, name, created_at, google_sheet_url, drive_folder_url"));
 
 async function pastas(db: SupabaseClient) {
   const plano = await planoDoBanco(db);
   const log = await marcarPastasInvalidas(db, plano.invalidos, new Date().toISOString());
   if (log) console.warn("robo pastas:", log);
-  return json({ candidatos: plano.candidatos, vigiar: plano.vigiar });
+  return json({ candidatos: plano.candidatos, vigiar: plano.vigiar, criar: plano.criar });
 }
 
 async function pastasResultado(db: SupabaseClient, input: { achados?: unknown; testes?: unknown; erros?: unknown }) {

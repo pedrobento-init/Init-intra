@@ -46,7 +46,9 @@ function testarResumo() {
 /** Mostra no log o que roboPastas faria, sem gravar nada. */
 function testarPastas() {
   var r = roboChamar_('pastas');
-  Logger.log('Sem pasta, com planilha: ' + r.candidatos.length + ' | pastas a vigiar: ' + r.vigiar.length);
+  var criar = r.criar || [];
+  Logger.log('Sem pasta, com planilha: ' + r.candidatos.length + ' | pastas a vigiar: ' + r.vigiar.length + ' | a criar: ' + criar.length +
+    (criar.length ? ' (' + criar.map(function (c) { return c.nome; }).join(', ') + ')' : ''));
 }
 
 function roboChamar_(action, body) {
@@ -330,11 +332,27 @@ function pastaBackup_() {
 }
 
 // Pasta do Drive de cada cliente (069). Quem tem planilha e não tem pasta ganha
-// a pasta-mãe da planilha; quem tem pasta é conferido. Só lê o Drive: a conta do
-// robô precisa enxergar as pastas (compartilhe a pasta raiz dos clientes com ela).
+// a pasta-mãe da planilha; quem tem pasta é conferido; cliente novo sem nada ganha
+// uma pasta em CLIENTES_ROOT_ID (a conta do robô precisa ser Colaborador do drive).
 function roboPastas() {
   var r = roboChamar_('pastas');
-  var achados = [], testes = [], erros = [];
+  var achados = [], testes = [], erros = [], criadas = 0, reusadas = 0;
+  var criar = r.criar || [];
+  var rootId = String(PropertiesService.getScriptProperties().getProperty('CLIENTES_ROOT_ID') || '').trim();
+  var root = null;
+  if (criar.length && !rootId) erros.push('CLIENTES_ROOT_ID vazio: ' + criar.length + ' cliente(s) sem pasta');
+  else if (criar.length) {
+    try { root = DriveApp.getFolderById(rootId); } catch (e) { erros.push('CLIENTES_ROOT_ID inacessível: ' + e.message); }
+  }
+  if (root) criar.forEach(function (c) {
+    try {
+      // Reusa a de mesmo nome: se a gravação falhou ontem, não cria outra hoje.
+      var f = null, it = root.getFoldersByName(c.nome);
+      while (!f && it.hasNext()) { var x = it.next(); if (!x.isTrashed()) f = x; }
+      if (f) reusadas++; else { f = root.createFolder(c.nome); criadas++; }
+      achados.push({ client_id: c.client_id, folder_url: f.getUrl() });
+    } catch (e) { erros.push(c.client_id + ': ' + e.message); }
+  });
   r.candidatos.forEach(function (c) {
     try {
       var pais = DriveApp.getFileById(c.sheet_id).getParents();
@@ -350,5 +368,5 @@ function roboPastas() {
     testes.push({ client_id: v.client_id, status: ok ? 'ok' : 'inacessivel' });
   });
   var g = roboChamar_('pastas-resultado', { achados: achados, testes: testes, erros: erros });
-  Logger.log('Pastas vinculadas: ' + g.gravados + ' | conferidas: ' + g.atualizados + (erros.length ? ' | erros: ' + erros.length : ''));
+  Logger.log('Pastas vinculadas: ' + g.gravados + ' | conferidas: ' + g.atualizados + ' | criadas: ' + criadas + ' | reusadas: ' + reusadas + (erros.length ? ' | erros: ' + erros.length : ''));
 }

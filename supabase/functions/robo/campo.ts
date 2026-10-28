@@ -553,12 +553,20 @@ function idDaPlanilha(v: unknown): string | null {
   return /^[a-zA-Z0-9-_]{20,}$/.test(s) ? s : null;
 }
 
-export type ClientePasta = { id: string; google_sheet_url?: string | null; drive_folder_url?: string | null };
+export type ClientePasta = {
+  id: string; name?: string | null; created_at?: string | null;
+  google_sheet_url?: string | null; drive_folder_url?: string | null;
+};
 
-/** O que o robô vai procurar (planilha sem pasta) e vigiar (pasta já vinculada). */
+// Antes desta data o cliente pode já ter pasta no Drive sem vínculo; criar outra duplicaria.
+export const PASTAS_CRIAR_DESDE = "2026-10-27T00:00:00-03:00";
+const desde = new Date(PASTAS_CRIAR_DESDE).getTime();
+
+/** O que o robô vai procurar (planilha sem pasta), vigiar (pasta já vinculada) e criar (cliente novo sem nada). */
 export function planoPastas(clientes: ClientePasta[]) {
   const candidatos: { client_id: string; sheet_id: string }[] = [];
   const vigiar: { client_id: string; folder_id: string }[] = [];
+  const criar: { client_id: string; nome: string }[] = [];
   const invalidos: string[] = [];
   for (const c of clientes) {
     if (c.drive_folder_url) {
@@ -567,10 +575,14 @@ export function planoPastas(clientes: ClientePasta[]) {
       else invalidos.push(c.id);
     } else {
       const sheet = idDaPlanilha(c.google_sheet_url);
-      if (sheet) candidatos.push({ client_id: c.id, sheet_id: sheet });
+      if (sheet) { candidatos.push({ client_id: c.id, sheet_id: sheet }); continue; }
+      // Link de planilha inválido também fica de fora: o cliente pode já ter pasta.
+      const nome = String(c.name ?? "").trim();
+      const criado = c.created_at ? new Date(c.created_at).getTime() : NaN;
+      if (!String(c.google_sheet_url ?? "").trim() && nome && criado >= desde) criar.push({ client_id: c.id, nome });
     }
   }
-  return { candidatos, vigiar, invalidos };
+  return { candidatos, vigiar, criar, invalidos };
 }
 
 // 42703 com o nome da coluna nova: a 069 ainda não foi aplicada neste banco.
@@ -599,7 +611,7 @@ export async function gravarResultadoPastas(
   db: Db, plano: ReturnType<typeof planoPastas>,
   input: { achados?: unknown; testes?: unknown }, agora: string,
 ) {
-  const cand = new Set(plano.candidatos.map((c) => c.client_id));
+  const cand = new Set([...plano.candidatos, ...(plano.criar ?? [])].map((c) => c.client_id));
   const vig = new Set(plano.vigiar.map((c) => c.client_id));
   const lista = (v: unknown) => (Array.isArray(v) ? v : []) as Record<string, unknown>[];
   let gravados = 0, atualizados = 0, ignorados = 0, log: string | null = null;
