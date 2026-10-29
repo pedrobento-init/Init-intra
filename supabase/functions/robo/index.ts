@@ -50,7 +50,7 @@ import {
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
   enderecoDoRemetente, entradaNaoAproveitada, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
   type Monitor, monitorDoEmail, type MotivoNaoAproveitado, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta,
-  remetenteInterno, respostaAutomatica, textoDaIa, triagemDaIa,
+  remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa,
 } from "./campo.ts";
 
 const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
@@ -507,32 +507,67 @@ async function pastasResultado(db: SupabaseClient, input: { achados?: unknown; t
   return json({ gravados: r.gravados, atualizados: r.atualizados });
 }
 
+type Entrada = { action?: string; enviar?: unknown; mensagens?: unknown; achados?: unknown; testes?: unknown; erros?: unknown; ambiguas?: unknown; orfas?: unknown };
+
+// Cada ação vira uma linha em robo_execucoes (071): é o único jeito de o app
+// saber que o robô parou sem alguém abrir o log da Edge Function.
+async function despachar(db: SupabaseClient, input: Entrada) {
+  switch (input.action) {
+    case "vencimentos": return await vencimentos(db);
+    case "dominios": return await dominios(db);
+    case "resumo": return await resumo(db, input);
+    case "indicadores": return await indicadores(db);
+    case "backup": return await backup(db);
+    case "backups": return await backups(db, input);
+    case "triagem": return await triagem(db, input);
+    case "pastas": return await pastas(db);
+    case "pastas-resultado": return await pastasResultado(db, input);
+    default: return json({ error: "Ação desconhecida" }, 400);
+  }
+}
+
+// Falhar aqui nunca muda a resposta: sem a 071 aplicada o robô segue como antes.
+async function registrarRodada(db: SupabaseClient, acao: string, inicio: Date, res: Response, erro: string | null) {
+  try {
+    const body = await res.clone().json().catch(() => null);
+    const resultado = resumoDaRodada(body);
+    const fim = new Date();
+    const { error } = await db.from("robo_execucoes").insert({
+      acao: acao.slice(0, 60) || "?", inicio: inicio.toISOString(), fim: fim.toISOString(),
+      duracao_ms: fim.getTime() - inicio.getTime(), ok: res.status < 400 && !erro,
+      erro: erro ?? (res.status >= 400 ? String(resultado.error ?? `HTTP ${res.status}`) : null), resultado,
+    });
+    if (error) { console.error("robo: rodada não gravada (aplique a 071_robo_execucoes.sql)", error.message); return; }
+    // A triagem roda a cada 5 min (~288 linhas/dia); 14 dias bastam para ver
+    // quando o robô parou, e a faxina aqui dispensa um cron só para isso.
+    const corte = new Date(fim.getTime() - 14 * 86_400_000).toISOString();
+    await db.from("robo_execucoes").delete().lt("inicio", corte);
+  } catch (e) {
+    console.error("robo: rodada não gravada", (e as Error).message);
+  }
+}
+
 // auth: "none" desliga só a checagem de JWT da plataforma: quem chama é o Apps
 // Script, que não tem JWT. O x-agenda-secret continua sendo o primeiro teste.
 async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!SECRET || !safeEqual(req.headers.get("x-agenda-secret") ?? "", SECRET)) return json({ error: "Não autorizado" }, 401);
 
-  let input: { action?: string; enviar?: unknown; mensagens?: unknown; achados?: unknown; testes?: unknown; erros?: unknown; ambiguas?: unknown; orfas?: unknown };
+  let input: Entrada;
   try { input = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
   const db = ctx.supabaseAdmin;
+  const inicio = new Date();
+  let res: Response;
+  let erro: string | null = null;
   try {
-    switch (input.action) {
-      case "vencimentos": return await vencimentos(db);
-      case "dominios": return await dominios(db);
-      case "resumo": return await resumo(db, input);
-      case "indicadores": return await indicadores(db);
-      case "backup": return await backup(db);
-      case "backups": return await backups(db, input);
-      case "triagem": return await triagem(db, input);
-      case "pastas": return await pastas(db);
-      case "pastas-resultado": return await pastasResultado(db, input);
-      default: return json({ error: "Ação desconhecida" }, 400);
-    }
+    res = await despachar(db, input);
   } catch (e) {
-    console.error("robo:", input.action, (e as Error).message);
-    return json({ error: "Falha no servidor" }, 500);
+    erro = String((e as Error).message ?? e).slice(0, 500);
+    console.error("robo:", input.action, erro);
+    res = json({ error: "Falha no servidor" }, 500);
   }
+  await registrarRodada(db, String(input.action ?? ""), inicio, res, erro);
+  return res;
 }
 
 export default { fetch: withSupabase({ auth: "none" }, handle) };

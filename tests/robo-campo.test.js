@@ -5,6 +5,7 @@ import {
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
   itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
   parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069, nomeDaPasta, NOME_PASTA_MAX,
+  resumoDaRodada,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -601,5 +602,29 @@ describe('pasta do Drive do cliente (069)', () => {
       const src = ler('tools/google-agenda-apps-script/Robo.gs');
       for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.buscar || []']) expect(src).toContain(s);
     });
+  });
+});
+
+describe('resumo da rodada do robô (071)', () => {
+  it('guarda as contagens que a triagem devolve', () => {
+    const r = resumoDaRodada({ success: true, mensagens: 7, abertas: 2, notas: 1, ignorados: 3, sem_cliente: ['a@x.com', 'b@y.com'] });
+    expect(r).toEqual({ mensagens: 7, abertas: 2, notas: 1, ignorados: 3, sem_cliente: 2 });
+  });
+
+  it('nunca grava o conteúdo do backup, só quantas tabelas vieram', () => {
+    const r = resumoDaRodada({ gerado_em: '2026-10-29T03:00:00Z', tabelas: { clients: [{ nome: 'X' }], pendencias: [] }, erros: [] });
+    expect(r).toEqual({ tabelas: 2, erros: 0 });
+    expect(JSON.stringify(r)).not.toContain('X');
+  });
+
+  it('guarda a mensagem de erro, cortada', () => {
+    const r = resumoDaRodada({ error: 'x'.repeat(1000) });
+    expect(r.error).toHaveLength(300);
+  });
+
+  it('corpo que não é objeto vira resumo vazio', () => {
+    expect(resumoDaRodada(null)).toEqual({});
+    expect(resumoDaRodada([1, 2])).toEqual({});
+    expect(resumoDaRodada('ok')).toEqual({});
   });
 });
