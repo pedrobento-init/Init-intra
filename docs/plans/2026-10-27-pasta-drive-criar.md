@@ -33,17 +33,17 @@
 
 ### Tarefa 1: campo.ts + index.ts
 
-- [ ] Testes em `tests/robo-campo.test.js` (bloco de pastas): `criar` inclui só cliente novo (limite inclusivo, `Z` e `+00:00`) sem pasta, sem planilha e com nome; exclui planilha válida (vai a `candidatos`), link de planilha inválido, nome vazio/branco, `created_at` nulo, quem já tem pasta e cliente antigo. `gravarResultadoPastas` grava id de `criar` com status `ok`. Guarda: `index.ts` contém `name, created_at` e `criar: plano.criar`.
-- [ ] `npx vitest run tests/robo-campo.test.js` → FAIL (`criar` indefinido).
-- [ ] `ClientePasta` ganha `name?`, `created_at?`; `export const PASTAS_CRIAR_DESDE = "2026-10-27T00:00:00-03:00"`; `planoPastas` devolve `criar: {client_id, nome}[]`; `cand` = união de `candidatos` e `criar`. `index.ts`: select e retorno.
-- [ ] Mesmo comando → PASS.
+- [x] Testes em `tests/robo-campo.test.js` (bloco de pastas): `criar` inclui só cliente novo (limite inclusivo, `Z` e `+00:00`) sem pasta, sem planilha e com nome; exclui planilha válida (vai a `candidatos`), link de planilha inválido, nome vazio/branco, `created_at` nulo, quem já tem pasta e cliente antigo. `gravarResultadoPastas` grava id de `criar` com status `ok`. Guarda: `index.ts` contém `name, created_at` e `criar: plano.criar`.
+- [x] `npx vitest run tests/robo-campo.test.js` → FAIL (`criar` indefinido).
+- [x] `ClientePasta` ganha `name?`, `created_at?`; `export const PASTAS_CRIAR_DESDE = "2026-10-27T00:00:00-03:00"`; `planoPastas` devolve `criar: {client_id, nome}[]`; `cand` = união de `candidatos` e `criar`. `index.ts`: select e retorno.
+- [x] Mesmo comando → PASS.
 
 ### Tarefa 2: Robo.gs
 
-- [ ] Guarda: `Robo.gs` contém `CLIENTES_ROOT_ID`, `isTrashed()` e `r.criar || []` → FAIL, depois PASS.
-- [ ] Laço `criar` em `roboPastas`: propriedade vazia → um erro; `getFolderById` lança → um erro, pula; por cliente reusa a primeira pasta não excluída de mesmo nome ou cria; log `| criadas: X | reusadas: Y`. `testarPastas` mostra `| a criar: N` e os nomes, sem criar.
+- [x] Guarda: `Robo.gs` contém `CLIENTES_ROOT_ID`, `isTrashed()` e `r.criar || []` → FAIL, depois PASS.
+- [x] Laço `criar` em `roboPastas`: propriedade vazia → um erro; `getFolderById` lança → um erro, pula; por cliente reusa a primeira pasta não excluída de mesmo nome ou cria; log `| criadas: X | reusadas: Y`. `testarPastas` mostra `| a criar: N` e os nomes, sem criar.
 
 ### Tarefa 3: documentação
 
-- [ ] `GOOGLE-AGENDA.md`, seção "Instalar a pasta do Drive automática": papel Colaborador; propriedade `CLIENTES_ROOT_ID`; rodar `testarPastas`; limite (só cliente novo; homônimos dividem pasta).
-- [ ] Gates: `npm test`, `npm run lint`, `node tools/build-assets.js --check` → verdes. Commit e PR.
+- [x] `GOOGLE-AGENDA.md`, seção "Instalar a pasta do Drive automática": papel Colaborador; propriedade `CLIENTES_ROOT_ID`; rodar `testarPastas`; limite (só cliente novo; homônimos dividem pasta).
+- [x] Gates: `npm test`, `npm run lint`, `node tools/build-assets.js --check` → verdes. Commit e PR.
