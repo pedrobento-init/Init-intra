@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { respostaAutomatica, entradaNaoAproveitada } from '../supabase/functions/robo/campo.ts';
+import { respostaAutomatica, entradaDaCaixa } from '../supabase/functions/robo/campo.ts';
 
 // ── Resposta automática não vira nota no chamado ──────────────────────────
 // A auto-resposta do cliente ("estou de férias") caía na conversa e virava
@@ -79,7 +79,7 @@ describe('sem cabeçalho, remetente, assunto e corpo cobrem', () => {
 
 describe('a auto-resposta não some: vai para a caixa de triagem', () => {
   it('vira entrada com motivo auto_resposta', () => {
-    expect(entradaNaoAproveitada(email(), 'auto_resposta', 'ETR-1').motivo).toBe('auto_resposta');
+    expect(entradaDaCaixa(email(), { motivo: 'auto_resposta' }, 'ETR-1').motivo).toBe('auto_resposta');
   });
 
   it('o robô separa a máquina antes de olhar a conversa do chamado', () => {

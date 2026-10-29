@@ -171,8 +171,8 @@ describe('o robô grava a entrada sem reprocessar para sempre', () => {
   const robo = fs.readFileSync(fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)), 'utf8');
 
   it('ignorado_ia herda a equipe do cliente — senão a caixa da mam/bt fica vazia', () => {
-    expect(robo).toContain('guardarEntrada(db, e, "ignorado_ia", c.team)');
-    expect(robo).toContain('guardarEntrada(db, e, "sem_cliente")');
+    expect(robo).toContain('naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team })');
+    expect(robo).toContain('naCaixa(e, { motivo: "sem_cliente" })');
   });
 
   it('a chave de dedupe não volta no erro da caixa: era reprocessamento para sempre', () => {

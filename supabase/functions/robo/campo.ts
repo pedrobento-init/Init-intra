@@ -550,26 +550,40 @@ export function respostaAutomatica(e: EmailEntrada): boolean {
   return CORPO_AUTOMATICO.some((p) => corpo.includes(p));
 }
 
+/** Caminho que a mensagem tomou na triagem; `pendente` é o que espera alguém decidir. */
+export type StatusDaCaixa = "pendente" | "virou_chamado" | "anexado";
+
+export interface OpcoesDaCaixa {
+  motivo?: MotivoNaoAproveitado | null;
+  status?: StatusDaCaixa;
+  pendenciaId?: string | null;
+  clientId?: string | null;
+  team?: string | null;
+}
+
 /**
- * Linha da caixa de triagem (066): o e-mail que chegou e NÃO virou chamado.
+ * Linha da caixa de entrada (066 + 073): toda mensagem externa da label.
  *
- * Antes disto, os dois caminhos de descarte eram silenciosos — `semCliente`
- * ia para um JSON que ninguém lê, e `ignorados` era só um contador. Os dois
- * podem ser pedido de cliente: o domínio pode não estar na ficha, a pessoa
- * pode ter escrito do Gmail pessoal, e o Make erra ao marcar `ignorar`.
+ * Na 066 só o que NÃO virava chamado ganhava linha — os descartes deixavam de
+ * ser silenciosos, mas o resto sumia do app depois da triagem. Agora o chamado
+ * aberto e a nota anexada também ganham linha, e a caixa fecha a conta de
+ * "tudo que chegou por e-mail".
+ *
+ * Linha que nasce resolvida leva `tratado_por = "robo"`, para a tela separar o
+ * que o robô decidiu do que alguém decidiu.
  *
  * Guarda o corpo LIMPO, não o cru: é o que alguém vai ler para decidir em
  * cinco segundos se aquilo era um chamado. O e-mail original continua no
  * Gmail, que é o arquivo de verdade.
  */
-export function entradaNaoAproveitada(
+export function entradaDaCaixa(
   e: EmailEntrada,
-  motivo: MotivoNaoAproveitado,
+  { motivo = null, status = "pendente", pendenciaId = null, clientId = null, team = "init" }: OpcoesDaCaixa,
   id: string,
-  team = "init",
   agora: Date = new Date(),
 ) {
   const recebido = Date.parse(String(e.data || "")) ? new Date(String(e.data)).toISOString() : agora.toISOString();
+  const resolvida = status !== "pendente";
   return {
     id,
     email_id: String(e.id || "").slice(0, 200),
@@ -580,11 +594,12 @@ export function entradaNaoAproveitada(
     corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
     recebido_em: recebido,
     motivo,
-    status: "pendente",
-    pendencia_id: null,
+    status,
+    pendencia_id: pendenciaId || null,
+    client_id: clientId || null,
     team: team || "init",
-    tratado_por: null,
-    tratado_em: null,
+    tratado_por: resolvida ? "robo" : null,
+    tratado_em: resolvida ? agora.toISOString() : null,
     created_at: agora.toISOString(),
     updated_at: agora.toISOString(),
   };

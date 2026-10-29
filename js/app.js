@@ -529,6 +529,7 @@ function navigateTo(page) {
   else if (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
   else if (page === 'prazos')      renderPrazos();
   else if (page === 'vencimentos') renderVencimentos();
+  else if (page === 'caixa')       renderCaixaEntrada();
   else if (page === 'conhecimento') renderConhecimento();
   else if (page === 'clientes')    renderClients();
   else if (page === 'templates')   renderTemplates();
@@ -1365,6 +1366,11 @@ function updateBadges() {
   } catch (_) {}
 
   try { if (typeof updateVencimentosBadge === 'function') updateVencimentosBadge(); } catch (_) {}
+  try {
+    var cxbadge = document.getElementById('badge-caixa');
+    var cxn = (typeof entradasEmailPendentes === 'function') ? entradasEmailPendentes().length : 0;
+    if (cxbadge) { cxbadge.textContent = cxn; cxbadge.classList.toggle('hidden', cxn === 0); }
+  } catch (_) {}
   // badge-chamados removido (módulo descontinuado na interface)
 }
 
@@ -1441,7 +1447,7 @@ function _startApp() {
   if (typeof setSidebarMoreAdmin === 'function') setSidebarMoreAdmin(isAdmin);
 
   const hash  = window.location.hash.replace('#','');
-  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','calendario','operadores','relatorios','equipamentos','historico','templates','visitas','reuniao'];
+  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','caixa','calendario','operadores','relatorios','equipamentos','historico','templates','visitas','reuniao'];
   // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
   // dia a dia cai na Minha fila.
   const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';

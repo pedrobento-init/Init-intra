@@ -48,8 +48,8 @@ import {
 import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
-  enderecoDoRemetente, entradaNaoAproveitada, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
-  type Monitor, monitorDoEmail, type MotivoNaoAproveitado, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta,
+  enderecoDoRemetente, entradaDaCaixa, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
+  type Monitor, monitorDoEmail, notaDoSolicitante, type OpcoesDaCaixa, pendenciaDaTriagem, pendenciaDoAlerta,
   remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa, type Remetente,
 } from "./campo.ts";
 
@@ -327,7 +327,7 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
   const t = String(threadId || "").trim();
   if (!t) return null;
   const { data, error } = await db.from("pendencias")
-    .select("id, status, notes, solicitante_email")
+    .select("id, status, notes, solicitante_email, client_id, team")
     .eq("email_thread_id", t)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -341,11 +341,17 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 
 
 /**
- * Guarda na caixa de triagem (066) o e-mail que não virou chamado.
+ * Guarda na caixa de entrada (066 + 073) a mensagem externa, em TODOS os
+ * caminhos da triagem: virou chamado, virou nota num chamado aberto ou ficou
+ * pendente de decisão. Antes só o que sobrava entrava, e o resto sumia do app.
  *
- * `team` vem do cliente no caminho ignorado_ia: a entrada da mam/bt tem de
- * aparecer na caixa da mam/bt, senão some para quem é de lá. Sem cliente
- * (sem_cliente) não há equipe para herdar — a 066 traz o padrão.
+ * `team` vem do cliente ou do chamado: a entrada da mam/bt tem de aparecer na
+ * caixa da mam/bt, senão some para quem é de lá. Sem cliente (sem_cliente) não
+ * há equipe para herdar — vai o padrão.
+ *
+ * Nos caminhos de chamado e de nota a linha é gravada DEPOIS deles: banco sem a
+ * 073 só falha aqui, no CHECK (motivo nulo, status 'anexado'), e o chamado ou a
+ * nota já estão salvos. O erro fica no log e no contador caixa_erros.
  *
  * Banco sem a 066 não derruba a triagem: o resto da rodada vale, e os
  * chamados de quem É cliente continuam abrindo. A chave de dedupe NÃO volta
@@ -358,10 +364,9 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 async function guardarEntrada(
   db: SupabaseClient,
   e: EmailEntrada,
-  motivo: MotivoNaoAproveitado,
-  team = "init",
+  opcoes: OpcoesDaCaixa,
 ): Promise<boolean> {
-  const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), team);
+  const linha = entradaDaCaixa(e, opcoes, "ETR-" + crypto.randomUUID());
   const { error } = await db.from("emails_triagem").insert(linha);
   if (!error) return true;
   // Já registrado: a rodada anterior gravou e caiu antes de seguir.
@@ -372,13 +377,16 @@ async function guardarEntrada(
 
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
-  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, auto_respostas: 0, sem_cliente: [] });
+  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, auto_respostas: 0, sem_cliente: [], caixa: 0, caixa_erros: 0 });
   const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
   // Sem a migration 072 a tabela não existe: o robô segue casando só pela ficha.
   const remetentes = await all<Remetente>(db, "clientes_remetentes", "remetente, tipo, client_id, team, updated_at").catch(() => [] as Remetente[]);
   const abertas: string[] = [], semCliente: string[] = [];
   const dominios = dominiosInternos(GMAIL_USER);
-  let ignorados = 0, internos = 0, notas_em_aberto = 0, auto_respostas = 0;
+  let ignorados = 0, internos = 0, notas_em_aberto = 0, auto_respostas = 0, caixa = 0, caixa_erros = 0;
+  const naCaixa = async (e: EmailEntrada, opcoes: OpcoesDaCaixa) => {
+    if (await guardarEntrada(db, e, opcoes)) caixa++; else caixa_erros++;
+  };
   for (const e of msgs) {
     // O robô varre a CONVERSA inteira do rótulo: a nossa própria resposta ao
     // cliente chega aqui como mensagem nova. Ela não é pedido novo — abria um
@@ -395,7 +403,8 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     // na equipe do cliente quando dá para saber qual é.
     if (respostaAutomatica(e)) {
       auto_respostas++;
-      await guardarEntrada(db, e, "auto_resposta", clienteDoEmail(clientes, e, remetentes)?.team || "init");
+      const dono = clienteDoEmail(clientes, e, remetentes);
+      await naCaixa(e, { motivo: "auto_resposta", clientId: dono?.id ?? null, team: dono?.team || "init" });
       continue;
     }
     // Mensagem numa conversa que já abriu chamado: é a MESMA história, e um
@@ -427,6 +436,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
         continue;
       }
       notas_em_aberto++;
+      await naCaixa(e, { status: "anexado", pendenciaId: aberto.id, clientId: aberto.client_id ?? null, team: aberto.team || "init" });
       continue;
     }
     const c = clienteDoEmail(clientes, e, remetentes);
@@ -436,7 +446,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       // pessoal (que nunca casa, de propósito) são pedido de cliente tanto
       // quanto os outros — agora ficam na caixa de triagem (066).
       semCliente.push(String(e.assunto || "").slice(0, 80));
-      await guardarEntrada(db, e, "sem_cliente");
+      await naCaixa(e, { motivo: "sem_cliente" });
       continue;
     }
     const t = triagemDaIa(await classificarComIa(e, c), e);
@@ -447,7 +457,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       ignorados++;
       // Com cliente na mão, a entrada nasce na equipe dele: senão a caixa da
       // mam/bt nunca veria o que a IA ignorou de um cliente da mam/bt.
-      await guardarEntrada(db, e, "ignorado_ia", c.team);
+      await naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team });
       continue;
     }
     const pen = pendenciaDaTriagem(t, e, c, "PEN-" + crypto.randomUUID(), new Date());
@@ -458,9 +468,10 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       continue;
     }
     abertas.push(pen.id);
+    await naCaixa(e, { status: "virou_chamado", pendenciaId: pen.id, clientId: c.id, team: c.team });
   }
   return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, internos,
-    notas: notas_em_aberto, auto_respostas, sem_cliente: semCliente });
+    notas: notas_em_aberto, auto_respostas, sem_cliente: semCliente, caixa, caixa_erros });
 }
 
 async function indicadores(db: SupabaseClient) {

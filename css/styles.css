@@ -4436,6 +4436,40 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   .etr-top { flex-wrap: wrap; }
   .etr-acoes > .btn { flex: 1; }
 }
+.etr-link { margin-left: auto; font-size: 13px; color: var(--accent, inherit); }
+
+/* Caixa de entrada (js/caixa-entrada.js): lista à esquerda, conversa à
+   direita. No celular só cabe uma das duas, então abrir a conversa esconde a
+   lista e o "Voltar" aparece. */
+.cx-corpo-tela { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 12px; align-items: start; }
+.cx-lista { display: flex; flex-direction: column; gap: 6px; }
+.cx-item {
+  display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-card); color: var(--text); cursor: pointer;
+}
+.cx-item.pendente { border-left: 3px solid var(--yellow); }
+.cx-item.ativo { background: var(--accent-dim2); }
+.cx-item-topo { display: flex; gap: 8px; align-items: baseline; }
+.cx-quando { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.cx-assunto { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-n { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text-secondary); }
+.cx-meta { font-size: 12px; color: var(--text-secondary); }
+.cx-conversa { min-height: 200px; }
+.cx-conv-topo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.cx-chamado { font-size: 13px; }
+.cx-nota { font-size: 13px; padding: 6px 10px; border-radius: 6px; background: var(--accent-dim2); }
+.cx-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.cx-msg { border-top: 1px solid var(--border); padding: 10px 0; }
+.cx-msg header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.cx-corpo { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+.cx-voltar { display: none; align-self: flex-start; }
+@media (max-width: 760px) {
+  .cx-corpo-tela { grid-template-columns: 1fr; }
+  .cx-corpo-tela.cx-aberta .cx-lista { display: none; }
+  .cx-corpo-tela:not(.cx-aberta) .cx-conversa { display: none; }
+  .cx-voltar { display: inline-flex; }
+}
 
 /* Painel do robô (js/robo-execucoes.js). Borda vermelha só com problema: o
    estado normal fica discreto para não competir com a caixa de e-mails. */

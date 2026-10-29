@@ -6,7 +6,7 @@ import fs from 'node:fs';
 // - Arquivos já convertidos não podem voltar a ter handler inline.
 // - O total restante só pode diminuir (ao converter uma tela, baixe o teto).
 const HANDLER = /\bon(click|change|input|submit|keydown|keyup|blur|focus|drop|dragover|dragleave)=/g;
-const CLEAN = ['js/prazos.js', 'js/roteiro.js', 'js/fila.js', 'js/vencimentos.js', 'js/conhecimento.js', 'js/actions.js', 'js/error-log.js', 'js/time-entries.js', 'index.html'];
+const CLEAN = ['js/prazos.js', 'js/roteiro.js', 'js/fila.js', 'js/vencimentos.js', 'js/conhecimento.js', 'js/actions.js', 'js/error-log.js', 'js/time-entries.js', 'js/caixa-entrada.js', 'index.html'];
 const CEILING = 380;
 
 const count = (f) => (fs.readFileSync(f, 'utf8').match(HANDLER) || []).length;
