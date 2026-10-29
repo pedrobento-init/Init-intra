@@ -43,12 +43,26 @@ function testarResumo() {
   Logger.log(roboChamar_('resumo', { enviar: false }).chat);
 }
 
-/** Mostra no log o que roboPastas faria, sem gravar nada. */
+/** Mostra no log o que roboPastas faria, sem escrever nada no Drive nem no banco. */
 function testarPastas() {
   var r = roboChamar_('pastas');
-  var criar = r.criar || [];
-  Logger.log('Sem pasta, com planilha: ' + r.candidatos.length + ' | pastas a vigiar: ' + r.vigiar.length + ' | a criar: ' + criar.length +
-    (criar.length ? ' (' + criar.map(function (c) { return c.nome; }).join(', ') + ')' : ''));
+  var buscar = r.buscar || [];
+  var rootId = String(PropertiesService.getScriptProperties().getProperty('CLIENTES_ROOT_ID') || '').trim();
+  var renomear = [], mover = [];
+  r.vigiar.forEach(function (v) {
+    if (!v.nome || v.compartilhada) return;
+    try {
+      var f = DriveApp.getFolderById(v.folder_id);
+      if (f.isTrashed()) return;
+      if (f.getName() !== v.nome) renomear.push(f.getName() + ' → ' + v.nome);
+      if (rootId && !temPai_(f, rootId)) mover.push(v.nome);
+    } catch (e) { /* inacessível: roboPastas marca */ }
+  });
+  Logger.log('Sem pasta, com planilha: ' + r.candidatos.length + ' | pastas a vigiar: ' + r.vigiar.length +
+    ' | a buscar: ' + buscar.length + ' | a renomear: ' + renomear.length + ' | a mover: ' + mover.length);
+  if (buscar.length) Logger.log('Buscar: ' + buscar.slice(0, 50).map(function (c) { return c.nome; }).join('; '));
+  if (renomear.length) Logger.log('Renomear: ' + renomear.slice(0, 50).join('; '));
+  if (mover.length) Logger.log('Mover: ' + mover.slice(0, 50).join('; '));
 }
 
 function roboChamar_(action, body) {
@@ -332,25 +346,31 @@ function pastaBackup_() {
 }
 
 // Pasta do Drive de cada cliente (069). Quem tem planilha e não tem pasta ganha
-// a pasta-mãe da planilha; quem tem pasta é conferido; cliente novo sem nada ganha
-// uma pasta em CLIENTES_ROOT_ID (a conta do robô precisa ser Colaborador do drive).
+// a pasta-mãe da planilha; quem não tem nenhuma das duas é procurado pelo nome em
+// CLIENTES_ROOT_ID (uma → vincula, nenhuma → cria, várias → só reporta); quem tem
+// pasta é conferido, renomeado para o nome do Intra e movido para a raiz. Nada é
+// apagado: órfãs e ambíguas só saem no log. Mover exige Gerente de conteúdo no drive.
 function roboPastas() {
   var r = roboChamar_('pastas');
-  var achados = [], testes = [], erros = [], criadas = 0, reusadas = 0;
-  var criar = r.criar || [];
+  var buscar = r.buscar || [];
+  var achados = [], testes = [], erros = [], ambiguas = [], orfas = [];
+  var n = { criadas: 0, reusadas: 0, renomeadas: 0, movidas: 0 };
   var rootId = String(PropertiesService.getScriptProperties().getProperty('CLIENTES_ROOT_ID') || '').trim();
   var root = null;
-  if (criar.length && !rootId) erros.push('CLIENTES_ROOT_ID vazio: ' + criar.length + ' cliente(s) sem pasta');
-  else if (criar.length) {
+  if (!rootId) erros.push('CLIENTES_ROOT_ID vazio: nada criado, movido nem listado');
+  else {
     try { root = DriveApp.getFolderById(rootId); } catch (e) { erros.push('CLIENTES_ROOT_ID inacessível: ' + e.message); }
   }
-  if (root) criar.forEach(function (c) {
+  if (root) buscar.forEach(function (c) {
     try {
-      // Reusa a de mesmo nome: se a gravação falhou ontem, não cria outra hoje.
-      var f = null, it = root.getFoldersByName(c.nome);
-      while (!f && it.hasNext()) { var x = it.next(); if (!x.isTrashed()) f = x; }
-      if (f) reusadas++; else { f = root.createFolder(c.nome); criadas++; }
-      achados.push({ client_id: c.client_id, folder_url: f.getUrl() });
+      // Procura antes de criar: cliente antigo pode ter pasta sem vínculo, e a
+      // pasta criada ontem cuja gravação falhou é reaproveitada hoje.
+      var vivas = [], it = root.getFoldersByName(c.nome);
+      while (it.hasNext()) { var x = it.next(); if (!x.isTrashed()) vivas.push(x); }
+      if (vivas.length > 1) { ambiguas.push(c.nome + ': ' + vivas.length + ' pastas'); return; }
+      var f = vivas[0];
+      if (f) n.reusadas++; else { f = root.createFolder(c.nome); n.criadas++; }
+      achados.push({ client_id: c.client_id, folder_id: f.getId(), folder_url: f.getUrl() });
     } catch (e) { erros.push(c.client_id + ': ' + e.message); }
   });
   r.candidatos.forEach(function (c) {
@@ -358,15 +378,48 @@ function roboPastas() {
       var pais = DriveApp.getFileById(c.sheet_id).getParents();
       while (pais.hasNext()) {
         var f = pais.next();
-        if (!f.isTrashed()) { achados.push({ client_id: c.client_id, folder_url: f.getUrl() }); break; }
+        if (f.isTrashed()) continue;
+        // Planilha solta na raiz: vincular a pasta-mãe daria a raiz inteira a um cliente.
+        if (rootId && f.getId() === rootId) { ambiguas.push(c.client_id + ': planilha solta na raiz'); break; }
+        achados.push({ client_id: c.client_id, folder_id: f.getId(), folder_url: f.getUrl() });
+        break;
       }
     } catch (e) { erros.push(c.client_id + ': ' + e.message); }  // planilha sem acesso: tenta de novo amanhã
   });
   r.vigiar.forEach(function (v) {
-    var ok = false;
-    try { ok = !DriveApp.getFolderById(v.folder_id).isTrashed(); } catch (e) { /* apagada ou sem acesso */ }
-    testes.push({ client_id: v.client_id, status: ok ? 'ok' : 'inacessivel' });
+    var f = null;
+    try { f = DriveApp.getFolderById(v.folder_id); if (f.isTrashed()) f = null; } catch (e) { f = null; /* apagada ou sem acesso */ }
+    testes.push({ client_id: v.client_id, status: f ? 'ok' : 'inacessivel' });
+    // Sem nome (função antiga) ou pasta de vários clientes: só confere, não mexe.
+    if (!f || !v.nome || v.compartilhada) return;
+    try {
+      if (f.getName() !== v.nome) { f.setName(v.nome); n.renomeadas++; }
+      if (root && !temPai_(f, rootId)) { f.moveTo(root); n.movidas++; }
+    } catch (e) { erros.push(v.client_id + ': ' + e.message); }  // a pasta segue ok; tenta de novo amanhã
   });
-  var g = roboChamar_('pastas-resultado', { achados: achados, testes: testes, erros: erros });
-  Logger.log('Pastas vinculadas: ' + g.gravados + ' | conferidas: ' + g.atualizados + ' | criadas: ' + criadas + ' | reusadas: ' + reusadas + (erros.length ? ' | erros: ' + erros.length : ''));
+  if (root) {
+    var conhecidas = {};
+    r.vigiar.forEach(function (v) { conhecidas[v.folder_id] = true; });
+    achados.forEach(function (a) { conhecidas[a.folder_id] = true; });
+    var filhas = root.getFolders();
+    while (filhas.hasNext()) {
+      var x = filhas.next();
+      if (!x.isTrashed() && !conhecidas[x.getId()]) orfas.push(x.getName());
+    }
+  }
+  var g = roboChamar_('pastas-resultado', {
+    achados: achados.map(function (a) { return { client_id: a.client_id, folder_url: a.folder_url }; }),
+    testes: testes, erros: erros, ambiguas: ambiguas, orfas: orfas,
+  });
+  Logger.log('Pastas vinculadas: ' + g.gravados + ' | conferidas: ' + g.atualizados + ' | criadas: ' + n.criadas +
+    ' | reusadas: ' + n.reusadas + ' | renomeadas: ' + n.renomeadas + ' | movidas: ' + n.movidas +
+    ' | ambíguas: ' + ambiguas.length + ' | órfãs: ' + orfas.length + (erros.length ? ' | erros: ' + erros.length : ''));
+  if (ambiguas.length) Logger.log('Ambíguas: ' + ambiguas.slice(0, 50).join('; '));
+  if (orfas.length) Logger.log('Órfãs na raiz: ' + orfas.slice(0, 50).join('; '));
+}
+
+function temPai_(f, id) {
+  var pais = f.getParents();
+  while (pais.hasNext()) if (pais.next().getId() === id) return true;
+  return false;
 }
