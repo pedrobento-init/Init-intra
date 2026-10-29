@@ -203,7 +203,13 @@ export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; h
 // é por ele que a triagem sabe que esta mensagem pertence a um chamado que
 // já existe. Opcional: e-mail de antes do Robo.gs mandar o campo abre
 // chamado novo, como antes.
-export type EmailEntrada = EmailBackup & { message_id?: string | null; thread_id?: string | null };
+// `cabecalhos` traz só os cabeçalhos que denunciam resposta automática
+// (respostaAutomatica). Opcional: Robo.gs antigo não manda, e aí a detecção
+// fica no assunto e no corpo.
+export type EmailEntrada = EmailBackup & {
+  message_id?: string | null; thread_id?: string | null;
+  cabecalhos?: Record<string, unknown> | null;
+};
 export type Cliente = {
   id: string; name: string; team?: string | null; technician?: string | null;
   emails?: Record<string, unknown> | null;
@@ -467,7 +473,46 @@ export function notaDoSolicitante(e: EmailEntrada, agora: Date = new Date()) {
 }
 
 /** Por que um e-mail que chegou não virou chamado. */
-export type MotivoNaoAproveitado = "sem_cliente" | "ignorado_ia";
+export type MotivoNaoAproveitado = "sem_cliente" | "ignorado_ia" | "auto_resposta";
+
+const ASSUNTO_AUTOMATICO = [
+  "resposta automatica", "respuesta automatica", "automatic reply", "auto-reply", "autoreply",
+  "out of office", "ausente do escritorio", "fora do escritorio", "em ferias",
+  "undeliverable", "delivery status notification", "mail delivery failed",
+];
+const CORPO_AUTOMATICO = [
+  "esta e uma resposta automatica", "esta e uma mensagem automatica",
+  "this is an automatic reply", "this is an automated reply", "this is an automated message",
+];
+
+/**
+ * A mensagem foi escrita por uma máquina, não por gente: "estou de férias",
+ * "recebemos seu e-mail", aviso de não entrega.
+ *
+ * Sem isto, a auto-resposta do cliente caía na conversa do chamado e virava
+ * nota do solicitante — ruído no fio e, no pior caso, eco: a nossa resposta
+ * gera a auto-resposta dele, que vira nota, que alguém responde.
+ *
+ * Cabeçalho primeiro (RFC 3834, Auto-Submitted), porque é o que o servidor
+ * afirma; assunto e corpo cobrem quem não manda cabeçalho. Ficam de fora, de
+ * propósito, `X-Auto-Response-Suppress` (o Outlook põe em e-mail comum) e
+ * `Precedence: list` (lista de discussão é gente escrevendo). Na dúvida o
+ * erro é barato: a mensagem não some, vai para a caixa de triagem.
+ */
+export function respostaAutomatica(e: EmailEntrada): boolean {
+  const h: Record<string, string> = {};
+  const brutos = e.cabecalhos && typeof e.cabecalhos === "object" ? e.cabecalhos : {};
+  for (const [k, v] of Object.entries(brutos)) h[k.toLowerCase()] = norm(v).trim();
+  const auto = h["auto-submitted"];
+  if (auto && auto !== "no") return true;
+  if (h["x-autoreply"] || h["x-autorespond"]) return true;
+  if (["bulk", "auto_reply", "junk"].includes(h["precedence"] || "")) return true;
+  if (/^(mailer-daemon|postmaster)@/.test(enderecoDoRemetente(e.de))) return true;
+  const assunto = norm(e.assunto);
+  if (ASSUNTO_AUTOMATICO.some((p) => assunto.includes(p))) return true;
+  const corpo = norm(e.trecho).slice(0, 2000);
+  return CORPO_AUTOMATICO.some((p) => corpo.includes(p));
+}
 
 /**
  * Linha da caixa de triagem (066): o e-mail que chegou e NÃO virou chamado.

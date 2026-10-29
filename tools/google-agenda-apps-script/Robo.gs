@@ -7,7 +7,7 @@
 //   roboResumo       por volta das 8h  e-mail "Seu dia" (o servidor envia) + Google Chat opcional
 //   roboNoite        de madrugada      domínios (RDAP), planilha de indicadores, backup no Drive, pastas dos clientes
 //   roboBackupsEmail de 30 em 30 min   e-mails do rótulo "Backups" do Gmail → status dos backups dos clientes
-//   roboPendenciasEmail de 15 em 15 min e-mails do rótulo "Pendências" do Gmail → pendência já preenchida
+//   roboPendenciasEmail de 5 em 5 min   e-mails do rótulo "Pendências" do Gmail → pendência já preenchida
 //
 // INSTALAÇÃO: cole este arquivo como "Robo.gs" e rode instalarRobo() uma vez.
 // Opcional: propriedade CHAT_WEBHOOK com o webhook de um espaço do Google Chat.
@@ -27,7 +27,9 @@ function instalarRobo() {
   ScriptApp.newTrigger('roboResumo').timeBased().everyDays(1).atHour(7).nearMinute(45).create();
   ScriptApp.newTrigger('roboNoite').timeBased().everyDays(1).atHour(2).create();
   ScriptApp.newTrigger('roboBackupsEmail').timeBased().everyMinutes(30).create();
-  ScriptApp.newTrigger('roboPendenciasEmail').timeBased().everyMinutes(15).create();
+  // 5 min: o cliente espera resposta de chamado, não de backup. A rodada sem
+  // e-mail novo sai antes de chamar a Edge Function, então o custo é a busca.
+  ScriptApp.newTrigger('roboPendenciasEmail').timeBased().everyMinutes(5).create();
   roboVencimentos();
   roboNoite();
   roboBackupsEmail();
@@ -251,8 +253,12 @@ function roboPendenciasEmail() {
       // thread_id é a CONVERSA: por ele o Intra sabe que esta mensagem pertence
       // a um chamado que já existe, e posta a resposta do cliente como nota ali
       // em vez de abrir outro chamado do mesmo assunto.
+      // cabecalhos: só os que denunciam resposta automática (férias, "recebemos
+      // sua mensagem"). Com eles a triagem separa a máquina antes de virar nota.
       mensagens.push({ id: m.getId(), de: m.getFrom(), assunto: m.getSubject() || '', data: m.getDate().toISOString(),
         message_id: m.getHeader('Message-ID') || '', thread_id: th.getId(),
+        cabecalhos: { 'Auto-Submitted': m.getHeader('Auto-Submitted') || '', 'X-Autoreply': m.getHeader('X-Autoreply') || '',
+          'X-Autorespond': m.getHeader('X-Autorespond') || '', 'Precedence': m.getHeader('Precedence') || '' },
         trecho: (m.getPlainBody() || '').slice(0, 2000) });
     });
   });
@@ -265,6 +271,7 @@ function roboPendenciasEmail() {
   Logger.log('Triagem: ' + mensagens.length + ' e-mail(s), ' + r.abertas + ' pendência(s), '
     + (r.notas ? r.notas + ' nota(s) em chamado aberto, ' : '')
     + r.ignorados + ' ignorado(s)' + (r.internos ? ', ' + r.internos + ' da própria Init' : '')
+    + (r.auto_respostas ? ', ' + r.auto_respostas + ' resposta(s) automática(s)' : '')
     + ((r.sem_cliente || []).length ? ', sem cliente: ' + r.sem_cliente.join(' | ') : ''));
 }
 
