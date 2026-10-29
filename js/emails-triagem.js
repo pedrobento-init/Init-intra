@@ -122,7 +122,7 @@ function _emailTriagemNome(de) {
 }
 
 /** Chamado criado a partir de uma entrada: fecha o ciclo. Chamado por pendencias, com o id vindo do formulário. */
-function emailTriagemMarcarAberta(pendenciaId, id) {
+function emailTriagemMarcarAberta(pendenciaId, id, clientId) {
   if (!id || !pendenciaId) return;
   var e = getEmailsTriagem().find(function (x) { return x && x.id === id; });
   // Entre abrir o formulário e salvar, o colega pode ter tratado a entrada:
@@ -132,7 +132,55 @@ function emailTriagemMarcarAberta(pendenciaId, id) {
     return;
   }
   _emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId });
+  // Quem escolheu o cliente no formulário respondeu a pergunta que o robô não
+  // soube responder: guardar a resposta é o que evita a mesma entrada amanhã.
+  _emailTriagemAprender(e.de, clientId);
   renderEntradasEmail();
+}
+
+// Par do DOMINIOS_PUBLICOS do robô (robo/campo.ts). Mudou lá, muda aqui: um
+// provedor pessoal fora desta lista teria o DOMÍNIO aprendido, e todo mundo que
+// escreve dele viraria chamado do mesmo cliente.
+var _EMAIL_TRIAGEM_PESSOAIS = [
+  'gmail.com', 'hotmail.com', 'hotmail.com.br', 'outlook.com', 'outlook.com.br',
+  'live.com', 'yahoo.com', 'yahoo.com.br', 'icloud.com', 'me.com', 'msn.com',
+  'uol.com.br', 'bol.com.br', 'terra.com.br', 'globo.com'
+];
+
+/**
+ * Grava em clientes_remetentes (072) que este remetente é deste cliente.
+ * Provedor pessoal aprende o endereço; domínio próprio aprende o domínio.
+ * Vai direto ao Supabase, fora do sync: quem lê é o robô, não o app.
+ */
+function _emailTriagemAprender(de, clientId) {
+  var endereco = _emailTriagemEndereco(de);
+  var c = (clientId && typeof getClientById === 'function') ? getClientById(clientId) : null;
+  if (!endereco || !c) return null;
+  var dominio = endereco.split('@')[1];
+  var pessoal = _EMAIL_TRIAGEM_PESSOAIS.indexOf(dominio) !== -1;
+  var remetente = pessoal ? endereco : dominio;
+  // O team é o do CLIENTE, não o de quem vinculou: é o cliente que pertence a
+  // uma equipe, e é a equipe dele que precisa enxergar (e corrigir) o vínculo.
+  var team = c.team || 'init';
+  var u = typeof getUser === 'function' ? getUser() : null;
+  var linha = {
+    // id derivado da chave única: vincular de novo atualiza a mesma linha.
+    id: team + '|' + remetente,
+    remetente: remetente,
+    tipo: pessoal ? 'endereco' : 'dominio',
+    client_id: c.id,
+    team: team,
+    created_by: u ? u.name : null,
+    updated_at: new Date().toISOString()
+  };
+  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    // Falhar aqui não é falha de sync: sem a 072, ou com o cliente ainda não
+    // enviado, o robô só deixa de aprender. O chamado já está salvo.
+    supabaseClient.from('clientes_remetentes').upsert(linha, { onConflict: 'team,remetente' }).then(function (res) {
+      if (res && res.error) console.warn('⚠️ clientes_remetentes:', res.error.message);
+    }).catch(function () {});
+  }
+  return linha;
 }
 
 /** Descartar: some da lista, fica no banco com quem decidiu. */

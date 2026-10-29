@@ -352,9 +352,45 @@ export function assuntoLimpo(assunto: string): string {
   return s.slice(0, 140);
 }
 
-/** Cliente do e-mail: domínio da ficha (emails.domain); senão, nome do cliente no remetente ou no assunto. */
-export function clienteDoEmail(clientes: Cliente[], e: EmailEntrada): Cliente | null {
-  const dominio = enderecoDoRemetente(e.de).split("@")[1] || "";
+/** Vínculo aprendido na caixa (migration 072): quem vincula um cliente ensina o robô. */
+export type Remetente = {
+  remetente: string; tipo: string; client_id: string; team?: string | null; updated_at?: string | null;
+};
+
+// O que alguém vinculou à mão vale mais que o domínio da ficha: é a correção
+// de um erro que o robô já cometeu. O endereço exato vem antes do domínio, e
+// domínio público nunca casa por domínio — mesmo que uma linha antiga o tenha.
+// Com duas equipes vinculando o mesmo remetente, o vínculo mais recente vence.
+function clienteAprendido(clientes: Cliente[], remetentes: Remetente[], endereco: string): Cliente | null {
+  if (!endereco || !remetentes.length) return null;
+  const dominio = endereco.split("@")[1] || "";
+  const porId = new Map(clientes.map((c) => [c.id, c]));
+  const maisRecente = (lista: Remetente[]) => {
+    let melhor: Cliente | null = null; let quando = "";
+    for (const r of lista) {
+      const c = porId.get(r.client_id);
+      // Cliente que esta rodada não enxerga (apagado, outra base) não decide nada.
+      if (!c) continue;
+      const t = String(r.updated_at || "");
+      if (!melhor || t > quando) { melhor = c; quando = t; }
+    }
+    return melhor;
+  };
+  const exato = maisRecente(remetentes.filter((r) => r.tipo === "endereco" && norm(r.remetente).trim() === endereco));
+  if (exato || !dominio || DOMINIOS_PUBLICOS.includes(dominio)) return exato;
+  return maisRecente(remetentes.filter((r) => {
+    const d = norm(r.remetente).replace(/^@/, "").trim();
+    return r.tipo === "dominio" && d.includes(".") && !DOMINIOS_PUBLICOS.includes(d) &&
+      (dominio === d || dominio.endsWith("." + d));
+  }));
+}
+
+/** Cliente do e-mail: vínculo aprendido na caixa; senão, domínio da ficha (emails.domain); senão, nome do cliente no remetente ou no assunto. */
+export function clienteDoEmail(clientes: Cliente[], e: EmailEntrada, remetentes: Remetente[] = []): Cliente | null {
+  const endereco = enderecoDoRemetente(e.de);
+  const aprendido = clienteAprendido(clientes, remetentes, endereco);
+  if (aprendido) return aprendido;
+  const dominio = endereco.split("@")[1] || "";
   if (dominio && !DOMINIOS_PUBLICOS.includes(dominio)) {
     for (const c of clientes) {
       const d = norm(c.emails?.domain).replace(/^@/, "").trim();

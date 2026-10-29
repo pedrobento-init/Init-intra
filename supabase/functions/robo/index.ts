@@ -50,7 +50,7 @@ import {
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
   enderecoDoRemetente, entradaNaoAproveitada, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
   type Monitor, monitorDoEmail, type MotivoNaoAproveitado, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta,
-  remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa,
+  remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa, type Remetente,
 } from "./campo.ts";
 
 const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
@@ -374,6 +374,8 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
   if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, auto_respostas: 0, sem_cliente: [] });
   const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
+  // Sem a migration 072 a tabela não existe: o robô segue casando só pela ficha.
+  const remetentes = await all<Remetente>(db, "clientes_remetentes", "remetente, tipo, client_id, team, updated_at").catch(() => [] as Remetente[]);
   const abertas: string[] = [], semCliente: string[] = [];
   const dominios = dominiosInternos(GMAIL_USER);
   let ignorados = 0, internos = 0, notas_em_aberto = 0, auto_respostas = 0;
@@ -393,7 +395,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     // na equipe do cliente quando dá para saber qual é.
     if (respostaAutomatica(e)) {
       auto_respostas++;
-      await guardarEntrada(db, e, "auto_resposta", clienteDoEmail(clientes, e)?.team || "init");
+      await guardarEntrada(db, e, "auto_resposta", clienteDoEmail(clientes, e, remetentes)?.team || "init");
       continue;
     }
     // Mensagem numa conversa que já abriu chamado: é a MESMA história, e um
@@ -427,7 +429,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       notas_em_aberto++;
       continue;
     }
-    const c = clienteDoEmail(clientes, e);
+    const c = clienteDoEmail(clientes, e, remetentes);
     if (!c) {
       // Antes isto era só `semCliente.push(assunto)`: o e-mail sumia e o
       // assunto ia para um JSON que ninguém lê. Domínio fora da ficha e Gmail
