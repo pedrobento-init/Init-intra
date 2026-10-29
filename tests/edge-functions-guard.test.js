@@ -4,9 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Rede de segurança das Edge Functions. Elas guardam o MILVUS_API_TOKEN e
-// fazem o team-check antes de escrever com service role — e não têm teste de
-// integração, porque o vitest não resolve os imports `https://deno.land/...`
-// e o projeto não usa Deno localmente. Então o que dá para travar é o
+// fazem o team-check antes de escrever com service role. O comportamento roda
+// em tests/edge-functions-auth.test.js e tests/edge-functions-secret-auth.test.js
+// (o harness empacota o index.ts com esbuild); o que sobra para cá é o
 // invariante estrutural, no mesmo espírito de tests/cdn-sri.test.js.
 //
 // Regressão principal: o config.toml cobria 6 das 17 functions; as outras 11

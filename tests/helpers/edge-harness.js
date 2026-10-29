@@ -1,26 +1,26 @@
 // Carrega uma Edge Function de verdade dentro do vitest.
 //
-// As functions importam de https://deno.land/..., https://esm.sh/... e npm:...
-// — por isso a Fase 1 só conseguiu travar o invariante estrutural
-// (tests/edge-functions-guard.test.js).
+// As functions importam de `npm:` (nodemailer, web-push) e do wrapper
+// `npm:@supabase/server`, que o esbuild não resolve no Node — daí os stubs.
+// O invariante estrutural fica em tests/edge-functions-guard.test.js; aqui
+// roda o código.
 //
-// Há duas formas de function no repositório, e o harness carrega as duas:
-//   - `withSupabase`: `export default { fetch: withSupabase({ auth }, handle) }`,
-//     a forma que o AGENTS.md manda usar. O wrapper é quem faz o gate de JWT,
-//     então o stub daqui emula esse gate e monta o `ctx` (supabaseAdmin,
-//     userClaims) a partir do dublê do teste.
-//   - `serve()`: a forma antiga, ainda nas 4 functions que autenticam por
-//     segredo próprio (agenda-ics, avisos-prazo, google-agenda, robo).
+// Forma das functions hoje (todas as 17):
+//   `withSupabase`: `export default { fetch: withSupabase({ auth }, handle) }`.
+//     O wrapper é quem faz o gate de JWT, então o stub daqui emula esse gate e
+//     monta o `ctx` (supabaseAdmin, userClaims) a partir do dublê do teste.
+//   Não existe mais function no padrão antigo (`serve()` de deno.land); o
+//     stub antigo saiu junto com a migração das quatro últimas.
 //
 // Aqui o esbuild (já vem com o vite) empacota o index.ts trocando esses
-// especificadores por stubs: serve() guarda o handler em vez de abrir porta,
-// createClient() devolve o dublê do teste, withSupabase faz o gate e nodemailer
-// não manda e-mail. O bundle roda dentro de uma função cujos parâmetros
-// sombreiam `Deno` e `fetch`, então nada escapa para a rede nem para o
-// ambiente.
+// especificadores por stubs: createClient() devolve o dublê do teste,
+// withSupabase faz o gate e nodemailer não manda e-mail. O bundle roda dentro
+// de uma função cujos parâmetros sombreiam `Deno` e `fetch`, então nada escapa
+// para a rede nem para o ambiente.
 //
 // O que isto cobre que o guarda estrutural não cobre: os 4 contratos de auth
-// (sem JWT → 401, inativo → bloqueado, outra equipe → 403, admin passa).
+// (sem JWT → 401, inativo → bloqueado, outra equipe → 403, admin passa) e o
+// contrato externo de quem autentica por segredo próprio.
 
 import esbuild from 'esbuild';
 import path from 'node:path';
@@ -29,9 +29,6 @@ import { fileURLToPath } from 'node:url';
 const fnDir = fileURLToPath(new URL('../../supabase/functions/', import.meta.url));
 
 const STUBS = {
-  serve: 'export function serve(h) { __inject.handler = h; }',
-  supabase:
-    'export function createClient(url, key, opts) { return __inject.createClient(url, key, opts); }',
   nodemailer: 'export default { createTransport: (opts) => __inject.createTransport(opts) };',
   supabaseServer:
     'export function withSupabase(cfg, handle) { return __inject.withSupabase(cfg, handle); }',
@@ -40,14 +37,6 @@ const STUBS = {
 const stubPlugin = {
   name: 'edge-stubs',
   setup(build) {
-    build.onResolve({ filter: /^https:\/\/deno\.land\// }, () => ({
-      path: 'serve',
-      namespace: 'stub',
-    }));
-    build.onResolve({ filter: /^https:\/\/esm\.sh\// }, () => ({
-      path: 'supabase',
-      namespace: 'stub',
-    }));
     build.onResolve({ filter: /^npm:@supabase\/server/ }, () => ({
       path: 'supabaseServer',
       namespace: 'stub',
@@ -80,7 +69,7 @@ async function bundleOf(name) {
 }
 
 /**
- * Devolve o handler que a function registrou em serve(), já com os dublês.
+ * Devolve o handler que a function exportou em `{ fetch }`, já com os dublês.
  * `env` é o Deno.env do teste; `fetch` e `createTransport` lançam se a function
  * tentar usá-los sem o teste ter pedido — chamada de rede em teste é bug.
  */
@@ -96,7 +85,6 @@ export async function loadHandler(
       throw new Error(`${name}: createClient() inesperado no teste`);
     });
   const inject = {
-    handler: null,
     createClient: injectCreateClient,
     // Emula o withSupabase real: ele é quem verifica o JWT (auth: "user") e
     // entrega o ctx pronto. Sem isso o 401 do contrato 1 nunca aconteceria no
@@ -170,10 +158,10 @@ export async function loadHandler(
   run(inject, Deno, fakeFetch, fakeConsole, mod, mod.exports, (m) => {
     throw new Error(`${name}: require("${m}") inesperado`);
   });
-  // `serve()` na forma antiga; `export default { fetch }` na forma withSupabase.
-  const handler = inject.handler ?? mod.exports?.default?.fetch;
+  // `export default { fetch }`, a única forma que existe hoje.
+  const handler = mod.exports?.default?.fetch;
   if (typeof handler !== 'function') {
-    throw new Error(`${name}: nem serve() nem export default registraram handler`);
+    throw new Error(`${name}: export default { fetch } não registrou handler`);
   }
   return { handler, logs };
 }

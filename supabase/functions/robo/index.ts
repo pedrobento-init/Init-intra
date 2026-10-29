@@ -37,8 +37,8 @@
 // BACKUP: sem segredos (token Milvus do cliente, PIN dos operadores) e sem
 // as tabelas de credenciais/sincronização.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
+import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.16";
 import { type Operator, todayBR } from "../avisos-prazo/avisos.ts";
 import {
@@ -53,8 +53,6 @@ import {
   remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa,
 } from "./campo.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
 const APP_URL = (Deno.env.get("APP_URL") ?? "").replace(/\/$/, "");
 const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
@@ -549,14 +547,15 @@ async function registrarRodada(db: SupabaseClient, acao: string, inicio: Date, r
   }
 }
 
-serve(async (req: Request) => {
+// auth: "none" desliga só a checagem de JWT da plataforma: quem chama é o Apps
+// Script, que não tem JWT. O x-agenda-secret continua sendo o primeiro teste.
+async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return json({ error: "Indisponível" }, 500);
   if (!SECRET || !safeEqual(req.headers.get("x-agenda-secret") ?? "", SECRET)) return json({ error: "Não autorizado" }, 401);
 
   let input: Entrada;
   try { input = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
-  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const db = ctx.supabaseAdmin;
   const inicio = new Date();
   let res: Response;
   let erro: string | null = null;
@@ -569,4 +568,6 @@ serve(async (req: Request) => {
   }
   await registrarRodada(db, String(input.action ?? ""), inicio, res, erro);
   return res;
-});
+}
+
+export default { fetch: withSupabase({ auth: "none" }, handle) };

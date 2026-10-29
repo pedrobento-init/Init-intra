@@ -50,6 +50,9 @@ function builder(linhas) {
       return api;
     },
     range: () => api,
+    // Fire-and-forget de `last_used_at` no agenda-ics: sem o update o handler
+    // estoura antes de montar o .ics.
+    update: () => api,
     maybeSingle: async () => ({ data: out[0] ?? null, error: null }),
     single: async () => ({
       data: out[0] ?? null,

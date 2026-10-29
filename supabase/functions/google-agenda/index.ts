@@ -24,12 +24,10 @@
 // - As mudanças do Google são aplicadas ANTES de confirmar o push: o que o
 //   robô leu é anterior ao envio, então não pode desfazer o que acabou de ir.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
+import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { eventIdFor, eventToVisitPatch, type GEvent, visitHash, visitIdFromEventId, visitToEvent, type VisitRow } from "./mapping.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const APP_URL = (Deno.env.get("APP_URL") ?? "").replace(/\/$/, "");
 const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
 
@@ -239,14 +237,15 @@ async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?
   return json({ success: true, applied, pushed: valid.length });
 }
 
-serve(async (req: Request) => {
+// auth: "none" desliga só a checagem de JWT da plataforma: quem chama é o Apps
+// Script, que não tem JWT. O x-agenda-secret continua sendo o primeiro teste.
+async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return json({ error: "Indisponível" }, 500);
   if (!SECRET || !safeEqual(req.headers.get("x-agenda-secret") ?? "", SECRET)) return json({ error: "Não autorizado" }, 401);
 
   let input: { action?: string };
   try { input = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
-  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const db = ctx.supabaseAdmin;
   try {
     if (input.action === "begin") return await begin(db, input);
     if (input.action === "finish") return await finish(db, input);
@@ -255,4 +254,6 @@ serve(async (req: Request) => {
     console.error("google-agenda:", (e as Error).message);
     return json({ error: "Falha no servidor" }, 500);
   }
-});
+}
+
+export default { fetch: withSupabase({ auth: "none" }, handle) };

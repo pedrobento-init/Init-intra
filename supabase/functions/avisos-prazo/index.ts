@@ -18,8 +18,7 @@
 // DUPLICIDADE: cada aviso é "reservado" em avisos_enviados (chave única)
 // antes do envio; se o Gmail falhar, a reserva é desfeita e tenta amanhã.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import nodemailer from "npm:nodemailer@6.9.16";
 import {
   isPendenciaGestao,
@@ -37,8 +36,6 @@ import {
 import { buildPushPayload } from "../send-push/payload.ts";
 import { pushToEmails } from "../send-push/push.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("AVISOS_CRON_SECRET") ?? "";
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
@@ -56,16 +53,18 @@ function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-serve(async (req: Request) => {
+// auth: "none" desliga só a checagem de JWT da plataforma: quem chama é o
+// pg_cron, que não tem JWT. O x-cron-secret continua sendo o primeiro teste.
+async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!CRON_SECRET || !safeEqual(req.headers.get("x-cron-secret") ?? "", CRON_SECRET)) {
     return json({ error: "Não autorizado" }, 401);
   }
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    return json({ error: "Secrets ausentes (SUPABASE_*, GMAIL_USER, GMAIL_APP_PASSWORD)" }, 500);
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    return json({ error: "Secrets ausentes (GMAIL_USER, GMAIL_APP_PASSWORD)" }, 500);
   }
 
-  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const db = ctx.supabaseAdmin;
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -164,4 +163,6 @@ serve(async (req: Request) => {
 
   if (result.falhas.length) console.error("avisos-prazo falhas:", result.falhas);
   return json(result);
-});
+}
+
+export default { fetch: withSupabase({ auth: "none" }, handle) };
