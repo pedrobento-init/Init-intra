@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const fnDir = fileURLToPath(new URL('../supabase/functions/', import.meta.url));
 const fonte = (nome) => fs.readFileSync(path.join(fnDir, nome, 'index.ts'), 'utf8');
 
-const MIGRADAS = ['agenda-ics', 'avisos-prazo', 'google-agenda'];
+const MIGRADAS = ['agenda-ics', 'avisos-prazo', 'google-agenda', 'robo'];
 
 describe('functions no padrão @supabase/server', () => {
   it.each(MIGRADAS)('%s usa withSupabase com auth none', (nome) => {
