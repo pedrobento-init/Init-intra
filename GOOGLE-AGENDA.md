@@ -92,7 +92,7 @@ O mesmo projeto do Apps Script também cuida destas tarefas. A regra de cada uma
 | Por volta das 8h | E-mail **"Seu dia"** para cada pessoa: visitas de hoje (com o "O que levar"), pendências vencidas ou que vencem hoje e vencimentos dos próximos 7 dias. Admin vê os vencimentos da equipe e os domínios com data diferente do registro. Dia sem nada não gera e-mail; no fim de semana, só recebe quem tem visita. Opcional: texto da equipe num espaço do Google Chat. |
 | De madrugada | **Domínios:** para vencimentos do tipo "Domínio", consulta a expiração no registro público (RDAP; `.br` vai ao registro.br). **Planilha "Init Intra — Indicadores"**, reescrita toda noite, com as abas Resumo mensal, Visitas, Pendências e Horas. **Backup** em JSON na pasta "Init Intra — Backups" do Drive, guardado por 30 dias. |
 | De 30 em 30 min | **Backups dos clientes:** e-mails do rótulo "Backups" do Gmail viram o status de cada rotina monitorada; falha ou silêncio além do limite abre pendência. |
-| De 15 em 15 min | **Triagem de e-mail:** e-mail de cliente no rótulo "Pendências" vira pendência já preenchida (assunto, descrição, tipo, prioridade, categoria). |
+| De 5 em 5 min | **Triagem de e-mail:** e-mail de cliente no rótulo "Pendências" vira pendência já preenchida (assunto, descrição, tipo, prioridade, categoria). |
 
 Detalhes:
 - **Lembretes da agenda:** no Google, lembrete de evento é pessoal. Os avisos de 30 e 7 dias e do dia continuam saindo por e-mail (`avisos-prazo`). Quem quiser também pode ligar as notificações da agenda "Vencimentos Init" nas próprias configurações do Google Agenda.
@@ -178,12 +178,14 @@ E-mail de cliente marcado com o rótulo **"Pendências"** no Gmail do robô vira
 
 ### Como funciona
 1. No Gmail da conta do robô, marque o e-mail com o rótulo **Pendências** — na mão ou por um filtro (por exemplo, tudo que chega no endereço de suporte). O robô cria o rótulo sozinho na primeira execução.
-2. De 15 em 15 minutos o robô (`roboPendenciasEmail`) manda ao Intra os e-mails novos do rótulo.
+2. De 5 em 5 minutos o robô (`roboPendenciasEmail`) manda ao Intra os e-mails novos do rótulo.
 3. O Intra acha o cliente pelo **domínio do remetente** (campo *Domínio* da aba E-mail da ficha do cliente) e, se não achar, pelo **nome do cliente no remetente ou no assunto**. Domínio de e-mail grátis (gmail, hotmail, uol…) nunca casa cliente.
 4. Com o cliente na mão, os fatos vão ao cenário do Make, que devolve a classificação. A pendência abre com canal **E-mail**, etiqueta `triagem-automatica`, o técnico do cliente como responsável, o solicitante do e-mail e o prazo de 1ª resposta pela prioridade (mesma regra do `js/sla.js`: 8h–18h, seg–sex).
 5. O e-mail original (remetente, data e assunto) fica no fim da descrição, e o texto do corpo é o que a IA resumiu — vale conferir antes de responder ao cliente.
 
 **Não abre pendência:** e-mail de quem não é cliente (aparece no log do Apps Script, para alguém olhar no Gmail) e e-mail que a IA marca como propaganda, aviso automático, cobrança ou agradecimento. É uma pendência por mensagem, mesmo que o robô reenvie o mesmo e-mail.
+
+**Resposta automática não vira nota (migration 070).** "Estou de férias", "recebemos sua mensagem" e aviso de não entrega são separados antes de o robô olhar a conversa do chamado e antes de chamar a IA. A detecção ([`respostaAutomatica`](supabase/functions/robo/campo.ts)) olha, nesta ordem: os cabeçalhos `Auto-Submitted` (qualquer valor menos `no`), `X-Autoreply`/`X-Autorespond` e `Precedence: bulk`/`auto_reply` (`list` fica de fora: lista de discussão é gente escrevendo); o remetente `mailer-daemon`/`postmaster`; e, sem cabeçalho, frases típicas no assunto e no corpo. O e-mail não some: vai para a caixa **"Chegou por e-mail e não virou chamado"** com o motivo **Resposta automática**, para alguém conferir se a detecção errou. Sem a migration 070 aplicada, a auto-resposta continua fora do chamado, mas não fica guardada.
 
 **Se o Make falhar ou estiver fora do ar**, a pendência abre com o assunto e o texto do próprio e-mail, prioridade Média e categoria Outro, com a etiqueta `sem-classificacao-ia`: o pedido do cliente não se perde.
 
@@ -279,7 +281,7 @@ Recebe `{ "tarefa", "email_id", "de", "assunto", "data", "trecho", "cliente" }` 
 
 O Intra confere tudo o que volta: categoria, prioridade e tipo fora das listas caem no padrão (Outro / Média / Suporte), então um ajuste malfeito no prompt não suja o banco.
 
-No Apps Script, rode **`instalarRobo`** de novo depois de atualizar o `Robo.gs` (ele recria os gatilhos e inclui o de 15 minutos).
+No Apps Script, rode **`instalarRobo`** de novo depois de atualizar o `Robo.gs` (ele recria os gatilhos e inclui o de 5 minutos).
 
 > Privacidade: o remetente, o assunto e os primeiros 2.000 caracteres do e-mail passam pelo Make e pelo provedor da IA.
 

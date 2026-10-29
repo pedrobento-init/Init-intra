@@ -49,8 +49,8 @@ import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
   enderecoDoRemetente, entradaNaoAproveitada, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
-  type Monitor, monitorDoEmail, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta, remetenteInterno,
-  textoDaIa, triagemDaIa,
+  type Monitor, monitorDoEmail, type MotivoNaoAproveitado, notaDoSolicitante, pendenciaDaTriagem, pendenciaDoAlerta,
+  remetenteInterno, respostaAutomatica, textoDaIa, triagemDaIa,
 } from "./campo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -360,7 +360,7 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 async function guardarEntrada(
   db: SupabaseClient,
   e: EmailEntrada,
-  motivo: "sem_cliente" | "ignorado_ia",
+  motivo: MotivoNaoAproveitado,
   team = "init",
 ): Promise<boolean> {
   const linha = entradaNaoAproveitada(e, motivo, "ETR-" + crypto.randomUUID(), team);
@@ -374,11 +374,11 @@ async function guardarEntrada(
 
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
-  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, sem_cliente: [] });
+  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, auto_respostas: 0, sem_cliente: [] });
   const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
   const abertas: string[] = [], semCliente: string[] = [];
   const dominios = dominiosInternos(GMAIL_USER);
-  let ignorados = 0, internos = 0, notas_em_aberto = 0;
+  let ignorados = 0, internos = 0, notas_em_aberto = 0, auto_respostas = 0;
   for (const e of msgs) {
     // O robô varre a CONVERSA inteira do rótulo: a nossa própria resposta ao
     // cliente chega aqui como mensagem nova. Ela não é pedido novo — abria um
@@ -389,6 +389,15 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     const key = `triagem:${e.id}`;
     const { error } = await db.from("avisos_enviados").insert({ key });
     if (error) { if (error.code === "23505") continue; throw new Error("avisos_enviados: " + error.message); }
+    // Antes da conversa e da IA: auto-resposta na conversa de um chamado
+    // virava nota do solicitante (e podia ecoar com a nossa resposta), e fora
+    // dela gastava uma chamada ao Make para ser ignorada. Vai para a caixa,
+    // na equipe do cliente quando dá para saber qual é.
+    if (respostaAutomatica(e)) {
+      auto_respostas++;
+      await guardarEntrada(db, e, "auto_resposta", clienteDoEmail(clientes, e)?.team || "init");
+      continue;
+    }
     // Mensagem numa conversa que já abriu chamado: é a MESMA história, e um
     // chamado por e-mail deixava quem atende com dois pela metade. Vira nota
     // ali. Não passa pela IA: não há nada a classificar numa conversa que já
@@ -451,7 +460,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     abertas.push(pen.id);
   }
   return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, internos,
-    notas: notas_em_aberto, sem_cliente: semCliente });
+    notas: notas_em_aberto, auto_respostas, sem_cliente: semCliente });
 }
 
 async function indicadores(db: SupabaseClient) {

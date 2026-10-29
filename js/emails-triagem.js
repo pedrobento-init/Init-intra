@@ -14,7 +14,8 @@
 
 var EMAIL_TRIAGEM_MOTIVOS = {
   sem_cliente: { label: 'Sem cliente', dica: 'O remetente não casou com nenhuma ficha. Cadastre o cliente, ou ponha o domínio na ficha dele.' },
-  ignorado_ia: { label: 'A IA ignorou', dica: 'O Make classificou como propaganda ou aviso automático. Confira se não era pedido.' }
+  ignorado_ia: { label: 'A IA ignorou', dica: 'O Make classificou como propaganda ou aviso automático. Confira se não era pedido.' },
+  auto_resposta: { label: 'Resposta automática', dica: 'Férias, confirmação de recebimento ou aviso de não entrega. Não virou nota no chamado; confira se não era gente escrevendo.' }
 };
 
 function getEmailsTriagem() {
