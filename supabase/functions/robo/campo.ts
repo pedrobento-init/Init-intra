@@ -718,3 +718,20 @@ export async function gravarResultadoPastas(
   }
   return { gravados, atualizados, ignorados, log };
 }
+
+// RODADAS DO ROBÔ (071): o que cada ação devolveu, reduzido ao que cabe num painel.
+// Guarda só contagem: o backup devolve o banco inteiro e a triagem devolve
+// remetentes — nada disso deve ir parar numa tabela que o app inteiro lê.
+export function resumoDaRodada(body: unknown): Record<string, number | boolean | string> {
+  const out: Record<string, number | boolean | string> = {};
+  if (!body || typeof body !== "object" || Array.isArray(body)) return out;
+  for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+    if (k === "success") continue;
+    if (k === "error" && typeof v === "string") out.error = v.slice(0, 300);
+    else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    else if (typeof v === "boolean") out[k] = v;
+    else if (Array.isArray(v)) out[k] = v.length;
+    else if (v && typeof v === "object") out[k] = Object.keys(v).length;
+  }
+  return out;
+}
