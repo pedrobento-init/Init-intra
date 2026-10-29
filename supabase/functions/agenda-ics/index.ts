@@ -10,24 +10,23 @@
 // - Sem dado sensível: cliente, motivo e observações da visita (o mesmo que
 //   o técnico já vê no app). Nada de acessos/IDs remotos.
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.113.0";
+import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { buildIcs } from "./ics.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 function iso(d: Date) { return d.toISOString().slice(0, 10); }
 
-serve(async (req: Request) => {
+// auth: "none" não é falta de autenticação — é o wrapper não exigir JWT da
+// plataforma, porque quem chama é o app de calendário. A autenticação é o
+// token da query, conferido aqui dentro.
+async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return new Response("Indisponível", { status: 500 });
 
   const token = new URL(req.url).searchParams.get("t") || "";
   if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return new Response("Not found", { status: 404 });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const admin = ctx.supabaseAdmin;
   const { data: feed } = await admin.from("calendar_feeds").select("operator_id").eq("token", token).maybeSingle();
   if (!feed) return new Response("Not found", { status: 404 });
   const { data: op } = await admin.from("operators").select("id, name, active").eq("id", feed.operator_id).maybeSingle();
@@ -62,4 +61,6 @@ serve(async (req: Request) => {
       "Cache-Control": "private, max-age=900",
     },
   });
-});
+}
+
+export default { fetch: withSupabase({ auth: "none" }, handle) };

@@ -37,7 +37,7 @@ fechou o PR #58). **Rulings do usuário (27/10/2026):**
 exato; os testes devolvem os globais que emprestam; o cabeçalho da seção ganha um
 emoji distinto; o plano original fica com as caixas marcadas e a contagem real.
 
-**Stack:** JavaScript modo script (70 arquivos em escopo global único), Vitest
+**Stack:** JavaScript modo script (69 arquivos em escopo global único), Vitest
 5.0.5, sem dependências novas.
 
 **Branch:** `fix/cliente-pasta-menores`, nascida de `origin/main`.
@@ -46,7 +46,7 @@ emoji distinto; o plano original fica com as caixas marcadas e a contagem real.
 
 Copiadas do plano original (`docs/plans/2026-10-27-pasta-drive-cliente.md:17-31`):
 
-- `js/` é **modo script**: 70 arquivos num escopo global único. Antes de criar nome global,
+- `js/` é **modo script**: 69 arquivos num escopo global único. Antes de criar nome global,
   conferir que não existe.
 - **Nada de handler inline.** `onclick` no markup é proibido pelo `AGENTS.md`. Usar `data-action`
   com ação registrada em `registerActions`.
@@ -116,7 +116,7 @@ documentado no comentário em vez de "consertável" — é a ruling flexível).
   `driveFolderUrl(v): string`. Consumidores (`saveDriveFolderLink`,
   `renderClientDriveSection`) não mudam.
 
-- [ ] **Passo 1: escrever os testes que falham**
+- [x] **Passo 1: escrever os testes que falham**
 
 Adicionar ao `tests/drive-folder-url.test.js`, depois do describe
 `recusa entrada com aspa...` (linha 36):
@@ -151,7 +151,7 @@ E no describe `aceita o ID colado cru` (linha 19), acrescentar a fixação do pi
   });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
@@ -159,7 +159,7 @@ Esperado: FAIL — 2 dos 3 testes novos falham (os que aceitam sem esquema/maiú
 `open?id=` recebem `null`; o de 14 chars já passa, o parser atual também o recusa).
 Contagem nova: 21 testes no arquivo (18 + 3), 2 vermelhos.
 
-- [ ] **Passo 3: implementar a normalização em `parseDriveFolderId`**
+- [x] **Passo 3: implementar a normalização em `parseDriveFolderId`**
 
 Em `js/clients-form.js:590`, mesma assinatura. Comportamento fixado pelo teste:
 
@@ -197,14 +197,14 @@ de ID cru não distingue pasta de arquivo (risco aceito — link que dá 404 é
 visível para quem colou errado, e o ID de planilha só chega aqui cru, sem a forma
 `/spreadsheets/` que é recusada).
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: PASS — 21 testes, 0 falhas (os 18 antigos, inclusive a guarda SEC-18,
 continuam verdes).
 
-- [ ] **Passo 5: commitar**
+- [x] **Passo 5: commitar**
 
 ```bash
 git add js/clients-form.js tests/drive-folder-url.test.js
@@ -235,7 +235,7 @@ minor 4: trabalho que escapa do teste e derruba o CI sem aviso.
 - As duas funções stubadas são de `js/storage-anexos.js:424` e `:321`, fora do
   grupo compilado pelo teste. A Tarefa 3 leva as duas chaves para a higiene.
 
-- [ ] **Passo 1: tornar o teste async com o await (o vermelho vira determinístico)**
+- [x] **Passo 1: tornar o teste async com o await (o vermelho vira determinístico)**
 
 Em `tests/drive-folder-url.test.js`, no `it('salvar leva de volta para a ficha do
 cliente')` (linha ~185), virar `async` e acrescentar o `await` **antes** da
@@ -254,7 +254,7 @@ Comentário no teste (pt-BR, por quê): o `viewClient` agenda o `setTimeout` de
 desmontagem do worker e o erro só aparece em algumas execuções — com ele, o
 timer dispara sempre dentro do teste.
 
-- [ ] **Passo 2: rodar e ver falhar (de forma determinística)**
+- [x] **Passo 2: rodar e ver falhar (de forma determinística)**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
@@ -263,7 +263,7 @@ ReferenceError: renderClientDocumentsList is not defined`
 (`Timeout._onTimeout` no fonte concatenado). É exatamente a falha intermitente do
 baseline (2 em 5), agora garantida a cada execução.
 
-- [ ] **Passo 3: stubar as duas funções fora do grupo**
+- [x] **Passo 3: stubar as duas funções fora do grupo**
 
 No corpo do mesmo `it`, antes de `mod.submitDriveFolderLink('cli-1')`:
 
@@ -274,13 +274,13 @@ No corpo do mesmo `it`, antes de `mod.submitDriveFolderLink('cli-1')`:
     global.renderAttachmentList = () => {};
 ```
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: PASS — 21 testes, **exit 0**, nenhum Unhandled Error.
 
-- [ ] **Passo 5: commitar**
+- [x] **Passo 5: commitar**
 
 ```bash
 git add tests/drive-folder-url.test.js
@@ -309,7 +309,7 @@ vaza entre describes).
 - Nenhuma mudança de código de produto. Padrão copiado de
   `tests/milvus-client-token.test.js:49-59`.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 No fim do `tests/drive-folder-url.test.js` (depois de todos os describes que
 atribuem global), um describe de higiene. Acima dele, no topo do arquivo (logo
@@ -346,7 +346,7 @@ describe('higiene dos globais', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
@@ -354,14 +354,14 @@ Esperado: FAIL no teste de higiene — `isCurrentAdmin` (e provavelmente
 `document`, `saveClient`, `openModal`, e os stubs `renderClientDocumentsList`/
 `renderAttachmentList` da Tarefa 2) ainda está atribuído pelo describe anterior.
 
-- [ ] **Passo 3: o `afterEach` de arquivo**
+- [x] **Passo 3: o `afterEach` de arquivo**
 
 O snapshot + `afterEach` do Passo 1 **já é a correção**: basta mantê-los no
 lugar. Se algum teste existente passar a falhar porque dependia do vazamento de
 outro describe, mover a atribuição que ele usava para o `beforeEach`/`it` dele
 próprio — nunca retirar a devolução.
 
-- [ ] **Passo 4: rodar o arquivo inteiro e depois a suíte**
+- [x] **Passo 4: rodar o arquivo inteiro e depois a suíte**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
@@ -373,7 +373,7 @@ Esperado: PASS, 0 falhas. Atenção ao primeiro vermelho aqui: se um teste de
 outro arquivo enxergava `isCurrentAdmin`/`document` vazados deste, o conserto é
 no arquivo que faltou declarar o próprio global, não aqui.
 
-- [ ] **Passo 5: commitar**
+- [x] **Passo 5: commitar**
 
 ```bash
 git add tests/drive-folder-url.test.js
@@ -398,7 +398,7 @@ o vazamento sobrevivia entre describes e o último a escrever vencia a suíte.
 
 - Nenhuma. Só texto de título.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 No `tests/drive-folder-url.test.js`, junto da guarda de fonte existente
 (linha 94):
@@ -416,14 +416,14 @@ describe('título da seção da pasta', () => {
 **Copiar o literal `🗂️` (com seletor de apresentação) do plano para os dois
 lugares** — teste e fonte têm de ser byte a byte o mesmo, senão o teste falha.
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: FAIL — `expect(src).toContain('🗂️ Pasta no Drive')` recebeu o texto
 com `📁`.
 
-- [ ] **Passo 3: trocar o título**
+- [x] **Passo 3: trocar o título**
 
 Em `js/clients-ficha.js:780`:
 
@@ -435,13 +435,13 @@ Só o cabeçalho da seção: o botão "📁 Abrir pasta no Drive" e o modal
 "📁 Vincular pasta do Drive" (em `js/clients-form.js`) ficam como estão — o
 choque apontado foi entre os dois títulos da mesma aba.
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rodar: `npx vitest run tests/drive-folder-url.test.js`
 
 Esperado: PASS — 23 testes.
 
-- [ ] **Passo 5: commitar**
+- [x] **Passo 5: commitar**
 
 ```bash
 git add js/clients-ficha.js tests/drive-folder-url.test.js
@@ -460,20 +460,20 @@ git commit -m "fix(cliente): seção da pasta usa 🗂️ para não repetir o da
 
 Nenhuma mudança de código — não há teste a escrever (edição de documentação).
 
-- [ ] **Passo 1: marcar as caixas**
+- [x] **Passo 1: marcar as caixas**
 
 Substituir **todas** as `- [ ]` por `- [x]` no arquivo (34 ocorrências: passos
 das Tarefas 1–4 e critérios de aceite 1–8 — tudo foi executado e mergeado no
 PR #58).
 
-- [ ] **Passo 2: corrigir a contagem**
+- [x] **Passo 2: corrigir a contagem**
 
 Linha 232: `a contagem de arquivos sobe de 103 para 104` →
 `a contagem de arquivos sobe de 101 para 102` (o número real registrado em
 `.godmode/runs/pasta-drive-cliente/progress.md:19`; o plano foi escrito sobre
 outra branch).
 
-- [ ] **Passo 3: verificar**
+- [x] **Passo 3: verificar**
 
 Rodar: `Select-String -Path docs/plans/2026-10-27-pasta-drive-cliente.md -Pattern '- \[ \]'`
 
@@ -483,7 +483,7 @@ Rodar: `Select-String -Path docs/plans/2026-10-27-pasta-drive-cliente.md -Patter
 
 Esperado: sem saída.
 
-- [ ] **Passo 4: commitar**
+- [x] **Passo 4: commitar**
 
 ```bash
 git add docs/plans/2026-10-27-pasta-drive-cliente.md
@@ -496,7 +496,7 @@ git commit -m "docs(plano): caixas marcadas e contagem real dos testes da pasta"
 
 **Arquivos:** nenhum novo.
 
-- [ ] **Passo 1: os três portões**
+- [x] **Passo 1: os três portões**
 
 Rodar: `npm test && npm run lint && node tools/build-assets.js --check`
 
@@ -504,7 +504,7 @@ Esperado: PASS com **0 falhas** (não fixar contagem de arquivos — ela muda a
 cada PR que entra na main, foi a lição do plano anterior); lint sem nenhuma
 saída, exit 0; `✅ build-assets (check): 69 js, 1 css`.
 
-- [ ] **Passo 2: push e PR**
+- [x] **Passo 2: push e PR**
 
 ```bash
 git push -u origin fix/cliente-pasta-menores
@@ -519,7 +519,7 @@ Postgres identifica o admin); lembrete de que a migration
 `068_clients_drive_folder.sql` é aplicada à mão no SQL Editor (e a branch
 `feat/csat-email` tem outra `068` — renumerar antes que as duas cheguem ao banco).
 
-- [ ] **Passo 3: CI verde**
+- [x] **Passo 3: CI verde**
 
 Rodar: `gh pr checks`
 
@@ -529,13 +529,13 @@ Esperado: `test` SUCCESS (o resto é Vercel/Supabase, mesmo padrão do PR #58).
 
 ## Critérios de aceite
 
-- [ ] 1. URL sem esquema, host em maiúsculas e forma `open?id=` vinculam; a caixa do ID sobrevive ao remonte.
-- [ ] 2. `/file/d/`, `docs.google.com`, aspa/espaço e ID de 14 chars continuam recusados.
-- [ ] 3. O timer de 20 ms do `viewClient` não derruba mais o run: `npx vitest run tests/drive-folder-url.test.js` sai com exit 0, sem Unhandled Error, em toda execução.
-- [ ] 4. Nenhum global atribuído pelos testes sobrevive ao teste (teste de higiene verde).
-- [ ] 5. Cabeçalho da seção da pasta é `🗂️`; o das Anexos segue `📁`.
-- [ ] 6. Plano original sem caixa aberta e sem a contagem 103→104.
-- [ ] 7. `npm test` 0 falhas, `npm run lint` exit 0, `build-assets --check` ok.
+- [x] 1. URL sem esquema, host em maiúsculas e forma `open?id=` vinculam; a caixa do ID sobrevive ao remonte.
+- [x] 2. `/file/d/`, `docs.google.com`, aspa/espaço e ID de 14 chars continuam recusados.
+- [x] 3. O timer de 20 ms do `viewClient` não derruba mais o run: `npx vitest run tests/drive-folder-url.test.js` sai com exit 0, sem Unhandled Error, em toda execução.
+- [x] 4. Nenhum global atribuído pelos testes sobrevive ao teste (teste de higiene verde).
+- [x] 5. Cabeçalho da seção da pasta é `🗂️`; o das Anexos segue `📁`.
+- [x] 6. Plano original sem caixa aberta e sem a contagem 103→104.
+- [x] 7. `npm test` 0 falhas, `npm run lint` exit 0, `build-assets --check` ok.
 
 ## Fora de escopo
 
