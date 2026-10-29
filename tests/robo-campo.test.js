@@ -146,6 +146,37 @@ describe('triagem de e-mail', () => {
   it('domínio de e-mail grátis não casa cliente nenhum', () => {
     expect(clienteDoEmail(clientes, { ...email, de: 'alguem@gmail.com', assunto: 'oi' })).toBeNull();
   });
+  it('endereço aprendido na caixa casa mesmo vindo de Gmail', () => {
+    const aprendidos = [{ remetente: 'alguem@gmail.com', tipo: 'endereco', client_id: 'C2' }];
+    expect(clienteDoEmail(clientes, { ...email, de: 'Alguém <Alguem@Gmail.com>', assunto: 'oi' }, aprendidos).id).toBe('C2');
+  });
+  it('endereço aprendido não vaza para outro remetente do mesmo provedor', () => {
+    const aprendidos = [{ remetente: 'alguem@gmail.com', tipo: 'endereco', client_id: 'C2' }];
+    expect(clienteDoEmail(clientes, { ...email, de: 'outro@gmail.com', assunto: 'oi' }, aprendidos)).toBeNull();
+  });
+  it('domínio aprendido casa também em subdomínio', () => {
+    const aprendidos = [{ remetente: 'acme.ind.br', tipo: 'dominio', client_id: 'C2' }];
+    expect(clienteDoEmail(clientes, { ...email, de: 'ti@filial.acme.ind.br', assunto: 'oi' }, aprendidos).id).toBe('C2');
+  });
+  it('linha de domínio público nunca casa: gmail.com como domínio seria todo mundo', () => {
+    const aprendidos = [{ remetente: 'gmail.com', tipo: 'dominio', client_id: 'C2' }];
+    expect(clienteDoEmail(clientes, { ...email, de: 'qualquer@gmail.com', assunto: 'oi' }, aprendidos)).toBeNull();
+  });
+  it('aprendido vence o domínio da ficha', () => {
+    const aprendidos = [{ remetente: 'marcia@filial.paoquente.com.br', tipo: 'endereco', client_id: 'C2' }];
+    expect(clienteDoEmail(clientes, email, aprendidos).id).toBe('C2');
+  });
+  it('dois vínculos para o mesmo remetente: vale o mais recente', () => {
+    const aprendidos = [
+      { remetente: 'paoquente.com.br', tipo: 'dominio', client_id: 'C2', updated_at: '2026-10-01T00:00:00Z' },
+      { remetente: 'paoquente.com.br', tipo: 'dominio', client_id: 'C3', updated_at: '2026-10-20T00:00:00Z' },
+    ];
+    expect(clienteDoEmail(clientes, email, aprendidos).id).toBe('C3');
+  });
+  it('vínculo para cliente que não existe mais cai para a ficha', () => {
+    const aprendidos = [{ remetente: 'paoquente.com.br', tipo: 'dominio', client_id: 'C-apagado' }];
+    expect(clienteDoEmail(clientes, email, aprendidos).id).toBe('C1');
+  });
   it('assunto perde os Re:/Enc: e o remetente dá o solicitante', () => {
     expect(assuntoLimpo('Re: Enc: impressora parada')).toBe('impressora parada');
     expect(nomeDoRemetente(email.de)).toBe('Márcia Souza');

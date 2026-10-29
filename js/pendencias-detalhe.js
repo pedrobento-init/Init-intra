@@ -710,7 +710,7 @@ function submitPendenciaForm(e, id) {
     // se a pessoa desistisse no meio. O id da entrada vem do hidden: sem ele
     // (formulário comum), a chamada é um no-op.
     if (isNew) {
-      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || '')); }
+      try { if (typeof emailTriagemMarcarAberta === 'function') emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || ''), data.clientId); }
       catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:etr-marcar'); }
     }
     showToast(id?'Pendência atualizada!':'Pendência criada!', 'success');

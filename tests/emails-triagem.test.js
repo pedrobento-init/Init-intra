@@ -14,6 +14,7 @@ let lista = [];
 let toasts = [];
 let aberturas = [];
 let undoCb = null;
+let clientes = [];
 
 const sandbox = {
   console,
@@ -30,6 +31,7 @@ const sandbox = {
   showUndoToast: (_m, cb) => { undoCb = cb; },
   escapeHtml: (s) => String(s == null ? '' : s),
   formatDateTime: (s) => s,
+  getClientById: (id) => clientes.find((c) => c.id === id) || null,
 };
 sandbox.globalThis = sandbox;
 sandbox.window.window = sandbox.window;
@@ -59,7 +61,7 @@ const entrada = (over = {}) => Object.assign({
   updatedAt: '2026-10-26T12:00:00.000Z',
 }, over);
 
-beforeEach(() => { lista = []; toasts = []; aberturas = []; undoCb = null; });
+beforeEach(() => { lista = []; toasts = []; aberturas = []; undoCb = null; clientes = []; });
 
 describe('abrir o formulário a partir da caixa', () => {
   it('entrada já tratada não abre nada: card velho não vira segundo chamado', () => {
@@ -144,7 +146,7 @@ describe('o formulário carrega e persiste o que veio do e-mail', () => {
 
   it('o id da entrada viaja no formulário e chega ao marcar', () => {
     expect(detalhe).toContain("['etrEntrada', p.etrEntrada]");
-    expect(detalhe).toContain("emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || ''))");
+    expect(detalhe).toContain("emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || ''), data.clientId)");
   });
 });
 
@@ -177,5 +179,30 @@ describe('o robô grava a entrada sem reprocessar para sempre', () => {
     const trecho = robo.slice(robo.indexOf('async function guardarEntrada'), robo.indexOf('async function triagem'));
     expect(trecho).not.toContain('avisos_enviados');
     expect(trecho).toContain('console.error');
+  });
+});
+
+describe('aprender o remetente ao vincular cliente', () => {
+  it('Gmail aprende o endereço inteiro, nunca o domínio', () => {
+    clientes = [{ id: 'C1', team: 'init' }];
+    const r = sandbox._emailTriagemAprender('Márcia <Marcia.Prado@Gmail.com>', 'C1');
+    expect(r.tipo).toBe('endereco');
+    expect(r.remetente).toBe('marcia.prado@gmail.com');
+  });
+  it('endereço corporativo aprende o domínio', () => {
+    clientes = [{ id: 'C1', team: 'init' }];
+    const r = sandbox._emailTriagemAprender('Márcia Prado <marcia@acme.com.br>', 'C1');
+    expect(r.tipo).toBe('dominio');
+    expect(r.remetente).toBe('acme.com.br');
+  });
+  it('a equipe vem do cliente, não de quem vinculou: a RLS filtra por ela', () => {
+    clientes = [{ id: 'C2', team: 'mam' }];
+    const r = sandbox._emailTriagemAprender('ti@acme.com.br', 'C2');
+    expect(r.team).toBe('mam');
+    expect(r.id).toBe('mam|acme.com.br');
+  });
+  it('sem cliente não aprende nada', () => {
+    expect(sandbox._emailTriagemAprender('ti@acme.com.br', 'C-sumiu')).toBeNull();
+    expect(sandbox._emailTriagemAprender('ti@acme.com.br', '')).toBeNull();
   });
 });
