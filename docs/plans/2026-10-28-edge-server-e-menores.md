@@ -49,7 +49,8 @@ cada uma (`x-agenda-secret`, `x-cron-secret`, token na query) **fica como está*
 - `supabase/config.toml:39-48` — as quatro com `verify_jwt = false`.
 - `supabase/functions/ia-levar/index.ts:25-26` — forma exata dos imports.
 - `tests/edge-functions-guard.test.js:36-101` — `authMode` e `verify_jwt`.
-- `.godmode/reviews/2026-10-27-pr59-drive-menores.md:85-107` — os sete menores.
+- Review do PR #59 (os sete menores): resumo no cabeçalho da Tarefa 5 abaixo.
+  O relatório completo vivia em `.godmode/reviews/`, que não é versionado.
 - `tests/drive-folder-url.test.js` — estado atual dos testes citados.
 
 ## Mapa de arquivos
@@ -57,6 +58,8 @@ cada uma (`x-agenda-secret`, `x-cron-secret`, token na query) **fica como está*
 | Arquivo | Ação | Responsabilidade |
 | --- | --- | --- |
 | `tests/edge-functions-server.test.js` | Criar | Trava o padrão novo nas quatro functions, uma linha por tarefa |
+| `tests/edge-functions-secret-auth.test.js` | Criar | Contrato externo: 405/401/404/400/200 das quatro (review, Importante 2) |
+| `tests/helpers/edge-harness.js` | Modificar | Sai o stub de `serve()`, que ficou morto com a migração |
 | `supabase/functions/agenda-ics/index.ts` | Modificar | Entrypoint + `ctx.supabaseAdmin` |
 | `supabase/functions/avisos-prazo/index.ts` | Modificar | Idem |
 | `supabase/functions/google-agenda/index.ts` | Modificar | Idem |
@@ -266,23 +269,43 @@ Esperado: PASS.
 
 ### Tarefa 6: portões e PR
 
-- [ ] **Passo 1: suíte completa**
+- [x] **Passo 1: suíte completa**
 
 Run: `npm test`
-Esperado: 0 falhas.
+Resultado: 1166 passam, 36 pulados; 2 suítes (`rls`, `client-secrets`) estouram
+o hook de 10 s do PGlite **nesta máquina** — passam isoladas e em par (36/36 em
+4,7 s) e o mesmo acontece na `main` sem estas mudanças. Não é o diff.
 
-- [ ] **Passo 2: lint**
+- [x] **Passo 2: lint**
 
-Run: `npm run lint`
-Esperado: exit 0.
+Run: `npm run lint` → exit 0.
 
-- [ ] **Passo 3: build**
+- [x] **Passo 3: build**
 
-Run: `node tools/build-assets.js --check`
-Esperado: exit 0 (aviso não-fatal de `js/config.js` ausente).
+Run: `node tools/build-assets.js --check` → exit 0 (aviso não-fatal de
+`js/config.js` ausente).
 
-- [ ] **Passo 4: abrir PR**
+- [x] **Passo 4: abrir PR**
 
 Corpo com: as quatro functions migradas, o que **não** mudou (auth própria,
 `verify_jwt = false`), os menores fechados, o menor 5 adiado com o motivo, e o
 lembrete de que a prova é o deploy (`supabase functions deploy <nome> --no-verify-jwt`).
+
+---
+
+### Revisão fresca da branch
+
+Revisor: subagente `code-reviewer`, sem contexto da execução, faixa
+`3e078e0..91d1766`. Veredito: "depois de correções" — nenhum Crítico.
+
+Fechados nesta branch: guarda passa a exigir `ctx.supabaseAdmin` e a proibir
+`Deno.serve` (Importante 1); `tests/edge-functions-secret-auth.test.js` cobre
+405/401/404/400/200 das quatro e a ordem do segredo antes do admin
+(Importante 2); instrução mutilada do plano anterior, "70 arquivos" na fonte,
+comentário e stub morto do harness, e a espiã com os argumentos certos
+(Menores 3, 4, 5, 7); Tarefa 6 registrada (Menor 9).
+
+Recusados, com motivo: helper `fnDir`/`fonte` repetido em dois testes (Menor 6)
+— são quatro linhas de `readFileSync` e extrair um módulo para isso é mais
+indireção que o problema; corpos de commit (Menor 8) — reescrever seis commits
+locais não muda o código e o "por quê" fica no corpo deste PR e no desta seção.

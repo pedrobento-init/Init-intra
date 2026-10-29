@@ -16,7 +16,7 @@ botão de abrir na aba Documentos, ao lado da planilha. Vincular e remover são 
 
 ## Restrições globais
 
-- `js/` é **modo script**: 70 arquivos num escopo global único. Antes de criar nome global,
+- `js/` é **modo script**: 69 arquivos num escopo global único. Antes de criar nome global,
   conferir que não existe. Os nomes deste plano foram conferidos e hoje não aparecem em nenhum
   arquivo: `parseDriveFolderId`, `driveFolderUrl`, `_canManageClientDrive`, `saveDriveFolderLink`,
   `removeDriveFolderConfirm`, `openDriveFolderPrompt`, `renderClientDriveSection`.

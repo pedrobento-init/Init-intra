@@ -462,7 +462,7 @@ Nenhuma mudança de código — não há teste a escrever (edição de documenta
 
 - [x] **Passo 1: marcar as caixas**
 
-Substituir **todas** as `- [x]` por `- [x]` no arquivo (34 ocorrências: passos
+Substituir **todas** as `- [ ]` por `- [x]` no arquivo (34 ocorrências: passos
 das Tarefas 1–4 e critérios de aceite 1–8 — tudo foi executado e mergeado no
 PR #58).
 

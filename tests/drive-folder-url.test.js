@@ -264,7 +264,9 @@ describe('submitDriveFolderLink reabre a ficha', () => {
     // o disparo acontece sempre dentro do teste.
     await new Promise((r) => setTimeout(r, 30));
     expect(titulo).toBe('ACME');
-    expect(docs).toHaveBeenCalled();
+    // Os argumentos são os do setTimeout de clients-ficha.js:786: provam que o
+    // timer redesenhou a seção certa do cliente certo.
+    expect(docs).toHaveBeenCalledWith('cli-1', 'cliDocumentsList');
   });
 });
 

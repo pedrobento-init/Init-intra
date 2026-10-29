@@ -17,5 +17,32 @@ describe('functions no padrão @supabase/server', () => {
     expect(src).toMatch(/withSupabase\(\s*\{\s*auth:\s*["']none["']\s*\}/);
     expect(src).not.toMatch(/deno\.land\/std/);
     expect(src).not.toMatch(/createClient\(\s*SUPABASE_URL/);
+    // Sem estas duas, uma volta parcial ao legado passa: `Deno.serve` com o
+    // client novo por dentro, ou o wrapper sem usar o admin que ele entrega.
+    expect(src).not.toMatch(/\bDeno\.serve\b/);
+    expect(src).toMatch(/\bctx\.supabaseAdmin\b/);
+  });
+
+  // A ordem é o que separa "autentica" de "autentica depois de consultar".
+  // No padrão antigo o guard estrutural conferia isso linha a linha; aqui a
+  // checagem é dentro do handler, então a posição relativa ainda importa: o
+  // admin nem pode ser referenciado antes do segredo.
+  it.each(['avisos-prazo', 'google-agenda', 'robo'])(
+    '%s checa o segredo antes de tocar no admin',
+    (nome) => {
+      const src = fonte(nome);
+      const inicio = src.indexOf('async function handle');
+      expect(inicio).toBeGreaterThan(-1);
+      const corpo = src.slice(inicio);
+      expect(corpo.indexOf('safeEqual(')).toBeGreaterThan(-1);
+      expect(corpo.indexOf('safeEqual(')).toBeLessThan(corpo.indexOf('ctx.supabaseAdmin'));
+    }
+  );
+
+  it('agenda-ics valida o token antes de tocar no admin', () => {
+    const src = fonte('agenda-ics');
+    const corpo = src.slice(src.indexOf('async function handle'));
+    expect(corpo.indexOf('searchParams.get("t")')).toBeGreaterThan(-1);
+    expect(corpo.indexOf('searchParams.get("t")')).toBeLessThan(corpo.indexOf('ctx.supabaseAdmin'));
   });
 });
