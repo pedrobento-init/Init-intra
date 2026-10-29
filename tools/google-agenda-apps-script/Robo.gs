@@ -416,6 +416,8 @@ function roboPastas() {
     ' | ambíguas: ' + ambiguas.length + ' | órfãs: ' + orfas.length + (erros.length ? ' | erros: ' + erros.length : ''));
   if (ambiguas.length) Logger.log('Ambíguas: ' + ambiguas.slice(0, 50).join('; '));
   if (orfas.length) Logger.log('Órfãs na raiz: ' + orfas.slice(0, 50).join('; '));
+  // Sem a mensagem no log, quem roda o robô só vê "erros: 1" e não sabe o que arrumar.
+  if (erros.length) Logger.log('Erros: ' + erros.slice(0, 50).join('; '));
 }
 
 function temPai_(f, id) {

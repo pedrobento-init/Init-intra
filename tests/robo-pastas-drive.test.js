@@ -170,6 +170,11 @@ describe('roboPastas no Drive', () => {
     expect(r.orfas).toEqual([]);
   });
 
+  it('erro sai no log com a mensagem, não só na contagem', () => {
+    rodar({}, { rootId: '' });
+    expect(logs).toContain('Erros: CLIENTES_ROOT_ID vazio: nada criado, movido nem listado');
+  });
+
   it('CLIENTES_ROOT_ID que não abre: registra o erro e não cria nada', () => {
     const total = drive.itens.size;
     const r = rodar({ buscar: [{ client_id: 'c1', nome: 'Nova' }] }, { rootId: 'nao-existe' });
