@@ -75,7 +75,7 @@ cada uma (`x-agenda-secret`, `x-cron-secret`, token na query) **fica como está*
 **Interfaces:**
 - Produz: `MIGRADAS` no teste (array de nomes) — as tarefas 2–4 acrescentam nomes.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```js
 import { describe, it, expect } from 'vitest';
@@ -101,12 +101,12 @@ describe('functions no padrão @supabase/server', () => {
 });
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js`
 Esperado: FAIL — `agenda-ics` ainda tem `deno.land/std` e `createClient(SUPABASE_URL`.
 
-- [ ] **Passo 3: migrar `agenda-ics`**
+- [x] **Passo 3: migrar `agenda-ics`**
 
 Trocar os imports por `import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";`,
 remover `SUPABASE_URL`/`SERVICE_ROLE_KEY`, virar o corpo de `serve(...)` em
@@ -116,12 +116,12 @@ remover `SUPABASE_URL`/`SERVICE_ROLE_KEY`, virar o corpo de `serve(...)` em
 Manter: método GET/HEAD, validação do token na query, os 404 secos e os headers
 de `text/calendar`.
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js tests/edge-functions-guard.test.js`
 Esperado: PASS nos dois arquivos.
 
-- [ ] **Passo 5: commit**
+- [x] **Passo 5: commit**
 
 `refactor(edge): agenda-ics no @supabase/server com auth none`
 
@@ -133,23 +133,23 @@ Esperado: PASS nos dois arquivos.
 - Modificar: `tests/edge-functions-server.test.js` (acrescentar `'avisos-prazo'` em `MIGRADAS`)
 - Modificar: `supabase/functions/avisos-prazo/index.ts:21-22, 40-41, 59-68, 167`
 
-- [ ] **Passo 1: acrescentar `'avisos-prazo'` em `MIGRADAS` e rodar**
+- [x] **Passo 1: acrescentar `'avisos-prazo'` em `MIGRADAS` e rodar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js`
 Esperado: FAIL só para `avisos-prazo`.
 
-- [ ] **Passo 2: migrar**
+- [x] **Passo 2: migrar**
 
 Mesma transformação. O `safeEqual` do `x-cron-secret` continua sendo a primeira
 coisa do handler (antes de qualquer query); o guard de env fica só com
 `GMAIL_USER`/`GMAIL_APP_PASSWORD`. `const db = ctx.supabaseAdmin;`.
 
-- [ ] **Passo 3: rodar e ver passar**
+- [x] **Passo 3: rodar e ver passar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js tests/edge-functions-guard.test.js`
 Esperado: PASS.
 
-- [ ] **Passo 4: commit**
+- [x] **Passo 4: commit**
 
 `refactor(edge): avisos-prazo no @supabase/server com auth none`
 
@@ -161,23 +161,23 @@ Esperado: PASS.
 - Modificar: `tests/edge-functions-server.test.js`
 - Modificar: `supabase/functions/google-agenda/index.ts:27-34, 242-258`
 
-- [ ] **Passo 1: acrescentar `'google-agenda'` em `MIGRADAS` e rodar**
+- [x] **Passo 1: acrescentar `'google-agenda'` em `MIGRADAS` e rodar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js`
 Esperado: FAIL só para `google-agenda`.
 
-- [ ] **Passo 2: migrar**
+- [x] **Passo 2: migrar**
 
 Mesma transformação. `begin`/`finish` continuam recebendo `SupabaseClient` —
 importar o tipo de `npm:@supabase/supabase-js@2` (como `ia-levar`). Manter o
 `safeEqual` do `x-agenda-secret`, o 400 de JSON inválido e o 500 genérico.
 
-- [ ] **Passo 3: rodar e ver passar**
+- [x] **Passo 3: rodar e ver passar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js tests/edge-functions-guard.test.js`
 Esperado: PASS.
 
-- [ ] **Passo 4: commit**
+- [x] **Passo 4: commit**
 
 `refactor(edge): google-agenda no @supabase/server com auth none`
 
@@ -189,12 +189,12 @@ Esperado: PASS.
 - Modificar: `tests/edge-functions-server.test.js`
 - Modificar: `supabase/functions/robo/index.ts:40-42, 56-58, 500-525`
 
-- [ ] **Passo 1: acrescentar `'robo'` em `MIGRADAS` e rodar**
+- [x] **Passo 1: acrescentar `'robo'` em `MIGRADAS` e rodar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js`
 Esperado: FAIL só para `robo`.
 
-- [ ] **Passo 2: migrar**
+- [x] **Passo 2: migrar**
 
 Mesma transformação. As nove ações do `switch` (`vencimentos`, `dominios`,
 `resumo`, `indicadores`, `backup`, `backups`, `triagem`, `pastas`,
@@ -202,12 +202,12 @@ Mesma transformação. As nove ações do `switch` (`vencimentos`, `dominios`,
 `ctx.supabaseAdmin`. Manter `x-agenda-secret` com `safeEqual`, o 400 de JSON
 inválido e o log `robo: <ação> <mensagem>`.
 
-- [ ] **Passo 3: rodar e ver passar**
+- [x] **Passo 3: rodar e ver passar**
 
 Run: `npx vitest run tests/edge-functions-server.test.js tests/edge-functions-guard.test.js`
 Esperado: PASS, 4 nomes.
 
-- [ ] **Passo 4: commit**
+- [x] **Passo 4: commit**
 
 `refactor(edge): robo no @supabase/server com auth none`
 
@@ -224,13 +224,13 @@ Esperado: PASS, 4 nomes.
 O menor 5 (higiene fora da lista fechada) fica de fora: a varredura de
 `globalThis` apagaria chaves do próprio Vitest; o risco é maior que o ganho.
 
-- [ ] **Passo 1: menor 1 — a espiã prova que o timer disparou**
+- [x] **Passo 1: menor 1 — a espiã prova que o timer disparou**
 
 Importar `vi` e trocar os stubs por `vi.fn()`, afirmando
 `expect(docs).toHaveBeenCalled()`. Sem isso, subir o delay de 20 ms para 40–50 ms
 devolve o flake silencioso.
 
-- [ ] **Passo 2: menor 2 — tail hostil depois de `?`**
+- [x] **Passo 2: menor 2 — tail hostil depois de `?`**
 
 ```js
 it('descarta o tail depois de ?/# e devolve só o ID', () => {
@@ -239,26 +239,26 @@ it('descarta o tail depois de ?/# e devolve só o ID', () => {
 });
 ```
 
-- [ ] **Passo 3: menor 3 — comentário do snapshot**
+- [x] **Passo 3: menor 3 — comentário do snapshot**
 
 Trocar o texto das linhas 7–10 por *por que* o snapshot é na carga do módulo
 ("em `beforeEach` ele capturaria o que o teste anterior deixou").
 
-- [ ] **Passo 4: menor 4 — guarda do emoji deixa de ser frouxa**
+- [x] **Passo 4: menor 4 — guarda do emoji deixa de ser frouxa**
 
 Acrescentar `expect(src).not.toContain('📁 Pasta no Drive');` ao teste do título.
 
-- [ ] **Passo 5: menores 6 e 7 — plano**
+- [x] **Passo 5: menores 6 e 7 — plano**
 
 Marcar todas as caixas de `2026-10-27-pasta-drive-menores.md` como `[x]` e
 trocar "70 arquivos" por "69 arquivos" (linhas 40 e 49).
 
-- [ ] **Passo 6: rodar e ver passar**
+- [x] **Passo 6: rodar e ver passar**
 
 Run: `npx vitest run tests/drive-folder-url.test.js tests/edge-functions-server.test.js tests/edge-functions-guard.test.js`
 Esperado: PASS.
 
-- [ ] **Passo 7: commit**
+- [x] **Passo 7: commit**
 
 `test(drive): fecha os menores do review do PR #59`
 

@@ -2,12 +2,12 @@ import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Snapshot antes de qualquer teste: o que é devolvido é exatamente o que
-// existia. Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
-// O afterEach que devolve vem depois, no passo verde: escrito junto, o teste de
-// higiene nasce verde e não prova nada.
+// Snapshot na carga do módulo, antes de qualquer teste: o valor guardado é o
+// que existia fora do arquivo. Em beforeEach ele capturaria o que o teste
+// anterior deixou no global, e a limpeza passaria a restaurar lixo.
+// Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
 const _globalKeys = [
   'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
   'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
@@ -93,6 +93,13 @@ describe('driveFolderUrl', () => {
     expect(mod.driveFolderUrl('https://example.com/x')).toBe('');
     expect(mod.driveFolderUrl('')).toBe('');
   });
+
+  // O tail é o vetor do SEC-18: o que vier depois de ? ou # não pode chegar ao
+  // href. Como a URL é remontada pelo ID, o teste prova o descarte.
+  it('descarta o tail depois de ?/# e devolve só o ID', () => {
+    expect(mod.driveFolderUrl(BASE + ID + '?x="><img src=x>')).toBe(BASE + ID);
+    expect(mod.driveFolderUrl(BASE + ID + '#"><img src=x>')).toBe(BASE + ID);
+  });
 });
 
 describe('saveDriveFolderLink', () => {
@@ -152,6 +159,8 @@ describe('título da seção da pasta', () => {
     const src = partsSource('clients').replace(/\r\n/g, '\n');
     expect(src).toContain('🗂️ Pasta no Drive');
     expect(src).toContain('📁 Anexos do Cliente');
+    // A guarda frouxa deixava o 📁 voltar em qualquer outro ponto do arquivo.
+    expect(src).not.toContain('📁 Pasta no Drive');
   });
 });
 
@@ -243,8 +252,11 @@ describe('submitDriveFolderLink reabre a ficha', () => {
     global.getPendenciasByClient = () => [];
     // Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
     // fora do grupo 'clients' que o teste compila: sem o stub, ReferenceError.
-    global.renderClientDocumentsList = () => {};
-    global.renderAttachmentList = () => {};
+    // São espiãs porque o timer é o que prova que a ficha foi redesenhada —
+    // um stub vazio deixaria o setTimeout quebrado passar despercebido.
+    const docs = vi.fn();
+    global.renderClientDocumentsList = docs;
+    global.renderAttachmentList = vi.fn();
     mod.submitDriveFolderLink('cli-1');
     // O viewClient agenda o setTimeout de 20 ms de clients-ficha.js:786, que
     // chama quatro renderizadores. Sem este await o timer disputa com a
@@ -252,6 +264,7 @@ describe('submitDriveFolderLink reabre a ficha', () => {
     // o disparo acontece sempre dentro do teste.
     await new Promise((r) => setTimeout(r, 30));
     expect(titulo).toBe('ACME');
+    expect(docs).toHaveBeenCalled();
   });
 });
 
