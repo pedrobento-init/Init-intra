@@ -290,6 +290,7 @@ Run: `node tools/build-assets.js --check` → exit 0 (aviso não-fatal de
 Corpo com: as quatro functions migradas, o que **não** mudou (auth própria,
 `verify_jwt = false`), os menores fechados, o menor 5 adiado com o motivo, e o
 lembrete de que a prova é o deploy (`supabase functions deploy <nome> --no-verify-jwt`).
+Aberto em https://github.com/pedrobento-init/Init-intra/pull/64.
 
 ---
 
