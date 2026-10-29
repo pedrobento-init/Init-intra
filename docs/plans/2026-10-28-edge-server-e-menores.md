@@ -300,10 +300,17 @@ Revisor: subagente `code-reviewer`, sem contexto da execução, faixa
 
 Fechados nesta branch: guarda passa a exigir `ctx.supabaseAdmin` e a proibir
 `Deno.serve` (Importante 1); `tests/edge-functions-secret-auth.test.js` cobre
-405/401/404/400/200 das quatro e a ordem do segredo antes do admin
+405/401/404/400/500/200 das quatro e a ordem do segredo antes do admin
 (Importante 2); instrução mutilada do plano anterior, "70 arquivos" na fonte,
 comentário e stub morto do harness, e a espiã com os argumentos certos
 (Menores 3, 4, 5, 7); Tarefa 6 registrada (Menor 9).
+
+Segunda passada (só os consertos): o token curto ganhou fixture própria — sem
+ela o 404 vinha do banco vazio, não da regex de formato; os 500 de `agenda-ics`,
+`google-agenda` e `robo` passaram a ser exercitados com um dublê que falha e a
+asserção de que a mensagem do banco não vaza; e o comentário do guarda
+estrutural deixou de dizer que não há teste de integração. Veredito: pronto
+para entrar.
 
 Recusados, com motivo: helper `fnDir`/`fonte` repetido em dois testes (Menor 6)
 — são quatro linhas de `readFileSync` e extrair um módulo para isso é mais

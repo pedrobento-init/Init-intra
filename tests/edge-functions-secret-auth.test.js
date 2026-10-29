@@ -36,6 +36,25 @@ const postJson = (body, headers = {}) =>
     body: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
   });
 
+/** Cliente que estoura na primeira query: exercita o catch/500 sem banco. */
+const dubleQuebrado = (env = ENV) => ({
+  env,
+  createClient: () => ({
+    from: () => {
+      throw new Error('banco fora do ar');
+    },
+  }),
+});
+
+/** 500 genérico: a mensagem do banco não pode chegar a quem chamou. */
+async function espera500Generico(handler, request) {
+  const res = await handler(request);
+  expect(res.status).toBe(500);
+  const corpo = await res.text();
+  expect(corpo).not.toContain('banco fora do ar');
+  return corpo;
+}
+
 /** Status da resposta; 0 = o handler estourou (gate deixou passar). */
 async function status(handler, request) {
   try {
@@ -51,11 +70,23 @@ describe('agenda-ics — token na query, 404 seco', () => {
     expect(await status(handler, postJson({}))).toBe(405);
   });
 
-  it('sem token, com token fora do formato e com token desconhecido: 404', async () => {
+  it('sem token e com token desconhecido: 404', async () => {
     const { handler } = await loadHandler('agenda-ics', duble());
     expect(await status(handler, req('GET'))).toBe(404);
-    expect(await status(handler, req('GET', { url: `https://fn.local/?t=curto` }))).toBe(404);
     expect(await status(handler, req('GET', { url: `https://fn.local/?t=${TOKEN}` }))).toBe(404);
+  });
+
+  // Fixture própria: sem ela, um token curto daria 404 só por não estar no
+  // banco, e apagar a regex de formato (index.ts:27) continuaria verde.
+  it('token fora do formato é recusado antes da consulta, mesmo se existir no banco', async () => {
+    const { handler } = await loadHandler(
+      'agenda-ics',
+      duble({
+        calendar_feeds: [{ operator_id: 'op-1', token: 'curto' }],
+        operators: [{ id: 'op-1', name: 'Fulano', active: true }],
+      })
+    );
+    expect(await status(handler, req('GET', { url: 'https://fn.local/?t=curto' }))).toBe(404);
   });
 
   it('operador desativado também é 404, sem revelar que o feed existe', async () => {
@@ -98,6 +129,47 @@ describe('agenda-ics — token na query, 404 seco', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/calendar');
     expect(await res.text()).toBe('');
+  });
+
+  // Feed e operador válidos, leitura das visitas falhando: é o caminho do
+  // catch de index.ts:49-52, que devolve "Erro" sem a mensagem do banco.
+  it('falha na leitura das visitas vira 500 sem detalhe', async () => {
+    const quebrado = {
+      env: ENV,
+      createClient: () => ({
+        from: (tabela) => {
+          const dado =
+            tabela === 'calendar_feeds'
+              ? { operator_id: 'op-1' }
+              : tabela === 'operators'
+                ? { id: 'op-1', name: 'Fulano', active: true }
+                : null;
+          const api = {
+            select: () => api,
+            eq: () => api,
+            is: () => api,
+            gte: () => api,
+            lte: () => api,
+            limit: () => api,
+            update: () => api,
+            maybeSingle: async () => ({ data: dado, error: null }),
+            then: (ok) =>
+              Promise.resolve(
+                tabela === 'visits'
+                  ? { data: null, error: { message: 'banco fora do ar' } }
+                  : { data: [], error: null }
+              ).then(ok),
+          };
+          return api;
+        },
+      }),
+    };
+    const { handler } = await loadHandler('agenda-ics', quebrado);
+    const corpo = await espera500Generico(
+      handler,
+      req('GET', { url: `https://fn.local/?t=${TOKEN}` })
+    );
+    expect(corpo).toBe('Erro');
   });
 });
 
@@ -151,6 +223,12 @@ describe('google-agenda — x-agenda-secret', () => {
     expect(await status(handler, postJson('{', SECRET))).toBe(400);
     expect(await status(handler, postJson({ action: 'nao-existe' }, SECRET))).toBe(400);
   });
+
+  it('falha do banco vira 500 sem detalhe', async () => {
+    const { handler } = await loadHandler('google-agenda', dubleQuebrado(ENV_AGENDA));
+    const corpo = await espera500Generico(handler, postJson({ action: 'begin' }, SECRET));
+    expect(corpo).toContain('Falha no servidor');
+  });
 });
 
 describe('robo — x-agenda-secret e as nove ações', () => {
@@ -172,6 +250,12 @@ describe('robo — x-agenda-secret e as nove ações', () => {
     const { handler } = await loadHandler('robo', duble({}, ENV_AGENDA));
     expect(await status(handler, postJson('{', SECRET))).toBe(400);
     expect(await status(handler, postJson({ action: 'nao-existe' }, SECRET))).toBe(400);
+  });
+
+  it('falha do banco vira 500 sem detalhe', async () => {
+    const { handler } = await loadHandler('robo', dubleQuebrado(ENV_AGENDA));
+    const corpo = await espera500Generico(handler, postJson({ action: 'vencimentos' }, SECRET));
+    expect(corpo).toContain('Falha no servidor');
   });
 
   // As ações são o contrato com o Robo.gs: se uma sair do switch, o robô que a
