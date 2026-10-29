@@ -4,7 +4,7 @@ import {
   aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
   clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
   itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
-  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069, PASTAS_CRIAR_DESDE,
+  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069, nomeDaPasta, NOME_PASTA_MAX,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
@@ -466,7 +466,7 @@ describe('pasta do Drive do cliente (069)', () => {
       { id: 'e', drive_folder_url: 'https://exemplo.com/pasta' },
     ]);
     expect(p.candidatos).toEqual([{ client_id: 'a', sheet_id: S }]);
-    expect(p.vigiar).toEqual([{ client_id: 'b', folder_id: F }]);
+    expect(p.vigiar).toEqual([{ client_id: 'b', folder_id: F, nome: '', compartilhada: false }]);
     expect(p.invalidos).toEqual(['e']);
   });
 
@@ -479,7 +479,7 @@ describe('pasta do Drive do cliente (069)', () => {
   });
 
   it('grava achado com status ok, não sobrescreve vínculo humano e ignora quem não estava no plano', async () => {
-    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }, { client_id: 'h', sheet_id: S }], vigiar: [], invalidos: [] };
+    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }, { client_id: 'h', sheet_id: S }], vigiar: [], buscar: [], invalidos: [] };
     // 'h' ganhou pasta à mão entre as duas chamadas do robô.
     const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'h', drive_folder_url: 'https://drive.google.com/drive/folders/HUMANO123456789' }, { id: 'z', drive_folder_url: null }]);
     const r = await gravarResultadoPastas(db, plano, { achados: [
@@ -492,7 +492,7 @@ describe('pasta do Drive do cliente (069)', () => {
   });
 
   it('testes viram ok / inacessivel com checked_at; status desconhecido é ignorado', async () => {
-    const plano = { candidatos: [], vigiar: [{ client_id: 'b', folder_id: F }, { client_id: 'c', folder_id: F }], invalidos: [] };
+    const plano = { candidatos: [], vigiar: [{ client_id: 'b', folder_id: F }, { client_id: 'c', folder_id: F }], buscar: [], invalidos: [] };
     const db = fakeDb([{ id: 'b' }, { id: 'c' }]);
     const r = await gravarResultadoPastas(db, plano, { testes: [
       { client_id: 'b', status: 'ok' }, { client_id: 'c', status: 'inacessivel' }, { client_id: 'c', status: 'invalido' }, { client_id: 'x', status: 'ok' },
@@ -505,7 +505,7 @@ describe('pasta do Drive do cliente (069)', () => {
   });
 
   it('sem a 069: não lança, ainda vincula a pasta e devolve a instrução', async () => {
-    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }], vigiar: [{ client_id: 'b', folder_id: F }], invalidos: ['e'] };
+    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }], vigiar: [{ client_id: 'b', folder_id: F }], buscar: [], invalidos: ['e'] };
     const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'b' }], { semColuna: true });
     expect(await marcarPastasInvalidas(db, ['e'], 'T')).toBe(AVISO_069);
     const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'a', folder_url: F }], testes: [{ client_id: 'b', status: 'ok' }] }, 'T');
@@ -518,48 +518,71 @@ describe('pasta do Drive do cliente (069)', () => {
     await expect(marcarPastasInvalidas(db, ['e'], 'T')).rejects.toThrow('permission denied');
   });
 
-  describe('criar pasta do cliente novo', () => {
-    const novo = '2026-10-28T10:00:00-03:00';
-
-    it('entra só cliente novo, sem pasta, sem planilha e com nome (aparado)', () => {
+  describe('buscar, criar e arrumar pasta (backfill e manutenção)', () => {
+    it('sem pasta e sem planilha vai a buscar, com o nome aparado — cliente antigo também', () => {
       const p = planoPastas([
-        { id: 'n', name: '  Acme Ltda  ', created_at: novo, google_sheet_url: null, drive_folder_url: null },
-        { id: 'branco', name: 'Beta', created_at: novo, google_sheet_url: '   ', drive_folder_url: '' },
+        { id: 'n', name: '  Acme Ltda  ', google_sheet_url: null, drive_folder_url: null },
+        { id: 'branco', name: 'Beta', google_sheet_url: '   ', drive_folder_url: '' },
       ]);
-      expect(p.criar).toEqual([{ client_id: 'n', nome: 'Acme Ltda' }, { client_id: 'branco', nome: 'Beta' }]);
+      expect(p.buscar).toEqual([{ client_id: 'n', nome: 'Acme Ltda' }, { client_id: 'branco', nome: 'Beta' }]);
     });
 
-    it('limite é inclusivo, com Z ou +00:00', () => {
-      expect(new Date(PASTAS_CRIAR_DESDE).toISOString()).toBe('2026-10-27T03:00:00.000Z');
-      const p = planoPastas([
-        { id: 'z', name: 'A', created_at: '2026-10-27T03:00:00Z' },
-        { id: 'o', name: 'B', created_at: '2026-10-27T03:00:00+00:00' },
-      ]);
-      expect(p.criar.map((c) => c.client_id)).toEqual(['z', 'o']);
+    it('link de planilha inválido também vai a buscar: o nome evita duplicar a pasta que exista', () => {
+      const p = planoPastas([{ id: 'inv', name: 'Gama', google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml' }]);
+      expect(p.buscar).toEqual([{ client_id: 'inv', nome: 'Gama' }]);
+      expect(p.candidatos).toEqual([]);
     });
 
-    it('cliente antigo nunca entra: pode já ter pasta no Drive sem vínculo', () => {
-      const p = planoPastas([{ id: 'v', name: 'Velho', created_at: '2026-10-26T23:59:59-03:00' }]);
-      expect(p.criar).toEqual([]);
-    });
-
-    it('fica de fora: planilha válida (vai a candidatos), link inválido, nome vazio, data nula ou inválida, já tem pasta', () => {
+    it('fica de fora de buscar: planilha válida (vai a candidatos), nome vazio, já tem pasta', () => {
       const p = planoPastas([
-        { id: 'pl', name: 'A', created_at: novo, google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit` },
-        { id: 'inv', name: 'A', created_at: novo, google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml' },
-        { id: 'vazio', name: '', created_at: novo },
-        { id: 'esp', name: '   ', created_at: novo },
-        { id: 'semnome', created_at: novo },
-        { id: 'nulo', name: 'A', created_at: null },
-        { id: 'lixo', name: 'A', created_at: 'ontem' },
-        { id: 'tem', name: 'A', created_at: novo, drive_folder_url: `https://drive.google.com/drive/folders/${F}` },
+        { id: 'pl', name: 'A', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit` },
+        { id: 'vazio', name: '' },
+        { id: 'esp', name: '   ' },
+        { id: 'semnome' },
+        { id: 'tem', name: 'B', drive_folder_url: `https://drive.google.com/drive/folders/${F}` },
       ]);
-      expect(p.criar).toEqual([]);
+      expect(p.buscar).toEqual([]);
       expect(p.candidatos).toEqual([{ client_id: 'pl', sheet_id: S }]);
     });
 
-    it('grava a pasta criada como achado, com status ok', async () => {
-      const plano = { candidatos: [], vigiar: [], invalidos: [], criar: [{ client_id: 'n', nome: 'X' }] };
+    it('nomeDaPasta troca barra, junta espaço e corta no limite', () => {
+      expect(nomeDaPasta('Acme / Filial\\Sul')).toBe('Acme - Filial-Sul');
+      expect(nomeDaPasta('  a \n\t b  ')).toBe('a b');
+      expect(nomeDaPasta(null)).toBe('');
+      expect(nomeDaPasta('x'.repeat(NOME_PASTA_MAX + 20))).toHaveLength(NOME_PASTA_MAX);
+      // O corte não pode deixar espaço no fim, que o Drive mostraria como outro nome.
+      expect(nomeDaPasta('x'.repeat(NOME_PASTA_MAX - 1) + ' y')).toBe('x'.repeat(NOME_PASTA_MAX - 1));
+    });
+
+    it('nome repetido ganha o CNPJ; sem CNPJ, o começo do id; nome único fica limpo', () => {
+      const p = planoPastas([
+        { id: 'aaaaaaaa-1111', name: 'Padaria', cnpj: ' 12.345.678/0001-90 ' },
+        { id: 'bbbbbbbb-2222', name: 'padaria  ' },
+        { id: 'cccccccc-3333', name: 'Única' },
+      ]);
+      expect(p.buscar).toEqual([
+        { client_id: 'aaaaaaaa-1111', nome: 'Padaria (12.345.678/0001-90)' },
+        { client_id: 'bbbbbbbb-2222', nome: 'padaria (bbbbbbbb)' },
+        { client_id: 'cccccccc-3333', nome: 'Única' },
+      ]);
+    });
+
+    it('vigiar leva o nome esperado; pasta de dois clientes vira compartilhada', () => {
+      const url = `https://drive.google.com/drive/folders/${F}`;
+      const p = planoPastas([
+        { id: 'a', name: 'Matriz', drive_folder_url: url },
+        { id: 'b', name: 'Filial', drive_folder_url: url },
+        { id: 'c', name: 'Só', drive_folder_url: `https://drive.google.com/drive/folders/${S}` },
+      ]);
+      expect(p.vigiar).toEqual([
+        { client_id: 'a', folder_id: F, nome: 'Matriz', compartilhada: true },
+        { client_id: 'b', folder_id: F, nome: 'Filial', compartilhada: true },
+        { client_id: 'c', folder_id: S, nome: 'Só', compartilhada: false },
+      ]);
+    });
+
+    it('grava a pasta achada ou criada para quem estava em buscar, com status ok', async () => {
+      const plano = { candidatos: [], vigiar: [], invalidos: [], buscar: [{ client_id: 'n', nome: 'X' }] };
       const db = fakeDb([{ id: 'n', drive_folder_url: null }]);
       const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'n', folder_url: F }] }, 'T');
       expect(r).toMatchObject({ gravados: 1, ignorados: 0 });
@@ -568,15 +591,15 @@ describe('pasta do Drive do cliente (069)', () => {
 
     const ler = (f) => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
 
-    it('index.ts lê nome e data e devolve criar', () => {
+    it('index.ts lê nome e CNPJ e devolve buscar', () => {
       const src = ler('supabase/functions/robo/index.ts');
-      expect(src).toContain('name, created_at');
-      expect(src).toContain('criar: plano.criar');
+      expect(src).toContain('id, name, cnpj, google_sheet_url, drive_folder_url');
+      expect(src).toContain('buscar: plano.buscar');
     });
 
-    it('Robo.gs cria na raiz configurada e não reusa pasta da lixeira', () => {
+    it('Robo.gs trabalha na raiz configurada, ignora a lixeira e lê buscar', () => {
       const src = ler('tools/google-agenda-apps-script/Robo.gs');
-      for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.criar || []']) expect(src).toContain(s);
+      for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.buscar || []']) expect(src).toContain(s);
     });
   });
 });

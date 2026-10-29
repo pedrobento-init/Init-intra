@@ -90,7 +90,7 @@ e2e/                  Testes de navegador (Playwright)
 | `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). Também por push, se configurado. |
 | `send-push` | Notificação no celular (Web Push). Só operador logado, só para operadores ativos; chaves VAPID nos secrets (migration 053). |
 | `agenda-ics` | Feed iCalendar da agenda do técnico (token secreto no link). |
-| `robo` | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores e backup no Drive (migration 059). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
+| `robo` | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores, backup no Drive (migration 059) e pasta do Drive de cada cliente: vincula, cria, renomeia e move para a raiz, sem nunca apagar (migrations 068 e 069). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `ia-relatorio` | Texto de relatório com IA. |
 | `ia-levar` | Sugere o que levar para a visita (IA). |

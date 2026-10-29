@@ -363,14 +363,26 @@ O botão só aparece com operador logado e conexão (mesma regra do relatório).
 2. No Apps Script, cole o `Robo.gs` novo (que agora inclui `roboBackupsEmail`), cole também o `appsscript.json` se você o usa (ele agora pede acesso ao Gmail), rode **`instalarRobo`** de novo e autorize.
 
 ### Instalar a pasta do Drive automática (robô da noite)
-Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está), cria a pasta do cliente novo que não tem pasta nem planilha e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
-1. Rode as migrations `068_clients_drive_folder.sql` e `069_clients_drive_folder_status.sql`.
-2. No drive compartilhado dos clientes, dê à conta que roda o robô o papel **Colaborador** (leitura não basta: ele cria pastas).
-3. No Apps Script, em **Configurações do projeto → Propriedades do script**, crie `CLIENTES_ROOT_ID` com o ID da pasta raiz dos clientes (a parte do link depois de `/folders/`).
-4. Cole o `Robo.gs` novo e rode **`instalarRobo`** de novo. Antes da primeira noite, rode **`testarPastas`**: ele mostra quantos clientes vai olhar e o nome de quem ganharia pasta, sem criar nada.
-5. Faça `supabase functions deploy robo --no-verify-jwt`.
+Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está) e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
 
-Limites da criação: só ganha pasta o cliente cadastrado a partir de 27/10/2026 (os antigos podem já ter pasta com outro nome); a pasta leva só o nome do cliente, então dois clientes com o mesmo nome dividem a mesma pasta.
+Quem não tem pasta nem planilha válida (cliente novo ou antigo, inclusive com link de planilha inválido) passa por uma busca pelo nome na raiz antes de qualquer criação:
+- **uma** pasta com o nome: o robô vincula essa pasta;
+- **nenhuma**: cria a pasta na raiz e vincula;
+- **várias**: não vincula nem cria, só registra no log ("Nome: N pastas") para alguém decidir.
+
+O nome da pasta é o do cliente, com `/` trocada por `-`, espaços juntados e no máximo 100 caracteres. Se dois clientes têm o mesmo nome, cada um ganha o CNPJ entre parênteses (sem CNPJ, o começo do id), e assim nenhum divide pasta com outro.
+
+Manutenção das pastas vinculadas: a pasta com nome diferente do esperado é renomeada, e a que está fora da raiz é movida para a raiz. A pasta que dois clientes dividem fica como está. As pastas vivas da raiz sem cliente vinculado saem no log como **órfãs**. **O robô nunca apaga nada**: órfã e caso ambíguo são só relatório. Pasta na lixeira não conta para busca nem para órfã.
+
+1. Rode as migrations `068_clients_drive_folder.sql` e `069_clients_drive_folder_status.sql`.
+2. No drive compartilhado dos clientes, dê à conta que roda o robô o papel **Gerente de conteúdo**. Leitura não basta, porque ele cria e renomeia pastas, e Colaborador não basta para mover pasta para a raiz. Essa última exigência ainda não foi conferida num drive real: se a pasta não mudar de lugar, o erro aparece no log da execução.
+3. No Apps Script, em **Configurações do projeto → Propriedades do script**, crie `CLIENTES_ROOT_ID` com o ID da pasta raiz dos clientes (a parte do link depois de `/folders/`). Sem ela, ou com um ID que não abre, o robô não cria, não move e não lista órfã; o erro vai ao log.
+4. Cole o `Robo.gs` novo e rode **`instalarRobo`** de novo. Antes da primeira noite, rode **`testarPastas`**. Ele não escreve nada no Drive nem no banco, e mostra no log:
+   - quantos clientes vai olhar;
+   - os nomes que vai buscar;
+   - as pastas que renomearia ("nome atual → nome novo");
+   - as pastas que moveria para a raiz.
+5. Faça `supabase functions deploy robo --no-verify-jwt`.
 
 ## Limites
 

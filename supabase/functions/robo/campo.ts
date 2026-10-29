@@ -554,35 +554,64 @@ function idDaPlanilha(v: unknown): string | null {
 }
 
 export type ClientePasta = {
-  id: string; name?: string | null; created_at?: string | null;
+  id: string; name?: string | null; cnpj?: string | null;
   google_sheet_url?: string | null; drive_folder_url?: string | null;
 };
 
-// Antes desta data o cliente pode já ter pasta no Drive sem vínculo; criar outra duplicaria.
-export const PASTAS_CRIAR_DESDE = "2026-10-27T00:00:00-03:00";
-const desde = new Date(PASTAS_CRIAR_DESDE).getTime();
+// O Drive aceita barra no nome, mas ela vira caminho na exportação e no Drive para desktop.
+export const NOME_PASTA_MAX = 100;
+export function nomeDaPasta(nome: unknown): string {
+  return String(nome ?? "").replace(/[/\\]/g, "-").replace(/\s+/g, " ").trim().slice(0, NOME_PASTA_MAX).trim();
+}
 
-/** O que o robô vai procurar (planilha sem pasta), vigiar (pasta já vinculada) e criar (cliente novo sem nada). */
+// Homônimo ganha o CNPJ (ou o começo do id) porque a raiz é uma só para todas
+// as equipes: dois "Padaria Sol" achariam a mesma pasta pela busca por nome.
+function nomesEsperados(clientes: ClientePasta[]) {
+  const conta = new Map<string, number>();
+  for (const c of clientes) {
+    const k = nomeDaPasta(c.name).toLowerCase();
+    if (k) conta.set(k, (conta.get(k) ?? 0) + 1);
+  }
+  const nomes = new Map<string, string>();
+  for (const c of clientes) {
+    const base = nomeDaPasta(c.name);
+    if (!base) continue;
+    const repetido = (conta.get(base.toLowerCase()) ?? 0) > 1;
+    nomes.set(c.id, repetido ? base + " (" + (String(c.cnpj ?? "").trim() || c.id.slice(0, 8)) + ")" : base);
+  }
+  return nomes;
+}
+
+/**
+ * O que o robô vai procurar (planilha sem pasta), vigiar (pasta já vinculada:
+ * confere, renomeia, move) e buscar (sem pasta nem planilha válida: acha pelo
+ * nome na raiz ou cria).
+ */
 export function planoPastas(clientes: ClientePasta[]) {
   const candidatos: { client_id: string; sheet_id: string }[] = [];
-  const vigiar: { client_id: string; folder_id: string }[] = [];
-  const criar: { client_id: string; nome: string }[] = [];
+  const vigiar: { client_id: string; folder_id: string; nome: string; compartilhada: boolean }[] = [];
+  const buscar: { client_id: string; nome: string }[] = [];
   const invalidos: string[] = [];
+  const nomes = nomesEsperados(clientes);
+  const usos = new Map<string, number>();
   for (const c of clientes) {
     if (c.drive_folder_url) {
       const id = parseDriveFolderId(c.drive_folder_url);
-      if (id) vigiar.push({ client_id: c.id, folder_id: id });
-      else invalidos.push(c.id);
+      if (id) {
+        vigiar.push({ client_id: c.id, folder_id: id, nome: nomes.get(c.id) ?? "", compartilhada: false });
+        usos.set(id, (usos.get(id) ?? 0) + 1);
+      } else invalidos.push(c.id);
     } else {
       const sheet = idDaPlanilha(c.google_sheet_url);
       if (sheet) { candidatos.push({ client_id: c.id, sheet_id: sheet }); continue; }
-      // Link de planilha inválido também fica de fora: o cliente pode já ter pasta.
-      const nome = String(c.name ?? "").trim();
-      const criado = c.created_at ? new Date(c.created_at).getTime() : NaN;
-      if (!String(c.google_sheet_url ?? "").trim() && nome && criado >= desde) criar.push({ client_id: c.id, nome });
+      // Link de planilha inválido cai aqui também: a busca pelo nome evita duplicar a pasta que já exista.
+      const nome = nomes.get(c.id);
+      if (nome) buscar.push({ client_id: c.id, nome });
     }
   }
-  return { candidatos, vigiar, criar, invalidos };
+  // Pasta usada por mais de um cliente não tem um nome certo: o robô não mexe nela.
+  for (const v of vigiar) v.compartilhada = (usos.get(v.folder_id) ?? 0) > 1;
+  return { candidatos, vigiar, buscar, invalidos };
 }
 
 // 42703 com o nome da coluna nova: a 069 ainda não foi aplicada neste banco.
@@ -611,7 +640,7 @@ export async function gravarResultadoPastas(
   db: Db, plano: ReturnType<typeof planoPastas>,
   input: { achados?: unknown; testes?: unknown }, agora: string,
 ) {
-  const cand = new Set([...plano.candidatos, ...(plano.criar ?? [])].map((c) => c.client_id));
+  const cand = new Set([...plano.candidatos, ...plano.buscar].map((c) => c.client_id));
   const vig = new Set(plano.vigiar.map((c) => c.client_id));
   const lista = (v: unknown) => (Array.isArray(v) ? v : []) as Record<string, unknown>[];
   let gravados = 0, atualizados = 0, ignorados = 0, log: string | null = null;
