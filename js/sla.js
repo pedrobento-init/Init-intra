@@ -335,11 +335,76 @@ function slaBindPrazoAuto(form) {
   aplica();
 }
 
+/**
+ * Minutos de expediente entre dois instantes (seg–sex, SLA_EXPEDIENTE).
+ * "De quem foi o tempo" mede em horas úteis pelo mesmo motivo do SLA: noite e
+ * fim de semana não são culpa de ninguém.
+ */
+function slaMinutosUteis(inicioMs, fimMs) {
+  if (!(fimMs > inicioMs)) return 0;
+  let total = 0;
+  const d = new Date(inicioMs); d.setHours(0, 0, 0, 0);
+  while (d.getTime() < fimMs) {
+    if (_slaDiaUtil(d)) {
+      const ini = new Date(d).setHours(SLA_EXPEDIENTE.inicio, 0, 0, 0);
+      const fim = new Date(d).setHours(SLA_EXPEDIENTE.fim, 0, 0, 0);
+      const a = Math.max(ini, inicioMs), b = Math.min(fim, fimMs);
+      if (b > a) total += (b - a) / 60000;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return Math.round(total);
+}
+
+/**
+ * Divide o tempo do chamado entre a equipe e quem pediu. Só "aguardando_cliente"
+ * conta para o solicitante; qualquer outro status aberto é tempo da equipe.
+ * O status inicial vem do "de" do primeiro evento — se os eventos antigos foram
+ * podados por PEN_MAX_EVENTS, o trecho antes deles fica com o status que o
+ * evento mais antigo diz ter deixado, que é o melhor palpite que sobra.
+ */
+function slaTempoPorLado(p, nowMs) {
+  const res = { equipe: 0, solicitante: 0 };
+  const inicio = Date.parse(p && p.createdAt);
+  if (!Number.isFinite(inicio)) return res;
+  const evs = (Array.isArray(p.events) ? p.events : [])
+    .filter(e => e && e.type === 'status')
+    .map(e => ({ t: Date.parse(e.at || e.createdAt), de: e.de, para: e.para }))
+    .filter(e => Number.isFinite(e.t))
+    .sort((a, b) => a.t - b.t);
+  const fimFechado = Date.parse(p.completedAt);
+  const fim = !_slaAberta(p.status) && Number.isFinite(fimFechado) ? fimFechado : (nowMs ?? Date.now());
+  // Fechado sem eventos: o tempo até completedAt foi de trabalho, logo da equipe.
+  let status = evs.length ? evs[0].de : (_slaAberta(p.status) ? p.status : 'aberto');
+  let desde = inicio;
+  const soma = (ate) => {
+    if (!_slaAberta(status)) return;
+    const min = slaMinutosUteis(desde, Math.min(ate, fim));
+    if (status === 'aguardando_cliente') res.solicitante += min; else res.equipe += min;
+  };
+  for (const e of evs) {
+    if (e.t >= fim) break;
+    if (e.t > desde) { soma(e.t); desde = e.t; }
+    status = e.para;
+  }
+  soma(fim);
+  return res;
+}
+
+/** Linha "Tempo" do detalhe: equipe em destaque, solicitante ao lado. */
+function penTempoPorLadoHtml(p, nowMs) {
+  const t = slaTempoPorLado(p, nowMs);
+  if (!t.equipe && !t.solicitante) return '<span class="sla-muted">—</span>';
+  return `<span class="sla-badge" title="Horas úteis com a equipe">Com a equipe ${slaDuracaoCurta(t.equipe)}</span> `
+    + `<span class="sla-muted" title="Horas úteis aguardando o solicitante">Com quem pediu ${slaDuracaoCurta(t.solicitante)}</span>`;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SLA_PRIORIDADE, SLA_EXPEDIENTE, PEN_CANAIS, PEN_CATEGORIAS, penCanalLabel, penCategoriaLabel,
     slaAddBusinessHours, slaAddBusinessDays, slaPrazoSugerido, slaRespostaAte, slaResumo, slaOnSave,
     slaRespostaEstado, slaDuracaoCurta, buildRespostaKpis, buildRecorrentesModel, solicitantesDoCliente, penRespostaBadge,
     slaResolucaoEstado, penResolucaoBadge, slaNotaEhResposta,
+    slaMinutosUteis, slaTempoPorLado, penTempoPorLadoHtml,
   };
 }

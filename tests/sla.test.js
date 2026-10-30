@@ -253,3 +253,38 @@ describe('situação da resolução', () => {
     expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0), { full: true })).toContain('Resolver em');
   });
 });
+
+describe('de quem foi o tempo', () => {
+  it('conta só minutos de expediente e pula o fim de semana', () => {
+    // Sexta 17h → segunda 9h = 1h na sexta + 1h na segunda
+    expect(sla.slaMinutosUteis(+local(2026, 10, 23, 17), +local(2026, 10, 26, 9))).toBe(120);
+  });
+  it('chamado sem eventos é todo tempo da equipe', () => {
+    const p = { status: 'aberto', createdAt: iso(2026, 10, 21, 9, 0) };
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 11))).toEqual({ equipe: 120, solicitante: 0 });
+  });
+  it('aguardando_cliente conta para quem pediu', () => {
+    const p = {
+      status: 'em_andamento', createdAt: iso(2026, 10, 21, 9, 0),
+      events: [
+        { type: 'status', at: iso(2026, 10, 21, 10, 0), de: 'aberto', para: 'aguardando_cliente' },
+        { type: 'status', at: iso(2026, 10, 21, 13, 0), de: 'aguardando_cliente', para: 'em_andamento' },
+      ],
+    };
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 14))).toEqual({ equipe: 120, solicitante: 180 });
+  });
+  it('chamado resolvido para de contar em completedAt', () => {
+    const p = { status: 'resolvido', createdAt: iso(2026, 10, 21, 9, 0), completedAt: iso(2026, 10, 21, 10, 0) };
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 22, 17))).toEqual({ equipe: 60, solicitante: 0 });
+  });
+  it('aceita createdAt no evento no lugar de at', () => {
+    const p = {
+      status: 'aguardando_cliente', createdAt: iso(2026, 10, 21, 9, 0),
+      events: [{ type: 'status', createdAt: iso(2026, 10, 21, 10, 0), de: 'aberto', para: 'aguardando_cliente' }],
+    };
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 12))).toEqual({ equipe: 60, solicitante: 120 });
+  });
+  it('sem createdAt devolve zero sem quebrar', () => {
+    expect(sla.slaTempoPorLado({ status: 'aberto' }, Date.now())).toEqual({ equipe: 0, solicitante: 0 });
+  });
+});
