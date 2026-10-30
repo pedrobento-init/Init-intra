@@ -35,6 +35,17 @@ function entradasEmailPendentes() {
   });
 }
 
+var _EMAIL_TRIAGEM_COLUNAS_073 = [
+  ['client_id', 'clientId'], ['team', 'team'], ['atribuido_a', 'atribuidoA'],
+  ['atribuido_em', 'atribuidoEm'], ['atribuicao_nota', 'atribuicaoNota']
+];
+
+/** A caixa (#caixa) mostra as mesmas linhas: quem muda uma redesenha as duas telas. */
+function _emailTriagemRedesenhar() {
+  if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
+  if (typeof renderCaixaEntrada === 'function' && document.getElementById('caixaLista')) renderCaixaEntrada();
+}
+
 /** Grava a decisão na entrada e empurra para o banco, como o resto do app. */
 function _emailTriagemSalvar(id, patch) {
   var lista = getEmailsTriagem();
@@ -45,22 +56,32 @@ function _emailTriagemSalvar(id, patch) {
   // e estampar tratadoPor/tratadoEm nela registraria um responsável numa
   // decisão que ninguém tomou — a entrada volta exatamente como chegou.
   var decidida = String((patch && patch.status) || lista[i].status || '') !== 'pendente';
-  lista[i] = Object.assign({}, lista[i], patch, {
-    tratadoPor: decidida ? ((typeof getUser === 'function' && getUser()) ? getUser().name : '') : null,
-    tratadoEm: decidida ? agora : null,
+  // Atribuir ou vincular não é decisão sobre a entrada: sem status no patch,
+  // quem a tratou (ou ninguém) continua sendo quem estava.
+  var mudaStatus = !!(patch && 'status' in patch);
+  var anterior = lista[i];
+  lista[i] = Object.assign({}, anterior, patch, {
+    tratadoPor: mudaStatus ? (decidida ? ((typeof getUser === 'function' && getUser()) ? getUser().name : '') : null) : (anterior.tratadoPor || null),
+    tratadoEm: mudaStatus ? (decidida ? agora : null) : (anterior.tratadoEm || null),
     // O sync resolve conflito por updatedAt: sem isto, duas abas decidindo a
     // mesma entrada não teriam como saber qual decisão é a mais nova.
     updatedAt: agora
   });
   dbSet(DB.EMAILS_TRIAGEM, lista);
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('emails_triagem').update({
+    var payload = {
       status: lista[i].status,
       pendencia_id: lista[i].pendenciaId || null,
       tratado_por: lista[i].tratadoPor,
       tratado_em: lista[i].tratadoEm,
       updated_at: lista[i].updatedAt
-    }).eq('id', id).then(function (res) {
+    };
+    // As colunas da 073 só vão quando a ação mexeu nelas: um banco ainda sem
+    // a migration recusaria o update inteiro, e descartar deixaria de funcionar.
+    _EMAIL_TRIAGEM_COLUNAS_073.forEach(function (par) {
+      if (patch && par[1] in patch) payload[par[0]] = lista[i][par[1]] == null ? null : lista[i][par[1]];
+    });
+    supabaseClient.from('emails_triagem').update(payload).eq('id', id).then(function (res) {
       if (res.error) { console.error('❌ Supabase emails_triagem:', res.error); markSyncPushFailed(); }
     }).catch(function () { markSyncPushFailed(); });
   }
@@ -69,9 +90,9 @@ function _emailTriagemSalvar(id, patch) {
 
 /**
  * A entrada vira chamado: abre o formulário já preenchido com o que o e-mail
- * trouxe. O cliente fica em branco DE PROPÓSITO — o motivo de a entrada estar
- * aqui é justamente ninguém saber de quem é, e adivinhar poria o chamado no
- * cliente errado.
+ * trouxe. O cliente só vem preenchido quando alguém o VINCULOU na caixa — sem
+ * isso fica em branco de propósito: a entrada está aqui justamente porque
+ * ninguém sabe de quem é, e adivinhar poria o chamado no cliente errado.
  *
  * A entrada só é marcada depois que o chamado existe de fato: marcar antes
  * perderia o e-mail se a pessoa desistisse no meio do formulário.
@@ -84,11 +105,11 @@ function emailTriagemAbrirChamado(id) {
   // mensagem. O status é conferido aqui, onde ainda dá para recusar.
   if (e.status !== 'pendente') {
     showToast('Esta entrada já foi tratada.', 'error');
-    if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
+    _emailTriagemRedesenhar();
     return;
   }
   if (typeof openPendenciaForm !== 'function') return;
-  openPendenciaForm(null, null, null, {
+  openPendenciaForm(null, e.clientId || null, null, {
     assunto: String(e.assunto || '').slice(0, 120),
     descricao: String(e.corpo || ''),
     canal: 'email',
@@ -128,14 +149,14 @@ function emailTriagemMarcarAberta(pendenciaId, id, clientId) {
   // Entre abrir o formulário e salvar, o colega pode ter tratado a entrada:
   // por cima da decisão dele, o pendenciaId novo apontaria para o chamado errado.
   if (!e || e.status !== 'pendente') {
-    if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
+    _emailTriagemRedesenhar();
     return;
   }
   _emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId });
   // Quem escolheu o cliente no formulário respondeu a pergunta que o robô não
   // soube responder: guardar a resposta é o que evita a mesma entrada amanhã.
   _emailTriagemAprender(e.de, clientId);
-  renderEntradasEmail();
+  _emailTriagemRedesenhar();
 }
 
 // Par do DOMINIOS_PUBLICOS do robô (robo/campo.ts). Mudou lá, muda aqui: um
@@ -187,11 +208,11 @@ function _emailTriagemAprender(de, clientId) {
 function emailTriagemDescartar(id) {
   var e = _emailTriagemSalvar(id, { status: 'descartado', pendenciaId: null });
   if (!e) { showToast('Entrada não encontrada.', 'error'); return; }
-  renderEntradasEmail();
+  _emailTriagemRedesenhar();
   if (typeof showUndoToast === 'function') {
     showUndoToast('Entrada descartada.', function () {
       _emailTriagemSalvar(id, { status: 'pendente', pendenciaId: null });
-      renderEntradasEmail();
+      _emailTriagemRedesenhar();
     });
   } else {
     showToast('Entrada descartada.', 'success');
@@ -234,6 +255,8 @@ function renderEntradasEmail() {
     + '<span class="etr-count">' + lista.length + '</span>'
     + '<span class="etr-chevron" aria-hidden="true">' + (aberta ? '▾' : '▸') + '</span>'
     + '</button>'
+    // Fora do botão: link dentro de <button> não é clicável de forma confiável.
+    + '<a class="etr-link" href="#caixa" data-action="nav" data-arg="caixa">Abrir caixa de entrada</a>'
     + (aberta ? '<ul class="etr-lista">' + lista.map(_emailTriagemCardHtml).join('') + '</ul>' : '')
     + '</section>';
 }

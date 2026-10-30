@@ -202,8 +202,9 @@ describe('a caixa de entradas de e-mail', () => {
   });
 
   it('não adivinha o cliente ao abrir o chamado', () => {
-    // O motivo de a entrada estar na caixa é ninguém saber de quem é.
-    expect(etrSrc).toContain('openPendenciaForm(null, null, null, {');
+    // O motivo de a entrada estar na caixa é ninguém saber de quem é. O único
+    // cliente que entra pré-preenchido é o que alguém vinculou na caixa.
+    expect(etrSrc).toContain('openPendenciaForm(null, e.clientId || null, null, {');
   });
 
   it('tudo que veio do e-mail passa por escapeHtml', () => {

@@ -312,6 +312,7 @@ const ENTITIES = [
       de: 'de', assunto: 'assunto', corpo: 'corpo', recebido_em: 'recebidoEm',
       motivo: 'motivo', status: 'status', pendencia_id: 'pendenciaId', team: 'team',
       tratado_por: 'tratadoPor', tratado_em: 'tratadoEm',
+      client_id: 'clientId', atribuido_a: 'atribuidoA', atribuido_em: 'atribuidoEm', atribuicao_nota: 'atribuicaoNota',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
     onChange: () => {
@@ -319,6 +320,9 @@ const ENTITIES = [
       // está olhando aparece sozinho, que é o ponto de ela existir.
       if ((window.location.hash.replace('#', '') || '') === 'pendencias'
         && document.getElementById('penViewArea') && typeof renderEntradasEmail === 'function') renderEntradasEmail();
+      // A tela #caixa também precisa ver a linha nova sem recarregar.
+      if ((window.location.hash.replace('#', '') || '') === 'caixa'
+        && document.getElementById('caixaLista') && typeof renderCaixaEntrada === 'function') renderCaixaEntrada();
     }
   },
   {
