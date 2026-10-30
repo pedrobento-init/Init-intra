@@ -7,8 +7,10 @@
 // que a atribuição mora: duas mensagens do mesmo thread com donos diferentes
 // seria o mesmo cliente atendido por duas pessoas sem saber uma da outra.
 //
-// Responder ao cliente NÃO sai daqui ainda: por enquanto a resposta passa pelo
-// chamado, que já tem o envio, o histórico e o SLA. A IA nunca responde sozinha.
+// Responder sai daqui por HUMANO: a resposta vai pelo Gmail na mesma conversa
+// (Edge Function caixa-responder, migration 074), a mensagem enviada vira
+// linha na conversa e as pendentes fecham como 'respondido'. A IA nunca
+// responde sozinha: só sai e-mail por clique de operador.
 
 var _caixaFiltro = 'pendentes';
 var _caixaBusca = '';
@@ -24,6 +26,7 @@ const CAIXA_STATUS = {
   pendente: 'Aguardando',
   virou_chamado: 'Virou chamado',
   anexado: 'Anexado a chamado',
+  respondido: 'Respondido',
   descartado: 'Descartado',
 };
 
@@ -131,7 +134,11 @@ function _caixaConversaHTML(c) {
     acoes + '</div>' +
     c.mensagens.map((m) =>
       '<article class="cx-msg">' +
-      '<header><b>' + escapeHtml(m.de || '') + '</b><span class="cx-quando">' + escapeHtml(formatDateTime(m.recebidoEm)) + '</span></header>' +
+      '<header><b>' + escapeHtml(m.de || '') + '</b>' +
+      // Selo do que SAIU daqui: sem ele a resposta da equipe parece mensagem
+      // do cliente na leitura da conversa.
+      (m.status === 'respondido' ? '<span class="cx-meta">✉ resposta enviada</span>' : '') +
+      '<span class="cx-quando">' + escapeHtml(formatDateTime(m.recebidoEm)) + '</span></header>' +
       // Corpo como texto escapado em pre-wrap: e-mail é a entrada mais hostil
       // do app, e renderizar o HTML dele aqui abriria a porta que o escapeHtml fecha.
       '<div class="cx-corpo">' + escapeHtml(m.corpo || '') + '</div>' +
@@ -252,6 +259,66 @@ function caixaDescartar(id) {
   });
 }
 
+function caixaResponder(id) {
+  const c = _caixaConversaPorId(id);
+  if (!c) return;
+  const pendentes = c.mensagens.filter((m) => m.status === 'pendente');
+  if (!pendentes.length) { showToast('Esta conversa já foi tratada.', 'error'); renderCaixaEntrada(); return; }
+  const alvo = pendentes[pendentes.length - 1];
+  const destino = _emailTriagemEndereco(alvo.de);
+  openModal('Responder ao cliente',
+    '<form data-submit="caixaResponderSalvar" data-arg="' + escapeHtml(c.id) + '">' +
+    '<div class="form-group"><label class="form-label">Para</label><p class="ov-muted">' + escapeHtml(destino || alvo.de || '(sem remetente)') + '</p></div>' +
+    '<p class="ov-muted">Em resposta a: <b>' + escapeHtml(alvo.assunto || '(sem assunto)') + '</b></p>' +
+    '<div class="form-group"><label class="form-label">Resposta *</label>' +
+    '<textarea class="form-textarea" name="texto" rows="6" required placeholder="Escreva a resposta..."></textarea></div>' +
+    '<p class="ov-muted">O e-mail sai pelo robô, na mesma conversa de e-mail. A IA não responde no seu lugar.</p>' +
+    '<div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>' +
+    '<button type="submit" class="btn btn-primary">Enviar resposta</button></div></form>');
+}
+
+// Responder é decidir: a caixa-responder fecha as pendentes do thread quando o
+// e-mail sai (mesmo se esta aba cair no meio). Aqui o local só é pintado depois
+// de confirmado — pintar antes marcaria 'respondido' uma conversa cujo envio
+// falhou, e o técnico sairia achando que o cliente foi atendido.
+function caixaResponderSalvar(id, texto) {
+  const c = _caixaConversaPorId(id);
+  if (!c) return Promise.resolve(false);
+  const pendentes = c.mensagens.filter((m) => m.status === 'pendente');
+  if (!pendentes.length) { showToast('Esta conversa já foi tratada.', 'error'); renderCaixaEntrada(); return Promise.resolve(false); }
+  const t = String(texto || '').trim();
+  if (!t) { showToast('Escreva a resposta antes de enviar.', 'error'); return Promise.resolve(false); }
+  const online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  if (!online) { showToast('Sem conexão com o servidor: a resposta não foi enviada.', 'error'); return Promise.resolve(false); }
+  const alvo = pendentes[pendentes.length - 1];
+  return supabaseClient.functions.invoke('caixa-responder', { body: { email_id: alvo.id, text: t } })
+    .then(function (r) {
+      const d = r && r.data;
+      if ((r && r.error) || !d || d.success !== true) {
+        const msg = (d && d.error) || (r && r.error && r.error.message) || 'erro desconhecido';
+        showToast('A resposta não foi enviada: ' + msg, 'error');
+        return false;
+      }
+      _caixaSalvarConversa(c, { status: 'respondido' }, true);
+      _emailTriagemRedesenhar();
+      // O e-mail saiu: registrar pode ter falhado (074 ausente, banco fora do
+      // ar) — avisa sem desfazer o envio, que já aconteceu.
+      if (d.registrado === false) {
+        showToast('Resposta enviada para ' + d.to + ', mas o registro na caixa falhou. Confira no servidor.', 'error');
+      } else if (d.threaded === false) {
+        showToast('Resposta enviada para ' + d.to + ' — como conversa nova (o original não trouxe Message-ID).', 'success');
+      } else {
+        showToast('Resposta enviada para ' + d.to + '.', 'success');
+      }
+      return true;
+    })
+    .catch(function (e) {
+      showToast('A resposta não foi enviada.', 'error');
+      if (typeof _logSilent === 'function') _logSilent(e, 'caixa-entrada:responder');
+      return false;
+    });
+}
+
 registerActions({
   caixaSelecionar: (_el, id) => { _caixaSelecionada = id || null; renderCaixaEntrada(); },
   caixaVoltar: () => { _caixaSelecionada = null; renderCaixaEntrada(); },
@@ -269,4 +336,9 @@ registerActions({
   },
   caixaAbrirChamado: (_el, id) => caixaAbrirChamado(id),
   caixaDescartar: (_el, id) => caixaDescartar(id),
+  caixaResponder: (_el, id) => caixaResponder(id),
+  caixaResponderSalvar: (el, id) => {
+    const fd = new FormData(el);
+    caixaResponderSalvar(id, String(fd.get('texto') || '')).then(function (ok) { if (ok) closeModal(); });
+  },
 });

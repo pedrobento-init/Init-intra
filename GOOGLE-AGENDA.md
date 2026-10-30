@@ -203,6 +203,16 @@ O caminho de volta: no chamado aberto pela triagem, a caixa **"Enviar por e-mail
 
 Deploy: `supabase functions deploy pendencia-responder`. Usa os mesmos secrets da `send-email` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM` opcional) — sem secret novo.
 
+### Responder direto da Caixa de entrada (migration 074)
+
+Na tela **Caixa de entrada** (`#caixa`), o botão **Responder** manda a resposta de quem está atendendo para o remetente da conversa, pelo Gmail, **na mesma conversa de e-mail**. A function [`caixa-responder`](supabase/functions/caixa-responder/index.ts) recebe só o id da linha em `emails_triagem`; o endereço sai do `de` da própria linha, lida com o cliente do operador — equipe que não enxerga a conversa não responde, e o app nunca escolhe o destinatário.
+
+- **Mesmo thread:** o `message_id` guardado na triagem volta como `In-Reply-To`/`References`, como na `pendencia-responder`. Linha antiga sem `message_id` sai como conversa nova, com aviso na tela.
+- **A resposta fica registrada:** a mensagem enviada vira linha nova em `emails_triagem` com status `respondido`, e as pendentes do thread fecham com o mesmo valor — responder é decidir, como abrir chamado ou descartar. Exige a migration 074; sem ela o e-mail sai e só o registro falha, com aviso na tela (`registrado: false`) — o envio nunca se desfaz.
+- **Só o que está pendente:** conversa já tratada é recusada, então card velho ou duplo clique não manda duas vezes o mesmo e-mail. A IA não participa do caminho: só sai e-mail por clique de operador.
+
+Deploy: `supabase functions deploy caixa-responder`. Usa os mesmos secrets da `send-email` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM` opcional) — sem secret novo.
+
 ### O que o Intra tira do e-mail antes de abrir o chamado
 
 Um e-mail de resposta carrega a conversa citada embaixo e a assinatura de quem
