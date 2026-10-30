@@ -12,6 +12,7 @@ const DB = {
   VENCIMENTOS: 'intra_vencimentos',
   TIME_ENTRIES: 'intra_time_entries',
   EMAILS_TRIAGEM: 'intra_emails_triagem',
+  RESPOSTAS_PRONTAS: 'intra_respostas_prontas',
   USER: 'intra_user',
   COUNTER: 'intra_counter',
   SESSION: 'intra_session',

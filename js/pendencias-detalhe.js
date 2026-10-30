@@ -118,6 +118,7 @@ function openPendenciaDetail(id) {
                   <input type="file" id="penFileInput" style="display:none" onchange="handleFileUpload('pendencias','${id}',this,()=>{renderAttachmentList('pendencias','${id}','penAttachmentsList');cmdRefreshAttCount('${escapeHtml(id)}')})" />
                 </label>
                 <button type="button" class="btn btn-secondary btn-sm pen-cmd-tool" title="Ir para o checklist" onclick="cmdFocusChecklist()">☑️ Checklist</button>
+                <button type="button" class="btn btn-secondary btn-sm pen-cmd-tool" title="Inserir uma resposta pronta da equipe" data-action="rpAbrir">💬 Respostas</button>
               </div>
               <button type="button" class="btn btn-primary pen-cmd-post" onclick="submitPenNote('${escapeHtml(id)}')">📝 Postar Atualização</button>
             </div>

@@ -39,7 +39,7 @@ describe('ENTITIES (schema central)', () => {
     // emails_triagem (066) entra aqui: a policy filtra por team igual às
     // outras. E-mail sem cliente não tem equipe para herdar, então a entrada
     // nasce com o team padrão — a caixa do robô é uma caixa só.
-    expect(teamScoped).toEqual(['clients', 'emails_triagem', 'equipamentos', 'pendencias', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
+    expect(teamScoped).toEqual(['clients', 'emails_triagem', 'equipamentos', 'pendencias', 'respostas_prontas', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
   });
 });
 

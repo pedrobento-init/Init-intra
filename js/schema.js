@@ -326,6 +326,19 @@ const ENTITIES = [
     }
   },
   {
+    table: 'respostas_prontas',
+    dbKey: 'intra_respostas_prontas',
+    label: 'Respostas prontas',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 074: banco sem a tabela não quebra o sync
+    fields: {
+      id: 'id', titulo: 'titulo', conteudo: 'conteudo', team: 'team',
+      created_by: 'createdBy', created_at: 'createdAt', updated_at: 'updatedAt'
+    }
+  },
+  {
     table: 'audit_logs',
     dbKey: 'intra_logs',
     label: 'Logs',
