@@ -8,6 +8,7 @@ import vm from 'node:vm';
 const FONTES = ['js/emails-triagem.js', 'js/caixa-entrada.js'].map((f) => fs.readFileSync(f, 'utf8'));
 
 let lista, toasts, undoCb, clientes, acoes, updates, upserts, conectado, elementos;
+let invokes, modais, invocacao;
 
 function elemento() {
   return { innerHTML: '', textContent: '', classes: new Set(), classList: { toggle(c, on) { if (on) this._el.classes.add(c); else this._el.classes.delete(c); } } };
@@ -32,7 +33,7 @@ function carregar() {
     showToast: (m, t) => toasts.push([m, t]),
     showUndoToast: (_m, cb) => { undoCb = cb; },
     openPendenciaForm: () => {},
-    openModal: () => {},
+    openModal: (titulo, html) => modais.push({ titulo, html }),
     closeModal: () => {},
     registerActions: (a) => Object.assign(acoes, a),
     getOperatorNames: () => ['Ana', 'Bruno'],
@@ -46,7 +47,13 @@ function carregar() {
       from: (tabela) => ({
         update: (p) => ({ eq: (_c, id) => { updates.push({ tabela, id, p }); return Promise.resolve({}); } }),
         upsert: (l) => { upserts.push({ tabela, l }); return Promise.resolve({}); }
-      })
+      }),
+      functions: {
+        invoke: (nome, opts) => {
+          invokes.push({ nome, opts });
+          return typeof invocacao === 'function' ? invocacao(nome, opts) : Promise.resolve(invocacao);
+        }
+      }
     }
   };
   sandbox.globalThis = sandbox;
@@ -87,6 +94,10 @@ beforeEach(() => {
   updates = [];
   upserts = [];
   conectado = false;
+  invokes = [];
+  modais = [];
+  // Padrão: envio confirmado, registrado e na mesma conversa.
+  invocacao = () => Promise.resolve({ data: { success: true, to: 'marcia@acme.com.br', threaded: true, registrado: true } });
   s = carregar();
 });
 
@@ -249,5 +260,100 @@ describe('renderCaixaEntrada', () => {
     lista = [entrada()];
     acoes.caixaSelecionar(null, 'thread-9');
     expect(elementos.caixaConversa.innerHTML).toContain('Impressora não imprime');
+  });
+
+  it('mensagem respondida mostra o selo de resposta enviada', () => {
+    lista = [entrada({ status: 'respondido' })];
+    s._caixaSelecionada = 'thread-9';
+    s.renderCaixaEntrada();
+    expect(elementos.caixaConversa.innerHTML).toContain('resposta enviada');
+  });
+});
+
+describe('responder', () => {
+  it('o modal do Responder escapa o assunto do e-mail', () => {
+    lista = [entrada({ assunto: '<img src=x onerror=alert(1)>' })];
+    s.caixaResponder('thread-9');
+    expect(modais).toHaveLength(1);
+    expect(modais[0].html).not.toContain('<img');
+    expect(modais[0].html).toContain('&lt;img');
+    expect(modais[0].html).toContain('marcia@acme.com.br');
+  });
+
+  it('sem texto não envia nada', async () => {
+    conectado = true;
+    lista = [entrada()];
+    expect(await s.caixaResponderSalvar('thread-9', '   ')).toBe(false);
+    expect(invokes).toHaveLength(0);
+    expect(toasts[0][1]).toBe('error');
+  });
+
+  it('sem conexão nada é enviado e o erro diz por quê', async () => {
+    conectado = false;
+    lista = [entrada()];
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(false);
+    expect(invokes).toHaveLength(0);
+    expect(toasts[0][0]).toMatch(/conexão/);
+  });
+
+  it('conversa sem pendente não responde de novo', async () => {
+    conectado = true;
+    lista = [entrada({ status: 'anexado' })];
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(false);
+    expect(invokes).toHaveLength(0);
+    expect(toasts[0][0]).toMatch(/tratada/);
+  });
+
+  it('sucesso: envia para a pendente mais nova e fecha as pendentes do thread', async () => {
+    conectado = true;
+    lista = [
+      entrada({ id: 'A', recebidoEm: '2026-10-26T10:00:00.000Z' }),
+      entrada({ id: 'B', recebidoEm: '2026-10-26T14:00:00.000Z' })
+    ];
+    expect(await s.caixaResponderSalvar('thread-9', 'Vamos verificar hoje.')).toBe(true);
+    expect(invokes).toHaveLength(1);
+    expect(invokes[0].nome).toBe('caixa-responder');
+    expect(invokes[0].opts.body).toEqual({ email_id: 'B', text: 'Vamos verificar hoje.' });
+    expect(lista.map((e) => e.status)).toEqual(['respondido', 'respondido']);
+    expect(lista[0].tratadoPor).toBe('Ana');
+    expect(toasts[0][1]).toBe('success');
+  });
+
+  it('falha do envio mantém a conversa pendente', async () => {
+    conectado = true;
+    lista = [entrada()];
+    invocacao = () => Promise.resolve({ data: { success: false, error: 'SMTP recusou' } });
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(false);
+    expect(lista[0].status).toBe('pendente');
+    expect(toasts[0][1]).toBe('error');
+    expect(toasts[0][0]).toMatch(/SMTP recusou/);
+  });
+
+  it('erro de rede também mantém a conversa pendente', async () => {
+    conectado = true;
+    lista = [entrada()];
+    invocacao = () => Promise.reject(new Error('rede fora'));
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(false);
+    expect(lista[0].status).toBe('pendente');
+    expect(toasts[0][1]).toBe('error');
+  });
+
+  it('sem message-id o aviso diz que saiu como conversa nova', async () => {
+    conectado = true;
+    lista = [entrada({ messageId: null })];
+    invocacao = () => Promise.resolve({ data: { success: true, to: 'marcia@acme.com.br', threaded: false, registrado: true } });
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(true);
+    expect(toasts[0][0]).toMatch(/conversa nova/);
+  });
+
+  it('envio confirmado mas sem registro na base avisa a falha', async () => {
+    conectado = true;
+    lista = [entrada()];
+    invocacao = () => Promise.resolve({ data: { success: true, to: 'marcia@acme.com.br', threaded: true, registrado: false } });
+    expect(await s.caixaResponderSalvar('thread-9', 'Olá Márcia')).toBe(true);
+    // O e-mail saiu: o app não desfaz, só avisa.
+    expect(lista[0].status).toBe('respondido');
+    expect(toasts[0][1]).toBe('error');
+    expect(toasts[0][0]).toMatch(/registro/);
   });
 });
