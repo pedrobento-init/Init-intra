@@ -85,6 +85,11 @@ const FUNCTIONS = [
     equipe: 'nenhum',
     body: { pendencia_id: 'p1', text: 'resposta de teste' },
   },
+  {
+    nome: 'whatsapp-responder',
+    equipe: 'nenhum',
+    body: { pendencia_id: 'p1', text: 'resposta de teste' },
+  },
 ];
 
 /** Status da resposta; se estourar DEPOIS do gate, o gate deixou passar. */
@@ -96,7 +101,7 @@ async function status(handler, req) {
   }
 }
 
-describe('Edge Functions: as 14 com JWT estão na lista', () => {
+describe('Edge Functions: as 15 com JWT estão na lista', () => {
   it('a lista cobre todas as functions que exigem usuário', async () => {
     const fs = await import('node:fs');
     const dir = new URL('../supabase/functions/', import.meta.url);
