@@ -251,3 +251,66 @@ describe('renderCaixaEntrada', () => {
     expect(elementos.caixaConversa.innerHTML).toContain('Impressora não imprime');
   });
 });
+
+describe('corpo e prévia', () => {
+  it('corta a citação da resposta anterior e separa a assinatura', () => {
+    const r = s.caixaCorpoLimpo('Segue o print.\n--\nMárcia\nAcme\nEm seg, 26 de out, Ana escreveu:\n> texto velho');
+    expect(r.texto).toBe('Segue o print.');
+    expect(r.assinatura).toBe('Márcia\nAcme');
+  });
+
+  it('prévia pula a saudação e corta texto longo com reticências', () => {
+    expect(s.caixaPrevia('Bom dia,\nA impressora parou.')).toBe('A impressora parou.');
+    expect(s.caixaPrevia('x'.repeat(50), 10)).toBe('x'.repeat(9) + '…');
+  });
+
+  it('rótulo de espera em minutos, horas e dias', () => {
+    const agora = Date.parse('2026-10-26T12:00:00Z');
+    expect(s.caixaEsperaRotulo('2026-10-26T11:55:00Z', agora)).toBe('há 5 min');
+    expect(s.caixaEsperaRotulo('2026-10-26T09:00:00Z', agora)).toBe('há 3 h');
+    expect(s.caixaEsperaRotulo('2026-10-25T12:00:00Z', agora)).toBe('há 1 dia');
+    expect(s.caixaEsperaRotulo('', agora)).toBe('');
+  });
+});
+
+describe('sugestão de cliente', () => {
+  const conv = (id, de, clientId) => ({ id, clientId: clientId || null, ultima: { id: 'm-' + id, de } });
+
+  it('domínio corporativo já vinculado sugere o mesmo cliente', () => {
+    const alvo = conv('t1', 'Márcia <marcia@acme.com.br>');
+    const outra = conv('t2', 'José <jose@acme.com.br>', 'CLI-1');
+    expect(s.caixaSugerirCliente(alvo, [alvo, outra])).toBe('CLI-1');
+  });
+
+  it('gmail de outra pessoa não vira sugestão', () => {
+    const alvo = conv('t1', 'Márcia <marcia@gmail.com>');
+    const outra = conv('t2', 'José <jose@gmail.com>', 'CLI-1');
+    expect(s.caixaSugerirCliente(alvo, [alvo, outra])).toBeNull();
+  });
+
+  it('conversa já vinculada não recebe sugestão', () => {
+    const alvo = conv('t1', 'Márcia <marcia@acme.com.br>', 'CLI-2');
+    expect(s.caixaSugerirCliente(alvo, [alvo, conv('t2', 'x@acme.com.br', 'CLI-1')])).toBeNull();
+  });
+
+  it('histórico traz só outras conversas do mesmo endereço', () => {
+    const alvo = conv('t1', 'Márcia <marcia@acme.com.br>');
+    const todas = [alvo, conv('t2', 'marcia@acme.com.br'), conv('t3', 'jose@acme.com.br')];
+    expect(s.caixaHistoricoRemetente(alvo, todas).map((c) => c.id)).toEqual(['t2']);
+  });
+});
+
+describe('contagem e não lidas', () => {
+  it('conta conversas por filtro', () => {
+    const convs = s.caixaAgruparConversas([entrada(), entrada({ id: 'ETR-2', threadId: 'thread-8', status: 'convertido' })]);
+    const n = s.caixaContarFiltros(convs, 'Ana');
+    expect(n.todas).toBe(2);
+    expect(n.pendentes).toBe(1);
+  });
+
+  it('mensagem nova no thread volta a conversa para não lida', () => {
+    const c = { id: 't1', ultima: { id: 'm2' } };
+    expect(s.caixaNaoLida(c, { t1: 'm1' })).toBe(true);
+    expect(s.caixaNaoLida(c, { t1: 'm2' })).toBe(false);
+  });
+});

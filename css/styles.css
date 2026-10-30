@@ -4488,6 +4488,21 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   .cx-lado { order: -1; padding-left: 0; border-left: 0; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
 }
 .cx-voltar { display: none; align-self: flex-start; }
+/* Lista e conversa rolam por dentro: a tela inteira rolando perdia o cabeçalho da conversa. */
+.cx-lista, .cx-timeline { max-height: calc(100vh - 220px); overflow-y: auto; }
+.cx-item.nao-lida .cx-assunto, .cx-item.nao-lida .cx-item-topo strong { font-weight: 700; }
+.cx-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; align-self: center; }
+.cx-previa { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.cx-alerta { color: var(--yellow); }
+.cx-chip-alerta { border-color: var(--yellow); color: var(--yellow); }
+.cx-balao { max-width: 760px; }
+.cx-assinatura { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.cx-assinatura summary { cursor: pointer; }
+.cx-sugestao { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--yellow); border-radius: 6px; }
+.cx-historico { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cx-historico a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.cx-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 240px; color: var(--text-muted); text-align: center; }
 @media (max-width: 760px) {
   .cx-corpo-tela { grid-template-columns: 1fr; }
   .cx-corpo-tela.cx-aberta .cx-lista { display: none; }
