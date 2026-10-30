@@ -85,6 +85,111 @@ function caixaValidarAtribuicao(conversa, para, nota) {
   return null;
 }
 
+// Separa o que o cliente escreveu da citação e da assinatura. A assinatura não
+// some: às vezes é ali que está o telefone ou o cargo de quem pediu.
+function caixaCorpoLimpo(corpo) {
+  const linhas = String(corpo || '').replace(/\r\n?/g, '\n').split('\n');
+  const fica = [];
+  const assina = [];
+  let naAssinatura = false;
+  for (const l of linhas) {
+    const t = l.trim();
+    if (/^(Em .+escreveu:|On .+wrote:|-{2,} ?(Mensagem original|Original Message) ?-{2,}|De: .+|From: .+)$/i.test(t) && (fica.length || assina.length)) break;
+    if (!naAssinatura && (t === '--' || t === '-- ')) { naAssinatura = true; continue; }
+    if (t.startsWith('>')) continue;
+    (naAssinatura ? assina : fica).push(l);
+  }
+  const limpa = (arr) => arr.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { texto: limpa(fica), assinatura: limpa(assina) };
+}
+
+function caixaPrevia(corpo, max) {
+  const lim = max || 120;
+  const linha = caixaCorpoLimpo(corpo).texto.split('\n').map((l) => l.trim())
+    .find((l) => l && !/^(ol[áa]|oi|bom dia|boa tarde|boa noite|prezad[oa]s?)\b[^.!?]{0,30}[,!.]?$/i.test(l)) || '';
+  return linha.length > lim ? linha.slice(0, lim - 1).trimEnd() + '…' : linha;
+}
+
+// Tempo de espera conta da última mensagem do cliente: é o relógio que ele vê.
+function caixaEsperaRotulo(iso, agora) {
+  const t = iso ? new Date(iso).getTime() : NaN;
+  if (isNaN(t)) return '';
+  const min = Math.max(0, Math.floor(((agora || Date.now()) - t) / 60000));
+  if (min < 1) return 'agora';
+  if (min < 60) return 'há ' + min + ' min';
+  const h = Math.floor(min / 60);
+  if (h < 24) return 'há ' + h + ' h';
+  const d = Math.floor(h / 24);
+  return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+}
+
+// Domínio corporativo identifica a empresa; gmail/hotmail não identifica
+// ninguém, então nesse caso só o mesmo endereço vale como pista.
+function _caixaChaveRemetente(de) {
+  const end = _emailTriagemEndereco(de);
+  const dom = end.split('@')[1] || '';
+  if (!dom) return '';
+  return _EMAIL_TRIAGEM_PESSOAIS.indexOf(dom) >= 0 ? end : '@' + dom;
+}
+
+function caixaSugerirCliente(conversa, conversas) {
+  if (!conversa || conversa.clientId) return null;
+  const chave = _caixaChaveRemetente(conversa.ultima && conversa.ultima.de);
+  if (!chave) return null;
+  const votos = {};
+  (conversas || []).forEach((c) => {
+    if (c.id === conversa.id || !c.clientId) return;
+    if (_caixaChaveRemetente(c.ultima && c.ultima.de) === chave) votos[c.clientId] = (votos[c.clientId] || 0) + 1;
+  });
+  const ids = Object.keys(votos).sort((a, b) => votos[b] - votos[a]);
+  return ids[0] || null;
+}
+
+function caixaHistoricoRemetente(conversa, conversas, max) {
+  const end = conversa && conversa.ultima ? _emailTriagemEndereco(conversa.ultima.de) : '';
+  if (!end) return [];
+  return (conversas || []).filter((c) => c.id !== conversa.id && _emailTriagemEndereco(c.ultima && c.ultima.de) === end)
+    .slice(0, max || 5);
+}
+
+function caixaContarFiltros(conversas, usuario) {
+  const r = {};
+  Object.keys(CAIXA_FILTROS).forEach((k) => { r[k] = caixaFiltrar(conversas, k, '', usuario).length; });
+  return r;
+}
+
+// Lido/não lido é por pessoa e não precisa sobreviver a outro aparelho, então
+// fica no navegador. Guarda o id da última mensagem vista: resposta nova no
+// thread faz a conversa voltar a não lida sozinha.
+function _caixaLidasChave() {
+  const u = typeof getUser === 'function' ? (getUser() || {}) : {};
+  return 'caixaLidas:' + (u.id || u.name || '');
+}
+
+function _caixaLidas() {
+  try {
+    return JSON.parse(localStorage.getItem(_caixaLidasChave()) || '{}') || {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function _caixaGravarLidas(mapa) {
+  try { localStorage.setItem(_caixaLidasChave(), JSON.stringify(mapa)); } catch (_e) { /* modo privado: segue sem */ }
+}
+
+function caixaNaoLida(conversa, lidas) {
+  return !!conversa && !!conversa.ultima && (lidas || {})[conversa.id] !== conversa.ultima.id;
+}
+
+function _caixaMarcar(conversa, lida) {
+  if (!conversa) return;
+  const mapa = _caixaLidas();
+  if (lida) mapa[conversa.id] = conversa.ultima.id;
+  else delete mapa[conversa.id];
+  _caixaGravarLidas(mapa);
+}
+
 function _caixaConversas() {
   const lista = typeof filterByTeam === 'function' ? filterByTeam(getEmailsTriagem()) : getEmailsTriagem();
   return caixaAgruparConversas(lista);
@@ -94,18 +199,23 @@ function _caixaConversaPorId(id) {
   return _caixaConversas().find((c) => c.id === id) || null;
 }
 
-function _caixaItemHTML(c) {
+function _caixaItemHTML(c, lidas) {
   const u = c.ultima;
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
   const n = c.mensagens.length;
-  return '<button type="button" class="cx-item' + (c.id === _caixaSelecionada ? ' ativo' : '') + (c.pendente ? ' pendente' : '') +
+  const naoLida = caixaNaoLida(c, lidas);
+  const status = c.pendente ? 'pendente' : (u.status || '');
+  const previa = caixaPrevia(u.corpo);
+  return '<button type="button" class="cx-item' + (c.id === _caixaSelecionada ? ' ativo' : '') + (c.pendente ? ' pendente' : '') + (naoLida ? ' nao-lida' : '') +
     '" data-action="caixaSelecionar" data-arg="' + escapeHtml(c.id) + '">' +
-    '<span class="cx-item-topo"><b>' + escapeHtml(_emailTriagemNome(u.de) || u.de || '(sem remetente)') + '</b>' +
-    '<span class="cx-quando">' + escapeHtml(formatDateTime(u.recebidoEm)) + '</span></span>' +
+    '<span class="cx-item-topo">' + (naoLida ? '<span class="cx-ponto" aria-label="Não lida"></span>' : '') +
+    '<b>' + escapeHtml(_emailTriagemNome(u.de) || u.de || '(sem remetente)') + '</b>' +
+    '<span class="cx-quando" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">' + escapeHtml(caixaEsperaRotulo(u.recebidoEm)) + '</span></span>' +
     '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + (n > 1 ? ' <span class="cx-n">' + n + '</span>' : '') + '</span>' +
-    '<span class="cx-meta">' + escapeHtml(CAIXA_STATUS[u.status] || u.status || '') +
-    (cli ? ' · ' + escapeHtml(cli.name) : '') +
-    (c.atribuidoA ? ' · com ' + escapeHtml(c.atribuidoA) : '') + '</span>' +
+    (previa ? '<span class="cx-previa">' + escapeHtml(previa) + '</span>' : '') +
+    '<span class="cx-meta"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
+    (cli ? '<span>' + escapeHtml(cli.name) + '</span>' : '<span class="cx-alerta">Sem cliente</span>') +
+    (c.atribuidoA ? '<span>com ' + escapeHtml(c.atribuidoA) + '</span>' : '') + '</span>' +
     '</button>';
 }
 
@@ -114,12 +224,20 @@ function _caixaConversaHTML(c) {
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
   const pen = c.pendenciaId && typeof getPendenciaById === 'function' ? getPendenciaById(c.pendenciaId) : null;
   const motivo = EMAIL_TRIAGEM_MOTIVOS[c.ultima.motivo];
+  // Resposta ao cliente sai pelo chamado, que é onde fica o histórico e o SLA:
+  // a caixa só aponta o caminho, não compõe e-mail por fora.
   const acoes = '<div class="cx-acoes">' +
+    (pen ? '<button type="button" class="btn btn-primary btn-sm" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Responder pelo chamado</button>' : '') +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir' : 'Atribuir') + '</button>' +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaVincular" data-arg="' + id + '">' + (cli ? 'Trocar cliente' : 'Vincular cliente') + '</button>' +
     (c.pendente ? '<button type="button" class="btn btn-primary btn-sm" data-action="caixaAbrirChamado" data-arg="' + id + '">Abrir chamado</button>' +
       '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaDescartar" data-arg="' + id + '">Descartar</button>' : '') +
+    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaMarcarNaoLida" data-arg="' + id + '">Marcar como não lida</button>' +
     '</div>';
+  const todas = _caixaConversas();
+  const sugerido = caixaSugerirCliente(c, todas);
+  const cliSug = sugerido && typeof getClientById === 'function' ? getClientById(sugerido) : null;
+  const historico = caixaHistoricoRemetente(c, todas);
   const u = c.ultima;
   const nome = _emailTriagemNome(u.de) || u.de || '(sem remetente)';
   const emailDe = _caixaEmailDe(u.de);
@@ -133,12 +251,18 @@ function _caixaConversaHTML(c) {
     return sep + '<article class="cx-msg">' +
       '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(quem)) + '</span>' +
       '<div class="cx-balao"><header><b>' + escapeHtml(quem) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
-      '<div class="cx-corpo">' + _caixaCorpoHTML(m.corpo) + '</div></div></article>';
+      _caixaCorpoHTML(m.corpo) + '</div></article>';
   }).join('');
   const lado = '<aside class="cx-lado">' +
     '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-avatar">' + escapeHtml(_caixaIniciais(nome)) + '</span><div><b>' + escapeHtml(nome) + '</b>' +
     (emailDe && emailDe !== nome ? '<span class="cx-sub">' + escapeHtml(emailDe) + '</span>' : '') + '</div></div>' +
-    '<dl><dt>Cliente</dt><dd>' + (cli ? escapeHtml(cli.name) : '<span class="cx-sub">Não vinculado</span>') + '</dd></dl></section>' +
+    '<dl><dt>Cliente</dt><dd>' + (cli ? escapeHtml(cli.name) : '<span class="cx-sub">Não vinculado</span>') + '</dd></dl>' +
+    (cliSug ? '<div class="cx-sugestao"><span>Parece ser <b>' + escapeHtml(cliSug.name) + '</b>, pelo remetente.</span>' +
+      '<button type="button" class="btn btn-primary btn-sm" data-action="caixaVincularSugerido" data-arg="' + id + '">Vincular</button></div>' : '') +
+    '</section>' +
+    (historico.length ? '<section><h3>Outras conversas dele</h3><ul class="cx-historico">' +
+      historico.map((h) => '<li><a href="#" data-action="caixaSelecionar" data-arg="' + escapeHtml(h.id) + '">' + escapeHtml(h.ultima.assunto || '(sem assunto)') +
+        '<span class="cx-sub">' + escapeHtml(formatDateTime(h.ultima.recebidoEm)) + '</span></a></li>').join('') + '</ul></section>' : '') +
     '<section><h3>Atendimento</h3><dl>' +
     '<dt>Situação</dt><dd>' + escapeHtml(CAIXA_STATUS[status] || status) + (motivo && c.pendente ? '<span class="cx-sub">' + escapeHtml(motivo.label) + '</span>' : '') + '</dd>' +
     '<dt>Responsável</dt><dd>' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : '<span class="cx-sub">Ninguém atribuído</span>') + '</dd>' +
@@ -149,8 +273,10 @@ function _caixaConversaHTML(c) {
     '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
     '<h2 class="ov-h2">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>' +
     '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
-    '<span class="cx-chip">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
-    '<span class="cx-chip">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
+    (c.pendente ? '<span class="cx-chip cx-chip-alerta" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">Aguardando ' + escapeHtml(caixaEsperaRotulo(u.recebidoEm)) + '</span>' : '') +
+    '<span class="cx-chip' + (cli ? '' : ' cx-chip-alerta') + '">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
+    '<span class="cx-chip' + (c.atribuidoA ? '' : ' cx-chip-alerta') + '">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
+    (pen ? '<span class="cx-chip">Chamado #' + escapeHtml(String(pen.id).slice(0, 8)) + '</span>' : '') +
     '<span class="cx-chip">' + c.mensagens.length + (c.mensagens.length > 1 ? ' mensagens' : ' mensagem') + '</span></div>' +
     acoes + '</div>' +
     '<div class="cx-conv-grade"><div class="cx-timeline">' + timeline + '</div>' + lado + '</div>';
@@ -186,16 +312,12 @@ function _caixaHora(iso) {
 // o que a timeline já mostra, então saem. Corpo continua texto escapado — e-mail
 // é a entrada mais hostil do app; só URL http(s) vira link, também escapada.
 function _caixaCorpoHTML(corpo) {
-  const linhas = String(corpo || '').replace(/\r\n?/g, '\n').split('\n');
-  const fica = [];
-  for (const l of linhas) {
-    const t = l.trim();
-    if (/^(Em .+escreveu:|On .+wrote:|-{2,} ?(Mensagem original|Original Message) ?-{2,}|De: .+|From: .+)$/i.test(t) && fica.length) break;
-    if (t === '--' || t === '-- ') break;
-    if (t.startsWith('>')) continue;
-    fica.push(l);
-  }
-  const texto = fica.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const limpo = caixaCorpoLimpo(corpo);
+  return '<div class="cx-corpo">' + _caixaLinkificar(limpo.texto) + '</div>' +
+    (limpo.assinatura ? '<details class="cx-assinatura"><summary>Assinatura</summary><div class="cx-corpo">' + _caixaLinkificar(limpo.assinatura) + '</div></details>' : '');
+}
+
+function _caixaLinkificar(texto) {
   return texto.split(/(<?https?:\/\/[^\s<>"]+>?)/g).map((p, i) => {
     if (i % 2 === 0) return escapeHtml(p);
     const url = p.replace(/^</, '').replace(/>$/, '');
@@ -214,7 +336,7 @@ function renderCaixaEntrada() {
     area.innerHTML = '<div class="ov-wrap cx"><div class="search-bar page-toolbar">' +
       '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
       '<input class="form-input" id="caixaBusca" placeholder="Buscar por assunto ou remetente..." value="' + escapeHtml(_caixaBusca) + '" data-input="caixaBusca" /></div>' +
-      '<select class="form-select pt-filter" data-change="caixaFiltro">' +
+      '<select class="form-select pt-filter" id="caixaFiltro" data-change="caixaFiltro">' +
       Object.keys(CAIXA_FILTROS).map((k) => '<option value="' + k + '"' + (k === _caixaFiltro ? ' selected' : '') + '>' + escapeHtml(CAIXA_FILTROS[k]) + '</option>').join('') +
       '</select></div>' +
       '<div class="cx-corpo-tela" id="caixaTela"><div class="cx-lista" id="caixaLista"></div><section class="card cx-conversa" id="caixaConversa"></section></div></div>';
@@ -222,15 +344,34 @@ function renderCaixaEntrada() {
   const usuario = (getUser() || {}).name || '';
   const todas = _caixaConversas();
   const visiveis = caixaFiltrar(todas, _caixaFiltro, _caixaBusca, usuario);
+  // A toolbar não é remontada (perderia o foco da busca), então só os rótulos
+  // do filtro são atualizados com a contagem.
+  const sel0 = document.getElementById('caixaFiltro');
+  if (sel0 && sel0.options) {
+    sel0.value = _caixaFiltro;
+    const contagem = caixaContarFiltros(todas, usuario);
+    Array.prototype.forEach.call(sel0.options, (o) => { o.textContent = CAIXA_FILTROS[o.value] + ' (' + (contagem[o.value] || 0) + ')'; });
+  }
+  // Abrir a conversa conta como ler; marcar antes de desenhar a lista evita o
+  // ponto de não lida piscando no item que acabou de ser clicado.
+  const sel = _caixaSelecionada ? todas.find((c) => c.id === _caixaSelecionada) : null;
+  if (sel && caixaNaoLida(sel, _caixaLidas())) _caixaMarcar(sel, true);
+  const lidas = _caixaLidas();
   const lista = document.getElementById('caixaLista');
-  lista.innerHTML = visiveis.length ? visiveis.map(_caixaItemHTML).join('')
-    : '<div class="empty-state"><p>' + (_caixaFiltro === 'pendentes' ? 'Nada aguardando decisão.' : 'Nenhuma conversa encontrada.') + '</p></div>';
+  const vazio = _caixaBusca ? 'Nada encontrado para "' + escapeHtml(_caixaBusca) + '".'
+    : _caixaFiltro === 'pendentes' ? 'Nada aguardando decisão. Tudo em dia.'
+    : _caixaFiltro === 'minhas' ? 'Nenhuma conversa atribuída a você.' : 'Nenhuma conversa ainda.';
+  lista.innerHTML = visiveis.length ? visiveis.map((c) => _caixaItemHTML(c, lidas)).join('')
+    : '<div class="empty-state"><p>' + vazio + '</p>' +
+      (_caixaFiltro !== 'todas' ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaFiltro" data-arg="todas">Ver todas</button>' : '') + '</div>';
 
   // A selecionada pode ter saído do filtro (foi descartada, por exemplo):
   // continua aberta, para o técnico ver o resultado do que acabou de fazer.
-  const sel = _caixaSelecionada ? todas.find((c) => c.id === _caixaSelecionada) : null;
   const conv = document.getElementById('caixaConversa');
-  conv.innerHTML = sel ? _caixaConversaHTML(sel) : '<div class="empty-state"><p>Escolha uma conversa.</p></div>';
+  const naoLidas = visiveis.filter((c) => caixaNaoLida(c, lidas)).length;
+  conv.innerHTML = sel ? _caixaConversaHTML(sel)
+    : '<div class="empty-state cx-vazio"><p><b>Escolha uma conversa</b></p><p class="ov-muted">' +
+      (naoLidas ? naoLidas + (naoLidas > 1 ? ' não lidas' : ' não lida') + ' neste filtro.' : 'Tudo lido neste filtro.') + '</p></div>';
   const tela = document.getElementById('caixaTela');
   if (tela) tela.classList.toggle('cx-aberta', !!sel);
 }
@@ -336,4 +477,18 @@ registerActions({
   },
   caixaAbrirChamado: (_el, id) => caixaAbrirChamado(id),
   caixaDescartar: (_el, id) => caixaDescartar(id),
+  // Fecha a conversa junto: aberta, o render a marcaria como lida de novo.
+  caixaMarcarNaoLida: (_el, id) => {
+    const c = _caixaConversas().find((x) => x.id === id);
+    if (c) _caixaMarcar(c, false);
+    _caixaSelecionada = null;
+    renderCaixaEntrada();
+  },
+  // Recalcula na hora do clique: a sugestão do render pode ter ficado velha.
+  caixaVincularSugerido: (_el, id) => {
+    const todas = _caixaConversas();
+    const c = todas.find((x) => x.id === id);
+    const sugerido = c ? caixaSugerirCliente(c, todas) : null;
+    if (sugerido && caixaVincularSalvar(id, sugerido)) _emailTriagemRedesenhar();
+  },
 });
