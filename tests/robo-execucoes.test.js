@@ -91,7 +91,7 @@ describe('_rbxIdade', () => {
 
 describe('renderRoboExecucoes', () => {
   beforeEach(() => {
-    nodes.penRoboStatus = { innerHTML: 'antigo' };
+    nodes.roboStatus = { innerHTML: 'antigo' };
     for (const k of Object.keys(store)) delete store[k];
   });
 
@@ -103,14 +103,14 @@ describe('renderRoboExecucoes', () => {
   it('sem linhas limpa o painel', () => {
     comCache([]);
     sandbox.renderRoboExecucoes();
-    expect(nodes.penRoboStatus.innerHTML).toBe('');
+    expect(nodes.roboStatus.innerHTML).toBe('');
   });
 
   it('escapa o erro vindo do banco', () => {
     const agora = Date.now();
     comCache([{ acao: 'triagem', inicio: new Date(agora - 60000).toISOString(), ok: false, erro: '<img src=x onerror=alert(1)>', resultado: null }]);
     sandbox.renderRoboExecucoes();
-    const html = nodes.penRoboStatus.innerHTML;
+    const html = nodes.roboStatus.innerHTML;
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');
   });
@@ -119,7 +119,7 @@ describe('renderRoboExecucoes', () => {
     store.intra_rbx_fechada = '1';
     comCache([{ acao: 'triagem', inicio: new Date(Date.now() - 60000).toISOString(), ok: false, erro: 'x', resultado: null }]);
     sandbox.renderRoboExecucoes();
-    const html = nodes.penRoboStatus.innerHTML;
+    const html = nodes.roboStatus.innerHTML;
     expect(html).toContain('is-problema');
     expect(html).not.toContain('is-fechada');
     expect(html).toContain('rbx-lista');
@@ -128,7 +128,7 @@ describe('renderRoboExecucoes', () => {
   it('tudo ok fica fechado por padrão', () => {
     comCache([{ acao: 'triagem', inicio: new Date(Date.now() - 60000).toISOString(), ok: true, erro: null, resultado: { lidos: 3 } }]);
     sandbox.renderRoboExecucoes();
-    const html = nodes.penRoboStatus.innerHTML;
+    const html = nodes.roboStatus.innerHTML;
     expect(html).toContain('is-fechada');
     expect(html).toContain('Robô ok');
     expect(html).not.toContain('rbx-lista');
