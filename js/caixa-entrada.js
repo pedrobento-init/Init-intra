@@ -94,6 +94,16 @@ function _caixaConversaPorId(id) {
   return _caixaConversas().find((c) => c.id === id) || null;
 }
 
+// Depois que vira chamado, o que importa é onde o chamado está — "Virou
+// chamado" para sempre esconde que ele já foi resolvido.
+function _caixaSituacao(status, pendenciaId) {
+  const pen = (status === 'virou_chamado' || status === 'anexado') && pendenciaId && typeof getPendenciaById === 'function' ? getPendenciaById(pendenciaId) : null;
+  if (pen && STATUS_PEN_MAP[pen.status]) {
+    return { label: 'Chamado ' + STATUS_PEN_MAP[pen.status].label.toLowerCase(), cls: isPendenciaClosed(pen.status) ? 'chamado-fechado' : 'chamado-aberto' };
+  }
+  return { label: CAIXA_STATUS[status] || status || '', cls: status };
+}
+
 function _caixaItemHTML(c) {
   const u = c.ultima;
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
@@ -103,7 +113,7 @@ function _caixaItemHTML(c) {
     '<span class="cx-item-topo"><b>' + escapeHtml(_emailTriagemNome(u.de) || u.de || '(sem remetente)') + '</b>' +
     '<span class="cx-quando">' + escapeHtml(formatDateTime(u.recebidoEm)) + '</span></span>' +
     '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + (n > 1 ? ' <span class="cx-n">' + n + '</span>' : '') + '</span>' +
-    '<span class="cx-meta">' + escapeHtml(CAIXA_STATUS[u.status] || u.status || '') +
+    '<span class="cx-meta">' + escapeHtml(_caixaSituacao(u.status, c.pendenciaId).label) +
     (cli ? ' · ' + escapeHtml(cli.name) : '') +
     (c.atribuidoA ? ' · com ' + escapeHtml(c.atribuidoA) : '') + '</span>' +
     '</button>';
@@ -124,6 +134,7 @@ function _caixaConversaHTML(c) {
   const nome = _emailTriagemNome(u.de) || u.de || '(sem remetente)';
   const emailDe = _caixaEmailDe(u.de);
   const status = c.pendente ? 'pendente' : (u.status || '');
+  const sit = _caixaSituacao(status, c.pendenciaId);
   let diaAnterior = '';
   const timeline = c.mensagens.map((m) => {
     const dia = _caixaDiaRotulo(m.recebidoEm);
@@ -140,7 +151,7 @@ function _caixaConversaHTML(c) {
     (emailDe && emailDe !== nome ? '<span class="cx-sub">' + escapeHtml(emailDe) + '</span>' : '') + '</div></div>' +
     '<dl><dt>Cliente</dt><dd>' + (cli ? escapeHtml(cli.name) : '<span class="cx-sub">Não vinculado</span>') + '</dd></dl></section>' +
     '<section><h3>Atendimento</h3><dl>' +
-    '<dt>Situação</dt><dd>' + escapeHtml(CAIXA_STATUS[status] || status) + (motivo && c.pendente ? '<span class="cx-sub">' + escapeHtml(motivo.label) + '</span>' : '') + '</dd>' +
+    '<dt>Situação</dt><dd>' + escapeHtml(sit.label) + (motivo && c.pendente ? '<span class="cx-sub">' + escapeHtml(motivo.label) + '</span>' : '') + '</dd>' +
     '<dt>Responsável</dt><dd>' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : '<span class="cx-sub">Ninguém atribuído</span>') + '</dd>' +
     '<dt>Recebido</dt><dd>' + escapeHtml(formatDateTime(c.mensagens[0].recebidoEm)) + '</dd>' +
     (pen ? '<dt>Chamado</dt><dd><a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">' + escapeHtml(pen.id) + ' · ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a></dd>' : '') +
@@ -148,7 +159,7 @@ function _caixaConversaHTML(c) {
   return '<div class="cx-conv-topo">' +
     '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
     '<h2 class="ov-h2">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>' +
-    '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
+    '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(sit.cls) + '">' + escapeHtml(sit.label) + '</span>' +
     '<span class="cx-chip">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
     '<span class="cx-chip">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
     '<span class="cx-chip">' + c.mensagens.length + (c.mensagens.length > 1 ? ' mensagens' : ' mensagem') + '</span></div>' +

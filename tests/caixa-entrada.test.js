@@ -7,7 +7,7 @@ import vm from 'node:vm';
 // como no index.html.
 const FONTES = ['js/emails-triagem.js', 'js/caixa-entrada.js'].map((f) => fs.readFileSync(f, 'utf8'));
 
-let lista, toasts, undoCb, clientes, acoes, updates, upserts, conectado, elementos;
+let pendencias, lista, toasts, undoCb, clientes, acoes, updates, upserts, conectado, elementos;
 
 function elemento() {
   return { innerHTML: '', textContent: '', classes: new Set(), classList: { toggle(c, on) { if (on) this._el.classes.add(c); else this._el.classes.delete(c); } } };
@@ -37,7 +37,9 @@ function carregar() {
     registerActions: (a) => Object.assign(acoes, a),
     getOperatorNames: () => ['Ana', 'Bruno'],
     getMyClients: () => clientes,
-    getPendenciaById: () => null,
+    getPendenciaById: (id) => pendencias.find((p) => p.id === id) || null,
+    STATUS_PEN_MAP: { em_andamento: { label: 'Em Andamento' }, resolvido: { label: 'Resolvido' } },
+    isPendenciaClosed: (st) => st === 'resolvido',
     markSyncPushFailed: () => {},
     escapeHtml: (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
     formatDateTime: (s) => String(s || ''),
@@ -79,6 +81,7 @@ function entrada(over) {
 
 let s;
 beforeEach(() => {
+  pendencias = [];
   lista = [];
   toasts = [];
   undoCb = null;
@@ -249,5 +252,25 @@ describe('renderCaixaEntrada', () => {
     lista = [entrada()];
     acoes.caixaSelecionar(null, 'thread-9');
     expect(elementos.caixaConversa.innerHTML).toContain('Impressora não imprime');
+  });
+
+  it('conversa que virou chamado mostra a situação atual do chamado, não só "Virou chamado"', () => {
+    pendencias = [{ id: 'PEN-44', status: 'resolvido', title: 'Impressora' }];
+    lista = [entrada({ status: 'virou_chamado', pendenciaId: 'PEN-44' })];
+    s._caixaSelecionada = 'thread-9';
+    s.renderCaixaEntrada();
+    const html = elementos.caixaConversa.innerHTML;
+    expect(html).toContain('Chamado resolvido');
+    expect(html).toContain('cx-st-chamado-fechado');
+    expect(html).not.toContain('Virou chamado');
+  });
+
+  it('chamado ainda aberto aparece com a situação dele e marcado como aberto', () => {
+    pendencias = [{ id: 'PEN-44', status: 'em_andamento' }];
+    lista = [entrada({ status: 'virou_chamado', pendenciaId: 'PEN-44' })];
+    s._caixaSelecionada = 'thread-9';
+    s.renderCaixaEntrada();
+    expect(elementos.caixaConversa.innerHTML).toContain('Chamado em andamento');
+    expect(elementos.caixaConversa.innerHTML).toContain('cx-st-chamado-aberto');
   });
 });
