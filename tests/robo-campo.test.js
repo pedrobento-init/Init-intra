@@ -659,3 +659,26 @@ describe('resumo da rodada do robô (071)', () => {
     expect(resumoDaRodada('ok')).toEqual({});
   });
 });
+
+import { conversaDoEmail } from '../supabase/functions/robo/campo.ts';
+
+describe('conversaDoEmail', () => {
+  it('usa o número do ticket quando o remetente é o Octadesk', () => {
+    expect(conversaDoEmail({ de: 'suporte@init.octadesk.com', assunto: 'Atualização no Ticket #4821', thread_id: 't1' }))
+      .toBe('octadesk:4821');
+  });
+
+  it('casa a mesma chave em threads diferentes do mesmo ticket', () => {
+    const a = conversaDoEmail({ de: 'noreply@octadesk.com', assunto: '[#4821] Novo comentário', thread_id: 't1' });
+    const b = conversaDoEmail({ de: 'noreply@octadesk.com', assunto: 'Re: Ticket 4821 resolvido', thread_id: 't2' });
+    expect(a).toBe(b);
+  });
+
+  it('cai na thread do Gmail quando o remetente não é o Octadesk', () => {
+    expect(conversaDoEmail({ de: 'cliente@empresa.com', assunto: 'Ticket #4821', thread_id: 't9' })).toBe('t9');
+  });
+
+  it('cai na thread do Gmail quando o assunto não traz número de ticket', () => {
+    expect(conversaDoEmail({ de: 'noreply@octadesk.com', assunto: 'Pesquisa de satisfação', thread_id: 't3' })).toBe('t3');
+  });
+});

@@ -49,7 +49,7 @@ import {
   aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
   type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
   enderecoDoRemetente, entradaDaCaixa, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
-  type Monitor, monitorDoEmail, notaDoSolicitante, type OpcoesDaCaixa, pendenciaDaTriagem, pendenciaDoAlerta,
+  conversaDoEmail, type Monitor, monitorDoEmail, notaDoSolicitante, type OpcoesDaCaixa, pendenciaDaTriagem, pendenciaDoAlerta,
   remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa, type Remetente,
 } from "./campo.ts";
 
@@ -411,7 +411,7 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     // chamado por e-mail deixava quem atende com dois pela metade. Vira nota
     // ali. Não passa pela IA: não há nada a classificar numa conversa que já
     // tem assunto, cliente e prioridade — e é uma chamada a menos ao Make.
-    const aberto = await chamadoDaConversa(db, e.thread_id || "");
+    const aberto = await chamadoDaConversa(db, conversaDoEmail(e));
     if (aberto) {
       const notas = Array.isArray(aberto.notes) ? aberto.notes : [];
       const agora = new Date().toISOString();
