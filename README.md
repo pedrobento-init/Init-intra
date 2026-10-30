@@ -94,6 +94,7 @@ e2e/                  Testes de navegador (Playwright)
 | `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
 | `ia-relatorio` | Texto de relatório com IA. |
 | `ia-levar` | Sugere o que levar para a visita (IA). |
+| `caixa-responder` | Responde um e-mail da Caixa de entrada (`#caixa`) na mesma conversa de e-mail (migration 074). Só operador logado; o destinatário sai da linha em `emails_triagem`, nunca do app. |
 | `update-user-password` | Admin troca a senha de um usuário. |
 | `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
 
