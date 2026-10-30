@@ -371,7 +371,9 @@ function _mapToRemote(record, fieldMap, optionalFields) {
   const out = {};
   const opt = optionalFields && optionalFields.length ? new Set(optionalFields) : null;
   for (const [rk, lk] of Object.entries(fieldMap)) {
-    const v = record[lk] ?? null;
+    let v = record[lk] ?? null;
+    // Coluna *_id é FK: "" (chamado sem cliente, vindo da triagem) quebra com 23503; NULL passa
+    if (v === '' && rk.endsWith('_id')) v = null;
     if (opt && opt.has(rk) && (v === null || v === '')) continue;
     out[rk] = v;
   }
