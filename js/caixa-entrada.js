@@ -120,22 +120,89 @@ function _caixaConversaHTML(c) {
     (c.pendente ? '<button type="button" class="btn btn-primary btn-sm" data-action="caixaAbrirChamado" data-arg="' + id + '">Abrir chamado</button>' +
       '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaDescartar" data-arg="' + id + '">Descartar</button>' : '') +
     '</div>';
+  const u = c.ultima;
+  const nome = _emailTriagemNome(u.de) || u.de || '(sem remetente)';
+  const emailDe = _caixaEmailDe(u.de);
+  const status = c.pendente ? 'pendente' : (u.status || '');
+  let diaAnterior = '';
+  const timeline = c.mensagens.map((m) => {
+    const dia = _caixaDiaRotulo(m.recebidoEm);
+    const sep = dia && dia !== diaAnterior ? '<div class="cx-dia"><span>' + escapeHtml(dia) + '</span></div>' : '';
+    diaAnterior = dia;
+    const quem = _emailTriagemNome(m.de) || m.de || '(sem remetente)';
+    return sep + '<article class="cx-msg">' +
+      '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(quem)) + '</span>' +
+      '<div class="cx-balao"><header><b>' + escapeHtml(quem) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
+      '<div class="cx-corpo">' + _caixaCorpoHTML(m.corpo) + '</div></div></article>';
+  }).join('');
+  const lado = '<aside class="cx-lado">' +
+    '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-avatar">' + escapeHtml(_caixaIniciais(nome)) + '</span><div><b>' + escapeHtml(nome) + '</b>' +
+    (emailDe && emailDe !== nome ? '<span class="cx-sub">' + escapeHtml(emailDe) + '</span>' : '') + '</div></div>' +
+    '<dl><dt>Cliente</dt><dd>' + (cli ? escapeHtml(cli.name) : '<span class="cx-sub">Não vinculado</span>') + '</dd></dl></section>' +
+    '<section><h3>Atendimento</h3><dl>' +
+    '<dt>Situação</dt><dd>' + escapeHtml(CAIXA_STATUS[status] || status) + (motivo && c.pendente ? '<span class="cx-sub">' + escapeHtml(motivo.label) + '</span>' : '') + '</dd>' +
+    '<dt>Responsável</dt><dd>' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : '<span class="cx-sub">Ninguém atribuído</span>') + '</dd>' +
+    '<dt>Recebido</dt><dd>' + escapeHtml(formatDateTime(c.mensagens[0].recebidoEm)) + '</dd>' +
+    (pen ? '<dt>Chamado</dt><dd><a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">' + escapeHtml(pen.id) + ' · ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a></dd>' : '') +
+    '</dl>' + (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') + '</section></aside>';
   return '<div class="cx-conv-topo">' +
     '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
-    '<h2 class="ov-h2">' + escapeHtml(c.ultima.assunto || '(sem assunto)') + '</h2>' +
-    '<div class="cx-meta">' + (cli ? 'Cliente: ' + escapeHtml(cli.name) : 'Sem cliente') +
-    (c.atribuidoA ? ' · com ' + escapeHtml(c.atribuidoA) : ' · ninguém atribuído') +
-    (motivo && c.pendente ? ' · ' + escapeHtml(motivo.label) : '') + '</div>' +
-    (pen ? '<a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Chamado ' + escapeHtml(pen.id) + ': ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a>' : '') +
-    (c.ultima.atribuicaoNota ? '<div class="cx-nota">Nota da atribuição: ' + escapeHtml(c.ultima.atribuicaoNota) + '</div>' : '') +
+    '<h2 class="ov-h2">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>' +
+    '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
+    '<span class="cx-chip">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
+    '<span class="cx-chip">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
+    '<span class="cx-chip">' + c.mensagens.length + (c.mensagens.length > 1 ? ' mensagens' : ' mensagem') + '</span></div>' +
     acoes + '</div>' +
-    c.mensagens.map((m) =>
-      '<article class="cx-msg">' +
-      '<header><b>' + escapeHtml(m.de || '') + '</b><span class="cx-quando">' + escapeHtml(formatDateTime(m.recebidoEm)) + '</span></header>' +
-      // Corpo como texto escapado em pre-wrap: e-mail é a entrada mais hostil
-      // do app, e renderizar o HTML dele aqui abriria a porta que o escapeHtml fecha.
-      '<div class="cx-corpo">' + escapeHtml(m.corpo || '') + '</div>' +
-      '</article>').join('');
+    '<div class="cx-conv-grade"><div class="cx-timeline">' + timeline + '</div>' + lado + '</div>';
+}
+
+function _caixaEmailDe(de) {
+  const m = /<([^>]+)>/.exec(de || '');
+  return m ? m[1] : (de || '');
+}
+
+function _caixaIniciais(nome) {
+  const partes = String(nome || '?').replace(/[<>"@].*$/, '').trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '?';
+  return ((partes[0][0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
+}
+
+function _caixaDiaRotulo(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return '';
+  const hoje = new Date();
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+  if (d.toDateString() === hoje.toDateString()) return 'Hoje';
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function _caixaHora(iso) {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+// O que chega é e-mail cru: citação da resposta anterior e assinatura repetem
+// o que a timeline já mostra, então saem. Corpo continua texto escapado — e-mail
+// é a entrada mais hostil do app; só URL http(s) vira link, também escapada.
+function _caixaCorpoHTML(corpo) {
+  const linhas = String(corpo || '').replace(/\r\n?/g, '\n').split('\n');
+  const fica = [];
+  for (const l of linhas) {
+    const t = l.trim();
+    if (/^(Em .+escreveu:|On .+wrote:|-{2,} ?(Mensagem original|Original Message) ?-{2,}|De: .+|From: .+)$/i.test(t) && fica.length) break;
+    if (t === '--' || t === '-- ') break;
+    if (t.startsWith('>')) continue;
+    fica.push(l);
+  }
+  const texto = fica.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return texto.split(/(<?https?:\/\/[^\s<>"]+>?)/g).map((p, i) => {
+    if (i % 2 === 0) return escapeHtml(p);
+    const url = p.replace(/^</, '').replace(/>$/, '');
+    let rotulo = url;
+    try { rotulo = new URL(url).hostname; } catch (_e) { /* fica a URL inteira */ }
+    return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(rotulo) + '</a>';
+  }).join('');
 }
 
 function renderCaixaEntrada() {
