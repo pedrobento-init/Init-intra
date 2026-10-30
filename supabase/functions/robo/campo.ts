@@ -344,6 +344,23 @@ export function dominiosInternos(gmailUser: string): string[] {
 }
 
 
+/**
+ * Chave da conversa que liga a mensagem a um chamado aberto.
+ *
+ * O Octadesk manda cada atualização do mesmo ticket como e-mail novo, numa
+ * thread nova do Gmail: pela thread, cada uma abria um chamado. Quando o
+ * remetente é o Octadesk e o assunto traz o número do ticket ("Ticket #1234",
+ * "[#1234]"), a chave é o ticket e as atualizações viram nota no chamado que
+ * ele já abriu. Fora disso vale a thread do Gmail, como antes. A coluna
+ * email_thread_id só serve para casar a conversa — a resposta sai pelo
+ * message_id —, então guardar ali "octadesk:1234" não quebra o envio.
+ */
+export function conversaDoEmail(e: { de?: string; assunto?: string; thread_id?: string | null }): string {
+  const m = String(e.assunto || "").match(/(?:ticket\s*#?|\[#)\s*(\d{2,10})\b/i);
+  if (m && /octadesk/i.test(String(e.de || ""))) return "octadesk:" + m[1];
+  return String(e.thread_id || "").trim().slice(0, 200);
+}
+
 /** Tira os Re:/Enc: empilhados do assunto. */
 export function assuntoLimpo(assunto: string): string {
   const prefixo = /^\s*(re|res|ref|enc|encaminhada|fwd|fw)\s*:\s*/i;
@@ -481,7 +498,7 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
     email_corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
     solicitante_email: enderecoDoRemetente(e.de) || null,
     email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
-    email_thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
+    email_thread_id: conversaDoEmail(e) || null,
     status: "aberto", priority: t.prioridade, canal: "email", categoria: t.categoria,
     first_response_due: primeiraRespostaDue(t.prioridade, agora),
     attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,

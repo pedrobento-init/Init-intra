@@ -88,7 +88,7 @@ describe('a auto-resposta não some: vai para a caixa de triagem', () => {
     expect(detecta).toBeGreaterThan(-1);
     expect(robo.slice(detecta, detecta + 300)).toContain('"auto_resposta"');
     // Depois da conversa seria tarde: a auto-resposta já teria virado nota.
-    expect(detecta).toBeLessThan(robo.indexOf('await chamadoDaConversa(db, e.thread_id'));
+    expect(detecta).toBeLessThan(robo.indexOf('await chamadoDaConversa(db, conversaDoEmail(e)'));
   });
 
   it('a migration 070 libera o motivo novo no CHECK e traz como reverter', () => {
