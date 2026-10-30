@@ -552,7 +552,7 @@ function savePendencia(data) {
   const _full = _idx !== -1 ? list[_idx] : data;
   var _remotePen = {
     id: _full.id,
-    client_id: _full.clientId,
+    client_id: _full.clientId || null,  // "" (chamado sem cliente, vindo da triagem) quebra a FK; NULL passa
     client_name: _full.clientName,
     tipo: _full.tipo,
     assunto: _full.assunto || '',
