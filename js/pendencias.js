@@ -435,8 +435,6 @@ function renderPendencias() {
          do penViewArea porque renderPenView reescreve aquele nó inteiro a
          cada filtro, e a caixa não depende de filtro nenhum. -->
     <div id="penEntradasEmail"></div>
-    <!-- Painel do robô (071): mesmo motivo, não depende de filtro. -->
-    <div id="penRoboStatus"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;
@@ -450,7 +448,6 @@ function renderPendencias() {
   }catch(_){}
   setTimeout(function(){ _penUpdateMoreFiltersBadge(); }, 30);
   try { if (typeof renderEntradasEmail === 'function') renderEntradasEmail(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:entradas-email'); }
-  try { if (typeof renderRoboExecucoes === 'function') renderRoboExecucoes(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias:robo-status'); }
   showSkeleton('penViewArea', 6);
   renderPenView();
 }

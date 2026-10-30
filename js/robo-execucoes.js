@@ -1,4 +1,4 @@
-// robo-execucoes.js — O robô diz se está vivo, na tela de Pendências.
+// robo-execucoes.js — O robô diz se está vivo, em Configurações (menu "Mais opções").
 // =============================================================================
 // O robô (supabase/functions/robo) grava cada ação em robo_execucoes (071).
 // Antes disso, a triagem podia parar por dias — segredo trocado, gatilho do
@@ -7,8 +7,8 @@
 //
 // A tabela NÃO entra no sync: são ~288 linhas por dia e só importam as
 // últimas. O painel busca direto do Supabase, com limite, e no máximo uma vez
-// por minuto — renderPendencias roda a cada filtro e não pode virar uma query
-// por tecla. Sem Supabase, ou sem a migration aplicada, o painel some.
+// por minuto — abrir e fechar Configurações não pode virar uma query
+// por clique. Sem Supabase, ou sem a migration aplicada, o painel some.
 //
 // Script clássico, como o resto de js/: sem import/export, nomes no escopo
 // global (ver AGENTS.md).
@@ -116,7 +116,7 @@ function carregarRoboExecucoes() {
 }
 
 function renderRoboExecucoes() {
-  var node = document.getElementById('penRoboStatus');
+  var node = document.getElementById('roboStatus');
   if (!node) return;
   if (!_rbxSupabaseReady()) { node.innerHTML = ''; return; }
   var agora = Date.now();
@@ -164,4 +164,14 @@ if (typeof registerActions === 'function') {
   registerActions({
     rbxToggle: function () { roboExecucoesToggle(); }
   });
+}
+
+// Ainda não há tela de Configurações; o modal é o lugar dela por enquanto. O
+// texto fica fora de #roboStatus porque o render zera o nó quando não há dado.
+function abrirConfiguracoes() {
+  if (typeof openModal !== 'function') return;
+  openModal('Configurações',
+    '<p style="color:var(--text-muted);margin:0 0 12px">Status do robô de triagem (últimas rodadas). Sem Supabase conectado, nada aparece aqui.</p>'
+    + '<div id="roboStatus"></div>');
+  renderRoboExecucoes();
 }
