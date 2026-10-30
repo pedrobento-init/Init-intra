@@ -4503,6 +4503,11 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .cx-historico { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .cx-historico a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .cx-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 240px; color: var(--text-muted); text-align: center; }
+/* Canal da conversa (075): discreto, porque a maioria ainda é e-mail; o verde
+   só aparece no WhatsApp, que é o que muda o jeito de responder. */
+.cx-canal { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
+.cx-canal svg { flex: none; }
+.cx-canal-whatsapp { border-color: var(--green); background: var(--green-dim); color: var(--green); }
 @media (max-width: 760px) {
   .cx-corpo-tela { grid-template-columns: 1fr; }
   .cx-corpo-tela.cx-aberta .cx-lista { display: none; }
