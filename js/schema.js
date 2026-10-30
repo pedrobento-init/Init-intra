@@ -313,8 +313,12 @@ const ENTITIES = [
       motivo: 'motivo', status: 'status', pendencia_id: 'pendenciaId', team: 'team',
       tratado_por: 'tratadoPor', tratado_em: 'tratadoEm',
       client_id: 'clientId', atribuido_a: 'atribuidoA', atribuido_em: 'atribuidoEm', atribuicao_nota: 'atribuicaoNota',
+      canal: 'canal', telefone: 'telefone',
       created_at: 'createdAt', updated_at: 'updatedAt'
     },
+    // 075: banco que ainda não rodou a migration não tem as colunas do WhatsApp;
+    // a entrada sem canal continua sendo lida como e-mail.
+    optionalFields: ['canal', 'telefone'], // 075
     onChange: () => {
       // A caixa mora na tela de Pendências: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.
