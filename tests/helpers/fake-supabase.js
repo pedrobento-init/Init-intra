@@ -53,6 +53,9 @@ function builder(linhas) {
     // Fire-and-forget de `last_used_at` no agenda-ics: sem o update o handler
     // estoura antes de montar o .ics.
     update: () => api,
+    // Idem para insert (caixa-responder): o que importa no teste é o que a
+    // function mandou gravar, não a linha que ficou.
+    insert: () => api,
     maybeSingle: async () => ({ data: out[0] ?? null, error: null }),
     single: async () => ({
       data: out[0] ?? null,

@@ -4,6 +4,8 @@
 project_id = "esticiaufganuxhcwxzq"
 
 # Chamadas do app, com o JWT do operador (o código também confere operators).
+[functions.caixa-responder]
+verify_jwt = true
 [functions.ia-relatorio]
 verify_jwt = true
 [functions.ia-levar]
