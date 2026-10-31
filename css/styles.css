@@ -6969,3 +6969,148 @@ textarea[aria-busy="true"] { opacity: .6; }
   .modal.cw-modal .modal-body { padding-bottom: 0 !important; }
 }
 .cw-body .vp-add { min-height: 44px; padding: 0 16px; font-size: 14px; }
+
+/* ===== Chamado: tela de detalhe (estilo SAF) ===== */
+/* Bloco único da tela de detalhe do chamado (js/chamado-detalhe.js). Só usa
+   os tokens do app, então o tema escuro (body.dark-theme) vem de graça: nada
+   aqui redefine cor fixa. */
+.chd { min-width: 0; }
+.chd-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+.chd-head-main { min-width: 0; flex: 1 1 auto; }
+.chd-head-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.chd-protocolo {
+  font-size: 12px; font-weight: 600; letter-spacing: .3px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.chd-assunto {
+  margin: 2px 0 8px; font-size: 18px; font-weight: 700; line-height: 1.3;
+  color: var(--text-primary); overflow-wrap: anywhere;
+}
+.chd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chd-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 20px;
+  background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-light);
+}
+.chd-chip-status { background: var(--accent-dim2); color: var(--accent-light); border-color: transparent; }
+.chd-pri-baixa { background: var(--green-dim); color: var(--green); border-color: transparent; }
+.chd-pri-media { background: var(--yellow-dim); color: var(--yellow); border-color: transparent; }
+.chd-pri-alta, .chd-pri-critica { background: var(--red-dim); color: var(--red); border-color: transparent; }
+.chd-pri-critica { font-weight: 800; }
+.chd-canal-email { background: var(--blue-dim); color: var(--blue); border-color: transparent; }
+.chd-canal-whatsapp { background: var(--green-dim); color: var(--green); border-color: transparent; }
+.chd-canal-nenhum { color: var(--text-muted); border-style: dashed; }
+
+/* Barra de ações: quebra linha em vez de rolar, para caber no celular. */
+.chd-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.chd-actions-pri { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.chd-select {
+  min-height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); color: var(--text-primary); font: inherit; font-size: 13px;
+}
+.chd-select:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.chd-btn-cancelar { color: var(--red); }
+.chd-painel {
+  display: grid; gap: 8px; margin: 0 0 10px; padding: 12px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.chd-painel[hidden] { display: none; }
+.chd-painel-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* Duas colunas: conversa à esquerda, cartões à direita. O minmax(0,1fr)
+   impede que uma URL comprida no chat empurre a página para o lado. */
+.chd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.chd-main, .chd-side { min-width: 0; display: grid; gap: 12px; }
+
+.chd-card {
+  padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+.chd-card-title {
+  margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.chd-card-dl { margin: 0; display: grid; gap: 6px; }
+.chd-card-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.chd-card-row dt { color: var(--text-muted); }
+.chd-card-row dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.chd-card-tempo { font-variant-numeric: tabular-nums; font-weight: 600; }
+.chd-vazio { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+.chd-andamento { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.chd-and-item { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 8px; font-size: 13px; }
+.chd-and-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--accent); }
+.chd-and-item.is-evento .chd-and-dot { background: var(--border); }
+.chd-and-txt { color: var(--text-primary); overflow-wrap: anywhere; }
+.chd-and-item.is-evento .chd-and-txt { color: var(--text-secondary); }
+.chd-and-at { grid-column: 2; font-size: 11px; color: var(--text-muted); }
+
+/* Chat: quem pediu fica à esquerda, a equipe à direita (row-reverse, como o
+   .feed-msg.is-me). Nota interna ganha borda tracejada para não ser
+   confundida com algo que o cliente viu. */
+.chd-chat { display: grid; gap: 10px; }
+.chd-msg { min-width: 0; }
+.chd-msg.is-equipe { flex-direction: row-reverse; }
+.chd-msg.is-equipe .feed-bubble { background: var(--bg-secondary); }
+.chd-msg .feed-bubble { max-width: min(560px, 100%); overflow-wrap: anywhere; }
+.chd-msg.is-interna .feed-bubble {
+  background: var(--yellow-dim); border: 1px dashed var(--yellow); border-left-width: 1px;
+}
+
+.chd-composer {
+  display: grid; gap: 8px; padding: 12px 14px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.chd-composer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.chd-composer-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.chd-composer-aviso { font-size: 12px; color: var(--text-muted); }
+.chd-composer.is-sem-canal .chd-composer-label { color: var(--text-muted); }
+.chd-composer-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.chd-vars { display: flex; flex-wrap: wrap; gap: 6px; }
+.chd-var {
+  padding: 2px 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm);
+  background: var(--bg-secondary); color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  transition: var(--transition);
+}
+.chd-var:hover { background: var(--bg-hover); color: var(--text-primary); }
+.chd-var:focus-visible, .chd-mencao-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.chd-textarea {
+  width: 100%; min-height: 96px; padding: 8px 10px; resize: vertical; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); color: var(--text-primary); font: inherit; font-size: 14px;
+}
+.chd-textarea:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.chd-nota {
+  display: grid; gap: 8px; padding: 12px 14px; background: var(--yellow-dim);
+  border: 1px dashed var(--yellow); border-radius: var(--radius);
+}
+.chd-nota-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.chd-mencao-wrap { position: relative; }
+.chd-mencao-lista {
+  position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 4px;
+  list-style: none; max-height: 200px; overflow-y: auto; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm);
+}
+.chd-mencao-lista[hidden] { display: none; }
+.chd-mencao-item {
+  display: block; width: 100%; padding: 6px 8px; text-align: left; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer;
+}
+.chd-mencao-item:hover { background: var(--bg-hover); }
+
+/* Celular: uma coluna, respiro de 16px e nada que force rolagem lateral. */
+@media (max-width: 640px) {
+  .chd { padding: 0 16px; box-sizing: border-box; max-width: 100%; overflow-x: hidden; }
+  .chd-head { flex-direction: column; }
+  .chd-head-side { justify-content: flex-start; }
+  .chd-grid { grid-template-columns: minmax(0, 1fr); }
+  .chd-actions > * { flex: 1 1 auto; }
+  .chd-card-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .chd-composer-acoes > * { flex: 1 1 auto; }
+  .chd-msg .feed-bubble { max-width: 100%; }
+}
