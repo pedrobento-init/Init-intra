@@ -44,6 +44,8 @@ var _EMAIL_TRIAGEM_COLUNAS_073 = [
 function _emailTriagemRedesenhar() {
   if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
   if (typeof renderCaixaEntrada === 'function' && document.getElementById('caixaLista')) renderCaixaEntrada();
+  // O "+N" da aba E-mail conta as entradas pendentes; sem isso fica velho até o próximo filtro.
+  if (typeof _penRenderOrigemCounts === 'function') { try { _penRenderOrigemCounts(); } catch (_e) { /* fora da tela de pendências */ } }
 }
 
 /** Grava a decisão na entrada e empurra para o banco, como o resto do app. */

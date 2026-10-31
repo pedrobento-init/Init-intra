@@ -507,6 +507,15 @@ tr:hover td { background: var(--bg-hover); }
   background:var(--accent-dim2); color:var(--accent-light); font-size:11px; font-weight:700; line-height:18px;
 }
 .pen-scope-tab .pen-scope-count:empty { display:none; }
+/* Abas de origem (Internas/E-mail): primeiro nível, acima de Ativas/Arquivadas. */
+.pen-origem-tabs { margin-bottom:10px; }
+.pen-origem-tabs .pen-scope-tab { font-size:14px; }
+.pen-origem-triagem {
+  display:inline-block; margin-left:4px; padding:0 6px; border-radius:999px;
+  background:var(--yellow-dim); color:var(--yellow);
+  font-size:11px; font-weight:700; line-height:18px;
+}
+.pen-origem-triagem:empty { display:none; }
 
 /* ── TEMPLATES GRID ── */
 #templatesGridWrap {
