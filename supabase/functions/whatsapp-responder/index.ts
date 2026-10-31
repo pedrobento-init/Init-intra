@@ -29,7 +29,7 @@
 // ZAPI_CLIENT_TOKEN.
 
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-import { telefoneDaConversa, TEXTO_MAX } from "../whatsapp/mensagem.ts";
+import { PEN_FECHADOS, telefoneDaConversa, TEXTO_MAX } from "../whatsapp/mensagem.ts";
 import { enviarTexto } from "../whatsapp/provedor.ts";
 
 function json(body: unknown, status = 200) {
@@ -74,15 +74,30 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (!visivel) return json({ error: "Chamado não encontrado", code: "pendencia_not_found" }, 404);
 
     const { data: pen, error: penErr } = await ctx.supabaseAdmin
-      .from("pendencias").select("id, email_thread_id").eq("id", id).maybeSingle();
+      .from("pendencias").select("id, email_thread_id, status").eq("id", id).maybeSingle();
     if (penErr || !pen) {
       console.error("whatsapp-responder: leitura do destino:", penErr?.message || "sumiu");
       return json({ error: "Não foi possível ler o chamado", code: "pendencia_read" }, 500);
+    }
+    // Mesma lista do webhook: resposta em chamado fechado chegaria ao cliente
+    // sem ninguém acompanhando a volta, que cai num chamado novo.
+    if (PEN_FECHADOS.includes(String(pen.status))) {
+      return json({ error: "Chamado encerrado: reabra antes de responder", code: "pendencia_closed" }, 409);
     }
 
     const tel = telefoneDaConversa(pen.email_thread_id);
     if (!tel) {
       return json({ error: "Este chamado não veio do WhatsApp", code: "not_whatsapp" }, 422);
+    }
+
+    // O email_thread_id é gravado pelo app, então sozinho não prova nada: o
+    // número precisa ter escrito para a empresa antes (076, só o webhook grava).
+    // Erro de leitura recusa também — sem a prova, não envia.
+    const { data: contato, error: contErr } = await ctx.supabaseAdmin
+      .from("whatsapp_conversas").select("telefone").eq("telefone", tel).maybeSingle();
+    if (contErr) console.error("whatsapp-responder: leitura da conversa:", contErr.message);
+    if (!contato) {
+      return json({ error: "Este número nunca escreveu para a empresa pelo WhatsApp", code: "not_whatsapp_contact" }, 422);
     }
 
     const envio = await enviarTexto(tel, bruto, cred);

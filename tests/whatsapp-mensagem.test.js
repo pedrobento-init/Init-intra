@@ -67,6 +67,16 @@ describe('clienteDoTelefone', () => {
   it('número desconhecido não casa ninguém', () => {
     expect(clienteDoTelefone(clientes, '5531999998888')).toBeNull();
   });
+
+  it('dois clientes com o mesmo número não decidem sozinhos: volta null', () => {
+    const ambiguos = [...clientes, { id: 'c3', name: 'Mercado', owner_phone: '(11) 98765-4321' }];
+    expect(clienteDoTelefone(ambiguos, '5511987654321')).toBeNull();
+  });
+
+  it('o mesmo cliente casando pelos dois telefones não é ambiguidade', () => {
+    const dobrado = [{ id: 'c4', name: 'Loja', owner_phone: '11 98765-4321', responsible_phone: '(11) 98765-4321' }];
+    expect(clienteDoTelefone(dobrado, '5511987654321')?.id).toBe('c4');
+  });
 });
 
 describe('assuntoDaMensagem', () => {

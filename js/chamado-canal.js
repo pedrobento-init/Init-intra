@@ -20,12 +20,14 @@ function _chamadoCampo(p, camel, snake) {
   return p[camel] != null ? p[camel] : (p[snake] != null ? p[snake] : '');
 }
 
-// WhatsApp vence o e-mail: a pendência do WhatsApp pode ter solicitanteEmail
-// herdado do cadastro, mas a pessoa falou pelo telefone e espera a resposta lá.
+// O thread 'whatsapp:' vence o e-mail: a pendência do WhatsApp pode ter
+// solicitanteEmail herdado do cadastro, mas a pessoa falou pelo telefone e
+// espera a resposta lá. A coluna canal sozinha não basta: o whatsapp-responder
+// tira o destino do thread, e sem ele o composer ofereceria um envio que falha.
 function chamadoCanalDe(p) {
   if (!p) return null;
   const thread = String(_chamadoCampo(p, 'emailThreadId', 'email_thread_id') || '');
-  if (p.canal === 'whatsapp' || thread.indexOf('whatsapp:') === 0) return 'whatsapp';
+  if (thread.indexOf('whatsapp:') === 0) return 'whatsapp';
   if (String(_chamadoCampo(p, 'solicitanteEmail', 'solicitante_email') || '').trim()) return 'email';
   return null;
 }

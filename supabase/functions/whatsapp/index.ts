@@ -36,11 +36,10 @@ import {
   clienteDoTelefone,
   conversaDoTelefone,
   type MensagemWhats,
+  PEN_FECHADOS,
   tempoConstante,
 } from "./mensagem.ts";
 import { mensagensDoWebhook } from "./provedor.ts";
-
-const PEN_FECHADOS = ["concluido", "resolvido", "cancelado", "fechado"];
 
 type ClienteFone = {
   id: string;
@@ -71,6 +70,10 @@ async function clientes(db: SupabaseClient): Promise<ClienteFone[]> {
 
 // Fechado não conta: mensagem depois de concluir é pedido novo, e ressuscitar
 // o chamado antigo esconderia isso do SLA e da fila.
+//
+// Sem filtro de team de propósito: a equipe só se sabe depois de casar o
+// cliente, e o mesmo número pode ter chamado aberto em qualquer equipe. O
+// update da nota filtra por id + team lidos aqui.
 async function chamadoDaConversa(db: SupabaseClient, conversa: string): Promise<Aberto | null> {
   if (!conversa) return null;
   const { data, error } = await db.from("pendencias")
@@ -145,6 +148,13 @@ async function handle(req: Request, ctx: SupabaseContext) {
         if (erroChave.code === "23505") continue;
         throw new Error("avisos_enviados: " + erroChave.message);
       }
+
+      // Prova, gravada só pelo servidor, de que este número falou com a empresa:
+      // o whatsapp-responder recusa enviar para quem não está aqui (076). Falha
+      // não segura a mensagem — o pior caso é a resposta ser recusada depois.
+      const { error: erroConversa } = await db.from("whatsapp_conversas")
+        .upsert({ telefone: m.telefone, ultima_em: new Date().toISOString() }, { onConflict: "telefone" });
+      if (erroConversa) console.error(`whatsapp conversa ${m.id}:`, erroConversa.message);
 
       const aberto = await chamadoDaConversa(db, conversaDoTelefone(m.telefone));
       if (aberto) {

@@ -31,6 +31,10 @@ export type MensagemWhats = {
 // ninguém lê resposta desse tamanho no celular: passou disso, é colagem errada.
 export const TEXTO_MAX = 20000;
 
+// Status em que o chamado não recebe mais a conversa: o webhook abre outro, e
+// o responder recusa enviar.
+export const PEN_FECHADOS = ["concluido", "resolvido", "cancelado", "fechado"];
+
 const PREFIXO = "whatsapp:";
 
 // Comparação de segredo sem curto-circuito: o tempo não diz quantos caracteres
@@ -64,13 +68,19 @@ type ClienteComFone = Cliente & {
   responsible_phone?: string | null;
 };
 
+// Dois clientes com o mesmo número (sócio de duas empresas, telefone de
+// contador) não decidem sozinhos: a mensagem vai sem cliente para alguém
+// escolher, em vez de cair na equipe do primeiro que aparecer.
 export function clienteDoTelefone<C extends ClienteComFone>(clientes: C[], telefone: string): C | null {
   const chave = chaveTelefone(telefone);
   if (!chave) return null;
+  let achado: C | null = null;
   for (const c of clientes || []) {
-    if (chaveTelefone(c.owner_phone) === chave || chaveTelefone(c.responsible_phone) === chave) return c;
+    if (chaveTelefone(c.owner_phone) !== chave && chaveTelefone(c.responsible_phone) !== chave) continue;
+    if (achado && achado.id !== c.id) return null;
+    achado = c;
   }
-  return null;
+  return achado;
 }
 
 // Mensagem de WhatsApp não tem assunto; a primeira linha é o mais perto disso

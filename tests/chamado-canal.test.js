@@ -40,8 +40,9 @@ beforeEach(() => {
 });
 
 describe('canal do chamado', () => {
-  it('canal whatsapp na pendência é WhatsApp', () => {
-    expect(s.chamadoCanalDe({ canal: 'whatsapp' })).toBe('whatsapp');
+  it('só a coluna canal, sem thread, não basta: o responder não teria destino', () => {
+    expect(s.chamadoCanalDe({ canal: 'whatsapp' })).toBeNull();
+    expect(s.chamadoCanalDe({ canal: 'whatsapp', solicitanteEmail: 'marcia@acme.com.br' })).toBe('email');
   });
 
   it('thread id com prefixo whatsapp: basta, mesmo sem a coluna canal', () => {
@@ -63,7 +64,7 @@ describe('canal do chamado', () => {
   });
 
   it('WhatsApp vence o e-mail herdado do cadastro: a pessoa espera a resposta onde falou', () => {
-    expect(s.chamadoCanalDe({ canal: 'whatsapp', solicitanteEmail: 'marcia@acme.com.br' })).toBe('whatsapp');
+    expect(s.chamadoCanalDe({ emailThreadId: 'whatsapp:5511987654321', solicitanteEmail: 'marcia@acme.com.br' })).toBe('whatsapp');
   });
 
   it('canal desconhecido aparece como "Sem canal"', () => {
