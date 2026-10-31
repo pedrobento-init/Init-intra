@@ -69,7 +69,8 @@ function chamadoAplicarVariaveis(texto, p, ctx) {
     nome: nome,
     primeiro_nome: nome ? nome.split(/\s+/)[0] : '',
     protocolo: _chdProtocolo(pen),
-    data_hoje: (c.hoje instanceof Date ? c.hoje : new Date()).toLocaleDateString('pt-BR'),
+    // Checa pelo método, não por instanceof: Date de outro realm (vm, iframe) falha o instanceof.
+    data_hoje: (c.hoje && typeof c.hoje.getTime === 'function' ? c.hoje : new Date()).toLocaleDateString('pt-BR'),
     area: (function () {
       var a = '';
       try { a = pen.categoria && typeof penCategoriaLabel === 'function' ? penCategoriaLabel(pen.categoria) : ''; } catch (_e) { a = ''; }
