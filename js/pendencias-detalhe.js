@@ -3,6 +3,26 @@
 // carregam logo depois de pendencias.js e compartilham os mesmos globais.
 // Nos testes, tests/_parts.cjs junta as partes na mesma ordem.
 
+// Um item do chat do chamado. Quem pediu fica de um lado, a equipe do outro
+// (CSS .chd-msg.is-equipe); evento vira linha discreta no meio.
+function _penChatItemHtml(n, me) {
+  if (n._evento) return _penEventoHtml(n);
+  var _isMe = me && n.author === me;
+  var _ini = String(n.author||'?').trim().split(/\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
+  // Sem o campo = nota anterior à separação: lida como interna.
+  // 'solicitante' (065) é a fala de quem PEDIU, que chegou por e-mail
+  // na conversa do chamado: não é nossa nem é segredo da equipe, então
+  // não pode ler como 🔒 interna.
+  var _doSolic = n.visibility === 'solicitante';
+  var _interna = !_doSolic && n.visibility !== 'resposta';
+  return '<div class="feed-msg chd-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+(_doSolic?' is-solicitante':' is-equipe')+'">'
+    + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
+    + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
+    + (_doSolic ? '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>' : '')
+    + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 Interna</span>' : '')
+    + '</div><div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
+}
+
 function openPendenciaDetail(id) {
   const p = getPendenciaById(id);
   if (!p) return;
@@ -22,9 +42,6 @@ function openPendenciaDetail(id) {
   const _checkList = Array.isArray(p.checklist) ? p.checklist : [];
   const _checkDone = _checkList.filter(function(it){ return it && it.done; }).length;
   const _me = (typeof getUser === 'function' && getUser()) ? getUser().name : '';
-  // Chamado aberto pela triagem de e-mail (064): dá para responder a quem
-  // pediu sem sair daqui. Sem endereço, a opção nem aparece.
-  const _emailDestino = String(p.solicitanteEmail || '').trim();
   // O bloco de origem sai da descrição e vira cartão — inclusive nos chamados
   // antigos, que é onde ele está feio hoje.
   const _penDesc = _penOrigemTriagem(p.descricao);
@@ -33,24 +50,20 @@ function openPendenciaDetail(id) {
   // é pior do que não ter o botão.
   const _emailCorpo = String(p.emailCorpo || '').trim();
   const _emailInteiro = _emailCorpo.length > _penDesc.corpo.length + 40 ? _emailCorpo : '';
+  const _eid = escapeHtml(id);
+  const _itens = _penFeedItens(p);
+  const _statusHtml = `<span class="pen-cmd-badge" id="cmdStatusBadge" style="--st-dot:${escapeHtml(_stMeta.dot)}"><span class="pen-cmd-dot" aria-hidden="true"></span>${escapeHtml(_stMeta.label)}</span>
+      <div class="pen-status-wrap pen-cmd-status-edit">
+        <select class="form-select pen-status-select pen-cmd-select" id="chgStatus" title="Alterar status (salva na hora)" aria-label="Status" data-change="chdStatus" data-id="${_eid}">
+          ${(STATUS_PEN_MAP[p.status] ? '' : `<option value="${escapeHtml(p.status || '')}" selected disabled>${escapeHtml({ concluido: 'Concluído', fechado: 'Fechado' }[p.status] || p.status || '—')} (antigo)</option>`) + Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
+        </select>
+      </div>`;
+  const _timerHtml = `<div class="timer-row pen-cmd-timer" title="${_worker ? _escapeHtmlFallback(_worker)+' trabalhando — clique ⏸ para pausar' : 'Ninguém trabalhando — clique ▶ para iniciar'}">${timerWidget(p, 'pendencia')}</div>`;
+  const _editarHtml = `<button type="button" class="pen-cmd-edit" title="Editar todos os campos" aria-label="Editar pendência" data-action="chdEditar" data-arg="${_eid}">✎</button>`;
   openModal(`${penDisplayNumber(p)} – ${escapeHtml(getPendenciaTitulo(p))}`, `
-    <div class="pen-detail pen-cmd" data-status="${escapeHtml(p.status||'')}">
-    <!-- ══ CABEÇALHO COMANDO: badge + timer primário + editar sutil ══ -->
-    <div class="pen-cmd-header">
-      <div class="pen-cmd-status-row">
-        <span class="pen-cmd-badge" id="cmdStatusBadge" style="--st-dot:${escapeHtml(_stMeta.dot)}"><span class="pen-cmd-dot" aria-hidden="true"></span>${escapeHtml(_stMeta.label)}</span>
-        <div class="pen-status-wrap pen-cmd-status-edit">
-          <select class="form-select pen-status-select pen-cmd-select" id="chgStatus" title="Alterar status (salva na hora)" onchange="cmdStatusPreview(this);changePenStatus('${escapeHtml(id)}')">
-            ${(STATUS_PEN_MAP[p.status] ? '' : `<option value="${escapeHtml(p.status || '')}" selected disabled>${escapeHtml({ concluido: 'Concluído', fechado: 'Fechado' }[p.status] || p.status || '—')} (antigo)</option>`) + Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
-          </select>
-        </div>
-        ${priorityTag(p.priority)}
-      </div>
-      <div class="pen-cmd-top-actions">
-        <div class="timer-row pen-cmd-timer" title="${_worker ? _escapeHtmlFallback(_worker)+' trabalhando — clique ⏸ para pausar' : 'Ninguém trabalhando — clique ▶ para iniciar'}">${timerWidget(p, 'pendencia')}</div>
-        <button class="pen-cmd-edit" title="Editar todos os campos" aria-label="Editar pendência" onclick="closeModal();openPendenciaForm('${escapeHtml(id)}')">✎</button>
-      </div>
-    </div>
+    <div class="pen-detail pen-cmd chd" data-status="${escapeHtml(p.status||'')}">
+    ${chamadoCabecalhoHtml(p, { status: _statusHtml, timer: _timerHtml, editar: _editarHtml })}
+    ${chamadoAcoesHtml(p)}
     <!-- Linha compacta de trabalho (mantém contrato pen-work p/ timer.js + teste mobile) -->
     <div class="pen-work ${_worker ? 'is-working' : 'is-free'} pen-cmd-work" title="${_worker ? _escapeHtmlFallback(_worker) + ' está trabalhando nesta pendência' : 'Ninguém trabalhando agora — inicie pelo botão verde acima'}">
       <span class="pen-work-dot" aria-hidden="true"></span>
@@ -62,115 +75,68 @@ function openPendenciaDetail(id) {
       </div>
       <div class="pen-work-side">
         <span class="pen-work-label">Tempo acumulado</span>
-        <span class="pen-time" title="Tempo total exato: ${_escapeHtmlFallback(_ft.exact)}">⏱ ${_escapeHtmlFallback(_ft.friendly)}</span><button type="button" class="link-btn pen-sessions" onclick="openTimeEntries('${escapeHtml(id)}')" title="Ver, corrigir ou lançar horas">Sessões</button>
+        <span class="pen-time" title="Tempo total exato: ${_escapeHtmlFallback(_ft.exact)}">⏱ ${_escapeHtmlFallback(_ft.friendly)}</span><button type="button" class="link-btn pen-sessions" data-action="chdSessoes" data-arg="${_eid}" title="Ver, corrigir ou lançar horas">Sessões</button>
       </div>
     </div>
 
-    <div class="pen-cmd-grid">
-      <!-- ══ COLUNA ESQUERDA (65%): contexto + feed ══ -->
-      <section class="pen-cmd-main">
-        <div class="ticket-info-item pen-assunto pen-cmd-assunto"><div class="ticket-info-label">Assunto</div><div class="ticket-info-value">${escapeHtml(getPendenciaAssunto(p))||'<span style="color:var(--text-muted)">Não preenchido (registro anterior à separação assunto/descrição)</span>'}</div></div>
+    <div class="chd-grid">
+      <!-- ══ CENTRO: contexto + conversa + composer ══ -->
+      <section class="chd-main">
         <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(_penDesc.corpo)||'—'}</div>
-        ${_penOrigemHtml(_penDesc.origem)}
         ${_penDesc.depois ? `<div class="pen-desc pen-desc-depois">${_penRichDesc(_penDesc.depois)}</div>` : ''}
         ${_emailInteiro ? `<details class="pen-email-full"><summary>Ver o e-mail inteiro (${_emailInteiro.length.toLocaleString('pt-BR')} caracteres)</summary><div class="pen-email-corpo">${_penRichDesc(_emailInteiro)}</div></details>` : ''}
         ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div style="margin-top:10px"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
         </div>
         ${typeof kbPendenciaPanelHtml === 'function' ? kbPendenciaPanelHtml(p) : ''}
 
-        <div class="pen-cmd-card pen-cmd-feed-card">
-          <div class="section-header pen-sec-head"><span class="section-title">💬 Feed de atividade</span><span class="pen-count">${(p.notes||[]).length ? (p.notes||[]).length+' msgs' : '0 msgs'}</span></div>
-          <div class="pen-cmd-feed" id="penTimeline">
-            ${_penFeedItens(p).length ? _penFeedItens(p).map(function(n){
-              if (n._evento) return _penEventoHtml(n);
-              var _isMe = _me && n.author === _me;
-              var _ini = String(n.author||'?').trim().split(/\\s+/).map(function(w){return (w[0]||'').toUpperCase();}).slice(0,2).join('') || '?';
-              // Sem o campo = nota anterior à separação: lida como interna.
-              // 'solicitante' (065) é a fala de quem PEDIU, que chegou por e-mail
-              // na conversa do chamado: não é nossa nem é segredo da equipe, então
-              // não pode ler como 🔒 interna.
-              var _doSolic = n.visibility === 'solicitante';
-              var _interna = !_doSolic && n.visibility !== 'resposta';
-              return '<div class="feed-msg'+(_isMe?' is-me':'')+(_interna?' is-interna':'')+(_doSolic?' is-solicitante':'')+'">'
-                + '<span class="feed-avatar" title="'+escapeHtml(n.author||'')+'">'+escapeHtml(_ini)+'</span>'
-                + '<div class="feed-bubble"><div class="feed-meta"><strong>'+escapeHtml(n.author)+'</strong><span> · '+formatDateTime(n.createdAt)+'</span>'
-                + (_doSolic ? '<span class="feed-tag-solicitante" title="Chegou por e-mail, na conversa do chamado">✉ do solicitante</span>' : '')
-                + (_interna ? '<span class="feed-tag-interna" title="Visível só para a equipe">🔒 interna</span>' : '')
-                + '</div>'
-                + '<div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
-            }).join('') : '<p class="text-muted pen-cmd-empty">Nenhuma nota ainda. Poste a primeira atualização abaixo 👇</p>'}
-          </div>
-          <div class="pen-cmd-composer" id="penComposer" data-vis="resposta">
-            <div class="pen-cmd-vis" role="tablist" aria-label="Destino da mensagem">
-              <button type="button" class="pen-vis-tab is-on" role="tab" aria-selected="true" data-action="penNoteVis" data-arg="resposta"
-                title="Fica visível para quem pediu e conta como 1ª resposta no SLA">Resposta</button>
-              <button type="button" class="pen-vis-tab" role="tab" aria-selected="false" data-action="penNoteVis" data-arg="interna"
-                title="Só a equipe vê; não conta como 1ª resposta">🔒 Anotação interna</button>
-            </div>
-            <textarea class="form-textarea" id="newNoteText" rows="3" placeholder="O que foi feito? Decisões tomadas? (Ctrl+Enter envia · @nome menciona)"></textarea>
-            ${_emailDestino ? `<label class="pen-cmd-email" id="penNoteEmailWrap" title="Vai na mesma conversa de e-mail em que ${escapeHtml(_emailDestino)} escreveu">
-              <input type="checkbox" id="penNoteEmail" checked>
-              <span>Enviar por e-mail para <strong>${escapeHtml(_emailDestino)}</strong></span>
-            </label>` : ''}
-            <div class="pen-cmd-composer-bar">
-              <div class="pen-cmd-tools">
-                <label class="btn btn-secondary btn-sm pen-cmd-tool" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">📎 Anexar
-                  <input type="file" id="penFileInput" style="display:none" onchange="handleFileUpload('pendencias','${id}',this,()=>{renderAttachmentList('pendencias','${id}','penAttachmentsList');cmdRefreshAttCount('${escapeHtml(id)}')})" />
-                </label>
-                <button type="button" class="btn btn-secondary btn-sm pen-cmd-tool" title="Ir para o checklist" onclick="cmdFocusChecklist()">☑️ Checklist</button>
-                <button type="button" class="btn btn-secondary btn-sm pen-cmd-tool" title="Inserir uma resposta pronta da equipe" data-action="rpAbrir">💬 Respostas</button>
-              </div>
-              <button type="button" class="btn btn-primary pen-cmd-post" onclick="submitPenNote('${escapeHtml(id)}')">📝 Postar Atualização</button>
-            </div>
-          </div>
+        <div class="pen-cmd-feed chd-chat" id="penTimeline" aria-label="Conversa do chamado">
+          ${_itens.length ? _itens.map(function(n){ return _penChatItemHtml(n, _me); }).join('') : '<p class="text-muted pen-cmd-empty">Nenhuma mensagem ainda.</p>'}
         </div>
+        ${chamadoComposerHtml(p)}
       </section>
 
-      <!-- ══ COLUNA DIREITA (35%): metadados + ferramentas ══ -->
-      <aside class="pen-cmd-side">
-        <div class="pen-cmd-card">
-          <div class="pen-section-label">Propriedades</div>
+      <!-- ══ DIREITA: cartões + propriedades + ferramentas ══ -->
+      <aside class="chd-side">
+        ${chamadoCartoesHtml(p, _penDesc.origem)}
+
+        <div class="chd-card">
+          <h3 class="chd-card-title">Propriedades</h3>
           <dl class="pen-props pen-cmd-props">
             <div class="pen-prop"><dt>Cliente</dt><dd>${c?`<span class="pen-client">${clientAvatar(c,22)}<span>${escapeHtml(p.clientName)}</span></span>`:escapeHtml(p.clientName)||'—'}</dd></div>
             <div class="pen-prop"><dt>Tipo</dt><dd>${escapeHtml(p.tipo)||'—'}</dd></div>
             ${typeof penCategoriaOptionsHtml === 'function' ? `
-            <div class="pen-prop"><dt>Solicitante</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.solicitante)||'—'}<button class="pen-inline-edit" title="Alterar solicitante" aria-label="Alterar solicitante" data-action="penEditSolicitante" data-arg="${escapeHtml(id)}">✏️</button></span></dd></div>
-            <div class="pen-prop"><dt>Canal</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCanalLabel(p.canal))||'—'}<select class="pen-inline-select" title="Alterar canal" aria-label="Alterar canal" data-change="penSetField" data-field="canal" data-id="${escapeHtml(id)}">${penCanalOptionsHtml(p.canal||'')}</select></span></dd></div>
-            <div class="pen-prop"><dt>Categoria</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCategoriaLabel(p.categoria))||'—'}<select class="pen-inline-select" title="Alterar categoria" aria-label="Alterar categoria" data-change="penSetField" data-field="categoria" data-id="${escapeHtml(id)}">${penCategoriaOptionsHtml(p.categoria||'')}</select></span></dd></div>
-            <div class="pen-prop"><dt>1ª resposta</dt><dd>${penRespostaBadge(p, Date.now(), { full: true })}</dd></div>
-            <div class="pen-prop"><dt>Resolução</dt><dd>${typeof penResolucaoBadge === 'function' ? penResolucaoBadge(p, Date.now(), { full: true }) : ''}</dd></div>
-            ${typeof penTempoPorLadoHtml === 'function' ? `<div class="pen-prop"><dt>Tempo</dt><dd>${penTempoPorLadoHtml(p, Date.now())}</dd></div>` : ''}` : ''}
-            <div class="pen-prop"><dt>Responsável</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.responsible)||'—'}<button class="pen-inline-edit" title="Alterar responsável" onclick="openReassignPendencia('${escapeHtml(id)}')">✏️</button></span></dd></div>
-            <div class="pen-prop"><dt>Prioridade</dt><dd><span class="pen-inline-wrap">${priorityTag(p.priority)}<select class="pen-inline-select" title="Alterar prioridade" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','priority',this.value)">${['baixa','media','alta','critica'].map(v=>`<option value="${v}" ${p.priority===v?'selected':''}>${v==='baixa'?'Baixa':v==='media'?'Média':v==='alta'?'Alta':'Crítica'}</option>`).join('')}</select></span></dd></div>
-            <div class="pen-prop${_isOverdue?' is-alert':''}"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" value="${escapeHtml(p.deadline||'')}" onchange="quickUpdatePendenciaField('${escapeHtml(id)}','deadline',this.value)" /></span>${_isOverdue?'<span class="pen-cmd-flag">⚠️ Vencido</span>':''}${(!p.deadline && _isHighPri)?'<span class="pen-cmd-flag warn">⚠ Sem prazo · prioridade '+escapeHtml(p.priority)+'</span>':''}</dd></div>
+            <div class="pen-prop"><dt>Solicitante</dt><dd><span class="pen-inline-wrap">${escapeHtml(p.solicitante)||'—'}<button class="pen-inline-edit" title="Alterar solicitante" aria-label="Alterar solicitante" data-action="penEditSolicitante" data-arg="${_eid}">✏️</button></span></dd></div>
+            <div class="pen-prop"><dt>Canal</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCanalLabel(p.canal))||'—'}<select class="pen-inline-select" title="Alterar canal" aria-label="Alterar canal" data-change="penSetField" data-field="canal" data-id="${_eid}">${penCanalOptionsHtml(p.canal||'')}</select></span></dd></div>
+            <div class="pen-prop"><dt>Categoria</dt><dd><span class="pen-inline-wrap">${escapeHtml(penCategoriaLabel(p.categoria))||'—'}<select class="pen-inline-select" title="Alterar categoria" aria-label="Alterar categoria" data-change="penSetField" data-field="categoria" data-id="${_eid}">${penCategoriaOptionsHtml(p.categoria||'')}</select></span></dd></div>` : ''}
+            <div class="pen-prop${_isOverdue?' is-alert':''}"><dt>Prazo</dt><dd><span class="pen-inline-wrap">${p.deadline?formatDate(parseDeadline(p.deadline)):'Sem prazo'}<input type="date" class="pen-inline-date" title="Alterar prazo" aria-label="Alterar prazo" value="${escapeHtml(p.deadline||'')}" data-change="penSetField" data-field="deadline" data-id="${_eid}" /></span>${_isOverdue?'<span class="pen-cmd-flag">⚠️ Vencido</span>':''}${(!p.deadline && _isHighPri)?'<span class="pen-cmd-flag warn">⚠ Sem prazo · prioridade '+escapeHtml(p.priority)+'</span>':''}</dd></div>
             <div class="pen-prop"><dt>Aberto em</dt><dd>${formatDate(p.createdAt)}</dd></div>
           </dl>
         </div>
 
-        <div class="pen-cmd-card" id="penCmdCheckCard">
+        <div class="chd-card" id="penCmdCheckCard">
           <div class="section-header pen-sec-head"><span class="section-title">☑ Checklist</span><span class="pen-count" id="penCheckCounter">${_checkList.length ? _checkDone+'/'+_checkList.length : ''}</span></div>
           <div class="pen-cmd-progress" title="${_checkDone} de ${_checkList.length} concluídos"><div class="pen-cmd-progress-bar" id="penCheckProgressBar" style="width:${_checkList.length ? Math.round(_checkDone/_checkList.length*100) : 0}%"></div></div>
           <div class="pen-cmd-progress-label" id="penCheckProgressLabel">${_checkList.length ? _checkDone+'/'+_checkList.length+' concluídos' : 'Nenhum item — quebre a entrega em passos'}</div>
           <div id="penChecklist"></div>
           <div class="pen-check-add">
-            <input class="form-input" id="newCheckItem" placeholder="Adicionar item... (Enter adiciona)" onkeydown="if(event.key==='Enter'){event.preventDefault();addCheckItem('${escapeHtml(id)}')}" />
-            <button class="btn btn-sm btn-secondary" title="Adicionar item ao checklist" onclick="addCheckItem('${escapeHtml(id)}')">+ Adicionar</button>
+            <input class="form-input" id="newCheckItem" placeholder="Adicionar item... (Enter adiciona)" aria-label="Novo item do checklist" />
+            <button type="button" class="btn btn-sm btn-secondary" title="Adicionar item ao checklist" data-action="chdCheckAdd" data-arg="${_eid}">+ Adicionar</button>
           </div>
         </div>
 
-        <div class="pen-cmd-card pen-cmd-drop" id="penDropzone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault();this.classList.remove('dragover');cmdDropFiles(event,'${escapeHtml(id)}')">
+        <div class="chd-card pen-cmd-drop" id="penDropzone">
           <div class="section-header pen-sec-head">
             <span class="section-title">📎 Anexos <span class="pen-count" id="penAttCounter"${_attCount?'':' style="display:none"'}>${_attCount||''}</span></span>
             <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">+ Anexar
-              <input type="file" id="penFileInputSide" style="display:none" onchange="handleFileUpload('pendencias','${id}',this,()=>{renderAttachmentList('pendencias','${id}','penAttachmentsList');cmdRefreshAttCount('${escapeHtml(id)}')})" />
+              <input type="file" id="penFileInputSide" style="display:none" data-change="chdAnexo" data-id="${_eid}" />
             </label>
           </div>
-          <div class="pen-cmd-drop-hint">Arraste e solte aqui <span>· Máx 2MB por arquivo · cole print com Ctrl+V na nota</span></div>
+          <div class="pen-cmd-drop-hint">Arraste e solte aqui <span>· Máx 2MB por arquivo · cole print com Ctrl+V na resposta</span></div>
           <div class="attachment-list" id="penAttachmentsList"></div>
         </div>
 
         <div class="pen-cmd-side-actions">
-          <button class="btn btn-secondary btn-sm" title="Criar uma cópia desta pendência" onclick="duplicatePendencia('${escapeHtml(id)}')">⧉ Duplicar</button>
+          <button type="button" class="btn btn-secondary btn-sm" title="Criar uma cópia desta pendência" data-action="chdDuplicar" data-arg="${_eid}">⧉ Duplicar</button>
         </div>
       </aside>
     </div>
@@ -184,11 +150,26 @@ function openPendenciaDetail(id) {
       var _feed = document.getElementById('penTimeline');
       if (_feed) _feed.scrollTop = _feed.scrollHeight;
     } catch (_) {}
+    var chk = document.getElementById('newCheckItem');
+    if (chk && !chk.dataset.chdKeys) {
+      chk.dataset.chdKeys = '1';
+      chk.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); addCheckItem(id); }
+      });
+    }
+    // Arrastar e soltar sai do markup (era ondragover inline) para listener.
+    var dz = document.getElementById('penDropzone');
+    if (dz && !dz.dataset.chdDrop) {
+      dz.dataset.chdDrop = '1';
+      dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('dragover'); });
+      dz.addEventListener('dragleave', function(){ dz.classList.remove('dragover'); });
+      dz.addEventListener('drop', function(e){ e.preventDefault(); dz.classList.remove('dragover'); cmdDropFiles(e, id); });
+    }
     var ta = document.getElementById('newNoteText');
     if (ta && !ta.dataset.cmdKeys) {
       ta.dataset.cmdKeys = '1';
       ta.addEventListener('keydown', function(e){
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); submitPenNote(id); }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); chamadoResponderAcao(id, 'responder'); }
       });
     }
     if (ta && !ta.dataset.clipboardBound) {
