@@ -35,7 +35,7 @@ test('abertura rápida: cria pendência de suporte com solicitante, canal, categ
   await expect(body).toContainText('WhatsApp');
   await expect(body).toContainText('Impressora');
   await body.locator('#newNoteText').fill('Falei com a Marta, vou passar lá.');
-  await body.getByRole('button', { name: /Postar/ }).click();
+  await body.getByRole('button', { name: 'Responder', exact: true }).click();
   await expect(body).toContainText(/Respondida em .* por /);
   const depois = await page.evaluate(() => getPendencias().find((p) => p.assunto === 'E2E — impressora do caixa'));
   expect(depois.firstResponseAt).toBeTruthy();
