@@ -179,6 +179,9 @@ if (typeof registerActions === 'function') {
 // Despacho da visualização atual — chamado por renderPenView e pelos patches
 // otimistas do quadro.
 function _penRenderAtual(area) {
+  // Todo redesenho da área passa aqui (filtro, página, otimista), então é o
+  // ponto que mantém os contadores das abas de origem em dia.
+  try { if (typeof _penRenderOrigemCounts === 'function') _penRenderOrigemCounts(); } catch (_) {}
   if (typeof penView !== 'undefined' && penView === 'fila') return renderPenFila(area);
   return renderPenKanban(area);
 }

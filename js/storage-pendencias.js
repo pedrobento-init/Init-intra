@@ -211,6 +211,25 @@ function _sanitizeIlike(s) {
   return String(s || '').replace(/[%_\\]/g, '').replace(/[,()]/g, ' ').trim().slice(0, 80);
 }
 
+// ── Origem: interna × e-mail ──────────────────────────────────────────────
+// A tela misturava o que a equipe abriu com o que a triagem abriu a partir de
+// e-mail de cliente, e a caixa de triagem ficava empilhada em cima de tudo.
+// O critério é só `canal === 'email'` (056), que a triagem grava ao abrir o
+// chamado. Igualdade exata de propósito: é a mesma regra que o filtro do
+// servidor aplica, então a aba conta e lista o mesmo conjunto nos dois
+// caminhos. O bloco de origem no fim da descrição não entra — o banco não
+// consegue filtrar por ele sem ilike em texto livre.
+/** 'email' se a pendência veio da triagem de e-mail; senão 'interna'. */
+function penOrigemDe(p) {
+  return p && p.canal === 'email' ? 'email' : 'interna';
+}
+/** Quantas pendências de cada origem há na lista: { interna, email }. */
+function penContarOrigens(lista) {
+  const out = { interna: 0, email: 0 };
+  for (const p of (lista || [])) out[penOrigemDe(p)]++;
+  return out;
+}
+
 // Puro e testável: encadeia filtros num builder postgrest (ou mock). Retorna q.
 function applyPendenciaPageFilters(q, opts) {
   const o = opts || {};
@@ -227,6 +246,10 @@ function applyPendenciaPageFilters(q, opts) {
   if (o.responsible) q = q.eq('responsible', o.responsible);
   if (o.status) q = q.eq('status', o.status);
   if (o.priority) q = q.eq('priority', o.priority);
+  // Interna precisa do `is.null`: canal é opcional (056) e um neq sozinho
+  // descartaria toda pendência sem canal, que é justamente a maioria.
+  if (o.origem === 'email') q = q.eq('canal', 'email');
+  else if (o.origem === 'interna') q = q.or('canal.is.null,canal.neq.email');
   const sq = _sanitizeIlike(o.search);
   if (sq) {
     const pat = '%' + sq + '%';
@@ -285,7 +308,8 @@ async function fetchPendenciasPage(opts) {
     scope: o.scope === 'archived' ? 'archived' : 'active',
     team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao,
     clientId: o.clientId || '', responsible: o.responsible || '',
-    status: o.status || '', priority: o.priority || '', search: o.search || ''
+    status: o.status || '', priority: o.priority || '', search: o.search || '',
+    origem: o.origem || ''
   });
   const sortCol = penSortRemoteCol(o.sort && o.sort.col);
   if (sortCol) {
@@ -326,12 +350,13 @@ function countPendenciaStatuses(statusRows, todayISO) {
   return { byStatus, total, vencidas };
 }
 
-async function fetchPendenciaStatusCounts(scope) {
+async function fetchPendenciaStatusCounts(scope, origem) {
   const sc = _penPageScope();
   let q = supabaseClient.from('pendencias').select('status,deadline');
   q = applyPendenciaPageFilters(q, {
     scope: scope === 'archived' ? 'archived' : 'active',
-    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao
+    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao,
+    origem: origem || ''
   });
   const res = await q;
   if (res.error) throw new Error(res.error.message || 'Falha na contagem');
