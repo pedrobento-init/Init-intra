@@ -249,7 +249,8 @@ function chamadoComposerHtml(p) {
   }).join('');
   return '<section class="chd-composer' + (canal ? '' : ' is-sem-canal') + '" aria-label="Responder">'
     + '<div class="chd-composer-head"><label class="chd-composer-label" id="chdComposerLabel" for="newNoteText">' + escapeHtml(chamadoRotuloComposer(p, canal)) + '</label>'
-    + '<button type="button" class="link-btn" data-action="rpAbrir">Respostas prontas</button></div>'
+    + '<button type="button" class="link-btn" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></div>'
+    + '<div class="rp-painel" id="rpPainel" hidden></div>'
     + (canal ? '' : '<p class="chd-composer-aviso">Sem e-mail nem WhatsApp de quem pediu: a resposta fica só no histórico do chamado.</p>')
     + '<div class="chd-vars" role="group" aria-label="Variáveis">' + vars + '</div>'
     + '<textarea class="form-input chd-textarea" id="newNoteText" rows="4" placeholder="Escreva a resposta… (Ctrl+Enter envia)"></textarea>'

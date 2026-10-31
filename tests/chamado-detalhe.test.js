@@ -106,6 +106,12 @@ describe('chamadoComposerHtml', () => {
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
+  it('tem o painel de respostas prontas dentro do composer, junto do texto', () => {
+    // O seletor abre aqui e não num modal, que trocaria o detalhe do chamado.
+    expect(html).toContain('id="rpPainel"');
+    expect(html.indexOf('id="rpPainel"')).toBeLessThan(html.indexOf('id="newNoteText"'));
+  });
+
   it('sem canal o composer fica marcado e explica que a resposta não sai', () => {
     const semCanal = sb.chamadoComposerHtml({ id: 'p2', solicitante: 'João' });
     expect(semCanal).toContain('is-sem-canal');
