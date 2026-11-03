@@ -790,6 +790,10 @@ function renderDashboard() {
     return (_parts[0][0] + _parts[1][0]).toUpperCase();
   };
 
+  const _operationalItems = typeof buildOperationalCenter === 'function'
+    ? buildOperationalCenter(visits, activePens, typeof _mstLoad === 'function' ? _mstLoad() : {}, new Date()) : [];
+  const _visitMetrics = typeof buildVisitMetrics === 'function' ? buildVisitMetrics(visits, today.slice(0, 7)) : null;
+
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
     <header class="ov-head">
@@ -854,6 +858,8 @@ function renderDashboard() {
         </div>
       </div>
     </section>` : ''}
+
+    ${operationalCenterHtml(_operationalItems)}
 
     <h2 class="ov-sec-t ov-sec-first" id="ov-meudia">Meu dia</h2>
     ${!_dashIsHidden('fila') ? `
@@ -1035,6 +1041,12 @@ function renderDashboard() {
     </div>
 
     <h2 class="ov-sec-t" id="ov-ind">Indicadores</h2>
+    ${_visitMetrics ? `<section class="card dash-widget ov-panel" aria-labelledby="ov-ind-vis"><div class="ov-ph"><h2 class="ov-h2" id="ov-ind-vis">Visitas concluídas no mês</h2></div><div class="ov-sum">
+      <div class="ov-col"><div class="ov-n">${_visitMetrics.avgMinutes === null ? '—' : _visitMetrics.avgMinutes + ' min'}</div><div class="ov-l">tempo médio</div></div>
+      <div class="ov-col"><div class="ov-n">${_visitMetrics.topOperator ? escapeHtml(_visitMetrics.topOperator[0]) : '—'}</div><div class="ov-l">${_visitMetrics.topOperator ? _visitMetrics.topOperator[1] + ' visitas' : 'sem operador'}</div></div>
+      <div class="ov-col"><div class="ov-n">${_visitMetrics.topClient ? escapeHtml(_visitMetrics.topClient[0]) : '—'}</div><div class="ov-l">${_visitMetrics.topClient ? _visitMetrics.topClient[1] + ' visitas' : 'sem cliente'}</div></div>
+      <div class="ov-col"><div class="ov-n">${_visitMetrics.recurrentClients}</div><div class="ov-l">clientes com reincidência</div></div>
+    </div></section>` : ''}
     
     ${!_dashIsHidden('stats') ? `<section class="dash-widget ov-kpis" aria-label="Resumo de indicadores" style="position:relative">${_dashHideBtn('stats')}` : '<div style="display:none"><div>'}
       <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('clientes')">

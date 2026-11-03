@@ -431,6 +431,19 @@ function toggleVisitAllDayFields() {
   if (end) end.disabled = !!allDay;
 }
 
+function findVisitScheduleConflicts(data, visits) {
+  const minutes = (value, fallback) => /^\d{2}:\d{2}$/.test(value || '') ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3)) : fallback;
+  const start = data.allDay ? 0 : minutes(data.time, 0);
+  const end = data.allDay ? 1440 : Math.max(start + 1, minutes(data.timeEnd, start + 1));
+  return (visits || []).filter(v => {
+    if (!v || v.id === data.id || v.clientId !== data.clientId || v.date !== data.date || v.status === 'cancelada') return false;
+    if (String(v.operator || '') === String(data.operator || '')) return false;
+    const otherStart = v.allDay ? 0 : minutes(v.time, 0);
+    const otherEnd = v.allDay ? 1440 : Math.max(otherStart + 1, minutes(v.timeEnd, otherStart + 1));
+    return start < otherEnd && otherStart < end;
+  });
+}
+
 function submitVisitForm(e, id) {
   e.preventDefault();
   try {
@@ -475,6 +488,11 @@ function submitVisitForm(e, id) {
     };
     const levar = typeof levarFormValor === 'function' ? levarFormValor() : undefined;
     if (levar !== undefined) data.levar = levar;
+    const conflicts = findVisitScheduleConflicts(data, getVisits());
+    if (conflicts.length) {
+      const nomes = conflicts.map(v => v.operator || 'Outro operador').join(', ');
+      if (!window.confirm('Já existe visita deste cliente no mesmo horário com ' + nomes + '.\n\nDeseja salvar mesmo assim?')) return;
+    }
     saveVisit(data);
     closeModal();
     if (document.getElementById('visitViewArea')) renderVisitView();
