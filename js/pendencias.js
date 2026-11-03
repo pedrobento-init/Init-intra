@@ -110,6 +110,22 @@ function penSetView(v) {
   try { localStorage.setItem(PEN_VIEW_KEY, alvo); } catch (_) {}
   if (typeof renderPendencias === 'function') renderPendencias();
 }
+// Origem: 'interna' (aberta pela equipe) ou 'email' (aberta pela triagem). Abas
+// separadas porque misturadas no mesmo quadro confundiam quem trabalha cada
+// fila. Também pessoal e no aparelho, como a visualização.
+const PEN_ORIGEM_KEY = 'intra_pen_origem';
+let penOrigem = (function () {
+  try { return localStorage.getItem(PEN_ORIGEM_KEY) === 'email' ? 'email' : 'interna'; } catch (_) { return 'interna'; }
+})();
+
+/** Troca a aba de origem e redesenha a tela (a caixa de triagem só existe na de e-mail). */
+function penSetOrigem(v) {
+  var alvo = v === 'email' ? 'email' : 'interna';
+  if (alvo === penOrigem) return;
+  penOrigem = alvo;
+  try { localStorage.setItem(PEN_ORIGEM_KEY, alvo); } catch (_) {}
+  if (typeof renderPendencias === 'function') renderPendencias();
+}
 let penScope = 'active';
 let _filteredPens = [];
 
@@ -361,6 +377,7 @@ if (typeof registerActions === 'function') {
   registerActions({
     penClearFilter: (_el, campo) => penClearFilter(campo),
     penClearFilters: () => { if (typeof clearPenFilters === 'function') clearPenFilters(); },
+    penSetOrigem: (_el, v) => penSetOrigem(v),
   });
 }
 
@@ -417,6 +434,12 @@ function renderPendencias() {
         <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
       </div>
     </div>
+    <div class="view-toggles pen-scope-tabs pen-origem-tabs" role="tablist" aria-label="Origem das pendências">
+      <button role="tab" data-action="penSetOrigem" data-arg="interna" aria-selected="${penOrigem==='interna'}"
+        class="pen-scope-tab ${penOrigem==='interna'?'is-active':''}" title="Abertas pela equipe">Internas<span class="pen-scope-count" id="penOrigemCount-interna"></span></button>
+      <button role="tab" data-action="penSetOrigem" data-arg="email" aria-selected="${penOrigem==='email'}"
+        class="pen-scope-tab ${penOrigem==='email'?'is-active':''}" title="Abertas pela triagem de e-mail">E-mail<span class="pen-scope-count" id="penOrigemCount-email"></span><span class="pen-origem-triagem" id="penOrigemTriagem"></span></button>
+    </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Escopo das pendências">
         <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
@@ -433,8 +456,9 @@ function renderPendencias() {
     <div id="penSlaSummary" style="margin-bottom:12px"></div>
     <!-- Caixa de entradas de e-mail que não viraram chamado (066). Fica FORA
          do penViewArea porque renderPenView reescreve aquele nó inteiro a
-         cada filtro, e a caixa não depende de filtro nenhum. -->
-    <div id="penEntradasEmail"></div>
+         cada filtro, e a caixa não depende de filtro nenhum. Só na aba
+         E-mail: sem o nó, renderEntradasEmail não desenha nada. -->
+    ${penOrigem === 'email' ? '<div id="penEntradasEmail"></div>' : ''}
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;
@@ -555,7 +579,7 @@ function renderPenView(resetPage) {
     _penServerMode = true;
     area.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Carregando pendências…</p></div>';
     var pageReq = fetchPendenciasPage({
-      scope: penScope, page: _penPage, pageSize: PEN_UI_PAGE_SIZE,
+      scope: penScope, origem: penOrigem, page: _penPage, pageSize: PEN_UI_PAGE_SIZE,
       clientId: document.getElementById('penClient')?.value || '',
       responsible: document.getElementById('penResponsible')?.value || '',
       status: document.getElementById('penStatus')?.value || '',
@@ -567,7 +591,7 @@ function renderPenView(resetPage) {
     });
     // FASE 6: totais por status vêm do banco (só coluna status), não da página.
     var countReq = (typeof fetchPendenciaStatusCounts === 'function')
-      ? fetchPendenciaStatusCounts(penScope) : Promise.resolve(null);
+      ? fetchPendenciaStatusCounts(penScope, penOrigem) : Promise.resolve(null);
     Promise.all([pageReq, countReq]).then(function (arr) {
       if (sig !== _penLastSig) return; // filtro mudou durante o fetch — descarta
       _filteredPens = _applyOptimisticPens(arr[0].rows);

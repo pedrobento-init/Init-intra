@@ -124,7 +124,9 @@ if (typeof document !== 'undefined' && document.addEventListener && !(typeof win
   });
 }
 
-function getFilteredPendencias() {
+// `ignorarOrigem` existe para os contadores das abas Internas/E-mail: cada aba
+// precisa saber quantas a outra teria com os mesmos filtros aplicados.
+function getFilteredPendencias(ignorarOrigem) {
   const q    = (document.getElementById('penSearch')?.value||'').toLowerCase();
   const cid  = document.getElementById('penClient')?.value||'';
   const resp = document.getElementById('penResponsible')?.value||'';
@@ -145,8 +147,35 @@ function getFilteredPendencias() {
     if (pr   && p.priority   !== pr)   return false;
     if (penScope === 'archived' && !isPendenciaClosed(p.status)) return false;
     if (penScope === 'active' && isPendenciaClosed(p.status)) return false;
+    if (!ignorarOrigem && typeof penOrigem !== 'undefined' && typeof penOrigemDe === 'function'
+        && penOrigemDe(p) !== penOrigem) return false;
     return true;
   });
+}
+
+/**
+ * Contadores das abas Internas/E-mail. Saem do cache local (mesmos filtros,
+ * sem o de origem); no modo servidor a aba aberta usa o total exato do banco,
+ * porque o cache pode não ter tudo. A outra aba fica com a conta local.
+ */
+function _penRenderOrigemCounts() {
+  if (typeof document === 'undefined' || typeof penContarOrigens !== 'function') return;
+  var cont = { interna: 0, email: 0 };
+  try { cont = penContarOrigens(getFilteredPendencias(true)); } catch (_) {}
+  if (typeof _penServerMode !== 'undefined' && _penServerMode && _penTotal != null) cont[penOrigem] = _penTotal;
+  ['interna', 'email'].forEach(function (o) {
+    var el = document.getElementById('penOrigemCount-' + o);
+    if (el) el.textContent = cont[o] ? String(cont[o]) : '';
+  });
+  // E-mails ainda na triagem não são pendência, mas são trabalho da aba
+  // E-mail — o sinal evita que alguém na aba Internas esqueça deles.
+  var tri = document.getElementById('penOrigemTriagem');
+  if (tri) {
+    var n = 0;
+    try { if (typeof entradasEmailPendentes === 'function') n = entradasEmailPendentes().length; } catch (_) {}
+    tri.textContent = n ? '+' + n : '';
+    tri.title = n ? n + (n === 1 ? ' e-mail aguardando triagem' : ' e-mails aguardando triagem') : '';
+  }
 }
 
 function savePenFilters() {

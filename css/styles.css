@@ -507,6 +507,15 @@ tr:hover td { background: var(--bg-hover); }
   background:var(--accent-dim2); color:var(--accent-light); font-size:11px; font-weight:700; line-height:18px;
 }
 .pen-scope-tab .pen-scope-count:empty { display:none; }
+/* Abas de origem (Internas/E-mail): primeiro nível, acima de Ativas/Arquivadas. */
+.pen-origem-tabs { margin-bottom:10px; }
+.pen-origem-tabs .pen-scope-tab { font-size:14px; }
+.pen-origem-triagem {
+  display:inline-block; margin-left:4px; padding:0 6px; border-radius:999px;
+  background:var(--yellow-dim); color:var(--yellow);
+  font-size:11px; font-weight:700; line-height:18px;
+}
+.pen-origem-triagem:empty { display:none; }
 
 /* ── TEMPLATES GRID ── */
 #templatesGridWrap {
@@ -7102,6 +7111,25 @@ textarea[aria-busy="true"] { opacity: .6; }
   background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer;
 }
 .chd-mencao-item:hover { background: var(--bg-hover); }
+
+/* Respostas prontas: painel dentro do composer (não um modal, que trocaria o detalhe do chamado). */
+.rp-painel {
+  display: grid; gap: 8px; padding: 10px; max-height: 320px; overflow-y: auto;
+  background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.rp-painel[hidden] { display: none; }
+.rp-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rp-item { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.rp-usar {
+  flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; padding: 6px 8px; text-align: left;
+  border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-card);
+  color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer;
+}
+.rp-usar:hover { background: var(--bg-hover); }
+.rp-usar:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.rp-usar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.rp-acoes { display: flex; gap: 4px; flex-shrink: 0; }
+.rp-form { display: grid; gap: 6px; }
 
 /* Celular: uma coluna, respiro de 16px e nada que force rolagem lateral. */
 @media (max-width: 640px) {

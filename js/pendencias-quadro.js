@@ -39,6 +39,7 @@ function _penViewSig() {
   } catch (_) {}
   return JSON.stringify({
     scope: (typeof penScope !== 'undefined') ? penScope : 'active',
+    origem: (typeof penOrigem !== 'undefined') ? penOrigem : 'interna',
     q: document.getElementById('penSearch')?.value || '',
     cid: document.getElementById('penClient')?.value || '',
     resp: document.getElementById('penResponsible')?.value || '',

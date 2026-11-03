@@ -102,23 +102,64 @@ function _respostasProntasLista() {
   }).join('') + '</ul>';
 }
 
-function abrirRespostasProntas(editId) {
+function _respostasProntasHtml(editId) {
   var ed = editId ? getRespostasProntas().find(function (r) { return r && r.id === editId; }) : null;
-  openModal('💬 Respostas prontas', _respostasProntasLista()
+  return _respostasProntasLista()
     + '<form class="rp-form" data-submit="rpSalvar">'
     + '<input type="hidden" id="rpId" value="' + escapeHtml(ed ? ed.id : '') + '">'
     + '<label class="form-label" for="rpTitulo">' + (ed ? 'Editar resposta' : 'Nova resposta') + '</label>'
     + '<input class="form-input" id="rpTitulo" maxlength="80" placeholder="Título (ex.: Reiniciar roteador)" value="' + escapeHtml(ed ? ed.titulo : '') + '">'
     + '<textarea class="form-textarea" id="rpConteudo" rows="4" placeholder="Texto que entra na resposta">' + escapeHtml(ed ? ed.conteudo : '') + '</textarea>'
     + '<button type="submit" class="btn btn-primary btn-sm">Salvar</button>'
-    + '</form>');
+    + '</form>';
+}
+
+function _rpPainel() {
+  return typeof document !== 'undefined' ? document.getElementById('rpPainel') : null;
+}
+
+function _rpMarcarBotao(aberto) {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  var b = document.querySelector('[aria-controls="rpPainel"]');
+  if (b) b.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+}
+
+/**
+ * O detalhe do chamado já ocupa o #modalBody. Abrir outro modal ali trocava o
+ * detalhe inteiro: o #newNoteText sumia junto com o que estava digitado, e o
+ * "inserir" não tinha mais onde escrever. Por isso o seletor abre num painel
+ * dentro do próprio composer; o modal fica só para quando não há chamado
+ * aberto.
+ */
+function abrirRespostasProntas(editId) {
+  var painel = _rpPainel();
+  if (painel) {
+    painel.innerHTML = _respostasProntasHtml(editId);
+    painel.hidden = false;
+    _rpMarcarBotao(true);
+    return;
+  }
+  openModal('💬 Respostas prontas', _respostasProntasHtml(editId));
+}
+
+function fecharRespostasProntas() {
+  var painel = _rpPainel();
+  if (!painel) return;
+  painel.hidden = true;
+  painel.innerHTML = '';
+  _rpMarcarBotao(false);
 }
 
 if (typeof registerActions === 'function') {
   registerActions({
-    rpAbrir: function () { abrirRespostasProntas(); },
+    rpAbrir: function () {
+      var painel = _rpPainel();
+      if (painel && !painel.hidden) fecharRespostasProntas();
+      else abrirRespostasProntas();
+    },
     rpInserir: function (_el, id) {
-      if (inserirRespostaPronta(id)) closeModal();
+      // Fecha só o painel: o chamado segue aberto para revisar e enviar.
+      if (inserirRespostaPronta(id)) fecharRespostasProntas();
       else showToast('Abra um chamado para usar a resposta.', 'error');
     },
     rpEditar: function (_el, id) { abrirRespostasProntas(id); },
@@ -141,5 +182,5 @@ if (typeof registerActions === 'function') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getRespostasProntas, respostasProntasDaEquipe, salvarRespostaPronta, excluirRespostaPronta, inserirRespostaPronta };
+  module.exports = { getRespostasProntas, respostasProntasDaEquipe, salvarRespostaPronta, excluirRespostaPronta, inserirRespostaPronta, abrirRespostasProntas, fecharRespostasProntas };
 }
