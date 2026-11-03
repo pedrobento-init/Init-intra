@@ -3,21 +3,24 @@
 
 .pgp-projeto {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   grid-template-areas:
     'cabecalho cabecalho'
     'abas abas'
     'principal lateral';
   column-gap: 24px;
   align-items: start;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 .pgp-projeto .prj-cabecalho {
   grid-area: cabecalho;
-  padding: 12px 24px 8px;
+  padding: 16px 24px 0;
   border: 1px solid var(--pgp-border);
   border-bottom: 0;
-  border-radius: var(--pgp-radius-card) var(--pgp-radius-card) 0 0;
+  border-radius: 16px 16px 0 0;
   background: var(--pgp-card);
 }
 
@@ -42,12 +45,14 @@
 }
 
 .pgp-projeto .prj-numero {
-  padding: 2px 8px;
-  border: 1px solid var(--pgp-border-strong);
-  border-radius: var(--pgp-radius-tag);
-  color: var(--pgp-text);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 2px 9px;
+  border: 1px solid var(--pgp-border);
+  border-radius: 999px;
+  background: var(--pgp-field);
+  color: var(--pgp-label);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .pgp-projeto .prj-topo {
@@ -55,12 +60,37 @@
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px 24px;
+  gap: 12px 24px;
 }
 
 .pgp-projeto .prj-topo .pgp-titulo {
   flex: 1 1 320px;
   min-width: 0;
+  margin: 14px 0 20px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.pgp-projeto .prj-topo .pgp-seletores {
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--pgp-border);
+  border-radius: 12px;
+  background: var(--pgp-field);
+}
+
+.pgp-projeto .prj-topo .pgp-seletor {
+  min-width: 128px;
+}
+
+.pgp-projeto .prj-topo .pgp-label {
+  margin-bottom: 6px;
+}
+
+.pgp-projeto .prj-topo .pgp-select {
+  background: var(--pgp-card);
 }
 
 /* ----- Abas: fecham o cartão do cabeçalho ----- */
@@ -68,46 +98,50 @@
 .pgp-projeto .prj-abas {
   grid-area: abas;
   display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  padding: 0 24px;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 0 20px;
   border: 1px solid var(--pgp-border);
   border-top: 0;
-  border-radius: 0 0 var(--pgp-radius-card) var(--pgp-radius-card);
+  border-radius: 0 0 16px 16px;
   background: var(--pgp-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .pgp-projeto .prj-aba {
-  min-height: 44px;
-  padding: 0 12px;
+  min-height: 48px;
+  padding: 0 14px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   background: none;
   color: var(--pgp-label);
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
 }
 
 .pgp-projeto .prj-aba:hover {
-  color: var(--pgp-text);
+  color: var(--pgp-link);
 }
 
 .pgp-projeto .prj-aba[aria-selected='true'] {
   border-bottom-color: var(--pgp-accent);
-  color: var(--pgp-heading);
+  color: var(--pgp-link);
 }
 
 .pgp-projeto .prj-aba-contador {
   display: inline-block;
   min-width: 20px;
-  margin-left: 4px;
+  margin-left: 6px;
   padding: 0 6px;
-  border: 1px solid var(--pgp-border-strong);
-  border-radius: 10px;
-  color: var(--pgp-text);
-  font-size: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pgp-field);
+  color: var(--pgp-label);
+  font-size: 11px;
+  font-weight: 700;
   line-height: 18px;
   text-align: center;
 }
@@ -118,7 +152,7 @@
 }
 
 .pgp-projeto .prj-painel > * + * {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 /* A regra de autor acima venceria o [hidden] do navegador se algum painel ganhasse display. */
@@ -140,44 +174,47 @@
 }
 
 .pgp-projeto .prj-card {
-  padding: 16px 24px;
+  padding: 20px 24px;
   border: 1px solid var(--pgp-border);
-  border-radius: var(--pgp-radius-card);
+  border-radius: 14px;
   background: var(--pgp-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .pgp-projeto .prj-card-topo {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .pgp-projeto .prj-secao-titulo {
   margin: 0;
   color: var(--pgp-label);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
 .pgp-projeto .prj-secao {
-  /* A descrição não é cartão; sem o mesmo recuo dos cards ela encosta na borda
-     da grade e desalinha do cabeçalho e do checklist. */
-  padding: 0 24px;
+  padding: 20px 24px;
+  border: 1px solid var(--pgp-border);
+  border-radius: 14px;
+  background: var(--pgp-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .pgp-projeto .prj-secao > .prj-secao-titulo {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .pgp-projeto .prj-descricao,
 .pgp-projeto .prj-feed-texto {
   color: var(--pgp-text);
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
@@ -185,6 +222,13 @@
   margin: 0;
   color: var(--pgp-muted);
   font-size: 14px;
+}
+
+.pgp-projeto .prj-card > .prj-vazio {
+  padding: 14px;
+  border: 1px dashed var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-control);
+  background: var(--pgp-field);
 }
 
 .pgp-projeto .prj-botao {
@@ -199,13 +243,21 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
 }
 
 .pgp-projeto .prj-botao:hover {
   border-color: var(--pgp-link);
+  color: var(--pgp-link);
 }
 
-.pgp-projeto .prj-botao-primario {
+.pgp-projeto .prj-editar {
+  background: var(--pgp-card);
+  color: var(--pgp-link);
+}
+
+.pgp-projeto .prj-botao-primario,
+.pgp-projeto .prj-botao-primario:hover {
   border-color: var(--pgp-accent);
   background: var(--pgp-accent);
   color: var(--pgp-accent-text);
@@ -233,14 +285,20 @@
 .pgp-projeto .prj-campo {
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--pgp-target-min);
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 9px 12px;
   border: 1px solid var(--pgp-border-strong);
   border-radius: var(--pgp-radius-control);
   background: var(--pgp-field);
   color: var(--pgp-text);
   font: inherit;
   font-size: 14px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.pgp-projeto .prj-campo:focus {
+  border-color: var(--pgp-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pgp-accent) 12%, transparent);
 }
 
 .pgp-projeto .prj-campo::placeholder {
@@ -251,19 +309,23 @@
 /* ----- Checklist ----- */
 
 .pgp-projeto .prj-contagem {
-  color: var(--pgp-muted);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--pgp-green-bg);
+  color: var(--pgp-green);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .pgp-projeto .prj-progresso {
   display: block;
   width: 100%;
-  height: 8px;
+  height: 6px;
   margin-bottom: 12px;
   overflow: hidden;
   border: 0;
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--pgp-field);
   accent-color: var(--pgp-green);
   appearance: none;
@@ -274,15 +336,17 @@
 }
 
 .pgp-projeto .prj-progresso::-webkit-progress-value {
+  border-radius: 999px;
   background: var(--pgp-green);
 }
 
 .pgp-projeto .prj-progresso::-moz-progress-bar {
+  border-radius: 999px;
   background: var(--pgp-green);
 }
 
 .pgp-projeto .prj-etapas {
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -304,7 +368,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  min-height: 44px;
+  min-height: 46px;
   color: var(--pgp-text);
   font-size: 14px;
   cursor: pointer;
@@ -315,6 +379,7 @@
   width: 18px;
   height: 18px;
   accent-color: var(--pgp-green);
+  cursor: pointer;
 }
 
 .pgp-projeto .prj-etapa-texto {
@@ -346,42 +411,52 @@
 .pgp-projeto .prj-etapa-form {
   display: flex;
   gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--pgp-border);
 }
 
 /* ----- Atividade ----- */
 
 .pgp-projeto .prj-composer-rotulo {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   color: var(--pgp-muted);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .pgp-projeto .prj-composer-rotulo strong {
   color: var(--pgp-heading);
+  font-size: 14px;
 }
 
 .pgp-projeto .prj-composer-texto {
   display: block;
+  min-height: 96px;
   resize: vertical;
 }
 
 .pgp-projeto .prj-composer-acoes {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .pgp-projeto .prj-feed {
   margin: 0;
-  padding: 0;
+  padding: 4px 20px;
+  border: 1px solid var(--pgp-border);
+  border-radius: 14px;
+  background: var(--pgp-card);
+  box-shadow: var(--shadow-sm);
   list-style: none;
 }
 
 .pgp-projeto .prj-feed-item {
   display: flex;
   gap: 12px;
-  padding: 12px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--pgp-border);
 }
 
@@ -395,7 +470,7 @@
 }
 
 .pgp-projeto .prj-feed-topo {
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   font-size: 14px;
 }
 
@@ -406,7 +481,7 @@
 
 .pgp-projeto .prj-quando {
   color: var(--pgp-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .pgp-projeto .prj-feed-evento {
@@ -416,14 +491,23 @@
   overflow-wrap: anywhere;
 }
 
+.pgp-projeto .prj-painel[data-prj-painel='atividade'] > .prj-vazio {
+  padding: 24px;
+  border: 1px dashed var(--pgp-border-strong);
+  border-radius: 14px;
+  background: var(--pgp-card);
+  text-align: center;
+}
+
 /* ----- Lateral ----- */
 
 .pgp-projeto .prj-lateral {
   grid-area: lateral;
-  padding: 16px;
+  padding: 20px;
   border: 1px solid var(--pgp-border);
-  border-radius: var(--pgp-radius-card);
+  border-radius: 14px;
   background: var(--pgp-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .pgp-projeto .prj-metas {
@@ -431,48 +515,74 @@
 }
 
 .pgp-projeto .prj-meta {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--pgp-border);
+}
+
+.pgp-projeto .prj-meta .pgp-label {
+  margin-bottom: 8px;
+  font-size: 11px;
 }
 
 .pgp-projeto .prj-meta-valor {
   margin: 0;
   color: var(--pgp-text);
   font-size: 14px;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .pgp-projeto .prj-pessoa {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+}
+
+.pgp-projeto .prj-pessoa .pgp-avatar,
+.pgp-projeto .prj-feed-item .pgp-avatar {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--pgp-accent) 12%, var(--pgp-card));
+  color: var(--pgp-link);
 }
 
 .pgp-projeto .prj-equipe {
   color: var(--pgp-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .pgp-projeto .prj-atrasado {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: var(--pgp-radius-tag);
+  background: var(--pgp-red-bg);
   color: var(--pgp-red);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .pgp-projeto .prj-ultima {
-  padding-top: 16px;
-  border-top: 1px solid var(--pgp-border);
+  padding-top: 2px;
+}
+
+.pgp-projeto .prj-ultima > .pgp-label {
+  margin-bottom: 8px;
+  font-size: 11px;
 }
 
 .pgp-projeto .prj-ultima-trecho {
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   color: var(--pgp-text);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
 .pgp-projeto .prj-ultima-rodape {
   margin: 0;
   color: var(--pgp-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 /* ----- Coluna única -----
@@ -505,24 +615,34 @@
   }
 
   .pgp-projeto .prj-topo .pgp-titulo {
+    margin: 4px 0 8px;
+  }
+
+  .pgp-projeto .prj-topo .pgp-seletor,
+  .pgp-projeto .prj-meta {
+    min-width: 0;
     margin: 0;
+    padding: 12px;
+    border: 1px solid var(--pgp-border);
+    border-radius: 12px;
+    background: var(--pgp-card);
+  }
+
+  .pgp-projeto .prj-metas .prj-meta:last-child {
+    grid-column: 1 / -1;
   }
 
   .pgp-projeto .pgp-select {
     width: 100%;
   }
 
-  .pgp-projeto .prj-meta {
-    margin-bottom: 0;
-  }
-
   .pgp-projeto .prj-abas {
     margin-bottom: 0;
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--pgp-border);
-    border-radius: 0;
-    background: none;
+    padding: 0 8px;
+    border: 1px solid var(--pgp-border);
+    border-radius: 12px;
+    background: var(--pgp-card);
+    box-shadow: none;
   }
 
   /* Só texto, sem foco: pode descer para o fim sem desordenar o Tab. */
@@ -530,15 +650,27 @@
     order: 1;
     padding: 16px;
     border: 1px solid var(--pgp-border);
-    border-radius: var(--pgp-radius-card);
+    border-radius: 12px;
     background: var(--pgp-card);
   }
 
-  .pgp-projeto .prj-card {
+  .pgp-projeto .prj-card,
+  .pgp-projeto .prj-secao {
     padding: 16px;
   }
 
-  .pgp-projeto .prj-secao {
-    padding: 0 16px;
+  .pgp-projeto .prj-feed {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .pgp-projeto .prj-etapa-form {
+    flex-direction: column;
+  }
+
+  .pgp-projeto .prj-etapa-form .prj-botao {
+    width: 100%;
   }
 }
