@@ -29,8 +29,19 @@ function _runAction(name, el, arg, ev) {
   try { fn(el, arg, ev); } catch (e) { if (typeof _logSilent === 'function') _logSilent(e, 'action:' + name); else throw e; }
 }
 
+// Clique modificado em link real é pedido de nova aba/janela, e quem resolve isso é o
+// navegador: rodar a ação junto abriria o item também na aba atual.
+function _isOpenInNewContext(ev) {
+  if (!(ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button > 0)) return false;
+  const a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+  if (!a) return false;
+  const href = a.getAttribute('href');
+  return !!href && href !== '#';
+}
+
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('click', (ev) => {
+    if (_isOpenInNewContext(ev)) return;
     const el = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
     if (!el || el.disabled) return;
     if (el.tagName === 'A' && el.getAttribute('href') === '#') ev.preventDefault();
@@ -40,6 +51,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   // Teclado: elementos não-botão com data-action (ex.: <a role="link">) respondem a Enter/Espaço.
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    if (_isOpenInNewContext(ev)) return;
     const t = ev.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; // digitando
     const el = t && t.closest ? t.closest('[data-action]') : null;

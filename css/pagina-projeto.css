@@ -1,0 +1,534 @@
+/* pagina-projeto.css: tela de projeto interno. Tudo escopado em .pgp-projeto.
+   Tokens e peças comuns ficam em css/pagina-pendencia.css. */
+
+.pgp-projeto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-areas:
+    'cabecalho cabecalho'
+    'abas abas'
+    'principal lateral';
+  column-gap: 24px;
+  align-items: start;
+}
+
+.pgp-projeto .prj-cabecalho {
+  grid-area: cabecalho;
+  padding: 12px 24px 8px;
+  border: 1px solid var(--pgp-border);
+  border-bottom: 0;
+  border-radius: var(--pgp-radius-card) var(--pgp-radius-card) 0 0;
+  background: var(--pgp-card);
+}
+
+.pgp-projeto .prj-trilha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pgp-projeto .prj-migalhas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pgp-projeto .prj-migalha-sep {
+  color: var(--pgp-muted);
+}
+
+.pgp-projeto .prj-numero {
+  padding: 2px 8px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-tag);
+  color: var(--pgp-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pgp-projeto .prj-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.pgp-projeto .prj-topo .pgp-titulo {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* ----- Abas: fecham o cartão do cabeçalho ----- */
+
+.pgp-projeto .prj-abas {
+  grid-area: abas;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 0 24px;
+  border: 1px solid var(--pgp-border);
+  border-top: 0;
+  border-radius: 0 0 var(--pgp-radius-card) var(--pgp-radius-card);
+  background: var(--pgp-card);
+}
+
+.pgp-projeto .prj-aba {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--pgp-label);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pgp-projeto .prj-aba:hover {
+  color: var(--pgp-text);
+}
+
+.pgp-projeto .prj-aba[aria-selected='true'] {
+  border-bottom-color: var(--pgp-accent);
+  color: var(--pgp-heading);
+}
+
+.pgp-projeto .prj-aba-contador {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: 10px;
+  color: var(--pgp-text);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.pgp-projeto .prj-principal {
+  grid-area: principal;
+  min-width: 0;
+}
+
+.pgp-projeto .prj-painel > * + * {
+  margin-top: 24px;
+}
+
+/* A regra de autor acima venceria o [hidden] do navegador se algum painel ganhasse display. */
+.pgp-projeto .prj-painel[hidden] {
+  display: none;
+}
+
+/* ----- Peças ----- */
+
+.pgp-projeto .prj-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pgp-projeto .prj-card {
+  padding: 16px 24px;
+  border: 1px solid var(--pgp-border);
+  border-radius: var(--pgp-radius-card);
+  background: var(--pgp-card);
+}
+
+.pgp-projeto .prj-card-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pgp-projeto .prj-secao-titulo {
+  margin: 0;
+  color: var(--pgp-label);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pgp-projeto .prj-secao > .prj-secao-titulo {
+  margin-bottom: 8px;
+}
+
+.pgp-projeto .prj-descricao,
+.pgp-projeto .prj-feed-texto {
+  color: var(--pgp-text);
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-vazio {
+  margin: 0;
+  color: var(--pgp-muted);
+  font-size: 14px;
+}
+
+.pgp-projeto .prj-botao {
+  flex: none;
+  min-height: var(--pgp-target-min);
+  padding: 0 14px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-control);
+  background: var(--pgp-field);
+  color: var(--pgp-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pgp-projeto .prj-botao:hover {
+  border-color: var(--pgp-link);
+}
+
+.pgp-projeto .prj-botao-primario {
+  border-color: var(--pgp-accent);
+  background: var(--pgp-accent);
+  color: var(--pgp-accent-text);
+}
+
+/* Parece link, mas é ação da tela. min-height garante o alvo mínimo de clique. */
+.pgp-projeto .prj-link {
+  min-height: var(--pgp-target-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pgp-link);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-link:hover {
+  color: var(--pgp-link-hover);
+  text-decoration: underline;
+}
+
+.pgp-projeto .prj-campo {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--pgp-target-min);
+  padding: 8px 12px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-control);
+  background: var(--pgp-field);
+  color: var(--pgp-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.pgp-projeto .prj-campo::placeholder {
+  color: var(--pgp-muted);
+  opacity: 1;
+}
+
+/* ----- Checklist ----- */
+
+.pgp-projeto .prj-contagem {
+  color: var(--pgp-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pgp-projeto .prj-progresso {
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: var(--pgp-field);
+  accent-color: var(--pgp-green);
+  appearance: none;
+}
+
+.pgp-projeto .prj-progresso::-webkit-progress-bar {
+  background: var(--pgp-field);
+}
+
+.pgp-projeto .prj-progresso::-webkit-progress-value {
+  background: var(--pgp-green);
+}
+
+.pgp-projeto .prj-progresso::-moz-progress-bar {
+  background: var(--pgp-green);
+}
+
+.pgp-projeto .prj-etapas {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.pgp-projeto .prj-etapa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--pgp-border);
+}
+
+.pgp-projeto .prj-etapa:last-child {
+  border-bottom: 0;
+}
+
+.pgp-projeto .prj-etapa-rotulo {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  color: var(--pgp-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pgp-projeto .prj-etapa-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--pgp-green);
+}
+
+.pgp-projeto .prj-etapa-texto {
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-etapa-feita .prj-etapa-texto {
+  color: var(--pgp-green);
+  text-decoration: line-through;
+}
+
+.pgp-projeto .prj-etapa-remover {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--pgp-radius-control);
+  background: none;
+  color: var(--pgp-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.pgp-projeto .prj-etapa-remover:hover {
+  background: var(--pgp-red-bg);
+  color: var(--pgp-red);
+}
+
+.pgp-projeto .prj-etapa-form {
+  display: flex;
+  gap: 8px;
+}
+
+/* ----- Atividade ----- */
+
+.pgp-projeto .prj-composer-rotulo {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--pgp-muted);
+  font-size: 14px;
+}
+
+.pgp-projeto .prj-composer-rotulo strong {
+  color: var(--pgp-heading);
+}
+
+.pgp-projeto .prj-composer-texto {
+  display: block;
+  resize: vertical;
+}
+
+.pgp-projeto .prj-composer-acoes {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.pgp-projeto .prj-feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pgp-projeto .prj-feed-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--pgp-border);
+}
+
+.pgp-projeto .prj-feed-item:last-child {
+  border-bottom: 0;
+}
+
+.pgp-projeto .prj-feed-corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.pgp-projeto .prj-feed-topo {
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.pgp-projeto .prj-feed-autor {
+  color: var(--pgp-heading);
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-quando {
+  color: var(--pgp-muted);
+  font-size: 13px;
+}
+
+.pgp-projeto .prj-feed-evento {
+  margin: 0;
+  color: var(--pgp-muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* ----- Lateral ----- */
+
+.pgp-projeto .prj-lateral {
+  grid-area: lateral;
+  padding: 16px;
+  border: 1px solid var(--pgp-border);
+  border-radius: var(--pgp-radius-card);
+  background: var(--pgp-card);
+}
+
+.pgp-projeto .prj-metas {
+  margin: 0;
+}
+
+.pgp-projeto .prj-meta {
+  margin-bottom: 16px;
+}
+
+.pgp-projeto .prj-meta-valor {
+  margin: 0;
+  color: var(--pgp-text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-pessoa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pgp-projeto .prj-equipe {
+  color: var(--pgp-muted);
+}
+
+.pgp-projeto .prj-atrasado {
+  color: var(--pgp-red);
+  font-weight: 600;
+}
+
+.pgp-projeto .prj-ultima {
+  padding-top: 16px;
+  border-top: 1px solid var(--pgp-border);
+}
+
+.pgp-projeto .prj-ultima-trecho {
+  margin: 0 0 4px;
+  color: var(--pgp-text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.pgp-projeto .prj-ultima-rodape {
+  margin: 0;
+  color: var(--pgp-muted);
+  font-size: 13px;
+}
+
+/* ----- Coluna única -----
+   display: contents dissolve os embrulhos: Status, Prioridade, Cliente, Responsável e
+   Prazo viram células da mesma grade 2x2 sem duplicar markup. Duplicar não é opção,
+   porque #chgStatus é contrato de id único. */
+
+@media (max-width: 900px) {
+  .pgp-projeto {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: none;
+    gap: 12px;
+  }
+
+  .pgp-projeto .prj-cabecalho,
+  .pgp-projeto .prj-topo,
+  .pgp-projeto .pgp-seletores,
+  .pgp-projeto .prj-lateral,
+  .pgp-projeto .prj-metas {
+    display: contents;
+  }
+
+  .pgp-projeto .prj-trilha,
+  .pgp-projeto .prj-topo .pgp-titulo,
+  .pgp-projeto .prj-abas,
+  .pgp-projeto .prj-principal,
+  .pgp-projeto .prj-ultima {
+    grid-area: auto;
+    grid-column: 1 / -1;
+  }
+
+  .pgp-projeto .prj-topo .pgp-titulo {
+    margin: 0;
+  }
+
+  .pgp-projeto .pgp-select {
+    width: 100%;
+  }
+
+  .pgp-projeto .prj-meta {
+    margin-bottom: 0;
+  }
+
+  .pgp-projeto .prj-abas {
+    margin-bottom: 0;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--pgp-border);
+    border-radius: 0;
+    background: none;
+  }
+
+  /* Só texto, sem foco: pode descer para o fim sem desordenar o Tab. */
+  .pgp-projeto .prj-ultima {
+    order: 1;
+    padding: 16px;
+    border: 1px solid var(--pgp-border);
+    border-radius: var(--pgp-radius-card);
+    background: var(--pgp-card);
+  }
+
+  .pgp-projeto .prj-card {
+    padding: 16px;
+  }
+}

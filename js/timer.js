@@ -356,6 +356,35 @@ function _refreshTimerUI(id) {
   });
 }
 
+function _refreshPenWorkBox(workBox, item) {
+  var w2 = getCurrentWorker(item);
+  workBox.classList.toggle('is-working', !!w2);
+  workBox.classList.toggle('is-free', !w2);
+  var valEl = workBox.querySelector('.pen-work-value');
+  if (valEl) {
+    if (w2) {
+      var esc = (typeof escapeHtml === 'function') ? escapeHtml(w2) : String(w2);
+      valEl.innerHTML = '<strong>' + esc + '</strong> <span class="pen-work-time">' + timerDisplayHTML(item) + '</span>';
+    } else {
+      valEl.innerHTML = '<strong>Ninguém</strong> <span class="pen-work-hint">· Disponível</span>';
+    }
+  }
+  var timeEl = workBox.querySelector('.pen-time');
+  if (timeEl) {
+    var secs = getElapsedSeconds(item);
+    var friendly = formatTimer(secs);
+    try {
+      if (typeof _penFriendlyTime === 'function') {
+        var ft = _penFriendlyTime(item);
+        if (ft && ft.friendly) friendly = ft.friendly;
+      } else if (typeof formatElapsedFriendly === 'function') {
+        friendly = formatElapsedFriendly(secs);
+      }
+    } catch (_) {}
+    timeEl.textContent = '⏱ ' + friendly;
+  }
+}
+
 /**
  * Full refresh de um timer: botão ▶/⏸/🔒 + badge de worker + display +
  * bloco "Trabalhando agora" do modal de detalhe (se aberto para este id).
@@ -388,34 +417,7 @@ function _refreshTimerFull(id, type) {
     var modalVisible = overlay && overlay.style.display !== 'none';
     if (modalVisible && document.querySelector('#modalBody [data-timer-widget]')) {
       var workBox = document.querySelector('#modalBody .pen-work');
-      if (workBox) {
-        var w2 = getCurrentWorker(item);
-        workBox.classList.toggle('is-working', !!w2);
-        workBox.classList.toggle('is-free', !w2);
-        var valEl = workBox.querySelector('.pen-work-value');
-        if (valEl) {
-          if (w2) {
-            var esc = (typeof escapeHtml === 'function') ? escapeHtml(w2) : String(w2);
-            valEl.innerHTML = '<strong>' + esc + '</strong> <span class="pen-work-time">' + timerDisplayHTML(item) + '</span>';
-          } else {
-            valEl.innerHTML = '<strong>Ninguém</strong> <span class="pen-work-hint">· Disponível</span>';
-          }
-        }
-        var timeEl = workBox.querySelector('.pen-time');
-        if (timeEl) {
-          var secs = getElapsedSeconds(item);
-          var friendly = formatTimer(secs);
-          try {
-            if (typeof _penFriendlyTime === 'function') {
-              var ft = _penFriendlyTime(item);
-              if (ft && ft.friendly) friendly = ft.friendly;
-            } else if (typeof formatElapsedFriendly === 'function') {
-              friendly = formatElapsedFriendly(secs);
-            }
-          } catch (_) {}
-          timeEl.textContent = '⏱ ' + friendly;
-        }
-      }
+      if (workBox) _refreshPenWorkBox(workBox, item);
     }
   } catch (_) {}
   // 4. Badges da sidebar

@@ -23,7 +23,29 @@ function _penChatItemHtml(n, me) {
     + '</div><div class="pen-note-text feed-text">'+_penRichNote(n.text)+'</div></div></div>';
 }
 
+// A pendência abre na página própria. O modal segue vivo como reserva: quem carrega
+// só este grupo de scripts (testes, telas antigas) não tem a página disponível.
 function openPendenciaDetail(id) {
+  if (typeof abrirPaginaPendencia === 'function') return abrirPaginaPendencia(id);
+  return openPendenciaDetailModal(id);
+}
+
+// Depois de gravar, redesenha só o que está na tela. Sem esta triagem, salvar um campo
+// com a página aberta reabriria o modal por cima dela, e salvar pela lista abriria um
+// detalhe que ninguém pediu.
+function _penRedesenharDetalhe(id) {
+  if (typeof penPaginaEstaAberta === 'function' && penPaginaEstaAberta(id)) {
+    penPaginaAtualizar(id);
+    return;
+  }
+  if (typeof penPaginaEstaAberta !== 'function') { openPendenciaDetailModal(id); return; }
+  const overlay = document.getElementById('modalOverlay');
+  const body = document.getElementById('modalBody');
+  const modalVisivel = !!(overlay && overlay.style.display === 'flex');
+  if (modalVisivel && body && body.querySelector('.pen-detail')) openPendenciaDetailModal(id);
+}
+
+function openPendenciaDetailModal(id) {
   const p = getPendenciaById(id);
   if (!p) return;
   try {
@@ -229,7 +251,7 @@ function changePenStatus(id) {
   _optimisticPenUpsert(next); // reflete na lista na hora; o fetch reconcilia depois
   updateBadges();
   showToast('Status atualizado!', 'success');
-  openPendenciaDetail(id);
+  _penRedesenharDetalhe(id);
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
 }
@@ -401,7 +423,7 @@ function submitPenNote(id) {
   if (!ok) { showToast('Não foi possível salvar a nota (pendência não encontrada). Texto mantido.', 'error'); return; }
   showToast(vis === 'interna' ? 'Anotação interna salva (só a equipe vê).' : 'Resposta postada!', 'success');
   if (_mandarEmail) penResponderPorEmail(id, text);
-  openPendenciaDetail(id);
+  _penRedesenharDetalhe(id);
   renderPenView(false);
 }
 
@@ -750,6 +772,8 @@ function deletePendenciaConfirm(id) {
     _optimisticPenRemove(id); // some da lista na hora (anti-ghost até o delete convergir)
     renderPenView(false);
     updateBadges();
+    // Página de item excluído não tem o que mostrar: volta para a lista.
+    if (typeof penPaginaVoltarSeAberta === 'function') penPaginaVoltarSeAberta(id);
     showUndoToast('Pendência removida.', function() {
       savePendencia(snapshot); // storage preserva o id original (links/anexos intactos)
       _clearOptimisticPenRemove(id);
