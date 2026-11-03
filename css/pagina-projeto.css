@@ -163,6 +163,12 @@
   text-transform: uppercase;
 }
 
+.pgp-projeto .prj-secao {
+  /* A descrição não é cartão; sem o mesmo recuo dos cards ela encosta na borda
+     da grade e desalinha do cabeçalho e do checklist. */
+  padding: 0 24px;
+}
+
 .pgp-projeto .prj-secao > .prj-secao-titulo {
   margin-bottom: 8px;
 }
@@ -530,5 +536,9 @@
 
   .pgp-projeto .prj-card {
     padding: 16px;
+  }
+
+  .pgp-projeto .prj-secao {
+    padding: 0 16px;
   }
 }
