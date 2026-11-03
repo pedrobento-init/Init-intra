@@ -1,0 +1,200 @@
+/* pagina-pendencia.css: base das páginas #chamados/<id> e #projetos/<id>.
+   Os tokens --pgp-* são o vocabulário das duas telas. O tema claro herda os tokens
+   do app, para acompanhar o design system; o escuro usa as cores do mockup, porque
+   é nele que a tela foi desenhada. Contraste de texto: mínimo 4.5:1 nos dois. */
+
+.pgp {
+  --pgp-bg: var(--bg-base);
+  --pgp-card: var(--bg-card);
+  --pgp-field: var(--bg-surface);
+  --pgp-border: var(--border);
+  --pgp-border-strong: var(--border);
+  --pgp-text: var(--text-primary);
+  --pgp-heading: var(--text-primary);
+  --pgp-label: var(--text-secondary);
+  --pgp-muted: var(--text-muted);
+  --pgp-accent: var(--accent);
+  --pgp-accent-text: #fff;
+  --pgp-link: var(--accent);
+  --pgp-link-hover: var(--accent);
+  --pgp-green: #047857;
+  --pgp-green-bg: #ecfdf5;
+  --pgp-green-border: #6ee7b7;
+  --pgp-amber: #92400e;
+  --pgp-amber-bg: #fffbeb;
+  --pgp-amber-border: #fcd34d;
+  --pgp-red: #b91c1c;
+  --pgp-red-bg: #fef2f2;
+  --pgp-red-border: #fca5a5;
+  --pgp-radius-card: 12px;
+  --pgp-radius-control: 8px;
+  --pgp-radius-tag: 6px;
+  --pgp-control-height: 38px;
+  --pgp-target-min: 40px;
+
+  background: var(--pgp-bg);
+  color: var(--pgp-text);
+  font-family: 'Manrope', var(--font-sans, system-ui, sans-serif);
+  min-width: 0;
+}
+
+body.dark-theme .pgp {
+  --pgp-bg: #0b1626;
+  --pgp-card: #0f1c2e;
+  --pgp-field: #13233a;
+  --pgp-border: #1f2f47;
+  --pgp-border-strong: #263a57;
+  --pgp-text: #e6edf7;
+  --pgp-heading: #f1f5fb;
+  --pgp-label: #93a4be;
+  --pgp-muted: #93a4be;
+  --pgp-accent: #4c7dff;
+  --pgp-accent-text: #0b1626;
+  --pgp-link: #7aa2ff;
+  --pgp-link-hover: #a9c2ff;
+  --pgp-green: #6ee7b7;
+  --pgp-green-bg: #10291f;
+  --pgp-green-border: #1f5a45;
+  --pgp-amber: #fcd34d;
+  --pgp-amber-bg: #241d0d;
+  --pgp-amber-border: #4a3b17;
+  --pgp-red: #fca5a5;
+  --pgp-red-bg: #2b1416;
+  --pgp-red-border: #6b2a2e;
+}
+
+.pgp-titulo {
+  margin: 12px 0 16px;
+  color: var(--pgp-heading);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pgp-voltar {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--pgp-target-min);
+  color: var(--pgp-link);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pgp-voltar:hover {
+  color: var(--pgp-link-hover);
+  text-decoration: underline;
+}
+
+.pgp-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--pgp-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pgp-seletores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pgp-seletor {
+  min-width: 0;
+}
+
+.pgp-select {
+  min-height: var(--pgp-target-min);
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-control);
+  background: var(--pgp-field);
+  color: var(--pgp-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pgp-select-status[data-status='resolvido'] {
+  border-color: var(--pgp-green-border);
+  background: var(--pgp-green-bg);
+  color: var(--pgp-green);
+}
+
+.pgp-select-prioridade[data-prioridade='media'],
+.pgp-select-status[data-status='aguardando'],
+.pgp-select-status[data-status='aguardando_cliente'] {
+  border-color: var(--pgp-amber-border);
+  background: var(--pgp-amber-bg);
+  color: var(--pgp-amber);
+}
+
+.pgp-select-prioridade[data-prioridade='alta'],
+.pgp-select-prioridade[data-prioridade='critica'] {
+  border-color: var(--pgp-red-border);
+  background: var(--pgp-red-bg);
+  color: var(--pgp-red);
+}
+
+.pgp-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pgp-avatar-size, 32px);
+  height: var(--pgp-avatar-size, 32px);
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: 50%;
+  background: var(--pgp-field);
+  color: var(--pgp-text);
+  font-size: calc(var(--pgp-avatar-size, 32px) * 0.38);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.pgp-estado {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 24px;
+  border: 1px solid var(--pgp-border);
+  border-radius: var(--pgp-radius-card);
+  background: var(--pgp-card);
+  text-align: center;
+}
+
+.pgp-estado-titulo {
+  margin: 0 0 8px;
+  color: var(--pgp-heading);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pgp-estado-texto {
+  margin: 0 0 12px;
+  color: var(--pgp-muted);
+  font-size: 14px;
+}
+
+.pgp :focus-visible {
+  outline: 2px solid var(--pgp-link);
+  outline-offset: 2px;
+}
+
+/* Única regra fora de .pgp: os links da lista precisam parecer o texto de antes.
+   Sem ela o navegador sublinharia e pintaria cada título de azul. */
+.kanban-card a.pgp-link-lista,
+.pf-titulo a.pgp-link-lista {
+  color: inherit;
+  text-decoration: none;
+}
+
+.kanban-card a.pgp-link-lista:hover,
+.pf-titulo a.pgp-link-lista:hover {
+  text-decoration: underline;
+}

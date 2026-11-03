@@ -499,22 +499,28 @@ function navigateTo(page) {
 
   // A rolagem é da janela (o content-area não é contêiner de scroll).
   const _changingPage = _currentPage !== page;
-  if (_changingPage) {
+  // Rota de item (#chamados/<id>, #projetos/<id>) não é página do menu: acende Pendências
+  // e não guarda rolagem, porque cada item abre do topo.
+  const _penRotaDe = (h) => (typeof penPaginaRotaDe === 'function' ? penPaginaRotaDe(h) : null);
+  const _rota = _penRotaDe(page);
+  const _veioDeRota = !!_penRotaDe(_currentPage || '');
+  const _navPage = _rota ? 'pendencias' : page;
+  if (_changingPage && !_veioDeRota) {
     _pageScrollState[_currentPage || currentHash] = window.scrollY || 0;
   }
   _currentPage = page;
 
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   // Modelos vive dentro de Conhecimento (aba): acende o item dela no menu.
-  const el = document.getElementById('nav-' + (page === 'templates' ? 'conhecimento' : page));
+  const el = document.getElementById('nav-' + (_navPage === 'templates' ? 'conhecimento' : _navPage));
   if (el) el.classList.add('active');
   // Barra inferior (celular): destaca o destino atual; páginas fora dela
   // acendem o "Mais".
   const _bottom = document.querySelectorAll('.bottom-nav-item');
   if (_bottom.length) {
-    const _inBar = ['fila', 'pendencias', 'calendario'].includes(page);
+    const _inBar = ['fila', 'pendencias', 'calendario'].includes(_navPage);
     _bottom.forEach(b => {
-      const on = _inBar ? b.dataset.page === page : b.dataset.page === '__more';
+      const on = _inBar ? b.dataset.page === _navPage : b.dataset.page === '__more';
       b.classList.toggle('is-active', on);
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
@@ -525,7 +531,21 @@ function navigateTo(page) {
 
   if (typeof updateBadges === 'function') updateBadges();
 
-  if      (page === 'fila')        renderFila();
+  // Saindo da página do item: o `_pgpAberta` não pode sobreviver, ou um realtime
+  // redesenharia a página por cima da tela seguinte.
+  if (!_rota && typeof penPaginaFechar === 'function') penPaginaFechar();
+  // Volta para a lista: a rolagem é aplicada depois do desenho, em _penRenderAtual,
+  // porque a lista pode pintar só depois do requestAnimationFrame lá embaixo.
+  if (_veioDeRota && page === 'pendencias' && typeof penPaginaMarcarScrollLista === 'function') {
+    penPaginaMarcarScrollLista(_pageScrollState.pendencias || 0);
+  }
+
+  if (_rota) {
+    // Recarregar a mesma rota (F5 lógico, troca de equipe) não pode recriar o DOM:
+    // penPaginaAtualizar captura e devolve rascunho, modo, aba e rolagem.
+    if (typeof penPaginaEstaAberta === 'function' && penPaginaEstaAberta(_rota.id)) penPaginaAtualizar(_rota.id);
+    else renderPaginaPendencia(_rota.tipo, _rota.id);
+  } else if (page === 'fila')      renderFila();
   else if (page === 'dashboard')   { document.getElementById('pageTitle').textContent = 'Dashboard'; renderDashboard(); }
   else if (page === 'prazos')      renderPrazos();
   else if (page === 'vencimentos') renderVencimentos();
@@ -1454,7 +1474,9 @@ function _startApp() {
   // Números amigáveis antes da primeira pintura (local, sem rede): evita
   // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
   try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
-  navigateTo(pages.includes(hash) ? hash : homePage);
+  // Rota de item carrega por id: o F5 e o link colado precisam voltar ao mesmo item.
+  const _isRota = (h) => typeof penPaginaRotaDe === 'function' && !!penPaginaRotaDe(h);
+  navigateTo(pages.includes(hash) || _isRota(hash) ? hash : homePage);
   // Offline-first: a UI já montou a partir do banco local; a sincronização
   // automática roda agora em segundo plano, sem bloquear (toda falha de rede
   // vira fallback local + retry — ver triggerStartupSync em storage.js).
@@ -1463,7 +1485,7 @@ function _startApp() {
     _appStarted = true;
     window.addEventListener('hashchange', () => {
       const p = window.location.hash.replace('#','');
-      if (pages.includes(p) && p !== _currentPage) navigateTo(p);
+      if ((pages.includes(p) || _isRota(p)) && p !== _currentPage) navigateTo(p);
     });
   }
 }

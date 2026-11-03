@@ -443,8 +443,14 @@ function penKanbanCard(p) {
     // teclado — antes o card era uma <article> com onclick e quem navega por
     // Tab não abria chamado nenhum pelo quadro. A <article> não pode virar
     // role="button": ela tem outros botões dentro (⋯, cronômetro).
+    // Link real só no número: <a> dentro de <button> é HTML inválido, e o título precisa
+    // continuar <button> pelo motivo acima. draggable="false" para o arrasto seguir com
+    // o cartão, não com a URL do link.
+    (typeof penPaginaHref === 'function'
+      ? '<a class="pen-display-num pgp-link-lista" href="' + escapeHtml(penPaginaHref(p)) + '" draggable="false">' + num + '</a>'
+      : '') +
     '<button type="button" class="kanban-card-title kc-open" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '" title="' + escapeHtml(title) + '">' +
-      '<span class="pen-display-num">' + num + '</span>' + escapeHtml(title) +
+      (typeof penPaginaHref === 'function' ? '' : '<span class="pen-display-num">' + num + '</span>') + escapeHtml(title) +
       (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
     '</button>' +
     '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +

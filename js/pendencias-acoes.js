@@ -100,6 +100,8 @@ function penQuickAssign(id, name, opts) {
     return;
   }
   if (document.getElementById('penViewArea')) renderPenView(false);
+  // O desfazer pode chegar com a página do chamado aberta, sem lista na tela.
+  if (typeof penPaginaAtualizar === 'function') penPaginaAtualizar(id);
 }
 
 if (typeof document !== 'undefined' && document.addEventListener && !(typeof window !== 'undefined' && window._penQuickMenuBound)) {
@@ -327,7 +329,7 @@ function quickUpdatePendenciaField(id, field, value) {
   if (field === 'solicitante') value = String(value || '').trim().slice(0, 120);
   if (field === 'priority' && ['baixa', 'media', 'alta', 'critica'].indexOf(value) === -1) {
     if (typeof showToast === 'function') showToast('Prioridade inválida.', 'error');
-    openPendenciaDetail(id);
+    _penRedesenharDetalhe(id);
     return;
   }
   if (field === 'deadline' && value && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
@@ -343,13 +345,13 @@ function quickUpdatePendenciaField(id, field, value) {
   try { errors = (typeof validatePendencia === 'function') ? (validatePendencia(p) || []) : []; } catch (_) {}
   if (errors.length) {
     if (typeof showToast === 'function') showToast(errors[0], 'error');
-    openPendenciaDetail(id);
+    _penRedesenharDetalhe(id);
     return;
   }
   savePendencia(p);
   if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
   if (typeof showToast === 'function') showToast('Atualizado!', 'success');
-  openPendenciaDetail(id);
+  _penRedesenharDetalhe(id);
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_) {} }
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_) {} }
 }

@@ -91,6 +91,14 @@ function _penFilaPrazo(p) {
     + (selos ? '<span class="pf-selos">' + selos + '</span>' : '');
 }
 
+// Link de verdade para Ctrl+clique e botão do meio abrirem em outra aba. tabindex -1
+// porque a parada de teclado já é a linha: duas seguidas para o mesmo destino só
+// alongariam o caminho de quem navega por Tab.
+function _penFilaTituloHtml(p, titulo) {
+  if (typeof penPaginaHref !== 'function') return escapeHtml(titulo);
+  return '<a class="pgp-link-lista" href="' + escapeHtml(penPaginaHref(p)) + '" tabindex="-1">' + escapeHtml(titulo) + '</a>';
+}
+
 function _penFilaLinha(p) {
   const titulo = getPendenciaTitulo(p);
   const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : (p.numero || '');
@@ -99,7 +107,7 @@ function _penFilaLinha(p) {
     + ' aria-label="' + escapeHtml(num + ' — ' + titulo) + '">'
     + '<td class="pf-num"><span class="pen-display-num">' + escapeHtml(String(num)) + '</span></td>'
     + '<td class="pf-data">' + escapeHtml(p.createdAt ? formatDate(new Date(p.createdAt)) : '—') + '</td>'
-    + '<td class="pf-titulo" title="' + escapeHtml(titulo) + '">' + escapeHtml(titulo) + '</td>'
+    + '<td class="pf-titulo" title="' + escapeHtml(titulo) + '">' + _penFilaTituloHtml(p, titulo) + '</td>'
     + '<td class="pf-cliente">' + escapeHtml(p.clientName || '—') + '</td>'
     + '<td class="pf-solic">' + escapeHtml(p.solicitante || '—') + '</td>'
     + '<td class="pf-resp">' + escapeHtml(p.responsible || '—') + '</td>'
@@ -182,8 +190,11 @@ function _penRenderAtual(area) {
   // Todo redesenho da área passa aqui (filtro, página, otimista), então é o
   // ponto que mantém os contadores das abas de origem em dia.
   try { if (typeof _penRenderOrigemCounts === 'function') _penRenderOrigemCounts(); } catch (_) {}
-  if (typeof penView !== 'undefined' && penView === 'fila') return renderPenFila(area);
-  return renderPenKanban(area);
+  const res = (typeof penView !== 'undefined' && penView === 'fila') ? renderPenFila(area) : renderPenKanban(area);
+  // A rolagem de volta da página do chamado só faz sentido com a lista já desenhada:
+  // antes disso a altura é a do "carregando" e o scroll seria cortado.
+  if (typeof penPaginaAplicarScrollLista === 'function') penPaginaAplicarScrollLista();
+  return res;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
