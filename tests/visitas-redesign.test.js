@@ -64,7 +64,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/visitas.js', 'utf8'), sandbox, { filename: 'visitas.js' });
   vm.runInContext(
-    'globalThis.__t = { visitInitials, VISIT_STATUS_CHIPS, setVisitStatusFilter, getFilteredVisits, visitCardHtml, openVisitFiltersSheet, applyVisitFiltersSheet, clearVisitFiltersSheet, updateVisitFilterDot, visitGroupKey, groupVisitsByPeriod };',
+    'globalThis.__t = { visitInitials, VISIT_STATUS_CHIPS, setVisitStatusFilter, getFilteredVisits, visitCardHtml, openVisitFiltersSheet, applyVisitFiltersSheet, clearVisitFiltersSheet, updateVisitFilterDot, visitGroupKey, groupVisitsByPeriod, findVisitScheduleConflicts };',
     sandbox
   );
 } finally {
@@ -261,5 +261,23 @@ describe('lista agrupada por período', () => {
     expect(T.visitCardHtml(FAKE_VISITS[2])).toContain('vis-why');
     expect(T.visitCardHtml(FAKE_VISITS[2])).toContain('Instalação');
     expect(T.visitCardHtml({ ...FAKE_VISITS[2], motivo: '' })).not.toContain('vis-why');
+  });
+});
+
+describe('conflito de horário entre operadores', () => {
+  const nova = { id: 'nova', clientId: 'cli', operator: 'Ana', date: '2026-11-04', time: '10:00', timeEnd: '11:00' };
+  const outra = (over = {}) => ({ id: 'outra', clientId: 'cli', operator: 'Beto', date: '2026-11-04', time: '10:30', timeEnd: '11:30', ...over });
+
+  it('avisa sobreposição e dia inteiro, sem bloquear clientes ou horários diferentes', () => {
+    expect(T.findVisitScheduleConflicts(nova, [outra()])).toHaveLength(1);
+    expect(T.findVisitScheduleConflicts({ ...nova, allDay: true }, [outra()])).toHaveLength(1);
+    expect(T.findVisitScheduleConflicts(nova, [outra({ time: '11:00', timeEnd: '12:00' })])).toHaveLength(0);
+    expect(T.findVisitScheduleConflicts(nova, [outra({ clientId: 'outro' })])).toHaveLength(0);
+  });
+
+  it('ignora a edição da própria visita, canceladas e o mesmo operador', () => {
+    expect(T.findVisitScheduleConflicts(nova, [outra({ id: 'nova' })])).toHaveLength(0);
+    expect(T.findVisitScheduleConflicts(nova, [outra({ status: 'cancelada' })])).toHaveLength(0);
+    expect(T.findVisitScheduleConflicts(nova, [outra({ operator: 'Ana' })])).toHaveLength(0);
   });
 });

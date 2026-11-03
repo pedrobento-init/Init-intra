@@ -6,10 +6,9 @@
 // (valida JWT + equipe; o código vem do banco) → status atual.
 //
 // Sem colunas novas: o resultado fica num cache local por visita (cada
-// aparelho consulta o seu, com TTL). Única escrita na visita: se o Milvus
-// diz "finalizado" e a etapa de finalização do app ainda estava pendente ou
-// com erro, ela é dada como feita (evita tentar finalizar de novo e cair
-// em "chamado não está em atendimento").
+// aparelho consulta o seu, com TTL). Se o Milvus diz "finalizado", a visita
+// também é concluída e a etapa de finalização é dada como feita, evitando
+// tentar finalizar de novo e cair em "chamado não está em atendimento".
 
 const MILVUS_STATUS_EDGE = 'milvus-chamado-status';
 const MILVUS_STATUS_KEY = 'intra_milvus_status_v1';
@@ -100,14 +99,22 @@ function pickVisitsForMilvusStatus(visits, cache, nowMs, opts) {
 }
 
 /**
- * Milvus finalizou mas a etapa de finalização do app ficou pendente/erro →
- * dá como feita (pura; null = nada a mudar). 'finalizando' (em voo) não mexe.
+ * Milvus finalizou → conclui a visita e evita uma segunda finalização.
+ * (pura; null = nada a mudar). 'finalizando' em voo não é alterado.
  */
 function reconcileFinalizeFromMilvus(visit, entry) {
   if (!visit || !entry || entry.kind !== 'finalizado') return null;
   if (Number(entry.codigo) !== Number(visit.milvusChamadoCodigo)) return null;
-  if (visit.milvusFinalizarStatus !== 'pendente' && visit.milvusFinalizarStatus !== 'erro') return null;
-  return { milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null };
+  const patch = {};
+  if (visit.status !== 'concluida' && visit.status !== 'cancelada') {
+    patch.status = 'concluida';
+    if (!String(visit.relatorio || '').trim() && entry.ultimaLog && entry.ultimaLog.texto) patch.relatorio = entry.ultimaLog.texto;
+  }
+  if (visit.milvusFinalizarStatus === 'pendente' || visit.milvusFinalizarStatus === 'erro' || !visit.milvusFinalizarStatus) {
+    patch.milvusFinalizarStatus = 'finalizado';
+    patch.milvusFinalizarErro = null;
+  }
+  return Object.keys(patch).length ? patch : null;
 }
 
 // ── HTML ─────────────────────────────────────────────────────────────────
@@ -154,9 +161,8 @@ function _mstDetailInner(visit, entry, loading) {
   const log = entry.ultimaLog
     ? '<div class="mst-log">“' + escapeHtml(entry.ultimaLog.texto) + '”' + (entry.ultimaLog.tecnico ? ' <span class="mst-muted">— ' + escapeHtml(entry.ultimaLog.tecnico) + '</span>' : '') + '</div>'
     : '';
-  const hint = (entry.kind === 'finalizado' && visit.status !== 'concluida' && visit.status !== 'cancelada')
-    ? '<div class="mst-hint">O chamado já foi finalizado no Milvus. Conclua a visita aqui com o relatório.</div>'
-    : (entry.kind === 'cancelado' && visit.status !== 'cancelada' ? '<div class="mst-hint">O chamado foi cancelado no Milvus.</div>' : '');
+  const hint = entry.kind === 'cancelado' && visit.status !== 'cancelada'
+    ? '<div class="mst-hint">O chamado foi cancelado no Milvus.</div>' : '';
   return '<div class="mst-detail">' +
     '<div class="mst-line"><span class="mst mst--' + k.tone + '">' + escapeHtml(k.label) + '</span>' +
     '<span class="mst-muted">verificado ' + escapeHtml(_mstAgo(entry.checkedAt)) + '</span>' + refresh + '</div>' +

@@ -62,13 +62,14 @@ describe('pickVisitsForMilvusStatus', () => {
 
 describe('reconcileFinalizeFromMilvus', () => {
   const e = { codigo: 100, kind: 'finalizado' };
-  it('Milvus finalizado + finalização pendente/erro no app → dá como finalizado', () => {
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' }, e)).toEqual({ milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'pendente' }, e)).not.toBeNull();
+  it('Milvus finalizado conclui a visita e dá a finalização como feita', () => {
+    expect(S.reconcileFinalizeFromMilvus({ status: 'em_andamento', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' }, e)).toEqual({ status: 'concluida', milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
+    expect(S.reconcileFinalizeFromMilvus({ status: 'agendada', milvusChamadoCodigo: 100 }, e)).toEqual({ status: 'concluida', milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
   });
-  it('não mexe em voo, já finalizado, outro código ou Milvus aberto', () => {
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizando' }, e)).toBeNull();
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' }, e)).toBeNull();
+  it('não reabre visita cancelada nem mexe em voo, já finalizado, outro código ou Milvus aberto', () => {
+    expect(S.reconcileFinalizeFromMilvus({ status: 'cancelada', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' }, e)).toBeNull();
+    expect(S.reconcileFinalizeFromMilvus({ status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizando' }, e)).toBeNull();
+    expect(S.reconcileFinalizeFromMilvus({ status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' }, e)).toBeNull();
     expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 101, milvusFinalizarStatus: 'erro' }, e)).toBeNull();
     expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' }, { codigo: 100, kind: 'atendimento' })).toBeNull();
   });

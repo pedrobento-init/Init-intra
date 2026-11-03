@@ -115,6 +115,7 @@ function _cwPassoHtml(passo, v) {
       (v.briefingIa ? '<div class="campo-ia">💡 ' + escapeHtml(v.briefingIa).replace(/\n/g, '<br>') + '</div>' : '') +
       (health && health.motivos && health.motivos.length ? '<div class="campo-atencao">⚠️ No cliente: ' + health.motivos.map(escapeHtml).join(' · ') + '</div>' : '') +
       (typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : '') +
+      '<div class="cw-field"><div class="cw-label">Preparação da visita</div><div class="cw-text">Confira equipamentos e materiais, documentos e acessos do cliente. Revise o histórico e os avisos acima antes de iniciar.</div></div>' +
       '<button type="button" class="link-btn cw-detalhes" data-action="cwDetalhes" data-arg="' + id + '">Ver todos os detalhes da visita</button>';
   }
   if (passo === 'fotos') {
