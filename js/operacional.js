@@ -114,7 +114,7 @@ function buildVisitMetrics(visits, ym) {
 function operationalCenterHtml(items) {
   return '<section class="card dash-widget ov-panel" aria-labelledby="ov-central">' +
     '<div class="ov-ph"><h2 class="ov-h2" id="ov-central">Central operacional</h2><span class="ov-sub">' + items.length + ' ' + (items.length === 1 ? 'alerta' : 'alertas') + '</span></div>' +
-    (items.length ? '<ul class="ov-ls">' + items.map(item => {
+    (items.length ? '<ul class="ov-ls ov-operational-list">' + items.map(item => {
       return '<li class="ov-it" role="button" tabindex="0" data-action="operacionalAbrir" data-kind="' + (item.visitId ? 'visita' : 'pendencia') + '" data-arg="' + escapeHtml(item.visitId || item.pendenciaId) + '">' +
         '<div style="min-width:0"><div class="ov-tt">' + escapeHtml(item.title) + '</div><div class="ov-mt"><span>' + escapeHtml(item.detail || '') + '</span></div></div><span class="ov-warn">Revisar</span></li>';
     }).join('') + '</ul>' : '<p class="ov-empty">Nenhum problema operacional encontrado.</p>') + '</section>';

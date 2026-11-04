@@ -7313,6 +7313,7 @@ textarea[aria-busy="true"] { opacity: .6; }
 .ov-row,
 .ov-li { min-height: 44px; }
 .ov-tt { line-height: 1.4; overflow-wrap: anywhere; }
+.ov-operational-list .ov-it { grid-template-columns: minmax(0, 1fr) auto; }
 .client-timeline .ov-it { grid-template-columns: minmax(0, 1fr); }
 .client-timeline .ov-mt { white-space: normal; overflow-wrap: anywhere; }
 .ov-mt,
