@@ -172,8 +172,8 @@ body.dark-theme .pgp-chamado {
 
 /* Cabeçalho */
 .pgp-chamado .chp-cabecalho {
-  margin: 12px 0 16px;
-  padding: 16px 20px;
+  margin: 4px 0 var(--pgp-gap);
+  padding: 20px 24px;
   border: 1px solid var(--pgp-border);
   border-radius: var(--pgp-radius-card);
   background: var(--chp-cabecalho-bg);
@@ -203,7 +203,7 @@ body.dark-theme .pgp-chamado {
 }
 
 .pgp-chamado .chp-cabecalho .pgp-titulo {
-  margin: 10px 0 14px;
+  margin: 10px 0 16px;
 }
 
 .pgp-chamado .chp-cabecalho-base {
@@ -262,7 +262,7 @@ body.dark-theme .pgp-chamado {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: start;
-  gap: 16px;
+  gap: var(--pgp-gap);
 }
 
 .pgp-chamado .chp-conversa {
@@ -580,12 +580,12 @@ body.dark-theme .pgp-chamado {
 .pgp-chamado .chp-lado {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--pgp-gap);
   min-width: 0;
 }
 
 .pgp-chamado .chp-card {
-  padding: 16px;
+  padding: 20px;
   border: 1px solid var(--pgp-border);
   border-radius: var(--pgp-radius-card);
   background: var(--pgp-card);
@@ -703,7 +703,7 @@ body.dark-theme .pgp-chamado {
 }
 
 .pgp-chamado .chp-separador {
-  margin: 14px 0;
+  margin: 16px 0;
   border: 0;
   border-top: 1px solid var(--chp-linha);
 }
