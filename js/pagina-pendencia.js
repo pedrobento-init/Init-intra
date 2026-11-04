@@ -201,7 +201,8 @@ function _pgpMostrar(seq, tipo, p) {
     }, 0);
     return;
   }
-  _pgpDesenhar(tipo, p);
+  // Só depois de desenhar: quem abriu está vendo o chamado de fato.
+  if (_pgpDesenhar(tipo, p) && tipo === 'chamado' && typeof chpMarcarVisto === 'function') chpMarcarVisto(p);
 }
 
 /**

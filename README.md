@@ -47,6 +47,12 @@ sendo contados para não ressuscitar registro antigo.
 - 7 dias sem nota nem evento: Aguard. Cliente vira Resolvido, e Em Andamento vira
   Pausado. Vale só para chamado (canal externo), nunca com o cronômetro ligado.
 
+**O Andamento mostra Recebido e Visto.** Recebido é a primeira atribuição (sai de
+`responsible` e dos eventos `responsavel`, sem gravar nada). Visto é a primeira vez que
+o responsável abre o chamado: a função `marcar_chamado_visto` (migration 079) grava o
+evento a partir do login, uma vez por pessoa. Abrir não conta como interação na regra
+de 7 dias.
+
 **O prazo sai da prioridade** (`js/sla.js`), em horas e dias **úteis**:
 
 | Prioridade | 1ª resposta | Resolução |
