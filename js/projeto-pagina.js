@@ -55,11 +55,14 @@ function prjCabecalhoHtml(p) {
     + (numero ? '<span class="prj-migalha-sep" aria-hidden="true">›</span>'
       + '<span class="prj-numero">' + escapeHtml(numero) + '</span>' : '')
     + '</nav>'
-    + '<button type="button" class="prj-botao prj-editar" data-action="prjEditar" data-arg="' + escapeHtml(p.id) + '">Editar</button>'
     + '</div>'
     + '<div class="prj-topo">'
     + '<h1 class="pgp-titulo">' + escapeHtml(titulo || 'Sem título') + '</h1>'
+    // Editar depois dos seletores também no DOM: o Tab segue a ordem que o olho vê.
+    + '<div class="prj-controles">'
     + pgpSeletoresHtml(p)
+    + '<button type="button" class="prj-botao prj-editar" data-action="prjEditar" data-arg="' + escapeHtml(p.id) + '">Editar</button>'
+    + '</div>'
     + '</div>'
     + '</header>';
 }
@@ -179,10 +182,10 @@ function prjChecklistHtml(p) {
   const corpo = prog.total
     ? '<progress class="prj-progresso" value="' + prog.feitos + '" max="' + prog.total + '" aria-label="Progresso do checklist"></progress>'
       + '<ul class="prj-etapas">' + itens.map((it, i) => prjEtapaHtml(it, i, p.id)).join('') + '</ul>'
-    : '<p class="prj-vazio">Nenhuma etapa ainda.</p>';
+    : '<p class="prj-checklist-dica">Nenhuma etapa ainda. Divida o trabalho em passos para acompanhar o progresso.</p>';
   // Form real porque o teclado delegado de actions.js ignora Enter em input: é o submit que faz "Enter adiciona".
   // O id newCheckItem é o que addCheckItem lê.
-  const form = '<form class="prj-etapa-form" data-submit="prjAdicionarEtapa" data-arg="' + escapeHtml(p.id) + '">'
+  const form = '<form class="prj-etapa-form' + (prog.total ? '' : ' prj-etapa-form--inicio') + '" data-submit="prjAdicionarEtapa" data-arg="' + escapeHtml(p.id) + '">'
     + '<label class="prj-oculto" for="newCheckItem">Adicionar etapa</label>'
     + '<input type="text" class="prj-campo" id="newCheckItem" data-pgp-rascunho="prj-etapa" placeholder="Adicionar etapa…" autocomplete="off" />'
     + '<button type="submit" class="prj-botao">Adicionar</button>'
