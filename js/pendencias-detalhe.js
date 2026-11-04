@@ -336,7 +336,7 @@ function _penOrigemHtml(origem) {
 function _penFeedItens(p) {
   var notas = Array.isArray(p && p.notes) ? p.notes : [];
   var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
-    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para };
+    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para, motivo: e.motivo || '' };
   });
   return notas.concat(eventos).sort(function(a, b) {
     return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
@@ -379,6 +379,8 @@ function _penEventoHtml(e) {
       + ': <span class="pen-ev-de">' + escapeHtml(_penValorLabel(e.type, e.de)) + '</span>'
       + ' → <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
   }
+  // Mudança automática (078) diz por quê; sem isso "Sistema mudou o status" parece defeito.
+  if (e.motivo) corpo += ' · ' + escapeHtml(e.motivo);
   return '<div class="pen-ev" role="note"><span class="pen-ev-txt">' + corpo
     + '</span><span class="pen-ev-at">' + formatDateTime(e.createdAt) + '</span></div>';
 }

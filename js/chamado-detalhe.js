@@ -274,6 +274,18 @@ function _chdReabrir(id) {
   if (typeof document !== 'undefined' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
 }
 
+/**
+ * Status depois de enviar algo ao cliente (pura). null = deixa como está.
+ * Responder é sinal de que alguém pegou o chamado: Aberto (ninguém pegou) e
+ * Pausado deixam de ser verdade. Aguard. Cliente / Terceiro ficam: escrever de
+ * novo enquanto espera não muda com quem está a bola.
+ */
+function chamadoStatusAposResposta(status, acao) {
+  if (acao === 'pedir_info') return 'aguardando_cliente';
+  if (acao === 'encerrar') return 'resolvido';
+  return status === 'aberto' || status === 'pausado' ? 'em_andamento' : null;
+}
+
 function _chdMudarStatus(id, status) {
   var sel = typeof document !== 'undefined' ? document.getElementById('chgStatus') : null;
   if (!sel || typeof changePenStatus !== 'function') return;
@@ -308,8 +320,8 @@ function chamadoResponderAcao(id, acao) {
       if (typeof showToast === 'function') showToast('Resposta salva, mas o envio falhou.', 'error');
     }
   }
-  if (acao === 'pedir_info') _chdMudarStatus(id, 'aguardando_cliente');
-  else if (acao === 'encerrar') _chdMudarStatus(id, 'resolvido');
+  var novoStatus = chamadoStatusAposResposta(p.status, acao);
+  if (novoStatus) _chdMudarStatus(id, novoStatus);
   else _chdReabrir(id);
   return true;
 }

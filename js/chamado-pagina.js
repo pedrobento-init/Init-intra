@@ -190,7 +190,8 @@ function chpAndamento(p) {
   _penFeedItens(p).forEach((i) => {
     if (i._evento) {
       if (i.type === 'criado') temAbertura = true;
-      itens.push({ titulo: _chpTituloEvento(i), autor: i.author || 'Sistema', at: i.createdAt });
+      const autor = i.author || 'Sistema';
+      itens.push({ titulo: _chpTituloEvento(i), autor: i.motivo ? autor + ' · ' + i.motivo : autor, at: i.createdAt });
       return;
     }
     const tipo = chpTipoNota(i);
