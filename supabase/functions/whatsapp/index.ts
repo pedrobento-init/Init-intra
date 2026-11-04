@@ -33,8 +33,12 @@ import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { type EmailEntrada, entradaDaCaixa, notaDoSolicitante } from "../robo/campo.ts";
 import {
   assuntoDaMensagem,
+  chaveTelefone,
   clienteDoTelefone,
   conversaDoTelefone,
+  funcaoAusente,
+  LIMITE_POR_MINUTO,
+  LOTE_MAX,
   type MensagemWhats,
   PEN_FECHADOS,
   tempoConstante,
@@ -56,7 +60,8 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-async function clientes(db: SupabaseClient): Promise<ClienteFone[]> {
+// Caminho antigo, só para banco sem a 077: lê clients inteiro.
+async function todosOsClientes(db: SupabaseClient): Promise<ClienteFone[]> {
   const out: ClienteFone[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("clients")
@@ -66,6 +71,67 @@ async function clientes(db: SupabaseClient): Promise<ClienteFone[]> {
     out.push(...((data || []) as ClienteFone[]));
     if (!data || data.length < 1000) return out;
   }
+}
+
+// Candidatos pelo índice da 077; a regra de ambiguidade continua em
+// clienteDoTelefone, que é a mesma testada no vitest.
+async function clienteDaMensagem(
+  db: SupabaseClient,
+  telefone: string,
+  cache: { todos: ClienteFone[] | null },
+): Promise<ClienteFone | null> {
+  const chave = chaveTelefone(telefone);
+  if (!chave) return null;
+  const { data, error } = await db.rpc("clientes_do_telefone", { p_chave: chave });
+  if (!error) return clienteDoTelefone((data || []) as ClienteFone[], telefone);
+  // Erro de verdade não derruba a mensagem: a chave de dedupe já foi gravada,
+  // então um 500 aqui faria a reentrega ser ignorada e a mensagem sumir. Sem
+  // cliente, ela ao menos chega na caixa para alguém escolher.
+  if (!funcaoAusente(error)) {
+    console.error("whatsapp clientes_do_telefone:", error.message);
+    return null;
+  }
+  if (!cache.todos) {
+    console.warn("whatsapp: migration 077 não aplicada, casando cliente pela tabela inteira");
+    cache.todos = await todosOsClientes(db);
+  }
+  return clienteDoTelefone(cache.todos, telefone);
+}
+
+// Soma a nota no chamado. Com a 077 é um UPDATE só no banco (sem corrida entre
+// duas mensagens do mesmo número); sem ela, o ler-e-regravar antigo. Nos dois,
+// filtra por id E pelo team lido: se o chamado mudou de equipe no meio, não
+// grava em vez de gravar no escopo errado — e aí a mensagem segue para a caixa
+// como pedido novo, em vez de sumir.
+type Anexo = { ok: true } | { ok: false; naoAchou: boolean; erro: string };
+async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Promise<Anexo> {
+  const { data, error } = await db.rpc("append_pendencia_note", { p_id: aberto.id, p_team: aberto.team, p_nota: nota });
+  if (!error) return data === true ? { ok: true } : { ok: false, naoAchou: true, erro: "chamado mudou de equipe ou sumiu" };
+  if (!funcaoAusente(error)) return { ok: false, naoAchou: false, erro: error.message };
+  console.warn("whatsapp: migration 077 não aplicada, anexando nota por ler-e-regravar");
+  const anteriores = Array.isArray(aberto.notes) ? aberto.notes : [];
+  let q = db.from("pendencias")
+    .update({ notes: [...anteriores, nota], updated_at: new Date().toISOString() })
+    .eq("id", aberto.id);
+  q = aberto.team == null ? q.is("team", null) : q.eq("team", aberto.team);
+  const { error: erroUpdate } = await q;
+  return erroUpdate ? { ok: false, naoAchou: false, erro: erroUpdate.message } : { ok: true };
+}
+
+// Quantas mensagens deste número entraram na caixa no último minuto. Usa o
+// índice (telefone, recebido_em) da 075. Erro de leitura não segura a
+// mensagem: o limite protege a fila, não é controle de acesso.
+async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<number> {
+  const desde = new Date(Date.now() - 60_000).toISOString();
+  const { count, error } = await db.from("emails_triagem")
+    .select("id", { count: "exact", head: true })
+    .eq("telefone", telefone)
+    .gte("recebido_em", desde);
+  if (error) {
+    console.error("whatsapp limite:", error.message);
+    return 0;
+  }
+  return count || 0;
 }
 
 // Fechado não conta: mensagem depois de concluir é pedido novo, e ressuscitar
@@ -134,19 +200,29 @@ async function handle(req: Request, ctx: SupabaseContext) {
   }
   // Evento que não é mensagem de texto (status, entrega, presença) responde 200
   // vazio: erro faria a Z-API reentregar algo que nunca vai ser tratado.
-  const msgs = mensagensDoWebhook(payload);
-  if (!msgs.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0 });
+  const todas = mensagensDoWebhook(payload);
+  if (!todas.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0 });
+  if (todas.length > LOTE_MAX) console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
+  const msgs = todas.slice(0, LOTE_MAX);
 
   const db = ctx.supabaseAdmin;
   try {
-    let notas = 0, caixa = 0, semCliente = 0;
-    let lista: ClienteFone[] | null = null;
+    let notas = 0, caixa = 0, semCliente = 0, limitadas = 0;
+    const cache: { todos: ClienteFone[] | null } = { todos: null };
     for (const m of msgs) {
       const key = "whatsapp:" + m.id;
       const { error: erroChave } = await db.from("avisos_enviados").insert({ key });
       if (erroChave) {
         if (erroChave.code === "23505") continue;
         throw new Error("avisos_enviados: " + erroChave.message);
+      }
+
+      // Depois da chave de dedupe: reentrega da mesma mensagem não conta duas
+      // vezes, e a descartada aqui não volta numa reentrega.
+      if (await recentesDoNumero(db, m.telefone) >= LIMITE_POR_MINUTO) {
+        limitadas++;
+        console.warn(`whatsapp: ${m.id} descartada, número passou de ${LIMITE_POR_MINUTO} mensagens por minuto`);
+        continue;
       }
 
       // Prova, gravada só pelo servidor, de que este número falou com a empresa:
@@ -158,33 +234,27 @@ async function handle(req: Request, ctx: SupabaseContext) {
 
       const aberto = await chamadoDaConversa(db, conversaDoTelefone(m.telefone));
       if (aberto) {
-        const anteriores = Array.isArray(aberto.notes) ? aberto.notes : [];
-        // Filtra pelo team que acabou de ler: se o chamado mudou de equipe no
-        // meio, o update não acha a linha em vez de gravar no escopo errado.
-        let q = db.from("pendencias")
-          .update({ notes: [...anteriores, notaDoSolicitante(entradaDe(m))], updated_at: new Date().toISOString() })
-          .eq("id", aberto.id);
-        q = aberto.team == null ? q.is("team", null) : q.eq("team", aberto.team);
-        const { error: erroNota } = await q;
-        if (erroNota) {
-          await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo na reentrega
-          console.error(`whatsapp nota ${m.id}:`, erroNota.message);
+        const anexo = await anexarNota(db, aberto, notaDoSolicitante(entradaDe(m)));
+        if (anexo.ok) {
+          notas++;
+          if (await guardarNaCaixa(db, m, { status: "anexado", pendenciaId: aberto.id, clientId: aberto.client_id, team: aberto.team || "init" })) caixa++;
           continue;
         }
-        notas++;
-        if (await guardarNaCaixa(db, m, { status: "anexado", pendenciaId: aberto.id, clientId: aberto.client_id, team: aberto.team || "init" })) caixa++;
-        continue;
+        console.error(`whatsapp nota ${m.id}:`, anexo.erro);
+        if (!anexo.naoAchou) {
+          await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo na reentrega
+          continue;
+        }
       }
 
-      lista ??= await clientes(db);
-      const c = clienteDoTelefone(lista, m.telefone);
+      const c = await clienteDaMensagem(db, m.telefone, cache);
       if (!c) semCliente++;
       const ok = await guardarNaCaixa(db, m, c
         ? { motivo: null, status: "pendente", clientId: c.id, team: c.team || "init" }
         : { motivo: "sem_cliente", status: "pendente", team: "init" });
       if (ok) caixa++;
     }
-    return json({ ok: true, notas, caixa, sem_cliente: semCliente });
+    return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas });
   } catch (err) {
     // 500 faz a Z-API reentregar; a chave de dedupe impede processar duas vezes
     // o que já passou.
