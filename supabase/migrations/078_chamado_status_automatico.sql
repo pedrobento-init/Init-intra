@@ -160,14 +160,16 @@ begin
             or coalesce(p.email_thread_id, '') like 'whatsapp:%'
             or btrim(coalesce(p.solicitante_email, '')) <> '')
        -- Última interação: abertura, qualquer nota (da equipe ou do cliente)
-       -- ou qualquer evento. updated_at não serve: o app o renova em toques
-       -- que não são atendimento (revisão em reunião, sync).
+       -- ou qualquer evento, menos 'visto': abrir o chamado não é atender.
+       -- updated_at não serve: o app o renova em toques que não são
+       -- atendimento (revisão em reunião, sync).
        and greatest(
              p.created_at,
              (select max(public.chamado_ts(n->>'createdAt'))
                 from jsonb_array_elements(case when jsonb_typeof(p.notes) = 'array' then p.notes else '[]'::jsonb end) n),
              (select max(public.chamado_ts(e->>'at'))
-                from jsonb_array_elements(case when jsonb_typeof(p.events) = 'array' then p.events else '[]'::jsonb end) e)
+                from jsonb_array_elements(case when jsonb_typeof(p.events) = 'array' then p.events else '[]'::jsonb end) e
+               where coalesce(e->>'type', '') <> 'visto')
            ) <= limite
        for update skip locked
   )

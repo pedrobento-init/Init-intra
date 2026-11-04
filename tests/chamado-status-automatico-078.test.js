@@ -170,6 +170,11 @@ describe('078: 7 dias sem interação', () => {
     expect(await rodar()).toEqual([]);
   });
 
+  it('abrir o chamado (evento visto) não é atender: não segura a pausa', async () => {
+    await inserir({ status: 'em_andamento', notes: [notaEquipe(DIAS_ATRAS(9))], events: [{ at: DIAS_ATRAS(1), by: 'Ana', type: 'visto' }] });
+    expect(await rodar()).toEqual([{ id: 'P1', de: 'em_andamento', para: 'pausado' }]);
+  });
+
   it('chamado recém-aberto sem nota nenhuma não é parado', async () => {
     await inserir({ status: 'em_andamento', created_at: DIAS_ATRAS(2) });
     expect(await rodar()).toEqual([]);
