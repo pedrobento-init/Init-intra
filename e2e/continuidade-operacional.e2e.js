@@ -59,6 +59,14 @@ test('visita guiada cria pendência do checklist selecionado', async ({ page }) 
   });
 });
 
+test('central operacional não comprime o texto dos alertas', async ({ page }) => {
+  await loginLocal(page, { hash: 'dashboard' });
+  const texto = page.locator('section[aria-labelledby="ov-central"] .ov-it > div').first();
+  await expect(texto).toBeVisible();
+  const width = await texto.evaluate(el => el.getBoundingClientRect().width);
+  expect(width).toBeGreaterThan(300);
+});
+
 test('central operacional exibe alerta e abre a pendência', async ({ page }) => {
   await loginLocal(page, { hash: 'dashboard' });
   const central = page.locator('section[aria-labelledby="ov-central"]');
