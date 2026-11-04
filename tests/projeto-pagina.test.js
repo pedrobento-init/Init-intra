@@ -345,6 +345,25 @@ describe('lateral', () => {
     expect(html).toMatch(/<button[^>]*data-action="openClient" data-arg="c1">Acme<\/button>/);
   });
 
+  it('cliente com logo mostra o logo no lugar das iniciais', () => {
+    globalThis.getClientById = () => ({ id: 'c1', name: 'Acme', logo: 'https://x/l.png' });
+    globalThis.clientAvatar = (c, t) => '<img class="client-logo-circle" data-t="' + t + '" src="' + c.logo + '">';
+    const html = lateral(desenhar(projeto({ title: 't', clientId: 'c1' })));
+    delete globalThis.clientAvatar;
+    expect(html).toContain('<img class="client-logo-circle" data-t="28" src="https://x/l.png">');
+    expect(html).not.toContain('pgp-avatar" aria-label="Acme"');
+  });
+
+  it('cliente sem logo continua com as iniciais da página', () => {
+    globalThis.getClientById = () => ({ id: 'c1', name: 'Acme' });
+    globalThis.clientAvatar = vi.fn();
+    const html = lateral(desenhar(projeto({ title: 't', clientId: 'c1' })));
+    const chamado = globalThis.clientAvatar.mock.calls.length;
+    delete globalThis.clientAvatar;
+    expect(html).toContain('pgp-avatar" aria-label="Acme"');
+    expect(chamado).toBe(0);
+  });
+
   it('mostra responsável e equipe juntos', () => {
     globalThis.TEAM_LABELS = { init: 'Init' };
     const html = semTags(lateral(desenhar(projeto({ title: 't', responsible: 'Ana' }))));
