@@ -19,11 +19,17 @@ const CW_DRAFT = 'intra_cw_draft_';  // + id: rascunho do relatório
 
 let _cw = null; // { id, passo, refazerAssinatura }
 
+/** Estado e texto da linha de sincronização (puro). A cor do ponto sai do estado. */
+function cwSyncEstado(pending, online) {
+  if (pending) return { estado: 'pendente', texto: pending + (pending === 1 ? ' alteração aguardando sincronização' : ' alterações aguardando sincronização') };
+  return online ? { estado: 'ok', texto: 'Tudo sincronizado' } : { estado: 'offline', texto: 'Offline — as alterações ficam neste aparelho' };
+}
+
 function cwSyncStatusHtml() {
   const pending = typeof getPendingSyncCount === 'function' ? getPendingSyncCount() : 0;
   const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-  const text = pending ? pending + (pending === 1 ? ' alteração aguardando sincronização' : ' alterações aguardando sincronização') : online ? 'Tudo sincronizado' : 'Offline — as alterações ficam neste aparelho';
-  return '<div class="cw-sync" role="status">' + escapeHtml(text) + '</div>';
+  const st = cwSyncEstado(pending, online);
+  return '<div class="cw-sync" role="status" data-estado="' + st.estado + '">' + escapeHtml(st.texto) + '</div>';
 }
 
 /** Etapa para (re)começar: onde parou ou, sem isso, pelo que a visita já tem (puro). */
@@ -281,4 +287,4 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   });
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { cwPassoInicial, cwResumo, CW_PASSOS };
+if (typeof module !== 'undefined' && module.exports) module.exports = { cwPassoInicial, cwResumo, cwSyncEstado, CW_PASSOS };
