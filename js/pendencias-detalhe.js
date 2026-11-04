@@ -364,14 +364,15 @@ const _PEN_EVENT_VERBO = {
   responsavel: 'passou para',
   prioridade: 'mudou a prioridade',
   prazo: 'mudou o prazo',
+  visto: 'visualizou o chamado',
 };
 
 /** Marcador discreto no meio do fio — não é balão de mensagem. */
 function _penEventoHtml(e) {
   var quem = e.author ? escapeHtml(e.author) : 'Sistema';
   var corpo;
-  if (e.type === 'criado') {
-    corpo = quem + ' ' + _PEN_EVENT_VERBO.criado;
+  if (e.type === 'criado' || e.type === 'visto') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO[e.type];
   } else if (e.type === 'responsavel') {
     corpo = quem + ' ' + _PEN_EVENT_VERBO.responsavel + ' <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
   } else {
