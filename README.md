@@ -117,7 +117,7 @@ Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 - **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
 - **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
 - **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
-  - **WhatsApp (Z-API)**: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN` (envio, no `whatsapp-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). No painel da Z-API, o webhook "Ao receber" aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
+  - **WhatsApp (Z-API)**: passo a passo completo, com número de teste, em [WHATSAPP.md](WHATSAPP.md). Resumo: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN` (envio, no `whatsapp-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). No painel da Z-API, o webhook "Ao receber" aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
 
 ## Ícones PWA
 
