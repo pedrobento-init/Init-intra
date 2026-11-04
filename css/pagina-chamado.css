@@ -571,9 +571,67 @@ body.dark-theme .pgp-chamado {
   gap: 10px;
 }
 
-.pgp-chamado .chp-composer-base .chp-enviar,
+.pgp-chamado .chp-composer-base .chp-envio,
 .pgp-chamado .chp-composer-base .chp-salvar {
   margin-left: auto;
+}
+
+.pgp-chamado .chp-envio {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Respostas prontas e variáveis: uma linha discreta sob o campo, para não
+   competir com o texto que está sendo escrito. */
+.pgp-chamado .chp-ferramentas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pgp-chamado .chp-ferramenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--pgp-border-strong);
+  border-radius: var(--pgp-radius-control);
+  background: var(--chp-btn-bg);
+  color: var(--pgp-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pgp-chamado .chp-ferramenta:hover,
+.pgp-chamado .chp-ferramenta[aria-expanded="true"] {
+  border-color: var(--pgp-link);
+  color: var(--pgp-link);
+}
+
+.pgp-chamado .chp-vars .chd-var {
+  min-height: 28px;
+  border-color: var(--pgp-border);
+  background: transparent;
+  color: var(--pgp-muted);
+  font-family: inherit;
+}
+
+.pgp-chamado .chp-vars .chd-var:hover {
+  border-color: var(--pgp-border-strong);
+  color: var(--pgp-text);
+}
+
+/* O composer gruda no fim da tela: a lista não pode empurrá-lo para fora. */
+.pgp-chamado .chp-rp {
+  max-height: min(320px, 40vh);
+  border-color: var(--pgp-border);
+  background: var(--pgp-card);
 }
 
 /* Coluna direita */
@@ -811,4 +869,10 @@ body.dark-theme .pgp-chamado {
   .pgp-chamado .chp-composer {
     bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* O formulário de nova resposta herda grid do painel antigo: sem isto o
+   "Salvar" vira uma faixa da largura toda. */
+.pgp-chamado .chp-rp .rp-form .btn {
+  justify-self: start;
 }

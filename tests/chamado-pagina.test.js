@@ -306,11 +306,41 @@ describe('chamado-pagina', () => {
       expect(desenhar(sb, chamado())).toContain('bia@cliente.com');
     });
 
-    it('não usa respostas prontas, Cancelar nem Assunto no composer', () => {
+    it('não tem Cancelar nem Assunto no composer', () => {
       const composer = sb.chpComposerHtml(chamado(), 'resposta');
-      expect(composer).not.toMatch(/respostas? prontas?/i);
       expect(composer).not.toContain('Cancelar');
       expect(composer).not.toContain('Assunto');
+    });
+
+    // Voltaram do detalhe antigo por decisão de produto: quem responde muito
+    // chamado parecido precisa do texto pronto e das variáveis na página também.
+    it('tem respostas prontas e variáveis, que escrevem no mesmo #newNoteText', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      expect(composer).toMatch(/data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false"/);
+      expect(composer).toContain('id="rpPainel"');
+      for (const v of ['nome', 'protocolo', 'atendente']) {
+        expect(composer).toContain('data-action="chdInserirVariavel" data-arg="' + v + '"');
+      }
+    });
+
+    it('o painel de respostas prontas não segue a troca de modo (abre só pelo botão)', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      expect(composer).toMatch(/<div class="rp-painel chp-rp" id="rpPainel" hidden><\/div>/);
+      expect(composer).not.toMatch(/id="rpPainel"[^>]*data-chp-so/);
+    });
+
+    it('envia de três jeitos: responder, pedir informação e encerrar', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      for (const acao of ['responder', 'pedir_info', 'encerrar']) {
+        expect(composer).toContain('data-action="chdResponder" data-arg="' + acao + '"');
+      }
+    });
+
+    it('sem canal não oferece nada que mande para fora', () => {
+      const composer = sb.chpComposerHtml(chamado({ solicitanteEmail: '' }), 'nota');
+      expect(composer).not.toContain('rpAbrir');
+      expect(composer).not.toContain('chdInserirVariavel');
+      expect(composer).not.toContain('data-action="chdResponder"');
     });
 
     it('avisa que o anexo fica só no chamado', () => {
