@@ -6453,7 +6453,8 @@ body:not(.dark-theme) .pen-cv-card {
   border-color: var(--ds-line);
   box-shadow: 0 1px 2px rgba(20, 26, 42, .05), 0 2px 8px rgba(20, 26, 42, .04);
 }
-body:not(.dark-theme) .pen-board .kanban-card { box-shadow: 0 1px 2px rgba(20, 26, 42, .06); }
+/* Sombra do card do quadro: vem de --kb-card-shadow (fim do arquivo), que
+   tem versão para cada tema — aqui ela vencia o :hover por especificidade. */
 body:not(.dark-theme) .form-input,
 body:not(.dark-theme) .form-select,
 body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
@@ -7359,4 +7360,109 @@ textarea[aria-busy="true"] { opacity: .6; }
   .ov-export > summary,
   .ov-export-menu button,
   .ov-bar .btn { min-height: 44px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   QUADRO DE PENDÊNCIAS — mesma hierarquia nos dois temas + movimento
+   As regras antigas de body.dark-theme (.kanban-col com o fundo da página,
+   .kanban-col-header com caixa própria, .kanban-card com --bg-surface) têm
+   especificidade maior que as do .pen-board e só valiam no escuro: a coluna
+   sumia no fundo, o cabeçalho virava uma caixa solta e o card ficava sem
+   profundidade. Aqui os dois temas seguem a mesma ordem de superfícies —
+   página < coluna < card — e só os tons mudam, por tokens.
+   O levantar do card no hover era feito pelo Motion (JS), que carrega depois
+   do quadro: os primeiros cards não animavam e às vezes ficavam presos em
+   translateY. Agora é CSS puro, igual nos dois temas.
+   ══════════════════════════════════════════════════════════════════════ */
+.pen-board {
+  --kb-col-bg: color-mix(in srgb, var(--kb-panel) 52%, transparent);
+  --kb-col-ring: transparent;
+  --kb-card-bg: var(--ds-panel);
+  --kb-card-line: var(--kb-line);
+  --kb-card-shadow: 0 1px 2px rgba(20, 26, 42, .06), 0 2px 7px rgba(20, 26, 42, .05);
+  --kb-card-shadow-hover: 0 10px 22px -8px rgba(20, 26, 42, .22), 0 2px 6px rgba(20, 26, 42, .06);
+  --kb-hover-fill: var(--kb-raised);
+  --kb-ease: cubic-bezier(.2, .8, .2, 1);
+}
+body.dark-theme .pen-board {
+  /* Coluna um degrau acima da página; card um degrau acima da coluna. */
+  --kb-col-bg: color-mix(in srgb, var(--kb-panel) 72%, transparent);
+  --kb-col-ring: color-mix(in srgb, var(--kb-line) 70%, transparent);
+  --kb-card-bg: color-mix(in srgb, var(--kb-raised) 55%, var(--kb-panel));
+  --kb-card-line: color-mix(in srgb, var(--ds-line-strong) 55%, var(--kb-line));
+  /* No escuro sombra quase não aparece: a borda de luz no topo é o que
+     descola o card da coluna, como a sombra faz no claro. */
+  --kb-card-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .4);
+  --kb-card-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, .06), 0 12px 26px -10px rgba(0, 0, 0, .75), 0 2px 6px rgba(0, 0, 0, .4);
+  --kb-hover-fill: color-mix(in srgb, var(--kb-text) 7%, transparent);
+}
+
+/* Coluna: painel único com o cabeçalho dentro, nos dois temas. */
+.pen-board .kanban-col,
+body.dark-theme .pen-board .kanban-col {
+  background: var(--kb-col-bg);
+  transition: background-color .2s ease, box-shadow .2s ease;
+}
+body.dark-theme .pen-board .kanban-col:not(.is-empty) { box-shadow: inset 0 0 0 1px var(--kb-col-ring); }
+body.dark-theme .pen-board .kanban-col.is-empty { border-color: var(--ds-line-strong); }
+body.dark-theme .pen-board .kanban-col-header { background: transparent; }
+
+/* Card */
+.pen-board .kanban-card,
+body.dark-theme .pen-board .kanban-card {
+  background: var(--kb-card-bg);
+  border-color: var(--kb-card-line);
+  box-shadow: var(--kb-card-shadow);
+  transition:
+    transform .18s var(--kb-ease),
+    box-shadow .18s var(--kb-ease),
+    border-color .15s ease,
+    background-color .35s ease,
+    opacity .15s ease;
+}
+@media (hover: hover) {
+  .pen-board .kanban-card:hover,
+  body.dark-theme .pen-board .kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--kb-card-shadow-hover);
+    border-color: color-mix(in srgb, var(--c, var(--kb-accent)) 65%, var(--kb-card-line));
+  }
+}
+/* Clique: o card "afunda" de leve antes de abrir o detalhe. */
+.pen-board .kanban-card:active:not(.dragging) {
+  transform: translateY(0) scale(.992);
+  box-shadow: var(--kb-card-shadow);
+  transition-duration: .08s;
+}
+/* Foco de teclado com o mesmo destaque do hover (não só o anel no título). */
+.pen-board .kanban-card:has(.kc-open:focus-visible) {
+  border-color: color-mix(in srgb, var(--c, var(--kb-accent)) 65%, var(--kb-card-line));
+  box-shadow: var(--kb-card-shadow-hover);
+}
+
+/* Selos e ações internas: o fundo de hover era --kb-panel, branco sobre
+   branco no claro e mais escuro que o card no escuro. */
+body.dark-theme .pen-board .kc-stale { border-color: var(--ds-line-strong); }
+body.dark-theme .pen-board .kc-av { background: var(--kb-raised); border-color: var(--ds-line-strong); }
+.pen-board .kanban-card-foot { border-top-color: var(--kb-card-line); }
+.pen-board .kb-go { transition: background-color .15s ease, color .15s ease; }
+.pen-board .kb-go:hover { background: color-mix(in srgb, var(--kb-green) 12%, transparent); color: var(--kb-text); }
+.pen-board .kb-play { transition: transform .15s var(--kb-ease), background-color .15s ease; }
+.pen-board .kb-go:hover .kb-play { transform: scale(1.12); background: color-mix(in srgb, var(--kb-green) 24%, transparent); }
+.pen-board .kc-menu:hover,
+.pen-board .kc-menu[aria-expanded="true"] { background: var(--kb-hover-fill); color: var(--kb-text); }
+
+/* Arrastar: o card some pela metade e a coluna-alvo ganha contorno na cor
+   dela (antes o border:0 da coluna anulava o contorno e só o tom mudava). */
+.pen-board .kanban-card.dragging { opacity: .45; box-shadow: none; }
+.pen-board .kanban-col.drag-over,
+body.dark-theme .pen-board .kanban-col.drag-over {
+  background: color-mix(in srgb, var(--c, var(--kb-accent)) 9%, var(--kb-col-bg));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c, var(--kb-accent)) 55%, transparent);
+}
+.pen-board .kanban-card.kb-drop-before::before { background: var(--c, var(--kb-accent)); }
+@media (prefers-reduced-motion: reduce) {
+  .pen-board .kanban-card:hover,
+  body.dark-theme .pen-board .kanban-card:hover,
+  .pen-board .kanban-card:active:not(.dragging) { transform: none; }
 }

@@ -243,7 +243,8 @@ function renderPenKanban(area) {
       window.addEventListener('resize', window._kanbanResizeHandler);
     }
   }
-  _applyPenCardMotion(area);
+  // Hover do card (levantar + sombra) é só CSS: o Motion chega depois do
+  // quadro e deixava os primeiros cards sem animação ou presos no ar.
   // Total como contador dentro da aba ativa ("Ativas 5")
   try{
     var cntEl=document.getElementById('penScopeCount');
@@ -282,39 +283,6 @@ function _updateKanbanScrollShadows(board) {
     board.classList.toggle('has-scroll-left', board.scrollLeft > 4);
     board.classList.toggle('has-scroll-right', max > 4 && board.scrollLeft < max - 4);
   } catch (_) {}
-}
-
-function _penReducedMotion() {
-  try {
-    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch (_) { return false; }
-}
-
-function _applyPenCardMotion(area) {
-  if (typeof _canAnimate === 'function' ? !_canAnimate() : typeof Motion === 'undefined') return;
-  if (_penReducedMotion()) return;
-  area.querySelectorAll('.kanban-card').forEach(function(card) {
-    if (card.dataset.motionHoverBound) return;
-    card.dataset.motionHoverBound = '1';
-    Motion.hover(card,
-      function() { Motion.animate(card, { y: -3 }, { duration: 0.2, ease: 'easeOut' }); },
-      function() { Motion.animate(card, { y: 0 }, { duration: 0.2, ease: 'easeOut' }); }
-    );
-    // Fallback nativo: garante que o card volte ao estado original mesmo se
-    // o Motion.hover não disparar o leave (ex: drag, pointer rápido, ou falha da lib)
-    var resetHover = function() {
-      try { Motion.animate(card, { y: 0 }, { duration: 0.15, ease: 'easeOut' }); } catch(_) {}
-      // Limpeza do inline style que o Motion deixa (evita ficar em translateY(-3px))
-      setTimeout(function(){
-        if (!card.matches(':hover')) card.style.transform = '';
-      }, 220);
-    };
-    card.addEventListener('mouseleave', resetHover);
-    card.addEventListener('pointerleave', resetHover);
-    card.addEventListener('dragend', resetHover);
-    card.addEventListener('blur', resetHover);
-  });
 }
 
 // ── Cache por render (FASE 1 — memoização) ─────────────────────────────────
