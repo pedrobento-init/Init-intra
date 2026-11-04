@@ -7265,3 +7265,97 @@ textarea[aria-busy="true"] { opacity: .6; }
   .pen-cv-label { width: 100%; flex-direction: row; gap: 4px; }
   .pen-cv-list { flex-basis: 100%; }
 }
+
+/* Acabamento dos fluxos operacionais, sempre com os tokens do tema ativo. */
+.cw :focus-visible,
+.campo-box :focus-visible,
+.cf-bar :focus-visible,
+.cf-health :focus-visible,
+.cf-quick :focus-visible,
+.cf-sections :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cw-step > button,
+.cw-links > *,
+.cw-detalhes,
+.cw-check { min-height: 44px; }
+.cw-links > * { display: inline-flex; align-items: center; justify-content: center; }
+.cw-client { line-height: 1.3; overflow-wrap: anywhere; }
+.cw-addr,
+.cw-hint { line-height: 1.55; }
+.cw-res { align-items: flex-start; line-height: 1.45; }
+.cw-res-ic { flex: none; }
+.cw-bar {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  box-shadow: 0 -4px 14px color-mix(in srgb, var(--ds-text) 6%, transparent);
+}
+
+.campo-box { padding: 14px; line-height: 1.5; }
+.campo-acts .btn { min-height: 44px; }
+.campo-st { line-height: 1.55; }
+.campo-brief { display: grid; gap: 8px; }
+.campo-ia,
+.campo-atencao { line-height: 1.55; overflow-wrap: anywhere; }
+.campo-ia { margin-bottom: 0; }
+
+.cf-text { display: inline-flex; align-items: center; min-height: 28px; line-height: 1.45; }
+.cf-empty {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  line-height: 1.5;
+}
+
+.ov-it,
+.ov-row,
+.ov-li { min-height: 44px; }
+.ov-tt { line-height: 1.4; overflow-wrap: anywhere; }
+.client-timeline .ov-it { grid-template-columns: minmax(0, 1fr); }
+.client-timeline .ov-mt { white-space: normal; overflow-wrap: anywhere; }
+.ov-mt,
+.ov-when { line-height: 1.45; }
+.ov-empty {
+  padding: 16px 12px;
+  border: 1px dashed var(--ov-line);
+  border-radius: 8px;
+  background: var(--ov-raised);
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .cw-steps { padding: 8px 8px 6px; }
+  .cw-body { gap: 16px; padding: 16px 12px; }
+  .cw-card { padding: 14px 12px; }
+  .cw-client { font-size: 20px; }
+  .cw-text { font-size: 15px; }
+  .cw-bar {
+    padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .campo-acts { align-items: stretch; }
+  .campo-acts .btn { flex: 1 1 150px; justify-content: center; }
+  .campo-st { flex: 1 1 100%; }
+
+  .cf-bar .btn,
+  .cf-act,
+  .cf-input,
+  .cf-info { min-height: 44px; }
+  .cf-info { width: 44px; }
+  .cf-field { padding: 10px 12px; }
+  .cf-sec-head { min-height: 48px; }
+  .cf-hint { align-items: flex-start; line-height: 1.5; }
+
+  .ov-panel,
+  .ov-wrap .card.ov-panel { padding: 14px 12px; }
+  .ov-it { gap: 10px; padding: 12px 8px; }
+  .ov-row,
+  .ov-li { padding-top: 12px; padding-bottom: 12px; }
+  .ov-seg .period-btn,
+  .ov-export > summary,
+  .ov-export-menu button,
+  .ov-bar .btn { min-height: 44px; }
+}
