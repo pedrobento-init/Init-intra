@@ -721,7 +721,9 @@ function renderClientFicha(clientId, el) {
 
 function renderClientTab(tab, id) {
   const el = document.getElementById('clientTabContent');
-  if (tab === 'ficha') {
+  if (tab === 'timeline') {
+    el.innerHTML = typeof clientTimelineHtml === 'function' ? clientTimelineHtml(id) : '<div class="empty-state"><p>Linha do tempo indisponível.</p></div>';
+  } else if (tab === 'ficha') {
     renderClientFicha(id, el);
   } else if (tab === 'procedimentos') {
     const procs = getProcedures(id);

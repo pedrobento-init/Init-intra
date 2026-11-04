@@ -46,11 +46,49 @@ function buildOperationalCenter(visits, pendencias, statusCache, now) {
       if (gap >= 0 && gap < 30) items.push({ kind: 'deslocamento', visitId: next.id, title: 'Menos de 30 min para deslocamento', detail: (prev.clientName || '—') + ' → ' + (next.clientName || '—') });
     }
   }
+  const closed = new Set(['concluido', 'resolvido', 'cancelado', 'fechado']);
+  const resolved = (pendencias || []).filter(p => p && (p.status === 'resolvido' || p.status === 'concluido' || p.status === 'fechado'));
+  const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   for (const p of pendencias || []) {
-    if (!p || p.status === 'concluido' || p.status === 'resolvido' || p.status === 'cancelado') continue;
-    if (p.deadline && String(p.deadline).slice(0, 10) < today) items.push({ kind: 'prazo', pendenciaId: p.id, title: 'Pendência vencida', detail: p.clientName || p.assunto });
+    if (!p || closed.has(p.status)) continue;
+    const detail = p.clientName || p.assunto;
+    if (p.deadline && String(p.deadline).slice(0, 10) < today) {
+      items.push({ kind: 'prazo', pendenciaId: p.id, title: 'Pendência vencida', detail });
+    } else if (p.deadline) {
+      const rawDeadline = String(p.deadline);
+      const deadline = new Date(rawDeadline.length === 10 ? rawDeadline + 'T23:59:59.999' : rawDeadline).getTime();
+      const remaining = deadline - at.getTime();
+      if (Number.isFinite(remaining) && remaining >= 0 && remaining <= 24 * 3600000) {
+        items.push({ kind: 'prazo_proximo', pendenciaId: p.id, title: 'Pendência perto do prazo', detail });
+      }
+    }
+    const timeline = (Array.isArray(p.notes) ? p.notes : []).concat(Array.isArray(p.timeline) ? p.timeline : []).filter(Boolean);
+    const requesterNotes = timeline.filter(n => n.visibility === 'solicitante' && Number.isFinite(new Date(n.createdAt || n.at).getTime()));
+    const latestRequest = requesterNotes.reduce((latest, n) => {
+      const time = new Date(n.createdAt || n.at).getTime();
+      return !latest || time > latest.time ? { time } : latest;
+    }, null);
+    const viewedAt = new Date(p.lastViewedAt || p.viewedAt || '').getTime();
+    if (latestRequest && !timeline.some(n => n.visibility === 'resposta' && new Date(n.createdAt || n.at).getTime() > latestRequest.time)
+      && !(Number.isFinite(viewedAt) && viewedAt > latestRequest.time)) {
+      items.push({ kind: 'resposta_solicitante', pendenciaId: p.id, title: 'Solicitante aguarda resposta', detail });
+    }
+    const updatedAt = new Date(p.updatedAt || '').getTime();
+    if (Number.isFinite(updatedAt) && at.getTime() - updatedAt >= 7 * 86400000) {
+      items.push({ kind: 'parada', pendenciaId: p.id, title: 'Pendência parada há 7 dias ou mais', detail });
+    }
+    const subject = normalize(p.assunto || p.tipo);
+    if (p.clientId && subject && resolved.some(r => {
+      if (r.id === p.id || r.clientId !== p.clientId || normalize(r.assunto || r.tipo) !== subject) return false;
+      const resolvedAt = new Date(r.resolvedAt || r.updatedAt || '').getTime();
+      const age = at.getTime() - resolvedAt;
+      return Number.isFinite(age) && age >= 0 && age <= 30 * 86400000;
+    })) {
+      items.push({ kind: 'reincidencia', pendenciaId: p.id, title: 'Possível reincidência nos últimos 30 dias', detail });
+    }
   }
-  return items.slice(0, 30);
+  const severity = { prazo: 0, resposta_solicitante: 0, milvus: 0, relatorio: 0, prazo_proximo: 1, atraso: 1, andamento: 1, conflito: 1, deslocamento: 1, parada: 2, reincidencia: 2 };
+  return items.map((item, index) => ({ item, index })).sort((a, b) => (severity[a.item.kind] ?? 2) - (severity[b.item.kind] ?? 2) || a.index - b.index).slice(0, 30).map(entry => entry.item);
 }
 
 function buildVisitMetrics(visits, ym) {

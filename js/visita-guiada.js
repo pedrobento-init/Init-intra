@@ -19,6 +19,13 @@ const CW_DRAFT = 'intra_cw_draft_';  // + id: rascunho do relatório
 
 let _cw = null; // { id, passo, refazerAssinatura }
 
+function cwSyncStatusHtml() {
+  const pending = typeof getPendingSyncCount === 'function' ? getPendingSyncCount() : 0;
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  const text = pending ? pending + (pending === 1 ? ' alteração aguardando sincronização' : ' alterações aguardando sincronização') : online ? 'Tudo sincronizado' : 'Offline — as alterações ficam neste aparelho';
+  return '<div class="cw-sync" role="status">' + escapeHtml(text) + '</div>';
+}
+
 /** Etapa para (re)começar: onde parou ou, sem isso, pelo que a visita já tem (puro). */
 function cwPassoInicial(v, salvo) {
   if (!v) return 0;
@@ -52,7 +59,7 @@ function openVisitaGuiada(id, passo) {
   _cw = { id, passo: Number.isInteger(passo) ? passo : cwPassoInicial(v, _cwGet(CW_KEY + id)), refazerAssinatura: false };
   const num = typeof formatVisitNumero === 'function' ? formatVisitNumero(v) : '';
   openModal((v.clientName || 'Visita') + (num ? ' · ' + num : ''),
-    '<div class="cw" id="cw">' +
+    '<div class="cw" id="cw">' + cwSyncStatusHtml() +
       '<ol class="cw-steps" id="cwSteps" aria-label="Etapas do atendimento"></ol>' +
       '<div class="cw-body" id="cwBody"></div>' +
       '<div class="cw-bar" id="cwBar"></div>' +
@@ -114,6 +121,7 @@ function _cwPassoHtml(passo, v) {
       (v.observacoes ? '<div class="cw-field"><div class="cw-label">Observações</div><div class="cw-text">' + escapeHtml(v.observacoes).replace(/\n/g, '<br>') + '</div></div>' : '') +
       (v.briefingIa ? '<div class="campo-ia">💡 ' + escapeHtml(v.briefingIa).replace(/\n/g, '<br>') + '</div>' : '') +
       (health && health.motivos && health.motivos.length ? '<div class="campo-atencao">⚠️ No cliente: ' + health.motivos.map(escapeHtml).join(' · ') + '</div>' : '') +
+      (typeof previousVisitPendingHtml === 'function' ? previousVisitPendingHtml(v) : '') +
       (typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : '') +
       '<div class="cw-field"><div class="cw-label">Preparação da visita</div><div class="cw-text">Confira equipamentos e materiais, documentos e acessos do cliente. Revise o histórico e os avisos acima antes de iniciar.</div></div>' +
       '<button type="button" class="link-btn cw-detalhes" data-action="cwDetalhes" data-arg="' + id + '">Ver todos os detalhes da visita</button>';
@@ -141,9 +149,17 @@ function _cwPassoHtml(passo, v) {
   // concluir
   const pendente = !v.checkinAt || v.checkoutAt ? '' :
     '<label class="cw-check"><input type="checkbox" id="cwSaida" checked /> Registrar a saída agora (lança as horas no cliente)</label>';
-  return '<ul class="cw-resumo" id="cwResumo">' + _cwResumoHtml(v, null) + '</ul>' +
-    pendente +
-    '<label class="cw-check"><input type="checkbox" id="cwPendencia" /> Criar pendência de acompanhamento</label>';
+  const pendentes = (Array.isArray(v.checklist) ? v.checklist : []).map((item, index) => ({ item, index })).filter(({ item }) => item && !item.done);
+  const operators = typeof getOperatorNames === 'function' ? getOperatorNames(typeof getCurrentTeam === 'function' ? getCurrentTeam() : undefined) : [];
+  const responsible = v.operator || (typeof getUser === 'function' ? getUser().name : '');
+  return '<ul class="cw-resumo" id="cwResumo">' + _cwResumoHtml(v, null) + '</ul>' + pendente +
+    '<section class="cw-followups"><h3>O que ficou para depois?</h3>' +
+    (pendentes.length ? pendentes.map(({ item, index }) => '<label class="cw-check"><input type="checkbox" class="cw-followup" value="' + index + '" checked /> ' + escapeHtml(item.text || 'Item sem descrição') + '</label>').join('')
+      : '<label class="cw-check"><input type="checkbox" id="cwPendencia" /> Criar pendência de acompanhamento</label>') +
+    '<label class="cw-label" for="cwFollowupNote">Detalhe do acompanhamento (opcional)</label><textarea class="form-textarea" id="cwFollowupNote" rows="2"></textarea>' +
+    '<div class="form-row"><div class="form-group"><label class="cw-label" for="cwFollowupResponsible">Responsável</label><select class="form-select" id="cwFollowupResponsible">' +
+      (operators.length ? operators : [responsible]).filter(Boolean).map(name => '<option value="' + escapeHtml(name) + '"' + (name === responsible ? ' selected' : '') + '>' + escapeHtml(name) + '</option>').join('') + '</select></div>' +
+    '<div class="form-group"><label class="cw-label" for="cwFollowupPriority">Prioridade</label><select class="form-select" id="cwFollowupPriority"><option value="baixa">Baixa</option><option value="media" selected>Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></div></div></section>';
 }
 
 function _cwResumoHtml(v, nFotos) {
@@ -228,8 +244,16 @@ function _cwConcluir() {
   if (!relatorio) { showToast('Falta o relatório: conte o que foi feito.', 'error'); _cw.passo = 2; _cwRender(); return; }
   const saida = document.getElementById('cwSaida');
   const criarPendencia = !!document.getElementById('cwPendencia')?.checked;
+  const itemIndexes = Array.from(document.querySelectorAll('.cw-followup:checked')).map(input => Number(input.value));
+  const followupOptions = {
+    itemIndexes,
+    responsible: document.getElementById('cwFollowupResponsible')?.value,
+    priority: document.getElementById('cwFollowupPriority')?.value,
+    note: criarPendencia ? 'Acompanhamento solicitado na conclusão da visita.' : document.getElementById('cwFollowupNote')?.value.trim(),
+  };
   if (saida && saida.checked && typeof registrarSaidaVisita === 'function') registrarSaidaVisita(id);
-  concludeVisit(id, { relatorio, criarPendencia });
+  concludeVisit(id, { relatorio, criarPendencia: false });
+  if (typeof createVisitFollowups === 'function') createVisitFollowups(v, followupOptions);
   _cwSet(CW_KEY + id, null);
   _cwSet(CW_DRAFT + id, null);
   _cw = null;
