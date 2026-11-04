@@ -18,6 +18,7 @@ const CHP_ICONES = {
   play: '<path d="M7 4.5v15l12-7.5Z"/>',
   pausa: '<path d="M8 5v14"/><path d="M16 5v14"/>',
   arquivo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>',
+  balao: '<path d="M21 12a8 8 0 0 1-8 8H4l2.5-3A8 8 0 1 1 21 12Z"/><path d="M8 10h8"/><path d="M8 14h5"/>',
 };
 
 function chpIcone(nome) {
@@ -362,11 +363,26 @@ function chpComposerHtml(p, modo) {
   const so = (qual) => ' data-chp-so="' + qual + '"' + ((qual === 'nota') === emNota ? '' : ' hidden');
   const canalTexto = canal === 'whatsapp' ? 'WhatsApp' : 'e-mail';
 
+  // Variáveis e respostas prontas vêm do detalhe antigo (chamado-detalhe.js e
+  // respostas-prontas.js), que já escrevem no #newNoteText: a página só desenha.
+  const variaveis = typeof CHAMADO_VARIAVEIS !== 'undefined' ? CHAMADO_VARIAVEIS : [];
+  const vars = variaveis.map((v) => '<button type="button" class="chd-var" data-action="chdInserirVariavel" data-arg="' + v + '"'
+    + ' title="Inserir {' + v + '}">{' + v + '}</button>').join('');
+  const ferramentas = '<div class="chp-ferramentas"' + so('resposta') + '>'
+    + '<button type="button" class="chp-ferramenta" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">'
+    + chpIcone('balao') + ' Respostas prontas</button>'
+    + (vars ? '<div class="chd-vars chp-vars" role="group" aria-label="Variáveis">' + vars + '</div>' : '')
+    + '</div>';
+
   // Sem canal a resposta não sai daqui: nem o campo existe, para não sugerir um envio impossível.
+  // O painel de respostas prontas não leva data-chp-so: ele abre e fecha pelo
+  // próprio botão, e a troca para anotação o fecha (_chpAplicarModo).
   const blocoResposta = canal
-    ? '<label class="chp-sr" for="newNoteText"' + so('resposta') + '>Resposta para ' + nome + '</label>'
+    ? '<div class="rp-painel chp-rp" id="rpPainel" hidden></div>'
+      + '<label class="chp-sr" for="newNoteText"' + so('resposta') + '>Resposta para ' + nome + '</label>'
       + '<textarea class="chp-campo" id="newNoteText" rows="3" data-pgp-rascunho="chp-resposta"'
       + ' placeholder="Escreva a resposta…"' + so('resposta') + '></textarea>'
+      + ferramentas
     : '<p class="chp-aviso">Sem e-mail nem WhatsApp de quem pediu: a resposta fica só no histórico do chamado.</p>';
 
   return '<div class="chp-composer" data-pgp-modo="' + (emNota ? 'nota' : 'resposta') + '">'
@@ -392,9 +408,16 @@ function chpComposerHtml(p, modo) {
     + chpIcone('clipe') + '</button>'
     + '<input type="file" id="chpAnexoInput" hidden data-change="chpAnexo" data-id="' + id + '">'
     + '<span class="chp-dica">Anexo fica só no chamado · Ctrl + Enter envia</span>'
+    // Os mesmos três envios do detalhe antigo: responder, responder e esperar o
+    // cliente (Aguard. Cliente) e responder encerrando (Resolvido).
     + (canal
-      ? '<button type="button" class="chp-btn chp-enviar" data-action="chdResponder" data-arg="responder" data-id="' + id + '"'
-        + so('resposta') + '>Enviar resposta</button>'
+      ? '<div class="chp-envio"' + so('resposta') + '>'
+        + '<button type="button" class="chp-btn" data-action="chdResponder" data-arg="pedir_info" data-id="' + id + '"'
+        + ' title="Envia e deixa o chamado aguardando o cliente">Pedir informação</button>'
+        + '<button type="button" class="chp-btn" data-action="chdResponder" data-arg="encerrar" data-id="' + id + '"'
+        + ' title="Envia e marca o chamado como resolvido">Enviar e encerrar</button>'
+        + '<button type="button" class="chp-btn chp-enviar" data-action="chdResponder" data-arg="responder" data-id="' + id + '">Enviar resposta</button>'
+        + '</div>'
       : '')
     + '<button type="button" class="chp-btn chp-salvar" data-action="chdNotaInterna" data-arg="' + id + '"'
     + so('nota') + '>Salvar anotação</button>'
@@ -592,6 +615,8 @@ function _chpAplicarModo(composer, modo) {
   composer.querySelectorAll('[data-chp-so]').forEach((el) => {
     el.hidden = el.dataset.chpSo !== modo;
   });
+  // Resposta pronta só entra na resposta ao cliente, nunca na anotação.
+  if (modo === 'nota' && typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
   const campo = composer.querySelector(modo === 'nota' ? '#chamadoNotaTexto' : '#newNoteText');
   if (campo) campo.focus();
 }
