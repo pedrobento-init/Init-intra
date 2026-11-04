@@ -32,14 +32,17 @@ Intra chega no celular do cliente**. O desenho do canal está no
 Guarde os três valores num lugar seguro; eles vão para os secrets no passo 3, e
 nunca para o git nem para o `js/config.js`.
 
-## 2. Banco: migrations 075 e 076
+## 2. Banco: migrations 075, 076 e 077
 
 No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
 
 1. Cole e rode `supabase/migrations/075_whatsapp_canal.sql`.
 2. Cole e rode `supabase/migrations/076_whatsapp_conversas.sql`. O backfill
    comentado no cabeçalho **não** precisa rodar: ainda não chegou mensagem nenhuma.
-3. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
+3. Cole e rode `supabase/migrations/077_whatsapp_desempenho.sql` (casamento do
+   cliente pelo telefone com índice e nota anexada sem corrida). Sem ela o
+   canal funciona, só que mais devagar e com um aviso no log.
+4. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
 
 ```sql
 select column_name from information_schema.columns
@@ -47,6 +50,8 @@ select column_name from information_schema.columns
 -- 2 linhas
 select relrowsecurity from pg_class where oid = 'public.whatsapp_conversas'::regclass;
 -- true
+select public.telefone_chave('(11) 98765-4321');
+-- 1187654321
 ```
 
 ## 3. Secrets das Edge Functions
@@ -145,6 +150,8 @@ Os logs ficam no painel do Supabase: **Edge Functions → whatsapp** (ou
 | Envio: `missing_credentials` (500)      | Faltou algum dos secrets `ZAPI_*`.                                                                                                |
 | Envio: `provider_error` (502)           | Client-Token errado ou desativado, ou instância desconectada.                                                                     |
 | Envio: `not_whatsapp_contact` (422)     | A 076 não foi aplicada, ou esse número nunca escreveu para a empresa. Peça para a pessoa mandar uma mensagem primeiro.            |
+| Log "migration 077 não aplicada"        | Funciona assim, mas rode a 077 para o webhook não ler todos os clientes a cada mensagem.                                          |
+| Log "passou de 30 mensagens por minuto" | O número mandou mais de 30 textos em um minuto; o excesso foi descartado de propósito.                                            |
 | Envio: `pendencia_closed` (409)         | O chamado está encerrado. Reabra antes de responder.                                                                              |
 
 ## Antes de trocar para o número de verdade
