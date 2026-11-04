@@ -6959,7 +6959,7 @@ textarea[aria-busy="true"] { opacity: .6; }
 .cw-label { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ds-muted); }
 .cw-text { font-size: 14px; line-height: 1.5; color: var(--ds-text); }
 .cw-hint { margin: 0; font-size: 13px; color: var(--ds-muted); }
-.cw-detalhes { align-self: flex-start; font-size: 13px; }
+.cw-detalhes { align-self: flex-start; font-size: 13px; margin: -8px 0; }
 .cw-relatorio { min-height: 180px; font-size: 15px; line-height: 1.5; }
 .cw-resumo { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .cw-res { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--ds-line); border-radius: 10px; font-size: 14px; color: var(--ds-text); }
@@ -6979,6 +6979,21 @@ textarea[aria-busy="true"] { opacity: .6; }
   .modal.cw-modal .modal-body { padding-bottom: 0 !important; }
 }
 .cw-body .vp-add { min-height: 44px; padding: 0 16px; font-size: 14px; }
+
+/* Sincronização: era texto cru, colado na borda. Agora é a primeira linha do
+   cabeçalho (mesmo fundo das etapas), discreta, e a cor do ponto diz o estado. */
+.cw-sync { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 16px 0; background: var(--ds-panel); font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--ds-muted); }
+.cw-sync::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ds-green); }
+.cw-sync[data-estado="pendente"] { color: var(--ds-amber); }
+.cw-sync[data-estado="pendente"]::before { background: var(--ds-amber); }
+.cw-sync[data-estado="offline"]::before { background: var(--ds-muted); }
+/* Atalhos do card: contorno sobre o card, e não um bloco mais escuro que ele. */
+.cw-links .btn.btn-secondary { background: transparent; border-color: var(--ds-line-strong); color: var(--ds-text); font-weight: 600; }
+.cw-links .btn.btn-secondary:hover { background: var(--accent-dim); border-color: var(--ds-accent); color: var(--ds-accent); }
+/* Dica da IA e aviso do cliente na mesma caixa: o aviso solto parecia texto comum. */
+.cw-body .campo-ia,
+.cw-body .campo-atencao { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.cw-body .campo-atencao { background: var(--ds-amber-bg); border: 1px solid color-mix(in srgb, var(--ds-amber) 35%, transparent); color: var(--ds-amber); }
 
 /* ===== Chamado: tela de detalhe (estilo SAF) ===== */
 /* Bloco único da tela de detalhe do chamado (js/chamado-detalhe.js). Só usa
@@ -7330,6 +7345,7 @@ textarea[aria-busy="true"] { opacity: .6; }
 
 @media (max-width: 640px) {
   .cw-steps { padding: 8px 8px 6px; }
+  .cw-sync { padding: 8px 12px 0; }
   .cw-body { gap: 16px; padding: 16px 12px; }
   .cw-card { padding: 14px 12px; }
   .cw-client { font-size: 20px; }

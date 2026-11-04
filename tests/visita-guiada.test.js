@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 const req = createRequire(import.meta.url);
 
-const { cwPassoInicial, cwResumo, CW_PASSOS } = req('../js/visita-guiada.js');
+const { cwPassoInicial, cwResumo, cwSyncEstado, CW_PASSOS } = req('../js/visita-guiada.js');
 const SIG = 'data:image/png;base64,iVBORw0KGgo=';
 
 beforeAll(() => {
@@ -54,5 +54,18 @@ describe('Atendimento guiado — resumo antes de concluir', () => {
 
   it('uma foto no singular', () => {
     expect(cwResumo({}, 1)[1].texto).toBe('1 foto');
+  });
+});
+
+describe('Atendimento guiado — linha de sincronização', () => {
+  // O estado vira data-estado no HTML e decide a cor do ponto: pendência não pode passar por "ok".
+  it('alteração pendente vence o online, no singular e no plural', () => {
+    expect(cwSyncEstado(1, true)).toEqual({ estado: 'pendente', texto: '1 alteração aguardando sincronização' });
+    expect(cwSyncEstado(3, false)).toEqual({ estado: 'pendente', texto: '3 alterações aguardando sincronização' });
+  });
+
+  it('sem pendência: ok online, offline sem rede', () => {
+    expect(cwSyncEstado(0, true).estado).toBe('ok');
+    expect(cwSyncEstado(0, false)).toEqual({ estado: 'offline', texto: 'Offline — as alterações ficam neste aparelho' });
   });
 });
