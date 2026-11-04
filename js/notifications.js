@@ -392,16 +392,49 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
   _pushPendencia(recipients, 'Pendência Atualizada', pendencia, statusChanged ? oldStatusLabel + ' → ' + newStatusLabel : pendencia.clientName);
 }
 
-function notifyPendenciaNote(pendencia, note) {
-  const prefs = getNotifPrefs();
-  if (!prefs.onPendenciaNote) return;
+// ── Menções (@nome) ──
+// A nota já guardava quem foi marcado (mentionedOperators), mas ninguém lia a
+// lista: o aviso de nota ia só para responsável e admins, e quem foi marcado
+// só descobria se abrisse a pendência. Aqui cada marcado recebe o próprio aviso.
 
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
-  if (!recipients.length) return;
+/**
+ * E-mails de quem foi marcado e pode ver a pendência, sem quem escreveu.
+ * Mesma regra do RLS (can_see_pendencia): Gestão só para Gestão; o resto para
+ * admin ou para a mesma equipe. Sem isso, marcar alguém de fora vazaria o
+ * título por e-mail.
+ */
+function collectMentionRecipients(pendencia, note) {
+  const nomes = Array.isArray(note && note.mentionedOperators) ? note.mentionedOperators : [];
+  if (!nomes.length || typeof getOperators !== 'function') return [];
+  let gestao = false;
+  try { gestao = typeof isPendenciaGestao === 'function' && isPendenciaGestao(pendencia); } catch (_) { gestao = false; }
+  const equipe = (pendencia && pendencia.team) || 'init';
+  const autor = String((note && note.author) || '').trim();
+  const emails = [];
+  getOperators().forEach((o) => {
+    if (!o || !o.email || o.active === false) return;
+    if (!nomes.includes(o.name) || o.name === autor) return;
+    const podeVer = gestao
+      ? (typeof isGestaoOperator === 'function' && isGestaoOperator(o))
+      : (o.isAdmin === true || (o.team || 'init') === equipe);
+    if (podeVer && !emails.includes(o.email)) emails.push(o.email);
+  });
+  return emails;
+}
 
-  const html = emailBody(`
+// Link direto para o item quando a rota existe; senão, a lista.
+function _notaLink(pendencia) {
+  try {
+    const h = typeof penPaginaHash === 'function' ? penPaginaHash(pendencia) : '';
+    if (h) return '#' + h;
+  } catch (_) {}
+  return '#pendencias';
+}
+
+function _notaEmailHtml(pendencia, note, selo) {
+  return emailBody(`
     <div style="margin-bottom:16px">
-      <div style="display:inline-block;background:#7c3aed15;color:#7c3aed;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">Nova Nota</div>
+      <div style="display:inline-block;background:#7c3aed15;color:#7c3aed;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">${escapeHtml(selo)}</div>
       <h2 style="margin:0;font-size:16px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px">
@@ -411,14 +444,43 @@ function notifyPendenciaNote(pendencia, note) {
       <div style="font-size:14px;color:#1e293b;line-height:1.6;white-space:pre-wrap">${escapeHtml(note.text)}</div>
     </div>
     <div style="text-align:center;margin-top:20px">
-      <a href="${window.location.origin}${window.location.pathname}#pendencias" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
+      <a href="${window.location.origin}${window.location.pathname}${_notaLink(pendencia)}" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a>
     </div>
   `);
+}
+
+function notifyPendenciaNote(pendencia, note) {
+  // Menção é pedido explícito de quem escreveu: sai mesmo com o aviso geral de
+  // nota desligado nas preferências.
+  const mencionados = collectMentionRecipients(pendencia, note);
+  if (mencionados.length) {
+    sendEmailNotification({
+      to: mencionados,
+      subject: `[Init Intra] Você foi mencionado em: ${getPendenciaTitulo(pendencia)}`,
+      html: _notaEmailHtml(pendencia, note, 'Você foi mencionado'),
+    });
+    if (typeof sendPushNotification === 'function') {
+      sendPushNotification({
+        to: mencionados,
+        title: 'Você foi mencionado: ' + getPendenciaTitulo(pendencia),
+        body: (note.author ? note.author + ': ' : '') + (note.text || ''),
+        url: _notaLink(pendencia),
+      });
+    }
+  }
+
+  const prefs = getNotifPrefs();
+  if (!prefs.onPendenciaNote) return;
+
+  const todos = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
+  // Quem já recebeu o aviso de menção não recebe o mesmo texto duas vezes.
+  const recipients = todos.filter((e) => !mencionados.includes(e));
+  if (!recipients.length) return;
 
   sendEmailNotification({
     to: recipients,
     subject: `[Init Intra] Nova nota em: ${getPendenciaTitulo(pendencia)}`,
-    html,
+    html: _notaEmailHtml(pendencia, note, 'Nova Nota'),
   });
   _pushPendencia(recipients, 'Nova nota', pendencia, (note.author ? note.author + ': ' : '') + (note.text || ''));
 }

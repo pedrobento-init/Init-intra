@@ -17,6 +17,7 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 - **Busca global**: `Ctrl+K` para clientes, pendências e ações.
 - **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
 - **Celular**: os mesmos avisos como notificação (Web Push), ativados por aparelho em Configurar notificações.
+- **@menção**: quem é marcado numa nota recebe "Você foi mencionado" por e-mail e no celular, com link direto. Só vai para quem pode ver a pendência (Gestão só para Gestão; o resto para admin ou mesma equipe), nunca para quem escreveu.
 
 ## Como o trabalho anda
 
