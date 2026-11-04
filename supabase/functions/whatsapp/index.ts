@@ -1,4 +1,4 @@
-// Edge Function: whatsapp — webhook de entrada do WhatsApp (hoje, Z-API).
+// Edge Function: whatsapp — webhook de entrada do WhatsApp (hoje, Evolution API).
 //
 // O que faz com cada mensagem de texto que um cliente manda para o número da
 // empresa:
@@ -12,21 +12,23 @@
 //     a fila. Com cliente casado pelo telefone a linha já vem com a equipe e o
 //     cliente; sem, vai como sem_cliente na equipe padrão.
 //
-// AUTENTICAÇÃO — auth "none" + token na query, e verify_jwt = false no
-// config.toml. A Z-API não manda JWT do Supabase, não assina o corpo e não
-// deixa configurar cabeçalho no webhook: o único segredo que dá para pôr é na
-// URL cadastrada no painel (…/whatsapp?token=…). O token é comparado em tempo
-// constante com WHATSAPP_WEBHOOK_TOKEN; sem o segredo configurado, tudo é 401
-// (fail-closed). A URL com token nunca vai para log.
+// AUTENTICAÇÃO — auth "none" + cabeçalho x-whatsapp-secret, e verify_jwt =
+// false no config.toml. A Evolution não manda JWT do Supabase nem assina o
+// corpo, mas deixa cadastrar cabeçalhos no webhook da instância. O segredo vai
+// no cabeçalho e não na URL porque a Evolution, com LOG_LEVEL contendo
+// WEBHOOKS (o padrão do .env de exemplo dela), grava a URL de destino em cada
+// log. O valor é comparado em tempo constante com WHATSAPP_WEBHOOK_TOKEN; sem o
+// segredo configurado, tudo é 401 (fail-closed).
 //
-// IDEMPOTÊNCIA — a Z-API pode reentregar o mesmo evento. A chave
-// "whatsapp:<messageId>" em avisos_enviados (051) garante uma passagem por
-// mensagem; o email_id UNIQUE da caixa (066) segura o resto.
+// IDEMPOTÊNCIA — a Evolution pode reentregar o mesmo evento. A chave
+// "whatsapp:<id da mensagem>" em avisos_enviados (051) garante uma passagem
+// por mensagem; o email_id UNIQUE da caixa (066) segura o resto.
 //
 // CONFIGURAÇÃO (supabase secrets set):
-//   WHATSAPP_WEBHOOK_TOKEN — o token que vai na URL do webhook no painel.
-//   (o envio usa ZAPI_INSTANCE_ID, ZAPI_TOKEN e ZAPI_CLIENT_TOKEN, mas só no
-//   whatsapp-responder.)
+//   WHATSAPP_WEBHOOK_TOKEN — o valor do cabeçalho x-whatsapp-secret cadastrado
+//   no webhook da instância.
+//   (o envio usa EVOLUTION_URL, EVOLUTION_INSTANCE e EVOLUTION_APIKEY, mas só
+//   no whatsapp-responder.)
 
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
@@ -189,7 +191,7 @@ async function guardarNaCaixa(
 async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const esperado = Deno.env.get("WHATSAPP_WEBHOOK_TOKEN") || "";
-  const recebido = new URL(req.url).searchParams.get("token") || "";
+  const recebido = req.headers.get("x-whatsapp-secret") || "";
   if (!esperado || !recebido || !tempoConstante(recebido, esperado)) return json({ ok: false }, 401);
 
   let payload: unknown;
@@ -199,7 +201,7 @@ async function handle(req: Request, ctx: SupabaseContext) {
     return json({ ok: false, error: "invalid_json" }, 400);
   }
   // Evento que não é mensagem de texto (status, entrega, presença) responde 200
-  // vazio: erro faria a Z-API reentregar algo que nunca vai ser tratado.
+  // vazio: erro faria a Evolution reentregar algo que nunca vai ser tratado.
   const todas = mensagensDoWebhook(payload);
   if (!todas.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0 });
   if (todas.length > LOTE_MAX) console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
@@ -256,7 +258,7 @@ async function handle(req: Request, ctx: SupabaseContext) {
     }
     return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas });
   } catch (err) {
-    // 500 faz a Z-API reentregar; a chave de dedupe impede processar duas vezes
+    // 500 faz a Evolution reentregar; a chave de dedupe impede processar duas vezes
     // o que já passou.
     console.error("whatsapp:", (err as Error).message);
     return json({ ok: false }, 500);

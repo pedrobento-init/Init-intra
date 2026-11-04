@@ -86,7 +86,7 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
   it('quem se autentica por segredo próprio usa verify_jwt = false', () => {
     // robô do Apps Script (x-agenda-secret), cron do banco (x-cron-secret),
     // o feed .ics (token na query, porque app de calendário não manda header)
-    // e o webhook da Z-API (token na query: ela não assina nem manda header próprio).
+    // e o webhook da Evolution (x-whatsapp-secret: ela não manda JWT nem assina o corpo).
     const proprio = functions.filter((f) => ['secret-header', 'query-token'].includes(authMode(f.source)));
     expect(proprio.map((f) => f.name).sort()).toEqual(['agenda-ics', 'avisos-prazo', 'google-agenda', 'robo', 'whatsapp']);
     for (const f of proprio) {
