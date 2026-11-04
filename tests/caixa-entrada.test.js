@@ -420,10 +420,17 @@ describe('cliente pelo telefone', () => {
     expect(s.caixaSugerirCliente(conversa, [conversa])).toBe('CLI-1');
   });
 
-  it('o histórico do WhatsApp junta outras conversas do mesmo telefone', () => {
-    const alvo = { id: 'w1', canal: 'whatsapp', telefone: '5511987654321' };
-    const todas = [alvo, { id: 'w2', canal: 'whatsapp', telefone: '1187654321' }, { id: 'w3', canal: 'whatsapp', telefone: '21999998888' }];
-    expect(s.caixaHistoricoRemetente(alvo, todas).map((c) => c.id)).toEqual(['w2']);
+  it('no WhatsApp o mesmo telefone já é uma conversa só, então não há histórico à parte', () => {
+    const linhas = [
+      { id: 'w1', canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia', recebidoEm: '2026-10-30T10:00:00Z' },
+      { id: 'w2', canal: 'whatsapp', telefone: '1187654321', de: 'Márcia', recebidoEm: '2026-10-30T11:00:00Z' },
+      { id: 'w3', canal: 'whatsapp', telefone: '21999998888', de: 'Outro', recebidoEm: '2026-10-30T12:00:00Z' },
+    ];
+    const conversas = s.caixaAgruparConversas(linhas);
+    expect(conversas).toHaveLength(2);
+    const marcia = conversas.find((c) => c.mensagens.length === 2);
+    expect(marcia.mensagens.map((m) => m.id).sort()).toEqual(['w1', 'w2']);
+    expect(s.caixaHistoricoRemetente(marcia, conversas)).toEqual([]);
   });
 
   it('vincular conversa de WhatsApp não ensina domínio ao robô', () => {

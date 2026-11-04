@@ -31,6 +31,27 @@ export type MensagemWhats = {
 // ninguém lê resposta desse tamanho no celular: passou disso, é colagem errada.
 export const TEXTO_MAX = 20000;
 
+// Limite de mensagens de TEXTO por número em 60 segundos. Gente não digita 30
+// mensagens por minuto; robô em loop, golpe ou "bom dia" encaminhado em massa
+// sim, e cada uma viraria linha na caixa e nota no chamado. O que passa do
+// limite é descartado com log (a chave de dedupe fica, para a reentrega não
+// furar o limite depois).
+export const LIMITE_POR_MINUTO = 30;
+
+// Teto de mensagens tratadas por chamada do webhook. A Z-API manda uma por vez;
+// lote grande só vem de reentrega acumulada ou de abuso, e segurar a function
+// rodando minutos faria a Z-API desistir e reentregar tudo de novo.
+export const LOTE_MAX = 50;
+
+// O banco ainda sem a migration da função chamada: PostgREST responde PGRST202
+// (função fora do cache do schema) e o Postgres, 42883 (função inexistente).
+// Só nesses dois casos vale cair no caminho antigo; erro de verdade (timeout,
+// permissão) tem de aparecer, não ser mascarado pelo fallback.
+export function funcaoAusente(erro: { code?: string | null } | null | undefined): boolean {
+  const code = String(erro?.code ?? "");
+  return code === "PGRST202" || code === "42883";
+}
+
 // Status em que o chamado não recebe mais a conversa: o webhook abre outro, e
 // o responder recusa enviar.
 export const PEN_FECHADOS = ["concluido", "resolvido", "cancelado", "fechado"];

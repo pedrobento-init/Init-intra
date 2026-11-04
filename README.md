@@ -96,7 +96,7 @@ e2e/                  Testes de navegador (Playwright)
 | `ia-levar` | Sugere o que levar para a visita (IA). |
 | `update-user-password` | Admin troca a senha de um usuário. |
 | `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
-| `whatsapp` | Webhook de entrada do WhatsApp (hoje Z-API, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). Autentica por token na query. |
+| `whatsapp` | Webhook de entrada do WhatsApp (hoje Z-API, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). A 077 casa o cliente pelo telefone com índice e anexa a nota num UPDATE só; sem ela, o webhook volta ao caminho antigo. Limite de 30 mensagens por número por minuto. Autentica por token na query. |
 | `whatsapp-responder` | Operador responde pelo WhatsApp a um chamado que veio do WhatsApp. O número sai do próprio chamado (`email_thread_id = 'whatsapp:<dígitos>'`), nunca do app. Só operador ativo logado. |
 
 ## Desenvolvimento
