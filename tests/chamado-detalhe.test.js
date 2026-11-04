@@ -197,6 +197,22 @@ describe('chamadoResponderAcao', () => {
     expect(statusTrocados).toEqual([{ id: 'p1', status: 'resolvido' }]);
   });
 
+  it('responder um chamado Aberto passa para Em Andamento', () => {
+    sb.els.newNoteText = { value: 'Já estou verificando.' };
+    sb.els.chgStatus = { value: 'aberto' };
+    sb.getPendenciaById = () => ({ id: 'p1', status: 'aberto', solicitanteEmail: 'j@x.com' });
+    sb.chamadoResponderAcao('p1', 'responder');
+    expect(statusTrocados).toEqual([{ id: 'p1', status: 'em_andamento' }]);
+  });
+
+  it('responder enquanto aguarda o cliente não tira o chamado da espera', () => {
+    sb.els.newNoteText = { value: 'Conseguiu ver o print?' };
+    sb.els.chgStatus = { value: 'aguardando_cliente' };
+    sb.getPendenciaById = () => ({ id: 'p1', status: 'aguardando_cliente', solicitanteEmail: 'j@x.com' });
+    sb.chamadoResponderAcao('p1', 'responder');
+    expect(statusTrocados).toEqual([]);
+  });
+
   it('sem o adaptador de canal, cai no envio por e-mail antigo', () => {
     const canalDe = sb.chamadoCanalDe;
     const enviar = sb.chamadoEnviarResposta;
@@ -213,6 +229,24 @@ describe('chamadoResponderAcao', () => {
       sb.chamadoCanalDe = canalDe;
       sb.chamadoEnviarResposta = enviar;
       delete sb.penResponderPorEmail;
+    }
+  });
+});
+
+describe('chamadoStatusAposResposta', () => {
+  it('pedir informação e encerrar decidem o status, seja qual for o atual', () => {
+    expect(sb.chamadoStatusAposResposta('em_andamento', 'pedir_info')).toBe('aguardando_cliente');
+    expect(sb.chamadoStatusAposResposta('aberto', 'encerrar')).toBe('resolvido');
+  });
+
+  it('responder tira de Aberto e de Pausado', () => {
+    expect(sb.chamadoStatusAposResposta('aberto', 'responder')).toBe('em_andamento');
+    expect(sb.chamadoStatusAposResposta('pausado', 'responder')).toBe('em_andamento');
+  });
+
+  it('responder não mexe em quem já anda, espera alguém ou está fechado', () => {
+    for (const st of ['em_andamento', 'aguardando_cliente', 'aguardando', 'resolvido', 'cancelado', undefined]) {
+      expect(sb.chamadoStatusAposResposta(st, 'responder')).toBeNull();
     }
   });
 });

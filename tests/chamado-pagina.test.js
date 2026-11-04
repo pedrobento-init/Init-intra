@@ -185,6 +185,30 @@ describe('chamado-pagina', () => {
     });
   });
 
+  describe('mudança automática de status (078)', () => {
+    const automatico = (motivo) => ({ at: antes(60), by: 'Sistema', type: 'status', de: 'aguardando_cliente', para: 'em_andamento', motivo });
+
+    it('o Andamento diz por que o status mudou sozinho', () => {
+      const itens = sb.chpAndamento(chamado({ events: [automatico('Cliente respondeu')] }));
+      expect(itens.find((i) => i.titulo.indexOf('Status') === 0)).toMatchObject({ autor: 'Sistema · Cliente respondeu' });
+    });
+
+    it('evento feito por gente continua mostrando só quem fez', () => {
+      const itens = sb.chpAndamento(chamado({ events: [{ at: antes(60), by: 'Ana', type: 'status', de: 'aberto', para: 'em_andamento' }] }));
+      expect(itens.find((i) => i.titulo.indexOf('Status') === 0).autor).toBe('Ana');
+    });
+
+    it('escapa o motivo no Andamento e no fio do detalhe', () => {
+      const p = chamado({ events: [automatico(XSS)] });
+      expect(desenhar(sb, p)).not.toContain(XSS);
+      sb.formatDateTime = (iso) => String(iso);
+      const ev = sb._penFeedItens(p).find((i) => i._evento);
+      const html = sb._penEventoHtml(ev);
+      expect(html).not.toContain(XSS);
+      expect(html).toContain('&lt;img src=x');
+    });
+  });
+
   describe('fio da conversa', () => {
     it('tem a mensagem original como primeira bolha', () => {
       const p = chamado({

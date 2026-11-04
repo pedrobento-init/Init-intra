@@ -38,6 +38,15 @@ passar por Pausado, Aguard. Terceiro ou Aguard. Cliente, e terminando em
 Resolvido ou Cancelado. `concluido` e `fechado` saíram das opções, mas seguem
 sendo contados para não ressuscitar registro antigo.
 
+**O status de chamado também anda sozinho** (migration 078), sempre com evento
+"Sistema" e o motivo na linha do tempo, e sem mandar nada ao cliente:
+
+- responder um chamado Aberto ou Pausado passa para Em Andamento;
+- mensagem nova do cliente (e-mail ou WhatsApp) tira de Aguard. Cliente ou Pausado
+  e volta para Em Andamento;
+- 7 dias sem nota nem evento: Aguard. Cliente vira Resolvido, e Em Andamento vira
+  Pausado. Vale só para chamado (canal externo), nunca com o cronômetro ligado.
+
 **O prazo sai da prioridade** (`js/sla.js`), em horas e dias **úteis**:
 
 | Prioridade | 1ª resposta | Resolução |
