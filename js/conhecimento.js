@@ -233,6 +233,7 @@ function openKbDoc(kind, id) {
   if (!d) { if (typeof showToast === 'function') showToast('Documento não encontrado.', 'warning'); return; }
   const acts = [];
   if (kind === 'artigo') acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="kbEdit" data-arg="' + escapeHtml(id) + '">Editar</button>');
+  if (kind === 'modelo' || kind === 'procedimento' || kind === 'artigo') acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="psRun" data-kind="' + (kind === 'modelo' ? 'tpl' : 'proc') + '" data-arg="' + escapeHtml(id) + '">Executar passo a passo</button>');
   if (kind === 'procedimento' && d.clientId) acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="openClient" data-arg="' + escapeHtml(d.clientId) + '">Abrir cliente</button>');
   acts.push('<button type="button" class="btn btn-secondary btn-sm" data-action="kbCopy" data-kind="' + escapeHtml(kind) + '" data-arg="' + escapeHtml(id) + '">Copiar texto</button>');
   openModal(escapeHtml(d.title || 'Documento'),

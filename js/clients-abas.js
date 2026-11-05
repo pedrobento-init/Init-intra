@@ -348,31 +348,38 @@ function duplicateProcedure(clientId, procId) {
 }
 
 function openProcedureForm(clientId, procId = null) {
-  const p = procId ? getProcedures(clientId).find(x => x.id === procId) : {};
+  const p = (procId ? getProcedures(clientId).find(x => x.id === procId) : null) || {};
   const templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
+  const cid = escapeHtml(clientId);
 
   openModal(procId ? 'Editar Procedimento' : 'Novo Procedimento', `
-    <form class="ov-form" onsubmit="submitProcedureForm(event,'${clientId}','${procId||''}')">
+    <form class="ov-form ps-form" data-submit="procSave" data-client="${cid}" data-arg="${escapeHtml(procId || '')}">
       ${templates.length ? `
-        <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="ps-tpl-load">
           <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text-primary)">📋 Carregar do Modelo</div>
-            <div style="font-size:11px;color:var(--text-muted)">Preenche o formulário com o padrão selecionado</div>
+            <div class="ps-tpl-load-t">Começar de um modelo</div>
+            <div class="ps-tpl-load-s">Substitui título, categoria e passos pelos do modelo</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select class="form-select" id="templatePickerSelect" style="font-size:12px;padding:4px 8px;max-width:220px">
+          <div class="ps-tpl-load-c">
+            <select class="form-select" id="templatePickerSelect" aria-label="Modelo de procedimento">
               <option value="">Selecione um modelo...</option>
-              ${templates.map(t => `<option value="${t.id}">${escapeHtml(t.title)}${t.category ? ` (${escapeHtml(t.category)})` : ''}</option>`).join('')}
+              ${templates.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title)}${t.category ? ` (${escapeHtml(t.category)})` : ''}</option>`).join('')}
             </select>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="loadTemplateIntoProcedureForm()">Carregar</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="procLoadTpl">Carregar</button>
           </div>
         </div>
       ` : ''}
-      <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="procTitleInput" name="title" value="${escapeHtml(p?.title||'')}" required /></div>
-      <div class="form-group"><label class="form-label">Categoria</label><input class="form-input" id="procCategoryInput" name="category" value="${escapeHtml(p?.category||'')}" placeholder="Ex: Acesso, Backup, Rede..." /></div>
-      <div class="form-group"><label class="form-label">Conteúdo / Passos</label><textarea class="form-textarea" id="procContentInput" name="content" rows="8" placeholder="Descreva o passo a passo...">${escapeHtml(p?.content||'')}</textarea></div>
-      <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="viewClient('${clientId}')">Cancelar</button><button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button></div>
-    </form>`);
+      <div class="ps-form-head">
+        <div class="form-group"><label class="form-label" for="procTitleInput">Título *</label><input class="form-input" id="procTitleInput" name="title" value="${escapeHtml(p.title||'')}" required /></div>
+        <div class="form-group"><label class="form-label" for="procCategoryInput">Categoria</label><input class="form-input" id="procCategoryInput" name="category" value="${escapeHtml(p.category||'')}" placeholder="Ex: Acesso, Backup, Rede..." /></div>
+      </div>
+      <div class="form-group ps-form-steps">
+        <span class="form-label">Passo a passo</span>
+        ${procEditorHtml(p.content || '')}
+      </div>
+      <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="openClient" data-arg="${cid}">Cancelar</button><button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button></div>
+    </form>`, 'xl');
+  procEditorMount(document.querySelector('#modalBody [data-pse]'));
 }
 
 function loadTemplateIntoProcedureForm() {
@@ -386,17 +393,16 @@ function loadTemplateIntoProcedureForm() {
 
   const titleInp = document.getElementById('procTitleInput');
   const catInp = document.getElementById('procCategoryInput');
-  const contentInp = document.getElementById('procContentInput');
 
   if (titleInp) titleInp.value = tpl.title || '';
   if (catInp) catInp.value = tpl.category || '';
-  if (contentInp) contentInp.value = tpl.content || '';
+  procEditorSet(document.querySelector('#modalBody [data-pse]'), tpl.content || '');
 
   if (typeof showToast === 'function') showToast(`Modelo "${tpl.title}" carregado no formulário!`, 'success');
 }
 
 function submitProcedureForm(e, clientId, procId) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const fd = new FormData(e.target);
   const title = (fd.get('title') || '').toString().trim();
   const category = (fd.get('category') || '').toString().trim();
@@ -530,5 +536,17 @@ function deleteClientConfirm(id) {
       updateBadges();
       showToast('Cliente restaurado.', 'success');
     });
+  });
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    procSave: (el, id, ev) => submitProcedureForm(ev, el.dataset.client, id || ''),
+    procLoadTpl: () => loadTemplateIntoProcedureForm(),
+    procToggle: (_el, id) => toggleProcCard(id),
+    procNew: (_el, clientId) => openProcedureForm(clientId),
+    procEdit: (el, id) => openProcedureForm(el.dataset.client, id),
+    procDup: (el, id) => duplicateProcedure(el.dataset.client, id),
+    procDelete: (el, id) => deleteProcedureConfirm(id, el.dataset.client),
   });
 }
