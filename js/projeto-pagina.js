@@ -89,7 +89,12 @@ function prjClienteHtml(p) {
   const cliente = p.clientId && typeof getClientById === 'function' ? getClientById(p.clientId) : null;
   if (!cliente) return '<span class="prj-vazio">Sem cliente</span>';
   const nome = cliente.name || 'Cliente sem nome';
-  return '<span class="prj-pessoa">' + pgpAvatarHtml(nome, 28)
+  // Com logo, usa o mesmo avatar das outras telas (forma e URL saneada vêm de lá);
+  // sem logo, as iniciais no tom da página ficam melhores que a cor sólida do cadastro.
+  const avatar = cliente.logo && typeof clientAvatar === 'function'
+    ? clientAvatar(cliente, 28)
+    : pgpAvatarHtml(nome, 28);
+  return '<span class="prj-pessoa">' + avatar
     + '<button type="button" class="prj-link" data-action="openClient" data-arg="' + escapeHtml(cliente.id) + '">'
     + escapeHtml(nome) + '</button></span>';
 }
