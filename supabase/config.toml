@@ -48,6 +48,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.agenda-ics]
 verify_jwt = false
-# O webhook da Z-API (whatsapp) se autentica por token na query (WHATSAPP_WEBHOOK_TOKEN): a Z-API não assina nem manda header próprio.
+# O webhook da Evolution (whatsapp) se autentica pelo cabeçalho x-whatsapp-secret (WHATSAPP_WEBHOOK_TOKEN): a Evolution não manda JWT nem assina o corpo.
 [functions.whatsapp]
 verify_jwt = false

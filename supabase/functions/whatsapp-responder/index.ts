@@ -1,10 +1,10 @@
 // Edge Function: whatsapp-responder — o operador responde pelo WhatsApp a quem
 // abriu o chamado por WhatsApp.
 //
-// Separada do webhook (whatsapp/) de propósito: lá a porta é um token na query
-// com verify_jwt = false, porque quem chama é a Z-API; aqui quem chama é o app,
-// com o JWT do operador. Juntar as duas numa função só obrigaria a abrir o
-// envio para o mesmo token da entrada.
+// Separada do webhook (whatsapp/) de propósito: lá a porta é um segredo em
+// cabeçalho com verify_jwt = false, porque quem chama é a Evolution; aqui quem
+// chama é o app, com o JWT do operador. Juntar as duas numa função só obrigaria
+// a abrir o envio para o mesmo segredo da entrada.
 //
 // O APP NUNCA ESCOLHE O DESTINATÁRIO. O body traz só o chamado e o texto; o
 // número sai de pendencias.email_thread_id ("whatsapp:<dígitos>"), gravado
@@ -25,8 +25,8 @@
 // Resposta: { success: true, to: "<dígitos>", id } — `to` são os dígitos crus,
 // iguais aos do email_thread_id, para o app comparar sem formatar.
 //
-// CONFIGURAÇÃO (supabase secrets set): ZAPI_INSTANCE_ID, ZAPI_TOKEN,
-// ZAPI_CLIENT_TOKEN.
+// CONFIGURAÇÃO (supabase secrets set): EVOLUTION_URL (https, sem barra no
+// fim), EVOLUTION_INSTANCE (nome da instância) e EVOLUTION_APIKEY.
 
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { PEN_FECHADOS, telefoneDaConversa, TEXTO_MAX } from "../whatsapp/mensagem.ts";
@@ -48,12 +48,12 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (!op || op.active === false) return json({ error: "Não autorizado", code: "unauthorized" }, 401);
 
     const cred = {
-      instanceId: Deno.env.get("ZAPI_INSTANCE_ID"),
-      token: Deno.env.get("ZAPI_TOKEN"),
-      clientToken: Deno.env.get("ZAPI_CLIENT_TOKEN"),
+      url: Deno.env.get("EVOLUTION_URL"),
+      instancia: Deno.env.get("EVOLUTION_INSTANCE"),
+      apikey: Deno.env.get("EVOLUTION_APIKEY"),
     };
-    if (!cred.instanceId || !cred.token || !cred.clientToken) {
-      console.error("whatsapp-responder: credenciais da Z-API não configuradas como secrets");
+    if (!cred.url || !cred.instancia || !cred.apikey) {
+      console.error("whatsapp-responder: credenciais da Evolution não configuradas como secrets");
       return json({ error: "WhatsApp não configurado no Supabase", code: "missing_credentials" }, 500);
     }
 
@@ -102,7 +102,13 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
 
     const envio = await enviarTexto(tel, bruto, cred);
     if (!envio.ok) {
-      // O erro do provedor nunca leva a URL (ela tem o token da instância).
+      // Os três secrets existem, mas o adaptador recusou: na prática é a
+      // EVOLUTION_URL sem https (a apikey não sai em texto puro) ou malformada.
+      if (envio.erro === "credenciais") {
+        console.error("whatsapp-responder: EVOLUTION_URL inválida; precisa ser https://");
+        return json({ error: "WhatsApp mal configurado no Supabase", code: "missing_credentials" }, 500);
+      }
+      // O erro do provedor nunca leva a apikey nem a URL do servidor.
       console.error("whatsapp-responder: envio falhou:", envio.erro);
       const code = envio.erro === "inalcancavel" ? "provider_unreachable" : "provider_error";
       return json({ success: false, error: "Não foi possível enviar pelo WhatsApp", code }, 502);

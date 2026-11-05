@@ -105,13 +105,13 @@ termina, commita antes de passar a bola — o git é a única coordenação que 
 
 ## Onde está o resto
 
-| Arquivo                                              | Para quê                                                     |
-| ---------------------------------------------------- | ------------------------------------------------------------ |
-| [README.md](README.md)                               | funcionalidades, estrutura, Edge Functions, deploy           |
-| [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md)                 | robô Apps Script, triagem de e-mail e as rotas de IA no Make |
-| [WHATSAPP.md](WHATSAPP.md)                           | configurar a Z-API e testar o canal com um número de teste   |
-| [AUDITORIA.md](AUDITORIA.md)                         | achados de auditoria e o que já foi fechado                  |
-| [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                 |
+| Arquivo                                              | Para quê                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------- |
+| [README.md](README.md)                               | funcionalidades, estrutura, Edge Functions, deploy            |
+| [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md)                 | robô Apps Script, triagem de e-mail e as rotas de IA no Make  |
+| [WHATSAPP.md](WHATSAPP.md)                           | subir a Evolution API e testar o canal com um número de teste |
+| [AUDITORIA.md](AUDITORIA.md)                         | achados de auditoria e o que já foi fechado                   |
+| [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                  |
 
 Agentes especializados ficam em `.claude/agents/` (Claude Code) e
 `.opencode/agent/` (opencode). Eles herdam este arquivo — contêm só o que é

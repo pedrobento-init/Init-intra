@@ -1,5 +1,5 @@
 // tools/whatsapp-simular.js — manda para o webhook `whatsapp` uma mensagem no
-// formato da Z-API ("Ao receber", ReceivedCallback), para testar a entrada sem
+// formato da Evolution API (evento messages.upsert), para testar a entrada sem
 // celular nem instância conectada.
 //
 //   WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js \
@@ -10,7 +10,8 @@
 // payload, sem enviar).
 //
 // O token vem do env de propósito: em argumento ficaria no histórico do shell.
-// E nunca é impresso — nem a URL, que o carrega na query.
+// Vai no cabeçalho x-whatsapp-secret, como a Evolution manda, e nunca é
+// impresso.
 
 const PADRAO = {
   telefone: '5511987654321',
@@ -41,25 +42,26 @@ function lerArgs(argv) {
   return out;
 }
 
-// O id muda a cada execução porque o webhook deduplica por messageId: repetir
-// o mesmo id faria a segunda simulação sumir sem explicação.
+// O id muda a cada execução porque o webhook deduplica pelo id da mensagem:
+// repetir o mesmo id faria a segunda simulação sumir sem explicação.
 function montarPayload(opcoes, agora = Date.now()) {
+  const telefone = String(opcoes.telefone || '').replace(/\D/g, '');
   return {
-    type: 'ReceivedCallback',
-    phone: String(opcoes.telefone || '').replace(/\D/g, ''),
-    fromMe: false,
-    isGroup: false,
-    messageId: opcoes.id || 'SIM' + agora.toString(36).toUpperCase(),
-    senderName: opcoes.nome || '',
-    momment: agora,
-    text: { message: opcoes.texto || '' },
+    event: 'messages.upsert',
+    instance: 'simulador',
+    data: {
+      key: {
+        remoteJid: telefone + '@s.whatsapp.net',
+        fromMe: false,
+        id: opcoes.id || 'SIM' + agora.toString(36).toUpperCase(),
+      },
+      pushName: opcoes.nome || '',
+      message: { conversation: opcoes.texto || '' },
+      messageType: 'conversation',
+      messageTimestamp: Math.floor(agora / 1000),
+    },
+    date_time: new Date(agora).toISOString(),
   };
-}
-
-function urlComToken(base, token) {
-  const u = new URL(base);
-  u.searchParams.set('token', token);
-  return u.toString();
 }
 
 async function principal(argv = process.argv.slice(2), env = process.env) {
@@ -78,9 +80,9 @@ async function principal(argv = process.argv.slice(2), env = process.env) {
     console.error('Defina WHATSAPP_WEBHOOK_TOKEN no ambiente (ou --token).');
     return 1;
   }
-  const resp = await fetch(urlComToken(opcoes.url, token), {
+  const resp = await fetch(opcoes.url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-whatsapp-secret': token },
     body: JSON.stringify(payload),
   });
   console.log('HTTP ' + resp.status);
@@ -88,13 +90,13 @@ async function principal(argv = process.argv.slice(2), env = process.env) {
   return resp.ok ? 0 : 1;
 }
 
-module.exports = { lerArgs, montarPayload, urlComToken, principal };
+module.exports = { lerArgs, montarPayload, principal };
 
 if (require.main === module) {
   principal()
     .then((code) => process.exit(code))
     .catch((err) => {
-      // Só a mensagem: o erro do fetch pode trazer a URL, que tem o token.
+      // Só o código: a mensagem do erro de rede não acrescenta nada aqui.
       console.error('Falhou: ' + (err && err.code ? err.code : 'erro de rede'));
       process.exit(1);
     });

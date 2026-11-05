@@ -4,9 +4,9 @@
 // roda Deno nem resolve os imports `npm:`, então o que dá para testar é o que
 // não depende do runtime. E é aqui que mora a lógica que erra calado.
 //
-// Também não sabe nada da Z-API: o formato do provedor fica em provedor.ts, e
-// o resto do sistema só enxerga MensagemWhats. Trocar de provedor (Evolution,
-// Meta Cloud) é reescrever provedor.ts, não este arquivo.
+// Também não sabe nada da Evolution: o formato do provedor fica em provedor.ts, e
+// o resto do sistema só enxerga MensagemWhats. Trocar de provedor (Meta Cloud,
+// outro) é reescrever provedor.ts, não este arquivo.
 
 import {
   type Cliente,
@@ -38,9 +38,9 @@ export const TEXTO_MAX = 20000;
 // furar o limite depois).
 export const LIMITE_POR_MINUTO = 30;
 
-// Teto de mensagens tratadas por chamada do webhook. A Z-API manda uma por vez;
+// Teto de mensagens tratadas por chamada do webhook. A Evolution manda uma por vez;
 // lote grande só vem de reentrega acumulada ou de abuso, e segurar a function
-// rodando minutos faria a Z-API desistir e reentregar tudo de novo.
+// rodando minutos faria a Evolution desistir e reentregar tudo de novo.
 export const LOTE_MAX = 50;
 
 // O banco ainda sem a migration da função chamada: PostgREST responde PGRST202
