@@ -17,10 +17,10 @@ function renderTemplates() {
       <div class="search-bar page-toolbar">
         <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." oninput="debouncedFilterTemplatesGrid()" />
+          <input class="form-input" id="templateSearch" placeholder="Buscar modelo por título ou conteúdo..." data-input="tplSearch" />
         </div>
         <div class="filter-field pt-filter pt-full">
-          <select class="form-select" id="templateCategorySelect" onchange="filterTemplatesGrid()">
+          <select class="form-select" id="templateCategorySelect" data-change="tplFilter">
             <option value="">Todas as categorias</option>
             ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
           </select>
@@ -89,70 +89,87 @@ function renderTemplatesGrid() {
   }
 
   if (!templates.length) {
-    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Nenhum modelo de procedimento encontrado.</p><button class="btn btn-primary btn-sm" onclick="openTemplateForm()">+ Novo Modelo</button></div>`;
+    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Nenhum modelo de procedimento encontrado.</p><button type="button" class="btn btn-primary btn-sm" data-action="tplNew">+ Novo Modelo</button></div>`;
     return;
   }
 
-  container.innerHTML = templates.map(t => `
+  container.innerHTML = templates.map(t => {
+    const n = typeof procParseSteps === 'function' ? procParseSteps(t.content).steps.length : 0;
+    const id = escapeHtml(t.id);
+    return `
     <!-- [UI] card no padrão Dashboard: bg/borda/radius vêm do CSS ov (#templatesGridWrap > .card) -->
-    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;gap:14px">
+    <div class="card tpl-card">
       <div>
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-          <h3 style="font-size:16px;font-weight:600;color:var(--ov-text);margin:0">${escapeHtml(t.title)}</h3>
+        <div class="tpl-card-head">
+          <h3 class="tpl-card-title">${escapeHtml(t.title)}</h3>
           ${t.category ? `<span class="tag tag-blue">${escapeHtml(t.category)}</span>` : ''}
         </div>
-        <div style="font-size:12px;color:var(--ov-muted);margin-bottom:12px">
-          Criado por: <strong>${escapeHtml(t.createdBy || 'Suporte TI')}</strong>
+        <div class="tpl-card-meta">
+          ${n ? `<span class="tpl-card-n">${n === 1 ? '1 passo' : n + ' passos'}</span> · ` : ''}Criado por <strong>${escapeHtml(t.createdBy || 'Suporte TI')}</strong>
         </div>
-        <pre class="proc-content" style="max-height:160px;overflow-y:auto;background:var(--ov-raised);padding:10px;border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-word;border:1px solid var(--ov-line);color:var(--ov-text)">${escapeHtml(t.content || 'Sem conteúdo cadastrado.')}</pre>
+        <div class="tpl-card-body">${typeof procReadHtml === 'function' ? procReadHtml(t.content, { limit: 4, empty: 'Sem conteúdo cadastrado.' }) : escapeHtml(t.content || 'Sem conteúdo cadastrado.')}</div>
       </div>
-      <div style="display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--ov-line);flex-wrap:wrap">
-        <button class="btn btn-sm btn-primary" onclick="openApplyTemplateModal('${escapeHtml(t.id)}')" title="Aplicar este modelo a um ou mais clientes">
+      <div class="tpl-card-actions">
+        <button type="button" class="btn btn-sm btn-primary" data-action="psRun" data-kind="tpl" data-arg="${id}" title="Seguir o passo a passo marcando cada etapa">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg> Executar
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" data-action="tplApply" data-arg="${id}" title="Aplicar este modelo a um ou mais clientes">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Aplicar a Clientes
         </button>
-        <button class="btn btn-sm btn-secondary" onclick="openTemplateForm('${escapeHtml(t.id)}')" title="Editar modelo">
+        <button type="button" class="btn btn-sm btn-secondary" data-action="tplEdit" data-arg="${id}" title="Editar modelo">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar
         </button>
-        <button class="btn btn-sm btn-danger" onclick="deleteTemplateConfirm('${escapeHtml(t.id)}')" title="Excluir modelo">
+        <button type="button" class="btn btn-sm btn-danger" data-action="tplDelete" data-arg="${id}" title="Excluir modelo" aria-label="Excluir modelo">
           ✕
         </button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   }, 10);
 }
 
 function openTemplateForm(id = null) {
-  const t = id ? getProcedureTemplateById(id) : {};
+  const t = (id ? getProcedureTemplateById(id) : null) || {};
+  const cats = Array.from(new Set((getProcedureTemplates() || []).map(x => x.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   openModal(id ? 'Editar Modelo de Procedimento' : 'Novo Modelo de Procedimento', `
-    <form class="ov-form" onsubmit="submitTemplateForm(event, '${id || ''}')">
-      <div class="form-group">
-        <label class="form-label">Título do Modelo *</label>
-        <input class="form-input" name="title" value="${escapeHtml(t.title || '')}" placeholder="Ex: Checklist de Backup Semanal" required />
+    <form class="ov-form ps-form" data-submit="tplSave" data-arg="${escapeHtml(id || '')}">
+      <div class="ps-form-head">
+        <div class="form-group">
+          <label class="form-label" for="tplTitle">Título do modelo *</label>
+          <input class="form-input" id="tplTitle" name="title" value="${escapeHtml(t.title || '')}" placeholder="Ex: Ativar BitLocker com PIN" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tplCategory">Categoria</label>
+          <input class="form-input" id="tplCategory" name="category" value="${escapeHtml(t.category || '')}" list="tplCategoryList" placeholder="Backup, Acesso, Rede, Segurança…" autocomplete="off" />
+          <datalist id="tplCategoryList">${cats.map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Categoria</label>
-        <input class="form-input" name="category" value="${escapeHtml(t.category || '')}" placeholder="Ex: Backup, Acesso, Rede, Servidores..." />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Conteúdo / Passos Padrão *</label>
-        <textarea class="form-textarea" name="content" rows="10" placeholder="Descreva os passos reutilizáveis..." required>${escapeHtml(t.content || '')}</textarea>
+      <div class="form-group ps-form-steps">
+        <span class="form-label">Passo a passo *</span>
+        ${procEditorHtml(t.content || '')}
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        ${id ? `<button type="button" class="btn btn-secondary ps-form-run" data-action="tplSaveRun" title="Salvar e abrir no modo execução">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg> Salvar e executar</button>` : ''}
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar Modelo</button>
       </div>
     </form>
-  `);
+  `, 'xl');
+  procEditorMount(document.querySelector('#modalBody [data-pse]'));
+  if (!id) { const ti = document.getElementById('tplTitle'); if (ti) ti.focus(); }
 }
 
-function submitTemplateForm(e, id) {
-  e.preventDefault();
+function submitTemplateForm(e, id, then) {
+  if (e && e.preventDefault) e.preventDefault();
   try {
-    const fd = new FormData(e.target);
-    const title = fd.get('title');
-    const category = fd.get('category');
-    const content = fd.get('content');
+    const form = e && e.target && e.target.tagName === 'FORM' ? e.target : document.querySelector('#modalBody form.ps-form');
+    if (!form) return;
+    if (!form.reportValidity()) return;
+    const fd = new FormData(form);
+    const title = String(fd.get('title') || '').trim();
+    const category = String(fd.get('category') || '').trim();
+    const content = String(fd.get('content') || '');
 
     const data = { id: id || null, title, category, content };
     const errors = validateTemplate(data);
@@ -163,6 +180,7 @@ function submitTemplateForm(e, id) {
     closeModal();
     _refreshTemplateCategories(); // reconstrói o filtro (categoria nova aparece sem F5)
     showToast(id ? 'Modelo atualizado com sucesso!' : 'Novo modelo criado!', 'success');
+    if (then === 'run' && id && typeof openProcedureRunner === 'function') openProcedureRunner('tpl', id);
   } catch (err) { showToast('Erro ao salvar modelo: ' + err.message, 'error'); }
 }
 
@@ -195,15 +213,15 @@ function openApplyTemplateModal(templateId) {
     return;
   }
 
-  openModal(`Aplicar Modelo: ${escapeHtml(tpl.title)}`, `
-    <form class="ov-form" onsubmit="submitApplyTemplate(event, '${templateId}')">
+  openModal(`Aplicar Modelo: ${tpl.title || ''}`, `
+    <form class="ov-form" data-submit="tplApplySave" data-arg="${escapeHtml(templateId)}">
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
         Selecione os clientes que receberão uma cópia deste procedimento:
       </p>
 
       <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg-base);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer">
-          <input type="checkbox" id="selectAllClientsBtn" onchange="toggleSelectAllClients(this)" />
+          <input type="checkbox" id="selectAllClientsBtn" data-change="tplApplyAll" />
           Selecionar Todos os Clientes
         </label>
         <span style="font-size:12px;color:var(--text-muted)" id="selectedClientsCount">0 selecionados</span>
@@ -212,7 +230,7 @@ function openApplyTemplateModal(templateId) {
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:6px">
         ${clients.map(c => `
           <label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:4px;cursor:pointer;background:var(--bg-surface);transition:background 0.15s" class="client-apply-row">
-            <input type="checkbox" name="client_ids" value="${c.id}" onchange="updateSelectedClientsCount()" />
+            <input type="checkbox" name="client_ids" value="${escapeHtml(c.id)}" data-change="tplApplyCount" />
             <div style="display:flex;align-items:center;gap:8px;flex:1">
               ${clientAvatar(c, 24)}
               <span style="font-size:13px;font-weight:500;color:var(--text-primary)">${escapeHtml(c.name)}</span>
@@ -223,7 +241,7 @@ function openApplyTemplateModal(templateId) {
       </div>
 
       <div class="form-actions" style="margin-top:16px">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Aplicar aos Clientes Selecionados</button>
       </div>
     </form>
@@ -247,7 +265,7 @@ function updateSelectedClientsCount() {
 }
 
 function submitApplyTemplate(e, templateId) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const tpl = getProcedureTemplateById(templateId);
   if (!tpl) return;
 
@@ -273,4 +291,20 @@ function submitApplyTemplate(e, templateId) {
 
   closeModal();
   showToast(`Procedimento "${escapeHtml(tpl.title)}" aplicado a ${plural(count, 'cliente', 'clientes')}!`, 'success');
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    tplSearch: () => window.debouncedFilterTemplatesGrid(),
+    tplFilter: () => filterTemplatesGrid(),
+    tplNew: () => openTemplateForm(),
+    tplEdit: (_el, id) => openTemplateForm(id),
+    tplDelete: (_el, id) => deleteTemplateConfirm(id),
+    tplApply: (_el, id) => openApplyTemplateModal(id),
+    tplSave: (el, id, ev) => submitTemplateForm(ev, id || ''),
+    tplSaveRun: (el) => { const f = el.closest('form'); submitTemplateForm({ target: f }, (f && f.dataset.arg) || '', 'run'); },
+    tplApplyAll: (el) => toggleSelectAllClients(el),
+    tplApplyCount: () => updateSelectedClientsCount(),
+    tplApplySave: (_el, id, ev) => submitApplyTemplate(ev, id),
+  });
 }
