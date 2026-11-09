@@ -6668,7 +6668,7 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 .rpt-brand { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #1a56db; }
 .rpt-period { color: #475569; }
 .rpt-gen { font-size: 11px; color: #64748b; white-space: nowrap; }
-.rpt-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0 8px; }
+.rpt-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 16px 0 8px; }
 .rpt-kpi { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; break-inside: avoid; }
 .rpt-kpi b { display: block; font-size: 18px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
 .rpt-kpi b small { font-size: 12px; color: #64748b; font-weight: 700; }
@@ -6694,7 +6694,7 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
   body.printing-doc { background: #fff !important; }
   body.printing-doc .rpt { box-shadow: none; padding: 0; max-width: none; border-radius: 0; }
   body.printing-doc .rpt th, body.printing-doc .rpt td { border: 0 !important; border-bottom: 1px solid #e2e8f0 !important; padding: 6px 8px !important; }
-  body.printing-doc .rpt-kpis { grid-template-columns: repeat(5, 1fr); }
+  body.printing-doc .rpt-kpis { grid-template-columns: repeat(6, 1fr); }
   @page { margin: 14mm; }
 }
 
@@ -6736,7 +6736,9 @@ body:not(.dark-theme) .form-textarea { border-color: var(--ds-line-strong); }
 .rt-note { margin: 6px 8px 0; font-size: 12px; color: var(--ds-muted); }
 
 /* ── Vencimentos ── */
-.venc { display: grid; gap: 16px; }
+.venc { display: grid; gap: var(--space-5); }
+.venc .page-toolbar { margin-bottom: 0; }
+.venc #vencList { display: grid; gap: var(--space-5); }
 .venc-kpis { grid-template-columns: repeat(4, 1fr); }
 .venc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .venc-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 150px auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; }

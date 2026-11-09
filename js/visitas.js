@@ -777,7 +777,8 @@ function openVisitMonthReportModal() {
   openModal('Relatório mensal de visitas', `
     <form onsubmit="return false;">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
-        Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong> e <strong>detalhe das visitas</strong> (incluindo o que foi feito em cada atendimento).
+        Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong>, <strong>resumo por técnico</strong> e <strong>detalhe das visitas</strong>
+        (horários previstos e reais de chegada/saída, observações, chamado, assinatura do cliente e o que foi feito em cada atendimento).
         O Excel sai formatado (pronto para enviar). O CSV serve para importar no Google Sheets.
       </p>
       <div class="form-group">
@@ -821,6 +822,42 @@ function _visitReportMonthLabel(yStr, mStr) {
   return (months[m] || mStr) + ' de ' + yStr;
 }
 
+/** ISO → 'HH:MM' no fuso local; '' se vazio/inválido (Cheguei/Saí gravam ISO). */
+function _visitReportClock(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Minutos → '2h30' / '45min' / '—' (mesmo padrão do tempo médio do cabeçalho). */
+function _visitReportFmtMin(min) {
+  if (min == null || !isFinite(min) || min <= 0) return '—';
+  const m = Math.round(min);
+  return m >= 60
+    ? Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'min' : '')
+    : m + 'min';
+}
+
+/** Duração real (Cheguei → Saí) em minutos; null sem o par completo. */
+function _visitReportRealMinutes(v) {
+  if (!v || !v.checkinAt || !v.checkoutAt) return null;
+  const ms = Date.parse(v.checkoutAt) - Date.parse(v.checkinAt);
+  return Number.isFinite(ms) && ms > 0 ? Math.round(ms / 60000) : null;
+}
+
+/** Minutos para totais: real quando há par Cheguei/Saí; senão o previsto. */
+function _visitReportMinutes(v) {
+  const real = _visitReportRealMinutes(v);
+  if (real != null) return real;
+  if (v && !v.allDay && v.time && v.timeEnd) {
+    const [h1, m1] = String(v.time).slice(0, 5).split(':').map(Number);
+    const [h2, m2] = String(v.timeEnd).slice(0, 5).split(':').map(Number);
+    const d = (h2 * 60 + m2) - (h1 * 60 + m1);
+    return Number.isFinite(d) && d > 0 ? d : null;
+  }
+  return null;
+}
+
 function _visitReportCollect(monthInput) {
   const [yStr, mStr] = monthInput.split('-');
   const prefix = monthInput;
@@ -834,6 +871,7 @@ function _visitReportCollect(monthInput) {
 
   const byClient = {};
   const byStatus = {};
+  const byOperator = {};
   visits.forEach(v => {
     const key = v.clientId || v.clientName || '_sem_cliente';
     if (!byClient[key]) {
@@ -844,10 +882,19 @@ function _visitReportCollect(monthInput) {
     if (v.operator) byClient[key].operators.add(v.operator);
     const st = v.status || '—';
     byStatus[st] = (byStatus[st] || 0) + 1;
+    const op = v.operator || '—';
+    if (!byOperator[op]) byOperator[op] = { operator: op, count: 0, concluidas: 0, minutes: 0, clients: new Set() };
+    byOperator[op].count += 1;
+    if (v.status === 'concluida') byOperator[op].concluidas += 1;
+    const mins = _visitReportMinutes(v);
+    if (mins) byOperator[op].minutes += mins;
+    if (v.clientName) byOperator[op].clients.add(v.clientName);
   });
 
   const summary = Object.values(byClient)
     .sort((a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName));
+  const operators = Object.values(byOperator)
+    .sort((a, b) => b.count - a.count || String(a.operator).localeCompare(String(b.operator)));
 
   const statusLabel = st => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
   const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
@@ -855,7 +902,7 @@ function _visitReportCollect(monthInput) {
     : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : '');
   const user = typeof getUser === 'function' ? getUser() : null;
 
-  return { yStr, mStr, visits, summary, byStatus, statusLabel, team, user };
+  return { yStr, mStr, visits, summary, operators, byStatus, statusLabel, team, user };
 }
 
 function _visitReportDownload(filename, blob) {
@@ -902,7 +949,7 @@ function _exportVisitMonthCsv(data) {
     ].map(_visitReportCsvCell).join(';'));
   });
   lines.push('');
-  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Cliente', 'Motivo', 'O Que Foi Feito (Relatório)', 'Operador', 'Status'].map(_visitReportCsvCell).join(';'));
+  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Chegada real', 'Saída real', 'Duração real', 'Cliente', 'Motivo', 'Observações prévias', 'O Que Foi Feito (Relatório)', 'Operador', 'Chamado', 'Assinatura', 'Status'].map(_visitReportCsvCell).join(';'));
   visits.forEach(v => {
     lines.push([
       'DETALHE',
@@ -910,11 +957,29 @@ function _exportVisitMonthCsv(data) {
       v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5)),
       v.allDay ? '' : ((v.timeEnd || '').toString().slice(0, 5)),
       formatVisitTimeRange(v),
+      _visitReportClock(v.checkinAt),
+      _visitReportClock(v.checkoutAt),
+      _visitReportFmtMin(_visitReportRealMinutes(v)),
       v.clientName || '',
       v.motivo || '',
+      v.observacoes || '',
       v.relatorio || '',
       v.operator || '',
+      v.milvusChamadoCodigo ? String(v.milvusChamadoCodigo) : '',
+      v.assinaturaNome ? v.assinaturaNome + (v.assinaturaEm ? ' (' + _visitReportClock(v.assinaturaEm) + ')' : '') : '',
       statusLabel(v.status),
+    ].map(_visitReportCsvCell).join(';'));
+  });
+  lines.push('');
+  lines.push(['SEÇÃO', 'Operador', 'Qtd visitas', 'Concluídas', 'Horas', 'Clientes'].map(_visitReportCsvCell).join(';'));
+  (data.operators || []).forEach(o => {
+    lines.push([
+      'OPERADOR',
+      o.operator,
+      String(o.count),
+      String(o.concluidas),
+      _visitReportFmtMin(o.minutes),
+      [...o.clients].join(', '),
     ].map(_visitReportCsvCell).join(';'));
   });
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -923,7 +988,7 @@ function _exportVisitMonthCsv(data) {
 }
 
 function _exportVisitMonthExcel(data) {
-  const { yStr, mStr, visits, summary, byStatus, statusLabel, team, user } = data;
+  const { yStr, mStr, visits, summary, operators, byStatus, statusLabel, team, user } = data;
   const monthLabel = _visitReportMonthLabel(yStr, mStr);
   const genAt = new Date();
   const genStr = genAt.toLocaleString('pt-BR');
@@ -935,20 +1000,11 @@ function _exportVisitMonthExcel(data) {
   const cancelada = byStatus['cancelada'] || 0;
   const clientsN = summary.length;
 
-  const durations = visits
-    .filter(v => !v.allDay && v.time && v.timeEnd)
-    .map(v => {
-      const [h1, m1] = String(v.time).slice(0, 5).split(':').map(Number);
-      const [h2, m2] = String(v.timeEnd).slice(0, 5).split(':').map(Number);
-      return (h2 * 60 + m2) - (h1 * 60 + m1);
-    })
-    .filter(m => m > 0);
-  const avgMinutes = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
-  const avgDurationLabel = avgMinutes == null
-    ? '—'
-    : (avgMinutes >= 60
-        ? `${Math.floor(avgMinutes / 60)}h${avgMinutes % 60 ? ' ' + (avgMinutes % 60) + 'min' : ''}`
-        : `${avgMinutes}min`);
+  const durations = visits.map(_visitReportMinutes).filter(m => m != null);
+  const totalMinutes = durations.reduce((a, b) => a + b, 0);
+  const avgMinutes = durations.length ? Math.round(totalMinutes / durations.length) : null;
+  const avgDurationLabel = _visitReportFmtMin(avgMinutes);
+  const totalDurationLabel = _visitReportFmtMin(durations.length ? totalMinutes : null);
 
   const kpiColor = (val, accent) => (val > 0 ? accent : '#cbd5e1');
 
@@ -977,16 +1033,37 @@ function _exportVisitMonthExcel(data) {
     const relatorioText = (v.relatorio && v.relatorio.trim())
       ? v.relatorio
       : (v.status === 'cancelada' ? 'Visita cancelada' : '—');
+    const assinaturaText = v.assinaturaNome
+      ? v.assinaturaNome + (v.assinaturaEm ? ' (' + _visitReportClock(v.assinaturaEm) + ')' : '')
+      : '—';
     detailRows += `<tr>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(d)}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5) || '—'))}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? '—' : ((v.timeEnd || '').toString().slice(0, 5) || '—'))}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(formatVisitTimeRange(v))}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(_visitReportClock(v.checkinAt) || '—')}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(_visitReportClock(v.checkoutAt) || '—')}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(_visitReportFmtMin(_visitReportRealMinutes(v)))}</td>
       <td style="${s}">${_visitReportEscHtml(v.clientName || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(v.motivo || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(v.observacoes || '—')}</td>
       <td style="${s}">${_visitReportEscHtml(relatorioText)}</td>
       <td style="${s}">${_visitReportEscHtml(v.operator || '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(v.milvusChamadoCodigo ? '#' + v.milvusChamadoCodigo : '—')}</td>
+      <td style="${s}">${_visitReportEscHtml(assinaturaText)}</td>
       <td style="${s}">${_visitReportEscHtml(statusLabel(v.status))}</td>
+    </tr>`;
+  });
+
+  let operatorRows = '';
+  (operators || []).forEach((o, i) => {
+    const s = i % 2 ? tdAlt : td;
+    operatorRows += `<tr>
+      <td style="${s}">${_visitReportEscHtml(o.operator)}</td>
+      <td style="${s}text-align:center;font-weight:700;color:#1a56db;">${o.count}</td>
+      <td style="${s}text-align:center;">${o.concluidas}</td>
+      <td style="${s}text-align:center;white-space:nowrap;">${_visitReportEscHtml(_visitReportFmtMin(o.minutes))}</td>
+      <td style="${s}">${_visitReportEscHtml([...o.clients].join(', ') || '—')}</td>
     </tr>`;
   });
 
@@ -1026,6 +1103,7 @@ function _exportVisitMonthExcel(data) {
       </td>
       <td style="background:#e8eefc;padding:10px 24px;border:none;font-size:10pt;color:#334155;text-align:right;white-space:nowrap;">
         Tempo médio por visita: <strong>${_visitReportEscHtml(avgDurationLabel)}</strong>
+        &nbsp;·&nbsp; Total de horas: <strong>${_visitReportEscHtml(totalDurationLabel)}</strong>
       </td>
     </tr>
   </table>
@@ -1038,6 +1116,7 @@ function _exportVisitMonthExcel(data) {
       <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(agendada, '#f59e0b')}">${agendada}</div><div style="${kpiLab}">Agendadas</div></td>
       <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(andamento, '#0ea5e9')}">${andamento}</div><div style="${kpiLab}">Em andamento</div></td>
       <td style="${kpiBox}"><div style="${kpiVal};color:${kpiColor(cancelada, '#94a3b8')}">${cancelada}</div><div style="${kpiLab}">Canceladas</div></td>
+      <td style="${kpiBox}"><div style="${kpiVal};color:#1a56db;">${_visitReportEscHtml(totalDurationLabel)}</div><div style="${kpiLab}">Horas totais</div></td>
     </tr>
   </table>
 
@@ -1068,15 +1147,39 @@ function _exportVisitMonthExcel(data) {
         <th style="${th}">Início</th>
         <th style="${th}">Fim</th>
         <th style="${th}">Duração</th>
+        <th style="${th}">Chegada real</th>
+        <th style="${th}">Saída real</th>
+        <th style="${th}">Duração real</th>
         <th style="${th}">Cliente</th>
         <th style="${th}">Motivo</th>
+        <th style="${th}">Observações prévias</th>
         <th style="${th}">O Que Foi Feito (Relatório)</th>
         <th style="${th}">Operador</th>
+        <th style="${th}">Chamado</th>
+        <th style="${th}">Assinatura</th>
         <th style="${th}">Status</th>
       </tr>
     </thead>
     <tbody>
       ${detailRows}
+    </tbody>
+  </table>
+
+  <table style="width:100%;margin:28px 0 8px;">
+    <tr><td style="font-size:14pt;font-weight:800;color:#1a56db;border-bottom:3px solid #1a56db;padding:0 0 8px;">3. Resumo por técnico</td></tr>
+  </table>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="${th}">Técnico</th>
+        <th style="${th}text-align:center;width:90px;">Visitas</th>
+        <th style="${th}text-align:center;width:110px;">Concluídas</th>
+        <th style="${th}text-align:center;width:110px;">Horas</th>
+        <th style="${th}">Clientes atendidos</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${operatorRows || `<tr><td colspan="5" style="${td}color:#94a3b8;text-align:center;font-style:italic;">Nenhuma visita no mês.</td></tr>`}
     </tbody>
   </table>
 
