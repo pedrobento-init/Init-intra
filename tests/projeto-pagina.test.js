@@ -55,6 +55,7 @@ beforeEach(() => {
     pgpVoltarHtml: (r) => '<a class="pgp-voltar" href="#pendencias">← ' + escapeReal(r) + '</a>',
     pgpSeletoresHtml: () => '<div class="pgp-seletores"><select id="chgStatus"></select></div>',
     pgpAvatarHtml: (n) => '<span class="pgp-avatar" aria-label="' + escapeReal(n) + '"></span>',
+    clientAvatar: (c) => c.logo ? '<img src="' + escapeReal(c.logo) + '" alt="' + escapeReal(c.name) + '">' : '<span>' + escapeReal(c.initials || '') + '</span>',
     pgpTempoAtras: (iso) => (iso ? 'há 1 h' : ''),
     getPendenciaTitulo: (p) => p.title,
     penDisplayNumber: () => '#001',
@@ -343,6 +344,12 @@ describe('lateral', () => {
     globalThis.getClientById = () => ({ id: 'c1', name: 'Acme' });
     const html = lateral(desenhar(projeto({ title: 't', clientId: 'c1' })));
     expect(html).toMatch(/<button[^>]*data-action="openClient" data-arg="c1">Acme<\/button>/);
+  });
+
+  it('usa a logo cadastrada no avatar do cliente', () => {
+    globalThis.getClientById = () => ({ id: 'c1', name: 'Acme', logo: 'https://cdn.exemplo/acme.png' });
+    const html = lateral(desenhar(projeto({ title: 't', clientId: 'c1' })));
+    expect(html).toContain('<img src="https://cdn.exemplo/acme.png" alt="Acme">');
   });
 
   it('mostra responsável e equipe juntos', () => {

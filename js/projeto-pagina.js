@@ -89,7 +89,7 @@ function prjClienteHtml(p) {
   const cliente = p.clientId && typeof getClientById === 'function' ? getClientById(p.clientId) : null;
   if (!cliente) return '<span class="prj-vazio">Sem cliente</span>';
   const nome = cliente.name || 'Cliente sem nome';
-  return '<span class="prj-pessoa">' + pgpAvatarHtml(nome, 28)
+  return '<span class="prj-pessoa">' + clientAvatar(cliente, 28)
     + '<button type="button" class="prj-link" data-action="openClient" data-arg="' + escapeHtml(cliente.id) + '">'
     + escapeHtml(nome) + '</button></span>';
 }
