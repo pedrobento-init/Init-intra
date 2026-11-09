@@ -55,6 +55,13 @@ function _rptHHMM(s) {
   return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
 }
 
+/** ISO → 'HH:MM' no fuso local; '' se vazio/inválido. */
+function _rptClock(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 /** Minutos → "3h 20min". */
 function rptFormatMinutes(min) {
   const t = Math.max(0, Math.round(Number(min) || 0));
@@ -155,13 +162,26 @@ function renderClientReportHtml(m) {
   const empty = (cols, txt) => '<tr><td colspan="' + cols + '" class="rpt-none">' + txt + '</td></tr>';
   const statusLabel = (s) => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[s] && VISIT_STATUS_MAP[s].label) || s || '—';
 
-  const visitRows = m.visits.map((x) => '<tr>' +
-    '<td>' + e(_rptDate(x.v.date)) + '</td>' +
-    '<td>' + e(x.v.operator || '—') + '</td>' +
-    '<td>' + e(_rptCut(x.v.motivo, 60) || '—') + (x.v.relatorio ? '<div class="rpt-sub">' + e(_rptCut(x.v.relatorio, 180)) + '</div>' : '') + '</td>' +
+  const visitRows = m.visits.map((x) => {
+    const v = x.v;
+    const realIn = _rptClock(v.checkinAt);
+    const realOut = _rptClock(v.checkoutAt);
+    const signedAt = _rptClock(v.assinaturaEm);
+    return '<tr>' +
+    '<td>' + e(_rptDate(v.date)) + '</td>' +
+    '<td>' + e(v.allDay ? 'Dia inteiro' : (v.time || '—')) + (realIn ? '<div class="rpt-sub">real ' + e(realIn) + '</div>' : '') + '</td>' +
+    '<td>' + e(v.allDay ? '—' : (v.timeEnd || '—')) + (realOut ? '<div class="rpt-sub">real ' + e(realOut) + '</div>' : '') + '</td>' +
+    '<td>' + e(v.operator || '—') + '</td>' +
+    '<td>' + e(_rptCut(v.motivo, 45) || '—') +
+      (v.observacoes ? '<div class="rpt-sub">Obs.: ' + e(_rptCut(v.observacoes, 90)) + '</div>' : '') +
+      (v.relatorio ? '<div class="rpt-sub">' + e(_rptCut(v.relatorio, 150)) + '</div>' : '') + '</td>' +
     '<td class="rpt-num">' + (x.minutes ? rptFormatMinutes(x.minutes) : '—') + '</td>' +
-    '<td>' + e(statusLabel(x.v.status)) + (x.v.milvusChamadoCodigo ? '<div class="rpt-sub">Chamado #' + e(String(x.v.milvusChamadoCodigo)) + '</div>' : '') + '</td>' +
-    '</tr>').join('');
+    '<td>' + e(statusLabel(v.status)) +
+      (v.milvusChamadoCodigo ? '<div class="rpt-sub">Chamado #' + e(String(v.milvusChamadoCodigo)) + '</div>' : '') +
+      ((v.assinaturaNome || signedAt) ? '<div class="rpt-sub">Ass.: ' + e(v.assinaturaNome || 'Cliente') + (signedAt ? ' · ' + e(signedAt) : '') + '</div>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join('');
 
   const resolvedRows = m.resolved.map((x) => '<tr>' +
     '<td>' + e(_rptPenNum(x.p)) + '</td>' +
@@ -199,12 +219,13 @@ function renderClientReportHtml(m) {
       kpi(rptFormatMinutes(m.totalMinutes), 'Horas no app (visitas + pendências)') +
       kpi(m.atendAvailable ? rptFormatMinutes(m.atendMinutes) : '—', 'Horas no Milvus') +
       kpi(m.visitsDone + (m.visits.length !== m.visitsDone ? '<small>/' + m.visits.length + '</small>' : ''), 'Visitas realizadas') +
+      kpi(m.visitsDone ? rptFormatMinutes(m.visitMinutes / m.visitsDone) : '—', 'Tempo médio por visita') +
       kpi(m.resolved.length, 'Pendências resolvidas') +
       kpi(m.stillOpen.length, 'Em aberto hoje') +
     '</section>' +
-    '<p class="rpt-note">Horas no app: ' + rptFormatMinutes(m.visitMinutes) + ' em visitas concluídas (pelo horário) e ' + rptFormatMinutes(m.penMinutes) + ' de cronômetro em pendências. ' + m.opened + ' pendência' + (m.opened === 1 ? '' : 's') + ' aberta' + (m.opened === 1 ? '' : 's') + ' no mês.</p>' +
+    '<p class="rpt-note">Horas no app: ' + rptFormatMinutes(m.visitMinutes) + ' em visitas concluídas (pelo horário previsto) e ' + rptFormatMinutes(m.penMinutes) + ' de cronômetro em pendências. ' + m.opened + ' pendência' + (m.opened === 1 ? '' : 's') + ' aberta' + (m.opened === 1 ? '' : 's') + ' no mês.</p>' +
     '<h2>Visitas</h2>' +
-    '<table><thead><tr><th>Data</th><th>Técnico</th><th>Motivo / relatório</th><th class="rpt-num">Duração</th><th>Situação</th></tr></thead><tbody>' + (visitRows || empty(5, 'Nenhuma visita no mês.')) + '</tbody></table>' +
+    '<table><thead><tr><th>Data</th><th>Chegada</th><th>Saída</th><th>Técnico</th><th>Motivo / relatório</th><th class="rpt-num">Duração</th><th>Situação</th></tr></thead><tbody>' + (visitRows || empty(7, 'Nenhuma visita no mês.')) + '</tbody></table>' +
     '<h2>Pendências resolvidas</h2>' +
     '<table><thead><tr><th>Nº</th><th>Assunto</th><th>Responsável</th><th>Concluída</th><th class="rpt-num">Tempo no mês</th></tr></thead><tbody>' + (resolvedRows || empty(5, 'Nenhuma pendência resolvida no mês.')) + '</tbody></table>' +
     '<h2>Chamados</h2>' + atendNote +

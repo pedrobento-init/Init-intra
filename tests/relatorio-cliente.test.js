@@ -34,7 +34,9 @@ describe('helpers do relatório', () => {
 describe('buildClientMonthReport', () => {
   const client = { id: 'C1', name: 'Acme <Ltda>' };
   const visits = [
-    { id: 'V1', date: '2026-10-05', time: '09:00', timeEnd: '11:00', status: 'concluida', operator: 'Ana', motivo: 'Servidor', milvusChamadoCodigo: 501 },
+    { id: 'V1', date: '2026-10-05', time: '09:00', timeEnd: '11:00', status: 'concluida', operator: 'Ana', motivo: 'Servidor', milvusChamadoCodigo: 501,
+      observacoes: 'Entrada pela portaria B', checkinAt: '2026-10-05T09:07:00', checkoutAt: '2026-10-05T11:24:00',
+      assinaturaNome: 'Maria Silva', assinaturaEm: '2026-10-05T11:25:00' },
     { id: 'V2', date: '2026-10-20', time: '14:00', timeEnd: '15:00', status: 'agendada', operator: 'Beto' },
     { id: 'V3', date: '2026-10-21', status: 'cancelada' },
     { id: 'V4', date: '2026-09-30', time: '09:00', timeEnd: '10:00', status: 'concluida' },
@@ -84,6 +86,34 @@ describe('buildClientMonthReport', () => {
     expect(html).toContain('Acme &lt;Ltda&gt;');
     expect(html).not.toContain('<Ltda>');
     expect(html).toContain('Chamado #501');
+  });
+
+  it('visitas mostram chegada/saída previstas, reais, observações e assinatura', () => {
+    const html = R.renderClientReportHtml(R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10'));
+    // Previstas nas colunas, reais em sub-linha (sem segundos, fuso local).
+    expect(html).toContain('09:00<div class="rpt-sub">real 09:07</div>');
+    expect(html).toContain('11:00<div class="rpt-sub">real 11:24</div>');
+    expect(html).toContain('Obs.: Entrada pela portaria B');
+    expect(html).toContain('Ass.: Maria Silva · 11:25');
+    // KPI de tempo médio (2h em 1 visita concluída).
+    expect(html).toContain('Tempo médio por visita');
+    // Agendada sem Cheguei/Saí: célula limpa, sem sub-linha "real".
+    expect(html).toContain('>14:00</td>');
+    expect(html).not.toContain('>14:00<div class="rpt-sub">real');
+  });
+
+  it('escapa observações e assinatura no HTML', () => {
+    const m = R.buildClientMonthReport({
+      client,
+      pens: [],
+      visits: [{ id: 'VX', date: '2026-10-07', time: '10:00', timeEnd: '11:00', status: 'concluida', operator: 'Ana',
+        motivo: 'X', observacoes: '<b>obs</b>', assinaturaNome: '<i>Maria</i>', assinaturaEm: '2026-10-07T11:00:00' }],
+      atend: null,
+    }, '2026-10');
+    const html = R.renderClientReportHtml(m);
+    expect(html).toContain('Obs.: &lt;b&gt;obs&lt;/b&gt;');
+    expect(html).toContain('Ass.: &lt;i&gt;Maria&lt;/i&gt;');
+    expect(html).not.toContain('<b>obs</b>');
   });
 });
 
