@@ -373,7 +373,7 @@ function openOperadorForm(id = null) {
   const esc = v => escapeHtml(v || '');
 
   const currentPasswordHtml = (isSelf && hasCurrentPassword) ? `
-    <div class="form-row" style="margin-bottom: 12px;">
+    <div class="form-row" style="margin-bottom:var(--space-5)">
       <div class="form-group" style="width:100%">
         <label class="form-label">Senha atual <span style="font-weight:400;color:var(--text-muted)">(só para trocar a senha)</span></label>
         <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
@@ -382,18 +382,18 @@ function openOperadorForm(id = null) {
   ` : '';
 
   const adminBanner = isAdminUser 
-    ? `<div style="padding:8px 12px;background:rgba(26,86,219,0.1);border:1px solid rgba(26,86,219,0.3);border-radius:6px;margin-bottom:12px;font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
+    ? `<div style="padding:8px 12px;background:rgba(26,86,219,0.1);border:1px solid rgba(26,86,219,0.3);border-radius:6px;margin-bottom:var(--space-5);font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
     : '';
 
   openModal(id ? 'Editar Operador' : 'Novo Operador', `
     <form id="opForm" class="ov-form" onsubmit="submitOperadorForm(event,'${id||''}')">
       ${adminBanner}
-      <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;padding:16px;background:var(--bg-base);border-radius:var(--radius)">
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:var(--space-6);padding:16px;background:var(--bg-base);border-radius:var(--radius)">
         <div id="opAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
           ${esc(op?.initials || (op?.name ? op.name.substring(0,2).toUpperCase() : '?'))}
         </div>
         <div style="flex:1">
-          <div class="form-group" style="margin-bottom:6px"><label class="form-label">Cor do avatar</label>
+          <div class="form-group" style="margin-bottom:var(--space-2)"><label class="form-label">Cor do avatar</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap" id="opColorPicker">
               ${OP_COLORS.map(col => {
                 var isSel = selColor===col;
@@ -438,15 +438,15 @@ function openOperadorForm(id = null) {
             </select>
           </div>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--border)">
           <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opIsAdmin" class="form-label" style="margin-bottom:0;cursor:pointer;font-weight:600">Perfil Administrador</label>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:8px 0 0">
           <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opIsGestao" class="form-label" style="margin-bottom:0;cursor:pointer">Gestão <span style="font-weight:400;color:var(--text-muted)">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:8px 0 0">
           <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
           <label for="opOnLeave" class="form-label" style="margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px">${_opLeaveIcon()} Afastado</label>
         </div>

@@ -77,7 +77,7 @@ function openClientForm(id = null) {
       </div>
       <div class="form-section">
         <div class="form-section-title">Integração Milvus</div>
-        <div class="form-group"><label class="form-label">Token do cliente no Milvus</label><input class="form-input" name="milvusClientToken" maxlength="64" value="${esc(c.milvusClientToken)}" placeholder="Ex.: ABC123" /><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Identificador utilizado para localizar este cliente no Milvus. Deixe vazio se o cliente não utiliza Milvus.</div></div>
+        <div class="form-group"><label class="form-label">Token do cliente no Milvus</label><input class="form-input" name="milvusClientToken" maxlength="64" value="${esc(c.milvusClientToken)}" placeholder="Ex.: ABC123" /><div class="form-hint">Identificador utilizado para localizar este cliente no Milvus. Deixe vazio se o cliente não utiliza Milvus.</div></div>
       </div>
       <div class="form-section">
         <div class="form-section-title">Responsáveis</div>

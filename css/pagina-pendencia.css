@@ -32,7 +32,7 @@
   --pgp-control-height: 38px;
   --pgp-target-min: 40px;
   /* Espaço único entre blocos (cabeçalho, colunas, cards) nas duas telas. */
-  --pgp-gap: 20px;
+  --pgp-gap: var(--space-5);
 
   /* Sem fundo próprio: no escuro --pgp-bg é outro azul que o da página, e o
      retângulo acabava logo abaixo do último card, cortando a tela ao meio. */
@@ -94,7 +94,7 @@ body.dark-theme .pgp {
 
 .pgp-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-2);
   color: var(--pgp-label);
   font-size: 12px;
   font-weight: 700;
