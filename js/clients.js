@@ -262,6 +262,7 @@ function viewClient(id) {
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</button>
       <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('historico','${id}')">Histórico</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-client-tab="timeline" data-client-id="${escapeHtml(id)}">Linha do tempo</button>
     </div>
     <div id="clientTabContent"></div>`, 'lg');
   // Cabeçalho: nome + "Atualizada em DD/MM/AAAA por <usuário>" (updated_at/updated_by).
@@ -274,6 +275,6 @@ function viewClient(id) {
 }
 
 function switchClientTab(tab, id) {
-  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => { const on = ['ficha','procedimentos','pendencias','visitas','inventario','backups','chamados','checklist','documentos','historico'][i]===tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  document.querySelectorAll('#clientTabs .tab').forEach((t,i) => { const on = ['ficha','procedimentos','pendencias','visitas','inventario','backups','chamados','checklist','documentos','historico','timeline'][i]===tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
   renderClientTab(tab, id);
 }

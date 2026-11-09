@@ -226,12 +226,9 @@ function caixaSugerirCliente(conversa, conversas) {
 }
 
 function caixaHistoricoRemetente(conversa, conversas, max) {
-  if (conversa && conversa.canal === 'whatsapp') {
-    const tel = chamadoTelefoneChave(conversa.telefone);
-    if (!tel) return [];
-    return (conversas || []).filter((c) => c.id !== conversa.id && chamadoTelefoneChave(c.telefone) === tel)
-      .slice(0, max || 5);
-  }
+  // No WhatsApp a conversa já é o número inteiro (_caixaChaveConversa agrupa
+  // pela chave do telefone): não existe "outra conversa do mesmo remetente".
+  if (conversa && conversa.canal === 'whatsapp') return [];
   const end = conversa && conversa.ultima ? _emailTriagemEndereco(conversa.ultima.de) : '';
   if (!end) return [];
   return (conversas || []).filter((c) => c.id !== conversa.id && _emailTriagemEndereco(c.ultima && c.ultima.de) === end)

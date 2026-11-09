@@ -8,11 +8,9 @@
     'cabecalho cabecalho'
     'abas abas'
     'principal lateral';
-  column-gap: 24px;
+  column-gap: var(--pgp-gap);
   align-items: start;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
 }
 
 .pgp-projeto .prj-cabecalho {
@@ -55,38 +53,63 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Grade de duas colunas: trilha e título à esquerda; Status, Prioridade e Editar
+   ocupam as duas linhas à direita, com o pé alinhado ao do título. Em linha
+   própria, os controles abriam um vão entre a trilha e o título. */
+.pgp-projeto .prj-cabecalho {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 24px;
+}
+
 .pgp-projeto .prj-topo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px 24px;
+  display: contents;
+}
+
+.pgp-projeto .prj-trilha {
+  grid-row: 1;
+  grid-column: 1;
 }
 
 .pgp-projeto .prj-topo .pgp-titulo {
-  flex: 1 1 320px;
+  grid-row: 2;
+  grid-column: 1;
   min-width: 0;
-  margin: 14px 0 20px;
+  margin: 4px 0 20px;
   font-size: clamp(24px, 2.2vw, 30px);
   font-weight: 800;
   letter-spacing: -0.035em;
   line-height: 1.2;
 }
 
+/* Status, Prioridade e Editar numa linha só, à direita do título. A caixa que
+   envolvia os seletores era um cartão dentro do cartão do cabeçalho. */
+.pgp-projeto .prj-controles {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: end;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
 .pgp-projeto .prj-topo .pgp-seletores {
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--pgp-border);
-  border-radius: 12px;
-  background: var(--pgp-field);
+  gap: 12px;
 }
 
 .pgp-projeto .prj-topo .pgp-seletor {
-  min-width: 128px;
+  min-width: 140px;
+}
+
+.pgp-projeto .prj-topo .pgp-select {
+  width: 100%;
 }
 
 .pgp-projeto .prj-topo .pgp-label {
   margin-bottom: var(--space-2);
+  font-size: 11px;
 }
 
 .pgp-projeto .prj-topo .pgp-select {
@@ -186,7 +209,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .pgp-projeto .prj-secao-titulo {
@@ -224,11 +247,10 @@
   font-size: 14px;
 }
 
-.pgp-projeto .prj-card > .prj-vazio {
-  padding: 14px;
-  border: 1px dashed var(--pgp-border-strong);
-  border-radius: var(--pgp-radius-control);
-  background: var(--pgp-field);
+.pgp-projeto .prj-checklist-dica {
+  margin: 0 0 12px;
+  color: var(--pgp-muted);
+  font-size: 13px;
 }
 
 .pgp-projeto .prj-botao {
@@ -416,6 +438,13 @@
   border-top: 1px solid var(--pgp-border);
 }
 
+/* Checklist vazio: o campo é o próprio estado vazio, sem divisor acima dele. */
+.pgp-projeto .prj-etapa-form--inicio {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* ----- Atividade ----- */
 
 .pgp-projeto .prj-composer-rotulo {
@@ -526,11 +555,18 @@
 }
 
 .pgp-projeto .prj-meta-valor {
+  min-height: 28px;
   margin: 0;
   color: var(--pgp-text);
   font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+/* O link mantém 40px de área de clique, mas ocupa só a altura do avatar (28px):
+   antes Cliente e Prazo ficavam mais altos que Responsável. */
+.pgp-projeto .prj-meta-valor .prj-link {
+  margin-block: -6px;
 }
 
 .pgp-projeto .prj-pessoa {
@@ -599,6 +635,7 @@
 
   .pgp-projeto .prj-cabecalho,
   .pgp-projeto .prj-topo,
+  .pgp-projeto .prj-controles,
   .pgp-projeto .pgp-seletores,
   .pgp-projeto .prj-lateral,
   .pgp-projeto .prj-metas {
@@ -616,6 +653,18 @@
 
   .pgp-projeto .prj-topo .pgp-titulo {
     margin: 4px 0 8px;
+  }
+
+  /* Editar volta para o canto da trilha, como antes, sem virar célula da grade. */
+  .pgp-projeto .prj-trilha {
+    grid-row: 1;
+  }
+
+  .pgp-projeto .prj-editar {
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+    align-self: center;
   }
 
   .pgp-projeto .prj-topo .pgp-seletor,

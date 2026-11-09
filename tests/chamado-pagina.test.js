@@ -185,6 +185,141 @@ describe('chamado-pagina', () => {
     });
   });
 
+  describe('mudança automática de status (078)', () => {
+    const automatico = (motivo) => ({ at: antes(60), by: 'Sistema', type: 'status', de: 'aguardando_cliente', para: 'em_andamento', motivo });
+
+    it('o Andamento diz por que o status mudou sozinho', () => {
+      const itens = sb.chpAndamento(chamado({ events: [automatico('Cliente respondeu')] }));
+      expect(itens.find((i) => i.titulo.indexOf('Status') === 0)).toMatchObject({ autor: 'Sistema · Cliente respondeu' });
+    });
+
+    it('evento feito por gente continua mostrando só quem fez', () => {
+      const itens = sb.chpAndamento(chamado({ events: [{ at: antes(60), by: 'Ana', type: 'status', de: 'aberto', para: 'em_andamento' }] }));
+      expect(itens.find((i) => i.titulo.indexOf('Status') === 0).autor).toBe('Ana');
+    });
+
+    it('escapa o motivo no Andamento e no fio do detalhe', () => {
+      const p = chamado({ events: [automatico(XSS)] });
+      expect(desenhar(sb, p)).not.toContain(XSS);
+      sb.formatDateTime = (iso) => String(iso);
+      const ev = sb._penFeedItens(p).find((i) => i._evento);
+      const html = sb._penEventoHtml(ev);
+      expect(html).not.toContain(XSS);
+      expect(html).toContain('&lt;img src=x');
+    });
+  });
+
+  describe('Recebido e Visto no Andamento', () => {
+    const titulos = (p) => sb.chpAndamento(p).map((i) => i.titulo);
+    const item = (p, titulo) => sb.chpAndamento(p).find((i) => i.titulo === titulo);
+    const troca = (min, de, para) => ({ at: antes(min), by: 'Gestor', type: 'responsavel', de, para });
+
+    it('aberto já com responsável: Recebido no instante da abertura, logo depois de Aberto', () => {
+      const p = chamado({ responsible: 'Ana', events: [{ at: antes(600), by: '', type: 'criado', de: null, para: 'aberto' }], createdAt: antes(600) });
+      expect(titulos(p)).toEqual(['Chamado aberto', 'Recebido']);
+      expect(item(p, 'Recebido')).toMatchObject({ autor: 'Ana', at: antes(600) });
+    });
+
+    it('atribuído depois: Recebido na hora da atribuição, sem repetir como "Passou para"', () => {
+      const p = chamado({ responsible: 'Ana', events: [troca(300, null, 'Ana')] });
+      expect(item(p, 'Recebido')).toMatchObject({ autor: 'Ana', at: antes(300) });
+      expect(titulos(p).some((t) => t.indexOf('Passou para') === 0)).toBe(false);
+    });
+
+    it('transferências depois da chegada continuam como "Passou para"', () => {
+      const p = chamado({ responsible: 'Beto', events: [troca(300, '', 'Ana'), troca(100, 'Ana', 'Beto')] });
+      expect(item(p, 'Recebido').autor).toBe('Ana');
+      expect(titulos(p)).toContain('Passou para Beto');
+    });
+
+    it('aberto com Ana e transferido: quem recebeu foi Ana, na abertura', () => {
+      const p = chamado({ responsible: 'Beto', events: [troca(100, 'Ana', 'Beto')] });
+      expect(item(p, 'Recebido')).toMatchObject({ autor: 'Ana', at: antes(600) });
+    });
+
+    it('sem responsável ainda não tem Recebido', () => {
+      expect(titulos(chamado({ responsible: '' }))).not.toContain('Recebido');
+    });
+
+    it('Visto mostra quem viu, em ordem com o resto', () => {
+      const p = chamado({ responsible: 'Ana', events: [{ at: antes(200), by: 'Ana', by_id: 'OP-A', type: 'visto' }] });
+      expect(titulos(p)).toEqual(['Chamado aberto', 'Recebido', 'Visto']);
+      expect(item(p, 'Visto').autor).toBe('Ana');
+    });
+
+    it('Visto não entra na conversa: é marco do Andamento', () => {
+      const p = chamado({ responsible: 'Ana', events: [{ at: antes(200), by: 'Ana', type: 'visto' }] });
+      expect(desenhar(sb, p)).not.toContain('visualizou');
+    });
+
+    it('escapa o nome de quem recebeu e de quem viu', () => {
+      const p = chamado({ responsible: XSS, events: [{ at: antes(200), by: XSS, type: 'visto' }] });
+      const html = desenhar(sb, p);
+      expect(html).not.toContain(XSS);
+      expect(html).toContain('&lt;img src=x');
+    });
+  });
+
+  describe('marcar Visto ao abrir', () => {
+    let chamadas;
+    let cache;
+    let resposta;
+
+    beforeEach(() => {
+      chamadas = [];
+      cache = [chamado({ id: 'p1', responsible: 'Ana Atendente', status: 'aberto' })];
+      resposta = { data: { events: [{ at: '2026-10-30T15:00:00.000Z', by: 'Ana Atendente', by_id: 'OP-A', type: 'visto' }], updated_at: '2026-10-30T15:00:00Z' }, error: null };
+      sb.supabaseClient = { rpc: (nome, args) => { chamadas.push([nome, args]); return Promise.resolve(resposta); } };
+      sb.isSupabaseConnected = () => true;
+      sb._supabaseAuthActive = true;
+      sb.getPendencias = () => cache;
+      sb.DB = { PENDENCIAS: 'pendencias' };
+      sb.dbSet = (_k, lista) => { cache = lista; };
+      sb.isPendenciaClosed = (st) => ['resolvido', 'cancelado', 'concluido', 'fechado'].includes(st);
+    });
+
+    it('precisa marcar só quando o usuário é o responsável, o chamado está aberto e ainda não viu', () => {
+      const p = chamado({ responsible: 'Ana', status: 'aberto' });
+      expect(sb.chpPrecisaMarcarVisto(p, 'Ana')).toBe(true);
+      expect(sb.chpPrecisaMarcarVisto(p, 'Beto')).toBe(false);
+      expect(sb.chpPrecisaMarcarVisto({ ...p, status: 'resolvido' }, 'Ana')).toBe(false);
+      expect(sb.chpPrecisaMarcarVisto({ ...p, events: [{ type: 'visto', by: 'Ana' }] }, 'Ana')).toBe(false);
+    });
+
+    it('chama o banco uma vez por sessão e soma o evento no cache', async () => {
+      await sb.chpMarcarVisto(cache[0]);
+      expect(chamadas).toEqual([['marcar_chamado_visto', { p_id: 'p1' }]]);
+      expect(cache[0].events.map((e) => e.type)).toEqual(['visto']);
+      // Redesenho com o cache ainda sem o evento (sync atrasado) não chama de novo.
+      expect(sb.chpMarcarVisto({ ...cache[0], events: [] })).toBeNull();
+      expect(chamadas).toHaveLength(1);
+    });
+
+    it('quem só olha o chamado de outro não chama o banco', () => {
+      cache[0].responsible = 'Beto';
+      expect(sb.chpMarcarVisto(cache[0])).toBeNull();
+      expect(chamadas).toEqual([]);
+    });
+
+    it('offline não chama o banco', () => {
+      sb.isSupabaseConnected = () => false;
+      expect(sb.chpMarcarVisto(cache[0])).toBeNull();
+      expect(chamadas).toEqual([]);
+    });
+
+    it('banco sem a 079 (erro) não quebra nem mexe no cache', async () => {
+      resposta = { data: null, error: { message: 'function marcar_chamado_visto does not exist' } };
+      await sb.chpMarcarVisto(cache[0]);
+      expect(cache[0].events).toEqual([]);
+    });
+
+    it('banco disse que não gravou (null): o cache fica como está', async () => {
+      resposta = { data: null, error: null };
+      await sb.chpMarcarVisto(cache[0]);
+      expect(cache[0].events).toEqual([]);
+    });
+  });
+
   describe('fio da conversa', () => {
     it('tem a mensagem original como primeira bolha', () => {
       const p = chamado({
@@ -306,11 +441,41 @@ describe('chamado-pagina', () => {
       expect(desenhar(sb, chamado())).toContain('bia@cliente.com');
     });
 
-    it('não usa respostas prontas, Cancelar nem Assunto no composer', () => {
+    it('não tem Cancelar nem Assunto no composer', () => {
       const composer = sb.chpComposerHtml(chamado(), 'resposta');
-      expect(composer).not.toMatch(/respostas? prontas?/i);
       expect(composer).not.toContain('Cancelar');
       expect(composer).not.toContain('Assunto');
+    });
+
+    // Voltaram do detalhe antigo por decisão de produto: quem responde muito
+    // chamado parecido precisa do texto pronto e das variáveis na página também.
+    it('tem respostas prontas e variáveis, que escrevem no mesmo #newNoteText', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      expect(composer).toMatch(/data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false"/);
+      expect(composer).toContain('id="rpPainel"');
+      for (const v of ['nome', 'protocolo', 'atendente']) {
+        expect(composer).toContain('data-action="chdInserirVariavel" data-arg="' + v + '"');
+      }
+    });
+
+    it('o painel de respostas prontas não segue a troca de modo (abre só pelo botão)', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      expect(composer).toMatch(/<div class="rp-painel chp-rp" id="rpPainel" hidden><\/div>/);
+      expect(composer).not.toMatch(/id="rpPainel"[^>]*data-chp-so/);
+    });
+
+    it('envia de três jeitos: responder, pedir informação e encerrar', () => {
+      const composer = sb.chpComposerHtml(chamado(), 'resposta');
+      for (const acao of ['responder', 'pedir_info', 'encerrar']) {
+        expect(composer).toContain('data-action="chdResponder" data-arg="' + acao + '"');
+      }
+    });
+
+    it('sem canal não oferece nada que mande para fora', () => {
+      const composer = sb.chpComposerHtml(chamado({ solicitanteEmail: '' }), 'nota');
+      expect(composer).not.toContain('rpAbrir');
+      expect(composer).not.toContain('chdInserirVariavel');
+      expect(composer).not.toContain('data-action="chdResponder"');
     });
 
     it('avisa que o anexo fica só no chamado', () => {

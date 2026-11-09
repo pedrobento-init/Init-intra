@@ -791,7 +791,7 @@ function renderDashboard() {
   };
 
   const _operationalItems = typeof buildOperationalCenter === 'function'
-    ? buildOperationalCenter(visits, activePens, typeof _mstLoad === 'function' ? _mstLoad() : {}, new Date()) : [];
+    ? buildOperationalCenter(visits, allPens, typeof _mstLoad === 'function' ? _mstLoad() : {}, new Date()) : [];
   const _visitMetrics = typeof buildVisitMetrics === 'function' ? buildVisitMetrics(visits, today.slice(0, 7)) : null;
 
   document.getElementById('contentArea').innerHTML = `

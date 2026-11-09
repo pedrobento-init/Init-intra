@@ -18,6 +18,7 @@ const CHP_ICONES = {
   play: '<path d="M7 4.5v15l12-7.5Z"/>',
   pausa: '<path d="M8 5v14"/><path d="M16 5v14"/>',
   arquivo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>',
+  balao: '<path d="M21 12a8 8 0 0 1-8 8H4l2.5-3A8 8 0 1 1 21 12Z"/><path d="M8 10h8"/><path d="M8 14h5"/>',
 };
 
 function chpIcone(nome) {
@@ -141,7 +142,8 @@ function chpItensConversa(p, anexos) {
   feed.forEach((i) => {
     if (i._evento) {
       // A primeira bolha já conta a abertura; repetir como evento só faria ruído.
-      if (i.type !== 'criado') cronologicos.push({ tipo: 'evento', at: i.createdAt, evento: i });
+      // "Visto" fica no Andamento: na conversa seria uma linha a cada responsável.
+      if (i.type !== 'criado' && i.type !== 'visto') cronologicos.push({ tipo: 'evento', at: i.createdAt, evento: i });
       return;
     }
     cronologicos.push({ tipo: chpTipoNota(i), at: i.createdAt, nota: i, anexos: porNota.get(i) || [] });
@@ -176,6 +178,7 @@ function chpSeloPrazo(est) {
 function _chpTituloEvento(e) {
   const valor = _penValorLabel(e.type, e.para);
   if (e.type === 'criado') return 'Chamado aberto';
+  if (e.type === 'visto') return 'Visto';
   if (e.type === 'status') return 'Status: ' + valor;
   if (e.type === 'responsavel') return 'Passou para ' + valor;
   if (e.type === 'prioridade') return 'Prioridade: ' + valor;
@@ -183,13 +186,38 @@ function _chpTituloEvento(e) {
   return 'Alteração';
 }
 
+/**
+ * Quando e para quem o chamado chegou pela primeira vez (pura). null = ainda
+ * sem responsável. Não grava nada: sai de `responsible` + eventos 'responsavel'.
+ * O 1º evento com `de` vazio É a chegada; se o 1º já sai de alguém, esse alguém
+ * recebeu na abertura. `evento` aponta o item do fio que vira "Recebido", para
+ * não aparecer também como "Passou para".
+ */
+function chpRecebido(p) {
+  const trocas = (Array.isArray(p && p.events) ? p.events : [])
+    .filter((e) => e && e.type === 'responsavel')
+    .sort((a, b) => (_chpMs(a.at) || 0) - (_chpMs(b.at) || 0));
+  const vazio = (v) => v == null || String(v).trim() === '';
+  const primeira = trocas[0];
+  if (primeira && vazio(primeira.de)) {
+    return vazio(primeira.para) ? null : { quem: String(primeira.para), at: primeira.at, evento: primeira };
+  }
+  const naAbertura = primeira ? primeira.de : (p && p.responsible);
+  return vazio(naAbertura) ? null : { quem: String(naAbertura), at: p.createdAt, evento: null };
+}
+
 function chpAndamento(p) {
   const itens = [];
   let temAbertura = false;
+  const recebido = chpRecebido(p);
   _penFeedItens(p).forEach((i) => {
     if (i._evento) {
       if (i.type === 'criado') temAbertura = true;
-      itens.push({ titulo: _chpTituloEvento(i), autor: i.author || 'Sistema', at: i.createdAt });
+      // A chegada sai abaixo, uma vez só, com a data certa.
+      if (recebido && recebido.evento && i.type === 'responsavel' && i.createdAt === recebido.evento.at
+        && i.para === recebido.evento.para && !i.de) return;
+      const autor = i.author || 'Sistema';
+      itens.push({ titulo: _chpTituloEvento(i), autor: i.motivo ? autor + ' · ' + i.motivo : autor, at: i.createdAt });
       return;
     }
     const tipo = chpTipoNota(i);
@@ -201,7 +229,60 @@ function chpAndamento(p) {
   if (!temAbertura && p.createdAt) {
     itens.push({ titulo: 'Chamado aberto', autor: _chdNomeSolicitante(p), at: p.createdAt });
   }
+  // Depois da abertura no array: com o mesmo instante, a ordenação (estável) mantém Aberto antes de Recebido.
+  if (recebido) itens.push({ titulo: 'Recebido', autor: recebido.quem, at: recebido.at });
   return itens.sort((a, b) => (_chpMs(a.at) || 0) - (_chpMs(b.at) || 0));
+}
+
+// ---- Visto (migration 079) ---------------------------------------------------
+
+// Uma tentativa por chamado e pessoa nesta sessão: a página redesenha a cada sync,
+// e sem isto cada redesenho seria uma chamada ao banco.
+const _chpVistoTentado = new Set();
+
+/**
+ * O usuário é o responsável por um chamado aberto e ainda não tem "Visto" dele (pura).
+ * É só filtro para não chamar à toa: quem decide é o banco, pelo login.
+ */
+function chpPrecisaMarcarVisto(p, usuario) {
+  const nome = String(usuario || '').trim();
+  if (!p || !nome || String(p.responsible || '').trim() !== nome) return false;
+  if (typeof isPendenciaClosed === 'function' && isPendenciaClosed(p.status)) return false;
+  return !(Array.isArray(p.events) ? p.events : []).some((e) => e && e.type === 'visto' && e.by === nome);
+}
+
+/** Fire-and-forget: falhar aqui (offline, banco sem a 079) nunca atrapalha abrir o chamado. */
+function chpMarcarVisto(p) {
+  let nome = '';
+  try { nome = (typeof getUser === 'function' && getUser() && getUser().name) || ''; } catch (_) { nome = ''; }
+  if (!chpPrecisaMarcarVisto(p, nome)) return null;
+  const chave = p.id + '|' + nome;
+  if (_chpVistoTentado.has(chave)) return null;
+  if (typeof supabaseClient === 'undefined' || !supabaseClient
+    || typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()
+    || typeof window === 'undefined' || !window._supabaseAuthActive) return null;
+  _chpVistoTentado.add(chave);
+  return Promise.resolve(supabaseClient.rpc('marcar_chamado_visto', { p_id: p.id })).then((res) => {
+    if (res && res.error) {
+      if (typeof _logSilent === 'function') _logSilent(new Error(res.error.message || 'rpc'), 'chamado-pagina:visto');
+      return;
+    }
+    const r = res && res.data;
+    const evento = r && Array.isArray(r.events)
+      ? r.events.filter((e) => e && e.type === 'visto').pop()
+      : null;
+    if (!evento) return;
+    // Só soma o evento no cache. O updated_at novo chega pelo sync, que traz o
+    // registro inteiro; trocar o array aqui apagaria um evento local ainda não enviado.
+    const lista = getPendencias();
+    const i = lista.findIndex((x) => x.id === p.id);
+    if (i === -1) return;
+    const atuais = Array.isArray(lista[i].events) ? lista[i].events : [];
+    if (atuais.some((e) => e && e.type === 'visto' && e.at === evento.at && e.by === evento.by)) return;
+    lista[i] = { ...lista[i], events: atuais.concat([evento]) };
+    dbSet(DB.PENDENCIAS, lista);
+    if (typeof penPaginaEstaAberta === 'function' && penPaginaEstaAberta(p.id)) penPaginaAtualizar(p.id);
+  }).catch((e) => { if (typeof _logSilent === 'function') _logSilent(e, 'chamado-pagina:visto'); });
 }
 
 // ---- Anexos ------------------------------------------------------------------
@@ -362,11 +443,26 @@ function chpComposerHtml(p, modo) {
   const so = (qual) => ' data-chp-so="' + qual + '"' + ((qual === 'nota') === emNota ? '' : ' hidden');
   const canalTexto = canal === 'whatsapp' ? 'WhatsApp' : 'e-mail';
 
+  // Variáveis e respostas prontas vêm do detalhe antigo (chamado-detalhe.js e
+  // respostas-prontas.js), que já escrevem no #newNoteText: a página só desenha.
+  const variaveis = typeof CHAMADO_VARIAVEIS !== 'undefined' ? CHAMADO_VARIAVEIS : [];
+  const vars = variaveis.map((v) => '<button type="button" class="chd-var" data-action="chdInserirVariavel" data-arg="' + v + '"'
+    + ' title="Inserir {' + v + '}">{' + v + '}</button>').join('');
+  const ferramentas = '<div class="chp-ferramentas"' + so('resposta') + '>'
+    + '<button type="button" class="chp-ferramenta" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">'
+    + chpIcone('balao') + ' Respostas prontas</button>'
+    + (vars ? '<div class="chd-vars chp-vars" role="group" aria-label="Variáveis">' + vars + '</div>' : '')
+    + '</div>';
+
   // Sem canal a resposta não sai daqui: nem o campo existe, para não sugerir um envio impossível.
+  // O painel de respostas prontas não leva data-chp-so: ele abre e fecha pelo
+  // próprio botão, e a troca para anotação o fecha (_chpAplicarModo).
   const blocoResposta = canal
-    ? '<label class="chp-sr" for="newNoteText"' + so('resposta') + '>Resposta para ' + nome + '</label>'
+    ? '<div class="rp-painel chp-rp" id="rpPainel" hidden></div>'
+      + '<label class="chp-sr" for="newNoteText"' + so('resposta') + '>Resposta para ' + nome + '</label>'
       + '<textarea class="chp-campo" id="newNoteText" rows="3" data-pgp-rascunho="chp-resposta"'
       + ' placeholder="Escreva a resposta…"' + so('resposta') + '></textarea>'
+      + ferramentas
     : '<p class="chp-aviso">Sem e-mail nem WhatsApp de quem pediu: a resposta fica só no histórico do chamado.</p>';
 
   return '<div class="chp-composer" data-pgp-modo="' + (emNota ? 'nota' : 'resposta') + '">'
@@ -392,9 +488,16 @@ function chpComposerHtml(p, modo) {
     + chpIcone('clipe') + '</button>'
     + '<input type="file" id="chpAnexoInput" hidden data-change="chpAnexo" data-id="' + id + '">'
     + '<span class="chp-dica">Anexo fica só no chamado · Ctrl + Enter envia</span>'
+    // Os mesmos três envios do detalhe antigo: responder, responder e esperar o
+    // cliente (Aguard. Cliente) e responder encerrando (Resolvido).
     + (canal
-      ? '<button type="button" class="chp-btn chp-enviar" data-action="chdResponder" data-arg="responder" data-id="' + id + '"'
-        + so('resposta') + '>Enviar resposta</button>'
+      ? '<div class="chp-envio"' + so('resposta') + '>'
+        + '<button type="button" class="chp-btn" data-action="chdResponder" data-arg="pedir_info" data-id="' + id + '"'
+        + ' title="Envia e deixa o chamado aguardando o cliente">Pedir informação</button>'
+        + '<button type="button" class="chp-btn" data-action="chdResponder" data-arg="encerrar" data-id="' + id + '"'
+        + ' title="Envia e marca o chamado como resolvido">Enviar e encerrar</button>'
+        + '<button type="button" class="chp-btn chp-enviar" data-action="chdResponder" data-arg="responder" data-id="' + id + '">Enviar resposta</button>'
+        + '</div>'
       : '')
     + '<button type="button" class="chp-btn chp-salvar" data-action="chdNotaInterna" data-arg="' + id + '"'
     + so('nota') + '>Salvar anotação</button>'
@@ -592,6 +695,8 @@ function _chpAplicarModo(composer, modo) {
   composer.querySelectorAll('[data-chp-so]').forEach((el) => {
     el.hidden = el.dataset.chpSo !== modo;
   });
+  // Resposta pronta só entra na resposta ao cliente, nunca na anotação.
+  if (modo === 'nota' && typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
   const campo = composer.querySelector(modo === 'nota' ? '#chamadoNotaTexto' : '#newNoteText');
   if (campo) campo.focus();
 }
@@ -662,6 +767,9 @@ if (typeof module !== 'undefined' && module.exports) {
     chpModoInicial,
     chpSeloPrazo,
     chpAndamento,
+    chpRecebido,
+    chpPrecisaMarcarVisto,
+    chpMarcarVisto,
     chpDiaRotulo,
     chpComposerHtml,
   };

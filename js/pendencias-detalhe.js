@@ -336,7 +336,7 @@ function _penOrigemHtml(origem) {
 function _penFeedItens(p) {
   var notas = Array.isArray(p && p.notes) ? p.notes : [];
   var eventos = (Array.isArray(p && p.events) ? p.events : []).map(function(e) {
-    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para };
+    return { _evento: true, createdAt: e.at, author: e.by, type: e.type, de: e.de, para: e.para, motivo: e.motivo || '' };
   });
   return notas.concat(eventos).sort(function(a, b) {
     return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
@@ -364,14 +364,15 @@ const _PEN_EVENT_VERBO = {
   responsavel: 'passou para',
   prioridade: 'mudou a prioridade',
   prazo: 'mudou o prazo',
+  visto: 'visualizou o chamado',
 };
 
 /** Marcador discreto no meio do fio — não é balão de mensagem. */
 function _penEventoHtml(e) {
   var quem = e.author ? escapeHtml(e.author) : 'Sistema';
   var corpo;
-  if (e.type === 'criado') {
-    corpo = quem + ' ' + _PEN_EVENT_VERBO.criado;
+  if (e.type === 'criado' || e.type === 'visto') {
+    corpo = quem + ' ' + _PEN_EVENT_VERBO[e.type];
   } else if (e.type === 'responsavel') {
     corpo = quem + ' ' + _PEN_EVENT_VERBO.responsavel + ' <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
   } else {
@@ -379,6 +380,8 @@ function _penEventoHtml(e) {
       + ': <span class="pen-ev-de">' + escapeHtml(_penValorLabel(e.type, e.de)) + '</span>'
       + ' → <strong>' + escapeHtml(_penValorLabel(e.type, e.para)) + '</strong>';
   }
+  // Mudança automática (078) diz por quê; sem isso "Sistema mudou o status" parece defeito.
+  if (e.motivo) corpo += ' · ' + escapeHtml(e.motivo);
   return '<div class="pen-ev" role="note"><span class="pen-ev-txt">' + corpo
     + '</span><span class="pen-ev-at">' + formatDateTime(e.createdAt) + '</span></div>';
 }

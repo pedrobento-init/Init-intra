@@ -55,6 +55,7 @@ const STATIC_ASSETS = [
   'js/visit-signature.js',
   'js/visita-guiada.js',
   'js/ia-relatorio.js',
+  'js/passos.js',
   'js/templates.js',
   'js/global-search.js',
   'js/timer.js',

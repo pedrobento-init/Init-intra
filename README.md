@@ -17,6 +17,7 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 - **Busca global**: `Ctrl+K` para clientes, pendências e ações.
 - **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
 - **Celular**: os mesmos avisos como notificação (Web Push), ativados por aparelho em Configurar notificações.
+- **@menção**: quem é marcado numa nota recebe "Você foi mencionado" por e-mail e no celular, com link direto. Só vai para quem pode ver a pendência (Gestão só para Gestão; o resto para admin ou mesma equipe), nunca para quem escreveu.
 
 ## Como o trabalho anda
 
@@ -37,6 +38,21 @@ ou fica em silêncio além do limite.
 passar por Pausado, Aguard. Terceiro ou Aguard. Cliente, e terminando em
 Resolvido ou Cancelado. `concluido` e `fechado` saíram das opções, mas seguem
 sendo contados para não ressuscitar registro antigo.
+
+**O status de chamado também anda sozinho** (migration 078), sempre com evento
+"Sistema" e o motivo na linha do tempo, e sem mandar nada ao cliente:
+
+- responder um chamado Aberto ou Pausado passa para Em Andamento;
+- mensagem nova do cliente (e-mail ou WhatsApp) tira de Aguard. Cliente ou Pausado
+  e volta para Em Andamento;
+- 7 dias sem nota nem evento: Aguard. Cliente vira Resolvido, e Em Andamento vira
+  Pausado. Vale só para chamado (canal externo), nunca com o cronômetro ligado.
+
+**O Andamento mostra Recebido e Visto.** Recebido é a primeira atribuição (sai de
+`responsible` e dos eventos `responsavel`, sem gravar nada). Visto é a primeira vez que
+o responsável abre o chamado: a função `marcar_chamado_visto` (migration 079) grava o
+evento a partir do login, uma vez por pessoa. Abrir não conta como interação na regra
+de 7 dias.
 
 **O prazo sai da prioridade** (`js/sla.js`), em horas e dias **úteis**:
 
@@ -96,7 +112,7 @@ e2e/                  Testes de navegador (Playwright)
 | `ia-levar` | Sugere o que levar para a visita (IA). |
 | `update-user-password` | Admin troca a senha de um usuário. |
 | `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
-| `whatsapp` | Webhook de entrada do WhatsApp (hoje Z-API, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). Autentica por token na query. |
+| `whatsapp` | Webhook de entrada do WhatsApp (hoje Z-API, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). A 077 casa o cliente pelo telefone com índice e anexa a nota num UPDATE só; sem ela, o webhook volta ao caminho antigo. Limite de 30 mensagens por número por minuto. Autentica por token na query. |
 | `whatsapp-responder` | Operador responde pelo WhatsApp a um chamado que veio do WhatsApp. O número sai do próprio chamado (`email_thread_id = 'whatsapp:<dígitos>'`), nunca do app. Só operador ativo logado. |
 
 ## Desenvolvimento
@@ -117,7 +133,7 @@ Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 - **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
 - **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
 - **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
-  - **WhatsApp (Z-API)**: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN` (envio, no `whatsapp-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). No painel da Z-API, o webhook "Ao receber" aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
+  - **WhatsApp (Z-API)**: passo a passo completo, com número de teste, em [WHATSAPP.md](WHATSAPP.md). Resumo: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN` (envio, no `whatsapp-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). No painel da Z-API, o webhook "Ao receber" aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
 
 ## Ícones PWA
 

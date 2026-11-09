@@ -721,28 +721,35 @@ function renderClientFicha(clientId, el) {
 
 function renderClientTab(tab, id) {
   const el = document.getElementById('clientTabContent');
-  if (tab === 'ficha') {
+  if (tab === 'timeline') {
+    el.innerHTML = typeof clientTimelineHtml === 'function' ? clientTimelineHtml(id) : '<div class="empty-state"><p>Linha do tempo indisponível.</p></div>';
+  } else if (tab === 'ficha') {
     renderClientFicha(id, el);
   } else if (tab === 'procedimentos') {
     const procs = getProcedures(id);
+    const cid = escapeHtml(id);
     el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="openProcedureForm('${id}')">+ Novo Procedimento</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="procNew" data-arg="${cid}">+ Novo Procedimento</button>
       </div>
-      ${procs.length ? procs.map(p => `
-        <div class="proc-card" id="proc-${escapeHtml(p.id)}">
-          <div class="proc-card-header" role="button" tabindex="0" onclick="toggleProcCard('${escapeHtml(p.id)}')">
+      ${procs.length ? procs.map(p => {
+        const pid = escapeHtml(p.id);
+        return `
+        <div class="proc-card" id="proc-${pid}">
+          <div class="proc-card-header" role="button" tabindex="0" data-action="procToggle" data-arg="${pid}">
             <div style="flex:1;min-width:0">
               <div class="proc-card-title">${escapeHtml(p.title)}</div>
               ${p.category ? `<span class="tag tag-blue" style="margin-top:4px">${escapeHtml(p.category)}</span>` : ''}
             </div>
-            <div class="proc-actions" onclick="event.stopPropagation()">
-              <button class="btn btn-sm btn-secondary" onclick="duplicateProcedure('${escapeHtml(id)}','${escapeHtml(p.id)}')">Duplicar</button>
-              <button class="btn btn-sm btn-secondary" onclick="openProcedureForm('${escapeHtml(id)}','${escapeHtml(p.id)}')">Editar</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteProcedureConfirm('${escapeHtml(p.id)}','${escapeHtml(id)}')">✕</button>
+            <div class="proc-actions">
+              <button type="button" class="btn btn-sm btn-primary" data-action="psRun" data-kind="proc" data-arg="${pid}" title="Seguir o passo a passo marcando cada etapa">Executar</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-action="procDup" data-client="${cid}" data-arg="${pid}">Duplicar</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-action="procEdit" data-client="${cid}" data-arg="${pid}">Editar</button>
+              <button type="button" class="btn btn-sm btn-danger" data-action="procDelete" data-client="${cid}" data-arg="${pid}" aria-label="Excluir procedimento">✕</button>
             </div>
           </div>
-          <pre class="proc-content">${escapeHtml(p.content)}</pre>
-        </div>`).join('') : `<div class="empty-state"><p>Nenhum procedimento cadastrado</p></div>`}`;
+          <div class="proc-content ps-proc-content">${typeof procReadHtml === 'function' ? procReadHtml(p.content) : escapeHtml(p.content)}</div>
+        </div>`;
+      }).join('') : `<div class="empty-state"><p>Nenhum procedimento cadastrado</p></div>`}`;
   } else if (tab === 'documentos') {
     el.innerHTML = `
       <div class="attachment-section" style="margin-top:0">

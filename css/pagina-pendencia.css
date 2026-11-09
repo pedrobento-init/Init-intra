@@ -31,11 +31,16 @@
   --pgp-radius-tag: 6px;
   --pgp-control-height: 38px;
   --pgp-target-min: 40px;
+  /* Espaço único entre blocos (cabeçalho, colunas, cards) nas duas telas. */
+  --pgp-gap: var(--space-5);
 
-  background: var(--pgp-bg);
+  /* Sem fundo próprio: no escuro --pgp-bg é outro azul que o da página, e o
+     retângulo acabava logo abaixo do último card, cortando a tela ao meio. */
   color: var(--pgp-text);
   font-family: 'Manrope', var(--font-sans, system-ui, sans-serif);
   min-width: 0;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 body.dark-theme .pgp {
