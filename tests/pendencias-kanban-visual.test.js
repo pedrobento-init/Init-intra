@@ -14,6 +14,7 @@ const _dummyEl = {
 };
 const sandbox = {
   console,
+  URL,
   window: { addEventListener() {}, location: { hash: '#pendencias' } },
   navigator: { onLine: true },
   document: {
@@ -116,6 +117,14 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
     expect(html).toContain('class="kc-av"');
     expect(html).toContain('>GR<');
     expect(html).toMatch(/kc-client-name[^>]*>Galvão e Raça/);
+  });
+
+  it('usa a logo cadastrada quando o cliente tem imagem', () => {
+    vm.runInContext('getClientById = () => ({ id: "c1", name: "Acme", logo: "https://cdn.exemplo/acme.png" });', sandbox);
+    const html = T.penKanbanCard(basePen());
+    expect(html).toContain('<img src="https://cdn.exemplo/acme.png"');
+    expect(html).toContain('alt="Acme"');
+    vm.runInContext('delete getClientById;', sandbox);
   });
 
   it('pill de prioridade na cor certa (Crítica=red, Baixa=green)', () => {

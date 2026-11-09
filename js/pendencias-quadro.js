@@ -369,6 +369,9 @@ function penTimerCell(p) {
 function penKanbanCard(p) {
   var c = _penRenderClient(p.clientId);
   var clientName = p.clientName || (c && c.name) || '—';
+  var clientAvatarHtml = c && typeof clientAvatar === 'function'
+    ? clientAvatar(c, 22)
+    : '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>';
   var isOverdue = penIsOverdue(p);
   // "Parada" (sem atualização há 7+ dias) contradiz um cronômetro rodando;
   // nesse caso o alerta certo é o de cronômetro esquecido, no rodapé.
@@ -425,7 +428,7 @@ function penKanbanCard(p) {
       ' onclick="openPenQuickMenu(event,\'' + escapeHtml(p.id) + '\')" ondragstart="event.preventDefault()">' + PEN_ICO_DOTS + '</button>' +
     '<div class="kanban-card-meta">' +
       '<span class="kc-client" title="' + escapeHtml(clientName) + '">' +
-        '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>' +
+        clientAvatarHtml +
         '<span class="kc-client-name">' + escapeHtml(clientName) + '</span>' +
       '</span>' +
       '<span class="kb-pill" style="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
