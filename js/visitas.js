@@ -393,7 +393,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
         <textarea class="form-textarea" name="observacoes" rows="2" placeholder="Orientações prévias, localização, contato local...">${escapeHtml(v.observacoes || '')}</textarea></div>
       ${typeof levarFormHtml === 'function' ? levarFormHtml(v) : ''}
 
-      <div class="form-group" style="margin-top:12px;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
+      <div class="form-group" style="margin-top:var(--space-5);padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
         <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);font-weight:700">
           <span>Relatório de Atendimento (O que foi feito na visita)</span>
           <span style="font-size:11px;font-weight:400;color:var(--text-muted)">Preenchimento após/durante a visita</span>
@@ -401,7 +401,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
         <textarea class="form-textarea" name="relatorio" rows="4" placeholder="Descreva em detalhes o serviço realizado, equipamentos testados, soluções aplicadas ou observações de conclusão...">${escapeHtml(v.relatorio || '')}</textarea>
       </div>
 
-      <div class="form-row" style="margin-top:12px">
+      <div class="form-row" style="margin-top:var(--space-5)">
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" name="status">
             ${Object.entries(VISIT_STATUS_MAP).map(([k,m]) => `<option value="${k}" ${(v.status||'agendada')===k?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
@@ -553,7 +553,7 @@ function openVisitDetail(id) {
     ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações prévias</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
     ${typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : ''}
 
-    <div class="form-group" style="margin-top:16px">
+    <div class="form-group" style="margin-top:var(--space-5)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <label class="form-label" style="margin:0;font-weight:700;display:flex;align-items:center;gap:6px;font-size:13px;color:#16a34a">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -576,10 +576,10 @@ function openVisitDetail(id) {
 
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
-      if (!linked.length) return `<div style="margin-top:16px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
-      return `<div style="margin-top:16px"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">Abrir</button></div>`).join('')}</div></div>`;
+      if (!linked.length) return `<div style="margin-top:var(--space-5);padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
+      return `<div style="margin-top:var(--space-5)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">Abrir</button></div>`).join('')}</div></div>`;
     })()}
-    <div class="form-group" style="margin-top:16px"><label class="form-label">Alterar status</label>
+    <div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select class="form-select" id="chgVisitStatus" style="width:180px">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}

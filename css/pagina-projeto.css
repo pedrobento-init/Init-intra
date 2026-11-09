@@ -86,7 +86,7 @@
 }
 
 .pgp-projeto .prj-topo .pgp-label {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
 }
 
 .pgp-projeto .prj-topo .pgp-select {
@@ -410,9 +410,9 @@
 
 .pgp-projeto .prj-etapa-form {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--pgp-border);
 }
 
@@ -420,7 +420,7 @@
 
 .pgp-projeto .prj-composer-rotulo {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-2);
   color: var(--pgp-muted);
   font-size: 13px;
   line-height: 1.5;
@@ -440,7 +440,7 @@
 .pgp-projeto .prj-composer-acoes {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  margin-top: var(--space-5);
 }
 
 .pgp-projeto .prj-feed {
@@ -515,8 +515,8 @@
 }
 
 .pgp-projeto .prj-meta {
-  margin-bottom: 18px;
-  padding-bottom: 18px;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--pgp-border);
 }
 
