@@ -46,6 +46,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.avisos-prazo]
 verify_jwt = false
+[functions.relatorio-visitas-mensal]
+verify_jwt = false
 [functions.agenda-ics]
 verify_jwt = false
 # O webhook da Z-API (whatsapp) se autentica por token na query (WHATSAPP_WEBHOOK_TOKEN): a Z-API não assina nem manda header próprio.

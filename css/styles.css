@@ -3805,6 +3805,59 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
   white-space: normal !important;
   line-height: 1.3;
 }
+/* Na semana, o harness controla posição e altura. O conteúdo precisa ocupar
+   esse espaço sem margens externas, que antes vazavam sobre o evento vizinho. */
+#calendarContainer .fc .fc-timegrid-event {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+#calendarContainer .fc .fc-timegrid-event .fc-event-main {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#calendarContainer .fc .fc-timegrid-event .ag-chip {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 6px;
+  align-items: flex-start;
+  border-radius: 4px;
+  background: inherit;
+  border-color: transparent;
+  border-left-color: var(--dot,#666);
+  color: #fff;
+  overflow: hidden;
+}
+#calendarContainer .fc .fc-timegrid-event .ag-chip::before {
+  flex: 0 0 5px;
+  width: 5px;
+  height: 5px;
+  margin-top: 4px;
+  background: currentColor;
+}
+#calendarContainer .fc .fc-timegrid-event .ag-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+#calendarContainer .fc .fc-timegrid-event-short .ag-chip {
+  padding-top: 2px;
+  padding-bottom: 2px;
+  align-items: center;
+}
+#calendarContainer .fc .fc-timegrid-event-short .ag-chip span {
+  white-space: nowrap;
+}
 .fc-visit-content {
   display: flex !important;
   align-items: center;
@@ -7730,4 +7783,32 @@ body.dark-theme .pen-board .kanban-col.drag-over {
 }
 @media (prefers-reduced-motion: reduce) {
   .psr-bar span, .psr-step, .pse-step { transition: none; }
+}
+
+/* ── Agenda: resumo acolhedor do dia ── */
+.cal-day-summary { display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-4px 0 18px;color:var(--text-muted);font-size:12px; }
+.cal-day-summary span:first-child { color:var(--accent);background:var(--accent-dim,rgba(59,130,246,.12));padding:5px 10px;border-radius:999px;font-weight:700; }
+.cal-day-events { max-height:52vh;overflow-y:auto; }
+.cal-day-empty { display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 20px 30px;border:1px dashed var(--border);border-radius:12px;background:var(--bg-base); }
+.cal-day-empty-icon { display:grid;place-items:center;width:40px;height:40px;margin-bottom:12px;border-radius:50%;background:var(--accent-dim,rgba(59,130,246,.12));color:var(--accent);font-size:24px;font-weight:400; }
+.cal-day-empty strong { font-size:14px;color:var(--text-primary); }
+.cal-day-empty p { max-width:260px;margin:6px 0 0;font-size:12.5px;line-height:1.5;color:var(--text-muted); }
+.cal-day-section { display:flex;align-items:center;gap:7px;margin:16px 2px 8px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em; }
+.cal-day-section span { display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--bg-hover);font-size:10px; }
+.cal-day-card { display:flex;align-items:center;gap:10px;padding:12px;margin-bottom:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg-base);cursor:pointer;transition:border-color .15s,transform .15s; }
+.cal-day-card:hover,.cal-day-card:focus-visible { border-color:var(--accent);transform:translateY(-1px);outline:none; }
+.cal-day-card-main { flex:1;min-width:0; }
+.cal-day-card-title { font-size:13px;font-weight:600;color:var(--text-primary); }
+.cal-day-card-meta { margin-top:3px;font-size:11.5px;line-height:1.4;color:var(--text-muted); }
+.cal-day-card-tags { display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end; }
+.cal-day-actions { display:flex;flex-direction:column;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border); }
+.cal-day-create { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.cal-day-create .btn { min-width:0;white-space:normal; }
+.cal-day-visit-btn { background:#0ea5e9;border-color:#0ea5e9;color:#fff; }
+.cal-day-visit-btn:hover { background:#0284c7;border-color:#0284c7; }
+@media screen and (max-width:480px) {
+  .cal-day-create { grid-template-columns:1fr; }
+  .cal-day-card { align-items:flex-start;flex-wrap:wrap; }
+  .cal-day-card-main { flex-basis:calc(100% - 44px); }
+  .cal-day-card-tags { margin-left:42px;justify-content:flex-start; }
 }
