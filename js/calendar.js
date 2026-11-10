@@ -421,39 +421,48 @@ function mapVisitsToEvents(visits) {
 }
 
 // ── Bottom-sheet do dia ─────────────────────────────────────────────────────
+function calendarDayTitle(dateStr) {
+  const date = new Date(dateStr + 'T12:00:00Z');
+  if (isNaN(date.getTime())) return formatDate(dateStr);
+  const label = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+  }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function openCalendarDaySheet(dateStr, hora = '') {
   if (!/^\d{2}:\d{2}$/.test(hora)) hora = '';
   const type = document.getElementById('calType')?.value || 'all';
   const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
   const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
   const total = allPens.length + allVisits.length;
-  const title = formatDate(dateStr) + (total ? ` — ${total} ${total === 1 ? 'evento' : 'eventos'}` : ' — sem eventos');
 
-  let html = `<div style="max-height:60vh;overflow-y:auto">`;
+  let html = `<div class="cal-day-summary"><span>${total ? `${total} ${total === 1 ? 'compromisso' : 'compromissos'}` : 'Agenda livre'}</span><span>${escapeHtml(formatDate(dateStr))}</span></div>`;
+  html += `<div class="cal-day-events">`;
   if (!total) {
-    html += `<p style="font-size:13px;color:var(--text-muted);padding:12px;text-align:center">Nenhum evento neste dia.</p>`;
+    html += `<div class="cal-day-empty"><span class="cal-day-empty-icon" aria-hidden="true">+</span><strong>Nada agendado por aqui</strong><p>Aproveite o dia livre ou inclua um novo compromisso.</p></div>`;
   } else {
     if (allVisits.length) {
-      html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Visitas (${allVisits.length})</div>`;
+      html += `<div class="cal-day-section">Visitas <span>${allVisits.length}</span></div>`;
       html += allVisits.map(v => {
         const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
-        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" role="button" tabindex="0" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
-          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${escapeHtml(v.clientName||'—')}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
+        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
+          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(v.clientName||'—')}</div><div class="cal-day-card-meta">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
       }).join('');
     }
     if (allPens.length) {
-      html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin:8px 0 6px">Pendências (${allPens.length})</div>`;
+      html += `<div class="cal-day-section">Pendências <span>${allPens.length}</span></div>`;
       html += allPens.map(p => {
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" role="button" tabindex="0" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
-          ${c ? clientAvatar(c, 24) : ''}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div style="display:flex;gap:4px">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
+        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
+          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(getPendenciaTitulo(p))}</div><div class="cal-day-card-meta">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div class="cal-day-card-tags">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
       }).join('');
     }
   }
   html += `</div>`;
-  html += `<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><button class="btn btn-primary btn-sm" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Pendência em ${escapeHtml(dateStr)}</button><button class="btn btn-secondary btn-sm" style="background:#0ea5e9;border-color:#0ea5e9;color:#fff" onclick="closeModal();openVisitForm(null,null,'${escapeHtml(dateStr)}','${hora}')">+ Visita em ${escapeHtml(dateStr)}${hora ? ' às ' + hora : ''}</button><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="closeModal()">Fechar</button></div>`;
+  html += `<div class="cal-day-actions"><div class="cal-day-create"><button class="btn btn-primary" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Nova pendência</button><button class="btn cal-day-visit-btn" onclick="closeModal();openVisitForm(null,null,'${escapeHtml(dateStr)}','${hora}')">+ Agendar visita${hora ? ' às ' + escapeHtml(hora) : ''}</button></div><button class="btn btn-secondary" onclick="closeModal()">Fechar</button></div>`;
 
-  openModal(title, html, 'sm');
+  openModal(calendarDayTitle(dateStr), html, 'sm');
   // Acessibilidade: bottom-sheet em mobile
   const modal = document.getElementById('modal');
   if (window.innerWidth <= 768) {

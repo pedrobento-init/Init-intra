@@ -47,7 +47,7 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/calendar.js', 'utf8'), sandbox, { filename: 'calendar.js' });
   vm.runInContext(
-    'globalThis.__t = { calendarPageTitle, agFcView, agDefaultView, agSetView, toggleCalFilters, closeCalFilters, initFullCalendar, agDayMonth, agOverdueItems, agNext7Items, agRecurringGroups, agChipHtml };',
+    'globalThis.__t = { calendarPageTitle, calendarDayTitle, agFcView, agDefaultView, agSetView, toggleCalFilters, closeCalFilters, initFullCalendar, agDayMonth, agOverdueItems, agNext7Items, agRecurringGroups, agChipHtml };',
     sandbox
   );
 } finally {
@@ -65,6 +65,11 @@ beforeEach(() => {
 describe('título da página', () => {
   it('é "Agenda"', () => {
     expect(T.calendarPageTitle()).toBe('Agenda');
+  });
+
+  it('apresenta a data do modal por extenso e sem mudar de dia pelo fuso', () => {
+    expect(T.calendarDayTitle('2026-11-08')).toBe('Domingo, 8 de novembro');
+    expect(T.calendarDayTitle('2027-01-01')).toBe('Sexta-feira, 1 de janeiro');
   });
 });
 
@@ -264,6 +269,13 @@ describe('contrato mobile no CSS', () => {
     expect(norm).toContain('.ag-side');
     expect(norm).toContain('.plist');
     expect(norm).toContain('.ag-card .badge.vencida');
+  });
+
+  it('eventos da semana respeitam a altura e não vazam sobre os vizinhos', () => {
+    expect(norm).toMatch(/\.fc-timegrid-event\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/);
+    expect(norm).toMatch(/\.fc-timegrid-event \.ag-chip\s*\{[^}]*height:\s*100%[^}]*margin:\s*0[^}]*overflow:\s*hidden/);
+    expect(norm).toMatch(/\.fc-timegrid-event \.ag-chip span\s*\{[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*anywhere/);
+    expect(norm).toMatch(/\.fc-timegrid-event-short \.ag-chip span\s*\{[^}]*white-space:\s*nowrap/);
   });
 
   it('index.html carrega Manrope (títulos da Agenda)', () => {
