@@ -6156,6 +6156,17 @@ body.dark-theme #penSlaSummary {
   color: var(--kb-green); font-weight: 700; font-size: 12.5px;
   font-variant-numeric: tabular-nums; flex: none; white-space: nowrap;
 }
+/* Pause no card: círculo âmbar (parar ≠ começar) ao lado do tempo correndo. */
+.pen-board .kb-play.kb-pause {
+  background: color-mix(in srgb, var(--kb-amber) 16%, transparent); color: var(--kb-amber);
+}
+.pen-board .kb-go:hover .kb-play.kb-pause {
+  background: color-mix(in srgb, var(--kb-amber) 26%, transparent);
+}
+/* Cronômetro de outro operador: cadeado explica por que o card não tem ação. */
+.pen-board .kb-timer-busy { display: inline-flex; align-items: center; gap: 5px; flex: none; color: var(--kb-muted); }
+.pen-board .kb-lock { display: inline-flex; }
+.pen-board .kb-lock .kb-ico { width: 12px; height: 12px; }
 
 /* ── Drag & drop ── */
 .pen-board .kanban-col.drag-over {

@@ -65,6 +65,61 @@ function timerClosedSessionNote(operator, sessionSeconds, totalSeconds) {
 }
 
 /**
+ * Nota de sessão pausada por movimentação manual de status (arrastar para
+ * Pausado, menu ⋯, select do detalhe) — espelha a nota do botão ⏸.
+ */
+function timerPausedSessionNote(operator, sessionSeconds, totalSeconds, moverName) {
+  const me = moverName || operator || 'Operador';
+  return {
+    text: `⏸ Cronômetro de ${operator || me} pausado ao mover para Pausado. Sessão registrada: ${formatTimer(sessionSeconds)}. Total: ${formatTimer(totalSeconds)}.`,
+    author: me,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Reação do cronômetro a uma mudança de status feita POR FORA do botão
+ * (arrastar no quadro, menu ⋯ do card, select do detalhe). Antes, só o ⏸ do
+ * timer pausava e só o select do detalhe encerrava: arrastar para Pausado ou
+ * Resolvido deixava o cronômetro rodando fantasma na coluna nova.
+ * Retorna null quando nada muda; senão { elapsed, total, operator, closed }.
+ * O chamador grava os campos na cópia e chama recordTimeSession.
+ */
+function timerSessionStopForStatus(cur, newStatus) {
+  if (!cur || !cur.timerRunning) return null;
+  const closed = _isTimerClosedStatus(newStatus);
+  if (!closed && newStatus !== 'pausado') return null;
+  const elapsed = cur.timerStartedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(cur.timerStartedAt).getTime()) / 1000))
+    : 0;
+  return {
+    elapsed,
+    total: (Number(cur.timerTotalSeconds) || 0) + elapsed,
+    operator: cur.timerOperator || '',
+    closed,
+  };
+}
+
+/**
+ * Aplica o retorno de timerSessionStopForStatus na cópia da pendência:
+ * zera a sessão, soma o total e anexa a nota de encerramento/pausa.
+ */
+function timerApplyStopOnStatus(cur, next, stop) {
+  next.timerTotalSeconds = stop.total;
+  next.timerRunning = false;
+  next.timerStartedAt = null;
+  next.timerOperator = null;
+  const me = (typeof getUser === 'function' && getUser() && getUser().name) || stop.operator || 'Operador';
+  const note = stop.closed
+    ? timerClosedSessionNote(stop.operator, stop.elapsed, stop.total)
+    : timerPausedSessionNote(stop.operator, stop.elapsed, stop.total, me);
+  next.notes = [...(cur.notes || []), note];
+  if (typeof recordTimeSession === 'function') {
+    recordTimeSession(cur, stop.elapsed, { source: stop.closed ? 'conclusao' : 'timer', operatorName: stop.operator });
+  }
+}
+
+/**
  * Versão curta para cards: até 24h igual a formatTimer; acima disso "8d 21h"
  * ("213:06:51" não se lê de relance).
  */

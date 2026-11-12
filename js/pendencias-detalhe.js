@@ -232,20 +232,11 @@ function changePenStatus(id) {
   // Cópia destacada (ver onPenKanbanDrop): preserva a detecção de transição
   // que gera a próxima ocorrência recorrente em savePendencia.
   const next = { ...p, status: newStatus };
-  // Auto-stop: concluir/cancelar/fechar com timer rodando congela o tempo
-  // acumulado em vez de deixar o cronômetro fantasma acumulando.
+  // Mesma regra do quadro e do botão ⏸: Pausado pausa o cronômetro;
+  // concluir/cancelar/fechar encerra a sessão — sem cronômetro fantasma.
   try {
-    var _closed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(newStatus) : ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(newStatus || '');
-    if (_closed && p.timerRunning) {
-      var _el = 0;
-      if (p.timerStartedAt) { _el = Math.max(0, Math.floor((Date.now() - new Date(p.timerStartedAt).getTime()) / 1000)); }
-      next.timerTotalSeconds = (Number(p.timerTotalSeconds) || 0) + _el;
-      if (typeof timerClosedSessionNote === 'function') next.notes = [...(p.notes || []), timerClosedSessionNote(p.timerOperator, _el, next.timerTotalSeconds)];
-      if (typeof recordTimeSession === 'function') recordTimeSession(p, _el, { source: 'conclusao' });
-      next.timerRunning = false;
-      next.timerStartedAt = null;
-      next.timerOperator = null;
-    }
+    var _stop = (typeof timerSessionStopForStatus === 'function') ? timerSessionStopForStatus(p, newStatus) : null;
+    if (_stop) timerApplyStopOnStatus(p, next, _stop);
   } catch (_) {}
   savePendencia(next);
   _optimisticPenUpsert(next); // reflete na lista na hora; o fetch reconcilia depois

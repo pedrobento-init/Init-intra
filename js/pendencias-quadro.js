@@ -357,11 +357,24 @@ function penTimerCell(p) {
         ' aria-label="Cronômetro ligado há ' + escapeHtml(ago) + '. Parar e ajustar tempo">' +
         PEN_ICO_WARN + display + agoHtml + '</button>';
     }
-    return display;
+    if (!running) return display; // concluída: só o tempo acumulado
+    // Cronômetro rodando: o card precisa oferecer o pause aqui mesmo — antes
+    // só a página/modal do chamado tinha o ⏸, e quem deu play pelo quadro
+    // ficava sem como parar.
+    var isMe = false;
+    try { if (typeof isCurrentWorker === 'function') isMe = isCurrentWorker(p); } catch (_) {}
+    if (isMe) {
+      return '<button type="button" class="kb-go kb-pause-btn" data-action="penTimerToggle" data-arg="' + escapeHtml(p.id) + '"' +
+        ' title="Pausar trabalho (a pendência vai para Pausado)" aria-label="Pausar cronômetro de ' + escapeHtml(penDisplayNumber(p)) + '">' +
+        '<span class="kb-play kb-pause" aria-hidden="true">' + PEN_ICO_PAUSE + '</span>' + display + '</button>';
+    }
+    // De outro operador: sem ação no card — o cadeado explica o porquê.
+    return '<span class="kb-timer-busy" title="' + escapeHtml(worker || 'Outro operador') + ' está trabalhando neste item">' +
+      '<span class="kb-lock" aria-hidden="true">' + PEN_ICO_LOCK + '</span>' + display + '</span>';
   }
   if (closed) return '';
   var label = 'Iniciar cronômetro de ' + penDisplayNumber(p);
-  return '<button class="kb-go" type="button" onclick="event.stopPropagation();toggleTimer(\'pendencia\',\'' + escapeHtml(p.id) + '\',this)"' +
+  return '<button class="kb-go" type="button" data-action="penTimerToggle" data-arg="' + escapeHtml(p.id) + '"' +
     ' aria-label="' + escapeHtml(label) + '">' +
     '<span class="kb-play" aria-hidden="true">' + PEN_ICO_PLAY + '</span>Iniciar</button>';
 }
@@ -558,6 +571,9 @@ function _bindPenBoardDrag() {
 if (typeof registerActions === 'function') {
   registerActions({
     penColSort: (_el, colId) => cyclePenColSort(colId),
+    // Play/pause do rodapé do card: o closest() da delegação pega o botão,
+    // então o clique nunca abre o detalhe do card por acidente.
+    penTimerToggle: (el, id) => { if (typeof toggleTimer === 'function') toggleTimer('pendencia', id, el); },
   });
 }
 
@@ -571,6 +587,13 @@ function penMoveTo(id, colId, opts) {
   // mutá-la antes do save cegaria a detecção de transição (oldStatus) que
   // gera a próxima ocorrência recorrente em savePendencia.
   var next = { ...p, status: colId };
+  // Mover o card também acerta o cronômetro: Pausado pausa, Resolvido/
+  // Cancelado encerra — a mesma regra do botão ⏸ e do select do detalhe.
+  // Sem isto, arrastar deixava o cronômetro rodando fantasma na coluna nova.
+  try {
+    var stop = (typeof timerSessionStopForStatus === 'function') ? timerSessionStopForStatus(p, colId) : null;
+    if (stop) timerApplyStopOnStatus(p, next, stop);
+  } catch (_) {}
   savePendencia(next);
   _optimisticPenUpsert(next); // move o card na hora; o fetch reconcilia depois
   updateBadges();

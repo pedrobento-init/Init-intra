@@ -146,6 +146,44 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
     expect(html).toContain('Iniciar');
     expect(html).toContain('kb-play');
   });
+
+  it('meu cronômetro rodando: o card oferece o pause, não só o tempo', () => {
+    vm.runInContext(`
+      isCurrentWorker = () => true;
+      getCurrentWorker = () => 'Felipe';
+      getElapsedSeconds = () => 3661;
+      formatTimerCompact = () => '01:01:01';
+    `, sandbox);
+    try {
+      const html = T.penKanbanCard(basePen({ timerRunning: true, timerOperator: 'Felipe', timerStartedAt: new Date().toISOString() }));
+      expect(html).toContain('kb-pause-btn');
+      expect(html).toContain('kb-pause');
+      expect(html).toContain('data-action="penTimerToggle" data-arg="PEN-1"');
+      expect(html).toContain('Pausar');
+      expect(html).not.toContain('kb-timer-busy');
+    } finally {
+      vm.runInContext('delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;', sandbox);
+    }
+  });
+
+  it('cronômetro de outro operador: cadeado explica a falta de ação', () => {
+    vm.runInContext(`
+      isCurrentWorker = () => false;
+      getCurrentWorker = () => 'Joarli';
+      getElapsedSeconds = () => 3661;
+      formatTimerCompact = () => '01:01:01';
+    `, sandbox);
+    try {
+      const html = T.penKanbanCard(basePen({ timerRunning: true, timerOperator: 'Joarli', timerStartedAt: new Date().toISOString() }));
+      expect(html).toContain('kb-timer-busy');
+      expect(html).toContain('kb-lock');
+      expect(html).toContain('Joarli está trabalhando');
+      expect(html).not.toContain('kb-pause-btn');
+      expect(html).not.toContain('toggleTimer');
+    } finally {
+      vm.runInContext('delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;', sandbox);
+    }
+  });
 });
 
 describe('card do quadro: abrir pelo teclado', () => {
