@@ -64,14 +64,19 @@ function timerClosedSessionNote(operator, sessionSeconds, totalSeconds) {
   };
 }
 
+// Status em que a pendência espera alguém (pausado pelo operador, ou aguardando
+// cliente/terceiro): quem está ali não está trabalhando, então qualquer
+// movimentação para eles pausa o cronômetro.
+const TIMER_PAUSE_STATUSES = ['pausado', 'aguardando', 'aguardando_cliente'];
+
 /**
- * Nota de sessão pausada por movimentação manual de status (arrastar para
- * Pausado, menu ⋯, select do detalhe) — espelha a nota do botão ⏸.
+ * Nota de sessão pausada por movimentação manual de status (arrastar no
+ * quadro, menu ⋯, select do detalhe) — espelha a nota do botão ⏸.
  */
-function timerPausedSessionNote(operator, sessionSeconds, totalSeconds, moverName) {
+function timerPausedSessionNote(operator, sessionSeconds, totalSeconds, moverName, destLabel) {
   const me = moverName || operator || 'Operador';
   return {
-    text: `⏸ Cronômetro de ${operator || me} pausado ao mover para Pausado. Sessão registrada: ${formatTimer(sessionSeconds)}. Total: ${formatTimer(totalSeconds)}.`,
+    text: `⏸ Cronômetro de ${operator || me} pausado ao mover para ${destLabel || 'Pausado'}. Sessão registrada: ${formatTimer(sessionSeconds)}. Total: ${formatTimer(totalSeconds)}.`,
     author: me,
     createdAt: new Date().toISOString(),
   };
@@ -80,23 +85,28 @@ function timerPausedSessionNote(operator, sessionSeconds, totalSeconds, moverNam
 /**
  * Reação do cronômetro a uma mudança de status feita POR FORA do botão
  * (arrastar no quadro, menu ⋯ do card, select do detalhe). Antes, só o ⏸ do
- * timer pausava e só o select do detalhe encerrava: arrastar para Pausado ou
- * Resolvido deixava o cronômetro rodando fantasma na coluna nova.
+ * timer pausava e só o select do detalhe encerrava: arrastar para Pausado,
+ * Aguardando ou Resolvido deixava o cronômetro rodando fantasma na coluna nova.
  * Retorna null quando nada muda; senão { elapsed, total, operator, closed }.
  * O chamador grava os campos na cópia e chama recordTimeSession.
  */
 function timerSessionStopForStatus(cur, newStatus) {
   if (!cur || !cur.timerRunning) return null;
   const closed = _isTimerClosedStatus(newStatus);
-  if (!closed && newStatus !== 'pausado') return null;
+  if (!closed && TIMER_PAUSE_STATUSES.indexOf(newStatus) === -1) return null;
   const elapsed = cur.timerStartedAt
     ? Math.max(0, Math.floor((Date.now() - new Date(cur.timerStartedAt).getTime()) / 1000))
     : 0;
+  let destLabel = newStatus;
+  try {
+    if (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[newStatus]) destLabel = STATUS_PEN_MAP[newStatus].label;
+  } catch (_) {}
   return {
     elapsed,
     total: (Number(cur.timerTotalSeconds) || 0) + elapsed,
     operator: cur.timerOperator || '',
     closed,
+    destLabel,
   };
 }
 
@@ -112,7 +122,7 @@ function timerApplyStopOnStatus(cur, next, stop) {
   const me = (typeof getUser === 'function' && getUser() && getUser().name) || stop.operator || 'Operador';
   const note = stop.closed
     ? timerClosedSessionNote(stop.operator, stop.elapsed, stop.total)
-    : timerPausedSessionNote(stop.operator, stop.elapsed, stop.total, me);
+    : timerPausedSessionNote(stop.operator, stop.elapsed, stop.total, me, stop.destLabel);
   next.notes = [...(cur.notes || []), note];
   if (typeof recordTimeSession === 'function') {
     recordTimeSession(cur, stop.elapsed, { source: stop.closed ? 'conclusao' : 'timer', operatorName: stop.operator });

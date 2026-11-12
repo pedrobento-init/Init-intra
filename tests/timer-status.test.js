@@ -83,9 +83,18 @@ describe('timerSessionStopForStatus', () => {
     expect(sandbox.timerSessionStopForStatus({ timerRunning: false }, 'resolvido')).toBe(null);
   });
 
-  it('status que não pausa nem fecha (em_andamento, aguardando): null', () => {
+  it('status de trabalho (em_andamento, aberto): null — cronômetro segue', () => {
     expect(sandbox.timerSessionStopForStatus(runningPen(), 'em_andamento')).toBe(null);
-    expect(sandbox.timerSessionStopForStatus(runningPen(), 'aguardando')).toBe(null);
+    expect(sandbox.timerSessionStopForStatus(runningPen(), 'aberto')).toBe(null);
+  });
+
+  it('Aguard. Cliente/Terceiro também pausa: esperando não é trabalhando', () => {
+    const stopT = sandbox.timerSessionStopForStatus(runningPen(), 'aguardando');
+    expect(stopT.closed).toBe(false);
+    expect(stopT.destLabel).toBe('Aguard. Terceiro');
+    const stopC = sandbox.timerSessionStopForStatus(runningPen(), 'aguardando_cliente');
+    expect(stopC.closed).toBe(false);
+    expect(stopC.destLabel).toBe('Aguard. Cliente');
   });
 
   it('Pausado: para a sessão somando ao total, sem fechar', () => {
@@ -128,6 +137,16 @@ describe('penMoveTo com cronômetro rodando', () => {
     expect(salvo.timerRunning).toBe(false);
     expect(sessoes[0].opts.source).toBe('conclusao');
     expect(salvo.notes.at(-1).text).toContain('parado ao concluir');
+  });
+
+  it('mover para Aguard. Cliente pausa o cronômetro com o rótulo certo na nota', () => {
+    sandbox.penMoveTo('PEN-1', 'aguardando_cliente');
+    const salvo = salvos[0];
+    expect(salvo.status).toBe('aguardando_cliente');
+    expect(salvo.timerRunning).toBe(false);
+    expect(sessoes.length).toBe(1);
+    expect(sessoes[0].opts.source).toBe('timer');
+    expect(salvo.notes.at(-1).text).toContain('pausado ao mover para Aguard. Cliente');
   });
 
   it('mover para Em Andamento não mexe no cronômetro', () => {
