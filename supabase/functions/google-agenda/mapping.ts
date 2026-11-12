@@ -65,11 +65,18 @@ function schedule(v: Pick<VisitRow, "date" | "time" | "time_end" | "all_day">) {
   return { date: String(v.date || ""), time, time_end: time ? hhmm(v.time_end) : "", all_day: !time };
 }
 
-/** Evento do Google para a visita. appUrl: link para abrir a visita no app. */
-export function visitToEvent(v: VisitRow, appUrl = ""): GEvent {
+/** Evento do Google para a visita. appUrl: link para abrir a visita no app.
+ *  operatorName: nome do técnico no título — usado na agenda compartilhada
+ *  (081), onde estão as visitas de todo mundo; na agenda pessoal do técnico
+ *  o próprio nome seria redundante. */
+export function visitToEvent(v: VisitRow, appUrl = "", operatorName?: string | null): GEvent {
   const s = schedule(v);
   const num = v.numero ? "#" + String(v.numero).padStart(4, "0") + " " : "";
-  const summary = "Visita " + num + "· " + (v.client_name || "Cliente") + (v.status === "concluida" ? " ✓" : "");
+  const cliente = v.client_name || "Cliente";
+  const check = v.status === "concluida" ? " ✓" : "";
+  const summary = operatorName
+    ? cliente + " · Visita " + num + "· " + operatorName + check
+    : "Visita " + num + "· " + cliente + check;
   const levar = levarItens(v);
   const description = [
     v.motivo ? "Motivo: " + v.motivo : "",
@@ -109,13 +116,18 @@ function levarItens(v: VisitRow): { t: string; ok: boolean }[] {
     .map((i) => ({ t: String(i.t).trim(), ok: i.ok === true }));
 }
 
-/** Assinatura do que foi enviado ao Google: igual = nada a enviar. */
-export async function visitHash(v: VisitRow): Promise<string> {
+/** Assinatura do que foi enviado ao Google: igual = nada a enviar.
+ *  operatorTitle: quando a agenda mostra o técnico no título (a
+ *  compartilhada da 081), o nome entra na assinatura — trocar de técnico
+ *  reenvia o evento para atualizar o título. Sem ele a chave fica igual à
+ *  de sempre: as agendas pessoais já sincronizadas não são reenviadas. */
+export async function visitHash(v: VisitRow, operatorTitle?: string | null): Promise<string> {
   const s = schedule(v);
   const levar = levarItens(v);
   // Sem lista, a chave fica igual à de antes da 058: nada é reenviado à toa.
   const key = JSON.stringify([s.date, s.time, s.time_end, s.all_day, v.status || "", v.client_name || "",
-    v.motivo || "", v.observacoes || "", v.numero ?? null, ...(levar.length ? [levar] : [])]);
+    v.motivo || "", v.observacoes || "", v.numero ?? null, ...(levar.length ? [levar] : []),
+    ...(operatorTitle ? [operatorTitle] : [])]);
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }

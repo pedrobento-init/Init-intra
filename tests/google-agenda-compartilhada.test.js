@@ -145,6 +145,34 @@ describe('google-agenda compartilhada — begin', () => {
     }
   });
 
+  it('o título na compartilhada traz o técnico; na pessoal, não', async () => {
+    const db = fakeDb({ operators: [ana], visits: [visita()], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const call = await handlerCom(db);
+    const res = await call({ action: 'begin' });
+
+    const porDest = Object.fromEntries(res.push.map((p) => [p.dest, p]));
+    expect(porDest.shared.event.summary).toBe('Padaria Central · Visita #0010 · Ana');
+    expect(porDest.personal.event.summary).toBe('Visita #0010 · Padaria Central');
+    // As assinaturas são de variantes diferentes: trocar o técnico reenvia a
+    // compartilhada (título muda) sem reenviar a pessoal à toa.
+    expect(porDest.shared.hash).toBe(await visitHash(visita(), 'Ana'));
+    expect(porDest.personal.hash).toBe(await visitHash(visita()));
+  });
+
+  it('trocar de técnico reenvia a compartilhada para atualizar o título', async () => {
+    const v = visita({ operator: 'Beto', operator_id: 'OP-2' });
+    // Sincronizada antes como Ana: a assinatura mudou só por causa do título.
+    v.google_hash = await visitHash(v);
+    v.google_hash_shared = await visitHash(visita(), 'Ana');
+    const beto = { id: 'OP-2', name: 'Beto', email: null, active: true };
+    const db = fakeDb({ operators: [ana, beto], visits: [v], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const call = await handlerCom(db);
+    const res = await call({ action: 'begin' });
+
+    const shared = res.push.find((p) => p.dest === 'shared');
+    expect(shared.event.summary).toBe('Padaria Central · Visita #0010 · Beto');
+  });
+
   it('visita de técnico sem e-mail vai só para a compartilhada', async () => {
     const beto = { id: 'OP-2', name: 'Beto', email: null, active: true };
     const db = fakeDb({ operators: [beto], visits: [visita({ operator: 'Beto', operator_id: 'OP-2' })], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
@@ -157,9 +185,8 @@ describe('google-agenda compartilhada — begin', () => {
 
   it('já igual nas duas agendas: fila esvaziada sem enviar nada', async () => {
     const v = visita();
-    const h = await visitHash(v);
-    v.google_hash = h;
-    v.google_hash_shared = h;
+    v.google_hash = await visitHash(v);
+    v.google_hash_shared = await visitHash(v, 'Ana');
     const db = fakeDb({ operators: [ana], visits: [v], google_agenda_queue: [{ seq: 7, visit_id: 'VIS-1' }] });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
@@ -202,7 +229,7 @@ describe('google-agenda compartilhada — finish', () => {
     const v = visita();
     const h = await visitHash(v);
     v.google_hash = h;
-    v.google_hash_shared = h;
+    v.google_hash_shared = await visitHash(v, 'Ana');
     // Agenda já liberada antes (sem backfill nesta rodada, que zera o hash).
     const db = fakeDb({ operators: [ana], visits: [v], google_agenda_shared: [{ id: 1, calendar_id: SHARED, ok: true }] });
     const call = await handlerCom(db);
@@ -225,7 +252,7 @@ describe('google-agenda compartilhada — finish', () => {
     const v2 = db.store.visits[0];
     expect(v2.time).toBe('14:00');
     expect(v2.time_end).toBe('15:00');
-    expect(v2.google_hash_shared).toBe(await visitHash(v2));
+    expect(v2.google_hash_shared).toBe(await visitHash(v2, 'Ana'));
     // A assinatura pessoal ficou velha de propósito: a próxima fila atualiza a agenda da Ana.
     expect(v2.google_hash).toBe(h);
   });
@@ -249,7 +276,7 @@ describe('google-agenda compartilhada — finish', () => {
     const v = visita();
     const h = await visitHash(v);
     v.google_hash = h;
-    v.google_hash_shared = h;
+    v.google_hash_shared = await visitHash(v, 'Ana');
     const db = fakeDb({ operators: [ana], visits: [v] });
     const call = await handlerCom(db);
     const res = await call({
@@ -269,6 +296,7 @@ describe('google-agenda compartilhada — finish', () => {
   it('confirmação do push grava a assinatura do destino certo', async () => {
     const v = visita();
     const h = await visitHash(v);
+    const hComp = await visitHash(v, 'Ana');
     const db = fakeDb({ operators: [ana], visits: [v], google_agenda_queue: [{ seq: 3, visit_id: 'VIS-1', attempts: 0 }] });
     const call = await handlerCom(db);
     await call({
@@ -276,12 +304,12 @@ describe('google-agenda compartilhada — finish', () => {
       calendars: [],
       changes: [],
       pushed: [
-        { seq: 3, visit_id: 'VIS-1', ok: true, hash: h, dest: 'shared' },
+        { seq: 3, visit_id: 'VIS-1', ok: true, hash: hComp, dest: 'shared' },
         { seq: 3, visit_id: 'VIS-1', ok: true, hash: h, dest: 'personal' },
       ],
     });
 
-    expect(db.store.visits[0].google_hash_shared).toBe(h);
+    expect(db.store.visits[0].google_hash_shared).toBe(hComp);
     expect(db.store.visits[0].google_hash).toBe(h);
     expect(db.store.google_agenda_queue).toEqual([]);
   });
