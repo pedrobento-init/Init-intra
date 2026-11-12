@@ -63,10 +63,14 @@ de 7 dias.
 | Média | 8 h | 3 dias úteis |
 | Baixa | 24 h | 7 dias úteis |
 
-**O que conta como primeira resposta** é só a nota marcada como resposta ao
-solicitante (`visibility: 'resposta'`). Anotação interna não conta, e a nota que
-veio da resposta do cliente (`'solicitante'`) também não — senão o relógio
-pararia sozinho sem ninguém ter respondido.
+**O que conta como primeira resposta** depende do tipo. Em **chamado** (canal
+externo — e-mail, WhatsApp — ou com e-mail do solicitante), só a nota marcada
+como resposta ao solicitante (`visibility: 'resposta'`): mudar status ou ligar
+o cronômetro não chega ao cliente. Em **tarefa ou projeto interno**, vale a
+primeira ação da equipe (status saindo de Aberto, cronômetro ou nota-resposta).
+Anotação interna nunca conta, e a nota que veio da resposta do cliente
+(`'solicitante'`) também não — senão o relógio pararia sozinho sem ninguém ter
+respondido.
 
 **Onde fica cada coisa:** **Pendências** alterna entre quadro e fila (a escolha e
 a ordenação ficam no aparelho); **Fila** é a tabela ordenada no servidor;

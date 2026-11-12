@@ -92,8 +92,9 @@ function _slaAberta(status) { return !['resolvido', 'concluido', 'cancelado', 'f
 
 /**
  * Ao gravar: define o prazo da 1ª resposta (criação ou troca de prioridade
- * antes de responder) e registra a 1ª resposta na primeira ação da equipe:
- * status saindo de "Aberto", cronômetro iniciado ou nota nova.
+ * antes de responder) e registra a 1ª resposta. O que conta depende do tipo:
+ * chamado (canal externo) só com nota-resposta; tarefa/projeto interno com a
+ * primeira ação da equipe (status saindo de "Aberto", cronômetro ou nota).
  * prev = registro antes (null na criação); cur = registro gravado (alterado aqui).
  */
 /**
@@ -109,6 +110,25 @@ function slaNotaEhResposta(n) {
   return !!n && n.visibility === 'resposta';
 }
 
+/**
+ * É chamado (conversa com quem pediu)? Mesma regra da migration 078 e de
+ * penPaginaTipo: canal externo (e-mail/WhatsApp), thread de WhatsApp ou
+ * e-mail do solicitante. Para esses, a 1ª resposta é SÓ a nota-resposta:
+ * mudar status ou ligar o cronômetro não chega ao cliente (medição de
+ * 12/11/2026: 6 de 13 "respondidos" sem nenhuma nota-resposta). Tarefas e
+ * projetos internos não têm solicitante — o 1º toque da equipe (status,
+ * cronômetro ou nota) segue valendo, como antes.
+ */
+function slaEhChamado(p) {
+  if (!p) return false;
+  const canal = String(p.canal || '').toLowerCase();
+  if (canal === 'email' || canal === 'whatsapp') return true;
+  const thread = String(p.emailThreadId != null ? p.emailThreadId : (p.email_thread_id || ''));
+  if (thread.indexOf('whatsapp:') === 0) return true;
+  const sol = String(p.solicitanteEmail != null ? p.solicitanteEmail : (p.solicitante_email || '')).trim();
+  return sol !== '';
+}
+
 function slaOnSave(prev, cur, nowIso, actor) {
   if (!cur) return cur;
   if (!prev) {
@@ -119,10 +139,13 @@ function slaOnSave(prev, cur, nowIso, actor) {
   if (cur.firstResponseAt || !cur.firstResponseDue) return cur;
   const notasAntes = prev && Array.isArray(prev.notes) ? prev.notes.length : 0;
   const notasNovas = (Array.isArray(cur.notes) ? cur.notes : []).slice(notasAntes);
+  // Chamado: a equipe "tocar" (status, cronômetro) não responde o cliente —
+  // só a nota-resposta queima o SLA. Tarefa/projeto interno: o toque basta.
+  const toqueVale = !slaEhChamado(cur);
   const respondeu = !prev
-    ? (cur.status && cur.status !== 'aberto')
-    : ((prev.status || 'aberto') === 'aberto' && cur.status && cur.status !== 'aberto')
-      || (cur.timerRunning === true && prev.timerRunning !== true)
+    ? (cur.status && cur.status !== 'aberto' && toqueVale) || notasNovas.some(slaNotaEhResposta)
+    : ((prev.status || 'aberto') === 'aberto' && cur.status && cur.status !== 'aberto' && toqueVale)
+      || (cur.timerRunning === true && prev.timerRunning !== true && toqueVale)
       || notasNovas.some(slaNotaEhResposta);
   if (respondeu) {
     cur.firstResponseAt = nowIso;
@@ -404,7 +427,7 @@ if (typeof module !== 'undefined' && module.exports) {
     SLA_PRIORIDADE, SLA_EXPEDIENTE, PEN_CANAIS, PEN_CATEGORIAS, penCanalLabel, penCategoriaLabel,
     slaAddBusinessHours, slaAddBusinessDays, slaPrazoSugerido, slaRespostaAte, slaResumo, slaOnSave,
     slaRespostaEstado, slaDuracaoCurta, buildRespostaKpis, buildRecorrentesModel, solicitantesDoCliente, penRespostaBadge,
-    slaResolucaoEstado, penResolucaoBadge, slaNotaEhResposta,
+    slaResolucaoEstado, penResolucaoBadge, slaNotaEhResposta, slaEhChamado,
     slaMinutosUteis, slaTempoPorLado, penTempoPorLadoHtml,
   };
 }
