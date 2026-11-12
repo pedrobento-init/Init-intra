@@ -19,8 +19,14 @@
 //
 // REGRAS
 // - Agenda do técnico = e-mail dele em operators (agenda principal).
+// - Agenda compartilhada da equipe (ex.: "Atendimentos"): o id vai no
+//   secret AGENDA_SHARED_CAL e toda visita sai lá também, com ou sem
+//   técnico de e-mail cadastrado (migration 081). Nos itens trocados com
+//   o robô ela é marcada com op = "shared" / dest = "shared".
 // - Google → site: só data, horários e dia inteiro; evento apagado cancela a
-//   visita agendada. Mudança do site ainda não enviada vence (google_hash).
+//   visita agendada. Mudança do site ainda não enviada ÀQUELA agenda vence
+//   (google_hash da pessoal, google_hash_shared da compartilhada — uma
+//   assinatura por agenda, senão a confirmação de uma esconderia a outra).
 // - As mudanças do Google são aplicadas ANTES de confirmar o push: o que o
 //   robô leu é anterior ao envio, então não pode desfazer o que acabou de ir.
 
@@ -30,12 +36,17 @@ import { eventIdFor, eventToVisitPatch, type GEvent, visitHash, visitIdFromEvent
 
 const APP_URL = (Deno.env.get("APP_URL") ?? "").replace(/\/$/, "");
 const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
+// Agenda compartilhada da equipe (ex.: c_xxx@group.calendar.google.com).
+// Vazia = só as agendas pessoais, como antes da 081.
+const SHARED_CAL = (Deno.env.get("AGENDA_SHARED_CAL") ?? "").trim();
+// Marcador do campo op/dest para a agenda compartilhada (não é um operator).
+const SHARED_OP = "shared";
 
-const VISIT_COLS = "id, numero, client_name, motivo, observacoes, date, time, time_end, all_day, status, operator, operator_id, google_hash, levar";
+const VISIT_COLS = "id, numero, client_name, motivo, observacoes, date, time, time_end, all_day, status, operator, operator_id, google_hash, google_hash_shared, levar";
 const PUSH_BATCH = 200;   // visitas por execução (o Apps Script tem 6 min)
 const MAX_ATTEMPTS = 10;  // depois disso a visita sai da fila (erro fica no log)
 
-type Visit = VisitRow & { operator?: string | null; operator_id?: string | null; google_hash?: string | null };
+type Visit = VisitRow & { operator?: string | null; operator_id?: string | null; google_hash?: string | null; google_hash_shared?: string | null };
 type Op = { id: string; name: string; email: string | null; active: boolean | null };
 type QueueRow = { seq: number; visit_id: string; old_operator_id: string | null; old_operator: string | null };
 
@@ -88,6 +99,7 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
 
   const ops = await loadOps(db);
   const calendars = [...ops.byId.values()].map((o) => ({ op: o.id, cal: ops.cal(o) })).filter((c) => c.cal);
+  if (SHARED_CAL) calendars.push({ op: SHARED_OP, cal: SHARED_CAL });
 
   const { data: rows, error } = await db.from("google_agenda_queue")
     .select("seq, visit_id, old_operator_id, old_operator").order("seq").limit(PUSH_BATCH * 3);
@@ -113,45 +125,72 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
     const cal = v ? ops.cal(ops.of(v.operator_id, v.operator)) : null;
     const live = !!v && v.status !== "cancelada" && /^\d{4}-\d{2}-\d{2}$/.test(String(v.date || ""));
     const removeFrom = [...g.old].filter((c) => c !== cal || !live);
-    const hash = live && cal ? await visitHash(v!) : null;
-    // Nada a fazer no Google: já está igual, ou o técnico não tem e-mail
-    // (fica sem hash, para ir quando tiver). Só tira da fila.
-    if (live && cal && hash === v!.google_hash && !removeFrom.length) { noop.push({ id, seq: g.seq }); continue; }
-    if (!cal && !removeFrom.length) { noop.push({ id, seq: g.seq }); continue; }
-    push.push({
-      seq: g.seq,
-      visit_id: id,
-      event_id: eventIdFor(id),
-      cal: live ? cal : null,
-      remove_from: live ? removeFrom : [...new Set([...removeFrom, ...(cal ? [cal] : [])])],
-      event: live && cal ? visitToEvent(v!, APP_URL ? APP_URL + "/#visitas" : "") : null,
-      hash,
-    });
+    const hash = live ? await visitHash(v!) : null;
+
+    // Destino pessoal (agenda do técnico). Nada a fazer quando já está igual,
+    // ou quando o técnico não tem e-mail (fica sem hash, para ir quando tiver).
+    const personalTodo = (live && !!cal && hash !== v!.google_hash) || removeFrom.length > 0 || (!live && !!cal);
+    // Destino compartilhado ("Atendimentos"): toda visita, mesmo sem técnico
+    // com e-mail. Visita morta sai de lá só se um dia entrou (hash gravado).
+    const sharedTodo = !!SHARED_CAL && (live ? hash !== v!.google_hash_shared : !!v!.google_hash_shared);
+
+    // Nada a fazer em NENHUMA das agendas: só tira da fila.
+    if (!personalTodo && !sharedTodo) { noop.push({ id, seq: g.seq }); continue; }
+
+    if (personalTodo) {
+      push.push({
+        seq: g.seq,
+        visit_id: id,
+        event_id: eventIdFor(id),
+        cal: live ? cal : null,
+        remove_from: live ? removeFrom : [...new Set([...removeFrom, ...(cal ? [cal] : [])])],
+        event: live && cal ? visitToEvent(v!, APP_URL ? APP_URL + "/#visitas" : "") : null,
+        hash: live && cal ? hash : null,
+        dest: "personal",
+      });
+    }
+    if (sharedTodo) {
+      push.push({
+        seq: g.seq,
+        visit_id: id,
+        event_id: eventIdFor(id),
+        cal: live ? SHARED_CAL : null,
+        remove_from: live ? [] : [SHARED_CAL],
+        event: live ? visitToEvent(v!, APP_URL ? APP_URL + "/#visitas" : "") : null,
+        hash,
+        dest: SHARED_OP,
+      });
+    }
   }
   for (const n of noop) await db.from("google_agenda_queue").delete().eq("visit_id", n.id).lte("seq", n.seq);
   return json({ calendars, push });
 }
 
-/** Google → site: aplica um evento mudado na visita correspondente. */
-async function applyEvent(db: SupabaseClient, ops: Ops, opId: string, ev: GEvent): Promise<boolean> {
+/** Google → site: aplica um evento mudado na visita correspondente.
+ *  opId nulo = o evento veio da agenda compartilhada: não há técnico dono
+ *  para conferir, e a assinatura que vale é a da compartilhada. */
+async function applyEvent(db: SupabaseClient, ops: Ops, opId: string | null, ev: GEvent): Promise<boolean> {
   const vid = visitIdFromEventId(ev?.id);
   if (!vid) return false;  // evento criado direto no Google: não é visita
   const v = (await loadVisits(db, [vid])).get(vid);
   if (!v || v.status === "cancelada") return false;
-  if (ops.of(v.operator_id, v.operator)?.id !== opId) return false;
-  // Mudança do site ainda não enviada ao Google: o site vence.
-  if (v.google_hash !== await visitHash(v)) return false;
+  if (opId !== null && ops.of(v.operator_id, v.operator)?.id !== opId) return false;
+  const hashCol = opId === null ? "google_hash_shared" : "google_hash";
+  // Mudança do site ainda não enviada a esta agenda: o site vence.
+  if ((v[hashCol] ?? null) !== await visitHash(v)) return false;
 
   const now = new Date().toISOString();
   if (ev.status === "cancelled") {
     if (v.status !== "agendada") return false;  // concluída não volta atrás
-    await db.from("visits").update({ status: "cancelada", google_hash: null, updated_at: now }).eq("id", vid);
+    // A outra agenda ainda tem o evento: sai no próximo ciclo, porque a
+    // mudança de status põe a visita na fila e o hash dela ficou velho.
+    await db.from("visits").update({ status: "cancelada", [hashCol]: null, updated_at: now }).eq("id", vid);
     return true;
   }
   const patch = eventToVisitPatch(ev, v);
   if (!patch) return false;
   const hash = await visitHash({ ...v, ...patch } as Visit);
-  await db.from("visits").update({ ...patch, google_hash: hash, updated_at: now }).eq("id", vid);
+  await db.from("visits").update({ ...patch, [hashCol]: hash, updated_at: now }).eq("id", vid);
   return true;
 }
 
@@ -170,6 +209,17 @@ async function backfill(db: SupabaseClient, op: Op) {
   await db.from("google_agenda_queue").insert(ids.map((visit_id) => ({ visit_id })));
 }
 
+/** Agenda compartilhada recém-liberada: todas as visitas de 7 dias atrás em
+ *  diante → fila, de qualquer técnico (mesma regra do backfill pessoal). */
+async function backfillShared(db: SupabaseClient) {
+  const from = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const { data } = await db.from("visits").select("id").gte("date", from).neq("status", "cancelada").limit(1000);
+  const ids = (data || []).map((r) => r.id as string);
+  if (!ids.length) return;
+  for (let i = 0; i < ids.length; i += 100) await db.from("visits").update({ google_hash_shared: null }).in("id", ids.slice(i, i + 100));
+  await db.from("google_agenda_queue").insert(ids.map((visit_id) => ({ visit_id })));
+}
+
 async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?: unknown; pushed?: unknown }) {
   const ops = await loadOps(db);
   const now = new Date().toISOString();
@@ -177,7 +227,28 @@ async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?
   // 1. Acesso a cada agenda.
   const { data: prevRows } = await db.from("google_agenda_calendars").select("operator_id, ok, last_ok_at");
   const prev = new Map((prevRows || []).map((r) => [r.operator_id as string, r]));
+  const { data: sharedRow } = SHARED_CAL
+    ? await db.from("google_agenda_shared").select("id, ok, last_ok_at").eq("id", 1).maybeSingle()
+    : { data: null };
   for (const c of (Array.isArray(input.calendars) ? input.calendars : []) as { op?: string; ok?: boolean; access?: boolean; error?: string }[]) {
+    // Agenda compartilhada: estado na tabela própria (081), não é operador.
+    if (c && c.op === SHARED_OP) {
+      if (!SHARED_CAL) continue;
+      if (c.ok !== true && c.access !== true && sharedRow) {
+        await db.from("google_agenda_shared").update({ last_error: String(c.error || "").slice(0, 300), updated_at: now }).eq("id", 1);
+        continue;
+      }
+      await db.from("google_agenda_shared").upsert({
+        id: 1,
+        calendar_id: SHARED_CAL,
+        ok: c.ok === true,
+        last_error: c.ok === true ? null : String(c.error || "Sem acesso").slice(0, 300),
+        last_ok_at: c.ok === true ? now : (sharedRow?.last_ok_at ?? null),
+        updated_at: now,
+      });
+      if (c.ok === true && !sharedRow?.ok) await backfillShared(db);
+      continue;
+    }
     const op = c && typeof c.op === "string" ? ops.byId.get(c.op) : null;
     const cal = ops.cal(op ?? null);
     if (!op || !cal) continue;
@@ -202,23 +273,28 @@ async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?
   // 2. Mudanças feitas no Google (antes de confirmar o push — ver cabeçalho).
   let applied = 0;
   for (const ch of (Array.isArray(input.changes) ? input.changes : []).slice(0, 5000) as { op?: string; event?: GEvent }[]) {
-    if (ch && typeof ch.op === "string" && ch.event && await applyEvent(db, ops, ch.op, ch.event)) applied++;
+    if (!ch || typeof ch.op !== "string" || !ch.event) continue;
+    if (ch.op === SHARED_OP ? await applyEvent(db, ops, null, ch.event) : await applyEvent(db, ops, ch.op, ch.event)) applied++;
   }
 
   // 3. Resultado do push.
   const pushedIn = (Array.isArray(input.pushed) ? input.pushed : []) as
-    { seq?: number; visit_id?: string; ok?: boolean; hash?: string | null; error?: string; access?: boolean }[];
+    { seq?: number; visit_id?: string; ok?: boolean; hash?: string | null; error?: string; access?: boolean; dest?: string }[];
   const valid = pushedIn.filter((p) => p && typeof p.visit_id === "string" && Number.isFinite(p.seq));
   const visits = await loadVisits(db, valid.filter((p) => p.ok).map((p) => p.visit_id as string));
   for (const p of valid) {
     const id = p.visit_id as string;
     if (p.ok || p.access) {
-      // Sem acesso à agenda: sai da fila; volta inteira quando o técnico liberar (backfill).
+      // Sem acesso à agenda: sai da fila; volta inteira quando a agenda for
+      // liberada (backfill pessoal ou da compartilhada).
       if (p.ok) {
         const v = visits.get(id);
+        // Cada destino confirma a própria assinatura. dest ausente = robô de
+        // antes da 081, que só conhece a agenda pessoal.
+        const hashCol = p.dest === SHARED_OP ? "google_hash_shared" : "google_hash";
         // Só confirma se a visita não mudou de novo enquanto o robô enviava.
-        if (v && (p.hash ? await visitHash(v) === p.hash : true) && v.google_hash !== (p.hash ?? null)) {
-          await db.from("visits").update({ google_hash: p.hash ?? null }).eq("id", id);
+        if (v && (p.hash ? await visitHash(v) === p.hash : true) && (v[hashCol] ?? null) !== (p.hash ?? null)) {
+          await db.from("visits").update({ [hashCol]: p.hash ?? null }).eq("id", id);
         }
       }
       await db.from("google_agenda_queue").delete().eq("visit_id", id).lte("seq", p.seq as number);

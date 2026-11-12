@@ -2,7 +2,9 @@
 //
 // Roda de minuto em minuto na conta do robô (ex.: agenda@empresa). Cada
 // técnico compartilha a própria agenda com essa conta ("Fazer alterações nos
-// eventos"). A cada execução:
+// eventos"); a agenda compartilhada da equipe ("Atendimentos", migration 081)
+// é compartilhada do mesmo jeito e entra na mesma rodada, marcada com
+// op/dest "shared". A cada execução:
 //   1. pergunta ao Intra (Edge Function google-agenda) o que enviar;
 //   2. lê o que mudou em cada agenda desde a última vez (syncToken);
 //   3. cria/altera/apaga os eventos das visitas;
@@ -121,7 +123,9 @@ function lerMudancas_(calId, syncToken) {
 }
 
 function enviar_(item, semAcesso) {
-  var out = { seq: item.seq, visit_id: item.visit_id, hash: item.hash };
+  // dest: "shared" = agenda compartilhada (081); o Intra confirma a
+  // assinatura da agenda certa. Ausente = agenda pessoal do técnico.
+  var out = { seq: item.seq, visit_id: item.visit_id, hash: item.hash, dest: item.dest };
   // Sem acesso: sai da fila (volta toda quando o técnico compartilhar).
   // Falha passageira: tenta de novo na próxima execução.
   if (item.cal && semAcesso[item.cal] === 'access') { out.ok = false; out.access = true; return out; }

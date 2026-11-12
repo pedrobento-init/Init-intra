@@ -16,12 +16,18 @@ async function _renderGoogleAgendaBox() {
   const robot = escapeHtml(st.runner_email);
   const parado = !st.runner_last_run || (Date.now() - new Date(st.runner_last_run).getTime()) > 15 * 60000;
   const aviso = parado ? '<p class="gcal-err">A sincronização com o Google está parada. Avise o administrador.</p>' : '';
+  // Agenda compartilhada da equipe (migration 081): null = não configurada.
+  const compart = st.shared_ok === true
+    ? '<p class="feed-lead">A agenda compartilhada da equipe também recebe todas as visitas.</p>'
+    : st.shared_ok === false
+      ? `<p class="gcal-err">Agenda compartilhada da equipe: ${escapeHtml(st.shared_error || 'sem acesso')}. Compartilhe essa agenda com ${robot} ("Fazer alterações nos eventos").</p>`
+      : '';
   if (!st.my_email) {
     box.innerHTML = `<h4>Google Agenda</h4>${aviso}
-      <p class="feed-lead">Seu cadastro está sem e-mail. Peça ao administrador para preencher o e-mail da sua conta Google em Operadores.</p>`;
+      <p class="feed-lead">Seu cadastro está sem e-mail. Peça ao administrador para preencher o e-mail da sua conta Google em Operadores.</p>${compart}`;
   } else if (st.ok) {
     box.innerHTML = `<h4>Google Agenda — sincronizando</h4>${aviso}
-      <p class="feed-lead">Suas visitas aparecem na agenda <b>${escapeHtml(st.my_email)}</b> em até 1 minuto. Mudou data ou horário lá? A visita muda aqui. Apagou o evento? A visita agendada é cancelada.</p>`;
+      <p class="feed-lead">Suas visitas aparecem na agenda <b>${escapeHtml(st.my_email)}</b> em até 1 minuto. Mudou data ou horário lá? A visita muda aqui. Apagou o evento? A visita agendada é cancelada.</p>${compart}`;
   } else {
     box.innerHTML = `<h4>Google Agenda (cria e edita na sua agenda)</h4>${aviso}
       <p class="feed-lead">Para as visitas virarem eventos na sua agenda <b>${escapeHtml(st.my_email)}</b> (e o que você mudar lá voltar para cá), compartilhe a agenda uma vez:</p>
@@ -31,6 +37,7 @@ async function _renderGoogleAgendaBox() {
         <li>Em até 1 minuto suas visitas começam a aparecer.</li>
       </ol>
       ${st.error ? `<p class="gcal-err">${escapeHtml(st.error)}</p>` : ''}
+      ${compart}
       <div class="feed-opts">
         <button type="button" class="btn btn-secondary btn-sm" data-gcal="copy">Copiar ${robot}</button>
         <a class="btn btn-primary btn-sm" href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener">Abrir configurações do Google Agenda</a>
