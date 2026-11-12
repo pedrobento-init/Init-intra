@@ -26,6 +26,9 @@ Se a visita foi editada no site e ainda não chegou ao Google, o site vence.
 A agenda do técnico é o **e-mail dele no cadastro de Operadores**, que precisa ser o da conta Google.
 O link ICS antigo ("só para ver") continua no mesmo modal para quem usa Outlook ou iPhone.
 
+Também dá para ter **uma agenda compartilhada da equipe** (ex.: "Atendimentos") que recebe
+todas as visitas, além das agendas pessoais — ver o passo 5 da instalação.
+
 ## Instalação (uma vez)
 
 ### 1. Supabase
@@ -68,11 +71,36 @@ específicas** → adicione o e-mail do robô com **Fazer alterações nos event
 O modal **Visitas → Agenda no celular** mostra esse passo a passo, o e-mail do robô e o estado
 ("sincronizando" ou o erro). Assim que a agenda é liberada, as visitas de 7 dias atrás em diante vão para ela.
 
+### 5. Agenda compartilhada da equipe (opcional — migration 081)
+
+Além da agenda pessoal de cada técnico, as visitas podem sair todas numa agenda compartilhada
+(ex.: **Atendimentos**), também nos dois sentidos: mover ou apagar o evento lá muda a visita aqui.
+Evento criado à mão nela não vira visita (visita precisa de cliente; crie pelo site).
+
+1. Rode `supabase/migrations/081_agenda_compartilhada.sql` no SQL Editor.
+2. Nas configurações da agenda "Atendimentos" no Google Agenda, copie o **ID da agenda**
+   (algo como `c_xxx@group.calendar.google.com`) e rode:
+   ```bash
+   supabase secrets set AGENDA_SHARED_CAL=<id da agenda>
+   supabase functions deploy google-agenda --no-verify-jwt
+   ```
+3. Ainda nas configurações dela: **Compartilhar com pessoas específicas** → adicione o e-mail
+   do robô com **Fazer alterações nos eventos**.
+4. Atualize o `Codigo.gs` no Apps Script: o robô passa a devolver o campo `dest` de cada envio;
+   sem isso, a confirmação da compartilhada cai na assinatura da agenda pessoal e o evento é
+   reenviado a cada minuto.
+5. O modal **Visitas → Agenda no celular** mostra o estado da compartilhada. Assim que ela é
+   liberada, as visitas de 7 dias atrás em diante vão para ela — inclusive as de técnico sem
+   e-mail cadastrado (que não têm agenda pessoal).
+
+Sem `AGENDA_SHARED_CAL`, nada muda: só as agendas pessoais sincronizam.
+
 ## Conferir
 
 ```sql
 SELECT * FROM public.google_agenda_runner;  -- last_run_at muda a cada minuto
 SELECT operator_id, calendar_id, ok, last_error FROM public.google_agenda_calendars;
+SELECT * FROM public.google_agenda_shared;  -- agenda compartilhada (081), se configurada
 SELECT count(*), max(attempts) FROM public.google_agenda_queue;  -- perto de 0
 ```
 
