@@ -454,7 +454,7 @@ function openCalendarDaySheet(dateStr, hora = '') {
       html += `<div class="cal-day-section">Pendências <span>${allPens.length}</span></div>`;
       html += allPens.map(p => {
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openPendenciaDetail('${escapeHtml(p.id)}')">
+        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openPendenciaQuickCard('${escapeHtml(p.id)}')">
           ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(getPendenciaTitulo(p))}</div><div class="cal-day-card-meta">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div class="cal-day-card-tags">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
       }).join('');
     }
@@ -470,6 +470,48 @@ function openCalendarDaySheet(dateStr, hora = '') {
     modal.style.borderRadius = '16px 16px 0 0';
     modal.style.maxHeight = '75vh';
   }
+}
+
+// ── Card rápido da pendência (Agenda) ───────────────────────────────────────
+// A visita abria um card no clique e a pendência navegava para a página
+// inteira — assimétrico no mesmo calendário. O card mostra o essencial e deixa
+// "Abrir chamado" para quem precisa da tela cheia.
+function openPendenciaQuickCard(id) {
+  const p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
+  if (!p) return;
+  try {
+    if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) {
+      if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
+      return;
+    }
+  } catch (_) {}
+  const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
+  const ev = penEventColors(p);
+  const num = (typeof penDisplayNumber === 'function') ? penDisplayNumber(p) : '';
+  const desc = String(p.descricao || '').trim();
+  const descCurta = desc.length > 280 ? desc.slice(0, 280) + '…' : desc;
+  openModal(`${num ? num + ' – ' : ''}${escapeHtml(getPendenciaTitulo(p))}`, `
+    <div class="ticket-info-grid">
+      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c, 22)}<span>${escapeHtml(p.clientName)}</span></div>` : escapeHtml(p.clientName || '—')}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Responsável</div><div class="ticket-info-value">${escapeHtml(p.responsible || '—')}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Prazo</div><div class="ticket-info-value">${p.deadline ? escapeHtml(formatDate(parseDeadline(p.deadline))) : 'Sem prazo'}${ev.overdue ? ' <span style="color:#dc2626;font-weight:600">⚠ Vencida</span>' : ''}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${statusTag(p.status)}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Prioridade</div><div class="ticket-info-value">${priorityTag(p.priority)}</div></div>
+    </div>
+    ${descCurta ? `<div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Descrição</label><div class="timeline-text">${escapeHtml(descCurta)}</div></div>` : ''}
+    ${typeof timerWidget === 'function' ? `<div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Cronômetro</label><div>${timerWidget(p, 'pendencia')}</div></div>` : ''}
+    <div class="form-group" style="margin-top:var(--space-5)"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary btn-sm" data-action="penQuickOpen" data-arg="${escapeHtml(id)}">Abrir chamado</button>
+      <button class="btn btn-secondary btn-sm" data-action="closeModal">Fechar</button>
+    </div></div>
+  `, 'sm');
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    // O card é um resumo; a tela cheia do chamado abre com o modal fechado.
+    penQuickOpen: (_el, id) => { closeModal(); if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+  });
 }
 
 let _fcInitSeq = 0;
@@ -541,7 +583,7 @@ async function initFullCalendar() {
       if (props.kind === 'visit') {
         if (typeof openVisitDetail === 'function') openVisitDetail(props.visitId);
       } else {
-        if (typeof openPendenciaDetail === 'function') openPendenciaDetail(props.penId);
+        if (typeof openPendenciaQuickCard === 'function') openPendenciaQuickCard(props.penId);
       }
     },
     dateClick: function(info) {
@@ -623,7 +665,7 @@ function renderAgendaSide() {
   if (overdue.length) {
     html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
       overdue.map(function (o) {
-        return '<li role="button" tabindex="0" onclick="openPendenciaDetail(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
+        return '<li role="button" tabindex="0" onclick="openPendenciaQuickCard(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }
@@ -631,7 +673,7 @@ function renderAgendaSide() {
   html += '<div class="card ag-card"><h2>Próximos 7 dias <span class="count">' + next7.length + (next7.length === 1 ? ' item' : ' itens') + '</span></h2>' +
     (next7.length
       ? '<ul class="plist">' + next7.map(function (o) {
-        var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaDetail';
+        var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaQuickCard';
         var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
         return '<li role="button" tabindex="0" onclick="' + fn + '(\'' + esc(o.id) + '\')"><div class="pbar" style="background:' + o.dot + '"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
