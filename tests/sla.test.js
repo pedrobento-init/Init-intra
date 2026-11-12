@@ -78,6 +78,52 @@ describe('1ª resposta ao gravar', () => {
     expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 11, 0), 'Beto']);
   });
 
+  // Em chamado (canal externo), "a equipe tocou" não é "o cliente foi
+  // respondido": nem status nem cronômetro queimam o SLA — só a nota que vai
+  // ao solicitante. Medição de 12/11/2026: 6 de 13 respondidos sem resposta.
+  describe('chamado (canal externo): só a nota-resposta queima o SLA', () => {
+    const chamado = () => ({ ...criada(), canal: 'email', solicitanteEmail: 'cliente@x.com' });
+
+    it('detecta chamado por canal, thread de WhatsApp ou e-mail do solicitante', () => {
+      expect(sla.slaEhChamado({ canal: 'whatsapp' })).toBe(true);
+      expect(sla.slaEhChamado({ canal: 'email' })).toBe(true);
+      expect(sla.slaEhChamado({ emailThreadId: 'whatsapp:5511999998888' })).toBe(true);
+      expect(sla.slaEhChamado({ solicitanteEmail: 'a@b.com' })).toBe(true);
+      expect(sla.slaEhChamado({ canal: 'telefone' })).toBe(false);
+      expect(sla.slaEhChamado(criada())).toBe(false);
+      expect(sla.slaEhChamado(null)).toBe(false);
+    });
+
+    it('status saindo de Aberto NÃO conta como resposta em chamado', () => {
+      const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
+      expect(base.firstResponseAt).toBeUndefined();
+      const andamento = sla.slaOnSave(base, { ...base, status: 'em_andamento' }, iso(2026, 10, 21, 10, 0), 'Ana');
+      expect(andamento.firstResponseAt).toBeUndefined();
+    });
+
+    it('cronômetro ligado NÃO conta como resposta em chamado', () => {
+      const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
+      const timer = sla.slaOnSave(base, { ...base, timerRunning: true }, iso(2026, 10, 21, 9, 30), 'Ana');
+      expect(timer.firstResponseAt).toBeUndefined();
+    });
+
+    it('a nota-resposta queima o SLA normalmente, inclusive na criação', () => {
+      const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
+      const resp = sla.slaOnSave(base, { ...base, notes: [{ text: 'bom dia, estamos vendo', visibility: 'resposta' }] }, iso(2026, 10, 21, 10, 0), 'Ana');
+      expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 10, 0), 'Ana']);
+      const naCriacao = sla.slaOnSave(null, { ...chamado(), notes: [{ text: 'oi', visibility: 'resposta' }] }, iso(2026, 10, 21, 9, 0), 'Ana');
+      expect(naCriacao.firstResponseAt).toBe(iso(2026, 10, 21, 9, 0));
+    });
+
+    it('tarefa interna segue medindo o 1º toque da equipe (status e cronômetro)', () => {
+      const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana'); // sem canal
+      const timer = sla.slaOnSave(base, { ...base, timerRunning: true }, iso(2026, 10, 21, 9, 30), 'Ana');
+      expect(timer.firstResponseAt).toBe(iso(2026, 10, 21, 9, 30));
+      const status = sla.slaOnSave(base, { ...base, status: 'em_andamento' }, iso(2026, 10, 21, 9, 45), 'Ana');
+      expect(status.firstResponseAt).toBe(iso(2026, 10, 21, 9, 45));
+    });
+  });
+
   it('nota antiga, sem o campo visibility, não conta (fail-closed)', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
     const velha = sla.slaOnSave(base, { ...base, notes: [{ text: 'sem campo' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
