@@ -65,3 +65,18 @@ describe('google-agenda: hash', () => {
     expect(await visitHash({ ...base, date: '2026-10-21' })).not.toBe(h);
   });
 });
+
+describe('google-agenda: técnico no título (agenda compartilhada, 081)', () => {
+  it('com o nome, o título é Cliente · Visita #0000 · Técnico; sem, o formato de sempre', () => {
+    expect(visitToEvent(base, '', 'Ana').summary).toBe('Acme · Visita #0073 · Ana');
+    expect(visitToEvent({ ...base, status: 'concluida' }, '', 'Ana').summary).toBe('Acme · Visita #0073 · Ana ✓');
+    expect(visitToEvent(base).summary).toBe('Visita #0073 · Acme');
+    expect(visitToEvent(base, '', null).summary).toBe('Visita #0073 · Acme');
+  });
+  it('a assinatura com técnico muda quando o técnico muda; a sem técnico não muda à toa', async () => {
+    const hAna = await visitHash(base, 'Ana');
+    expect(hAna).not.toBe(await visitHash(base, 'Beto'));
+    expect(hAna).not.toBe(await visitHash(base));
+    expect(await visitHash(base, null)).toBe(await visitHash(base));
+  });
+});

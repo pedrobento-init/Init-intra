@@ -93,6 +93,10 @@ Evento criado à mão nela não vira visita (visita precisa de cliente; crie pel
    liberada, as visitas de 7 dias atrás em diante vão para ela — inclusive as de técnico sem
    e-mail cadastrado (que não têm agenda pessoal).
 
+Na compartilhada o título do evento é `Cliente · Visita #0001 · Técnico` — como ela tem as
+visitas de todo mundo, o técnico aparece no título (na agenda pessoal continua
+`Visita #0001 · Cliente`). Trocar o técnico da visita atualiza o título sozinho.
+
 Sem `AGENDA_SHARED_CAL`, nada muda: só as agendas pessoais sincronizam.
 
 ## Conferir

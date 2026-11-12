@@ -83,6 +83,11 @@ async function loadOps(db: SupabaseClient) {
   return new Ops((data || []) as Op[]);
 }
 
+/** Nome do técnico para o título na agenda compartilhada (cadastro > visita). */
+function opNameOf(ops: Ops, v: Visit): string | null {
+  return ops.of(v.operator_id, v.operator)?.name ?? v.operator ?? null;
+}
+
 async function loadVisits(db: SupabaseClient, ids: string[]) {
   const map = new Map<string, Visit>();
   for (let i = 0; i < ids.length; i += 100) {
@@ -100,7 +105,6 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
   const ops = await loadOps(db);
   const calendars = [...ops.byId.values()].map((o) => ({ op: o.id, cal: ops.cal(o) })).filter((c) => c.cal);
   if (SHARED_CAL) calendars.push({ op: SHARED_OP, cal: SHARED_CAL });
-
   const { data: rows, error } = await db.from("google_agenda_queue")
     .select("seq, visit_id, old_operator_id, old_operator").order("seq").limit(PUSH_BATCH * 3);
   if (error) throw new Error("fila: " + error.message);
@@ -126,13 +130,16 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
     const live = !!v && v.status !== "cancelada" && /^\d{4}-\d{2}-\d{2}$/.test(String(v.date || ""));
     const removeFrom = [...g.old].filter((c) => c !== cal || !live);
     const hash = live ? await visitHash(v!) : null;
+    // A compartilhada mostra o técnico no título: a assinatura dela inclui o
+    // nome, então trocar de técnico reenvia o evento para atualizar o título.
+    const hashShared = live && SHARED_CAL ? await visitHash(v!, opNameOf(ops, v!)) : null;
 
     // Destino pessoal (agenda do técnico). Nada a fazer quando já está igual,
     // ou quando o técnico não tem e-mail (fica sem hash, para ir quando tiver).
     const personalTodo = (live && !!cal && hash !== v!.google_hash) || removeFrom.length > 0 || (!live && !!cal);
     // Destino compartilhado ("Atendimentos"): toda visita, mesmo sem técnico
     // com e-mail. Visita morta sai de lá só se um dia entrou (hash gravado).
-    const sharedTodo = !!SHARED_CAL && (live ? hash !== v!.google_hash_shared : !!v!.google_hash_shared);
+    const sharedTodo = !!SHARED_CAL && (live ? hashShared !== v!.google_hash_shared : !!v!.google_hash_shared);
 
     // Nada a fazer em NENHUMA das agendas: só tira da fila.
     if (!personalTodo && !sharedTodo) { noop.push({ id, seq: g.seq }); continue; }
@@ -156,8 +163,8 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
         event_id: eventIdFor(id),
         cal: live ? SHARED_CAL : null,
         remove_from: live ? [] : [SHARED_CAL],
-        event: live ? visitToEvent(v!, APP_URL ? APP_URL + "/#visitas" : "") : null,
-        hash,
+        event: live ? visitToEvent(v!, APP_URL ? APP_URL + "/#visitas" : "", opNameOf(ops, v!)) : null,
+        hash: hashShared,
         dest: SHARED_OP,
       });
     }
@@ -176,8 +183,10 @@ async function applyEvent(db: SupabaseClient, ops: Ops, opId: string | null, ev:
   if (!v || v.status === "cancelada") return false;
   if (opId !== null && ops.of(v.operator_id, v.operator)?.id !== opId) return false;
   const hashCol = opId === null ? "google_hash_shared" : "google_hash";
+  // A compartilhada assina com o técnico no título; a pessoal, sem.
+  const titleOp = opId === null ? opNameOf(ops, v) : undefined;
   // Mudança do site ainda não enviada a esta agenda: o site vence.
-  if ((v[hashCol] ?? null) !== await visitHash(v)) return false;
+  if ((v[hashCol] ?? null) !== await visitHash(v, titleOp)) return false;
 
   const now = new Date().toISOString();
   if (ev.status === "cancelled") {
@@ -189,7 +198,7 @@ async function applyEvent(db: SupabaseClient, ops: Ops, opId: string | null, ev:
   }
   const patch = eventToVisitPatch(ev, v);
   if (!patch) return false;
-  const hash = await visitHash({ ...v, ...patch } as Visit);
+  const hash = await visitHash({ ...v, ...patch } as Visit, titleOp);
   await db.from("visits").update({ ...patch, [hashCol]: hash, updated_at: now }).eq("id", vid);
   return true;
 }
@@ -289,11 +298,14 @@ async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?
       // liberada (backfill pessoal ou da compartilhada).
       if (p.ok) {
         const v = visits.get(id);
-        // Cada destino confirma a própria assinatura. dest ausente = robô de
-        // antes da 081, que só conhece a agenda pessoal.
-        const hashCol = p.dest === SHARED_OP ? "google_hash_shared" : "google_hash";
+        // Cada destino confirma a própria assinatura — e a compartilhada
+        // assina com o técnico no título. dest ausente = robô de antes da
+        // 081, que só conhece a agenda pessoal.
+        const isShared = p.dest === SHARED_OP;
+        const hashCol = isShared ? "google_hash_shared" : "google_hash";
+        const esperado = p.hash ? await visitHash(v!, isShared ? opNameOf(ops, v!) : undefined) : null;
         // Só confirma se a visita não mudou de novo enquanto o robô enviava.
-        if (v && (p.hash ? await visitHash(v) === p.hash : true) && (v[hashCol] ?? null) !== (p.hash ?? null)) {
+        if (v && (!p.hash || esperado === p.hash) && (v[hashCol] ?? null) !== (p.hash ?? null)) {
           await db.from("visits").update({ [hashCol]: p.hash ?? null }).eq("id", id);
         }
       }
