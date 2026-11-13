@@ -247,7 +247,7 @@ corta, nesta ordem:
   (`Em ... escreveu:`, `On ... wrote:`, `-----Mensagem original-----`, o bloco
   `De:/Enviada em:` do Outlook, a régua de sublinhados, a primeira linha com `>`);
 - **a assinatura**, pelo delimitador `-- ` do RFC 3676 ou por uma despedida
-  (`Obrigado,`, `Atenciosamente`) seguida de bloco de contato curto — telefone,
+  (`Obrigado,`, `Obg`, `Atenciosamente`) seguida de bloco de contato curto — telefone,
   site ou e-mail. A despedida em si fica: é a última coisa que a pessoa escreveu.
 
 A regra é **errar para menos**: despedida seguida de texto de verdade não é
