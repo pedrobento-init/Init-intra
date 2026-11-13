@@ -272,7 +272,7 @@ const MARCAS_CITACAO: RegExp[] = [
 
 // O delimitador do RFC 3676 ("-- " sozinho na linha): sem ambiguidade nenhuma.
 const MARCA_SIG_RFC = /^-- ?[ \t]*$/m;
-const DESPEDIDAS = /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
+const DESPEDIDAS = /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Obg\.?|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
 // Sinais de bloco de contato: telefone, site ou e-mail soltos.
 const SINAL_CONTATO = /(\+?\d[\d ().-]{7,}\d)|(https?:\/\/|www\.)|([^\s@]+@[^\s@]+\.[^\s@]{2,})/i;
 

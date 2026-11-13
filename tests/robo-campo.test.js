@@ -293,6 +293,15 @@ describe('corpoLimpo: só o que a pessoa escreveu agora', () => {
     expect(limpo).not.toContain('initnet.com.br');
   });
 
+  it('despedida abreviada corta a assinatura com imagens e contatos', () => {
+    const e = 'Boa tarde.\nPeço verificar se há algo ocorrendo no SharePoint pois temos relatos internos que alguns arquivos não estão sendo salvos.\nObg\n\n[cid:image001.png@01DD7050.B4901920]\nJorge Babazono\nBusiness Partner\n+55 11 99774-4427\njorgeb@pxcs.com.br\nwww.pxcs.com.br';
+    const limpo = corpoLimpo(e);
+    expect(limpo).toContain('Peço verificar');
+    expect(limpo.endsWith('Obg')).toBe(true);
+    expect(limpo).not.toContain('Business Partner');
+    expect(limpo).not.toContain('[cid:');
+  });
+
   it('o delimitador "-- " do RFC corta sozinho', () => {
     const e = 'A impressora parou de imprimir hoje de manhã.\n\n-- \nAna Paula\nDias Rizzo';
     expect(corpoLimpo(e)).toBe('A impressora parou de imprimir hoje de manhã.');

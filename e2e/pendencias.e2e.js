@@ -7,6 +7,28 @@ test.describe('Pendências', () => {
     await expect(page.locator('.kanban-board')).toBeVisible();
   });
 
+  test('coluna longa rola os cards sem mover o cabeçalho ou a página', async ({ page }) => {
+    const column = penColumn(page, 'Aberto');
+    await column.locator('.kanban-card').first().evaluate((card) => {
+      for (let i = 0; i < 30; i++) card.parentElement.append(card.cloneNode(true));
+    });
+
+    const result = await column.evaluate((col) => {
+      const header = col.querySelector('.kanban-col-header');
+      const cards = col.querySelector('.kanban-cards');
+      const headerTop = header.getBoundingClientRect().top;
+      const pageScroll = window.scrollY;
+      cards.scrollTop = cards.scrollHeight;
+      return {
+        scrollable: cards.scrollHeight > cards.clientHeight,
+        scrolled: cards.scrollTop > 0,
+        headerFixed: header.getBoundingClientRect().top === headerTop,
+        pageFixed: window.scrollY === pageScroll,
+      };
+    });
+    expect(result).toEqual({ scrollable: true, scrolled: true, headerFixed: true, pageFixed: true });
+  });
+
   test('criar pendência pelo formulário aparece em "Aberto"', async ({ page }) => {
     await page.locator('#topbarActionBtn').click();
     const modal = page.locator('#modal');

@@ -64,6 +64,8 @@ function openClientForm(id = null) {
           <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" name="name" value="${esc(c.name)}" required /></div>
           <div class="form-group"><label class="form-label">CNPJ / CPF</label><input class="form-input" name="cnpj" value="${esc(c.cnpj)}" /></div>
         </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="autoFillClientByCnpj(this)">Preencher automaticamente</button>
+        <div class="form-hint">Consulta os dados públicos do CNPJ e preenche somente os campos vazios.</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Segmento</label><input class="form-input" name="segment" value="${esc(c.segment)}" /></div>
           ${(() => {
@@ -167,6 +169,53 @@ function openClientForm(id = null) {
   window._selectedColor = c.color || COLORS[0];
   window._selectedLogoShape = c.logoShape || 'circle';
   window._currentLogoData = c.logo || '';
+}
+
+function clientCnpjFormData(data) {
+  const clean = v => String(v == null ? '' : v).trim();
+  const street = [clean(data.descricao_tipo_de_logradouro), clean(data.logradouro)].filter(Boolean).join(' ');
+  const address = [
+    [street, clean(data.numero)].filter(Boolean).join(', '),
+    clean(data.complemento),
+    clean(data.bairro),
+    [clean(data.municipio), clean(data.uf)].filter(Boolean).join(' - '),
+  ].filter(Boolean).join(' · ');
+  return {
+    name: clean(data.nome_fantasia) || clean(data.razao_social),
+    segment: clean(data.cnae_fiscal_descricao),
+    address,
+  };
+}
+
+async function autoFillClientByCnpj(button) {
+  const form = button.closest('form');
+  const cnpj = String(form.elements.cnpj.value || '').replace(/\D/g, '');
+  if (cnpj.length !== 14) {
+    showToast('Informe um CNPJ com 14 dígitos.', 'warning');
+    return;
+  }
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = 'Consultando…';
+  try {
+    const response = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cnpj);
+    if (!response.ok) throw new Error(response.status === 404 ? 'CNPJ não encontrado.' : 'Não foi possível consultar o CNPJ.');
+    const values = clientCnpjFormData(await response.json());
+    const filled = [];
+    Object.entries(values).forEach(([key, value]) => {
+      const input = form.elements[key];
+      if (value && input && !input.value.trim()) {
+        input.value = value;
+        filled.push(key);
+      }
+    });
+    showToast(filled.length ? 'Dados preenchidos. Revise e salve a ficha.' : 'Nenhum campo vazio para preencher.', filled.length ? 'success' : 'info');
+  } catch (err) {
+    showToast(err.message || 'Não foi possível consultar o CNPJ.', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
 }
 
 let _licIdx = 10;
@@ -1066,7 +1115,7 @@ function _refreshClientsInPlace(){
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    buildClientNarrative, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
+    buildClientNarrative, autoFillClientByCnpj, clientCnpjFormData, normalizeMilvusClientToken, parseGoogleSheetId, parseGoogleSheetLink, googleSheetEmbedUrl,
     parseDriveFolderId, driveFolderUrl, driveFolderBadge, _canManageClientDrive, saveDriveFolderLink,
     renderClientDriveSection, submitDriveFolderLink,
     // Ficha TI (aba "Ficha TI" do modal de cliente)
