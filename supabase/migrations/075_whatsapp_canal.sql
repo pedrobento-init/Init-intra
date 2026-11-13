@@ -3,7 +3,7 @@
 -- ============================================================
 -- A 073 fez de emails_triagem a caixa única de "tudo que chegou", mas tudo que
 -- chegava era e-mail. Com a entrada por WhatsApp (supabase/functions/whatsapp/,
--- hoje pela Z-API), a mensagem precisa cair na MESMA caixa — senão quem atende
+-- hoje pelo WAHA), a mensagem precisa cair na MESMA caixa — senão quem atende
 -- passa a ter duas filas, e a que não tem tela é a que esquece.
 --
 -- O nome da tabela continua dizendo e-mail porque renomear quebraria o sync do

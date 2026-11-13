@@ -25,6 +25,16 @@ describe('ENTITIES (schema central)', () => {
     expect(clients.optionalFields).toContain('drive_folder_url');
   });
 
+  // 082: banco sem a migration recusaria o push inteiro se o app mandasse
+  // media/direcao vazios; como opcionais, eles só vão quando têm valor.
+  it('emails_triagem mapeia direcao e media e os trata como opcionais', () => {
+    const t = ENTITIES.find((e) => e.table === 'emails_triagem');
+    expect(t.fields.direcao).toBe('direcao');
+    expect(t.fields.media).toBe('media');
+    expect(t.optionalFields).toContain('direcao');
+    expect(t.optionalFields).toContain('media');
+  });
+
   it('toda entidade de sync tem id e updated_at no mapa de campos', () => {
     for (const e of SYNC_ENTITIES) {
       expect(e.fields, `fields ausentes em ${e.table}`).toBeTruthy();

@@ -7,8 +7,8 @@
 // que a atribuição mora: duas mensagens do mesmo thread com donos diferentes
 // seria o mesmo cliente atendido por duas pessoas sem saber uma da outra.
 //
-// Responder ao cliente NÃO sai daqui ainda: por enquanto a resposta passa pelo
-// chamado, que já tem o envio, o histórico e o SLA. A IA nunca responde sozinha.
+// A resposta sai direto da conversa pela function conversa-responder. Chamado
+// é opcional e tem SLA próprio. A IA classifica, mas nunca responde sozinha.
 //
 // Desde a 075 a mesma tabela recebe o WhatsApp (canal = 'whatsapp', telefone).
 // Não há thread do Gmail ali: a conversa é o telefone, e é por ele que a
@@ -27,16 +27,18 @@ const CAIXA_CANAIS = {
 };
 
 const CAIXA_FILTROS = {
-  pendentes: 'Aguardando decisão',
+  pendentes: 'Em atendimento',
   minhas: 'Atribuídas a mim',
+  encerradas: 'Encerradas',
   todas: 'Todas',
 };
 
 const CAIXA_STATUS = {
   pendente: 'Aguardando',
   virou_chamado: 'Virou chamado',
-  anexado: 'Anexado a chamado',
+  anexado: 'Em atendimento',
   descartado: 'Descartado',
+  encerrado: 'Encerrado',
 };
 
 // Ordena por data ISO; entrada sem data vai para o fim em vez de quebrar a
@@ -60,6 +62,20 @@ function _caixaChaveConversa(e) {
   return 'whatsapp:' + (chamadoTelefoneChave(e.telefone) || chamadoTelefoneDigitos(e.telefone) || e.id);
 }
 
+// A tela agrupa o WhatsApp pelo telefone normalizado (sem 55 e sem nono
+// dígito), mas o banco guarda o thread com o número inteiro. Responder com a
+// chave da tela daria 404 na function: o thread id que vale é o que o servidor
+// gravou — e, numa linha antiga sem ele, o telefone reconstruído do mesmo jeito.
+function caixaThreadId(c) {
+  if (!c) return '';
+  if (c.ultima && c.ultima.threadId) return c.ultima.threadId;
+  if ((c.canal || caixaCanalEntrada(c.ultima)) === 'whatsapp') {
+    const digitos = chamadoTelefoneDigitos(c.telefone || (c.ultima && c.ultima.telefone) || '');
+    if (digitos) return 'whatsapp:' + digitos;
+  }
+  return c.id || '';
+}
+
 function caixaAgruparConversas(lista) {
   const grupos = {};
   (lista || []).forEach((e) => {
@@ -77,13 +93,18 @@ function caixaAgruparConversas(lista) {
       for (let i = mensagens.length - 1; i >= 0; i--) if (mensagens[i][campo]) return mensagens[i][campo];
       return null;
     };
+    const pendente = mensagens.some((m) => (m.direcao || 'entrada') === 'entrada' && m.status === 'pendente');
     return {
       id: chave,
       mensagens,
       ultima,
       canal: caixaCanalEntrada(ultima),
       telefone: ultimoCom('telefone'),
-      pendente: mensagens.some((m) => m.status === 'pendente'),
+      pendente,
+      encerrada: !pendente && mensagens.some((m) => m.status === 'encerrado'),
+      // Descartar é decisão tomada: a conversa não volta para a fila de quem
+      // espera resposta, mas continua existindo em "Todas".
+      descartada: !pendente && mensagens.some((m) => m.status === 'descartado'),
       atribuidoA: ultimoCom('atribuidoA'),
       clientId: ultimoCom('clientId'),
       pendenciaId: ultimoCom('pendenciaId'),
@@ -98,7 +119,8 @@ function caixaFiltrar(conversas, filtro, busca, usuario) {
   const qDig = chamadoTelefoneDigitos(q);
   return (conversas || []).filter((c) => {
     if (filtro === 'minhas' && c.atribuidoA !== usuario) return false;
-    if ((filtro || 'pendentes') === 'pendentes' && !c.pendente) return false;
+    if ((filtro || 'pendentes') === 'pendentes' && (c.encerrada || c.descartada)) return false;
+    if (filtro === 'encerradas' && !c.encerrada) return false;
     if (!q) return true;
     return c.mensagens.some((m) =>
       String(m.assunto || '').toLowerCase().includes(q) || String(m.de || '').toLowerCase().includes(q) ||
@@ -308,14 +330,12 @@ function _caixaConversaHTML(c) {
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
   const pen = c.pendenciaId && typeof getPendenciaById === 'function' ? getPendenciaById(c.pendenciaId) : null;
   const motivo = EMAIL_TRIAGEM_MOTIVOS[c.ultima.motivo];
-  // Resposta ao cliente sai pelo chamado, que é onde fica o histórico e o SLA:
-  // a caixa só aponta o caminho, não compõe e-mail por fora.
   const acoes = '<div class="cx-acoes">' +
-    (pen ? '<button type="button" class="btn btn-primary btn-sm" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Responder pelo chamado</button>' : '') +
-    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir' : 'Atribuir') + '</button>' +
+    (pen ? '<button type="button" class="btn btn-secondary btn-sm" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Abrir chamado</button>' : '') +
+    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir' : 'Assumir / atribuir') + '</button>' +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaVincular" data-arg="' + id + '">' + (cli ? 'Trocar cliente' : 'Vincular cliente') + '</button>' +
-    (c.pendente ? '<button type="button" class="btn btn-primary btn-sm" data-action="caixaAbrirChamado" data-arg="' + id + '">Abrir chamado</button>' +
-      '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaDescartar" data-arg="' + id + '">Descartar</button>' : '') +
+    (!pen ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAbrirChamado" data-arg="' + id + '">Criar chamado</button>' : '') +
+    (!c.encerrada ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaEncerrar" data-arg="' + id + '">Encerrar conversa</button>' : '') +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaMarcarNaoLida" data-arg="' + id + '">Marcar como não lida</button>' +
     '</div>';
   const todas = _caixaConversas();
@@ -333,11 +353,12 @@ function _caixaConversaHTML(c) {
     const dia = _caixaDiaRotulo(m.recebidoEm);
     const sep = dia && dia !== diaAnterior ? '<div class="cx-dia"><span>' + escapeHtml(dia) + '</span></div>' : '';
     diaAnterior = dia;
-    const quem = _caixaNomeDe(m, c.canal);
-    return sep + '<article class="cx-msg">' +
+    const direcao = m.direcao || 'entrada';
+    const quem = direcao === 'interna' ? 'Nota interna · ' + (m.de || 'Equipe') : direcao === 'saida' ? (m.de || 'Você') : _caixaNomeDe(m, c.canal);
+    return sep + '<article class="cx-msg cx-' + escapeHtml(direcao) + '">' +
       '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(quem)) + '</span>' +
       '<div class="cx-balao"><header><b>' + escapeHtml(quem) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
-      _caixaCorpoHTML(m.corpo, c.canal) + '</div></article>';
+      _caixaCorpoHTML(m.corpo, c.canal) + _caixaMediaHTML(m.media) + '</div></article>';
   }).join('');
   const lado = '<aside class="cx-lado">' +
     '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-avatar">' + escapeHtml(_caixaIniciais(nome)) + '</span><div><b>' + escapeHtml(nome) + '</b>' +
@@ -355,6 +376,13 @@ function _caixaConversaHTML(c) {
     '<dt>Recebido</dt><dd>' + escapeHtml(formatDateTime(c.mensagens[0].recebidoEm)) + '</dd>' +
     (pen ? '<dt>Chamado</dt><dd><a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">' + escapeHtml(pen.id) + ' · ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a></dd>' : '') +
     '</dl>' + (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') + '</section></aside>';
+  const composer = '<form class="cx-composer" data-submit="caixaEnviarMensagem" data-arg="' + id + '">' +
+    '<div class="cx-composer-opcoes"><select class="form-select" name="kind" aria-label="Tipo de mensagem">' +
+    '<option value="reply">Responder ao cliente</option><option value="internal">Nota interna (não envia)</option></select>' +
+    '<button type="button" class="btn btn-secondary btn-sm" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></div>' +
+    '<textarea class="form-textarea" id="newNoteText" name="text" rows="3" placeholder="Escreva a resposta ou a nota interna..."></textarea>' +
+    '<div class="cx-composer-envio"><input type="file" name="file" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
+    '<button type="submit" class="btn btn-primary">Salvar / enviar</button></div><div id="rpPainel" hidden></div></form>';
   return '<div class="cx-conv-topo">' +
     '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
     '<h2 class="ov-h2">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>' +
@@ -366,7 +394,19 @@ function _caixaConversaHTML(c) {
     (pen ? '<span class="cx-chip">Chamado #' + escapeHtml(String(pen.id).slice(0, 8)) + '</span>' : '') +
     '<span class="cx-chip">' + c.mensagens.length + (c.mensagens.length > 1 ? ' mensagens' : ' mensagem') + '</span></div>' +
     acoes + '</div>' +
-    '<div class="cx-conv-grade"><div class="cx-timeline">' + timeline + '</div>' + lado + '</div>';
+    '<div class="cx-conv-grade"><div><div class="cx-timeline">' + timeline + '</div>' + composer + '</div>' + lado + '</div>';
+}
+
+function _caixaMediaHTML(media) {
+  if (!media || typeof media !== 'object') return '';
+  const nome = String(media.nome || media.filename || 'Anexo');
+  const tipo = String(media.tipo || media.mimetype || 'application/octet-stream');
+  const url = media.dados ? 'data:' + tipo + ';base64,' + String(media.dados).replace(/[^A-Za-z0-9+/=]/g, '') : String(media.url || '');
+  if (!/^https?:\/\//.test(url) && !url.startsWith('data:')) return '<div class="cx-anexo">' + escapeHtml(nome) + '</div>';
+  const seguro = escapeHtml(url);
+  if (tipo.startsWith('image/')) return '<a href="' + seguro + '" target="_blank" rel="noopener noreferrer"><img class="cx-imagem" src="' + seguro + '" alt="' + escapeHtml(nome) + '"></a>';
+  if (tipo.startsWith('audio/')) return '<audio class="cx-audio" controls preload="none" src="' + seguro + '"></audio>';
+  return '<a class="cx-anexo" href="' + seguro + '" target="_blank" rel="noopener noreferrer" download="' + escapeHtml(nome) + '">Baixar ' + escapeHtml(nome) + '</a>';
 }
 
 function _caixaEmailDe(de) {
@@ -560,9 +600,9 @@ function caixaPrefillWhatsapp(c, e) {
 function caixaAbrirChamado(id) {
   const c = _caixaConversaPorId(id);
   if (!c) return;
-  const pendentes = c.mensagens.filter((m) => m.status === 'pendente');
-  if (!pendentes.length) { showToast('Esta conversa já foi tratada.', 'error'); renderCaixaEntrada(); return; }
-  const e = pendentes[pendentes.length - 1];
+  const recebidas = c.mensagens.filter((m) => (m.direcao || 'entrada') === 'entrada');
+  if (!recebidas.length || c.pendenciaId) { showToast('Esta conversa já tem um chamado.', 'error'); renderCaixaEntrada(); return; }
+  const e = recebidas[recebidas.length - 1];
   if (c.canal !== 'whatsapp') { emailTriagemAbrirChamado(e.id); return; }
   if (typeof openPendenciaForm !== 'function') return;
   openPendenciaForm(null, e.clientId || c.clientId || null, null, caixaPrefillWhatsapp(c, e));
@@ -579,6 +619,52 @@ function caixaDescartar(id) {
     ids.forEach((mid) => _emailTriagemSalvar(mid, { status: 'pendente', pendenciaId: null }));
     _emailTriagemRedesenhar();
   });
+}
+
+async function caixaEnviarMensagem(id, form) {
+  const c = _caixaConversaPorId(id);
+  if (!c || !window._supabaseAuthActive) { showToast('Conecte-se ao Supabase para responder.', 'error'); return; }
+  const fd = new FormData(form);
+  const texto = String(fd.get('text') || '').trim();
+  const arquivo = fd.get('file');
+  if (!texto && !(arquivo && arquivo.size)) { showToast('Escreva uma mensagem ou escolha um arquivo.', 'error'); return; }
+  if (arquivo && arquivo.size > 5 * 1024 * 1024) { showToast('O arquivo deve ter no máximo 5 MB.', 'error'); return; }
+  const botao = form.querySelector('[type="submit"]');
+  if (botao) botao.disabled = true;
+  try {
+    let file = null;
+    if (arquivo && arquivo.size) {
+      const dados = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(arquivo);
+      });
+      file = { nome: arquivo.name, tipo: arquivo.type || 'application/octet-stream', dados };
+    }
+    const res = await supabaseClient.functions.invoke('conversa-responder', { body: {
+      thread_id: caixaThreadId(c), text: texto, kind: fd.get('kind') === 'internal' ? 'internal' : 'reply', file,
+    } });
+    if (res.error) throw res.error;
+    if (res.data && res.data.error) throw new Error(res.data.error);
+    form.reset();
+    if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
+    showToast(fd.get('kind') === 'internal' ? 'Nota interna salva.' : 'Resposta enviada.', 'success');
+    if (typeof syncSupabaseToLocal === 'function') await syncSupabaseToLocal();
+    renderCaixaEntrada();
+  } catch (err) {
+    showToast('Não foi possível concluir: ' + String((err && err.message) || 'erro de conexão'), 'error');
+  } finally {
+    if (botao) botao.disabled = false;
+  }
+}
+
+function caixaEncerrar(id) {
+  const c = _caixaConversaPorId(id);
+  if (!c) return;
+  _caixaSalvarConversa(c, { status: 'encerrado' });
+  _emailTriagemRedesenhar();
+  showToast('Conversa encerrada. Uma nova mensagem do cliente reabre o atendimento.', 'success');
 }
 
 registerActions({
@@ -599,6 +685,8 @@ registerActions({
   },
   caixaAbrirChamado: (_el, id) => caixaAbrirChamado(id),
   caixaDescartar: (_el, id) => caixaDescartar(id),
+  caixaEncerrar: (_el, id) => caixaEncerrar(id),
+  caixaEnviarMensagem: (el, id) => { caixaEnviarMensagem(id, el); },
   // Fecha a conversa junto: aberta, o render a marcaria como lida de novo.
   caixaMarcarNaoLida: (_el, id) => {
     const c = _caixaConversas().find((x) => x.id === id);

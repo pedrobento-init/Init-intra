@@ -1,4 +1,4 @@
-// Edge Function: whatsapp — webhook de entrada do WhatsApp (hoje, Z-API).
+// Edge Function: whatsapp — webhook de entrada do WhatsApp (hoje, WAHA).
 //
 // O que faz com cada mensagem de texto que um cliente manda para o número da
 // empresa:
@@ -13,19 +13,18 @@
 //     cliente; sem, vai como sem_cliente na equipe padrão.
 //
 // AUTENTICAÇÃO — auth "none" + token na query, e verify_jwt = false no
-// config.toml. A Z-API não manda JWT do Supabase, não assina o corpo e não
-// deixa configurar cabeçalho no webhook: o único segredo que dá para pôr é na
-// URL cadastrada no painel (…/whatsapp?token=…). O token é comparado em tempo
+// config.toml. O WAHA não manda JWT do Supabase; o webhook usa o token na URL
+// cadastrada no painel (…/whatsapp?token=…). O token é comparado em tempo
 // constante com WHATSAPP_WEBHOOK_TOKEN; sem o segredo configurado, tudo é 401
 // (fail-closed). A URL com token nunca vai para log.
 //
-// IDEMPOTÊNCIA — a Z-API pode reentregar o mesmo evento. A chave
+// IDEMPOTÊNCIA — a WAHA pode reentregar o mesmo evento. A chave
 // "whatsapp:<messageId>" em avisos_enviados (051) garante uma passagem por
 // mensagem; o email_id UNIQUE da caixa (066) segura o resto.
 //
 // CONFIGURAÇÃO (supabase secrets set):
 //   WHATSAPP_WEBHOOK_TOKEN — o token que vai na URL do webhook no painel.
-//   (o envio usa ZAPI_INSTANCE_ID, ZAPI_TOKEN e ZAPI_CLIENT_TOKEN, mas só no
+//   (o envio usa WAHA_BASE_URL, WAHA_API_KEY e WAHA_SESSION, mas só no
 //   whatsapp-responder.)
 
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
@@ -54,17 +53,27 @@ type ClienteFone = {
   responsible_phone?: string | null;
 };
 
-type Aberto = { id: string; status: string; notes: unknown; client_id: string | null; team: string | null };
+type Aberto = {
+  id: string;
+  status: string;
+  notes: unknown;
+  client_id: string | null;
+  team: string | null;
+};
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 // Caminho antigo, só para banco sem a 077: lê clients inteiro.
 async function todosOsClientes(db: SupabaseClient): Promise<ClienteFone[]> {
   const out: ClienteFone[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from("clients")
+    const { data, error } = await db
+      .from("clients")
       .select("id, name, team, technician, owner_phone, responsible_phone")
       .range(from, from + 999);
     if (error) throw new Error("clients: " + error.message);
@@ -78,7 +87,7 @@ async function todosOsClientes(db: SupabaseClient): Promise<ClienteFone[]> {
 async function clienteDaMensagem(
   db: SupabaseClient,
   telefone: string,
-  cache: { todos: ClienteFone[] | null },
+  cache: { todos: ClienteFone[] | null }
 ): Promise<ClienteFone | null> {
   const chave = chaveTelefone(telefone);
   if (!chave) return null;
@@ -106,11 +115,13 @@ async function clienteDaMensagem(
 type Anexo = { ok: true } | { ok: false; naoAchou: boolean; erro: string };
 async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Promise<Anexo> {
   const { data, error } = await db.rpc("append_pendencia_note", { p_id: aberto.id, p_team: aberto.team, p_nota: nota });
-  if (!error) return data === true ? { ok: true } : { ok: false, naoAchou: true, erro: "chamado mudou de equipe ou sumiu" };
+  if (!error)
+    return data === true ? { ok: true } : { ok: false, naoAchou: true, erro: "chamado mudou de equipe ou sumiu" };
   if (!funcaoAusente(error)) return { ok: false, naoAchou: false, erro: error.message };
   console.warn("whatsapp: migration 077 não aplicada, anexando nota por ler-e-regravar");
   const anteriores = Array.isArray(aberto.notes) ? aberto.notes : [];
-  let q = db.from("pendencias")
+  let q = db
+    .from("pendencias")
     .update({ notes: [...anteriores, nota], updated_at: new Date().toISOString() })
     .eq("id", aberto.id);
   q = aberto.team == null ? q.is("team", null) : q.eq("team", aberto.team);
@@ -123,7 +134,8 @@ async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Pr
 // mensagem: o limite protege a fila, não é controle de acesso.
 async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<number> {
   const desde = new Date(Date.now() - 60_000).toISOString();
-  const { count, error } = await db.from("emails_triagem")
+  const { count, error } = await db
+    .from("emails_triagem")
     .select("id", { count: "exact", head: true })
     .eq("telefone", telefone)
     .gte("recebido_em", desde);
@@ -142,7 +154,8 @@ async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<n
 // update da nota filtra por id + team lidos aqui.
 async function chamadoDaConversa(db: SupabaseClient, conversa: string): Promise<Aberto | null> {
   if (!conversa) return null;
-  const { data, error } = await db.from("pendencias")
+  const { data, error } = await db
+    .from("pendencias")
     .select("id, status, notes, client_id, team")
     .eq("email_thread_id", conversa)
     .order("created_at", { ascending: false })
@@ -170,18 +183,65 @@ function entradaDe(m: MensagemWhats): EmailEntrada {
 // Banco sem a 075 falha aqui (coluna canal/telefone não existe): o erro fica no
 // log e a nota, se houve, já está salva. A chave de dedupe NÃO volta, pelo
 // mesmo motivo do robô: reentrega repetiria o erro para sempre.
+async function baixarMidia(m: MensagemWhats) {
+  if (!m.media) return null;
+  try {
+    const base = Deno.env.get("WAHA_BASE_URL") || "";
+    const key = Deno.env.get("WAHA_API_KEY") || "";
+    const origem = new URL(m.media.url);
+    const url = new URL(origem.pathname + origem.search, base).toString();
+    const resp = await fetch(url, { headers: { "X-Api-Key": key }, signal: AbortSignal.timeout(20000) });
+    const tamanho = Number(resp.headers.get("content-length") || 0);
+    if (!resp.ok || tamanho > 5 * 1024 * 1024) return null;
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    if (bytes.length > 5 * 1024 * 1024) return null;
+    let binario = "";
+    for (let i = 0; i < bytes.length; i += 32768) binario += String.fromCharCode(...bytes.subarray(i, i + 32768));
+    return { nome: m.media.nome, tipo: m.media.tipo, dados: btoa(binario) };
+  } catch (err) {
+    console.error(`whatsapp mídia ${m.id}:`, (err as Error).message);
+    return null;
+  }
+}
+
+// Banco sem a 082 não tem direcao/media. O PostgREST recusa o insert inteiro
+// (PGRST204, coluna fora do schema cache) e o Postgres direto devolve 42703:
+// sem o retry, a mensagem sumiria da caixa por causa de uma coluna que é só do
+// portal. O histórico do portal fica para quando a migration rodar.
+function colunaDoPortalAusente(error: { code?: string; message?: string }): boolean {
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = error.message || "";
+  return /(direcao|media)/.test(msg) && /does not exist|schema cache/i.test(msg);
+}
+
 async function guardarNaCaixa(
   db: SupabaseClient,
   m: MensagemWhats,
-  opcoes: { motivo?: string | null; status?: string; pendenciaId?: string | null; clientId?: string | null; team?: string | null },
+  opcoes: {
+    motivo?: string | null;
+    status?: string;
+    pendenciaId?: string | null;
+    clientId?: string | null;
+    team?: string | null;
+  }
 ): Promise<boolean> {
   const linha = {
     ...entradaDaCaixa(entradaDe(m), opcoes, "ETR-" + crypto.randomUUID()),
     canal: "whatsapp",
     telefone: m.telefone,
+    direcao: "entrada",
+    media: await baixarMidia(m),
   };
   const { error } = await db.from("emails_triagem").insert(linha);
   if (!error || error.code === "23505") return true;
+  if (colunaDoPortalAusente(error)) {
+    console.warn(`whatsapp caixa ${m.id}: migration 082 não aplicada, gravando sem direcao/media`);
+    const { direcao: _direcao, media: _media, ...semPortal } = linha;
+    const { error: erroAntigo } = await db.from("emails_triagem").insert(semPortal);
+    if (!erroAntigo || erroAntigo.code === "23505") return true;
+    console.error(`whatsapp caixa ${m.id} (a mensagem NÃO apareceu na caixa):`, erroAntigo.message);
+    return false;
+  }
   console.error(`whatsapp caixa ${m.id} (a mensagem NÃO apareceu na caixa):`, error.message);
   return false;
 }
@@ -199,7 +259,7 @@ async function handle(req: Request, ctx: SupabaseContext) {
     return json({ ok: false, error: "invalid_json" }, 400);
   }
   // Evento que não é mensagem de texto (status, entrega, presença) responde 200
-  // vazio: erro faria a Z-API reentregar algo que nunca vai ser tratado.
+  // vazio: erro faria a WAHA reentregar algo que nunca vai ser tratado.
   const todas = mensagensDoWebhook(payload);
   if (!todas.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0 });
   if (todas.length > LOTE_MAX) console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
@@ -207,7 +267,10 @@ async function handle(req: Request, ctx: SupabaseContext) {
 
   const db = ctx.supabaseAdmin;
   try {
-    let notas = 0, caixa = 0, semCliente = 0, limitadas = 0;
+    let notas = 0,
+      caixa = 0,
+      semCliente = 0,
+      limitadas = 0;
     const cache: { todos: ClienteFone[] | null } = { todos: null };
     for (const m of msgs) {
       const key = "whatsapp:" + m.id;
@@ -228,7 +291,8 @@ async function handle(req: Request, ctx: SupabaseContext) {
       // Prova, gravada só pelo servidor, de que este número falou com a empresa:
       // o whatsapp-responder recusa enviar para quem não está aqui (076). Falha
       // não segura a mensagem — o pior caso é a resposta ser recusada depois.
-      const { error: erroConversa } = await db.from("whatsapp_conversas")
+      const { error: erroConversa } = await db
+        .from("whatsapp_conversas")
         .upsert({ telefone: m.telefone, ultima_em: new Date().toISOString() }, { onConflict: "telefone" });
       if (erroConversa) console.error(`whatsapp conversa ${m.id}:`, erroConversa.message);
 
@@ -237,26 +301,38 @@ async function handle(req: Request, ctx: SupabaseContext) {
         const anexo = await anexarNota(db, aberto, notaDoSolicitante(entradaDe(m)));
         if (anexo.ok) {
           notas++;
-          if (await guardarNaCaixa(db, m, { status: "anexado", pendenciaId: aberto.id, clientId: aberto.client_id, team: aberto.team || "init" })) caixa++;
+          if (
+            await guardarNaCaixa(db, m, {
+              status: "anexado",
+              pendenciaId: aberto.id,
+              clientId: aberto.client_id,
+              team: aberto.team || "init",
+            })
+          )
+            caixa++;
           continue;
         }
         console.error(`whatsapp nota ${m.id}:`, anexo.erro);
         if (!anexo.naoAchou) {
-          await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo na reentrega
+          await db.from("avisos_enviados").delete().eq("key", key); // tenta de novo na reentrega
           continue;
         }
       }
 
       const c = await clienteDaMensagem(db, m.telefone, cache);
       if (!c) semCliente++;
-      const ok = await guardarNaCaixa(db, m, c
-        ? { motivo: null, status: "pendente", clientId: c.id, team: c.team || "init" }
-        : { motivo: "sem_cliente", status: "pendente", team: "init" });
+      const ok = await guardarNaCaixa(
+        db,
+        m,
+        c
+          ? { motivo: null, status: "pendente", clientId: c.id, team: c.team || "init" }
+          : { motivo: "sem_cliente", status: "pendente", team: "init" }
+      );
       if (ok) caixa++;
     }
     return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas });
   } catch (err) {
-    // 500 faz a Z-API reentregar; a chave de dedupe impede processar duas vezes
+    // 500 faz a WAHA reentregar; a chave de dedupe impede processar duas vezes
     // o que já passou.
     console.error("whatsapp:", (err as Error).message);
     return json({ ok: false }, 500);

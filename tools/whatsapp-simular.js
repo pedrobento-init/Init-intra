@@ -1,6 +1,6 @@
 // tools/whatsapp-simular.js — manda para o webhook `whatsapp` uma mensagem no
-// formato da Z-API ("Ao receber", ReceivedCallback), para testar a entrada sem
-// celular nem instância conectada.
+// formato do WAHA (evento "message"), para testar a entrada sem celular nem
+// sessão conectada.
 //
 //   WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js \
 //     --url https://<ref>.supabase.co/functions/v1/whatsapp --texto "oi"
@@ -44,15 +44,19 @@ function lerArgs(argv) {
 // O id muda a cada execução porque o webhook deduplica por messageId: repetir
 // o mesmo id faria a segunda simulação sumir sem explicação.
 function montarPayload(opcoes, agora = Date.now()) {
+  const telefone = String(opcoes.telefone || '').replace(/\D/g, '');
   return {
-    type: 'ReceivedCallback',
-    phone: String(opcoes.telefone || '').replace(/\D/g, ''),
-    fromMe: false,
-    isGroup: false,
-    messageId: opcoes.id || 'SIM' + agora.toString(36).toUpperCase(),
-    senderName: opcoes.nome || '',
-    momment: agora,
-    text: { message: opcoes.texto || '' },
+    event: 'message',
+    session: 'default',
+    payload: {
+      id: opcoes.id || 'SIM' + agora.toString(36).toUpperCase(),
+      timestamp: Math.floor(agora / 1000),
+      from: telefone + '@c.us',
+      fromMe: false,
+      body: opcoes.texto || '',
+      hasMedia: false,
+      _data: { notifyName: opcoes.nome || '' },
+    },
   };
 }
 

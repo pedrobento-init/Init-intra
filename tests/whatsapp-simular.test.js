@@ -25,8 +25,11 @@ describe('lerArgs', () => {
 });
 
 describe('montarPayload', () => {
-  it('gera um ReceivedCallback que o adaptador aceita', () => {
-    const p = montarPayload(lerArgs(['--texto', 'oi', '--telefone', '+55 (11) 98765-4321']), 1700000000000);
+  it('gera um evento message do WAHA que o adaptador aceita', () => {
+    const p = montarPayload(
+      lerArgs(['--texto', 'oi', '--telefone', '+55 (11) 98765-4321']),
+      1700000000000
+    );
     const [m] = mensagensDoWebhook(p);
     expect(m.telefone).toBe('5511987654321');
     expect(m.texto).toBe('oi');
@@ -35,11 +38,11 @@ describe('montarPayload', () => {
 
   it('id novo a cada execução, para não cair na deduplicação', () => {
     const o = lerArgs([]);
-    expect(montarPayload(o, 1).messageId).not.toBe(montarPayload(o, 2).messageId);
+    expect(montarPayload(o, 1).payload.id).not.toBe(montarPayload(o, 2).payload.id);
   });
 
   it('respeita --id quando o teste é justamente a deduplicação', () => {
-    expect(montarPayload(lerArgs(['--id', 'FIXO']), 1).messageId).toBe('FIXO');
+    expect(montarPayload(lerArgs(['--id', 'FIXO']), 1).payload.id).toBe('FIXO');
   });
 });
 

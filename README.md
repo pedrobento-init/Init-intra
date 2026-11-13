@@ -16,6 +16,7 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 - **Operadores**: cadastro com equipes (init, mam, bt), papéis e flags de admin/Gestão.
 - **Busca global**: `Ctrl+K` para clientes, pendências e ações.
 - **E-mails**: notificações de pendência e lembretes de prazo pelo Gmail do Google Workspace.
+- **Caixa de entrada**: WhatsApp e e-mail na mesma lista, agrupados por conversa. Responder, anexar arquivo e anotar saem dali mesmo, sem abrir chamado; chamado continua opcional e com SLA próprio. O robô classifica, mas nunca responde sozinho.
 - **Celular**: os mesmos avisos como notificação (Web Push), ativados por aparelho em Configurar notificações.
 - **@menção**: quem é marcado numa nota recebe "Você foi mencionado" por e-mail e no celular, com link direto. Só vai para quem pode ver a pendência (Gestão só para Gestão; o resto para admin ou mesma equipe), nunca para quem escreveu.
 
@@ -33,6 +34,13 @@ equipamento e chamado Milvus — é o que um helpdesk genérico não faz.
 do Gmail, que a triagem abre já preenchido; por mensagem de WhatsApp, que passa
 pela mesma triagem; pelo Milvus; e pelo robô, quando um backup monitorado falha
 ou fica em silêncio além do limite.
+
+**A Caixa de entrada é o portal de conversas.** WhatsApp e e-mail caem na mesma
+lista, uma conversa por telefone ou thread. A resposta sai dali mesmo, pela
+function `conversa-responder`, e a nota interna fica no histórico sem ir ao
+cliente (migration 082). Encerrar não apaga nada: mensagem nova do cliente
+reabre o atendimento, e a resposta da equipe também. Chamado é opcional — a
+conversa não precisa dele para ser respondida.
 
 **Os status** (`js/ui.js`, `STATUS_PEN_MAP`): Aberto → Em Andamento, podendo
 passar por Pausado, Aguard. Terceiro ou Aguard. Cliente, e terminando em
@@ -56,12 +64,12 @@ de 7 dias.
 
 **O prazo sai da prioridade** (`js/sla.js`), em horas e dias **úteis**:
 
-| Prioridade | 1ª resposta | Resolução |
-| --- | --- | --- |
-| Crítica | 1 h | no mesmo dia |
-| Alta | 4 h | 1 dia útil |
-| Média | 8 h | 3 dias úteis |
-| Baixa | 24 h | 7 dias úteis |
+| Prioridade | 1ª resposta | Resolução    |
+| ---------- | ----------- | ------------ |
+| Crítica    | 1 h         | no mesmo dia |
+| Alta       | 4 h         | 1 dia útil   |
+| Média      | 8 h         | 3 dias úteis |
+| Baixa      | 24 h        | 7 dias úteis |
 
 **O que conta como primeira resposta** depende do tipo. Em **chamado** (canal
 externo — e-mail, WhatsApp — ou com e-mail do solicitante), só a nota marcada
@@ -104,20 +112,21 @@ e2e/                  Testes de navegador (Playwright)
 
 ### Edge Functions
 
-| Função | Para quê |
-| --- | --- |
-| `send-email` | Envia e-mail pelo Gmail (SMTP). Só operador logado, só para e-mails de operadores ativos. |
-| `avisos-prazo` | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). Também por push, se configurado. |
-| `send-push` | Notificação no celular (Web Push). Só operador logado, só para operadores ativos; chaves VAPID nos secrets (migration 053). |
-| `agenda-ics` | Feed iCalendar da agenda do técnico (token secreto no link). |
-| `robo` | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores, backup no Drive (migration 059) e pasta do Drive de cada cliente: vincula, cria, renomeia e move para a raiz, sem nunca apagar (migrations 068 e 069). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
-| `google-agenda` | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md). |
-| `ia-relatorio` | Texto de relatório com IA. |
-| `ia-levar` | Sugere o que levar para a visita (IA). |
-| `update-user-password` | Admin troca a senha de um usuário. |
-| `milvus-*` | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes). |
-| `whatsapp` | Webhook de entrada do WhatsApp (hoje Z-API, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). A 077 casa o cliente pelo telefone com índice e anexa a nota num UPDATE só; sem ela, o webhook volta ao caminho antigo. Limite de 30 mensagens por número por minuto. Autentica por token na query. |
-| `whatsapp-responder` | Operador responde pelo WhatsApp a um chamado que veio do WhatsApp. O número sai do próprio chamado (`email_thread_id = 'whatsapp:<dígitos>'`), nunca do app. Só operador ativo logado. |
+| Função                 | Para quê                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `send-email`           | Envia e-mail pelo Gmail (SMTP). Só operador logado, só para e-mails de operadores ativos.                                                                                                                                                                                                                                                                                                                               |
+| `avisos-prazo`         | Lembretes de prazo e avisos de vencimento, uma vez por dia pelo `pg_cron` (migration 051). Também por push, se configurado.                                                                                                                                                                                                                                                                                             |
+| `send-push`            | Notificação no celular (Web Push). Só operador logado, só para operadores ativos; chaves VAPID nos secrets (migration 053).                                                                                                                                                                                                                                                                                             |
+| `agenda-ics`           | Feed iCalendar da agenda do técnico (token secreto no link).                                                                                                                                                                                                                                                                                                                                                            |
+| `robo`                 | Tarefas do robô Apps Script: agenda de vencimentos, checagem de domínios (RDAP), e-mail "Seu dia", planilha de indicadores, backup no Drive (migration 059) e pasta do Drive de cada cliente: vincula, cria, renomeia e move para a raiz, sem nunca apagar (migrations 068 e 069). Ver [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md).                                                                                            |
+| `google-agenda`        | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md).                                                                                                                                                                                                                                                  |
+| `ia-relatorio`         | Texto de relatório com IA.                                                                                                                                                                                                                                                                                                                                                                                              |
+| `ia-levar`             | Sugere o que levar para a visita (IA).                                                                                                                                                                                                                                                                                                                                                                                  |
+| `update-user-password` | Admin troca a senha de um usuário.                                                                                                                                                                                                                                                                                                                                                                                      |
+| `milvus-*`             | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes).                                                                                                                                                                                                                                                                                                                                               |
+| `whatsapp`             | Webhook de entrada do WhatsApp (WAHA, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). A 077 casa o cliente pelo telefone com índice e anexa a nota num UPDATE só; sem ela, o webhook volta ao caminho antigo. Limite de 30 mensagens por número por minuto. Autentica por token na query. |
+| `whatsapp-responder`   | Operador responde pelo WhatsApp a um chamado que veio do WhatsApp. O número sai do próprio chamado (`email_thread_id = 'whatsapp:<dígitos>'`), nunca do app. Só operador ativo logado.                                                                                                                                                                                                                                  |
+| `conversa-responder`   | Portal da caixa de entrada: responde a conversa (WhatsApp ou e-mail) e grava nota interna, com ou sem chamado, e com anexo até 5 MB. O destino sai da última mensagem recebida no thread, nunca do navegador. Resposta real reabre conversa encerrada; nota interna não. Só operador ativo logado (migration 082).                                                                                                        |
 
 ## Desenvolvimento
 
@@ -137,7 +146,8 @@ Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 - **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
 - **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
 - **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
-  - **WhatsApp (Z-API)**: passo a passo completo, com número de teste, em [WHATSAPP.md](WHATSAPP.md). Resumo: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN` (envio, no `whatsapp-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). No painel da Z-API, o webhook "Ao receber" aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
+  - **Portal da caixa de entrada**: rode a migration 082 (colunas `direcao` e `media`, status `encerrado`) antes de publicar `conversa-responder`. A function usa os mesmos secrets do WhatsApp (`WAHA_*`) e do Gmail (`GMAIL_*`); sem eles, a resposta por aquele canal devolve erro de configuração e o histórico não é gravado.
+  - **WhatsApp (WAHA)**: n8n, PostgreSQL e WAHA sobem com `docker compose up -d`; o passo a passo completo está em [WHATSAPP.md](WHATSAPP.md). Resumo: `WAHA_BASE_URL`, `WAHA_API_KEY` e `WAHA_SESSION` (envio, no `whatsapp-responder` e no `conversa-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). O webhook do evento `message` aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
 
 ## Ícones PWA
 

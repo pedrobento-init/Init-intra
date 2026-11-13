@@ -199,4 +199,12 @@ describe('contrato do whatsapp-responder', () => {
     expect(webhook).toContain('.eq("email_thread_id", conversa)');
     expect(webhook).toContain('conversaDoTelefone(m.telefone)');
   });
+
+  // A 082 é do portal; banco que ainda não a rodou não pode perder mensagem
+  // por causa de duas colunas que ele nem conhece.
+  it('banco sem a 082 ainda recebe a mensagem: o insert repete sem direcao/media', () => {
+    expect(webhook).toContain('"42703"');
+    expect(webhook).toContain('"PGRST204"');
+    expect(webhook).toContain('const { direcao: _direcao, media: _media, ...semPortal } = linha;');
+  });
 });

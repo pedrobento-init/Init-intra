@@ -308,7 +308,7 @@ describe('contagem e não lidas', () => {
     const convs = s.caixaAgruparConversas([entrada(), entrada({ id: 'ETR-2', threadId: 'thread-8', status: 'convertido' })]);
     const n = s.caixaContarFiltros(convs, 'Ana');
     expect(n.todas).toBe(2);
-    expect(n.pendentes).toBe(1);
+    expect(n.pendentes).toBe(2);
   });
 
   it('mensagem nova no thread volta a conversa para não lida', () => {
@@ -459,10 +459,81 @@ describe('abrir chamado do WhatsApp', () => {
     });
   });
 
-  it('conversa de WhatsApp já tratada não abre formulário', () => {
+  it('conversa de WhatsApp já tratada ainda pode virar chamado opcional', () => {
     lista = [entrada({ canal: 'whatsapp', telefone: '5511987654321', threadId: null, status: 'convertido' })];
     s.caixaAbrirChamado('whatsapp:1187654321');
-    expect(formAberto).toBeNull();
-    expect(toasts[0][1]).toBe('error');
+    expect(formAberto[3].emailThreadId).toBe('whatsapp:5511987654321');
+    expect(toasts).toEqual([]);
+  });
+});
+
+
+describe('portal de conversas', () => {
+  it('resposta da equipe não deixa a conversa pendente nem vira mensagem do cliente', () => {
+    lista = [entrada({ status: 'anexado' }), entrada({ id: 'portal:1', emailId: 'portal:1', direcao: 'saida', status: 'anexado', de: 'Ana', corpo: 'Vamos verificar.' })];
+    const c = s.caixaAgruparConversas(lista)[0];
+    expect(c.pendente).toBe(false);
+    expect(c.mensagens.map((m) => m.direcao || 'entrada')).toEqual(['entrada', 'saida']);
+  });
+
+  it('filtro de encerradas separa a conversa sem apagar o histórico', () => {
+    const c = { id: 'c1', encerrada: true, mensagens: [entrada({ status: 'encerrado' })] };
+    expect(s.caixaFiltrar([c], 'encerradas', '', 'Ana')).toHaveLength(1);
+    expect(s.caixaFiltrar([c], 'pendentes', '', 'Ana')).toHaveLength(0);
+  });
+
+  // "Em atendimento" é o que espera alguém; descartado já foi decidido e não
+  // pode ficar na fila fingindo que ainda precisa de resposta.
+  it('conversa descartada sai de Em atendimento e continua em Todas', () => {
+    const convs = s.caixaAgruparConversas([
+      entrada({ id: 'A', threadId: 't1', status: 'pendente' }),
+      entrada({ id: 'B', threadId: 't2', status: 'descartado' }),
+    ]);
+    expect(convs.find((c) => c.id === 't2').descartada).toBe(true);
+    expect(s.caixaFiltrar(convs, 'pendentes', '', 'Ana').map((c) => c.id)).toEqual(['t1']);
+    expect(s.caixaFiltrar(convs, 'todas', '', 'Ana')).toHaveLength(2);
+  });
+
+  it('mensagem nova depois do descarte volta a conversa para Em atendimento', () => {
+    const convs = s.caixaAgruparConversas([
+      entrada({ id: 'A', threadId: 't1', status: 'descartado' }),
+      entrada({ id: 'B', threadId: 't1', status: 'pendente', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+    ]);
+    expect(convs[0].descartada).toBe(false);
+    expect(s.caixaFiltrar(convs, 'pendentes', '', 'Ana')).toHaveLength(1);
+  });
+
+  it('composer envia resposta e nota interna pela mesma function', () => {
+    expect(FONTES[2]).toContain("supabaseClient.functions.invoke('conversa-responder'");
+    expect(FONTES[2]).toContain("fd.get('kind') === 'internal' ? 'internal' : 'reply'");
+    expect(FONTES[2]).toContain('data-action="rpAbrir"');
+    expect(FONTES[2]).toContain('thread_id: caixaThreadId(c)');
+  });
+
+  // A tela agrupa pelo telefone normalizado (sem 55/nono dígito), mas o banco
+  // guarda a chave inteira. Responder com a chave da tela dava 404 na function.
+  it('a resposta usa o thread id do banco, com o telefone inteiro', () => {
+    const [c] = s.caixaAgruparConversas([entrada({
+      canal: 'whatsapp', telefone: '5511987654321', threadId: 'whatsapp:5511987654321', de: 'Márcia',
+    })]);
+    expect(c.id).toBe('whatsapp:1187654321');
+    expect(s.caixaThreadId(c)).toBe('whatsapp:5511987654321');
+  });
+
+  it('linha antiga sem thread id reconstrói a chave do banco pelo telefone', () => {
+    // O webhook grava o telefone como a WAHA manda: com 55. Sem o thread id
+    // sincronizado, é dele que sai a chave que a function reconhece.
+    const c = { id: 'whatsapp:1187654321', canal: 'whatsapp', telefone: '5511987654321', ultima: { id: 'W' } };
+    expect(s.caixaThreadId(c)).toBe('whatsapp:5511987654321');
+  });
+
+  it('conversa de e-mail responde pelo thread do Gmail', () => {
+    const [c] = s.caixaAgruparConversas([entrada({ threadId: 'thread-9' })]);
+    expect(s.caixaThreadId(c)).toBe('thread-9');
+  });
+
+  it('mídia usa apenas URL http(s) ou dados e escapa o nome', () => {
+    expect(s._caixaMediaHTML({ nome: '<img src=x>', tipo: 'text/plain', url: 'javascript:alert(1)' })).not.toContain('javascript:');
+    expect(s._caixaMediaHTML({ nome: 'foto.png', tipo: 'image/png', dados: 'AAAA' })).toContain('<img');
   });
 });
