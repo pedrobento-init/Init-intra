@@ -175,6 +175,15 @@ describe('renderPenKanban (modo local)', () => {
   });
 });
 
+describe('rolagem independente por coluna', () => {
+  it('limita o quadro à viewport e mantém a rolagem vertical na lista de cards', () => {
+    const css = read('css/styles.css').replace(/\s+/g, ' ');
+    expect(css).toContain('.content-area:has(> #penViewArea > .pen-board)');
+    expect(css).toMatch(/\.pen-board \.kanban-board \{[^}]*flex: 1;[^}]*min-height: 0;[^}]*overflow-y: hidden;[^}]*align-items: stretch;/);
+    expect(css).toMatch(/\.pen-board \.kanban-cards \{[^}]*min-height: 0;[^}]*overscroll-behavior: contain;/);
+  });
+});
+
 describe('cabeçalho da coluna: a ordem só ganha nome quando sai do padrão', () => {
   // Cinco colunas repetindo "criação" seria ruído. O cabeçalho fala quando
   // AQUELA coluna foge do resto, que é quando a pessoa precisa saber.

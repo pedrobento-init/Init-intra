@@ -5967,12 +5967,28 @@ body.dark-theme #penSlaSummary {
 .pen-board .pen-summary .pen-sum-over strong { color: inherit; font-weight: 800; }
 
 /* ── Quadro: 5 colunas, rolagem horizontal só dentro do container ── */
+.content-area:has(> #penViewArea > .pen-board) {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  height: calc(100dvh - var(--topbar-h));
+  overflow: hidden;
+}
+#penViewArea:has(> .pen-board),
+.pen-board {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
 .pen-board .kanban-board {
   display: flex;
+  flex: 1;
   gap: 14px;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  align-items: flex-start;
+  align-items: stretch;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   scroll-padding-inline: 4px;
   -webkit-overflow-scrolling: touch;
@@ -5980,6 +5996,7 @@ body.dark-theme #penSlaSummary {
 .pen-board .kanban-col {
   flex: 1 1 260px;
   min-width: 260px;
+  min-height: 0;
   max-width: none;
   background: var(--kb-panel);
   border: 1px solid var(--kb-line);
@@ -6038,7 +6055,14 @@ body.dark-theme #penSlaSummary {
 .pen-board .kcs-word { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
 /* O nome cede largura ao selo em vez de empurrar o cabeçalho para fora. */
 .pen-board .kct-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pen-board .kanban-cards { padding: 0; gap: 10px; background: transparent; }
+.pen-board .kanban-cards {
+  min-height: 0;
+  padding: 0;
+  gap: 10px;
+  background: transparent;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
 .pen-board .kanban-cards .empty-state p { color: var(--kb-muted); font-size: 13px; margin-bottom: 8px; }
 
 .pen-board .kb-col-empty {

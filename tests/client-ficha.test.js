@@ -1,6 +1,6 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
@@ -156,6 +156,64 @@ describe('Ficha TI', () => {
       const meta = mod.cfUpdatedMeta({ id: 'X', updatedAt: '2024-05-02T10:00:00Z', updatedBy: '<script>x</script>' });
       expect(meta).toContain('&lt;script&gt;');
       expect(meta).not.toContain('<script>');
+    });
+  });
+
+  describe('preenchimento automático por CNPJ', () => {
+    const empresa = {
+      nome_fantasia: 'Padaria Central',
+      razao_social: 'Padaria Central LTDA',
+      cnae_fiscal_descricao: 'Comércio de alimentos',
+      descricao_tipo_de_logradouro: 'Rua',
+      logradouro: 'das Flores',
+      numero: '123',
+      complemento: 'Sala 2',
+      bairro: 'Centro',
+      municipio: 'São Paulo',
+      uf: 'SP',
+    };
+
+    it('mapeia nome fantasia, segmento e endereço completo', () => {
+      expect(mod.clientCnpjFormData(empresa)).toEqual({
+        name: 'Padaria Central',
+        segment: 'Comércio de alimentos',
+        address: 'Rua das Flores, 123 · Sala 2 · Centro · São Paulo - SP',
+      });
+    });
+
+    it('usa a razão social quando não há nome fantasia', () => {
+      expect(mod.clientCnpjFormData({ ...empresa, nome_fantasia: '' }).name).toBe('Padaria Central LTDA');
+    });
+
+    it('preenche somente campos vazios e restaura o botão', async () => {
+      const fields = {
+        cnpj: { value: '12.345.678/0001-90' },
+        name: { value: 'Nome manual' },
+        segment: { value: '' },
+        address: { value: '' },
+      };
+      const button = {
+        disabled: false,
+        textContent: 'Preencher automaticamente',
+        closest: () => ({ elements: fields }),
+      };
+      globalThis.fetch = async () => ({ ok: true, json: async () => empresa });
+      globalThis.showToast = vi.fn();
+      await mod.autoFillClientByCnpj(button);
+      expect(fields.name.value).toBe('Nome manual');
+      expect(fields.segment.value).toBe(empresa.cnae_fiscal_descricao);
+      expect(fields.address.value).toContain('Rua das Flores, 123');
+      expect(button.disabled).toBe(false);
+      expect(button.textContent).toBe('Preencher automaticamente');
+    });
+
+    it('recusa CPF ou CNPJ incompleto sem consultar a API', async () => {
+      globalThis.fetch = vi.fn();
+      globalThis.showToast = vi.fn();
+      const button = { closest: () => ({ elements: { cnpj: { value: '123.456.789-00' } } }) };
+      await mod.autoFillClientByCnpj(button);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith('Informe um CNPJ com 14 dígitos.', 'warning');
     });
   });
 
