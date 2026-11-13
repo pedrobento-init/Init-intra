@@ -2,6 +2,7 @@ import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 
 const CLIENT = {
@@ -205,6 +206,14 @@ describe('Ficha TI', () => {
       expect(fields.address.value).toContain('Rua das Flores, 123');
       expect(button.disabled).toBe(false);
       expect(button.textContent).toBe('Preencher automaticamente');
+    });
+
+    it('a política de segurança do deploy permite consultar a BrasilAPI', () => {
+      const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+      const headers = config.headers.find(h => h.source === '/(.*)').headers;
+      const csp = headers.find(h => h.key === 'Content-Security-Policy').value;
+      const connectSrc = csp.match(/connect-src ([^;]+)/)[1];
+      expect(connectSrc.split(' ')).toContain('https://brasilapi.com.br');
     });
 
     it('recusa CPF ou CNPJ incompleto sem consultar a API', async () => {
