@@ -2,7 +2,7 @@
 // abriu o chamado por WhatsApp.
 //
 // Separada do webhook (whatsapp/) de propósito: lá a porta é um token na query
-// com verify_jwt = false, porque quem chama é a Z-API; aqui quem chama é o app,
+// com verify_jwt = false, porque quem chama é o WAHA; aqui quem chama é o app,
 // com o JWT do operador. Juntar as duas numa função só obrigaria a abrir o
 // envio para o mesmo token da entrada.
 //
@@ -25,15 +25,18 @@
 // Resposta: { success: true, to: "<dígitos>", id } — `to` são os dígitos crus,
 // iguais aos do email_thread_id, para o app comparar sem formatar.
 //
-// CONFIGURAÇÃO (supabase secrets set): ZAPI_INSTANCE_ID, ZAPI_TOKEN,
-// ZAPI_CLIENT_TOKEN.
+// CONFIGURAÇÃO (supabase secrets set): WAHA_BASE_URL, WAHA_API_KEY e,
+// opcionalmente, WAHA_SESSION (padrão "default").
 
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { PEN_FECHADOS, telefoneDaConversa, TEXTO_MAX } from "../whatsapp/mensagem.ts";
 import { enviarTexto } from "../whatsapp/provedor.ts";
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
@@ -48,12 +51,12 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (!op || op.active === false) return json({ error: "Não autorizado", code: "unauthorized" }, 401);
 
     const cred = {
-      instanceId: Deno.env.get("ZAPI_INSTANCE_ID"),
-      token: Deno.env.get("ZAPI_TOKEN"),
-      clientToken: Deno.env.get("ZAPI_CLIENT_TOKEN"),
+      baseUrl: Deno.env.get("WAHA_BASE_URL"),
+      apiKey: Deno.env.get("WAHA_API_KEY"),
+      session: Deno.env.get("WAHA_SESSION") || "default",
     };
-    if (!cred.instanceId || !cred.token || !cred.clientToken) {
-      console.error("whatsapp-responder: credenciais da Z-API não configuradas como secrets");
+    if (!cred.baseUrl || !cred.apiKey) {
+      console.error("whatsapp-responder: credenciais do WAHA não configuradas como secrets");
       return json({ error: "WhatsApp não configurado no Supabase", code: "missing_credentials" }, 500);
     }
 
@@ -66,7 +69,10 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (bruto.length > TEXTO_MAX) return json({ error: "Resposta longa demais", code: "text_too_long" }, 400);
 
     const { data: visivel, error: visErr } = await ctx.supabase
-      .from("pendencias").select("id").eq("id", id).maybeSingle();
+      .from("pendencias")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
     if (visErr) {
       console.error("whatsapp-responder: leitura do chamado:", visErr.message);
       return json({ error: "Não foi possível ler o chamado", code: "pendencia_read" }, 500);
@@ -74,7 +80,10 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (!visivel) return json({ error: "Chamado não encontrado", code: "pendencia_not_found" }, 404);
 
     const { data: pen, error: penErr } = await ctx.supabaseAdmin
-      .from("pendencias").select("id, email_thread_id, status").eq("id", id).maybeSingle();
+      .from("pendencias")
+      .select("id, email_thread_id, status")
+      .eq("id", id)
+      .maybeSingle();
     if (penErr || !pen) {
       console.error("whatsapp-responder: leitura do destino:", penErr?.message || "sumiu");
       return json({ error: "Não foi possível ler o chamado", code: "pendencia_read" }, 500);
@@ -94,10 +103,19 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     // número precisa ter escrito para a empresa antes (076, só o webhook grava).
     // Erro de leitura recusa também — sem a prova, não envia.
     const { data: contato, error: contErr } = await ctx.supabaseAdmin
-      .from("whatsapp_conversas").select("telefone").eq("telefone", tel).maybeSingle();
+      .from("whatsapp_conversas")
+      .select("telefone")
+      .eq("telefone", tel)
+      .maybeSingle();
     if (contErr) console.error("whatsapp-responder: leitura da conversa:", contErr.message);
     if (!contato) {
-      return json({ error: "Este número nunca escreveu para a empresa pelo WhatsApp", code: "not_whatsapp_contact" }, 422);
+      return json(
+        {
+          error: "Este número nunca escreveu para a empresa pelo WhatsApp",
+          code: "not_whatsapp_contact",
+        },
+        422
+      );
     }
 
     const envio = await enviarTexto(tel, bruto, cred);

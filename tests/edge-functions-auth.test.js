@@ -63,6 +63,7 @@ const dubles = (operador) => ({
 //   filtra  → não nega: devolve só o que é da equipe (sem 403 para testar)
 //   nenhum  → só exige operador ativo
 const FUNCTIONS = [
+  { nome: 'conversa-responder', equipe: 'nenhum', body: { thread_id: 't1', text: 'resposta de teste' } },
   { nome: 'milvus-devices', equipe: 'cliente', body: { clientId: 'c1' } },
   { nome: 'milvus-tickets', equipe: 'cliente', body: { clientId: 'c1' } },
   { nome: 'milvus-chamado-create', equipe: 'cliente', body: { visitId: 'v1' } },
@@ -101,7 +102,7 @@ async function status(handler, req) {
   }
 }
 
-describe('Edge Functions: as 15 com JWT estão na lista', () => {
+describe('Edge Functions: as 16 com JWT estão na lista', () => {
   it('a lista cobre todas as functions que exigem usuário', async () => {
     const fs = await import('node:fs');
     const dir = new URL('../supabase/functions/', import.meta.url);

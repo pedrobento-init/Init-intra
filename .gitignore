@@ -9,6 +9,7 @@ Desktop.ini
 node_modules/
 .env
 .env.local
+.whatsapp-webhook-token
 *.local
 
 # Supabase credentials — never commit this file

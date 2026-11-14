@@ -4575,6 +4575,16 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .cx-canal { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
 .cx-canal svg { flex: none; }
 .cx-canal-whatsapp { border-color: var(--green); background: var(--green-dim); color: var(--green); }
+.cx-saida { flex-direction: row-reverse; }
+.cx-saida .cx-balao { border-radius: 10px 4px 10px 10px; background: var(--accent-dim2); }
+.cx-saida .cx-balao header { flex-direction: row-reverse; }
+.cx-interna .cx-balao { border-style: dashed; border-color: var(--yellow); background: var(--yellow-dim, var(--bg-card)); }
+.cx-composer { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.cx-composer-opcoes, .cx-composer-envio { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cx-composer-opcoes .form-select { width: auto; }
+.cx-imagem { display: block; max-width: min(100%, 360px); max-height: 360px; border-radius: 8px; margin-top: 8px; }
+.cx-audio { display: block; width: min(100%, 360px); margin-top: 8px; }
+.cx-anexo { display: inline-block; margin-top: 8px; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   .cx-corpo-tela { grid-template-columns: 1fr; }
   .cx-corpo-tela.cx-aberta .cx-lista { display: none; }

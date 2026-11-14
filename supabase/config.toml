@@ -31,6 +31,8 @@ verify_jwt = true
 verify_jwt = true
 [functions.whatsapp-responder]
 verify_jwt = true
+[functions.conversa-responder]
+verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 [functions.send-push]
@@ -50,6 +52,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.agenda-ics]
 verify_jwt = false
-# O webhook da Z-API (whatsapp) se autentica por token na query (WHATSAPP_WEBHOOK_TOKEN): a Z-API não assina nem manda header próprio.
+# O webhook do WAHA (whatsapp) se autentica por token na query (WHATSAPP_WEBHOOK_TOKEN).
 [functions.whatsapp]
 verify_jwt = false

@@ -4,7 +4,7 @@
 // roda Deno nem resolve os imports `npm:`, então o que dá para testar é o que
 // não depende do runtime. E é aqui que mora a lógica que erra calado.
 //
-// Também não sabe nada da Z-API: o formato do provedor fica em provedor.ts, e
+// Também não sabe nada da WAHA: o formato do provedor fica em provedor.ts, e
 // o resto do sistema só enxerga MensagemWhats. Trocar de provedor (Evolution,
 // Meta Cloud) é reescrever provedor.ts, não este arquivo.
 
@@ -25,6 +25,7 @@ export type MensagemWhats = {
   texto: string;
   id: string;
   quando: string;
+  media?: { nome: string; tipo: string; url: string } | null;
 };
 
 // Teto do texto que sai para o WhatsApp. O limite do protocolo é maior, mas
@@ -38,9 +39,9 @@ export const TEXTO_MAX = 20000;
 // furar o limite depois).
 export const LIMITE_POR_MINUTO = 30;
 
-// Teto de mensagens tratadas por chamada do webhook. A Z-API manda uma por vez;
+// Teto de mensagens tratadas por chamada do webhook. A WAHA manda uma por vez;
 // lote grande só vem de reentrega acumulada ou de abuso, e segurar a function
-// rodando minutos faria a Z-API desistir e reentregar tudo de novo.
+// rodando minutos faria a WAHA desistir e reentregar tudo de novo.
 export const LOTE_MAX = 50;
 
 // O banco ainda sem a migration da função chamada: PostgREST responde PGRST202
@@ -107,10 +108,11 @@ export function clienteDoTelefone<C extends ClienteComFone>(clientes: C[], telef
 // Mensagem de WhatsApp não tem assunto; a primeira linha é o mais perto disso
 // que o cliente escreveu, e é o que aparece na lista da caixa.
 export function assuntoDaMensagem(texto: string): string {
-  const linha = String(texto || "")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => l) || "";
+  const linha =
+    String(texto || "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l) || "";
   if (!linha) return "Pedido por WhatsApp";
   return linha.length > 120 ? linha.slice(0, 117).trimEnd() + "…" : linha;
 }
@@ -140,12 +142,13 @@ export function pendenciaDoWhatsapp(
   m: MensagemWhats,
   c: Cliente,
   id: string,
-  agora = new Date(),
+  agora = new Date()
 ): Record<string, unknown> {
   const tel = String(m.telefone || "").replace(/\D/g, "");
   const tags = ["triagem-automatica", "whatsapp"];
   if (t.semIa) tags.push("sem-classificacao-ia");
-  const origem = "\n\n— Aberta pela triagem de WhatsApp do Init Intra." +
+  const origem =
+    "\n\n— Aberta pela triagem de WhatsApp do Init Intra." +
     `\nDe: ${m.nome || "(perfil sem nome)"} · +${tel}` +
     `\nRecebido em: ${m.quando}`;
   const iso = agora.toISOString();
@@ -202,7 +205,9 @@ export function telefoneDaConversa(threadId: unknown): string {
 }
 
 export function textoDaResposta(bruto: unknown): string {
-  return String(bruto ?? "").trim().slice(0, TEXTO_MAX);
+  return String(bruto ?? "")
+    .trim()
+    .slice(0, TEXTO_MAX);
 }
 
 // Só para mostrar (log, nota): o que vai para o provedor e para o app são os

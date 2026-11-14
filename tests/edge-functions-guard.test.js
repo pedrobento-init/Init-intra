@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const fnDir = fileURLToPath(new URL('../supabase/functions/', import.meta.url));
 const configToml = fs.readFileSync(
   fileURLToPath(new URL('../supabase/config.toml', import.meta.url)),
-  'utf8',
+  'utf8'
 );
 
 // Uma function é um diretório com index.ts (os demais são módulos
@@ -24,11 +24,16 @@ const configToml = fs.readFileSync(
 const functions = fs
   .readdirSync(fnDir, { withFileTypes: true })
   .filter((e) => e.isDirectory() && fs.existsSync(path.join(fnDir, e.name, 'index.ts')))
-  .map((e) => ({ name: e.name, source: fs.readFileSync(path.join(fnDir, e.name, 'index.ts'), 'utf8') }));
+  .map((e) => ({
+    name: e.name,
+    source: fs.readFileSync(path.join(fnDir, e.name, 'index.ts'), 'utf8'),
+  }));
 
 // [functions.<nome>] seguido de verify_jwt = true|false (config.toml é CRLF).
 function verifyJwtOf(name) {
-  const re = new RegExp(`\\[functions\\.${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]\\s*verify_jwt\\s*=\\s*(true|false)`);
+  const re = new RegExp(
+    `\\[functions\\.${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]\\s*verify_jwt\\s*=\\s*(true|false)`
+  );
   const m = re.exec(configToml);
   return m ? m[1] === 'true' : null;
 }
@@ -48,8 +53,10 @@ function authMode(source) {
 // Escreve com privilégio elevado? No legado é o SERVICE_ROLE_KEY lido do env;
 // no novo é o ctx.supabaseAdmin que o withSupabase entrega pronto.
 function usaServiceRole(source) {
-  return /Deno\.env\.get\(["']SUPABASE_SERVICE_ROLE_KEY["']\)/.test(source) ||
-    /\bsupabaseAdmin\b/.test(source);
+  return (
+    /Deno\.env\.get\(["']SUPABASE_SERVICE_ROLE_KEY["']\)/.test(source) ||
+    /\bsupabaseAdmin\b/.test(source)
+  );
 }
 
 const SEGREDOS = ['MILVUS_API_TOKEN', 'SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY'];
@@ -79,18 +86,32 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
     const jwt = functions.filter((f) => authMode(f.source) === 'jwt');
     expect(jwt.length).toBeGreaterThanOrEqual(13);
     for (const f of jwt) {
-      expect(verifyJwtOf(f.name), `${f.name} chama auth.getUser mas não exige JWT na plataforma`).toBe(true);
+      expect(
+        verifyJwtOf(f.name),
+        `${f.name} chama auth.getUser mas não exige JWT na plataforma`
+      ).toBe(true);
     }
   });
 
   it('quem se autentica por segredo próprio usa verify_jwt = false', () => {
     // robô do Apps Script (x-agenda-secret), cron do banco (x-cron-secret),
     // o feed .ics (token na query, porque app de calendário não manda header)
-    // e o webhook da Z-API (token na query: ela não assina nem manda header próprio).
-    const proprio = functions.filter((f) => ['secret-header', 'query-token'].includes(authMode(f.source)));
-    expect(proprio.map((f) => f.name).sort()).toEqual(['agenda-ics', 'avisos-prazo', 'google-agenda', 'relatorio-visitas-mensal', 'robo', 'whatsapp']);
+    // e o webhook do WAHA (token na query).
+    const proprio = functions.filter((f) =>
+      ['secret-header', 'query-token'].includes(authMode(f.source))
+    );
+    expect(proprio.map((f) => f.name).sort()).toEqual([
+      'agenda-ics',
+      'avisos-prazo',
+      'google-agenda',
+      'relatorio-visitas-mensal',
+      'robo',
+      'whatsapp',
+    ]);
     for (const f of proprio) {
-      expect(verifyJwtOf(f.name), `${f.name} não valida JWT; verify_jwt deveria ser false`).toBe(false);
+      expect(verifyJwtOf(f.name), `${f.name} não valida JWT; verify_jwt deveria ser false`).toBe(
+        false
+      );
     }
   });
 
@@ -127,7 +148,10 @@ describe('higiene de segredos', () => {
         .filter(({ l }) => !/if \(!MILVUS_API_TOKEN\)/.test(l))
         .filter(({ l }) => !/"[^"]*MILVUS_API_TOKEN[^"]*"\s*\)/.test(l))
         .filter(({ l }) => !/"Authorization":\s*MILVUS_API_TOKEN/.test(l));
-      expect(usos.map((u) => `${f.name}:${u.n}`), `uso inesperado do token em ${f.name}`).toEqual([]);
+      expect(
+        usos.map((u) => `${f.name}:${u.n}`),
+        `uso inesperado do token em ${f.name}`
+      ).toEqual([]);
     }
   });
 });
@@ -151,8 +175,10 @@ describe('autorização antes da escrita com service role', () => {
       const iAuth = linhas.findIndex((l) => /auth\.getUser\(/.test(l));
       const iEscrita = linhas.findIndex((l) => escrita.test(l));
       if (iEscrita === -1) continue; // só lê — nada a ordenar
-      expect(iAuth, `${f.name}: escreve (linha ${iEscrita + 1}) antes de autenticar (linha ${iAuth + 1})`)
-        .toBeLessThan(iEscrita);
+      expect(
+        iAuth,
+        `${f.name}: escreve (linha ${iEscrita + 1}) antes de autenticar (linha ${iAuth + 1})`
+      ).toBeLessThan(iEscrita);
     }
   });
 });
