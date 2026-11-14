@@ -503,6 +503,40 @@ describe('portal de conversas', () => {
     expect(s.caixaFiltrar(convs, 'pendentes', '', 'Ana')).toHaveLength(1);
   });
 
+  // Encerrar não é um carimbo eterno: se o cliente escreve de novo e a mensagem
+  // chega 'anexado' (chamado aberto), a conversa tem que voltar para a fila em
+  // vez de ficar presa em "Encerradas" por causa do histórico.
+  it('mensagem nova depois de encerrar tira a conversa de Encerradas', () => {
+    const convs = s.caixaAgruparConversas([
+      entrada({ id: 'A', threadId: 't1', status: 'encerrado' }),
+      entrada({ id: 'B', threadId: 't1', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+    ]);
+    expect(convs[0].encerrada).toBe(false);
+    expect(s.caixaFiltrar(convs, 'encerradas', '', 'Ana')).toHaveLength(0);
+    expect(s.caixaFiltrar(convs, 'pendentes', '', 'Ana')).toHaveLength(1);
+  });
+
+  // O sync do Supabase redesenha a caixa a cada mensagem nova. Sem guardar o
+  // texto, quem estava escrevendo perdia a resposta no meio da frase.
+  it('o rascunho do composer sobrevive ao redesenho da tela', () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    s._caixaSelecionada = 't1';
+    s.renderCaixaEntrada();
+    acoes.caixaRascunho({}, 'estava escrevendo a resposta');
+    s.renderCaixaEntrada();
+    expect(elementos.caixaConversa.innerHTML).toContain('estava escrevendo a resposta');
+  });
+
+  it('o rascunho não vaza para outra conversa', () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' }), entrada({ id: 'E2', threadId: 't2', recebidoEm: '2026-10-26T13:00:00.000Z' })];
+    s._caixaSelecionada = 't1';
+    s.renderCaixaEntrada();
+    acoes.caixaRascunho({}, 'texto da conversa t1');
+    s._caixaSelecionada = 't2';
+    s.renderCaixaEntrada();
+    expect(elementos.caixaConversa.innerHTML).not.toContain('texto da conversa t1');
+  });
+
   it('composer envia resposta e nota interna pela mesma function', () => {
     expect(FONTES[2]).toContain("supabaseClient.functions.invoke('conversa-responder'");
     expect(FONTES[2]).toContain("fd.get('kind') === 'internal' ? 'internal' : 'reply'");
@@ -530,6 +564,33 @@ describe('portal de conversas', () => {
   it('conversa de e-mail responde pelo thread do Gmail', () => {
     const [c] = s.caixaAgruparConversas([entrada({ threadId: 'thread-9' })]);
     expect(s.caixaThreadId(c)).toBe('thread-9');
+  });
+
+  // Depois que a equipe responde, a última mensagem do thread é nossa. O
+  // interlocutor continua sendo o cliente: nome, endereço, sugestão e histórico
+  // saem da última mensagem de ENTRADA, não da resposta.
+  it('depois da resposta, a lista e o painel continuam mostrando o cliente', () => {
+    lista = [
+      entrada({ id: 'E1', threadId: 't1', de: 'Márcia <marcia@acme.com.br>', recebidoEm: '2026-10-26T10:00:00Z' }),
+      entrada({
+        id: 'S1', threadId: 't1', direcao: 'saida', status: 'anexado', de: 'Ana',
+        assunto: 'Re: Impressora', corpo: 'Vamos verificar.', recebidoEm: '2026-10-26T11:00:00Z',
+      }),
+    ];
+    s._caixaSelecionada = 't1';
+    s.renderCaixaEntrada();
+    expect(elementos.caixaLista.innerHTML).toContain('Márcia');
+    expect(elementos.caixaLista.innerHTML).not.toContain('<b>Ana</b>');
+    expect(elementos.caixaConversa.innerHTML).toContain('marcia@acme.com.br');
+  });
+
+  it('a sugestão de cliente olha o remetente da entrada, não a nossa resposta', () => {
+    const todas = s.caixaAgruparConversas([
+      entrada({ id: 'E1', threadId: 't1', de: 'Márcia <marcia@acme.com.br>' }),
+      entrada({ id: 'S1', threadId: 't1', direcao: 'saida', de: 'Ana', recebidoEm: '2026-10-26T11:00:00Z' }),
+      entrada({ id: 'E2', threadId: 't2', de: 'José <jose@acme.com.br>', clientId: 'CLI-1' }),
+    ]);
+    expect(s.caixaSugerirCliente(todas.find((c) => c.id === 't1'), todas)).toBe('CLI-1');
   });
 
   it('mídia usa apenas URL http(s) ou dados e escapa o nome', () => {

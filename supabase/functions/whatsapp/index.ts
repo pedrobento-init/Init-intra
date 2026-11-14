@@ -20,7 +20,9 @@
 //
 // IDEMPOTÊNCIA — a WAHA pode reentregar o mesmo evento. A chave
 // "whatsapp:<messageId>" em avisos_enviados (051) garante uma passagem por
-// mensagem; o email_id UNIQUE da caixa (066) segura o resto.
+// mensagem; o email_id UNIQUE da caixa (066) segura o resto. Quando a caixa é o
+// único destino e o insert falha, a chave volta e a function responde 500 para
+// a reentrega: repetir é melhor que perder a mensagem do cliente.
 //
 // CONFIGURAÇÃO (supabase secrets set):
 //   WHATSAPP_WEBHOOK_TOKEN — o token que vai na URL do webhook no painel.
@@ -188,9 +190,17 @@ async function baixarMidia(m: MensagemWhats) {
   try {
     const base = Deno.env.get("WAHA_BASE_URL") || "";
     const key = Deno.env.get("WAHA_API_KEY") || "";
+    const raiz = new URL(base);
     const origem = new URL(m.media.url);
-    const url = new URL(origem.pathname + origem.search, base).toString();
-    const resp = await fetch(url, { headers: { "X-Api-Key": key }, signal: AbortSignal.timeout(20000) });
+    // `//host` no pathname do anexo resolveria como URL protocol-relative e
+    // mandaria a X-Api-Key para outro host. O host do download é sempre o da
+    // WAHA; o resto é recusado antes do fetch.
+    const url = new URL(origem.pathname.replace(/^\/+/, "/") + origem.search, raiz);
+    if (url.origin !== raiz.origin) {
+      console.error(`whatsapp mídia ${m.id}: host fora da WAHA, download ignorado`);
+      return null;
+    }
+    const resp = await fetch(url.toString(), { headers: { "X-Api-Key": key }, signal: AbortSignal.timeout(20000) });
     const tamanho = Number(resp.headers.get("content-length") || 0);
     if (!resp.ok || tamanho > 5 * 1024 * 1024) return null;
     const bytes = new Uint8Array(await resp.arrayBuffer());
@@ -328,7 +338,14 @@ async function handle(req: Request, ctx: SupabaseContext) {
           ? { motivo: null, status: "pendente", clientId: c.id, team: c.team || "init" }
           : { motivo: "sem_cliente", status: "pendente", team: "init" }
       );
-      if (ok) caixa++;
+      if (!ok) {
+        // Sem chamado, a caixa é o único lugar onde a mensagem existiria.
+        // Devolver a chave e falhar faz a WAHA reentregar; repetir é melhor que
+        // a mensagem sumir sem ninguém ver.
+        await db.from("avisos_enviados").delete().eq("key", key);
+        throw new Error("whatsapp: mensagem " + m.id + " não entrou na caixa");
+      }
+      caixa++;
     }
     return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas });
   } catch (err) {

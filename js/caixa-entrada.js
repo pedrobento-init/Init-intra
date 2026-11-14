@@ -19,6 +19,10 @@ var _caixaFiltro = 'pendentes';
 var _caixaBusca = '';
 var _caixaSelecionada = null;
 var _caixaCanal = 'todos';
+// Rascunho do composer. O sync e o realtime redesenham a tela a cada mensagem
+// nova; sem guardar o texto, o que a pessoa estava escrevendo sumia no meio da
+// frase. Fica por conversa: trocar de thread não leva o texto para outra.
+var _caixaRascunho = { id: null, texto: '', kind: 'reply' };
 
 const CAIXA_CANAIS = {
   todos: 'Todos os canais',
@@ -86,6 +90,8 @@ function caixaAgruparConversas(lista) {
   return Object.keys(grupos).map((chave) => {
     const mensagens = grupos[chave].slice().sort((a, b) => _caixaData(a).localeCompare(_caixaData(b)));
     const ultima = mensagens[mensagens.length - 1];
+    const entradas = mensagens.filter((m) => (m.direcao || 'entrada') === 'entrada');
+    const ultimaEntrada = entradas.length ? entradas[entradas.length - 1] : null;
     // Dono, cliente e chamado valem para o thread: pega o mais recente que
     // tiver o campo, porque uma resposta nova pode chegar antes do robô ou do
     // técnico carimbarem nela o que a primeira já tinha.
@@ -94,22 +100,38 @@ function caixaAgruparConversas(lista) {
       return null;
     };
     const pendente = mensagens.some((m) => (m.direcao || 'entrada') === 'entrada' && m.status === 'pendente');
+    // Encerrada/descartada é o estado da ÚLTIMA mensagem do cliente, não de
+    // qualquer uma do thread: mensagem nova depois de encerrar chega como
+    // 'anexado' (chamado aberto) e, olhando o histórico inteiro, a conversa
+    // ficaria presa em "Encerradas" mesmo com o cliente falando de novo.
+    const statusCliente = ultimaEntrada ? ultimaEntrada.status : null;
     return {
       id: chave,
       mensagens,
       ultima,
+      ultimaEntrada,
       canal: caixaCanalEntrada(ultima),
       telefone: ultimoCom('telefone'),
       pendente,
-      encerrada: !pendente && mensagens.some((m) => m.status === 'encerrado'),
+      encerrada: !pendente && statusCliente === 'encerrado',
       // Descartar é decisão tomada: a conversa não volta para a fila de quem
       // espera resposta, mas continua existindo em "Todas".
-      descartada: !pendente && mensagens.some((m) => m.status === 'descartado'),
+      descartada: !pendente && statusCliente === 'descartado',
       atribuidoA: ultimoCom('atribuidoA'),
       clientId: ultimoCom('clientId'),
       pendenciaId: ultimoCom('pendenciaId'),
     };
   }).sort((a, b) => _caixaData(b.ultima).localeCompare(_caixaData(a.ultima)));
+}
+
+// Depois que a equipe responde, a última mensagem do thread é nossa — mas o
+// interlocutor não mudou. Nome, endereço, motivo e sugestão de cliente saem da
+// última mensagem de ENTRADA; a resposta não vira o "quem pediu".
+function caixaInterlocutor(c) {
+  if (!c) return null;
+  if (c.ultimaEntrada) return c.ultimaEntrada;
+  const entradas = (c.mensagens || []).filter((m) => (m.direcao || 'entrada') === 'entrada');
+  return entradas.length ? entradas[entradas.length - 1] : (c.ultima || null);
 }
 
 function caixaFiltrar(conversas, filtro, busca, usuario) {
@@ -236,12 +258,14 @@ function caixaSugerirCliente(conversa, conversas) {
   if (conversa.canal === 'whatsapp') {
     return caixaClientePorTelefone(conversa.telefone, typeof getMyClients === 'function' ? getMyClients() : []);
   }
-  const chave = _caixaChaveRemetente(conversa.ultima && conversa.ultima.de);
+  const quem = caixaInterlocutor(conversa);
+  const chave = _caixaChaveRemetente(quem && quem.de);
   if (!chave) return null;
   const votos = {};
   (conversas || []).forEach((c) => {
     if (c.id === conversa.id || !c.clientId) return;
-    if (_caixaChaveRemetente(c.ultima && c.ultima.de) === chave) votos[c.clientId] = (votos[c.clientId] || 0) + 1;
+    const outro = caixaInterlocutor(c);
+    if (_caixaChaveRemetente(outro && outro.de) === chave) votos[c.clientId] = (votos[c.clientId] || 0) + 1;
   });
   const ids = Object.keys(votos).sort((a, b) => votos[b] - votos[a]);
   return ids[0] || null;
@@ -251,10 +275,13 @@ function caixaHistoricoRemetente(conversa, conversas, max) {
   // No WhatsApp a conversa já é o número inteiro (_caixaChaveConversa agrupa
   // pela chave do telefone): não existe "outra conversa do mesmo remetente".
   if (conversa && conversa.canal === 'whatsapp') return [];
-  const end = conversa && conversa.ultima ? _emailTriagemEndereco(conversa.ultima.de) : '';
+  const quem = caixaInterlocutor(conversa);
+  const end = quem ? _emailTriagemEndereco(quem.de) : '';
   if (!end) return [];
-  return (conversas || []).filter((c) => c.id !== conversa.id && _emailTriagemEndereco(c.ultima && c.ultima.de) === end)
-    .slice(0, max || 5);
+  return (conversas || []).filter((c) => {
+    const outro = caixaInterlocutor(c);
+    return c.id !== conversa.id && _emailTriagemEndereco(outro && outro.de) === end;
+  }).slice(0, max || 5);
 }
 
 function caixaContarFiltros(conversas, usuario) {
@@ -306,6 +333,9 @@ function _caixaConversaPorId(id) {
 
 function _caixaItemHTML(c, lidas) {
   const u = c.ultima;
+  // A prévia e a hora são da última atividade (inclusive a nossa resposta); o
+  // nome é de quem falou com a empresa.
+  const quem = caixaInterlocutor(c) || u;
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
   const n = c.mensagens.length;
   const naoLida = caixaNaoLida(c, lidas);
@@ -314,7 +344,7 @@ function _caixaItemHTML(c, lidas) {
   return '<button type="button" class="cx-item' + (c.id === _caixaSelecionada ? ' ativo' : '') + (c.pendente ? ' pendente' : '') + (naoLida ? ' nao-lida' : '') +
     '" data-action="caixaSelecionar" data-arg="' + escapeHtml(c.id) + '">' +
     '<span class="cx-item-topo">' + (naoLida ? '<span class="cx-ponto" aria-label="Não lida"></span>' : '') +
-    '<b>' + escapeHtml(_caixaNomeDe(u, c.canal)) + '</b>' +
+    '<b>' + escapeHtml(_caixaNomeDe(quem, c.canal)) + '</b>' +
     '<span class="cx-quando" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">' + escapeHtml(caixaEsperaRotulo(u.recebidoEm)) + '</span></span>' +
     '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + (n > 1 ? ' <span class="cx-n">' + n + '</span>' : '') + '</span>' +
     (previa ? '<span class="cx-previa">' + escapeHtml(previa) + '</span>' : '') +
@@ -329,7 +359,9 @@ function _caixaConversaHTML(c) {
   const id = escapeHtml(c.id);
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
   const pen = c.pendenciaId && typeof getPendenciaById === 'function' ? getPendenciaById(c.pendenciaId) : null;
-  const motivo = EMAIL_TRIAGEM_MOTIVOS[c.ultima.motivo];
+  const u = c.ultima;
+  const quem = caixaInterlocutor(c) || u;
+  const motivo = EMAIL_TRIAGEM_MOTIVOS[quem.motivo];
   const acoes = '<div class="cx-acoes">' +
     (pen ? '<button type="button" class="btn btn-secondary btn-sm" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Abrir chamado</button>' : '') +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir' : 'Assumir / atribuir') + '</button>' +
@@ -342,11 +374,10 @@ function _caixaConversaHTML(c) {
   const sugerido = caixaSugerirCliente(c, todas);
   const cliSug = sugerido && typeof getClientById === 'function' ? getClientById(sugerido) : null;
   const historico = caixaHistoricoRemetente(c, todas);
-  const u = c.ultima;
   const whats = c.canal === 'whatsapp';
-  const nome = _caixaNomeDe(u, c.canal);
+  const nome = _caixaNomeDe(quem, c.canal);
   // No WhatsApp o contato é o telefone; o e-mail cru do "de" não existe ali.
-  const emailDe = whats ? chamadoTelefoneFormatar(c.telefone || u.telefone || '') : _caixaEmailDe(u.de);
+  const emailDe = whats ? chamadoTelefoneFormatar(c.telefone || quem.telefone || '') : _caixaEmailDe(quem.de);
   const status = c.pendente ? 'pendente' : (u.status || '');
   let diaAnterior = '';
   const timeline = c.mensagens.map((m) => {
@@ -354,10 +385,10 @@ function _caixaConversaHTML(c) {
     const sep = dia && dia !== diaAnterior ? '<div class="cx-dia"><span>' + escapeHtml(dia) + '</span></div>' : '';
     diaAnterior = dia;
     const direcao = m.direcao || 'entrada';
-    const quem = direcao === 'interna' ? 'Nota interna · ' + (m.de || 'Equipe') : direcao === 'saida' ? (m.de || 'Você') : _caixaNomeDe(m, c.canal);
+    const autor = direcao === 'interna' ? 'Nota interna · ' + (m.de || 'Equipe') : direcao === 'saida' ? (m.de || 'Você') : _caixaNomeDe(m, c.canal);
     return sep + '<article class="cx-msg cx-' + escapeHtml(direcao) + '">' +
-      '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(quem)) + '</span>' +
-      '<div class="cx-balao"><header><b>' + escapeHtml(quem) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
+      '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(autor)) + '</span>' +
+      '<div class="cx-balao"><header><b>' + escapeHtml(autor) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
       _caixaCorpoHTML(m.corpo, c.canal) + _caixaMediaHTML(m.media) + '</div></article>';
   }).join('');
   const lado = '<aside class="cx-lado">' +
@@ -376,19 +407,21 @@ function _caixaConversaHTML(c) {
     '<dt>Recebido</dt><dd>' + escapeHtml(formatDateTime(c.mensagens[0].recebidoEm)) + '</dd>' +
     (pen ? '<dt>Chamado</dt><dd><a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">' + escapeHtml(pen.id) + ' · ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a></dd>' : '') +
     '</dl>' + (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') + '</section></aside>';
+  const rasc = _caixaRascunho && _caixaRascunho.id === c.id ? _caixaRascunho : { texto: '', kind: 'reply' };
   const composer = '<form class="cx-composer" data-submit="caixaEnviarMensagem" data-arg="' + id + '">' +
-    '<div class="cx-composer-opcoes"><select class="form-select" name="kind" aria-label="Tipo de mensagem">' +
-    '<option value="reply">Responder ao cliente</option><option value="internal">Nota interna (não envia)</option></select>' +
+    '<div class="cx-composer-opcoes"><select class="form-select" name="kind" data-change="caixaRascunhoTipo" aria-label="Tipo de mensagem">' +
+    '<option value="reply"' + (rasc.kind === 'internal' ? '' : ' selected') + '>Responder ao cliente</option>' +
+    '<option value="internal"' + (rasc.kind === 'internal' ? ' selected' : '') + '>Nota interna (não envia)</option></select>' +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></div>' +
-    '<textarea class="form-textarea" id="newNoteText" name="text" rows="3" placeholder="Escreva a resposta ou a nota interna..."></textarea>' +
+    '<textarea class="form-textarea" id="newNoteText" name="text" rows="3" data-input="caixaRascunho" placeholder="Escreva a resposta ou a nota interna...">' + escapeHtml(rasc.texto) + '</textarea>' +
     '<div class="cx-composer-envio"><input type="file" name="file" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
     '<button type="submit" class="btn btn-primary">Salvar / enviar</button></div><div id="rpPainel" hidden></div></form>';
   return '<div class="cx-conv-topo">' +
     '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
-    '<h2 class="ov-h2">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>' +
+    '<h2 class="ov-h2">' + escapeHtml(quem.assunto || u.assunto || '(sem assunto)') + '</h2>' +
     '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
     _caixaCanalHTML(c.canal) +
-    (c.pendente ? '<span class="cx-chip cx-chip-alerta" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">Aguardando ' + escapeHtml(caixaEsperaRotulo(u.recebidoEm)) + '</span>' : '') +
+    (c.pendente ? '<span class="cx-chip cx-chip-alerta" title="' + escapeHtml(formatDateTime(quem.recebidoEm)) + '">Aguardando ' + escapeHtml(caixaEsperaRotulo(quem.recebidoEm)) + '</span>' : '') +
     '<span class="cx-chip' + (cli ? '' : ' cx-chip-alerta') + '">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
     '<span class="cx-chip' + (c.atribuidoA ? '' : ' cx-chip-alerta') + '">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
     (pen ? '<span class="cx-chip">Chamado #' + escapeHtml(String(pen.id).slice(0, 8)) + '</span>' : '') +
@@ -648,6 +681,7 @@ async function caixaEnviarMensagem(id, form) {
     if (res.error) throw res.error;
     if (res.data && res.data.error) throw new Error(res.data.error);
     form.reset();
+    _caixaRascunho = { id: null, texto: '', kind: 'reply' };
     if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
     showToast(fd.get('kind') === 'internal' ? 'Nota interna salva.' : 'Resposta enviada.', 'success');
     if (typeof syncSupabaseToLocal === 'function') await syncSupabaseToLocal();
@@ -687,6 +721,13 @@ registerActions({
   caixaDescartar: (_el, id) => caixaDescartar(id),
   caixaEncerrar: (_el, id) => caixaEncerrar(id),
   caixaEnviarMensagem: (el, id) => { caixaEnviarMensagem(id, el); },
+  // Guardar a cada tecla é o que sobrevive ao redesenho disparado pelo sync.
+  caixaRascunho: (_el, texto) => {
+    _caixaRascunho = { id: _caixaSelecionada, texto: String(texto || ''), kind: _caixaRascunho.kind || 'reply' };
+  },
+  caixaRascunhoTipo: (_el, tipo) => {
+    _caixaRascunho = { id: _caixaSelecionada, texto: _caixaRascunho.texto || '', kind: tipo === 'internal' ? 'internal' : 'reply' };
+  },
   // Fecha a conversa junto: aberta, o render a marcaria como lida de novo.
   caixaMarcarNaoLida: (_el, id) => {
     const c = _caixaConversas().find((x) => x.id === id);

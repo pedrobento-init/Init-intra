@@ -1,5 +1,13 @@
 // Resposta e nota interna de uma conversa da caixa, sem exigir chamado.
 // O destino sai da última mensagem recebida no thread, nunca do navegador.
+//
+// LIMITE CONHECIDO — no e-mail não existe prova de contato como a
+// whatsapp_conversas (076). O destino sai da última mensagem de entrada, mas
+// quem pode inserir em emails_triagem (RLS por equipe) consegue criar uma linha
+// de entrada com o "de" de um terceiro e usar a caixa para escrever em nome da
+// empresa. Fechar de verdade exige gravar toda mensagem recebida numa tabela de
+// prova, como a 076 fez para o WhatsApp; até lá isto é saída autenticada de
+// e-mail, não um relay aberto — e é dívida registrada, não detalhe.
 import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import nodemailer from "npm:nodemailer@6.9.16";
 import { enviarTexto } from "../whatsapp/provedor.ts";
@@ -129,8 +137,12 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     }
     // Responder reabre o que estava encerrado: o cliente voltou a falar e isso
     // é atendimento novo. Nota interna não conta — ninguém respondeu ao cliente.
+    //
+    // O update é com service role, então o escopo de equipe vai explícito: o
+    // mesmo thread de WhatsApp pode ter linha em mais de uma equipe, e sem o
+    // filtro responder por uma tiraria a conversa da fila da outra.
     let statusQuery = ctx.supabaseAdmin.from("emails_triagem")
-      .update({ status: "anexado", updated_at: agora }).eq("thread_id", thread);
+      .update({ status: "anexado", updated_at: agora }).eq("thread_id", thread).eq("team", ultima.team);
     statusQuery = interna
       ? statusQuery.eq("status", "pendente")
       : statusQuery.in("status", ["pendente", "encerrado"]);
