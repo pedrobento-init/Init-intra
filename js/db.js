@@ -94,6 +94,10 @@ const _dbCache = {
 
 let _dbReady = false;
 const _storeWriteQueues = {};
+// Store cuja leitura falhou no boot: o cache fica vazio, mas o IndexedDB pode
+// ter linhas. Sem esta marca, a primeira setCacheStore faria bulkDelete das
+// "stale" (= todas) e apagaria dados que nunca foram lidos.
+const _dbLoadFailed = {};
 
 /**
  * Inicialização e migração de dados do localStorage para o IndexedDB
@@ -165,30 +169,28 @@ async function initIndexedDB() {
       console.debug('✅ Migração para IndexedDB concluída com sucesso!');
     }
 
-    // Carregar dados armazenados para o cache em memória
-    _dbCache.clients = await idb.clients.toArray();
-    _dbCache.pendencias = await idb.pendencias.toArray();
-    _dbCache.procedures = await idb.procedures.toArray();
-    _dbCache.procedure_templates = await idb.procedure_templates.toArray();
-    _dbCache.operators = await idb.operators.toArray();
-    _dbCache.visits = await idb.visits.toArray();
-    _dbCache.reunioes = await idb.reunioes.toArray();
-    try { _dbCache.equipamentos = await idb.equipamentos.toArray(); }
-    catch (_) { _dbCache.equipamentos = []; }
-    try { _dbCache.client_devices = await idb.client_devices.toArray(); }
-    catch (_) { _dbCache.client_devices = []; }
-    try { _dbCache.client_milvus_tickets = await idb.client_milvus_tickets.toArray(); }
-    catch (_) { _dbCache.client_milvus_tickets = []; }
-    try { _dbCache.checklist_modelo_itens = await idb.checklist_modelo_itens.toArray(); }
-    catch (_) { _dbCache.checklist_modelo_itens = []; }
-    try { _dbCache.checklist_marcacoes = await idb.checklist_marcacoes.toArray(); }
-    catch (_) { _dbCache.checklist_marcacoes = []; }
-    try { _dbCache.checklists = await idb.checklists.toArray(); }
-    catch (_) { _dbCache.checklists = []; }
-    try { _dbCache.vencimentos = await idb.vencimentos.toArray(); }
-    catch (_) { _dbCache.vencimentos = []; }
-    try { _dbCache.time_entries = await idb.time_entries.toArray(); }
-    catch (_) { _dbCache.time_entries = []; }
+    // Carregar dados armazenados para o cache em memória. Cada store tem o
+    // próprio try/catch: uma falha isolada não esvazia os demais caches (e
+    // registra a marca para o setCacheStore não apagar linhas que não leu).
+    const _loadStore = async (name, loader) => {
+      try { _dbCache[name] = await loader(); }
+      catch (_e) { _dbLoadFailed[name] = true; console.warn('⚠️ Falha ao carregar store "' + name + '" do IndexedDB (mantida a tabela):', _e); }
+    };
+    await _loadStore('clients', () => idb.clients.toArray());
+    await _loadStore('pendencias', () => idb.pendencias.toArray());
+    await _loadStore('procedures', () => idb.procedures.toArray());
+    await _loadStore('procedure_templates', () => idb.procedure_templates.toArray());
+    await _loadStore('operators', () => idb.operators.toArray());
+    await _loadStore('visits', () => idb.visits.toArray());
+    await _loadStore('reunioes', () => idb.reunioes.toArray());
+    await _loadStore('equipamentos', () => idb.equipamentos.toArray());
+    await _loadStore('client_devices', () => idb.client_devices.toArray());
+    await _loadStore('client_milvus_tickets', () => idb.client_milvus_tickets.toArray());
+    await _loadStore('checklist_modelo_itens', () => idb.checklist_modelo_itens.toArray());
+    await _loadStore('checklist_marcacoes', () => idb.checklist_marcacoes.toArray());
+    await _loadStore('checklists', () => idb.checklists.toArray());
+    await _loadStore('vencimentos', () => idb.vencimentos.toArray());
+    await _loadStore('time_entries', () => idb.time_entries.toArray());
 
     const allKV = await idb.keyvalue.toArray();
     allKV.forEach(item => {
@@ -217,17 +219,25 @@ async function initIndexedDB() {
       }
     }
 
-    // Load v2 tables into cache
-    const userProfile = await idb.user_profile.toArray();
-    _dbCache.user_profile = userProfile.length ? userProfile[0] : {};
+    // Load v2 tables into cache (mesma proteção por store do boot)
+    try {
+      const userProfile = await idb.user_profile.toArray();
+      _dbCache.user_profile = userProfile.length ? userProfile[0] : {};
+    } catch (_e) { _dbLoadFailed.user_profile = true; console.warn('⚠️ Falha ao carregar store "user_profile":', _e); }
 
-    const counters = await idb.counters.toArray();
-    _dbCache.counters = counters.length ? counters[0] : {};
+    try {
+      const counters = await idb.counters.toArray();
+      _dbCache.counters = counters.length ? counters[0] : {};
+    } catch (_e) { _dbLoadFailed.counters = true; console.warn('⚠️ Falha ao carregar store "counters":', _e); }
 
-    const sessions = await idb.sessions.toArray();
-    _dbCache.sessions = sessions.length ? sessions[0] : {};
+    try {
+      const sessions = await idb.sessions.toArray();
+      _dbCache.sessions = sessions.length ? sessions[0] : {};
+    } catch (_e) { _dbLoadFailed.sessions = true; console.warn('⚠️ Falha ao carregar store "sessions":', _e); }
 
-    _dbCache.audit_logs = await idb.audit_logs.toArray();
+    try {
+      _dbCache.audit_logs = await idb.audit_logs.toArray();
+    } catch (_e) { _dbLoadFailed.audit_logs = true; console.warn('⚠️ Falha ao carregar store "audit_logs":', _e); }
 
     _dbReady = true;
     console.debug('⚡ IndexedDB carregado no cache com sucesso.');
@@ -255,10 +265,12 @@ function setCacheStore(storeName, items) {
       if (!Array.isArray(data)) return;
       const keep = new Set(data.map(d => d && (d.id ?? d.key)));
       const keys = await idb[storeName].toCollection().primaryKeys();
-      const stale = keys.filter(k => !keep.has(k));
+      // Leitura do boot falhou: o cache não sabe o que existe — só faz upsert,
+      // nunca apaga (as "stale" podem ser linhas que não foram lidas).
+      const stale = _dbLoadFailed[storeName] ? [] : keys.filter(k => !keep.has(k));
       if (stale.length) await idb[storeName].bulkDelete(stale);
       if (data.length) await idb[storeName].bulkPut(data);
-      else if (!stale.length) await idb[storeName].clear();
+      else if (!_dbLoadFailed[storeName]) await idb[storeName].clear();
     })).catch(err => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
   }
 }
@@ -291,10 +303,10 @@ function setCacheTable(tableName, data) {
     _storeWriteQueues[tableName] = previous.then(() => idb.transaction('rw', idb[tableName], async () => {
       const keep = new Set(data.map(d => d && (d.id ?? d.key)));
       const keys = await idb[tableName].toCollection().primaryKeys();
-      const stale = keys.filter(k => !keep.has(k));
+      const stale = _dbLoadFailed[tableName] ? [] : keys.filter(k => !keep.has(k));
       if (stale.length) await idb[tableName].bulkDelete(stale);
       if (data.length) await idb[tableName].bulkPut(data);
-      else if (!stale.length) await idb[tableName].clear();
+      else if (!_dbLoadFailed[tableName]) await idb[tableName].clear();
     })).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
   } else if (data && typeof data === 'object' && data.key) {
     idb.transaction('rw', idb[tableName], async () => {
