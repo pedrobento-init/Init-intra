@@ -22,6 +22,15 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+// Quem atende aparece no WhatsApp: o cliente fala com a empresa por um
+// número compartilhado, então o nome da pessoa da equipe vai no próprio
+// texto — é a única forma do cliente saber com quem está falando.
+function prefixoAtendente(nome: string, texto: string): string {
+  const n = String(nome || "").trim();
+  if (!n) return texto;
+  return n + ": " + texto;
+}
+
 function enderecoDe(de: unknown): string {
   const bruto = String(de || "");
   const m = /<([^>]+)>/.exec(bruto);
@@ -80,15 +89,16 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       const apiKey = Deno.env.get("WAHA_API_KEY") || "";
       const session = Deno.env.get("WAHA_SESSION") || "default";
       if (!baseUrl || !apiKey) return json({ error: "WhatsApp não configurado", code: "missing_credentials" }, 500);
+      const textoEnvio = prefixoAtendente(op.name || "", texto);
       if (!midia) {
-        const envio = await enviarTexto(telefone, texto, { baseUrl, apiKey, session });
+        const envio = await enviarTexto(telefone, textoEnvio, { baseUrl, apiKey, session });
         if (!envio.ok) return json({ error: "Não foi possível enviar pelo WhatsApp", code: "provider_error" }, 502);
         providerId = envio.id || null;
       } else {
         const endpoint = midia.tipo.startsWith("image/") ? "sendImage" : midia.tipo.startsWith("audio/") ? "sendVoice" : "sendFile";
         const payload: Record<string, unknown> = { session, chatId: telefone + "@c.us", file: { mimetype: midia.tipo, filename: midia.nome, data: midia.dados } };
         if (endpoint === "sendVoice") payload.convert = true;
-        else payload.caption = texto;
+        else payload.caption = prefixoAtendente(op.name || "", texto);
         try {
           const resp = await fetch(`${baseUrl}/api/${endpoint}`, {
             method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
@@ -122,9 +132,12 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
 
     const id = "portal:" + crypto.randomUUID();
     const agora = new Date().toISOString();
+    // O histórico mostra a mesma mensagem que o cliente recebeu: no WhatsApp
+    // o texto enviado leva o nome de quem atendeu, então o registro idem.
+    const textoSalvo = !interna && ultima.canal === "whatsapp" ? prefixoAtendente(op.name || "", texto) : texto;
     const { error: insertErr } = await ctx.supabaseAdmin.from("emails_triagem").insert({
       id, email_id: id, thread_id: thread, message_id: providerId, de: op.name || "Equipe Init",
-      assunto: ultima.assunto, corpo: texto, recebido_em: agora, motivo: null, status: "anexado",
+      assunto: ultima.assunto, corpo: textoSalvo, recebido_em: agora, motivo: null, status: "anexado",
       pendencia_id: ultima.pendencia_id, team: ultima.team, tratado_por: op.name, tratado_em: agora,
       client_id: ultima.client_id, atribuido_a: op.name, atribuido_em: agora, canal: ultima.canal || "email",
       telefone: ultima.telefone, direcao: interna ? "interna" : "saida",

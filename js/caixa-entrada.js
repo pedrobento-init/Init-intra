@@ -331,29 +331,52 @@ function _caixaConversaPorId(id) {
   return _caixaConversas().find((c) => c.id === id) || null;
 }
 
+// Selo com o ícone do canal (WhatsApp/e-mail), no canto do avatar.
+function _cxBadgeCanal(canal) {
+  const whats = canal === 'whatsapp';
+  const path = whats
+    ? '<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-5A8.5 8.5 0 1 1 21 11.5z"/>'
+    : '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>';
+  return '<span class="cx-av-badge ' + (whats ? 'wa' : 'em') + '">' +
+    '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg></span>';
+}
+
+// Número curto do chamado: o cliente vê "Chamado 1721", não "PEN-0001721".
+function _cxChamadoCurto(id) {
+  return String(id || '').replace(/^PEN-?0*/i, '').replace(/^0+/, '') || String(id || '');
+}
+
 function _caixaItemHTML(c, lidas) {
   const u = c.ultima;
   // A prévia e a hora são da última atividade (inclusive a nossa resposta); o
   // nome é de quem falou com a empresa.
   const quem = caixaInterlocutor(c) || u;
   const cli = c.clientId && typeof getClientById === 'function' ? getClientById(c.clientId) : null;
-  const n = c.mensagens.length;
   const naoLida = caixaNaoLida(c, lidas);
-  const status = c.pendente ? 'pendente' : (u.status || '');
-  const previa = caixaPrevia(u.corpo, 120, c.canal);
-  return '<button type="button" class="cx-item' + (c.id === _caixaSelecionada ? ' ativo' : '') + (c.pendente ? ' pendente' : '') + (naoLida ? ' nao-lida' : '') +
+  const previa = caixaPrevia(u.corpo, 110, c.canal);
+  // Relógio de espera: quem ficou esperando um dia fica âmbar; dois, vermelho.
+  const esperaMs = u.recebidoEm ? (Date.now() - new Date(u.recebidoEm).getTime()) : 0;
+  const classeEspera = esperaMs >= 2 * 86400000 ? ' cx-late-r' : esperaMs >= 86400000 ? ' cx-late-y' : '';
+  const espera = caixaEsperaRotulo(u.recebidoEm);
+  const nome = _caixaNomeDe(quem, c.canal);
+  return '<button type="button" class="cx-item' + (c.id === _caixaSelecionada ? ' sel' : '') + (c.pendente ? ' pendente' : '') + (naoLida ? ' nao-lida' : '') +
     '" data-action="caixaSelecionar" data-arg="' + escapeHtml(c.id) + '">' +
-    '<span class="cx-item-topo">' + (naoLida ? '<span class="cx-ponto" aria-label="Não lida"></span>' : '') +
-    '<b>' + escapeHtml(_caixaNomeDe(quem, c.canal)) + '</b>' +
-    '<span class="cx-quando" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">' + escapeHtml(caixaEsperaRotulo(u.recebidoEm)) + '</span></span>' +
-    '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + (n > 1 ? ' <span class="cx-n">' + n + '</span>' : '') + '</span>' +
-    (previa ? '<span class="cx-previa">' + escapeHtml(previa) + '</span>' : '') +
-    '<span class="cx-meta"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
-    _caixaCanalHTML(c.canal) +
-    (cli ? '<span>' + escapeHtml(cli.name) + '</span>' : '<span class="cx-alerta">Sem cliente</span>') +
-    (c.atribuidoA ? '<span>com ' + escapeHtml(c.atribuidoA) + '</span>' : '') + '</span>' +
-    '</button>';
+    '<span class="cx-av" aria-hidden="true">' + escapeHtml(_caixaIniciais(nome)) + _cxBadgeCanal(c.canal) + '</span>' +
+    '<span class="cx-cm">' +
+      '<span class="cx-r1">' + (naoLida ? '<i class="cx-dot" aria-label="Não lida"></i>' : '') + '<b class="cx-nm">' + escapeHtml(nome) + '</b>' +
+        '<span class="cx-quando' + classeEspera + '" title="' + escapeHtml(formatDateTime(u.recebidoEm)) + '">' + escapeHtml(espera) + '</span></span>' +
+      (u.assunto ? '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + '</span>' : '') +
+      (previa ? '<span class="cx-previa">' + escapeHtml(previa) + '</span>' : '') +
+      '<span class="cx-meta"><span class="cx-emp' + (cli ? '' : ' cx-alerta') + '">' + escapeHtml(cli ? cli.name : 'Sem cliente') + '</span>' +
+        (c.pendenciaId ? '<span class="cx-badge">Chamado ' + escapeHtml(_cxChamadoCurto(c.pendenciaId)) + '</span>' : '') +
+        (c.atribuidoA ? '<span class="cx-meta-com">com ' + escapeHtml(c.atribuidoA) + '</span>' : '') + '</span>' +
+    '</span></button>';
 }
+
+// Estado local da tela: conversas com cartões de e-mail expandidos (a última
+// sempre abre) e o painel de detalhes visível ou não.
+var _caixaExpand = {};
+var _caixaDetalhesAberto = true;
 
 function _caixaConversaHTML(c) {
   const id = escapeHtml(c.id);
@@ -362,14 +385,6 @@ function _caixaConversaHTML(c) {
   const u = c.ultima;
   const quem = caixaInterlocutor(c) || u;
   const motivo = EMAIL_TRIAGEM_MOTIVOS[quem.motivo];
-  const acoes = '<div class="cx-acoes">' +
-    (pen ? '<button type="button" class="btn btn-secondary btn-sm" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Abrir chamado</button>' : '') +
-    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir' : 'Assumir / atribuir') + '</button>' +
-    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaVincular" data-arg="' + id + '">' + (cli ? 'Trocar cliente' : 'Vincular cliente') + '</button>' +
-    (!pen ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaAbrirChamado" data-arg="' + id + '">Criar chamado</button>' : '') +
-    (!c.encerrada ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaEncerrar" data-arg="' + id + '">Encerrar conversa</button>' : '') +
-    '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaMarcarNaoLida" data-arg="' + id + '">Marcar como não lida</button>' +
-    '</div>';
   const todas = _caixaConversas();
   const sugerido = caixaSugerirCliente(c, todas);
   const cliSug = sugerido && typeof getClientById === 'function' ? getClientById(sugerido) : null;
@@ -379,20 +394,36 @@ function _caixaConversaHTML(c) {
   // No WhatsApp o contato é o telefone; o e-mail cru do "de" não existe ali.
   const emailDe = whats ? chamadoTelefoneFormatar(c.telefone || quem.telefone || '') : _caixaEmailDe(quem.de);
   const status = c.pendente ? 'pendente' : (u.status || '');
+  const expMap = (_caixaExpand[c.id] = _caixaExpand[c.id] || {});
   let diaAnterior = '';
-  const timeline = c.mensagens.map((m) => {
+  const hora = (m) => escapeHtml(_caixaHora(m.recebidoEm) || formatDateTime(m.recebidoEm));
+  const autorDe = (m) =>
+    (m.direcao || 'entrada') === 'interna' ? 'Nota interna · ' + (m.de || 'Equipe')
+    : (m.direcao || 'entrada') === 'saida' ? (m.de || 'Você')
+    : _caixaNomeDe(m, c.canal);
+  const timeline = c.mensagens.map((m, i) => {
     const dia = _caixaDiaRotulo(m.recebidoEm);
     const sep = dia && dia !== diaAnterior ? '<div class="cx-dia"><span>' + escapeHtml(dia) + '</span></div>' : '';
     diaAnterior = dia;
     const direcao = m.direcao || 'entrada';
-    const autor = direcao === 'interna' ? 'Nota interna · ' + (m.de || 'Equipe') : direcao === 'saida' ? (m.de || 'Você') : _caixaNomeDe(m, c.canal);
-    return sep + '<article class="cx-msg cx-' + escapeHtml(direcao) + '">' +
-      '<span class="cx-avatar" aria-hidden="true">' + escapeHtml(_caixaIniciais(autor)) + '</span>' +
-      '<div class="cx-balao"><header><b>' + escapeHtml(autor) + '</b><span class="cx-quando">' + escapeHtml(_caixaHora(m.recebidoEm)) + '</span></header>' +
-      _caixaCorpoHTML(m.corpo, c.canal) + _caixaMediaHTML(m.media) + '</div></article>';
+    const autor = autorDe(m);
+    if (whats) {
+      const cls = direcao === 'interna' ? 'cx-bubble-nota' : direcao === 'saida' ? 'cx-bubble-out' : 'cx-bubble-in';
+      const nota = direcao === 'interna' ? '<b class="cx-bubble-nota-tag">' + escapeHtml(autor) + '</b>' : '';
+      return sep + '<div class="cx-bubble ' + cls + '">' + nota + _caixaCorpoHTML(m.corpo, c.canal) + _caixaMediaHTML(m.media) + '<small>' + hora(m) + '</small></div>';
+    }
+    const ultimaMsg = i === c.mensagens.length - 1;
+    const expandida = ultimaMsg || !!expMap[i];
+    if (!expandida) {
+      const linha = caixaPrevia(m.corpo, 100, c.canal) || '(sem texto)';
+      return sep + '<button type="button" class="cx-em cx-em-fold" data-action="caixaExpandir" data-arg="' + i + '"><span><b>' + escapeHtml(autor) + '</b>: ' + escapeHtml(linha) + '</span><span class="cx-quando">' + hora(m) + '</span></button>';
+    }
+    return sep + '<article class="cx-em' + (direcao === 'saida' ? ' cx-em-out' : '') + (direcao === 'interna' ? ' cx-em-nota' : '') + '">' +
+      '<div class="cx-em-eh"><b>' + escapeHtml(autor) + '</b><span class="cx-quando">' + hora(m) + '</span></div>' +
+      '<div class="cx-em-eb">' + _caixaCorpoHTML(m.corpo, c.canal) + _caixaMediaHTML(m.media) + '</div></article>';
   }).join('');
   const lado = '<aside class="cx-lado">' +
-    '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-avatar">' + escapeHtml(_caixaIniciais(nome)) + '</span><div><b>' + escapeHtml(nome) + '</b>' +
+    '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-av cx-av-md" aria-hidden="true">' + escapeHtml(_caixaIniciais(nome)) + '</span><div><b>' + escapeHtml(nome) + '</b>' +
     (emailDe && emailDe !== nome ? '<span class="cx-sub">' + escapeHtml(emailDe) + '</span>' : '') + '</div></div>' +
     '<dl><dt>Cliente</dt><dd>' + (cli ? escapeHtml(cli.name) : '<span class="cx-sub">Não vinculado</span>') + '</dd></dl>' +
     (cliSug ? '<div class="cx-sugestao"><span>Parece ser <b>' + escapeHtml(cliSug.name) + '</b>, ' + (whats ? 'pelo telefone' : 'pelo remetente') + '.</span>' +
@@ -406,28 +437,46 @@ function _caixaConversaHTML(c) {
     '<dt>Responsável</dt><dd>' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : '<span class="cx-sub">Ninguém atribuído</span>') + '</dd>' +
     '<dt>Recebido</dt><dd>' + escapeHtml(formatDateTime(c.mensagens[0].recebidoEm)) + '</dd>' +
     (pen ? '<dt>Chamado</dt><dd><a class="cx-chamado" href="#" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">' + escapeHtml(pen.id) + ' · ' + escapeHtml(pen.title || pen.titulo || pen.assunto || '') + '</a></dd>' : '') +
-    '</dl>' + (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') + '</section></aside>';
+    '</dl>' + (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') + '</section>' +
+    '<section class="cx-lado-acoes"><h3>Ações</h3><div class="cx-acoes-ver">' +
+      (pen ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Abrir chamado</button>'
+        : '<button type="button" class="btn cx-btn" data-action="caixaAbrirChamado" data-arg="' + id + '">Criar chamado</button>') +
+      '<button type="button" class="btn cx-btn" data-action="caixaAtribuir" data-arg="' + id + '">' + (c.atribuidoA ? 'Transferir atendimento' : 'Assumir / atribuir') + '</button>' +
+      '<button type="button" class="btn cx-btn" data-action="caixaVincular" data-arg="' + id + '">' + (cli ? 'Trocar cliente' : 'Vincular cliente') + '</button>' +
+      '<button type="button" class="btn cx-btn" data-action="caixaMarcarNaoLida" data-arg="' + id + '">Marcar como não lida</button>' +
+      (!c.encerrada ? '<button type="button" class="btn cx-btn" data-action="caixaEncerrar" data-arg="' + id + '">Encerrar conversa</button>' : '') +
+      '<button type="button" class="btn cx-btn" data-action="caixaDescartar" data-arg="' + id + '">Descartar conversa</button>' +
+    '</div></section></aside>';
+  const eu = (typeof getUser === 'function' ? (getUser() || {}) : {}).name || '';
   const rasc = _caixaRascunho && _caixaRascunho.id === c.id ? _caixaRascunho : { texto: '', kind: 'reply' };
+  const linhaInfo = whats
+    ? '<span class="cx-comp-info">O cliente vê seu nome: <b>' + escapeHtml(eu || 'você') + '</b></span>'
+    : '<span class="cx-comp-info">Para: ' + escapeHtml(_caixaEmailDe(quem.de)) + ' · Assunto: Re: ' + escapeHtml(u.assunto || 'Atendimento') + '</span>';
   const composer = '<form class="cx-composer" data-submit="caixaEnviarMensagem" data-arg="' + id + '">' +
-    '<div class="cx-composer-opcoes"><select class="form-select" name="kind" data-change="caixaRascunhoTipo" aria-label="Tipo de mensagem">' +
-    '<option value="reply"' + (rasc.kind === 'internal' ? '' : ' selected') + '>Responder ao cliente</option>' +
-    '<option value="internal"' + (rasc.kind === 'internal' ? ' selected' : '') + '>Nota interna (não envia)</option></select>' +
-    '<button type="button" class="btn btn-secondary btn-sm" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></div>' +
-    '<textarea class="form-textarea" id="newNoteText" name="text" rows="3" data-input="caixaRascunho" placeholder="Escreva a resposta ou a nota interna...">' + escapeHtml(rasc.texto) + '</textarea>' +
-    '<div class="cx-composer-envio"><input type="file" name="file" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
-    '<button type="submit" class="btn btn-primary">Salvar / enviar</button></div><div id="rpPainel" hidden></div></form>';
+    '<div class="cx-comp-top">' + linhaInfo +
+      '<span class="cx-comp-grp"><select class="form-select" name="kind" data-change="caixaRascunhoTipo" aria-label="Tipo de mensagem">' +
+        '<option value="reply"' + (rasc.kind === 'internal' ? '' : ' selected') + '>Responder</option>' +
+        '<option value="internal"' + (rasc.kind === 'internal' ? ' selected' : '') + '>Nota interna</option></select>' +
+        '<button type="button" class="btn cx-btn cx-rp" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></span>' +
+    '</div>' +
+    '<div class="cx-comp-row"><label class="btn cx-ic-btn" for="cxArquivo" aria-label="Anexar arquivo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label>' +
+      '<input type="file" id="cxArquivo" name="file" class="cx-filehidden" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
+      '<textarea class="cx-tx" name="text" id="newNoteText" rows="' + (whats ? 1 : 4) + '" data-input="caixaRascunho" placeholder="' + (whats ? 'Escreva uma mensagem' : 'Escreva a resposta') + '">' + escapeHtml(rasc.texto) + '</textarea>' +
+      '<button type="submit" class="btn cx-btn cx-send" aria-label="Enviar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-11 11"/><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>' +
+    '<div id="rpPainel" hidden></div></form>';
   return '<div class="cx-conv-topo">' +
-    '<button type="button" class="btn btn-secondary btn-sm cx-voltar" data-action="caixaVoltar">Voltar</button>' +
-    '<h2 class="ov-h2">' + escapeHtml(quem.assunto || u.assunto || '(sem assunto)') + '</h2>' +
-    '<div class="cx-chips"><span class="cx-chip cx-st-' + escapeHtml(status) + '">' + escapeHtml(CAIXA_STATUS[status] || status) + '</span>' +
-    _caixaCanalHTML(c.canal) +
-    (c.pendente ? '<span class="cx-chip cx-chip-alerta" title="' + escapeHtml(formatDateTime(quem.recebidoEm)) + '">Aguardando ' + escapeHtml(caixaEsperaRotulo(quem.recebidoEm)) + '</span>' : '') +
-    '<span class="cx-chip' + (cli ? '' : ' cx-chip-alerta') + '">' + (cli ? escapeHtml(cli.name) : 'Sem cliente') + '</span>' +
-    '<span class="cx-chip' + (c.atribuidoA ? '' : ' cx-chip-alerta') + '">' + (c.atribuidoA ? escapeHtml(c.atribuidoA) : 'Sem responsável') + '</span>' +
-    (pen ? '<span class="cx-chip">Chamado #' + escapeHtml(String(pen.id).slice(0, 8)) + '</span>' : '') +
-    '<span class="cx-chip">' + c.mensagens.length + (c.mensagens.length > 1 ? ' mensagens' : ' mensagem') + '</span></div>' +
-    acoes + '</div>' +
-    '<div class="cx-conv-grade"><div><div class="cx-timeline">' + timeline + '</div>' + composer + '</div>' + lado + '</div>';
+    '<button type="button" class="btn cx-btn cx-voltar" data-action="caixaVoltar" aria-label="Voltar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>' +
+    '<span class="cx-av cx-av-lg" aria-hidden="true">' + escapeHtml(_caixaIniciais(nome)) + _cxBadgeCanal(c.canal) + '</span>' +
+    '<div class="cx-conv-id"><b>' + escapeHtml(nome) + '</b><span>' + escapeHtml((cli ? cli.name : '') + (cli ? ' · ' : '') + (whats ? 'WhatsApp' : 'E-mail')) + '</span></div>' +
+    '<span class="cx-conv-flex"></span>' +
+    (pen ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' + escapeHtml(pen.id) + '">Chamado ' + escapeHtml(_cxChamadoCurto(pen.id)) + '</button>'
+      : '<button type="button" class="btn cx-btn" data-action="caixaAbrirChamado" data-arg="' + id + '">Virar chamado</button>') +
+    '<button type="button" class="btn cx-btn cx-ic-btn" data-action="cxDetalhes" aria-pressed="' + (_caixaDetalhesAberto ? 'true' : 'false') + '" aria-label="Detalhes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>' +
+    '</div>' +
+    '<div class="cx-conv-grade' + (_caixaDetalhesAberto ? '' : ' cx-det-fechado') + '"><div class="cx-conv-main"><div class="cx-timeline">' +
+      (whats ? '' : '<h2 class="cx-subj">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>') +
+      timeline +
+    '</div>' + composer + '</div>' + lado + '</div>';
 }
 
 function _caixaMediaHTML(media) {
@@ -493,16 +542,13 @@ function renderCaixaEntrada() {
   const area = document.getElementById('contentArea');
   if (!area) return;
   if (!document.getElementById('caixaLista')) {
-    area.innerHTML = '<div class="ov-wrap cx"><div class="search-bar page-toolbar">' +
-      '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-      '<input class="form-input" id="caixaBusca" placeholder="Buscar por assunto, remetente ou telefone..." value="' + escapeHtml(_caixaBusca) + '" data-input="caixaBusca" /></div>' +
-      '<select class="form-select pt-filter" id="caixaFiltro" data-change="caixaFiltro">' +
-      Object.keys(CAIXA_FILTROS).map((k) => '<option value="' + k + '"' + (k === _caixaFiltro ? ' selected' : '') + '>' + escapeHtml(CAIXA_FILTROS[k]) + '</option>').join('') +
-      '</select>' +
-      '<select class="form-select pt-filter" id="caixaCanal" data-change="caixaCanal" aria-label="Canal">' +
-      Object.keys(CAIXA_CANAIS).map((k) => '<option value="' + escapeHtml(k) + '"' + (k === _caixaCanal ? ' selected' : '') + '>' + escapeHtml(CAIXA_CANAIS[k]) + '</option>').join('') +
-      '</select></div>' +
-      '<div class="cx-corpo-tela" id="caixaTela"><div class="cx-lista" id="caixaLista"></div><section class="card cx-conversa" id="caixaConversa"></section></div></div>';
+    area.innerHTML = '<div class="cx" id="caixaTela"><div class="cx-list-panel"><div class="cx-lh">' +
+      '<div class="cx-search-wrap"><svg class="cx-search-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<input class="cx-search" id="caixaBusca" type="search" placeholder="Buscar por nome, assunto ou telefone…" value="' + escapeHtml(_caixaBusca) + '" data-input="caixaBusca" aria-label="Buscar" /></div>' +
+      '<div class="cx-chips" id="caixaCanalChips" role="group" aria-label="Canal"></div>' +
+      '<div class="cx-tabs" id="caixaTabs" role="tablist" aria-label="Situação"></div></div>' +
+      '<div class="cx-cards" id="caixaLista"></div></div>' +
+      '<section class="cx-main" id="caixaConversa"></section></div>';
   }
   const usuario = (getUser() || {}).name || '';
   const todas = _caixaConversas();
@@ -510,16 +556,24 @@ function renderCaixaEntrada() {
   // escolhido tem que ser 3 conversas de WhatsApp.
   const doCanal = caixaFiltrarCanal(todas, _caixaCanal);
   const visiveis = caixaFiltrar(doCanal, _caixaFiltro, _caixaBusca, usuario);
-  // A toolbar não é remontada (perderia o foco da busca), então só os rótulos
-  // do filtro são atualizados com a contagem.
-  const selCanal = document.getElementById('caixaCanal');
-  if (selCanal) selCanal.value = _caixaCanal;
-  const sel0 = document.getElementById('caixaFiltro');
-  if (sel0 && sel0.options) {
-    sel0.value = _caixaFiltro;
-    const contagem = caixaContarFiltros(doCanal, usuario);
-    Array.prototype.forEach.call(sel0.options, (o) => { o.textContent = CAIXA_FILTROS[o.value] + ' (' + (contagem[o.value] || 0) + ')'; });
-  }
+  // Toolbar não é remontada (perderia o foco da busca), então só as contagens
+  // e os estados ativo/inativo das chips e abas são atualizados.
+  const contagem = caixaContarFiltros(doCanal, usuario);
+  const chips = [
+    ['todos', 'Todos', null],
+    ['email', 'E-mail', '<path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="m3 7 9 6 9-6"/>'],
+    ['whatsapp', 'WhatsApp', '<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-5A8.5 8.5 0 1 1 21 11.5z"/>'],
+  ];
+  const chipsHtml = chips.map(([k, l, svg]) =>
+    '<button type="button" class="chip' + (k === _caixaCanal ? ' on' : '') + '" data-action="caixaCanal" data-arg="' + k + '" aria-pressed="' + (k === _caixaCanal) + '">' +
+      (svg ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + svg + '</svg>' : '') +
+      escapeHtml(l) + '</button>').join('');
+  const chipsBox = document.getElementById('caixaCanalChips');
+  if (chipsBox) chipsBox.innerHTML = chipsHtml;
+  const tabs = Object.keys(CAIXA_FILTROS).map((k) =>
+    '<button type="button" class="tab' + (k === _caixaFiltro ? ' on' : '') + '" role="tab" aria-selected="' + (k === _caixaFiltro) + '" data-action="caixaFiltro" data-arg="' + k + '">' + escapeHtml(CAIXA_FILTROS[k]) + ' <span class="cx-tab-n">' + (contagem[k] || 0) + '</span></button>').join('');
+  const tabsBox = document.getElementById('caixaTabs');
+  if (tabsBox) tabsBox.innerHTML = tabs;
   // Abrir a conversa conta como ler; marcar antes de desenhar a lista evita o
   // ponto de não lida piscando no item que acabou de ser clicado.
   const sel = _caixaSelecionada ? todas.find((c) => c.id === _caixaSelecionada) : null;
@@ -530,16 +584,17 @@ function renderCaixaEntrada() {
     : _caixaFiltro === 'pendentes' ? 'Nada aguardando decisão. Tudo em dia.'
     : _caixaFiltro === 'minhas' ? 'Nenhuma conversa atribuída a você.' : 'Nenhuma conversa ainda.';
   lista.innerHTML = visiveis.length ? visiveis.map((c) => _caixaItemHTML(c, lidas)).join('')
-    : '<div class="empty-state"><p>' + vazio + '</p>' +
-      (_caixaFiltro !== 'todas' ? '<button type="button" class="btn btn-secondary btn-sm" data-action="caixaFiltro" data-arg="todas">Ver todas</button>' : '') + '</div>';
+    : '<div class="cx-lista-vazia"><p>' + vazio + '</p>' +
+      (_caixaFiltro !== 'todas' ? '<button type="button" class="btn cx-btn" data-action="caixaFiltro" data-arg="todas">Ver todas</button>' : '') + '</div>';
 
   // A selecionada pode ter saído do filtro (foi descartada, por exemplo):
   // continua aberta, para o técnico ver o resultado do que acabou de fazer.
   const conv = document.getElementById('caixaConversa');
   const naoLidas = visiveis.filter((c) => caixaNaoLida(c, lidas)).length;
   conv.innerHTML = sel ? _caixaConversaHTML(sel)
-    : '<div class="empty-state cx-vazio"><p><b>Escolha uma conversa</b></p><p class="ov-muted">' +
-      (naoLidas ? naoLidas + (naoLidas > 1 ? ' não lidas' : ' não lida') + ' neste filtro.' : 'Tudo lido neste filtro.') + '</p></div>';
+    : '<div class="cx-empty"><div class="cx-empty-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg></div>' +
+      '<b>Escolha uma conversa</b>' +
+      '<p class="cx-empty-sub">' + (naoLidas ? naoLidas + (naoLidas > 1 ? ' mensagens não lidas.' : ' mensagem não lida.') : 'Tudo lido neste filtro.') + '</p></div>';
   const tela = document.getElementById('caixaTela');
   if (tela) tela.classList.toggle('cx-aberta', !!sel);
 }
@@ -702,6 +757,16 @@ function caixaEncerrar(id) {
 }
 
 registerActions({
+  // Alternar painel de detalhes (mockup) e expandir cartão de e-mail antigo.
+  cxDetalhes: () => { _caixaDetalhesAberto = !_caixaDetalhesAberto; renderCaixaEntrada(); },
+  caixaExpandir: (_el, i) => {
+    const c = _caixaConversas().find((x) => x.id === _caixaSelecionada);
+    if (!c) return;
+    const k = parseInt(i, 10);
+    const m = (_caixaExpand[c.id] = _caixaExpand[c.id] || {});
+    m[k] = !m[k];
+    renderCaixaEntrada();
+  },
   caixaSelecionar: (_el, id) => { _caixaSelecionada = id || null; renderCaixaEntrada(); },
   caixaVoltar: () => { _caixaSelecionada = null; renderCaixaEntrada(); },
   caixaBusca: (_el, v) => { _caixaBusca = v || ''; renderCaixaEntrada(); },

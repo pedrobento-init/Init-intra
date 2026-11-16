@@ -32,6 +32,15 @@ import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
 import { PEN_FECHADOS, telefoneDaConversa, TEXTO_MAX } from "../whatsapp/mensagem.ts";
 import { enviarTexto } from "../whatsapp/provedor.ts";
 
+// Quem atende aparece no WhatsApp: o cliente fala com a empresa por um
+// número compartilhado, então o nome da pessoa da equipe vai no próprio
+// texto — é a única forma do cliente saber com quem está falando.
+function prefixoAtendente(nome: string, texto: string): string {
+  const n = String(nome || "").trim();
+  if (!n) return texto;
+  return n + ": " + texto;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -118,7 +127,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       );
     }
 
-    const envio = await enviarTexto(tel, bruto, cred);
+    const envio = await enviarTexto(tel, prefixoAtendente(op.name || "", bruto), cred);
     if (!envio.ok) {
       // O erro do provedor nunca leva a URL (ela tem o token da instância).
       console.error("whatsapp-responder: envio falhou:", envio.erro);
