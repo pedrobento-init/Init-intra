@@ -139,7 +139,10 @@ async function begin(db: SupabaseClient, input: { runner_email?: unknown }) {
     const personalTodo = (live && !!cal && hash !== v!.google_hash) || removeFrom.length > 0 || (!live && !!cal);
     // Destino compartilhado ("Atendimentos"): toda visita, mesmo sem técnico
     // com e-mail. Visita morta sai de lá só se um dia entrou (hash gravado).
-    const sharedTodo = !!SHARED_CAL && (live ? hashShared !== v!.google_hash_shared : !!v!.google_hash_shared);
+    // Visita apagada do banco (a fila fica, a linha some): sai da
+    // compartilhada mesmo sem hash gravado — apagar evento inexistente dá
+    // 404/410, que o robô ignora, e a fila é esvaziada.
+    const sharedTodo = !!SHARED_CAL && (live ? hashShared !== v!.google_hash_shared : !v || !!v.google_hash_shared);
 
     // Nada a fazer em NENHUMA das agendas: só tira da fila.
     if (!personalTodo && !sharedTodo) { noop.push({ id, seq: g.seq }); continue; }
@@ -303,7 +306,9 @@ async function finish(db: SupabaseClient, input: { calendars?: unknown; changes?
         // 081, que só conhece a agenda pessoal.
         const isShared = p.dest === SHARED_OP;
         const hashCol = isShared ? "google_hash_shared" : "google_hash";
-        const esperado = p.hash ? await visitHash(v!, isShared ? opNameOf(ops, v!) : undefined) : null;
+        // Visita apagada entre begin e finish: sem linha para assinar, mas a
+        // fila ainda precisa ser esvaziada.
+        const esperado = p.hash && v ? await visitHash(v, isShared ? opNameOf(ops, v) : undefined) : null;
         // Só confirma se a visita não mudou de novo enquanto o robô enviava.
         if (v && (!p.hash || esperado === p.hash) && (v[hashCol] ?? null) !== (p.hash ?? null)) {
           await db.from("visits").update({ [hashCol]: p.hash ?? null }).eq("id", id);
