@@ -212,6 +212,23 @@ describe('google-agenda compartilhada — begin', () => {
     expect(remocoes[0]).toMatchObject({ visit_id: 'VIS-1', cal: null, remove_from: [SHARED], hash: null });
   });
 
+  it('linha na fila de visita apagada do banco não derruba o begin', async () => {
+    // O trigger da 057 enfileira no DELETE; apagar a visita (js/storage-visitas.js)
+    // não tira a linha da fila. begin via a visita como nula e quebrava ao ler
+    // google_hash_shared — 500 toda execução, para sempre.
+    const db = fakeDb({
+      operators: [ana],
+      visits: [],
+      google_agenda_queue: [{ seq: 5, visit_id: 'VIS-APAGADA', old_operator_id: 'OP-1', old_operator: 'Ana' }],
+    });
+    const call = await handlerCom(db);
+    const res = await call({ action: 'begin', runner_email: 'agenda@empresa.com' });
+
+    const porDest = Object.fromEntries(res.push.map((p) => [p.dest, p]));
+    expect(porDest.personal).toMatchObject({ visit_id: 'VIS-APAGADA', cal: null, remove_from: ['ana@empresa.com'], event: null });
+    expect(porDest.shared).toMatchObject({ visit_id: 'VIS-APAGADA', cal: null, remove_from: [SHARED], event: null });
+  });
+
   it('sem AGENDA_SHARED_CAL, o comportamento é o de antes da 081', async () => {
     const db = fakeDb({ operators: [ana], visits: [visita()], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
     const env = { ...ENV };
@@ -291,6 +308,24 @@ describe('google-agenda compartilhada — finish', () => {
     expect(db.store.visits[0].google_hash_shared).toBeNull();
     // O evento continua na agenda pessoal até a próxima fila: a assinatura dela não muda aqui.
     expect(db.store.visits[0].google_hash).toBe(h);
+  });
+
+  it('confirmação de visita apagada entre begin e finish não derruba o finish', async () => {
+    const db = fakeDb({
+      operators: [ana],
+      visits: [],
+      google_agenda_queue: [{ seq: 9, visit_id: 'VIS-APAGADA', attempts: 0 }],
+    });
+    const call = await handlerCom(db);
+    const res = await call({
+      action: 'finish',
+      calendars: [],
+      changes: [],
+      pushed: [{ seq: 9, visit_id: 'VIS-APAGADA', ok: true, hash: 'h-velho', dest: 'shared' }],
+    });
+
+    expect(res.success).toBe(true);
+    expect(db.store.google_agenda_queue).toEqual([]);
   });
 
   it('confirmação do push grava a assinatura do destino certo', async () => {
