@@ -298,13 +298,19 @@ async function loadClientReport(clientId) {
   const c = typeof getClientById === 'function' ? getClientById(clientId) : null;
   const sel = document.getElementById('rptMonth');
   const box = document.getElementById('rptPreview');
-  if (!c || !sel || !box) return;
+  if (!box) return;
+  if (!c || !sel) {
+    // Sem isso o modal fica preso em "Montando o relatório…" sem explicação.
+    box.innerHTML = '<p class="rpt-loading">Não foi possível montar o relatório (cliente não encontrado). Feche o modal e abra de novo.</p>';
+    return;
+  }
   const ym = sel.value;
   const r = rptMonthRange(ym);
   const btn = document.getElementById('rptPrintBtn');
   if (btn) btn.disabled = true;
   box.innerHTML = '<p class="rpt-loading">Montando o relatório…</p>';
 
+  try {
   const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter((p) => p && p.clientId === clientId);
   const visits = (typeof getVisits === 'function' ? getVisits() : []).filter((v) => v && v.clientId === clientId);
   const penIds = new Set(pens.map((p) => p.id));
@@ -328,6 +334,12 @@ async function loadClientReport(clientId) {
   _rptLast = { html, title: 'Relatório ' + c.name + ' ' + ym };
   box.innerHTML = html;
   if (btn) btn.disabled = false;
+  } catch (err) {
+    // Nunca deixar a tela presa em "Montando…": mostra o erro e loga.
+    if (typeof _logSilent === 'function') _logSilent(err, 'relatorio-cliente');
+    box.innerHTML = '<p class="rpt-loading">Não foi possível montar o relatório. Tente de novo.</p>';
+    if (btn) btn.disabled = true;
+  }
 }
 
 function printClientReport() {
@@ -338,7 +350,8 @@ function printClientReport() {
 
 if (typeof registerActions === 'function') {
   registerActions({
-    loadClientReport: (_el, id) => loadClientReport(id),
+    // actions.js entrega el.value no change — o clientId vem do data-arg do select.
+    loadClientReport: (el) => loadClientReport(el && el.dataset ? el.dataset.arg : undefined),
     printClientReport: () => printClientReport(),
   });
 }

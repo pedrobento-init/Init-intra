@@ -255,7 +255,8 @@ function meetingReassignPen(penId) { return openReassignPendencia(penId); }
 
 if (typeof registerActions === 'function') {
   registerActions({
-    toggleCheckItem: (el, id) => toggleCheckItem(id, Number(el.dataset.index)),
+    // actions.js entrega el.checked no change — os ids vêm do data-arg/data-index.
+    toggleCheckItem: (el) => toggleCheckItem(el.dataset.arg, Number(el.dataset.index)),
     removeCheckItem: (el, id) => removeCheckItem(id, Number(el.dataset.index)),
     penCmdCloseModal: () => closeModal(),
     // Desabilita o botão uma vez clicado (evita duplo submit) e passa o botão adiante.

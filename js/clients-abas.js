@@ -553,6 +553,7 @@ if (typeof registerActions === 'function') {
     openMilvusTicketDetail: (el, clientId) => openMilvusTicketDetail(clientId, el.dataset.ticket),
     syncClientInventoryUI: (_el, id) => syncClientInventoryUI(id),
     exportClientInventory: (_el, id) => { if (typeof exportClientInventory === 'function') exportClientInventory(id); },
-    importClientInventoryUI: (el, id) => importClientInventoryUI(id, el),
+    // actions.js entrega el.value (fakepath) no change — o clientId vem do data-arg.
+    importClientInventoryUI: (el) => importClientInventoryUI(el.dataset.arg, el),
   });
 }
