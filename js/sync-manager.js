@@ -32,6 +32,17 @@ function shouldApplyRemote(local, remote, isEnqueued) {
   return String((remote && remote.id) || '') > String((local && local.id) || '');
 }
 
+// `onMerged` do pull (ex.: visita sem `numero` no remoto não pode apagar o
+// local) também vale para o realtime: aplica no item mesclado e devolve ele.
+function _applyOnMerged(meta, item, localItem) {
+  if (!meta || typeof meta.onMerged !== 'function' || !item) return item;
+  try {
+    var out = meta.onMerged([item], localItem ? [localItem] : []);
+    if (Array.isArray(out) && out[0]) return out[0];
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  return item;
+}
+
 function _syncTeamFilter() {
   try {
     if (typeof isTeamAdmin === 'function' && isTeamAdmin()) {
@@ -125,14 +136,16 @@ var SyncManager = (function () {
             : ((typeof outboxHas === 'function') ? await outboxHas(mapped.id) : false);
         } catch (_) { enq = false; }
         if (idx !== -1) {
-          if (shouldApplyRemote(list[idx], mapped, enq)) {
-            list[idx] = (typeof _keepLocalEdits === 'function')
-              ? _keepLocalEdits(Object.assign({}, list[idx], mapped), list[idx])
-              : Object.assign({}, list[idx], mapped);
-            delete list[idx].pinHash; delete list[idx].pinSalt; // hash de senha não é mais guardado
+          var loc = list[idx];
+          if (shouldApplyRemote(loc, mapped, enq)) {
+            var mergedOne = (typeof _keepLocalEdits === 'function')
+              ? _keepLocalEdits(Object.assign({}, loc, mapped), loc)
+              : Object.assign({}, loc, mapped);
+            delete mergedOne.pinHash; delete mergedOne.pinSalt; // hash de senha não é mais guardado
+            list[idx] = _applyOnMerged(meta, mergedOne, loc);
           }
         } else {
-          list.unshift(mapped);
+          list.unshift(_applyOnMerged(meta, mapped, null));
         }
       } else {
         return;
@@ -154,6 +167,14 @@ var SyncManager = (function () {
       if (typeof window !== 'undefined' && !window._supabaseAuthActive) return false;
       return typeof supabaseClient !== 'undefined' && !!supabaseClient;
     } catch (_) { return false; }
+  }
+
+  // Remove e esquece o canal atual. O `removeChannel` é best-effort (o canal
+  // pode já estar morto); o que importa é `_channel` voltar a null para o
+  // `visibilitychange`/`pageshow` reconectarem.
+  function _dropDeadChannel() {
+    try { if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    _channel = null;
   }
 
   function connect() {
@@ -180,6 +201,10 @@ var SyncManager = (function () {
         if (st === 'SUBSCRIBED') { _retryN = 0; _emit('live'); }
         else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
           _emit('error');
+          // Canal morto (ex.: erro com a aba oculta): solta a referência.
+          // Sem isso o `visibilitychange` nunca reconecta — `_channel`
+          // continua truthy e o reconnect agendado aborta escondido.
+          _dropDeadChannel();
           // Anti-storm: o fallback completo (8 entidades) roda no máximo 1×
           // a cada 60s e nunca com aba oculta. Sem isso, token expirado gera
           // erro → sync → reconnect → erro em loop, cada sync logando os
@@ -203,6 +228,7 @@ var SyncManager = (function () {
       });
     } catch (_) {
       _emit('error');
+      _dropDeadChannel();
       var d2 = _syncBackoffDelay(_retryN++);
       setTimeout(function () { try { if (_canConnect()) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }, d2);
     }
