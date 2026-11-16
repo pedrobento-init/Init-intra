@@ -378,6 +378,15 @@ function getEquipamentosByClient(clientId) {
 function saveEquipamento(data) {
   const list = getEquipamentos();
   const isEdit = !!data.id;
+  const prev = isEdit ? list.find(e => e.id === data.id) : null;
+  // Edição cruzada de equipe é recusada na storage, não só na tela — e o
+  // dono do registro não muda por edição: sem team explícito, vale o da
+  // ficha atual (antes um ativo de estoque sem cliente herdava o team de
+  // quem editou e passava a ser dele).
+  if (isEdit && prev && typeof canViewTeam === 'function' && !canViewTeam(prev.team || 'init')) {
+    if (typeof showToast === 'function') showToast('Permissão negada: equipamento de outra equipe.', 'error');
+    return null;
+  }
   const now = new Date().toISOString();
   // Alias legado: 'em_uso' → 'entregue'.
   if (data.status === 'em_uso') data.status = 'entregue';
@@ -392,7 +401,7 @@ function saveEquipamento(data) {
     const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
     if (client) data.team = client.team || 'init';
   }
-  if (!data.team) data.team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init';
+  if (!data.team) data.team = (isEdit && prev && prev.team) ? prev.team : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init');
   // Estoque Initnet é valor interno: sem vínculo de cliente.
   if (data.clientId === '__estoque__' || data.clientId === 'estoque-initnet') {
     data.clientId = null;
