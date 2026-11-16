@@ -321,11 +321,8 @@ const ENTITIES = [
     // e-mail, e media/direcao vazios não entram no push.
     optionalFields: ['canal', 'telefone', 'direcao', 'media'], // 075, 082
     onChange: () => {
-      // A caixa mora na tela de Pendências: e-mail que chega enquanto alguém
+      // A caixa mora na tela #caixa: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.
-      if ((window.location.hash.replace('#', '') || '') === 'pendencias'
-        && document.getElementById('penViewArea') && typeof renderEntradasEmail === 'function') renderEntradasEmail();
-      // A tela #caixa também precisa ver a linha nova sem recarregar.
       if ((window.location.hash.replace('#', '') || '') === 'caixa'
         && document.getElementById('caixaLista') && typeof renderCaixaEntrada === 'function') renderCaixaEntrada();
     }

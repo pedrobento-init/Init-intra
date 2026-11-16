@@ -119,14 +119,15 @@ describe('fechar o ciclo quando o chamado nasce', () => {
 
 describe('desfazer não deixa responsável fantasma', () => {
   it('descartar grava quem decidiu; o desfazer volta a pendente sem nome nem data', () => {
+    // O caminho real (caixa-entrada) chama _emailTriagemSalvar com este patch;
+    // a garantia vive nele, não num wrapper de tela.
     lista = [entrada()];
-    sandbox.emailTriagemDescartar('ETR-1');
+    sandbox._emailTriagemSalvar('ETR-1', { status: 'descartado', pendenciaId: null });
     expect(lista[0].status).toBe('descartado');
     expect(lista[0].tratadoPor).toBe('Ana');
     expect(lista[0].tratadoEm).toBeTruthy();
 
-    expect(typeof undoCb).toBe('function');
-    undoCb();
+    sandbox._emailTriagemSalvar('ETR-1', { status: 'pendente', pendenciaId: null });
     expect(lista[0].status).toBe('pendente');
     // Ninguém decidiu nada ainda: estampar tratadoPor/tratadoEm aqui seria
     // um responsável registrado numa entrada que está de volta na fila.

@@ -187,9 +187,6 @@ if (typeof registerActions === 'function') {
 // Despacho da visualização atual — chamado por renderPenView e pelos patches
 // otimistas do quadro.
 function _penRenderAtual(area) {
-  // Todo redesenho da área passa aqui (filtro, página, otimista), então é o
-  // ponto que mantém os contadores das abas de origem em dia.
-  try { if (typeof _penRenderOrigemCounts === 'function') _penRenderOrigemCounts(); } catch (_) {}
   const res = (typeof penView !== 'undefined' && penView === 'fila') ? renderPenFila(area) : renderPenKanban(area);
   // A rolagem de volta da página do chamado só faz sentido com a lista já desenhada:
   // antes disso a altura é a do "carregando" e o scroll seria cortado.
