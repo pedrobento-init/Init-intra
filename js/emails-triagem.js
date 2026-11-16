@@ -40,12 +40,10 @@ var _EMAIL_TRIAGEM_COLUNAS_073 = [
   ['atribuido_em', 'atribuidoEm'], ['atribuicao_nota', 'atribuicaoNota']
 ];
 
-/** A caixa (#caixa) mostra as mesmas linhas: quem muda uma redesenha as duas telas. */
+/** A caixa (#caixa) é a única superfície de triagem: quem muda uma entrada lá
+ *  redesenha a própria lista (a antiga caixa embutida em Pendências saiu). */
 function _emailTriagemRedesenhar() {
-  if (typeof renderEntradasEmail === 'function') renderEntradasEmail();
   if (typeof renderCaixaEntrada === 'function' && document.getElementById('caixaLista')) renderCaixaEntrada();
-  // O "+N" da aba E-mail conta as entradas pendentes; sem isso fica velho até o próximo filtro.
-  if (typeof _penRenderOrigemCounts === 'function') { try { _penRenderOrigemCounts(); } catch (_e) { /* fora da tela de pendências */ } }
 }
 
 /** Grava a decisão na entrada e empurra para o banco, como o resto do app. */
@@ -206,76 +204,3 @@ function _emailTriagemAprender(de, clientId) {
   return linha;
 }
 
-/** Descartar: some da lista, fica no banco com quem decidiu. */
-function emailTriagemDescartar(id) {
-  var e = _emailTriagemSalvar(id, { status: 'descartado', pendenciaId: null });
-  if (!e) { showToast('Entrada não encontrada.', 'error'); return; }
-  _emailTriagemRedesenhar();
-  if (typeof showUndoToast === 'function') {
-    showUndoToast('Entrada descartada.', function () {
-      _emailTriagemSalvar(id, { status: 'pendente', pendenciaId: null });
-      _emailTriagemRedesenhar();
-    });
-  } else {
-    showToast('Entrada descartada.', 'success');
-  }
-}
-
-function _emailTriagemCardHtml(e) {
-  var motivo = EMAIL_TRIAGEM_MOTIVOS[e.motivo] || { label: e.motivo || '—', dica: '' };
-  var quando = e.recebidoEm || e.createdAt || '';
-  try { if (Date.parse(quando) && typeof formatDateTime === 'function') quando = formatDateTime(quando); } catch (_e) { /* data estranha: mostra crua */ }
-  var trecho = String(e.corpo || '').replace(/\s+/g, ' ').trim();
-  return '<li class="etr-card">'
-    + '<div class="etr-top">'
-    + '<span class="etr-motivo etr-motivo--' + escapeHtml(e.motivo || 'outro') + '" title="' + escapeHtml(motivo.dica) + '">' + escapeHtml(motivo.label) + '</span>'
-    + '<span class="etr-quando">' + escapeHtml(quando) + '</span>'
-    + '</div>'
-    + '<div class="etr-assunto">' + (escapeHtml(e.assunto || '') || '<em>sem assunto</em>') + '</div>'
-    + '<div class="etr-de">' + escapeHtml(e.de || '') + '</div>'
-    + (trecho ? '<p class="etr-trecho">' + escapeHtml(trecho.slice(0, 260)) + (trecho.length > 260 ? '…' : '') + '</p>' : '')
-    + '<div class="etr-acoes">'
-    + '<button type="button" class="btn btn-primary btn-sm" data-action="etrAbrir" data-arg="' + escapeHtml(e.id) + '">Abrir chamado</button>'
-    + '<button type="button" class="btn btn-secondary btn-sm" data-action="etrDescartar" data-arg="' + escapeHtml(e.id) + '">Descartar</button>'
-    + '</div></li>';
-}
-
-/**
- * Desenha a caixa. Sem entradas pendentes ela some inteira — um painel vazio
- * dizendo "nada aqui" todo dia vira ruído, e aí ninguém lê quando tem algo.
- */
-function renderEntradasEmail() {
-  var node = document.getElementById('penEntradasEmail');
-  if (!node) return;
-  var lista = entradasEmailPendentes();
-  if (!lista.length) { node.innerHTML = ''; return; }
-  var aberta = true;
-  try { aberta = localStorage.getItem('intra_etr_fechada') !== '1'; } catch (_e) { /* sem localStorage: aberta */ }
-  node.innerHTML = '<section class="etr-box' + (aberta ? '' : ' is-fechada') + '">'
-    + '<button type="button" class="etr-head" data-action="etrToggle" aria-expanded="' + (aberta ? 'true' : 'false') + '">'
-    + '<span class="etr-head-title">📥 Chegou por e-mail e não virou chamado</span>'
-    + '<span class="etr-count">' + lista.length + '</span>'
-    + '<span class="etr-chevron" aria-hidden="true">' + (aberta ? '▾' : '▸') + '</span>'
-    + '</button>'
-    // Fora do botão: link dentro de <button> não é clicável de forma confiável.
-    + '<a class="etr-link" href="#caixa" data-action="nav" data-arg="caixa">Abrir caixa de entrada</a>'
-    + (aberta ? '<ul class="etr-lista">' + lista.map(_emailTriagemCardHtml).join('') + '</ul>' : '')
-    + '</section>';
-}
-
-function emailTriagemToggle() {
-  var aberta = true;
-  try {
-    aberta = localStorage.getItem('intra_etr_fechada') !== '1';
-    localStorage.setItem('intra_etr_fechada', aberta ? '1' : '0');
-  } catch (_e) { /* sem localStorage: não lembra, e tudo bem */ }
-  renderEntradasEmail();
-}
-
-if (typeof registerActions === 'function') {
-  registerActions({
-    etrAbrir: function (_el, arg) { emailTriagemAbrirChamado(arg); },
-    etrDescartar: function (_el, arg) { emailTriagemDescartar(arg); },
-    etrToggle: function () { emailTriagemToggle(); }
-  });
-}

@@ -173,10 +173,12 @@ describe('o cartão de origem', () => {
   });
 });
 
-describe('a caixa de entradas de e-mail', () => {
-  it('some inteira quando não há nada pendente', () => {
-    // Painel vazio todo dia vira ruído, e aí ninguém lê no dia que importa.
-    expect(etrSrc).toContain("if (!lista.length) { node.innerHTML = ''; return; }");
+describe('a triagem mora na Caixa de entrada', () => {
+  it('a caixa embutida de entradas saiu de Pendências', () => {
+    // A aba E-mail foi removida: a triagem de e-mail existe só em #caixa.
+    expect(etrSrc).not.toContain('renderEntradasEmail');
+    expect(etrSrc).not.toContain('penEntradasEmail');
+    expect(etrSrc).not.toContain('_emailTriagemCardHtml');
   });
 
   it('mostra só o que ninguém tratou', () => {
@@ -187,10 +189,9 @@ describe('a caixa de entradas de e-mail', () => {
     expect(etrSrc).toContain('filterByTeam(lista)');
   });
 
-  it('descartar grava quem decidiu, em vez de apagar', () => {
-    expect(etrSrc).toContain("status: 'descartado'");
+  it('a decisão grava quem decidiu, em vez de apagar', () => {
     expect(etrSrc).toContain('tratadoPor:');
-    expect(etrSrc).not.toContain(".delete()");
+    expect(etrSrc).not.toContain('.delete()');
   });
 
   it('a entrada só é marcada depois que o chamado existe', () => {
@@ -207,16 +208,10 @@ describe('a caixa de entradas de e-mail', () => {
     expect(etrSrc).toContain('openPendenciaForm(null, e.clientId || null, null, {');
   });
 
-  it('tudo que veio do e-mail passa por escapeHtml', () => {
-    expect(etrSrc).toContain('escapeHtml(e.assunto');
-    expect(etrSrc).toContain('escapeHtml(e.de');
-    expect(etrSrc).toContain('escapeHtml(e.id)');
-  });
-
-  it('as ações vão por delegação, não por onclick inline', () => {
-    // AGENTS.md: onclick no markup obriga o CSP a liberar 'unsafe-inline'.
-    expect(etrSrc).toContain("data-action=\"etrAbrir\"");
-    expect(etrSrc).toContain('registerActions({');
-    expect(etrSrc).not.toMatch(/onclick=/);
+  it('o que veio do e-mail é escapado antes de virar HTML na Caixa de entrada', () => {
+    const caixaSrc = fs.readFileSync('js/caixa-entrada.js', 'utf8');
+    expect(caixaSrc).toContain('escapeHtml(u.assunto');
+    expect(caixaSrc).toContain('escapeHtml(autor');
+    expect(caixaSrc).toContain('escapeHtml(c.id');
   });
 });
