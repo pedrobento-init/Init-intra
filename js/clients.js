@@ -58,15 +58,15 @@ function renderClients() {
       <div class="search-bar page-toolbar">
         <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" oninput="debouncedFilterClientCards()" />
+          <input class="form-input" id="clientSearch" placeholder="Buscar cliente..." value="${filterState.search || ''}" data-input="debouncedFilterClientCards" />
         </div>
         <div class="pt-actions">
         <div class="cl-view" role="group" aria-label="Modo de exibição">
           <button type="button" class="cl-view-btn${_clientView === 'lista' ? ' is-on' : ''}" aria-pressed="${_clientView === 'lista'}" data-action="clientView" data-arg="lista" title="Lista"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Lista</button>
           <button type="button" class="cl-view-btn${_clientView === 'cartoes' ? ' is-on' : ''}" aria-pressed="${_clientView === 'cartoes'}" data-action="clientView" data-arg="cartoes" title="Cartões"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Cartões</button>
         </div>
-        <button class="btn btn-secondary" onclick="openImportClientsModal()" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
-        ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" onclick="openMilvusClientsImportModal()" title="Importar clientes do Milvus (cria o mapeamento junto)"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Milvus</button>` : ''}
+        <button class="btn btn-secondary" data-action="openImportClientsModal" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
+        ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" data-action="openMilvusClientsImportModal" title="Importar clientes do Milvus (cria o mapeamento junto)"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Milvus</button>` : ''}
         </div>
       </div>
       <div class="${_clientView === 'lista' ? 'cl-list' : 'client-cards-grid'}" id="clientGrid"></div>
@@ -122,6 +122,15 @@ if (typeof registerActions === 'function') {
     driveUnlink: (_el, id) => removeDriveFolderConfirm(id),
     // Cancelar volta para a ficha: o prompt substituiu o #modalBody dela.
     driveCancel: (_el, id) => { viewClient(id); switchClientTab('documentos', id); },
+    // Busca da grade: debounce de 300ms (a entrada é um <input data-input>).
+    debouncedFilterClientCards: () => { if (typeof window !== 'undefined' && typeof window.debouncedFilterClientCards === 'function') window.debouncedFilterClientCards(); },
+    openImportClientsModal: () => openImportClientsModal(),
+    openMilvusClientsImportModal: () => openMilvusClientsImportModal(),
+    openClientForm: () => openClientForm(),
+    clientPagePrev: () => { _clientPage--; renderClientGrid(); },
+    clientPageNext: () => { _clientPage++; renderClientGrid(); },
+    openClientReport: (_el, id) => { if (typeof openClientReport === 'function') openClientReport(id); },
+    switchClientTab: (el, tab) => switchClientTab(tab, el.dataset.client),
   });
 }
 function _clientRowStats(c, pens, today) {
@@ -160,7 +169,7 @@ function renderClientGrid() {
   const grid = document.getElementById('clientGrid');
   if (!grid) return;
   const clients = _filteredClients;
-  if (!clients.length) { grid.innerHTML = `<div class="empty-state"><p>Nenhum cliente cadastrado</p>${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '<button class="btn btn-primary btn-sm" onclick="openClientForm()">+ Novo Cliente</button>' : ''}</div>`; return; }
+  if (!clients.length) { grid.innerHTML = `<div class="empty-state"><p>Nenhum cliente cadastrado</p>${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '<button class="btn btn-primary btn-sm" data-action="openClientForm">+ Novo Cliente</button>' : ''}</div>`; return; }
 
   setTimeout(() => {
     const totalPages = Math.ceil(clients.length / CLIENT_PAGE_SIZE);
@@ -184,9 +193,9 @@ function renderClientGrid() {
     <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
       <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
       <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} onclick="_clientPage--;renderClientGrid()">← Anterior</button>
+        <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} data-action="clientPagePrev">← Anterior</button>
         <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} onclick="_clientPage++;renderClientGrid()">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} data-action="clientPageNext">Próxima →</button>
       </div>
     </div>
   ` : '';
@@ -204,15 +213,15 @@ function renderClientGrid() {
       const pending = sla.totalAbertas;
       const vencidas = sla.vencidas;
       const dentro = sla.dentroPrazo;
-      return `<div class="client-card" role="button" tabindex="0" onclick="viewClient('${escapeHtml(c.id)}')">
+      return `<div class="client-card" role="button" tabindex="0" data-action="openClient" data-arg="${escapeHtml(c.id)}">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
       <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
         <div style="display:flex;gap:4px">
-          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientForm('${escapeHtml(c.id)}')">Editar</button>
-          ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteClientConfirm('${escapeHtml(c.id)}')">✕</button>` : ''}
+          <button class="btn btn-sm btn-secondary" data-action="clientEdit" data-arg="${escapeHtml(c.id)}" data-stop="1">Editar</button>
+          ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" data-action="clientDelete" data-arg="${escapeHtml(c.id)}" data-stop="1">✕</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -250,19 +259,19 @@ function viewClient(id) {
   if (!c) return;
   openModal(c.name, `
     ${clientSummaryHtml(c)}
-    <div class="cs-actions"><button type="button" class="link-btn" onclick="openClientReport('${id}')">Relatório do mês (PDF)</button></div>
+    <div class="cs-actions"><button type="button" class="link-btn" data-action="openClientReport" data-arg="${escapeHtml(id)}">Relatório do mês (PDF)</button></div>
     <div class="tabs" id="clientTabs" role="tablist" aria-label="Seções do cliente">
-      <button type="button" role="tab" aria-selected="true" class="tab active" onclick="switchClientTab('ficha','${id}')">Ficha TI</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('procedimentos','${id}')">Procedimentos</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('pendencias','${id}')">Pendências</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('visitas','${id}')">Visitas</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('inventario','${id}')">Inventário</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" data-client-tab="backups" data-client-id="${escapeHtml(id)}">Backups</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('chamados','${id}')">Chamados</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('checklist','${id}')">Checklist</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('documentos','${id}')">Anexos / Docs</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" onclick="switchClientTab('historico','${id}')">Histórico</button>
-      <button type="button" role="tab" aria-selected="false" class="tab" data-client-tab="timeline" data-client-id="${escapeHtml(id)}">Linha do tempo</button>
+      <button type="button" role="tab" aria-selected="true" class="tab active" data-action="switchClientTab" data-arg="ficha" data-client="${escapeHtml(id)}">Ficha TI</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="procedimentos" data-client="${escapeHtml(id)}">Procedimentos</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="pendencias" data-client="${escapeHtml(id)}">Pendências</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="visitas" data-client="${escapeHtml(id)}">Visitas</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="inventario" data-client="${escapeHtml(id)}">Inventário</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="backups" data-client="${escapeHtml(id)}">Backups</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="chamados" data-client="${escapeHtml(id)}">Chamados</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="checklist" data-client="${escapeHtml(id)}">Checklist</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="documentos" data-client="${escapeHtml(id)}">Anexos / Docs</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="historico" data-client="${escapeHtml(id)}">Histórico</button>
+      <button type="button" role="tab" aria-selected="false" class="tab" data-action="switchClientTab" data-arg="timeline" data-client="${escapeHtml(id)}">Linha do tempo</button>
     </div>
     <div id="clientTabContent"></div>`, 'lg');
   // Cabeçalho: nome + "Atualizada em DD/MM/AAAA por <usuário>" (updated_at/updated_by).

@@ -73,8 +73,8 @@ async function openCalendarFeed(rotate) {
   openModal('Agenda no celular', `
     <div class="gcal-box" id="gcalBox" hidden></div>
     <p class="feed-lead">Ou só para ver (sem conectar conta): suas visitas aparecem no app de agenda do celular e se atualizam sozinhas (o Google pode levar algumas horas para buscar mudanças).</p>
-    <div class="feed-url"><input class="form-input" id="feedUrl" readonly value="${escapeHtml(url)}" onclick="this.select()" />
-      <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('feedUrl').value).then(()=>showToast('Link copiado.','success'))">Copiar</button></div>
+    <div class="feed-url"><input class="form-input" id="feedUrl" readonly value="${escapeHtml(url)}" data-action="feedSelectAll" />
+      <button type="button" class="btn btn-secondary btn-sm" data-action="feedCopyLink">Copiar</button></div>
     <div class="feed-opts">
       <a class="btn btn-primary btn-sm" href="${escapeHtml(google)}" target="_blank" rel="noopener">Adicionar ao Google Agenda</a>
       <a class="btn btn-secondary btn-sm" href="${escapeHtml(webcal)}">iPhone / Mac / Outlook</a>
@@ -84,6 +84,15 @@ async function openCalendarFeed(rotate) {
       <li><b>Android sem Google Agenda:</b> use o link no app de agenda que aceitar "assinatura por URL".</li>
     </ul>
     <p class="feed-warn">Este link é pessoal: quem tiver o link vê suas visitas (cliente e motivo). Se ele vazar, gere outro.</p>
-    <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="openCalendarFeed(true)">Gerar link novo</button><button type="button" class="btn btn-primary" onclick="closeModal()">Fechar</button></div>`);
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="openCalendarFeed" data-arg="true">Gerar link novo</button><button type="button" class="btn btn-primary" data-action="closeModal">Fechar</button></div>`);
   _renderGoogleAgendaBox();
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    feedSelectAll: (el) => el.select(),
+    feedCopyLink: () => navigator.clipboard.writeText(document.getElementById('feedUrl').value).then(() => showToast('Link copiado.', 'success')),
+    openCalendarFeed: (_el, arg) => openCalendarFeed(arg === true || arg === 'true'),
+    closeModal: () => closeModal(),
+  });
 }

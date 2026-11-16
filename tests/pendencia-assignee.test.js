@@ -166,7 +166,7 @@ describe('contrato: migração, mapa e card', () => {
     expect(pen.fields.completed_by).toBe('completedBy');
     const src = fs.readFileSync('js/reunioes.js', 'utf8');
     expect(src).toContain('meeting-done-${escapeHtml(p.id)}');
-    expect(src).toContain("onclick=\"openCorrectCompletion('${escapeHtml(p.id)}')\"");
+    expect(src).toContain("data-action=\"openCorrectCompletion\" data-arg=\"${escapeHtml(p.id)}\"");
     expect(src).toContain('_meetingPenHistoryHtml(p.id)');
     expect(src).toContain('Corrigiu conclusão');
   });

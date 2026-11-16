@@ -55,7 +55,7 @@ describe('contrato da landing (pontos de atenção)', () => {
   it('"Ver Relatório Anterior" aponta à última encerrada de mês menor', () => {
     expect(src).toContain('prevMeeting');
     expect(src).toMatch(/\(r\.mesAno \|\| ''\) < mesAno/);
-    expect(src).toContain("showMeetingReport('${prevMeeting.id}')");
+    expect(src).toContain('data-action="showMeetingReport" data-arg="${escapeHtml(prevMeeting.id)}"');
   });
 
   it('contador renomeado para "Clientes" (sem "na fila")', () => {

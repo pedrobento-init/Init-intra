@@ -834,19 +834,19 @@ function renderLogs() {
         <input type="date" id="logDateTo" class="form-input filter-date" />
       </div>
       <div class="pt-actions">
-      <button class="btn btn-secondary btn-sm" onclick="exportLogsCSV()" title="Exporta o que está filtrado">
+      <button class="btn btn-secondary btn-sm" data-action="exportLogsCSV" title="Exporta o que está filtrado">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         CSV
       </button>
-      ${isCurrentAdmin() && typeof openClientErrors === 'function' ? '<button class="btn btn-secondary btn-sm" onclick="openClientErrors()" title="Falhas que o app registrou nos aparelhos">Erros do app</button>' : ''}
-      ${isCurrentAdmin() ? '<button class="btn btn-danger btn-sm" onclick="clearLogs()">Limpar Histórico</button>' : ''}
+      ${isCurrentAdmin() && typeof openClientErrors === 'function' ? '<button class="btn btn-secondary btn-sm" data-action="openClientErrors" title="Falhas que o app registrou nos aparelhos">Erros do app</button>' : ''}
+      ${isCurrentAdmin() ? '<button class="btn btn-danger btn-sm" data-action="clearLogs">Limpar Histórico</button>' : ''}
       </div>
     </div>
     <div class="audit-quick" role="group" aria-label="Período rápido">
-      <button type="button" class="vis-chip" data-p="today" onclick="auditQuickPeriod('today')">Hoje</button>
-      <button type="button" class="vis-chip" data-p="7" onclick="auditQuickPeriod('7')">7 dias</button>
-      <button type="button" class="vis-chip" data-p="30" onclick="auditQuickPeriod('30')">30 dias</button>
-      <button type="button" class="vis-chip" data-p="" onclick="auditQuickPeriod('')">Tudo</button>
+      <button type="button" class="vis-chip" data-p="today" data-action="auditQuickPeriod" data-arg="today">Hoje</button>
+      <button type="button" class="vis-chip" data-p="7" data-action="auditQuickPeriod" data-arg="7">7 dias</button>
+      <button type="button" class="vis-chip" data-p="30" data-action="auditQuickPeriod" data-arg="30">30 dias</button>
+      <button type="button" class="vis-chip" data-p="" data-action="auditQuickPeriod" data-arg="">Tudo</button>
     </div>
     <div class="audit-summary" id="auditSummary" aria-live="polite"></div>
     <div id="logsContainer"></div>`;
@@ -903,7 +903,7 @@ function _renderAuditList() {
   const online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
   if (sum) {
     sum.innerHTML = '<b>' + plural(list.length, 'registro', 'registros') + '</b> · ' + plural(people, 'pessoa', 'pessoas') +
-      (online && !_auditState.remote ? ' · <button type="button" class="link-btn" onclick="auditFetchRemote(this)" title="O aparelho guarda só os últimos 500 registros">Buscar também no servidor</button>' : '') +
+      (online && !_auditState.remote ? ' · <button type="button" class="link-btn" data-action="auditFetchRemote" title="O aparelho guarda só os últimos 500 registros">Buscar também no servidor</button>' : '') +
       (_auditState.remote ? ' · inclui registros do servidor' : '');
   }
   if (!list.length) {
@@ -934,12 +934,12 @@ function _renderAuditList() {
         '<div class="log-meta">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
           escapeHtml(log.operatorName || 'Sistema') +
-          (canOpen(log) ? ' · <button type="button" class="link-btn" onclick="openAuditTarget(\'' + escapeHtml(log.type) + '\',\'' + escapeHtml(log.targetId) + '\')">Abrir</button>' : '') +
+          (canOpen(log) ? ' · <button type="button" class="link-btn" data-action="openAuditTarget" data-arg="' + escapeHtml(log.targetId) + '" data-type="' + escapeHtml(log.type) + '">Abrir</button>' : '') +
         '</div>' +
       '</div>';
     }).join('') + '</div></section>').join('') +
     (list.length > page.length
-      ? '<div style="text-align:center;padding:12px"><button type="button" class="btn btn-secondary" onclick="_auditState.shown+=' + AUDIT_PAGE + ';_renderAuditList()">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
+      ? '<div style="text-align:center;padding:12px"><button type="button" class="btn btn-secondary" data-action="auditLoadMore">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
       : '');
 }
 
@@ -1305,7 +1305,7 @@ function renderOverdueBanner(dueTodayCount, dueTomorrowCount) {
         ${dueTomorrowCount > 0 ? ` ${plural(dueTomorrowCount, 'pendência', 'pendências')} vencendo amanhã.` : ''}
       </span>
     </div>
-    <button class="btn btn-secondary btn-sm" style="background:rgba(0,0,0,0.05)" onclick="navigateTo('pendencias')">Ver Pendências →</button>
+    <button class="btn btn-secondary btn-sm" style="background:rgba(0,0,0,0.05)" data-action="nav" data-arg="pendencias">Ver Pendências →</button>
   `;
 
   contentArea.insertBefore(banner, contentArea.firstChild);
@@ -1510,4 +1510,17 @@ function formatElapsedFriendly(totalSeconds) {
   if (h === 0) return m + 'min';
   if (rm === 0) return h + 'h';
   return h + 'h ' + String(rm).padStart(2, '0') + 'min';
+}
+
+// Ações da tela de Histórico/auditoria (clique por delegação em js/actions.js).
+if (typeof registerActions === 'function') {
+  registerActions({
+    exportLogsCSV: () => { if (typeof exportLogsCSV === 'function') exportLogsCSV(); },
+    openClientErrors: () => { if (typeof openClientErrors === 'function') openClientErrors(); },
+    clearLogs: () => { if (typeof clearLogs === 'function') clearLogs(); },
+    auditQuickPeriod: (_el, p) => { if (typeof auditQuickPeriod === 'function') auditQuickPeriod(p); },
+    auditFetchRemote: (el) => { if (typeof auditFetchRemote === 'function') auditFetchRemote(el); },
+    openAuditTarget: (el, id) => { if (typeof openAuditTarget === 'function') openAuditTarget(el.dataset.type, id); },
+    auditLoadMore: () => { _auditState.shown += AUDIT_PAGE; if (typeof _renderAuditList === 'function') _renderAuditList(); },
+  });
 }

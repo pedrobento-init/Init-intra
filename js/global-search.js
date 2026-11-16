@@ -128,7 +128,7 @@ function matchSearchActions(query, actions, max) {
 }
 function _searchActionHtml(a, idx) {
   return `
-      <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
+      <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
         <div class="search-result-icon search-result-icon--action">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
         </div>
@@ -282,7 +282,7 @@ function _renderSearchResults(query) {
   if (matchClients.length) {
     html += `<div class="search-group-label">Clientes</div>`;
     html += matchClients.map((c, i) => `
-      <div class="search-result-item" data-idx="${actionOffset + i}" onclick="selectSearchResult(${actionOffset + i})">
+      <div class="search-result-item" data-idx="${actionOffset + i}" data-action="selectSearchResult" data-arg="${actionOffset + i}" role="button" tabindex="0">
         <div class="search-result-icon" style="background:#eff6ff">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
@@ -310,7 +310,7 @@ function _renderSearchResults(query) {
         }
       }
       return `
-      <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
+      <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
         <div class="search-result-icon" style="background:#fef9ee">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
@@ -329,7 +329,7 @@ function _renderSearchResults(query) {
     html += matchEquips.map((eq, i) => {
       const idx = penOffset + i;
       return `
-      <div class="search-result-item" data-idx="${idx}" onclick="selectSearchResult(${idx})">
+      <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
         <div class="search-result-icon" style="background:#f5f3ff">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </div>
@@ -346,7 +346,7 @@ function _renderSearchResults(query) {
     const kbOffset = penOffset + matchEquips.length;
     html += `<div class="search-group-label">Conhecimento</div>`;
     html += matchKb.map((d, i) => `
-      <div class="search-result-item" data-idx="${kbOffset + i}" onclick="selectSearchResult(${kbOffset + i})">
+      <div class="search-result-item" data-idx="${kbOffset + i}" data-action="selectSearchResult" data-arg="${kbOffset + i}" role="button" tabindex="0">
         <div class="search-result-icon" style="background:#ecfdf5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         </div>
@@ -554,6 +554,13 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', () => {
   _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
 });
+
+// Ação dos itens de resultado (clique/Enter por delegação em js/actions.js).
+if (typeof registerActions === 'function') {
+  registerActions({
+    selectSearchResult: (_el, idx) => selectSearchResult(Number(idx) || 0),
+  });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { parseSearchShortcuts, getNoteSnippet, matchSearchActions, _getPendingSyncCountSafe, _getPendingSyncText, _refreshSyncBannerSafe, _triggerBackgroundSync };

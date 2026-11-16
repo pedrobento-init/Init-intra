@@ -103,14 +103,17 @@ describe('contrato da tabela e do retorno à aba', () => {
   const penSrc = partsSource('pendencias');
 
   it('coluna de ações com Abrir (focável, aria-label, sem propagar)', () => {
-    expect(clientsSrc).toContain("onclick=\"event.stopPropagation();openClientPendencia('");
+    expect(clientsSrc).toContain('data-action="clientPenOpen"');
+    expect(clientsSrc).toContain('data-pen="${escapeHtml(p.id)}"');
+    expect(clientsSrc).toContain('data-stop="1"');
     expect(clientsSrc).toContain('aria-label="Abrir pendência:');
     expect(clientsSrc).toContain('<th></th></tr></thead>');
   });
 
-  it('linha com tabindex + Enter/Espaço e prazo vazio como "—"', () => {
+  it('linha com tabindex + Enter/Espaço (delegação) e prazo vazio como "—"', () => {
+    // Enter/Espaço vêm de graça da delegação em js/actions.js (TR[role=button] não é INPUT).
     expect(clientsSrc).toContain("class=\"cli-pen-row\" tabindex=\"0\"");
-    expect(clientsSrc).toContain("event.key==='Enter'||event.key===' '");
+    expect(clientsSrc).toContain('data-action="clientPenRow"');
     expect(clientsSrc).toContain("${p.deadline?formatDate(p.deadline):'—'}");
   });
 

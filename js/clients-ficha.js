@@ -696,11 +696,11 @@ function renderClientFicha(clientId, el) {
   const cid = escapeHtml(clientId);
   el.innerHTML = `
     <div class="cf-bar">
-      <button type="button" class="btn btn-primary btn-sm" onclick="editFichaAll('${cid}')">${cfIcon('edit', 13)} Editar ficha</button>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${cid}'),100)">+ Nova Pendência</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="editFichaAll" data-arg="${cid}">${cfIcon('edit', 13)} Editar ficha</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="clientNewPendencia" data-arg="${cid}">+ Nova Pendência</button>
       <span class="cf-bar-sp"></span>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="openClientFullForm('${cid}')">${cfIcon('form', 13)} Formulário</button>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="copyClientSummary('${cid}')">${cfIcon('copy', 13)} Copiar resumo</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="openClientFullForm" data-arg="${cid}">${cfIcon('form', 13)} Formulário</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="copyClientSummary" data-arg="${cid}">${cfIcon('copy', 13)} Copiar resumo</button>
     </div>
     ${cfHealthHtml(clientId, c)}
     <div class="cf-quick">
@@ -757,7 +757,7 @@ function renderClientTab(tab, id) {
           <span class="section-title">📄 Documentos permanentes (Máx 2MB)</span>
           <label class="btn btn-primary btn-sm" style="cursor:pointer">
             + Enviar Documento permanente
-            <input type="file" id="cliDocFileInput" style="display:none" onchange="handleClientDocumentUpload('${id}',this,()=>renderClientDocumentsList('${id}','cliDocumentsList'))" />
+            <input type="file" id="cliDocFileInput" style="display:none" data-change="clientDocumentUpload" data-client="${escapeHtml(id)}" />
           </label>
         </div>
         <div class="attachment-list" id="cliDocumentsList"></div>
@@ -768,7 +768,7 @@ function renderClientTab(tab, id) {
           <span class="section-title">📁 Anexos do Cliente (Máx 2MB)</span>
           <label class="btn btn-secondary btn-sm" style="cursor:pointer">
             + Enviar Anexo
-            <input type="file" id="cliFileInput" style="display:none" onchange="handleFileUpload('clients','${id}',this,()=>renderAttachmentList('clients','${id}','cliAttachmentsList'))" />
+            <input type="file" id="cliFileInput" style="display:none" data-change="clientAttachmentUpload" data-client="${escapeHtml(id)}" />
           </label>
         </div>
         <div class="attachment-list" id="cliAttachmentsList"></div>
@@ -794,7 +794,7 @@ function renderClientTab(tab, id) {
   } else if (tab === 'visitas') {
     const visits = getVisitsByClient(id);
     el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="openVisitForm(null,'${escapeHtml(id)}')">+ Registrar Visita</button>
+        <button class="btn btn-primary btn-sm" data-action="visitFormForClient" data-arg="${escapeHtml(id)}">+ Registrar Visita</button>
       </div>
       ${visits.length ? `<div class="table-wrapper"><table><thead><tr><th>Data</th><th>Horário</th><th>Motivo</th><th>Operador</th><th>Status</th><th></th></tr></thead><tbody>${visits.map(v => `<tr>
         <td><strong>${formatDate(v.date)}</strong></td>
@@ -802,7 +802,7 @@ function renderClientTab(tab, id) {
         <td>${escapeHtml(v.motivo || '—')}${v.observacoes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(v.observacoes)}</div>` : ''}</td>
         <td>${escapeHtml(v.operator || '—')}</td>
         <td>${typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : escapeHtml(v.status)}</td>
-        <td style="text-align:right"><button class="btn btn-sm btn-secondary" onclick="openVisitDetail('${escapeHtml(v.id)}')">Abrir</button></td>
+        <td style="text-align:right"><button class="btn btn-sm btn-secondary" data-action="openVisit" data-arg="${escapeHtml(v.id)}">Abrir</button></td>
       </tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma visita registrada para este cliente.</p></div>`}`;
   } else if (tab === 'inventario') {
     renderClientInventoryTab(id);
@@ -854,7 +854,33 @@ function renderClientTab(tab, id) {
       try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
       return true;
     });
-    el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,'${id}'),100)">+ Nova Pendência</button></div>
-      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th><th></th></tr></thead><tbody>${pens.map(p=>`<tr class="cli-pen-row" tabindex="0" onclick="openClientPenRow(event,'${escapeHtml(id)}','${escapeHtml(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openClientPenRow(event,'${escapeHtml(id)}','${escapeHtml(p.id)}')}"><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td><td style="text-align:right"><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openClientPendencia('${escapeHtml(id)}','${escapeHtml(p.id)}')" aria-label="Abrir pendência: ${escapeHtml(getPendenciaTitulo(p))}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+    el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" data-action="clientNewPendencia" data-arg="${escapeHtml(id)}">+ Nova Pendência</button></div>
+      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th><th></th></tr></thead><tbody>${pens.map(p=>`<tr class="cli-pen-row" tabindex="0" data-action="clientPenRow" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}"><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td><td style="text-align:right"><button class="btn btn-sm btn-secondary" data-action="clientPenOpen" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}" data-stop="1" aria-label="Abrir pendência: ${escapeHtml(getPendenciaTitulo(p))}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
   }
+}
+
+// Ações de delegação (js/actions.js) para os handlers da ficha do cliente.
+if (typeof registerActions === 'function') {
+  registerActions({
+    editFichaAll: (_el, cid) => editFichaAll(cid),
+    copyClientSummary: (_el, cid) => copyClientSummary(cid),
+    openClientFullForm: (_el, cid) => openClientFullForm(cid),
+    // "+ Nova Pendência": fecha o modal, vai para Pendências e abre o formulário com o cliente pré-selecionado.
+    clientNewPendencia: (_el, cid) => { closeModal(); navigateTo('pendencias'); setTimeout(() => openPendenciaForm(null, cid), 100); },
+    clientDocumentUpload: (el) => {
+      const id = el.dataset.client;
+      if (typeof handleClientDocumentUpload === 'function') {
+        handleClientDocumentUpload(id, el, () => { if (typeof renderClientDocumentsList === 'function') renderClientDocumentsList(id, 'cliDocumentsList'); });
+      }
+    },
+    clientAttachmentUpload: (el) => {
+      const id = el.dataset.client;
+      if (typeof handleFileUpload === 'function') {
+        handleFileUpload('clients', id, el, () => { if (typeof renderAttachmentList === 'function') renderAttachmentList('clients', id, 'cliAttachmentsList'); });
+      }
+    },
+    visitFormForClient: (_el, cid) => { if (typeof openVisitForm === 'function') openVisitForm(null, cid); },
+    clientPenRow: (el, arg, ev) => openClientPenRow(ev, arg, el.dataset.pen),
+    clientPenOpen: (el, arg) => openClientPendencia(arg, el.dataset.pen),
+  });
 }

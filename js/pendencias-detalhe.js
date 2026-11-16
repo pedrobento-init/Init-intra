@@ -482,7 +482,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
   const _tpls = (!id && typeof getProcedureTemplates === 'function') ? (getProcedureTemplates() || []) : [];
   const _tplField = _tpls.length ? `
       <div class="form-group pen-tpl-field"><label class="form-label" for="penTemplateSel">Começar de um modelo</label>
-        <select class="form-select" id="penTemplateSel" onchange="applyPenTemplate(this.value)">
+        <select class="form-select" id="penTemplateSel" data-change="applyPenTemplate">
           <option value="">Em branco</option>
           ${_tpls.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.title || '—')}${t.category ? ' · ' + escapeHtml(t.category) : ''}</option>`).join('')}
         </select>
@@ -507,7 +507,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
     : '';
 
   openModal(id ? 'Editar Pendência' : 'Nova Pendência', `
-    <form onsubmit="submitPendenciaForm(event,'${escapeHtml(id||'')}')">
+    <form data-submit="submitPendenciaForm" data-arg="${escapeHtml(id||'')}">
       ${_tplField}
       ${_ocultos}
       <div class="form-row">
@@ -572,7 +572,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
           <input class="form-input" name="tags" value="${escapeHtml((p.tags||[]).join(', '))}" placeholder="Ex: urgente, firewall, vpn" /></div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`);
@@ -591,7 +591,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
       var best=suggestTemplateForDescription(txt, tpls);
       if(best){
         sug.style.display='block';
-        sug.innerHTML="Usar modelo '"+escapeHtml(best.title)+"'? <button class=\"btn btn-sm btn-primary\" onclick=\"applyTemplateSuggestion('"+escapeHtml(best.id)+"')\">Aplicar</button>";
+        sug.innerHTML="Usar modelo '"+escapeHtml(best.title)+"'? <button class=\"btn btn-sm btn-primary\" data-action=\"applyTemplateSuggestion\" data-arg=\""+escapeHtml(best.id)+"\">Aplicar</button>";
       } else { sug.style.display='none'; sug.innerHTML=''; }
     });
   }, 30);
@@ -783,5 +783,9 @@ function deletePendenciaConfirm(id) {
 if (typeof registerActions === 'function') {
   registerActions({
     penNoteVis: (_el, vis) => penNoteVis(vis),
+    applyPenTemplate: (_el, v) => applyPenTemplate(v),
+    submitPendenciaForm: (_el, arg, ev) => submitPendenciaForm(ev, arg),
+    closeModal: () => closeModal(),
+    applyTemplateSuggestion: (_el, id) => applyTemplateSuggestion(id),
   });
 }

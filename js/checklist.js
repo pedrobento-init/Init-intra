@@ -712,8 +712,14 @@ function ckRefreshStats(clientId, checklistId) {
 function _ckIsChecklistTabActive() {
   try {
     const active = document.querySelector('#clientTabs .tab.active');
-    const oc = active ? (active.getAttribute('onclick') || '') : '';
-    return /switchClientTab\('checklist'/.test(oc);
+    if (!active) return false;
+    // Legado (onclick inline) e delegação (data-*) — o atributo usado depende
+    // de quem renderiza a tab (clients.js); aceita os formatos conhecidos.
+    const oc = active.getAttribute('onclick') || '';
+    if (/switchClientTab\('checklist'/.test(oc)) return true;
+    if (active.getAttribute('data-client-tab') === 'checklist') return true;
+    if (active.getAttribute('data-action') === 'switchClientTab' && (active.getAttribute('data-arg') || '').split(',')[0] === 'checklist') return true;
+    return false;
   } catch (_) { return false; }
 }
 
@@ -762,14 +768,14 @@ function _ckEnsureLocal() {
 // ── Modo de USO ──────────────────────────────────────────────────────────────
 
 function _ckRenderUso(clientId, el) {
-  const cid = _ckEsc(clientId);
+  const cid = escapeHtml(clientId);
   const ativos = getActiveChecklists();
 
   if (!ativos.length) {
     el.innerHTML = `
       <div class="empty-state">
         <p>Nenhum checklist ativo.</p>
-        <button type="button" class="btn btn-primary btn-sm" onclick="setChecklistMode('${cid}','gerir',true)">+ Novo checklist</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="ckOpenGerirNovo" data-arg="${cid}">+ Novo checklist</button>
       </div>
       <p class="ck-hint">Checklists são gerenciados no modo “Gerenciar” e valem para todos os clientes.</p>`;
     return;
@@ -781,7 +787,7 @@ function _ckRenderUso(clientId, el) {
 
   const segBtns = ativos.map(c => `
     <button type="button" class="ck-seg-btn${c.id === sel ? ' is-on' : ''}" data-ck-tipo="${_ckEsc(c.id)}"
-      aria-pressed="${c.id === sel}" onclick="setChecklistSel('${cid}','${_ckEsc(c.id)}')">${escapeHtml(c.nome)}</button>`).join('');
+      aria-pressed="${c.id === sel}" data-action="ckSelectChecklist" data-client="${cid}" data-arg="${escapeHtml(c.id)}">${escapeHtml(c.nome)}</button>`).join('');
 
   const groupsHtml = grupos.map(g => {
     const d = g.itens.filter(it => marcado.has(it.id)).length;
@@ -800,7 +806,7 @@ function _ckRenderUso(clientId, el) {
         <h3 class="ck-group-title">${escapeHtml(g.categoria)}</h3>
         <span class="ck-count" data-ck-count="${escapeHtml(g.categoria)}">${d}/${g.itens.length}</span>
         <span class="ck-sp"></span>
-        ${temProc ? `<button type="button" class="ck-proc-btn" onclick="openChecklistProc('${cid}','${_ckEsc(g.categoria)}')">Ver procedimento</button>` : ''}
+        ${temProc ? `<button type="button" class="ck-proc-btn" data-action="openChecklistProc" data-client="${cid}" data-arg="${escapeHtml(g.categoria)}">Ver procedimento</button>` : ''}
       </header>
       <div class="ck-list">${rows}</div>
     </section>`;
@@ -809,14 +815,14 @@ function _ckRenderUso(clientId, el) {
   el.innerHTML = `
     <div class="ck-bar">
       <div class="ck-seg" role="group" aria-label="Checklists">${segBtns}</div>
-      <button type="button" class="ck-mgr-btn" onclick="setChecklistMode('${cid}','gerir')">Gerenciar</button>
+      <button type="button" class="ck-mgr-btn" data-action="ckOpenGerir" data-arg="${cid}">Gerenciar</button>
     </div>
     <div class="ck-prog">
       <div class="ck-prog-main">
         <div class="ck-prog-top"><span id="ckProgText">${done} de ${total} itens</span><b id="ckProgPct">${pct}%</b></div>
         <div class="ck-track"><i id="ckProgFill" class="${pct === 100 ? 'is-done' : ''}" style="width:${pct}%"></i></div>
       </div>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="clearChecklistConfirm('${cid}')">Desmarcar tudo</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="clearChecklistConfirm" data-arg="${cid}">Desmarcar tudo</button>
     </div>
     <div class="ck-ok${total > 0 && pct === 100 ? ' is-on' : ''}" id="ckOk" role="status">Tudo confirmado. Nada pendente neste checklist.</div>
     <div class="ck-groups">${groupsHtml || '<div class="empty-state"><p>Nenhum item neste checklist.</p></div>'}</div>
@@ -875,7 +881,7 @@ function _ckReopen(clientId) {
 // ── Modo GERENCIAR ───────────────────────────────────────────────────────────
 
 function _ckRenderGerir(clientId, el) {
-  const cid = _ckEsc(clientId);
+  const cid = escapeHtml(clientId);
   const admin = ckIsAdmin();
   const lista = getChecklists();
 
@@ -885,7 +891,7 @@ function _ckRenderGerir(clientId, el) {
   const sel = _ckAdmSel[clientId];
 
   const novoForm = _ckNovoAberto && admin ? `
-    <form class="ck-adm-new" onsubmit="ckAdmCreate(event,'${cid}'); return false;">
+    <form class="ck-adm-new" data-submit="ckAdmCreate" data-arg="${cid}">
       <input type="text" class="ck-adm-input" id="ckAdmNewName" maxlength="60"
         placeholder="Nome do checklist" aria-label="Nome do checklist" />
       <select class="ck-adm-select" id="ckAdmNewFrom" aria-label="A partir de">
@@ -893,7 +899,7 @@ function _ckRenderGerir(clientId, el) {
         ${lista.map(c => `<option value="${_ckEsc(c.id)}">Duplicar: ${escapeHtml(c.nome)}</option>`).join('')}
       </select>
       <button type="submit" class="btn btn-primary btn-sm">Criar</button>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="ckAdmCloseNew('${cid}')">Cancelar</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmCloseNew" data-arg="${cid}">Cancelar</button>
     </form>` : '';
 
   const rows = lista.map(c => {
@@ -904,8 +910,8 @@ function _ckRenderGerir(clientId, el) {
     const nome = admin
       ? `<input type="text" class="ck-adm-name" value="${escapeHtml(c.nome)}" maxlength="60"
            aria-label="Nome do checklist"
-           onchange="ckAdmRename('${cid}','${_ckEsc(c.id)}',this.value)"
-           onkeydown="if(event.key==='Enter'){this.blur()}" />`
+           data-change="ckAdmRename" data-client="${cid}" data-arg="${escapeHtml(c.id)}"
+           data-enter-blur="1" />`
       : `<span class="ck-adm-name-txt">${escapeHtml(c.nome)}</span>`;
     const badge = c.ativo === false
       ? '<span class="ck-badge ck-badge--off">inativo</span>'
@@ -914,9 +920,9 @@ function _ckRenderGerir(clientId, el) {
       + (contas.inativos ? ` <span class="ck-adm-off">(+${contas.inativos} desativados)</span>` : '')
       + (marcados ? ` <span class="ck-adm-marks">${marcados} ${marcados === 1 ? 'cliente' : 'clientes'}</span>` : '');
     const acoes = admin ? `
-      <button type="button" class="btn btn-secondary btn-sm" onclick="ckAdmPick('${cid}','${_ckEsc(c.id)}')">Itens</button>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="ckAdmToggle('${cid}','${_ckEsc(c.id)}')">${c.ativo === false ? 'Reativar' : 'Desativar'}</button>
-      <button type="button" class="btn btn-danger btn-sm" onclick="ckAdmDelete('${cid}','${_ckEsc(c.id)}')">Excluir</button>` : '';
+      <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmPick" data-client="${cid}" data-arg="${escapeHtml(c.id)}">Itens</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmToggle" data-client="${cid}" data-arg="${escapeHtml(c.id)}">${c.ativo === false ? 'Reativar' : 'Desativar'}</button>
+      <button type="button" class="btn btn-danger btn-sm" data-action="ckAdmDelete" data-client="${cid}" data-arg="${escapeHtml(c.id)}">Excluir</button>` : '';
     return `<div class="ck-adm-row${c.id === sel ? ' is-on' : ''}">
       <div class="ck-adm-id">${nome}${badge}</div>
       <div class="ck-adm-meta">${contagem}</div>
@@ -932,13 +938,13 @@ function _ckRenderGerir(clientId, el) {
           <div class="ck-adm-title">Gerenciar checklists</div>
           <div class="ck-adm-sub">${admin ? 'Salvar acontece a cada alteração.' : 'Leitura — apenas administradores podem editar.'}</div>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="setChecklistMode('${cid}','uso')">Ver como técnico</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="ckSetUso" data-arg="${cid}">Ver como técnico</button>
       </div>
       ${admin ? '' : '<div class="ck-adm-locked">Somente administradores podem editar os checklists.</div>'}
       <section class="ck-adm-sec">
         <div class="ck-adm-sec-head">
           <h3 class="ck-adm-sec-title">Checklists (${lista.length})</h3>
-          ${admin ? `<button type="button" class="btn btn-primary btn-sm" onclick="ckAdmOpenNew('${cid}')">+ Novo checklist</button>` : ''}
+          ${admin ? `<button type="button" class="btn btn-primary btn-sm" data-action="ckAdmOpenNew" data-arg="${cid}">+ Novo checklist</button>` : ''}
         </div>
         ${novoForm}
         ${rows || '<div class="empty-state"><p>Nenhum checklist cadastrado.</p></div>'}
@@ -973,16 +979,16 @@ function _ckRenderItensSec(cid, checklistId) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
         </span>
         <input type="text" class="ck-adm-input ck-adm-text" value="${escapeHtml(it.texto)}" maxlength="160"
-          aria-label="Texto do item" onchange="ckAdmItemText('${cid}','${_ckEsc(it.id)}',this.value)"
-          onkeydown="if(event.key==='Enter'){this.blur()}" />
+          aria-label="Texto do item" data-change="ckAdmItemText" data-client="${cid}" data-arg="${escapeHtml(it.id)}"
+          data-enter-blur="1" />
         <select class="ck-adm-select ck-adm-cat" aria-label="Categoria do item"
-          onchange="ckAdmItemCat('${cid}','${_ckEsc(it.id)}',this.value)">${selOpts(g.categoria)}</select>
+          data-change="ckAdmItemCat" data-client="${cid}" data-arg="${escapeHtml(it.id)}">${selOpts(g.categoria)}</select>
         <button type="button" class="ck-adm-btn" title="Subir" aria-label="Subir item"
-          onclick="ckAdmMove('${cid}','${_ckEsc(it.id)}',-1)"${i === 0 ? ' disabled' : ''}>↑</button>
+          data-action="ckAdmMoveUp" data-client="${cid}" data-arg="${escapeHtml(it.id)}"${i === 0 ? ' disabled' : ''}>↑</button>
         <button type="button" class="ck-adm-btn" title="Descer" aria-label="Descer item"
-          onclick="ckAdmMove('${cid}','${_ckEsc(it.id)}',1)"${i === g.itens.length - 1 ? ' disabled' : ''}>↓</button>
+          data-action="ckAdmMoveDown" data-client="${cid}" data-arg="${escapeHtml(it.id)}"${i === g.itens.length - 1 ? ' disabled' : ''}>↓</button>
         <button type="button" class="ck-adm-btn ck-adm-btn--rm" title="Remover item" aria-label="Remover item"
-          onclick="ckAdmRemoveItem('${cid}','${_ckEsc(it.id)}')">×</button>
+          data-action="ckAdmRemoveItem" data-client="${cid}" data-arg="${escapeHtml(it.id)}">×</button>
       </div>`).join('');
     return `<section class="ck-group">
       <header class="ck-group-head">
@@ -1004,13 +1010,29 @@ function _ckRenderItensSec(cid, checklistId) {
       <input type="text" class="ck-adm-input" id="ckAdmAddText" maxlength="160"
         placeholder="+ Novo item (Enter adiciona e mantém o foco)"
         aria-label="Novo item"
-        onkeydown="ckAdmAddKey(event,'${cid}')" />
+        data-ck-add="${cid}" />
       <select class="ck-adm-select" id="ckAdmAddCat" aria-label="Categoria do novo item">
         ${checklistCategoriaOptions('Estações').map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
       </select>
-      <button type="button" class="btn btn-primary btn-sm" onclick="ckAdmAdd('${cid}')">Adicionar</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="ckAdmAdd" data-arg="${cid}">Adicionar</button>
     </div>
   </section>`;
+}
+
+// Enter nos campos de texto do Gerenciar: o actions.js ignora keydown em
+// INPUT (lá Enter é digitação), então a aba tem o próprio ouvinte.
+//   [data-enter-blur] → Enter sai do campo (o change salva, como o onblur)
+//   [data-ck-add]     → Enter adiciona o item (equivale a ckAdmAddKey)
+if (typeof document !== 'undefined' && document.addEventListener && !(typeof window !== 'undefined' && window._ckEnterBound)) {
+  if (typeof window !== 'undefined') window._ckEnterBound = true;
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter') return;
+    const t = ev.target;
+    if (!t || !t.getAttribute) return;
+    if (t.hasAttribute('data-enter-blur')) { t.blur(); return; }
+    const addFor = t.getAttribute('data-ck-add');
+    if (addFor != null && typeof ckAdmAddKey === 'function') ckAdmAddKey(ev, addFor);
+  });
 }
 
 // ── Ações do modo GERENCIAR ──────────────────────────────────────────────────
@@ -1250,10 +1272,35 @@ if (typeof document !== 'undefined') {
   });
 }
 
-// Escape no atributo onclick/atributos (escapeHtml não escapa crase/aspas
+// Escape em atributos (escapeHtml não escapa crase/aspas
 // simples dos nossos ids, que são sempre alfanuméricos + '-').
 function _ckEsc(v) {
   return String(v == null ? '' : v).replace(/[<>"'`\\]/g, '');
+}
+
+// Ações do arquivo — delegação via js/actions.js (data-action/data-change/data-submit).
+if (typeof registerActions === 'function') {
+  registerActions({
+    ckOpenGerirNovo: (_el, arg) => setChecklistMode(arg, 'gerir', true),
+    ckSelectChecklist: (el, arg) => setChecklistSel(el.dataset.client, arg),
+    openChecklistProc: (el, arg) => openChecklistProc(el.dataset.client, arg),
+    ckOpenGerir: (_el, arg) => setChecklistMode(arg, 'gerir'),
+    ckSetUso: (_el, arg) => setChecklistMode(arg, 'uso'),
+    clearChecklistConfirm: (_el, arg) => clearChecklistConfirm(arg),
+    ckAdmCreate: (_el, arg, ev) => ckAdmCreate(ev, arg),
+    ckAdmCloseNew: (_el, arg) => ckAdmCloseNew(arg),
+    ckAdmOpenNew: (_el, arg) => ckAdmOpenNew(arg),
+    ckAdmRename: (el, arg) => ckAdmRename(el.dataset.client, arg, el.value),
+    ckAdmPick: (el, arg) => ckAdmPick(el.dataset.client, arg),
+    ckAdmToggle: (el, arg) => ckAdmToggle(el.dataset.client, arg),
+    ckAdmDelete: (el, arg) => ckAdmDelete(el.dataset.client, arg),
+    ckAdmItemText: (el, arg) => ckAdmItemText(el.dataset.client, arg, el.value),
+    ckAdmItemCat: (el, arg) => ckAdmItemCat(el.dataset.client, arg, el.value),
+    ckAdmMoveUp: (el, arg) => ckAdmMove(el.dataset.client, arg, -1),
+    ckAdmMoveDown: (el, arg) => ckAdmMove(el.dataset.client, arg, 1),
+    ckAdmRemoveItem: (el, arg) => ckAdmRemoveItem(el.dataset.client, arg),
+    ckAdmAdd: (_el, arg) => ckAdmAdd(arg),
+  });
 }
 
 // Export para testes (Node/Vitest). Em browser os identificadores acima ficam

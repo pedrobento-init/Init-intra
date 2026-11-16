@@ -111,12 +111,12 @@ function _buildOperadoresPage(savedFilters = {}) {
       <div class="search-bar page-toolbar">
         <div class="search-input-wrap pt-search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="form-input" id="opSearch" placeholder="Buscar operador..." oninput="debouncedFilterOperadores()" />
+          <input class="form-input" id="opSearch" placeholder="Buscar operador..." data-input="debouncedFilterOperadores" />
         </div>
         <div class="pt-filter pt-seg pt-full" role="group" aria-label="Filtrar operadores">
-          <button class="btn btn-secondary btn-sm op-filter-btn active" data-filter="todos" onclick="setOpFilter(this,'todos')">Todos</button>
-          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="ativos" onclick="setOpFilter(this,'ativos')">Ativos</button>
-          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="inativos" onclick="setOpFilter(this,'inativos')">Inativos</button>
+          <button class="btn btn-secondary btn-sm op-filter-btn active" data-filter="todos" data-action="setOpFilter">Todos</button>
+          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="ativos" data-action="setOpFilter">Ativos</button>
+          <button class="btn btn-secondary btn-sm op-filter-btn" data-filter="inativos" data-action="setOpFilter">Inativos</button>
         </div>
       </div>
 
@@ -172,7 +172,7 @@ function _renderOpGrid() {
   const ops = _filteredOps;
   if (!ops.length) {
     const _canCreate = (typeof isCurrentAdmin === 'function' && isCurrentAdmin());
-    grid.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>Nenhum operador encontrado</p>${_canCreate ? '<button class="btn btn-primary btn-sm" onclick="openOperadorForm()">+ Novo Operador</button>' : ''}</div>`;
+    grid.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>Nenhum operador encontrado</p>${_canCreate ? '<button class="btn btn-primary btn-sm" data-action="openOperadorForm">+ Novo Operador</button>' : ''}</div>`;
     return;
   }
 
@@ -199,11 +199,11 @@ function _renderOpGrid() {
     let actionsHtml = '';
     let kebabItems = '';
     if (isAdminUser || isSelf) {
-      actionsHtml += `<button class="btn btn-secondary btn-sm op-edit-btn" onclick="event.stopPropagation();openOperadorForm('${escapeHtml(op.id)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
+      actionsHtml += `<button class="btn btn-secondary btn-sm op-edit-btn" data-action="openOperadorForm" data-arg="${escapeHtml(op.id)}" data-stop="1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
     }
     if (isAdminUser) {
       kebabItems += `
-        <button class="op-kebab-item" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');toggleOp('${escapeHtml(op.id)}')" title="${isActive ? 'Desativar' : 'Ativar'}">
+        <button class="op-kebab-item" data-action="opToggleActive" data-arg="${escapeHtml(op.id)}" data-stop="1" title="${isActive ? 'Desativar' : 'Ativar'}">
           ${isActive
             ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`
             : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 14 14"/></svg>`
@@ -211,16 +211,16 @@ function _renderOpGrid() {
           <span>${isActive ? 'Desativar' : 'Ativar'}</span>
         </button>`;
       if(op.email){
-        kebabItems += `<button class="op-kebab-item" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');resendOperatorInvite('${escapeHtml(op.id)}')" title="Reenviar convite"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span>Reenviar convite</span></button>`;
+        kebabItems += `<button class="op-kebab-item" data-action="opResendInvite" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Reenviar convite"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span>Reenviar convite</span></button>`;
       }
-      kebabItems += `<button class="op-kebab-item op-kebab-item--danger" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}');deleteOpConfirm('${escapeHtml(op.id)}')" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
+      kebabItems += `<button class="op-kebab-item op-kebab-item--danger" data-action="opDeleteConfirm" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
     }
     if(kebabItems){
-      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" onclick="event.stopPropagation();toggleOpMenu('${escapeHtml(op.id)}')" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu" id="opMenu-${escapeHtml(op.id)}" data-open="0" style="display:none">${kebabItems}</div></div>`;
+      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" data-action="toggleOpMenu" data-arg="${escapeHtml(op.id)}" data-stop="1" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu" id="opMenu-${escapeHtml(op.id)}" data-open="0" style="display:none">${kebabItems}</div></div>`;
     }
 
     return `
-      <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" role="button" tabindex="0" onclick="openOpPendencias('${escapeHtml(op.id)}')">
+      <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
           <div class="op-avatar" style="background:${color}">${escapeHtml(initials)}</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -245,9 +245,9 @@ function _renderOpGrid() {
     <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
       <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
       <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" ${_opPage===1?'disabled':''} onclick="_opPage--;_renderOpGrid()">← Anterior</button>
+        <button class="btn btn-sm btn-secondary" ${_opPage===1?'disabled':''} data-action="opPageDelta" data-arg="-1">← Anterior</button>
         <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_opPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_opPage===totalPages?'disabled':''} onclick="_opPage++;_renderOpGrid()">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_opPage===totalPages?'disabled':''} data-action="opPageDelta" data-arg="1">Próxima →</button>
       </div>
     </div>
   ` : '');
@@ -386,7 +386,7 @@ function openOperadorForm(id = null) {
     : '';
 
   openModal(id ? 'Editar Operador' : 'Novo Operador', `
-    <form id="opForm" class="ov-form" onsubmit="submitOperadorForm(event,'${id||''}')">
+    <form id="opForm" class="ov-form" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
       ${adminBanner}
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:var(--space-6);padding:16px;background:var(--bg-base);border-radius:var(--radius)">
         <div id="opAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
@@ -397,7 +397,7 @@ function openOperadorForm(id = null) {
             <div style="display:flex;gap:6px;flex-wrap:wrap" id="opColorPicker">
               ${OP_COLORS.map(col => {
                 var isSel = selColor===col;
-                return `<button type="button" onclick="selectOpColor('${col}')" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
+                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
               }).join('')}
             </div>
           </div>
@@ -409,11 +409,11 @@ function openOperadorForm(id = null) {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Nome *</label>
-            <input class="form-input" name="name" id="opNameInput" value="${esc(op?.name)}" required placeholder="Ex: Pedro" oninput="updateOpPreview()" />
+            <input class="form-input" name="name" id="opNameInput" value="${esc(op?.name)}" required placeholder="Ex: Pedro" data-input="updateOpPreview" />
           </div>
           <div class="form-group">
             <label class="form-label">Iniciais</label>
-            <input class="form-input" name="initials" id="opInitialsInput" maxlength="3" value="${esc(op?.initials)}" placeholder="Ex: PE" oninput="updateOpPreview()" />
+            <input class="form-input" name="initials" id="opInitialsInput" maxlength="3" value="${esc(op?.initials)}" placeholder="Ex: PE" data-input="updateOpPreview" />
           </div>
         </div>
         <div class="form-row">
@@ -493,7 +493,7 @@ function openOperadorForm(id = null) {
       </div>
 
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`, 'sm');
@@ -746,9 +746,9 @@ function openOpPendencias(opId) {
       const color = c?.color || '#2563eb';
         const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:border-color .15s;background:var(--bg-surface)"
-             onmouseover="this.style.borderColor='#1a56db'" onmouseout="this.style.borderColor='var(--border)'"
-             onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">
+        <div class="opd-pendencia-delay-card"
+             role="button" tabindex="0"
+             data-action="opOpenPendenciaDelayed" data-arg="${escapeHtml(p.id)}">
           ${c ? clientAvatar(c, 28) : ''}
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(getPendenciaTitulo(p))}</div>
@@ -798,8 +798,8 @@ function openOpPendencias(opId) {
     ` : ''}
 
     <div class="form-actions" style="margin-top:16px">
-      <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
-      <button class="btn btn-primary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaForm(null,null),100)">+ Nova Pendência</button>
+      <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
+      <button class="btn btn-primary" data-action="opNewPendenciaDelayed">+ Nova Pendência</button>
     </div>
   `, 'lg');
 }
@@ -846,3 +846,33 @@ function _refreshOperadoresInPlace(){
     } catch (_) { try { window.location.reload(); } catch (_) {} }
   });
 })();
+
+// Ações da tela de operadores (clique/enter/input/submit por delegação em js/actions.js).
+if (typeof registerActions === 'function') {
+  registerActions({
+    debouncedFilterOperadores: () => { if (typeof debouncedFilterOperadores === 'function') debouncedFilterOperadores(); },
+    setOpFilter: (el) => { if (el && typeof setOpFilter === 'function') setOpFilter(el, el.dataset.filter); },
+    openOperadorForm: (_el, id) => { if (typeof openOperadorForm === 'function') openOperadorForm(id || null); },
+    selectOpColor: (_el, col) => { if (typeof selectOpColor === 'function') selectOpColor(col); },
+    updateOpPreview: () => { if (typeof updateOpPreview === 'function') updateOpPreview(); },
+    submitOperadorForm: (el, id, ev) => { if (typeof submitOperadorForm === 'function') submitOperadorForm(ev, id || ''); },
+    openOpPendencias: (_el, id) => { if (typeof openOpPendencias === 'function') openOpPendencias(id); },
+    opPageDelta: (_el, d) => { _opPage += parseInt(d, 10) || 0; if (typeof _renderOpGrid === 'function') _renderOpGrid(); },
+    toggleOpMenu: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); },
+    opToggleActive: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); toggleOp(id); },
+    opResendInvite: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); resendOperatorInvite(id); },
+    opDeleteConfirm: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); deleteOpConfirm(id); },
+    // Fechar o modal, ir para a lista e só então abrir o detalhe: a lista
+    // precisa renderizar antes de o detalhe procurar o registro.
+    opOpenPendenciaDelayed: (_el, id) => {
+      if (typeof closeModal === 'function') closeModal();
+      if (typeof navigateTo === 'function') navigateTo('pendencias');
+      setTimeout(() => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); }, 100);
+    },
+    opNewPendenciaDelayed: () => {
+      if (typeof closeModal === 'function') closeModal();
+      if (typeof navigateTo === 'function') navigateTo('pendencias');
+      setTimeout(() => { if (typeof openPendenciaForm === 'function') openPendenciaForm(null, null); }, 100);
+    },
+  });
+}

@@ -215,8 +215,8 @@ async function _paintPendingStrip() {
   el.innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>' +
     '<span class="ps-text"><b>' + (typeof plural === 'function' ? plural(n, 'alteração', 'alterações') : n + ' alterações') + '</b> aguardando envio' + (offline ? ' — sem conexão, sobem quando a rede voltar' : '') + '</span>' +
-    '<button type="button" class="btn btn-secondary btn-sm" onclick="openPendingChanges()">Ver lista</button>' +
-    (offline ? '' : '<button type="button" class="btn btn-primary btn-sm" onclick="pendingSyncNow(this)">Enviar agora</button>');
+    '<button type="button" class="btn btn-secondary btn-sm" data-action="openPendingChanges">Ver lista</button>' +
+    (offline ? '' : '<button type="button" class="btn btn-primary btn-sm" data-action="pendingSyncNow">Enviar agora</button>');
 }
 
 async function openPendingChanges() {
@@ -231,8 +231,8 @@ async function openPendingChanges() {
     : '<div class="empty-state"><p>Tudo enviado. Nada pendente neste aparelho.</p></div>';
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   openModal('Aguardando envio', '<p class="pend-intro">Estas alterações estão salvas <b>neste aparelho</b> e sobem para o servidor no próximo sincronismo. Não feche a sessão (Sair) antes disso.</p>' + body +
-    '<div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Fechar</button>' +
-    (offline || !list.length ? '' : '<button type="button" class="btn btn-primary" onclick="closeModal();pendingSyncNow()">Enviar agora</button>') + '</div>', 'sm');
+    '<div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>' +
+    (offline || !list.length ? '' : '<button type="button" class="btn btn-primary" data-action="pendCloseAndSync">Enviar agora</button>') + '</div>', 'sm');
 }
 
 async function pendingSyncNow(btn) {
@@ -252,6 +252,15 @@ if (typeof window !== 'undefined' && !window._pendStripBound) {
   try {
     if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'vencimentos', 'horas', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    openPendingChanges: () => openPendingChanges(),
+    pendingSyncNow: (el) => pendingSyncNow(el),
+    closeModal: () => closeModal(),
+    pendCloseAndSync: () => { closeModal(); return pendingSyncNow(); },
+  });
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { buildPendingList, wrapSupabaseForSeen, markServerSeen, markServerDeleted, _loadServerSeen };

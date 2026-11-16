@@ -15,7 +15,7 @@ function iaReportAvailable() {
 function iaReportButtonHtml(textareaId, visitId) {
   if (!iaReportAvailable()) return '';
   return '<div class="ia-bar" id="iaBar_' + escapeHtml(textareaId) + '">' +
-    '<button type="button" class="btn btn-secondary btn-sm ia-btn" onclick="iaWriteReport(\'' + escapeHtml(textareaId) + '\',\'' + escapeHtml(visitId) + '\',this)">✨ Escrever com IA</button>' +
+    '<button type="button" class="btn btn-secondary btn-sm ia-btn" data-action="iaWriteReport" data-arg="' + escapeHtml(textareaId) + '" data-visit-id="' + escapeHtml(visitId) + '">✨ Escrever com IA</button>' +
     '<span class="ia-hint">Escreva tópicos soltos e a IA organiza para o cliente. Revise antes de salvar; não coloque senhas.</span>' +
   '</div>';
 }
@@ -64,4 +64,11 @@ async function iaWriteReport(textareaId, visitId, btn) {
     if (btn) { btn.disabled = false; btn.textContent = label; }
     ta.removeAttribute('aria-busy');
   }
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    // data-arg = textareaId; visitId viaja em data-visit-id; o botão vai como `btn`.
+    iaWriteReport: (el, textareaId) => iaWriteReport(textareaId, el.dataset.visitId, el),
+  });
 }

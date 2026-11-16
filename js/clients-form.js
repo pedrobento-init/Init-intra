@@ -13,7 +13,7 @@ function openClientForm(id = null) {
   const lics = c.licenses || [];
   const esc = v => escapeHtml(v || '');
   openModal(id ? 'Editar Cliente' : 'Novo Cliente', `
-    <form id="cliForm" class="ov-form" onsubmit="submitClientForm(event,'${id||''}')">
+    <form id="cliForm" class="ov-form" data-submit="submitClientForm" data-arg="${esc(id || '')}">
       <div class="form-section">
         <div class="form-section-title">Ícone do Cliente</div>
         <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:12px">
@@ -21,35 +21,35 @@ function openClientForm(id = null) {
           <div style="flex:1">
             <div class="form-group" style="margin-bottom:8px"><label class="form-label">Cor do avatar</label>
               <div style="display:flex;gap:6px;flex-wrap:wrap" id="colorPicker">
-                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" onclick="selectColor('${col}')" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
+                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" data-action="selectColor" data-arg="${col}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
               </div>
             </div>
           <div class="form-row">
-              <div class="form-group"><label class="form-label">Iniciais</label><input class="form-input" id="initialsInput" name="initials" maxlength="3" value="${esc(c.initials)}" oninput="updateLogoPreview()" /></div>
-              <div class="form-group"><label class="form-label">URL da Logo (opcional)</label><input class="form-input" name="logo" id="logoUrlInput" value="${esc(c.logo && !c.logo.startsWith('data:') ? c.logo : '')}" placeholder="https://..." oninput="onLogoUrlChange()" /></div>
+              <div class="form-group"><label class="form-label">Iniciais</label><input class="form-input" id="initialsInput" name="initials" maxlength="3" value="${esc(c.initials)}" data-input="updateLogoPreview" /></div>
+              <div class="form-group"><label class="form-label">URL da Logo (opcional)</label><input class="form-input" name="logo" id="logoUrlInput" value="${esc(c.logo && !c.logo.startsWith('data:') ? c.logo : '')}" placeholder="https://..." data-input="onLogoUrlChange" /></div>
             </div>
             <div class="logo-upload-zone">
-              <input type="file" id="logoFileInput" accept="image/*" style="display:none" onchange="onLogoFileSelected(event)" />
-              <button type="button" class="logo-upload-btn" onclick="document.getElementById('logoFileInput').click()">
+              <input type="file" id="logoFileInput" accept="image/*" style="display:none" data-change="onLogoFileSelected" />
+              <button type="button" class="logo-upload-btn" data-action="logoFilePick">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Enviar Imagem
               </button>
-              <button type="button" class="logo-crop-btn" id="cropBtn" onclick="openCropModal()" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-crop-btn" id="cropBtn" data-action="openCropModal" style="display:${c.logo?'inline-flex':'none'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"/><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"/></svg>
                 Recortar
               </button>
-              <button type="button" class="logo-remove-btn" id="removeLogoBtn" onclick="removeClientLogo()" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-remove-btn" id="removeLogoBtn" data-action="removeClientLogo" style="display:${c.logo?'inline-flex':'none'}">
                 ✕
               </button>
             </div>
             <div class="form-group" style="margin-top:8px">
               <label class="form-label">Formato da Logo</label>
               <div style="display:flex;gap:8px" id="shapePicker">
-                <div class="logo-shape-option ${(c.logoShape||'circle')==='circle'?'selected':''}" role="button" tabindex="0" onclick="selectLogoShape('circle')" data-shape="circle">
+                <div class="logo-shape-option ${(c.logoShape||'circle')==='circle'?'selected':''}" role="button" tabindex="0" data-action="selectLogoShape" data-arg="circle" data-shape="circle">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
                   Redondo
                 </div>
-                <div class="logo-shape-option ${(c.logoShape||'circle')==='square'?'selected':''}" role="button" tabindex="0" onclick="selectLogoShape('square')" data-shape="square">
+                <div class="logo-shape-option ${(c.logoShape||'circle')==='square'?'selected':''}" role="button" tabindex="0" data-action="selectLogoShape" data-arg="square" data-shape="square">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
                   Quadrado
                 </div>
@@ -64,7 +64,7 @@ function openClientForm(id = null) {
           <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" name="name" value="${esc(c.name)}" required /></div>
           <div class="form-group"><label class="form-label">CNPJ / CPF</label><input class="form-input" name="cnpj" value="${esc(c.cnpj)}" /></div>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="autoFillClientByCnpj(this)">Preencher automaticamente</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="autoFillClientByCnpj">Preencher automaticamente</button>
         <div class="form-hint">Consulta os dados públicos do CNPJ e preenche somente os campos vazios.</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Segmento</label><input class="form-input" name="segment" value="${esc(c.segment)}" /></div>
@@ -155,14 +155,14 @@ function openClientForm(id = null) {
       <div class="form-section">
         <div class="form-section-title">Licenças</div>
         <div id="licContainer">${lics.map((l,i)=>licRow(l,i)).join('')}</div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="addLicRow()">+ Licença</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="addLicRow">+ Licença</button>
       </div>
       <div class="form-section">
         <div class="form-section-title">Observações Gerais</div>
         <textarea class="form-textarea" name="notes" rows="3">${esc(c.notes)}</textarea>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`, 'lg');
@@ -225,7 +225,7 @@ function licRow(l={}, i=0) {
     <div class="form-group" style="margin-bottom:0"><label class="form-label">Software</label><input class="form-input" name="ls_${i}" value="${esc(l.software)}" /></div>
     <div class="form-group" style="margin-bottom:0"><label class="form-label">Chave</label><input class="form-input" name="lk_${i}" value="${esc(l.key)}"${l.hasKey && !l.key ? ' placeholder="Guardada — preencha para trocar"' : ''} autocomplete="off" /><input type="hidden" name="lid_${i}" value="${esc(l.kid)}" /><input type="hidden" name="lh_${i}" value="${l.hasKey ? '1' : ''}" /></div>
     <div class="form-group" style="margin-bottom:0"><label class="form-label">Validade</label><input type="date" class="form-input" name="le_${i}" value="${esc(l.expiry)}" /></div>
-    <button type="button" class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="document.getElementById('lr${i}').remove()">✕</button>
+    <button type="button" class="btn btn-danger btn-sm" style="flex-shrink:0" data-action="licRowRemove" data-arg="${i}">✕</button>
   </div>`;
 }
 function addLicRow() {
@@ -508,24 +508,24 @@ function openImportClientsModal() {
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
         <label class="btn btn-secondary" style="cursor:pointer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Escolher arquivo (.docx, .csv, .txt)
-          <input type="file" id="importFileInput" accept=".docx,.csv,.txt" style="display:none" onchange="handleImportFile(this)" />
+          <input type="file" id="importFileInput" accept=".docx,.csv,.txt" style="display:none" data-change="handleImportFile" />
         </label>
         <span style="font-size:12px;color:var(--text-muted);display:flex;align-items:center">ou</span>
-        <button class="btn btn-secondary" onclick="document.getElementById('importPasteArea').style.display='block'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Colar texto</button>
+        <button class="btn btn-secondary" data-action="importPasteShow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Colar texto</button>
       </div>
-      <textarea id="importPasteArea" class="form-textarea" rows="6" placeholder="Cole aqui os dados copiados do Word ou Excel...&#10;Exemplo:&#10;Nome | CNPJ | Segmento&#10;Padaria Central | 12.345.678/0001-90 | Alimentação" style="display:none;margin-bottom:8px" oninput="handleImportPaste(this.value)"></textarea>
+      <textarea id="importPasteArea" class="form-textarea" rows="6" placeholder="Cole aqui os dados copiados do Word ou Excel...&#10;Exemplo:&#10;Nome | CNPJ | Segmento&#10;Padaria Central | 12.345.678/0001-90 | Alimentação" style="display:none;margin-bottom:8px" data-input="handleImportPaste"></textarea>
     </div>
     <div id="importPreviewWrap" style="display:none">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">2. Preview e mapeamento de colunas</div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px;cursor:pointer">
-        <input type="checkbox" id="importHasHeader" checked onchange="_importHasHeader=this.checked;renderImportPreview()" />
+        <input type="checkbox" id="importHasHeader" checked data-change="importHasHeaderToggle" />
         Primeira linha é cabeçalho
       </label>
       <div id="importPreviewTable" style="max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:12px"></div>
       <div id="importStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button class="btn btn-primary" id="importBtn" onclick="executeClientImport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar Clientes</button>
+        <button class="btn btn-secondary" data-action="closeModal">Cancelar</button>
+        <button class="btn btn-primary" id="importBtn" data-action="executeClientImport"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar Clientes</button>
       </div>
     </div>
   `, 'lg');
@@ -807,11 +807,11 @@ function renderClientSheetSection(clientId) {
   const safeId = escapeHtml(clientId);
   if (actions) {
     if (!embed) {
-      actions.innerHTML = canManage ? `<button class="btn btn-primary btn-sm" onclick="openSheetLinkModal('${safeId}')">+ Vincular planilha</button>` : '';
+      actions.innerHTML = canManage ? `<button class="btn btn-primary btn-sm" data-action="openSheetLinkModal" data-arg="${safeId}">+ Vincular planilha</button>` : '';
     } else {
       actions.innerHTML =
         `<a class="btn btn-secondary btn-sm" href="${escapeHtml(saved)}" target="_blank" rel="noopener">Abrir no Google Sheets ↗</a>` +
-        (canManage ? `<button class="btn btn-secondary btn-sm" onclick="openSheetLinkModal('${safeId}')">Editar link</button><button class="btn btn-sm btn-danger" onclick="removeSheetLinkConfirm('${safeId}')">Remover</button>` : '');
+        (canManage ? `<button class="btn btn-secondary btn-sm" data-action="openSheetLinkModal" data-arg="${safeId}">Editar link</button><button class="btn btn-sm btn-danger" data-action="removeSheetLinkConfirm" data-arg="${safeId}">Remover</button>` : '');
     }
   }
   if (!embed) {
@@ -838,7 +838,7 @@ function openSheetLinkModal(clientId) {
   openModal('📊 Vincular planilha de documentação', `
     <div class="form-group"><label class="form-label">Link do Google Sheets</label><input class="form-input" id="sheetLinkInput" value="${escapeHtml(cur)}" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
     <p style="font-size:12px;color:var(--text-muted)">Cole o link de <strong>compartilhamento</strong> (…/spreadsheets/d/…) ou o de <strong>Publicar na web</strong> (…/spreadsheets/d/e/…/pubhtml). No primeiro caso, compartilhe no Google como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
-    <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="viewClient('${safeId}');switchClientTab('documentos','${safeId}')">Cancelar</button><button type="button" class="btn btn-primary" onclick="saveSheetLink('${safeId}')">Salvar</button></div>
+    <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="sheetLinkCancel" data-arg="${safeId}">Cancelar</button><button type="button" class="btn btn-primary" data-action="saveSheetLink" data-arg="${safeId}">Salvar</button></div>
     <div id="sheetLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
 }
 
@@ -958,7 +958,7 @@ function renderImportPreview() {
 
   // Build column mapping dropdowns
   const mapHtml = headerRow.map((h, i) => `
-    <select class="form-select" id="importCol_${i}" style="font-size:11px;padding:2px 6px;max-width:140px" onchange="updateImportMapping()">
+    <select class="form-select" id="importCol_${i}" style="font-size:11px;padding:2px 6px;max-width:140px" data-change="updateImportMapping">
       ${CLIENT_IMPORT_FIELDS.map(f => `<option value="${f.key}">${f.label}</option>`).join('')}
     </select>
   `).join('');
@@ -1103,15 +1103,44 @@ function _refreshClientsInPlace(){
       if(!tab) return;
       if(tab.querySelector('input:focus, textarea:focus, select:focus')) return;
       var active=document.querySelector('#clientTabs .tab.active');
-      var oc=active?(active.getAttribute('onclick')||''):'';
-      var m=oc.match(/switchClientTab\('([^']+)','([^']+)'\)/);
-      if(!m || typeof renderClientTab!=='function') return;
+      // As abas usam delegação via data-action="switchClientTab" (js/actions.js).
+      var tabName=active?(active.getAttribute('data-arg')||''):'';
+      var clientId=active?(active.getAttribute('data-client')||''):'';
+      if(!tabName || !clientId || typeof renderClientTab!=='function') return;
       var sc=tab.scrollTop;
-      renderClientTab(m[1], m[2]);
+      renderClientTab(tabName, clientId);
       try{ tab.scrollTop=sc; }catch(_){}
     }catch(_){}
   });
 })();
+
+// Ações de delegação (js/actions.js) para os handlers do formulário do cliente.
+if (typeof registerActions === 'function') {
+  registerActions({
+    submitClientForm: (el, id, ev) => submitClientForm(ev, id || ''),
+    selectColor: (_el, col) => selectColor(col),
+    updateLogoPreview: () => updateLogoPreview(),
+    onLogoUrlChange: () => onLogoUrlChange(),
+    onLogoFileSelected: (_el, _v, ev) => onLogoFileSelected(ev),
+    logoFilePick: () => { const i = document.getElementById('logoFileInput'); if (i) i.click(); },
+    openCropModal: () => openCropModal(),
+    removeClientLogo: () => removeClientLogo(),
+    selectLogoShape: (_el, shape) => selectLogoShape(shape),
+    autoFillClientByCnpj: (el) => autoFillClientByCnpj(el),
+    addLicRow: () => addLicRow(),
+    licRowRemove: (_el, i) => { const row = document.getElementById('lr' + i); if (row) row.remove(); },
+    handleImportFile: (el) => handleImportFile(el),
+    importPasteShow: () => { const ta = document.getElementById('importPasteArea'); if (ta) ta.style.display = 'block'; },
+    handleImportPaste: (_el, v) => handleImportPaste(v),
+    importHasHeaderToggle: (_el, checked) => { _importHasHeader = !!checked; renderImportPreview(); },
+    executeClientImport: () => executeClientImport(),
+    updateImportMapping: () => updateImportMapping(),
+    openSheetLinkModal: (_el, id) => openSheetLinkModal(id),
+    removeSheetLinkConfirm: (_el, id) => removeSheetLinkConfirm(id),
+    saveSheetLink: (_el, id) => saveSheetLink(id),
+    sheetLinkCancel: (_el, id) => { viewClient(id); switchClientTab('documentos', id); },
+  });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {

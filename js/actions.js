@@ -45,7 +45,12 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     const el = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
     if (!el || el.disabled) return;
     if (el.tagName === 'A' && el.getAttribute('href') === '#') ev.preventDefault();
-    if (el.dataset.stop) ev.stopPropagation();
+    // data-stop reproduz o stopPropagation que os onclick inline chamavam no
+    // target: o clique não pode vazar para os document-listeners que fecham o
+    // menu aberto (ex.: pendencias-acoes closePenQuickMenu). stopPropagation só
+    // impede nós ANCESTRAIS — como o handler roda no document, era preciso
+    // suprimir também os listeners irmãos no document → stopImmediatePropagation.
+    if (el.dataset.stop) ev.stopImmediatePropagation();
     _runAction(el.dataset.action, el, el.dataset.arg, ev);
   });
   // Teclado: elementos não-botão com data-action (ex.: <a role="link">) respondem a Enter/Espaço.

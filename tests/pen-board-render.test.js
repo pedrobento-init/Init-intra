@@ -128,8 +128,9 @@ describe('renderPenKanban (modo local)', () => {
   it('um card por pendência, com drag-and-drop mantido', () => {
     expect(html).toContain('<article class="kanban-card" style="border-left:4px');
     expect((html.match(/<article class="kanban-card"/g) || []).length).toBe(3);
-    expect(html).toContain('onPenKanbanDragStart');
-    expect(html).toContain('onPenKanbanDrop(event,\'aberto\')');
+    // Drag via delegação (data-pen-id + data-col-id na coluna; _bindPenBoardDrag)
+    expect(html).toContain('data-pen-id=');
+    expect(html).toContain('data-col-id="aberto"');
     expect(html).toContain('border-left:4px solid var(--kb-cyan)');
     expect(html).toContain('Iniciar');
   });

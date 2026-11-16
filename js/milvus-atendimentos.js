@@ -343,10 +343,10 @@ function _atendPagerHtml(paginate, perPage, currentPage, total){
   return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line);margin-top:12px;flex-wrap:wrap;gap:8px">'+
     '<div style="font-size:12px;color:var(--ov-muted)">Página '+cur+' de '+last+' · '+from+'–'+to+' de '+total+'</div>'+
     '<div style="display:flex;gap:6px;align-items:center">'+
-      '<select class="form-select" style="width:90px;font-size:12px;padding:4px 8px" onchange="_atendChangePerPage(this.value)"><option value="50" '+(perPage==50?'selected':'')+'>50</option><option value="100" '+(perPage==100?'selected':'')+'>100</option><option value="200" '+(perPage==200?'selected':'')+'>200</option></select>'+
-      '<button class="btn btn-sm btn-secondary" '+(cur<=1?'disabled':'')+' onclick="_atendGotoPage('+(cur-1)+')">‹ Anterior</button>'+
+      '<select class="form-select" style="width:90px;font-size:12px;padding:4px 8px" data-change="_atendChangePerPage"><option value="50" '+(perPage==50?'selected':'')+'>50</option><option value="100" '+(perPage==100?'selected':'')+'>100</option><option value="200" '+(perPage==200?'selected':'')+'>200</option></select>'+
+      '<button class="btn btn-sm btn-secondary" '+(cur<=1?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur-1)+'">‹ Anterior</button>'+
       '<span style="font-size:13px;padding:4px 8px">'+cur+' / '+last+'</span>'+
-      '<button class="btn btn-sm btn-secondary" '+(cur>=last?'disabled':'')+' onclick="_atendGotoPage('+(cur+1)+')">Próxima ›</button>'+
+      '<button class="btn btn-sm btn-secondary" '+(cur>=last?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur+1)+'">Próxima ›</button>'+
     '</div>'+
   '</div>';
 }
@@ -490,14 +490,14 @@ function getMilvusAtendimentosClientHtml(range){
       // [UI] Tokens ov-* (mesmo padrão visual do Dashboard) nos filtros do cliente
       '<span style="font-size:12px;color:var(--ov-muted)">até</span>'+
       '<input type="date" class="form-input" id="atendDataFinal" value="'+r.end+'" style="width:150px" />'+
-      '<div class="search-input-wrap" style="flex:1;min-width:140px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" oninput="if(this.value===\'\') _atendApplyFilters(false)" /></div>'+
-      '<button class="btn btn-primary btn-sm" onclick="_atendApplyFilters(false)">Buscar</button>'+
-      '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" onclick="_atendToggleMore(\'atend\')" aria-expanded="false">Mais filtros</button>'+
+      '<div class="search-input-wrap" style="flex:1;min-width:140px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" data-input="atendCodigoClear" /></div>'+
+      '<button class="btn btn-primary btn-sm" data-action="_atendApplyFilters" data-arg="false">Buscar</button>'+
+      '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" data-action="_atendToggleMore" data-arg="atend" aria-expanded="false">Mais filtros</button>'+
       '<div style="position:relative">'+
-        '<button class="btn btn-primary btn-sm" id="atendExportBtn" onclick="_atendToggleExport()">Exportar ▾</button>'+
+        '<button class="btn btn-primary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button>'+
         '<div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px">'+
-          '<button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'csv\')">CSV</button>'+
-          '<button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'xls\')">XLS</button>'+
+          '<button class="op-kebab-item" data-action="atendExportCsv">CSV</button>'+
+          '<button class="op-kebab-item" data-action="atendExportXls">XLS</button>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -552,13 +552,13 @@ function renderRelatorios(){
     '<div class="ov-wrap">'+
       '<div class="search-bar page-toolbar">'+
         '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>'+
-        '<select class="form-select pt-filter pt-full" id="gAtendClient" style="width:220px" onchange="_atendUI.clientId=this.value;_atendApplyFilters(true)"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
+        '<select class="form-select pt-filter pt-full" id="gAtendClient" style="width:220px" data-change="atendClientChange"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
         '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input" id="gAtendDataInicial" value="'+range.start+'" style="width:150px" aria-label="Data inicial" />'+
         '<span style="font-size:12px;color:var(--ov-muted)">até</span>'+
         '<input type="date" class="form-input" id="gAtendDataFinal" value="'+range.end+'" style="width:150px" aria-label="Data final" /></div>'+
-        '<button class="btn btn-primary btn-sm pt-filter" onclick="_atendApplyFilters(true)">Buscar</button>'+
-        '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" onclick="_atendToggleMore(\'gAtend\')" aria-expanded="false">Mais filtros</button>'+
-        '<div class="pt-actions"><div style="position:relative"><button class="btn btn-secondary btn-sm" id="atendExportBtn" onclick="_atendToggleExport()">Exportar ▾</button><div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px"><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'csv\')">CSV</button><button class="op-kebab-item" onclick="_atendToggleExport();_atendExport(\'xls\')">XLS</button></div></div></div>'+
+        '<button class="btn btn-primary btn-sm pt-filter" data-action="_atendApplyFilters" data-arg="true">Buscar</button>'+
+        '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" data-action="_atendToggleMore" data-arg="gAtend" aria-expanded="false">Mais filtros</button>'+
+        '<div class="pt-actions"><div style="position:relative"><button class="btn btn-secondary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button><div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px"><button class="op-kebab-item" data-action="atendExportCsv">CSV</button><button class="op-kebab-item" data-action="atendExportXls">XLS</button></div></div></div>'+
       '</div>'+
       '<div id="gAtendMorePanel" class="ov-more" data-open="0" style="display:none;flex-wrap:wrap;gap:8px;padding:10px">'+
         '<input class="form-input" id="gAtendTecnico" placeholder="Técnico" style="width:160px" />'+
@@ -609,4 +609,18 @@ if(typeof module!=='undefined' && module.exports){
     _normalizeHHMM,
     _monthRangeISO
   };
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    _atendChangePerPage: (_el, v) => _atendChangePerPage(v),
+    _atendGotoPage: (_el, n) => _atendGotoPage(Number(n)),
+    _atendApplyFilters: (_el, v) => _atendApplyFilters(v === 'true'),
+    _atendToggleMore: (_el, v) => _atendToggleMore(v),
+    _atendToggleExport: () => _atendToggleExport(),
+    atendExportCsv: () => { _atendToggleExport(); _atendExport('csv'); },
+    atendExportXls: () => { _atendToggleExport(); _atendExport('xls'); },
+    atendClientChange: (_el, v) => { _atendUI.clientId = v; _atendApplyFilters(true); },
+    atendCodigoClear: (el) => { if (el.value === '') _atendApplyFilters(false); },
+  });
 }

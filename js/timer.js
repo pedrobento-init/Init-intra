@@ -1,13 +1,6 @@
 // timer.js – Sistema "Quem está trabalhando nesta pendência?"
 
 /**
- * Escapa aspas simples para uso em strings JS dentro de atributos HTML onclick
- */
-function _jsEscape(str) {
-  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-/**
  * Retorna o nome do operador que está trabalhando ativamente no item
  */
 function getCurrentWorker(item) {
@@ -197,12 +190,12 @@ function timerActionBtnHTML(item, type = 'pendencia') {
       : _st === 'em_andamento' ? 'Retomar trabalho (já em andamento)'
       : _st === 'pausado' ? 'Retomar trabalho (move para Em Andamento)'
       : 'Iniciar trabalho neste chamado';
-    return `<button class="timer-btn" title="${_playTitle}" onclick="toggleTimer('${type}','${_jsEscape(item.id)}',this)">▶</button>`;
+    return `<button class="timer-btn" title="${_playTitle}" data-action="toggleTimer" data-arg="${escapeHtml(item.id)}" data-type="${escapeHtml(type)}">▶</button>`;
   }
 
   if (itsMe) {
     // Sou eu trabalhando — mostrar pause
-    return `<button class="timer-btn running" title="Pausar trabalho" onclick="toggleTimer('${type}','${_jsEscape(item.id)}',this)">⏸</button>`;
+    return `<button class="timer-btn running" title="Pausar trabalho" data-action="toggleTimer" data-arg="${escapeHtml(item.id)}" data-type="${escapeHtml(type)}">⏸</button>`;
   }
 
   // Outro operador trabalhando — mostrar bloqueado/desabilitado
@@ -360,8 +353,8 @@ function openTimerAdjust(id) {
     </div>
     <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
     <div class="form-actions">
-      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="submitTimerAdjust('${_jsEscape(id)}')">Parar e salvar</button>
+      <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
+      <button type="button" class="btn btn-primary" data-action="submitTimerAdjust" data-arg="${escapeHtml(id)}">Parar e salvar</button>
     </div>`, 'sm');
 }
 
@@ -521,3 +514,11 @@ document.addEventListener('visibilitychange', () => {
 
 // Aliases de compatibilidade para uso nos modais
 function timerButtonHTML(item, type) { return timerActionBtnHTML(item, type); }
+
+// Ações dos botões do cronômetro (clique por delegação em js/actions.js).
+if (typeof registerActions === 'function') {
+  registerActions({
+    toggleTimer: (el, id) => { if (typeof toggleTimer === 'function') toggleTimer(el.dataset.type || 'pendencia', id, el); },
+    submitTimerAdjust: (_el, id) => { if (typeof submitTimerAdjust === 'function') submitTimerAdjust(id); },
+  });
+}

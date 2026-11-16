@@ -114,7 +114,7 @@ describe('contrato do card e do CSS', () => {
 
   it('botão ver mais só para descrições longas', () => {
     expect(src).toContain("descView.long ? `<button type=\"button\" class=\"meet-desc-toggle\"");
-    expect(src).toContain("onclick=\"meetingToggleDesc('${escapeHtml(p.id)}')\"");
+    expect(src).toContain("data-action=\"meetingToggleDesc\" data-arg=\"${escapeHtml(p.id)}\"");
   });
 
   it('apresentação: fonte maior, sem clamp, sem botão', () => {

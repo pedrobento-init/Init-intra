@@ -147,7 +147,7 @@ function milvusStatusChipHtml(visit) {
 
 function _mstDetailInner(visit, entry, loading) {
   const id = escapeHtml(visit.id);
-  const refresh = '<button type="button" class="link-btn mst-refresh" onclick="refreshMilvusStatusFor(\'' + id + '\')"' + (loading ? ' disabled' : '') + '>' + (loading ? 'Consultando…' : '↻ Atualizar') + '</button>';
+  const refresh = '<button type="button" class="link-btn mst-refresh" data-action="refreshMilvusStatusFor" data-arg="' + id + '"' + (loading ? ' disabled' : '') + '>' + (loading ? 'Consultando…' : '↻ Atualizar') + '</button>';
   if (!entry || Number(entry.codigo) !== Number(visit.milvusChamadoCodigo)) {
     return '<div class="mst-detail"><div class="mst-line"><span class="mst-muted">' + (loading ? 'Consultando o Milvus…' : 'Status no Milvus ainda não consultado.') + '</span>' + refresh + '</div></div>';
   }
@@ -276,6 +276,12 @@ if (typeof document !== 'undefined' && document.addEventListener) {
       const h = (window.location.hash || '').replace('#', '');
       if (document.visibilityState === 'visible' && (h === 'visitas' || h === 'calendario')) scheduleMilvusStatusRefresh();
     } catch (_) {}
+  });
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    refreshMilvusStatusFor: (_el, visitId) => refreshMilvusStatusFor(visitId),
   });
 }
 

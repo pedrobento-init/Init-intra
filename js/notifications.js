@@ -162,7 +162,11 @@ async function sendTestEmail() {
 }
 
 if (typeof registerActions === 'function') {
-  registerActions({ sendTestEmail: () => sendTestEmail() });
+  registerActions({
+    sendTestEmail: () => sendTestEmail(),
+    notifHideModal: () => { const el = document.getElementById('notifModalOverlay'); if (el) el.style.display = 'none'; },
+    saveNotifSettings: () => saveNotifSettings(),
+  });
 }
 
 // ── Layout do e-mail ──
@@ -541,8 +545,8 @@ function openNotifSettings() {
     </div>
 
     <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" onclick="document.getElementById('notifModalOverlay').style.display='none'">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveNotifSettings()">Salvar</button>
+      <button class="btn btn-secondary" data-action="notifHideModal">Cancelar</button>
+      <button class="btn btn-primary" data-action="saveNotifSettings">Salvar</button>
     </div>
   `;
 

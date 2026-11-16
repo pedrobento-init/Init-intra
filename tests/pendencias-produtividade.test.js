@@ -85,7 +85,7 @@ describe('menu ⋯ do card', () => {
   it('card tem o botão ⋯ que não dispara o arrasto', () => {
     const html = T.penKanbanCard({ id: 'P2', status: 'aberto', clientName: 'Acme', priority: 'media', assunto: 'X' });
     expect(html).toContain('class="kc-menu"');
-    expect(html).toContain('openPenQuickMenu(event,');
+    expect(html).toContain('data-action="openPenQuickMenu"');
     expect(html).toContain('aria-haspopup="menu"');
   });
 });

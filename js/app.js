@@ -190,7 +190,7 @@ function resetDashWidgets() {
   if (typeof showToast === 'function') showToast('Widgets do Dashboard restaurados.', 'success');
 }
 function _dashHideBtn(id) {
-  return `<button class="dash-hide-btn" title="Ocultar widget" onclick="event.stopPropagation();toggleDashWidget('${id}')">✕</button>`;
+  return `<button class="dash-hide-btn" title="Ocultar widget" data-action="toggleDashWidget" data-arg="${escapeHtml(id)}" data-stop="1">✕</button>`;
 }
 function dashGoPresentation() {
   navigateTo('reuniao');
@@ -805,15 +805,15 @@ function renderDashboard() {
     </header>
     <div class="ov-bar">
       <div class="period-filter ov-seg" role="group" aria-label="Período">
-        <button type="button" class="period-btn${_dashPeriod==='all'?' active':''}" data-period="all" aria-pressed="${_dashPeriod==='all'}" onclick="setDashPeriod('all')">Todos</button>
-        <button type="button" class="period-btn${_dashPeriod==='week'?' active':''}" data-period="week" aria-pressed="${_dashPeriod==='week'}" onclick="setDashPeriod('week')">Semana</button>
-        <button type="button" class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" aria-pressed="${_dashPeriod==='month'}" onclick="setDashPeriod('month')">Mês</button>
-        <button type="button" class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" aria-pressed="${_dashPeriod==='quarter'}" onclick="setDashPeriod('quarter')">Trimestre</button>
-        <button type="button" class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" aria-pressed="${_dashPeriod==='custom'}" onclick="setDashPeriod('custom')">Personalizado</button>
+        <button type="button" class="period-btn${_dashPeriod==='all'?' active':''}" data-period="all" aria-pressed="${_dashPeriod==='all'}" data-action="setDashPeriod" data-arg="all">Todos</button>
+        <button type="button" class="period-btn${_dashPeriod==='week'?' active':''}" data-period="week" aria-pressed="${_dashPeriod==='week'}" data-action="setDashPeriod" data-arg="week">Semana</button>
+        <button type="button" class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" aria-pressed="${_dashPeriod==='month'}" data-action="setDashPeriod" data-arg="month">Mês</button>
+        <button type="button" class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" aria-pressed="${_dashPeriod==='quarter'}" data-action="setDashPeriod" data-arg="quarter">Trimestre</button>
+        <button type="button" class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" aria-pressed="${_dashPeriod==='custom'}" data-action="setDashPeriod" data-arg="custom">Personalizado</button>
         <div id="customDateRange" class="custom-date-range ov-custom" style="display:${_dashPeriod==='custom'?'flex':'none'}">
-          <input type="date" id="dashCustomStart" value="${_dashCustomStart}" onchange="setDashCustomDates()" class="date-input" aria-label="Data inicial" />
+          <input type="date" id="dashCustomStart" value="${_dashCustomStart}" data-change="setDashCustomDates" class="date-input" aria-label="Data inicial" />
           <span class="ov-until">até</span>
-          <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" onchange="setDashCustomDates()" class="date-input" aria-label="Data final" />
+          <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" data-change="setDashCustomDates" class="date-input" aria-label="Data final" />
         </div>
       </div>
       <div class="dash-export-btns ov-acts">
@@ -830,14 +830,14 @@ function renderDashboard() {
             <button type="button" role="menuitem" data-action="dashExport" data-arg="print">Imprimir / PDF</button>
           </div>
         </details>
-        ${_dashCanManage ? `<button type="button" class="btn btn-primary btn-sm ov-btn" onclick="generateMonthlyReport()">
+        ${_dashCanManage ? `<button type="button" class="btn btn-primary btn-sm ov-btn" data-action="generateMonthlyReport">
           <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7zM14 3v4h4M9 13h6M9 17h6"/></svg>
           Relatório Mensal
         </button>` : ''}
-        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Abrir reunião em modo apresentação" onclick="dashGoPresentation()">
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Abrir reunião em modo apresentação" data-action="dashGoPresentation">
           <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
           Apresentar</button>` : ''}
-        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Restaurar widgets ocultos" onclick="resetDashWidgets()">
+        ${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" title="Restaurar widgets ocultos" data-action="resetDashWidgets">
           <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
           Widgets</button>` : ''}
       </div>
@@ -870,7 +870,7 @@ function renderDashboard() {
         const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
         const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : escapeHtml(v.time + (v.timeEnd ? ' – ' + v.timeEnd : ''));
         const vstTag = typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : '';
-        return `<li class="ov-it" role="button" tabindex="0" onclick="openVisitDetail('${v.id}')">
+        return `<li class="ov-it" role="button" tabindex="0" data-action="openVisitDetail" data-arg="${escapeHtml(v.id)}">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
           <div style="min-width:0">
             <div class="ov-tt">${escapeHtml(v.clientName)||'—'}</div>
@@ -885,7 +885,7 @@ function renderDashboard() {
         const isStale = typeof isStalePendencia === 'function' ? isStalePendencia(p) : false;
         const priTag = typeof priorityTag === 'function' ? priorityTag(p.priority) : '';
         const stTag = typeof statusTag === 'function' ? statusTag(p.status) : '';
-        return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('pendencias');setTimeout(function(){ openPendenciaDetail('${p.id}'); },100)">
+        return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenPen" data-arg="${escapeHtml(p.id)}">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
           <div style="min-width:0">
             <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
@@ -893,7 +893,7 @@ function renderDashboard() {
           </div>
           <div>${stTag}</div>
         </li>`;
-      }).join('') + `</ul>` + (myQueue.length>Math.max(0,8-myTodayVisits.length)?`<div style="text-align:center;margin-top:8px"><button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="navigateTo('pendencias')">Ver todas (${myQueue.length})<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>`:'') : `<p class="ov-empty">Nenhum item urgente.</p>`}
+      }).join('') + `</ul>` + (myQueue.length>Math.max(0,8-myTodayVisits.length)?`<div style="text-align:center;margin-top:8px"><button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="navigateTo" data-arg="pendencias">Ver todas (${myQueue.length})<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>`:'') : `<p class="ov-empty">Nenhum item urgente.</p>`}
     </section>` : ''}
 
     <div class="ov-g-day">
@@ -901,13 +901,13 @@ function renderDashboard() {
         ${!_dashIsHidden('recentes') ? `
         <section class="card dash-widget ov-panel" aria-labelledby="ov-rec2">
           ${_dashHideBtn('recentes')}
-          <div class="ov-ph"><h2 class="ov-h2" id="ov-rec2">Minhas pendências recentes</h2><button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="navigateTo('pendencias')">Ver todas<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
+          <div class="ov-ph"><h2 class="ov-h2" id="ov-rec2">Minhas pendências recentes</h2><button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="navigateTo" data-arg="pendencias">Ver todas<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
           ${recentPens.length ? `<ul class="ov-ls">
             ${recentPens.map(p => {
               const c = getClientById(p.clientId);
                const _isClosedR = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : function(s){ return ['concluido','resolvido','cancelado','fechado'].includes(s || ''); };
                const isOverdue = p.deadline && p.deadline < localDateISO() && !_isClosedR(p.status);
-              return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${p.id}'),100)">
+              return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenPen" data-arg="${escapeHtml(p.id)}">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
                 <div style="min-width:0">
                   <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
@@ -922,12 +922,12 @@ function renderDashboard() {
         ${!_dashIsHidden('visitas') ? `
         <section class="card dash-widget ov-panel" aria-labelledby="ov-vis">
           ${_dashHideBtn('visitas')}
-          <div class="ov-ph"><h2 class="ov-h2" id="ov-vis">Próximas visitas</h2><button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="navigateTo('visitas')">Ver todas<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
+          <div class="ov-ph"><h2 class="ov-h2" id="ov-vis">Próximas visitas</h2><button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="navigateTo" data-arg="visitas">Ver todas<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
           ${upcomingVisits.length ? `<ul class="ov-ls">
             ${upcomingVisits.map(v => {
               const c = getClientById(v.clientId);
               const isToday = v.date === today;
-              return `<li class="ov-it" role="button" tabindex="0" onclick="navigateTo('visitas');setTimeout(()=>openVisitDetail('${v.id}'),100)">
+              return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenVisit" data-arg="${escapeHtml(v.id)}">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
                 <div style="min-width:0">
                   <div class="ov-tt">${escapeHtml(v.motivo)||'(sem motivo)'}</div>
@@ -946,11 +946,11 @@ function renderDashboard() {
 
       <div class="ov-col">
         <section class="card ov-panel" aria-labelledby="ov-acoes">
-          <div class="ov-ph"><h2 class="ov-h2" id="ov-acoes">Ações rápidas</h2>${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="dashGoPresentation()"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>Apresentar reunião</button>` : ''}</div>
+          <div class="ov-ph"><h2 class="ov-h2" id="ov-acoes">Ações rápidas</h2>${_dashCanManage ? `<button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="dashGoPresentation"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>Apresentar reunião</button>` : ''}</div>
           <div class="ov-acts-big">
-            ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button type="button" class="btn btn-primary ov-btn ov-big" onclick="navigateTo('clientes');setTimeout(()=>openClientForm(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Novo cliente</button>` : ''}
-            <button type="button" class="btn btn-secondary ov-btn ov-big" onclick="navigateTo('pendencias');setTimeout(()=>openPendenciaRapida(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova pendência</button>
-            <button type="button" class="btn btn-secondary ov-btn ov-big" onclick="navigateTo('visitas');setTimeout(()=>openVisitForm(),100)"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova visita</button>
+            ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button type="button" class="btn btn-primary ov-btn ov-big" data-action="dashGoClientForm"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Novo cliente</button>` : ''}
+            <button type="button" class="btn btn-secondary ov-btn ov-big" data-action="dashGoPendenciaRapida"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova pendência</button>
+            <button type="button" class="btn btn-secondary ov-btn ov-big" data-action="dashGoVisitForm"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova visita</button>
           </div>
         </section>
       </div>
@@ -968,10 +968,10 @@ function renderDashboard() {
         : `<p class="ov-muted">Nenhuma reunião registrada ainda. Use “Iniciar/Continuar Reunião” para começar a deste mês.</p>`}
       </div>
       <div class="dash-export-btns ov-acts ov-meet-acts">
-        <button type="button" class="btn btn-secondary btn-sm ov-btn" onclick="dashGoPresentation()">
+        <button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="dashGoPresentation">
           <svg class="ov-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
           Apresentar</button>
-        <button type="button" class="btn btn-primary btn-sm ov-btn" onclick="navigateTo('reuniao')">${_nextMeeting && _nextMeeting.status === 'aberta' ? 'Continuar Reunião' : 'Iniciar/Continuar Reunião'}</button>
+        <button type="button" class="btn btn-primary btn-sm ov-btn" data-action="navigateTo" data-arg="reuniao">${_nextMeeting && _nextMeeting.status === 'aberta' ? 'Continuar Reunião' : 'Iniciar/Continuar Reunião'}</button>
       </div>
     </section>` : ''}
 
@@ -983,7 +983,7 @@ function renderDashboard() {
         ${_onLeaveWithCount.map(o => `
           <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--bg-secondary)">
             <span style="font-size:13px;flex:1"><strong>${escapeHtml(o.name)}</strong> está afastado — ${plural(o.count, 'pendência aguardando', 'pendências aguardando')} reatribuição</span>
-            <button class="btn btn-secondary btn-sm" onclick="dashGoToPendenciasByOperator('${escapeHtml(o.name)}')">Ver pendências →</button>
+            <button class="btn btn-secondary btn-sm" data-action="dashGoToPendenciasByOperator" data-arg="${escapeHtml(o.name)}">Ver pendências →</button>
           </div>`).join('')}
       </div>
     </div>` : ''}
@@ -999,7 +999,7 @@ function renderDashboard() {
           const _lbl = _ovRiskLabel[r.health && r.health.level] || (r.health && r.health.label) || '—';
           const _pct = (r.health && r.health.totalAbertas) ? Math.min(100, Math.round((r.health.vencidas / r.health.totalAbertas) * 100)) : 0;
           return `
-          <div class="ov-row" role="button" tabindex="0" onclick="viewClient('${escapeHtml(r.clientId)}')">
+          <div class="ov-row" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(r.clientId)}">
             <div class="ov-client"><div class="ov-name">${escapeHtml(r.clientName)}</div><div class="ov-st ov-${_lvl}">${escapeHtml(_lbl)}</div></div>
             <div class="ov-track ov-${_lvl}" aria-hidden="true"><i style="width:${_pct}%"></i></div>
             <div class="ov-num">${r.health.totalAbertas}</div>
@@ -1012,7 +1012,7 @@ function renderDashboard() {
         ${_dashHideBtn('silencio')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-silencio">Silêncio do cliente</h2><span class="ov-sub">Mais de 30 dias</span></div>
         ${_silent.length ? _silent.map(s => `
-          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(s.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(s.clientId)}">
             <span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(s.clientName))}</span>
             <span class="ov-name">${escapeHtml(s.clientName)}</span>
             <small>${s.daysSince >= 9999 ? 'Sem contato registrado' : `há ${s.daysSince} dias`}</small>
@@ -1023,7 +1023,7 @@ function renderDashboard() {
         ${_dashHideBtn('recorrentes')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-rec">Pendência recorrente</h2><span class="ov-sub">Top 5</span></div>
         ${_recurrent.length ? _recurrent.map(r => `
-          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(r.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(r.clientId)}">
             <span class="ov-name">${escapeHtml(r.clientName)}</span>
             <small>${r.streak} meses seguidos</small>
           </div>`).join('') : `<p class="ov-empty">Nenhum cliente recorrente.</p>`}
@@ -1033,7 +1033,7 @@ function renderDashboard() {
         ${_dashHideBtn('aniversarios')}
         <div class="ov-ph"><h2 class="ov-h2" id="ov-aniv">Aniversários de clientes</h2><span class="ov-sub">Mês atual</span></div>
         ${_anniv.length ? _anniv.map(a => `
-          <div class="ov-li" role="button" tabindex="0" onclick="viewClient('${escapeHtml(a.clientId)}')">
+          <div class="ov-li" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(a.clientId)}">
             <span class="ov-name">${escapeHtml(a.clientName)}</span>
             <small>${a.years} ${a.years === 1 ? 'ano' : 'anos'}</small>
           </div>`).join('') : `<p class="ov-empty">Nenhum aniversário neste mês.</p>`}
@@ -1049,10 +1049,10 @@ function renderDashboard() {
     </div></section>` : ''}
     
     ${!_dashIsHidden('stats') ? `<section class="dash-widget ov-kpis" aria-label="Resumo de indicadores" style="position:relative">${_dashHideBtn('stats')}` : '<div style="display:none"><div>'}
-      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('clientes')">
+      <div class="ov-k" role="button" tabindex="0" data-action="navigateTo" data-arg="clientes">
         <b class="stat-value">${clients.length}</b><span>Clientes${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
-      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('visitas')">
+      <div class="ov-k" role="button" tabindex="0" data-action="navigateTo" data-arg="visitas">
         <b class="stat-value">${visits.length}</b><span>Visitas${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
       <div class="ov-k ov-k-static">
@@ -1061,19 +1061,19 @@ function renderDashboard() {
       <div class="ov-k ov-k-static">
         <b class="stat-value">${completionRate}%</b><span>Taxa de conclusão ${_deltaComp ? _dashDeltaBadge(_deltaComp) : ''}</span>
       </div>
-      <div class="ov-k" role="button" tabindex="0" onclick="navigateTo('pendencias')">
+      <div class="ov-k" role="button" tabindex="0" data-action="navigateTo" data-arg="pendencias">
         <b class="stat-value">${open.length + inProg.length + paused.length}</b><span>Pendências abertas${_dashPeriod!=='all'?' (período)':''} ${_deltaOpen ? _dashDeltaBadge(_deltaOpen) : ''}</span>
       </div>
-      <div class="ov-k amber" role="button" tabindex="0" onclick="navigateTo('pendencias')">
+      <div class="ov-k amber" role="button" tabindex="0" data-action="navigateTo" data-arg="pendencias">
         <b class="stat-value">${critical.length}</b><span>Alta prioridade${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
-      <div class="ov-k red" role="button" tabindex="0" onclick="navigateTo('prazos')" title="Ver por responsável e cliente em Prazos e SLA">
+      <div class="ov-k red" role="button" tabindex="0" data-action="navigateTo" data-arg="prazos" title="Ver por responsável e cliente em Prazos e SLA">
         <b class="stat-value">${_pz ? _pz.vencidas : overdue.length}</b><span>Pendências vencidas →</span>
       </div>
-      <div class="ov-k amber" role="button" tabindex="0" onclick="navigateTo('prazos')" title="Ver em Prazos e SLA">
+      <div class="ov-k amber" role="button" tabindex="0" data-action="navigateTo" data-arg="prazos" title="Ver em Prazos e SLA">
         <b class="stat-value">${_pz ? _pz.hoje : dueToday.length}</b><span>Vencem hoje →</span>
       </div>
-      ${_dashCanManage ? `<div class="ov-k" role="button" tabindex="0" onclick="navigateTo('pendencias')">
+      ${_dashCanManage ? `<div class="ov-k" role="button" tabindex="0" data-action="navigateTo" data-arg="pendencias">
         <b class="stat-value">${unassigned.length}</b><span>Sem responsável</span>
       </div>` : ''}
     ${!_dashIsHidden('stats') ? `</section>` : '</div></div>'}
@@ -1095,7 +1095,7 @@ function renderDashboard() {
     <section class="card dash-widget ov-panel" aria-labelledby="ov-op">
       ${_dashHideBtn('workload')}
       <div class="ov-ph"><h2 class="ov-h2" id="ov-op">Carga por operador</h2>
-        <select id="workloadPeriod" class="form-select ov-sel" style="width:160px" aria-label="Período da carga por operador" onchange="setWorkloadPeriod(this.value)">
+        <select id="workloadPeriod" class="form-select ov-sel" style="width:160px" aria-label="Período da carga por operador" data-change="setWorkloadPeriod">
           <option value="all" ${(_dashWorkloadPeriod||'all')==='all'?'selected':''}>Todo período</option>
           <option value="week" ${(_dashWorkloadPeriod||'all')==='week'?'selected':''}>Semana atual</option>
           <option value="month" ${(_dashWorkloadPeriod||'all')==='month'?'selected':''}>Mês atual</option>
@@ -1542,23 +1542,21 @@ function showLoginScreen() {
         <div class="login-field">
           <label class="login-label">E-mail</label>
           <input type="email" id="loginEmail" class="login-input" autocomplete="email"
-            placeholder="seu.email@empresa.com" ${!serverOk ? 'disabled' : ''}
-            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('loginPassword').focus()}" />
+            placeholder="seu.email@empresa.com" ${!serverOk ? 'disabled' : ''} />
         </div>
 
         <div class="login-field">
           <div class="login-label-row">
             <label class="login-label">Senha</label>
-            <button type="button" class="login-forgot" onclick="forgotPassword()" ${!serverOk ? 'disabled' : ''}>Esqueci minha senha</button>
+            <button type="button" class="login-forgot" data-action="forgotPassword" ${!serverOk ? 'disabled' : ''}>Esqueci minha senha</button>
           </div>
           <input type="password" id="loginPassword" class="login-input" autocomplete="current-password"
-            placeholder="Digite sua senha..." ${!serverOk ? 'disabled' : ''}
-            onkeydown="if(event.key==='Enter')doLogin()" />
+            placeholder="Digite sua senha..." ${!serverOk ? 'disabled' : ''} />
         </div>
 
         <div id="loginError" class="login-error"></div>
 
-        <button id="loginBtn" class="login-btn" onclick="doLogin()" ${!serverOk ? 'disabled' : ''}>
+        <button id="loginBtn" class="login-btn" data-action="doLogin" ${!serverOk ? 'disabled' : ''}>
           Entrar →
         </button>
       </div>
@@ -1567,6 +1565,14 @@ function showLoginScreen() {
       </p>
     </div>
   `;
+
+  // Enter no e-mail pula para a senha; Enter na senha entra (antes era onkeydown no HTML).
+  document.getElementById('loginEmail')?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('loginPassword')?.focus(); }
+  });
+  document.getElementById('loginPassword')?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') doLogin();
+  });
 
   setTimeout(() => document.getElementById('loginEmail')?.focus(), 100);
 }
@@ -1786,4 +1792,45 @@ function generateMonthlyReport() {
     '</tbody></table>' +
   '</article>';
   if (typeof printHtmlDocument === 'function') printHtmlDocument(html, 'Relatório mensal ' + monthNames[now.getMonth()] + ' ' + now.getFullYear());
+}
+
+// ── Ações de delegação deste arquivo (ver js/actions.js) ───────────────────
+// Roda no load (defer): a tela de login usa estas ações antes de qualquer
+// renderDashboard, então o registro não fica dentro de função de render.
+if (typeof registerActions === 'function') {
+  registerActions({
+    toggleDashWidget: (_el, id) => toggleDashWidget(id),
+    resetDashWidgets: () => resetDashWidgets(),
+    setDashPeriod: (_el, period) => setDashPeriod(period),
+    setDashCustomDates: () => setDashCustomDates(),
+    setWorkloadPeriod: (_el, value) => setWorkloadPeriod(value),
+    generateMonthlyReport: () => generateMonthlyReport(),
+    dashGoPresentation: () => dashGoPresentation(),
+    dashGoToPendenciasByOperator: (_el, name) => dashGoToPendenciasByOperator(name),
+    dashOpenPen: (_el, id) => {
+      navigateTo('pendencias');
+      setTimeout(() => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); }, 100);
+    },
+    dashOpenVisit: (_el, id) => {
+      navigateTo('visitas');
+      setTimeout(() => { if (typeof openVisitDetail === 'function') openVisitDetail(id); }, 100);
+    },
+    dashGoClientForm: () => {
+      navigateTo('clientes');
+      setTimeout(() => { if (typeof openClientForm === 'function') openClientForm(); }, 100);
+    },
+    dashGoPendenciaRapida: () => {
+      navigateTo('pendencias');
+      setTimeout(() => { if (typeof openPendenciaRapida === 'function') openPendenciaRapida(); }, 100);
+    },
+    dashGoVisitForm: () => {
+      navigateTo('visitas');
+      setTimeout(() => { if (typeof openVisitForm === 'function') openVisitForm(); }, 100);
+    },
+    navigateTo: (_el, page) => navigateTo(page),
+    openVisitDetail: (_el, id) => { if (typeof openVisitDetail === 'function') openVisitDetail(id); },
+    viewClient: (_el, id) => { if (typeof viewClient === 'function') viewClient(id); },
+    forgotPassword: () => forgotPassword(),
+    doLogin: () => doLogin(),
+  });
 }
