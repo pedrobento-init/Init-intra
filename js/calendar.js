@@ -220,39 +220,39 @@ function renderCalendar() {
       </div>
       <div class="nav ag-nav">
         <div class="ag-nav-group">
-          <button class="ghost" onclick="agNav('prev')" aria-label="Período anterior">‹</button>
-          <button onclick="agToday()">Hoje</button>
-          <button class="ghost" onclick="agNav('next')" aria-label="Próximo período">›</button>
+          <button class="ghost" data-action="agNav" data-arg="prev" aria-label="Período anterior">‹</button>
+          <button data-action="agToday">Hoje</button>
+          <button class="ghost" data-action="agNav" data-arg="next" aria-label="Próximo período">›</button>
           <span class="ag-period" id="agPeriod" aria-live="polite"></span>
         </div>
         <div class="ag-nav-group ag-filter-group">
-          <button id="calFiltersToggle" onclick="toggleCalFilters(event)" aria-expanded="false" aria-controls="calFilters" title="Filtros">
+          <button id="calFiltersToggle" data-action="toggleCalFilters" data-stop="1" aria-expanded="false" aria-controls="calFilters" title="Filtros">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
             Filtros
           </button>
-          <button onclick="openCalendarFeed()" title="Ver suas visitas no app de agenda do celular">
+          <button data-action="openCalendarFeed" title="Ver suas visitas no app de agenda do celular">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
             No celular
           </button>
           <div class="cal-filters" id="calFilters" data-open="0">
-            <select class="form-select" id="calType" onchange="refreshCalendar()" title="Tipo de evento">
+            <select class="form-select" id="calType" data-change="refreshCalendar" title="Tipo de evento">
               <option value="all">Pendências + Visitas</option>
               <option value="pendencias">Apenas Pendências</option>
               <option value="visitas">Apenas Visitas</option>
             </select>
-            <select class="form-select" id="calClient" onchange="refreshCalendar()">
+            <select class="form-select" id="calClient" data-change="refreshCalendar">
               <option value="">Todos os clientes</option>
               ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
             </select>
-            <select class="form-select" id="calResponsible" onchange="refreshCalendar()">
+            <select class="form-select" id="calResponsible" data-change="refreshCalendar">
               <option value="">Todos os responsáveis</option>
               ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
             </select>
-            <select class="form-select" id="calStatus" onchange="refreshCalendar()">
+            <select class="form-select" id="calStatus" data-change="refreshCalendar">
               <option value="">Todos os status</option>
               ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('')}
             </select>
-            <select class="form-select" id="calPriority" onchange="refreshCalendar()">
+            <select class="form-select" id="calPriority" data-change="refreshCalendar">
               <option value="">Prioridade</option>
               <option value="baixa">Baixa</option>
               <option value="media">Média</option>
@@ -260,15 +260,15 @@ function renderCalendar() {
               <option value="critica">Crítica</option>
             </select>
             <div class="cal-menu-actions">
-              <button class="btn btn-primary btn-sm" onclick="closeCalFilters();openPendenciaForm()">
+              <button class="btn btn-primary btn-sm" data-action="calOpenPendenciaForm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Nova Pendência
               </button>
-              <button class="btn btn-primary btn-sm" onclick="closeCalFilters();openVisitForm()">
+              <button class="btn btn-primary btn-sm" data-action="calOpenVisitForm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
                 Nova Visita
               </button>
-              <button class="btn btn-secondary btn-sm" onclick="closeCalFilters();exportCalendarICS()" title="Baixar calendário em .ics (Google/Outlook)">
+              <button class="btn btn-secondary btn-sm" data-action="calExportICS" title="Baixar calendário em .ics (Google/Outlook)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 iCal
               </button>
@@ -276,9 +276,9 @@ function renderCalendar() {
           </div>
         </div>
         <span class="ag-nav-sep"></span>
-        <button data-view="month" onclick="agSetView('month')">Mês</button>
-        <button data-view="week" onclick="agSetView('week')">Semana</button>
-        <button data-view="list" onclick="agSetView('list')">Lista</button>
+        <button data-view="month" data-action="agSetView" data-arg="month">Mês</button>
+        <button data-view="week" data-action="agSetView" data-arg="week">Semana</button>
+        <button data-view="list" data-action="agSetView" data-arg="list">Lista</button>
       </div>
     </div>
     <div class="legend ag-legend" id="calLegend">
@@ -446,7 +446,7 @@ function openCalendarDaySheet(dateStr, hora = '') {
       html += `<div class="cal-day-section">Visitas <span>${allVisits.length}</span></div>`;
       html += allVisits.map(v => {
         const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
-        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openVisitDetail('${escapeHtml(v.id)}')">
+        return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayVisit" data-arg="${escapeHtml(v.id)}">
           ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(v.clientName||'—')}</div><div class="cal-day-card-meta">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
       }).join('');
     }
@@ -454,13 +454,13 @@ function openCalendarDaySheet(dateStr, hora = '') {
       html += `<div class="cal-day-section">Pendências <span>${allPens.length}</span></div>`;
       html += allPens.map(p => {
         const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        return `<div class="cal-day-card" role="button" tabindex="0" onclick="closeModal();openPendenciaQuickCard('${escapeHtml(p.id)}')">
+        return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayPendencia" data-arg="${escapeHtml(p.id)}">
           ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(getPendenciaTitulo(p))}</div><div class="cal-day-card-meta">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div class="cal-day-card-tags">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
       }).join('');
     }
   }
   html += `</div>`;
-  html += `<div class="cal-day-actions"><div class="cal-day-create"><button class="btn btn-primary" onclick="closeModal();openPendenciaForm(null,null,'${escapeHtml(dateStr)}')">+ Nova pendência</button><button class="btn cal-day-visit-btn" onclick="closeModal();openVisitForm(null,null,'${escapeHtml(dateStr)}','${hora}')">+ Agendar visita${hora ? ' às ' + escapeHtml(hora) : ''}</button></div><button class="btn btn-secondary" onclick="closeModal()">Fechar</button></div>`;
+  html += `<div class="cal-day-actions"><div class="cal-day-create"><button class="btn btn-primary" data-action="agDayPendenciaForm" data-arg="${escapeHtml(dateStr)}">+ Nova pendência</button><button class="btn cal-day-visit-btn" data-action="agDayVisitForm" data-arg="${escapeHtml(dateStr)}" data-hora="${escapeHtml(hora)}">+ Agendar visita${hora ? ' às ' + escapeHtml(hora) : ''}</button></div><button class="btn btn-secondary" data-action="closeModal">Fechar</button></div>`;
 
   openModal(calendarDayTitle(dateStr), html, 'sm');
   // Acessibilidade: bottom-sheet em mobile
@@ -511,6 +511,23 @@ if (typeof registerActions === 'function') {
   registerActions({
     // O card é um resumo; a tela cheia do chamado abre com o modal fechado.
     penQuickOpen: (_el, id) => { closeModal(); if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+    agNav: (_el, dir) => agNav(dir),
+    agToday: () => agToday(),
+    agSetView: (_el, view) => agSetView(view),
+    // data-stop="1" no botão já faz stopPropagation; a função repete por segurança.
+    toggleCalFilters: (_el, _arg, ev) => toggleCalFilters(ev),
+    openCalendarFeed: () => { if (typeof openCalendarFeed === 'function') openCalendarFeed(); },
+    refreshCalendar: () => refreshCalendar(),
+    calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); },
+    calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); },
+    calExportICS: () => { closeCalFilters(); exportCalendarICS(); },
+    agDayVisit: (_el, id) => { closeModal(); if (typeof openVisitDetail === 'function') openVisitDetail(id); },
+    agDayPendencia: (_el, id) => { closeModal(); openPendenciaQuickCard(id); },
+    agDayPendenciaForm: (_el, dateStr) => { closeModal(); openPendenciaForm(null, null, dateStr); },
+    agDayVisitForm: (el, dateStr) => { closeModal(); openVisitForm(null, null, dateStr, el.dataset.hora || ''); },
+    initFullCalendar: () => initFullCalendar(),
+    openPendenciaQuickCard: (_el, id) => openPendenciaQuickCard(id),
+    openVisitDetail: (_el, id) => { if (typeof openVisitDetail === 'function') openVisitDetail(id); },
   });
 }
 
@@ -532,13 +549,13 @@ async function initFullCalendar() {
     await _loadFullCalendarWithTimeout(15000);
   } catch (_) {
     if (seq !== _fcInitSeq) return;
-    container.innerHTML = '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
+    container.innerHTML = '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
     return;
   }
   if (seq !== _fcInitSeq || container.isConnected === false) return;
 
   if (typeof FullCalendar === 'undefined') {
-    container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" onclick="initFullCalendar()">Tentar novamente</button></div>';
+    container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
     return;
   }
 
@@ -665,7 +682,7 @@ function renderAgendaSide() {
   if (overdue.length) {
     html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
       overdue.map(function (o) {
-        return '<li role="button" tabindex="0" onclick="openPendenciaQuickCard(\'' + esc(o.id) + '\')"><div class="pbar" style="background:#b3122a"></div>' +
+        return '<li role="button" tabindex="0" data-action="openPendenciaQuickCard" data-arg="' + esc(o.id) + '"><div class="pbar" style="background:#b3122a"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }
@@ -675,7 +692,7 @@ function renderAgendaSide() {
       ? '<ul class="plist">' + next7.map(function (o) {
         var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaQuickCard';
         var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
-        return '<li role="button" tabindex="0" onclick="' + fn + '(\'' + esc(o.id) + '\')"><div class="pbar" style="background:' + o.dot + '"></div>' +
+        return '<li role="button" tabindex="0" data-action="' + fn + '" data-arg="' + esc(o.id) + '"><div class="pbar" style="background:' + o.dot + '"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul>'
       : '<div class="empty-state" style="padding:12px 4px 4px"><p>Nada nos próximos 7 dias 🎉</p></div>') +
@@ -684,7 +701,7 @@ function renderAgendaSide() {
   if (rec.length) {
     html += '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
       rec.map(function (g) {
-        return '<li role="button" tabindex="0" onclick="openVisitDetail(\'' + esc(g.visitId) + '\')"><div class="pbar" style="background:#0ea5e9"></div>' +
+        return '<li role="button" tabindex="0" data-action="openVisitDetail" data-arg="' + esc(g.visitId) + '"><div class="pbar" style="background:#0ea5e9"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(g.clientName) + '</div><div class="tmeta">' + esc(g.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }

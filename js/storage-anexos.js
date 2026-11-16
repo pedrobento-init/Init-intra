@@ -342,14 +342,14 @@ function renderAttachmentList(type, itemId, containerId) {
     const l = _attachmentLinkAttrs(a);
     const href = l.signed ? `aria-disabled="true" title="Carregando…"` : `href="${escapeHtml(l.src)}" title="Baixar"`;
     return `<div class="attachment-item">
-      ${isImage ? `<img src="${escapeHtml(l.src)}"${l.signed} class="attachment-thumb" alt="${escapeHtml(a.name)}" onclick="if(this.src)window.open(this.src,'_blank','noopener')" />` : `<div class="attachment-icon">${icon}</div>`}
+      ${isImage ? `<img src="${escapeHtml(l.src)}"${l.signed} class="attachment-thumb" alt="${escapeHtml(a.name)}" data-action="attOpenFull" />` : `<div class="attachment-icon">${icon}</div>`}
       <div class="attachment-info">
         <div class="attachment-name">${escapeHtml(a.name)}</div>
         <div class="attachment-meta">${sizeKB} KB · ${escapeHtml(a.uploadedBy)} · ${formatDateTime(a.uploadedAt)}</div>
       </div>
       <div class="attachment-actions">
         <a ${href}${l.signed} data-att-name="${escapeHtml(a.name)}" download="${escapeHtml(a.name)}" class="btn btn-sm btn-secondary">⬇</a>
-        <button class="btn btn-sm btn-danger" onclick="removeAttachmentUI('${type}','${itemId}','${a.id}','${containerId}')" title="Remover">✕</button>
+        <button class="btn btn-sm btn-danger" data-action="removeAttachmentUI" data-arg="${escapeHtml(type)}" data-item-id="${escapeHtml(itemId)}" data-att-id="${escapeHtml(a.id)}" data-container-id="${escapeHtml(containerId)}" title="Remover">✕</button>
       </div>
     </div>`;
   }).join('');
@@ -433,9 +433,9 @@ function renderClientDocumentsList(clientId, containerId) {
     var l = _attachmentLinkAttrs(a);
     var href = l.signed ? 'aria-disabled="true" title="Carregando…"' : 'href="' + escapeHtml(l.src) + '" title="Baixar"';
     return '<div class="attachment-item">' +
-      (isImage ? '<img src="' + escapeHtml(l.src) + '"' + l.signed + ' class="attachment-thumb" alt="' + escapeHtml(a.name) + '" onclick="if(this.src)window.open(this.src,\'_blank\',\'noopener\')" />' : '<div class="attachment-icon">' + icon + '</div>') +
+      (isImage ? '<img src="' + escapeHtml(l.src) + '"' + l.signed + ' class="attachment-thumb" alt="' + escapeHtml(a.name) + '" data-action="attOpenFull" />' : '<div class="attachment-icon">' + icon + '</div>') +
       '<div class="attachment-info"><div class="attachment-name">' + escapeHtml(a.name) + '</div><div class="attachment-meta">' + sizeKB + ' KB · ' + escapeHtml(a.uploadedBy) + ' · ' + formatDateTime(a.uploadedAt) + '</div></div>' +
-      '<div class="attachment-actions"><a ' + href + l.signed + ' data-att-name="' + escapeHtml(a.name) + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary">⬇</a><button class="btn btn-sm btn-danger" onclick="removeClientDocumentUI(\'' + clientId + '\',\'' + a.id + '\',\'' + containerId + '\')" title="Remover">✕</button></div></div>';
+      '<div class="attachment-actions"><a ' + href + l.signed + ' data-att-name="' + escapeHtml(a.name) + '" download="' + escapeHtml(a.name) + '" class="btn btn-sm btn-secondary">⬇</a><button class="btn btn-sm btn-danger" data-action="removeClientDocumentUI" data-arg="' + escapeHtml(clientId) + '" data-att-id="' + escapeHtml(a.id) + '" data-container-id="' + escapeHtml(containerId) + '" title="Remover">✕</button></div></div>';
   }).join('');
   fillSignedAttachmentLinks(container);
 }
@@ -463,4 +463,12 @@ function handleClientDocumentUpload(clientId, inputElement, callback) {
     if (result && result.error) { if (typeof showToast==='function') showToast(result.error,'error'); }
     else { if (typeof showToast==='function') showToast('Documento anexado!', 'success'); if (callback) callback(result.document); renderClientDocumentsList(clientId, 'cliDocumentsList'); }
   })();
+}
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    attOpenFull: (el) => { if (el.src) window.open(el.src, '_blank', 'noopener'); },
+    removeAttachmentUI: (el) => removeAttachmentUI(el.dataset.arg, el.dataset.itemId, el.dataset.attId, el.dataset.containerId),
+    removeClientDocumentUI: (el) => removeClientDocumentUI(el.dataset.arg, el.dataset.attId, el.dataset.containerId),
+  });
 }

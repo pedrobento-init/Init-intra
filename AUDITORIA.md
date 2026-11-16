@@ -88,7 +88,7 @@ Status: **CORRIGIDO**, **PROPOSTA**, **PENDENTE (DBA)**, **MONITORAR**.
 | SYNC-01 | MÉDIO    | MÉDIA | **SUSPEITA** — `pull` sem `.range()`: se o PostgREST `max-rows` (padrão 1000) truncar, linhas ausentes são tratadas como “deletadas no servidor” e **descartadas do merged** → perda local                            | `js/storage.js:834`, `js/schema.js:295-297`                                                                                                                      | PROPOSTA (P-9)                            |
 | SYNC-02 | BAIXO    | ALTA  | Outbox cobre **só `pendencias`**; demais entidades sobem só no próximo ciclo de sync                                                                                                                                  | `js/storage.js:1910`, `js/storage.js:953`                                                                                                                        | PROPOSTA (P-10)                           |
 | SYNC-03 | BAIXO    | MÉDIA | **SUSPEITA** — `applyRemote` reescreve a lista inteira via `dbSet` em paralelo com o merge do sync (corrida de escrita perdida)                                                                                       | `js/sync-manager.js:143`                                                                                                                                         | PROPOSTA (P-10)                           |
-| SYNC-04 | MÉDIO    | ALTA  | `tickets` sem policies + RLS ligado = **fail-closed** (sync de `tickets` nega tudo)                                                                                                                                   | `021_rls_remediation.sql:9-12`                                                                                                                                   | PENDENTE (decisão de produto)             |
+| SYNC-04 | MÉDIO    | ALTA  | `tickets` sem policies + RLS ligado = **fail-closed** (sync de `tickets` nega tudo)                                                                                                                                   | `021_rls_remediation.sql:9-12`                                                                                                                                   | DECIDIDO (16/11/2026): mantido fail-closed, ver §13.5 |
 | SYNC-05 | MÉDIO    | ALTA  | Prefixo `011` duplicado (`011_rls_roles_teams.sql` + `011_visit_time_range.sql`) → ordem de aplicação ambígua                                                                                                         | `supabase/migrations/011_*.sql`                                                                                                                                  | PROPOSTA (P-11) / DBA                     |
 | PERF-01 | MÉDIO    | ALTA  | `select('*')` sem paginação no pull de todas as entidades (+ `audit_logs` `select('*')` com 500 linhas)                                                                                                               | `js/storage.js:834,1012`, `js/checklist.js:348,366,405`                                                                                                          | PROPOSTA (P-9)                            |
 | PERF-02 | MÉDIO    | ALTA  | `dist/` nunca era limpo → 4.323 KB/73 arquivos acumulados                                                                                                                                                             | `tools/build-assets.js`                                                                                                                                          | **CORRIGIDO** `12c875f`                   |
@@ -633,6 +633,17 @@ e a Fase 3 da migração para `@supabase/server`, que esperava por isso, está
 liberada.
 
 ### 13.5 O que continua aberto
+
+**`tickets` — decisão registrada (16/11/2026): fail-closed por design, mantido.**
+A migration `011` registrou "tickets/chamados removidos do produto - sem policies";
+a `042` (e a `055`) criou `tickets_admin` (FOR ALL TO authenticated, só admin); o
+frontend nunca sincronizou `tickets` (não está em `ENTITIES`, sem policy para os
+demais papéis). Ou seja: não é exposição, é tabela legado morta por decisão
+deliberada — fechada para todo mundo exceto admin. Manter assim; não dar policy
+por equipe (ressuscitaria entidade removida) nem dropar a tabela (destrutivo,
+sem necessidade). O Dexie ainda guarda a store v1 `tickets` só para a migração
+única do localStorage legado — ninguém lê dela. **SYNC-04 encerrado nesta
+decisão.**
 
 **`tickets` não aparece na lista de policies.** RLS ligado sem policy nenhuma
 = *fail-closed*: ninguém acessa e o sync nega tudo. É o SYNC-04, com a mesma

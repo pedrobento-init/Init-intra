@@ -19,9 +19,9 @@ function penQuickMenuModel(p, cols, operators) {
   return { statuses: statuses, people: people };
 }
 
-function openPenQuickMenu(ev, id) {
-  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
-  var btn = ev && ev.currentTarget;
+// Menu aberto por delegação: o botão ⋯ chama openPenQuickMenu(el, id)
+// (id do card) e o actions.js resolve o clique pelo data-action.
+function openPenQuickMenu(btn, id) {
   var already = btn && btn.getAttribute('aria-expanded') === 'true';
   closePenQuickMenu();
   if (already) return;
@@ -43,7 +43,7 @@ function openPenQuickMenu(ev, id) {
   menu.innerHTML =
     '<div class="pqm-label">Mover para</div>' +
     m.statuses.map(function(s) {
-      return '<button type="button" role="menuitem" onclick="closePenQuickMenu();penMoveTo(\'' + sid + '\',\'' + s.id + '\')">' +
+      return '<button type="button" role="menuitem" data-action="penQuickMoveTo" data-arg="' + sid + '" data-status="' + escapeHtml(s.id) + '">' +
         '<span class="pqm-dot" style="--c:' + penColColor(s.id) + '"></span>' + escapeHtml(s.label) + '</button>';
     }).join('') +
     '<div class="pqm-label">Atribuir a</div>' +
@@ -52,12 +52,12 @@ function openPenQuickMenu(ev, id) {
       var n = escapeHtml(o.name);
       // Afastado não pode receber (updatePendenciaAssignee recusa): desabilitado.
       return '<button type="button" role="menuitemradio" aria-checked="' + o.current + '"' + (o.current || o.away ? ' disabled' : '') +
-        ' onclick="closePenQuickMenu();penQuickAssign(\'' + sid + '\',\'' + n.replace(/&#39;/g, '\\&#39;') + '\')">' +
+        ' data-action="penQuickAssign" data-arg="' + sid + '" data-name="' + n + '">' +
         '<span class="pqm-check">' + (o.current ? '✓' : '') + '</span>' + n + (o.away ? ' <small>afastado</small>' : '') + '</button>';
     }).join('') +
     '</div>' +
     '<div class="pqm-sep"></div>' +
-    '<button type="button" role="menuitem" onclick="closePenQuickMenu();openPendenciaDetail(\'' + sid + '\')">Abrir detalhes</button>';
+    '<button type="button" role="menuitem" data-action="penQuickOpenDetail" data-arg="' + sid + '">Abrir detalhes</button>';
   document.body.appendChild(menu);
   if (btn) {
     btn.setAttribute('aria-expanded', 'true');
@@ -354,4 +354,16 @@ function quickUpdatePendenciaField(id, field, value) {
   _penRedesenharDetalhe(id);
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_) {} }
   if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_) {} }
+}
+
+// Ações do menu ⋯ (clique por delegação em js/actions.js).
+if (typeof registerActions === 'function') {
+  registerActions({
+    openPenQuickMenu: (el, id) => { if (typeof openPenQuickMenu === 'function') openPenQuickMenu(el, id); },
+    penQuickMoveTo: (el, id) => { closePenQuickMenu(); if (typeof penMoveTo === 'function') penMoveTo(id, el.dataset.status); },
+    // O nome cru passa por data-name (escapeHtml no atributo, dataset
+    // devolve a string original); o status vai em data-status.
+    penQuickAssign: (el, id) => { closePenQuickMenu(); if (typeof penQuickAssign === 'function') penQuickAssign(id, el.dataset.name); },
+    penQuickOpenDetail: (_el, id) => { closePenQuickMenu(); if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+  });
 }

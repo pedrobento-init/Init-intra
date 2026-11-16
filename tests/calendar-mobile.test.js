@@ -106,7 +106,7 @@ describe('primeiro acesso: loading imediato + erro com retry se o CDN falhar', (
     expect(_el.calendarContainer.innerHTML).toContain('Carregando calendário');
     await p;
     expect(_el.calendarContainer.innerHTML).toContain('Tentar novamente');
-    expect(_el.calendarContainer.innerHTML).toContain('onclick="initFullCalendar()"');
+    expect(_el.calendarContainer.innerHTML).toContain('data-action="initFullCalendar"');
     vm.runInContext('delete loadFullCalendar;', sandbox);
   });
 
@@ -203,7 +203,7 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
   });
 
   it('botão Filtros fica no nav ao lado do Hoje; painel tem selects + ações', () => {
-    const navIdx = src.indexOf('agNav(\'next\')');
+    const navIdx = src.indexOf('data-action="agNav" data-arg="next"');
     const toggleIdx = src.indexOf('id="calFiltersToggle"');
     expect(navIdx).toBeGreaterThan(-1);
     expect(toggleIdx).toBeGreaterThan(navIdx);
@@ -217,9 +217,9 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
 
   it('usa toolbar própria (sem headerToolbar nativa)', () => {
     expect(src).toContain('headerToolbar: false');
-    expect(src).toContain("agSetView('month')");
-    expect(src).toContain("agSetView('week')");
-    expect(src).toContain("agSetView('list')");
+    expect(src).toContain("data-action=\"agSetView\" data-arg=\"month\"");
+    expect(src).toContain("data-action=\"agSetView\" data-arg=\"week\"");
+    expect(src).toContain("data-action=\"agSetView\" data-arg=\"list\"");
   });
 
   it('header da Agenda: título só na topbar (sem h1 duplicado) + legenda + layout grade/sidebar', () => {
@@ -231,9 +231,13 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
   });
 
   it('ações do menu fecham o dropdown', () => {
-    expect(src).toContain('closeCalFilters();openPendenciaForm()');
-    expect(src).toContain('closeCalFilters();openVisitForm()');
-    expect(src).toContain('closeCalFilters();exportCalendarICS()');
+    // Migrado para delegação: as ações calOpen* e calExportICS chamam closeCalFilters + a ação.
+    expect(src).toContain("data-action=\"calOpenPendenciaForm\"");
+    expect(src).toContain("data-action=\"calOpenVisitForm\"");
+    expect(src).toContain("data-action=\"calExportICS\"");
+    expect(src).toContain("calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); }");
+    expect(src).toContain("calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); }");
+    expect(src).toContain("calExportICS: () => { closeCalFilters(); exportCalendarICS(); }");
   });
 });
 

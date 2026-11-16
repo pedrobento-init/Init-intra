@@ -80,10 +80,10 @@ function renderPenChecklist(id) {
     var isDone = !!(item && item.done);
     return '<div class="pen-check-item' + (isDone ? ' is-done' : '') + '">' +
       '<label class="pen-check-label" title="' + (isDone ? 'Marcar como pendente' : 'Marcar como concluído') + '">' +
-      '<input type="checkbox" class="pen-check-box" ' + (isDone ? 'checked' : '') + ' onchange="toggleCheckItem(\'' + escapeHtml(id) + '\',' + i + ')" />' +
+      '<input type="checkbox" class="pen-check-box" ' + (isDone ? 'checked' : '') + ' data-change="toggleCheckItem" data-arg="' + escapeHtml(id) + '" data-index="' + i + '" />' +
       '<span class="pen-check-text">' + escapeHtml(item.text) + '</span>' +
       '</label>' +
-      '<button class="pen-check-remove" title="Remover item" onclick="removeCheckItem(\'' + escapeHtml(id) + '\',' + i + ')">✕</button>' +
+      '<button class="pen-check-remove" title="Remover item" data-action="removeCheckItem" data-arg="' + escapeHtml(id) + '" data-index="' + i + '">✕</button>' +
     '</div>';
   }).join('');
 }
@@ -144,8 +144,8 @@ function openReassignPendencia(penId) {
       </select>
     </div>
     <div class="form-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="this.disabled=true;submitReassignPendencia('${escapeHtml(penId)}',this)">Salvar</button>
+      <button class="btn btn-secondary" data-action="penCmdCloseModal">Cancelar</button>
+      <button class="btn btn-primary" data-action="penReassignSave" data-arg="${escapeHtml(penId)}">Salvar</button>
     </div>
   `);
 }
@@ -209,8 +209,8 @@ function openCorrectCompletion(penId) {
       </select>
     </div>
     <div class="form-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="this.disabled=true;submitCorrectCompletion('${escapeHtml(penId)}',this)">Salvar</button>
+      <button class="btn btn-secondary" data-action="penCmdCloseModal">Cancelar</button>
+      <button class="btn btn-primary" data-action="penCorrectSave" data-arg="${escapeHtml(penId)}">Salvar</button>
     </div>
   `);
 }
@@ -252,6 +252,17 @@ function meetingReassignPen(penId) { return openReassignPendencia(penId); }
     }); }catch(_){}
   });
 })();
+
+if (typeof registerActions === 'function') {
+  registerActions({
+    toggleCheckItem: (el, id) => toggleCheckItem(id, Number(el.dataset.index)),
+    removeCheckItem: (el, id) => removeCheckItem(id, Number(el.dataset.index)),
+    penCmdCloseModal: () => closeModal(),
+    // Desabilita o botão uma vez clicado (evita duplo submit) e passa o botão adiante.
+    penReassignSave: (el, penId) => { el.disabled = true; submitReassignPendencia(penId, el); },
+    penCorrectSave: (el, penId) => { el.disabled = true; submitCorrectCompletion(penId, el); },
+  });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { suggestTemplateForDescription, _tokenizeWords, parseMentionedOperators, highlightMentions };

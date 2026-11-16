@@ -380,6 +380,21 @@ if (typeof registerActions === 'function') {
     penClearFilter: (_el, campo) => penClearFilter(campo),
     penClearFilters: () => { if (typeof clearPenFilters === 'function') clearPenFilters(); },
     penSetOrigem: (_el, v) => penSetOrigem(v),
+    // Barra de filtros (migrada de oninput/onchange/onclick):
+    penSearchInput: () => { savePenFilters(); debouncedRenderPenView(); _penUpdateMoreFiltersBadge(); },
+    penFilterChange: () => { savePenFilters(); renderPenView(); _penUpdateMoreFiltersBadge(); },
+    togglePenMoreFilters: () => togglePenMoreFilters(),
+    penApplySavedFilter: () => { applySavedPenFilter(); _penUpdateMoreFiltersBadge(); },
+    saveCurrentPenFilter: () => saveCurrentPenFilter(),
+    deleteSavedPenFilter: () => deleteSavedPenFilter(),
+    setPenScope: (_el, v) => setPenScope(v),
+    togglePenClientChip: (_el, cid) => togglePenClientChip(cid),
+    penSlaSummaryToggle: () => {
+      const target = document.getElementById('penSlaSummary');
+      if (!target) return;
+      target.dataset.collapsed = target.dataset.collapsed === '0' ? '1' : '0';
+      _renderPendenciaSlaSummary();
+    },
   });
 }
 
@@ -398,42 +413,42 @@ function renderPendencias() {
     <div class="search-bar pen-search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="penSearch" placeholder="Buscar por título, cliente ou quem pediu" oninput="savePenFilters();debouncedRenderPenView();_penUpdateMoreFiltersBadge()" />
+        <input class="form-input" id="penSearch" placeholder="Buscar por título, cliente ou quem pediu" data-input="penSearchInput" />
       </div>
-      <select class="form-select filter-select-md pt-filter pt-full" id="penClient" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+      <select class="form-select filter-select-md pt-filter pt-full" id="penClient" data-change="penFilterChange">
         <option value="">Todos os clientes</option>
         ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary pen-more-btn pt-filter" id="penMoreFiltersBtn" onclick="togglePenMoreFilters()" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penMoreFiltersBtn" data-action="togglePenMoreFilters" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
       </button>
-      <button class="btn btn-secondary pen-more-btn pt-filter" id="penClearFiltersBtn" onclick="clearPenFilters()" title="Limpar todos os filtros" aria-label="Limpar filtros">
+      <button class="btn btn-secondary pen-more-btn pt-filter" id="penClearFiltersBtn" data-action="penClearFilters" title="Limpar todos os filtros" aria-label="Limpar filtros">
         ✕ Limpar
       </button>
       <div class="pen-more-panel" id="penMoreFiltersPanel" data-open="0" style="display:none">
-        <select class="form-select filter-select-md" id="penResponsible" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+        <select class="form-select filter-select-md" id="penResponsible" data-change="penFilterChange">
           <option value="">Todos os responsáveis</option>
           ${opNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
         </select>
-        <select class="form-select filter-select" id="penStatus" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+        <select class="form-select filter-select" id="penStatus" data-change="penFilterChange">
           <option value="">Todos os status</option>
           ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('')}
         </select>
-        <select class="form-select filter-select-sm" id="penPriority" onchange="savePenFilters();renderPenView();_penUpdateMoreFiltersBadge()">
+        <select class="form-select filter-select-sm" id="penPriority" data-change="penFilterChange">
           <option value="">Prioridade</option>
           <option value="baixa">Baixa</option>
           <option value="media">Média</option>
           <option value="alta">Alta</option>
           <option value="critica">Crítica</option>
         </select>
-        <select class="form-select filter-select" id="penSavedFilter" onchange="applySavedPenFilter();_penUpdateMoreFiltersBadge()">
+        <select class="form-select filter-select" id="penSavedFilter" data-change="penApplySavedFilter">
           <option value="">Filtros salvos...</option>
           ${getSavedPenFilters().map(f => `<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('')}
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="saveCurrentPenFilter()" title="Salvar filtro atual" aria-label="Salvar filtro atual"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></button>
-        <button class="btn btn-secondary btn-sm" onclick="deleteSavedPenFilter()" title="Remover filtro salvo">✕</button>
+        <button class="btn btn-secondary btn-sm" data-action="saveCurrentPenFilter" title="Salvar filtro atual" aria-label="Salvar filtro atual"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></button>
+        <button class="btn btn-secondary btn-sm" data-action="deleteSavedPenFilter" title="Remover filtro salvo">✕</button>
       </div>
     </div>
     <div class="view-toggles pen-scope-tabs pen-origem-tabs" role="tablist" aria-label="Origem das pendências">
@@ -444,8 +459,8 @@ function renderPendencias() {
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Escopo das pendências">
-        <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" onclick="setPenScope('active')">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
-        <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" onclick="setPenScope('archived')">Arquivadas${penScope==='archived' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
+        <button role="tab" aria-selected="${penScope==='active'}" class="pen-scope-tab ${penScope==='active'?'is-active':''}" data-action="setPenScope" data-arg="active">Ativas${penScope==='active' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
+        <button role="tab" aria-selected="${penScope==='archived'}" class="pen-scope-tab ${penScope==='archived'?'is-active':''}" data-action="setPenScope" data-arg="archived">Arquivadas${penScope==='archived' ? '<span class="pen-scope-count" id="penScopeCount" aria-live="polite"></span>' : ''}</button>
       </div>
       <div class="view-toggles pen-view-tabs" role="tablist" aria-label="Visualização">
         <button role="tab" data-action="penSetView" data-arg="kanban" aria-selected="${penView==='kanban'}"
@@ -523,7 +538,7 @@ function _penClientCard(entry, selClient) {
   for (var i = 0; i < segs; i++) bars += `<i class="pen-cv-seg${i < reds ? ' is-venc' : ''}"></i>`;
   var active = penClientChipState(selClient, cid);
   return `<button class="pen-cv-card${active}" aria-pressed="${active ? 'true' : 'false'}" `+
-    `onclick="togglePenClientChip('${escapeHtml(cid)}')" `+
+    `data-action="togglePenClientChip" data-arg="${escapeHtml(cid)}" `+
     `title="Filtrar por ${safeName}: ${total} abertas, ${venc} vencidas">`+
       `<span class="pen-cv-head">`+
         `<span class="pen-cv-badge" aria-hidden="true">${escapeHtml(penInitials(name))}</span>`+
@@ -564,7 +579,7 @@ function _renderPendenciaSlaSummary() {
     `<div class="pen-cv-list" id="penClientStrip" role="group" aria-label="Clientes por vencidas">`+
       visible.map(function(entry){ return _penClientCard(entry, _selClient); }).join('')+
     `</div>`+
-    (entries.length>4 ? `<button class="btn btn-secondary btn-sm pen-cv-more" onclick="(function(el){el.dataset.collapsed=el.dataset.collapsed==='0'?'1':'0';_renderPendenciaSlaSummary()})(document.getElementById('penSlaSummary'))" aria-expanded="${_collapsed?'false':'true'}">${_collapsed ? 'Ver todos ('+entries.length+')' : 'Ver menos'}</button>` : '')+
+    (entries.length>4 ? `<button class="btn btn-secondary btn-sm pen-cv-more" data-action="penSlaSummaryToggle" aria-expanded="${_collapsed?'false':'true'}">${_collapsed ? 'Ver todos ('+entries.length+')' : 'Ver menos'}</button>` : '')+
   `</div>`;
   _penCvUpdateStrip();
 }

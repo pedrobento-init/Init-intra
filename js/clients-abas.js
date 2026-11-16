@@ -68,7 +68,7 @@ async function openMilvusClientsImportModal() {
         <td style="font-size:12px">${escapeHtml(p.cnpj || '—')}</td>
         <td>${_milvusImportStatusTag(p.status)}</td>
       </tr>`).join('')}</tbody></table></div>
-      <div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" onclick="confirmMilvusClientsImport()">Importar selecionados</button></div>
+      <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" data-action="confirmMilvusClientsImport">Importar selecionados</button></div>
       <div id="milvusImportMsg" style="font-size:13px;margin-top:8px"></div>`;
   } catch (e) {
     const body = document.getElementById('milvusImportBody');
@@ -134,7 +134,7 @@ function renderClientMilvusTicketsTab(clientId) {
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
       <span class="mtickets-title">📋 Últimos chamados no Milvus</span>
       <span style="flex:1"></span>
-      <button class="btn btn-secondary btn-sm" id="milvusTicketsSyncBtn" onclick="syncClientMilvusTicketsUI('${escapeHtml(clientId)}')">↻ Sincronizar</button>
+      <button class="btn btn-secondary btn-sm" id="milvusTicketsSyncBtn" data-action="syncClientMilvusTicketsUI" data-arg="${escapeHtml(clientId)}">↻ Sincronizar</button>
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Última sincronização: <strong id="milvusTicketsLastSync">${escapeHtml(lastTxt)}</strong> · máx. 10 recentes</div>
     <div id="milvusTicketsMsg" style="font-size:13px;margin-bottom:10px"></div>
@@ -173,7 +173,7 @@ async function loadClientMilvusTicketsUI(clientId) {
     return;
   }
   wrap.innerHTML = `<div class="mticket-list">` + tickets.slice(0, 10).map((t) => `
-    <div class="mticket-row" role="button" tabindex="0" onclick="openMilvusTicketDetail('${escapeHtml(clientId)}','${escapeHtml(t.id)}')" title="Ver detalhes">
+    <div class="mticket-row" role="button" tabindex="0" data-action="openMilvusTicketDetail" data-arg="${escapeHtml(clientId)}" data-ticket="${escapeHtml(t.id)}" title="Ver detalhes">
       <div class="mticket-top">
         <strong class="mticket-code">#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))}</strong>
         <span class="mticket-subject">${escapeHtml(t.assunto || 'Sem assunto')}</span>
@@ -260,12 +260,12 @@ function renderClientInventoryTab(clientId) {
     : 'nunca';
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" id="milvusSyncBtn" onclick="syncClientInventoryUI('${escapeHtml(clientId)}')">↻ Sincronizar inventário</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportClientInventory('${escapeHtml(clientId)}')" title="Exportar inventário (.xlsx)">Exportar planilha</button>
+      <button class="btn btn-primary btn-sm" id="milvusSyncBtn" data-action="syncClientInventoryUI" data-arg="${escapeHtml(clientId)}">↻ Sincronizar inventário</button>
+      <button class="btn btn-secondary btn-sm" data-action="exportClientInventory" data-arg="${escapeHtml(clientId)}" title="Exportar inventário (.xlsx)">Exportar planilha</button>
       <button type="button" class="btn btn-secondary btn-sm" data-qr-inventario="${escapeHtml(clientId)}" title="Etiquetas com QR code para colar nos equipamentos">🏷️ Etiquetas QR</button>
       <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Importar export Excel do Milvus (.xlsx)">
         📥 Importar planilha
-        <input type="file" id="milvusImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientInventoryUI('${escapeHtml(clientId)}',this)" />
+        <input type="file" id="milvusImportFile" accept=".xlsx,.xls" style="display:none" data-change="importClientInventoryUI" data-arg="${escapeHtml(clientId)}" />
       </label>
       <span style="font-size:12px;color:var(--text-muted)">Última sincronização: <strong id="milvusLastSync">${escapeHtml(lastTxt)}</strong></span>
     </div>
@@ -548,5 +548,11 @@ if (typeof registerActions === 'function') {
     procEdit: (el, id) => openProcedureForm(el.dataset.client, id),
     procDup: (el, id) => duplicateProcedure(el.dataset.client, id),
     procDelete: (el, id) => deleteProcedureConfirm(id, el.dataset.client),
+    confirmMilvusClientsImport: () => confirmMilvusClientsImport(),
+    syncClientMilvusTicketsUI: (_el, id) => syncClientMilvusTicketsUI(id),
+    openMilvusTicketDetail: (el, clientId) => openMilvusTicketDetail(clientId, el.dataset.ticket),
+    syncClientInventoryUI: (_el, id) => syncClientInventoryUI(id),
+    exportClientInventory: (_el, id) => { if (typeof exportClientInventory === 'function') exportClientInventory(id); },
+    importClientInventoryUI: (el, id) => importClientInventoryUI(id, el),
   });
 }

@@ -127,15 +127,15 @@ function _renderLanding(mesAno, label, existingMeeting) {
         ? `<div style="padding:20px;background:var(--bg-secondary);border-radius:8px;margin-bottom:20px">
             <p style="color:var(--text-muted);margin:0">Nenhum cliente cadastrado.</p>
           </div>`
-        : `<button class="btn btn-primary" style="padding:12px 32px;font-size:15px" onclick="startReuniao('${mesAno}')">
+        : `<button class="btn btn-primary" style="padding:12px 32px;font-size:15px" data-action="startReuniao" data-arg="${escapeHtml(mesAno)}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             ${existingMeeting && existingMeeting.status === 'encerrada' ? 'Reabrir' : 'Iniciar'} Reunião de ${label}
           </button>`}
 
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
         ${prevMeeting
-          ? `<button class="btn btn-secondary" onclick="showMeetingReport('${prevMeeting.id}')">📄 Ver Relatório Anterior</button>` : ''}
-        <button class="btn btn-secondary" onclick="openMeetingCompareModal()">📊 Comparar meses</button>
+          ? `<button class="btn btn-secondary" data-action="showMeetingReport" data-arg="${escapeHtml(prevMeeting.id)}">📄 Ver Relatório Anterior</button>` : ''}
+        <button class="btn btn-secondary" data-action="openMeetingCompareModal">📊 Comparar meses</button>
       </div>
     </div>`;
 }
@@ -262,13 +262,13 @@ function renderMeetingFlow() {
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <span style="font-size:13px;color:var(--text-muted)">${_meetingState.notes.length} notas · ${_meetingState.resolvedIds.length} resolvidas</span>
-          <button class="btn btn-secondary btn-sm" onclick="enterPresentationMode()">🖥️ Modo Apresentação</button>
-          <button class="btn btn-danger btn-sm" onclick="endReuniao()">Encerrar Reunião</button>
+          <button class="btn btn-secondary btn-sm" data-action="enterPresentationMode">🖥️ Modo Apresentação</button>
+          <button class="btn btn-danger btn-sm" data-action="endReuniao">Encerrar Reunião</button>
         </div>
       </div>
 
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="openMeetingCompareModal()">📊 Comparar meses</button>
+        <button class="btn btn-secondary btn-sm" data-action="openMeetingCompareModal">📊 Comparar meses</button>
         <span style="font-size:12px;color:var(--text-muted);align-self:center">Fila ordenada por SLA (vencidas primeiro)</span>
       </div>
       <div style="background:var(--bg-secondary);border-radius:8px;padding:4px;margin-bottom:20px">
@@ -286,10 +286,10 @@ function renderMeetingFlow() {
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <button class="btn btn-secondary" ${index === 0 ? 'disabled' : ''} onclick="prevMeetingClient()">
+        <button class="btn btn-secondary" ${index === 0 ? 'disabled' : ''} data-action="prevMeetingClient">
           ← Anterior
         </button>
-        <button class="btn btn-primary" onclick="nextMeetingClient()">
+        <button class="btn btn-primary" data-action="nextMeetingClient">
           Próximo cliente →
         </button>
       </div>
@@ -336,7 +336,7 @@ function _ensureExitPresentationBtn(){
   btn.textContent='Sair do modo';
   btn.className='btn btn-secondary';
   btn.style.cssText='position:fixed;top:12px;right:12px;z-index:9999';
-  btn.onclick=exitPresentationMode;
+  btn.dataset.action='exitPresentationMode';
   document.body.appendChild(btn);
   return btn;
 }
@@ -380,8 +380,8 @@ function _meetingInlineFormInnerHtml(cid) {
           <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
             ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}
           </select>
-          <button class="btn btn-secondary btn-sm" onclick="meetingUseTemplate('${cid}')" style="white-space:nowrap">📋 Usar modelo</button>
-          <button class="btn btn-primary btn-sm" onclick="meetingCreateInlinePendencia('${cid}')" style="white-space:nowrap">+ Adicionar</button>
+          <button class="btn btn-secondary btn-sm" data-action="meetingUseTemplate" data-arg="${cid}" style="white-space:nowrap">📋 Usar modelo</button>
+          <button class="btn btn-primary btn-sm" data-action="meetingCreateInlinePendencia" data-arg="${cid}" style="white-space:nowrap">+ Adicionar</button>
         </div>`;
 }
 
@@ -403,7 +403,7 @@ function _meetingNewPendenciaFooterHtml(group) {
   const cid = escapeHtml(group.clientId);
   return `
     <div class="card" style="padding:12px">
-      <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="toggleMeetingInlineForm('${cid}')">+ Nova pendência para este cliente</button>
+      <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" data-action="toggleMeetingInlineForm" data-arg="${cid}">+ Nova pendência para este cliente</button>
       <div id="meeting-inline-form-${cid}" style="display:none;margin-top:12px;text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
         <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para ${escapeHtml(group.clientName)}</div>
         ${_meetingInlineFormInnerHtml(cid)}
@@ -479,7 +479,7 @@ function _meetingPenCard(p) {
   const isResolved = _meetingState && _meetingState.resolvedIds.includes(p.id);
   const onLeave = typeof isOperatorOnLeave === 'function' ? isOperatorOnLeave(p.responsible) : false;
   const onLeaveBadge = onLeave ? `<span class="tag badge-afastado">🏖️ Afastado</span>` : '';
-  const reassignBtn = `<button class="btn btn-sm btn-secondary" onclick="openReassignPendencia('${escapeHtml(p.id)}')" aria-label="Reatribuir responsável">Reatribuir</button>`;
+  const reassignBtn = `<button class="btn btn-sm btn-secondary" data-action="openReassignPendencia" data-arg="${escapeHtml(p.id)}" aria-label="Reatribuir responsável">Reatribuir</button>`;
   const descView = getMeetingDescView(p);
   let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
   try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
@@ -501,7 +501,7 @@ function _meetingPenCard(p) {
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btn btn-sm ${isReviewed ? 'btn-primary' : 'btn-secondary'}" onclick="meetingToggleReviewed('${escapeHtml(p.id)}')" title="Marcar como revisada">
+          <button class="btn btn-sm ${isReviewed ? 'btn-primary' : 'btn-secondary'}" data-action="meetingToggleReviewed" data-arg="${escapeHtml(p.id)}" title="Marcar como revisada">
             ${isReviewed ? '✓ Revisada' : 'Revisar'}
           </button>
         </div>
@@ -509,10 +509,10 @@ function _meetingPenCard(p) {
 
       ${descView ? `
       <div class="meet-desc${descView.long ? ' is-clamped' : ''}" id="meeting-desc-${escapeHtml(p.id)}">${escapeHtml(descView.text)}</div>
-      ${descView.long ? `<button type="button" class="meet-desc-toggle" id="meeting-desc-toggle-${escapeHtml(p.id)}" onclick="meetingToggleDesc('${escapeHtml(p.id)}')">ver mais</button>` : ''}` : ''}
+      ${descView.long ? `<button type="button" class="meet-desc-toggle" id="meeting-desc-toggle-${escapeHtml(p.id)}" data-action="meetingToggleDesc" data-arg="${escapeHtml(p.id)}">ver mais</button>` : ''}` : ''}
 
       ${isDone ? `
-      <div class="meet-done" id="meeting-done-${escapeHtml(p.id)}">Concluída por <strong>${escapeHtml(p.completedBy || '—')}</strong>${p.completedAt ? ` em ${escapeHtml(_fmtMeetingDateTime(p.completedAt))}` : ''} <button type="button" class="btn btn-sm btn-secondary" onclick="openCorrectCompletion('${escapeHtml(p.id)}')" aria-label="Corrigir quem concluiu">Corrigir</button></div>` : ''}
+      <div class="meet-done" id="meeting-done-${escapeHtml(p.id)}">Concluída por <strong>${escapeHtml(p.completedBy || '—')}</strong>${p.completedAt ? ` em ${escapeHtml(_fmtMeetingDateTime(p.completedAt))}` : ''} <button type="button" class="btn btn-sm btn-secondary" data-action="openCorrectCompletion" data-arg="${escapeHtml(p.id)}" aria-label="Corrigir quem concluiu">Corrigir</button></div>` : ''}
       ${_meetingPenHistoryHtml(p.id)}
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -521,7 +521,7 @@ function _meetingPenCard(p) {
             `<option value="${k}" ${p.status === k ? 'selected' : ''}>${escapeHtml(v.label)}</option>`
           ).join('')}
         </select>
-        <button class="btn btn-sm btn-primary" onclick="meetingChangePenStatus('${escapeHtml(p.id)}')">Atualizar</button>
+        <button class="btn btn-sm btn-primary" data-action="meetingChangePenStatus" data-arg="${escapeHtml(p.id)}">Atualizar</button>
       </div>
 
       <div style="margin-bottom:8px">
@@ -542,10 +542,10 @@ function _meetingPenCard(p) {
         ` : ''}
       </div>
 
-      <div style="display:flex;gap:6px">
-        <input class="form-input" id="meeting-note-${escapeHtml(p.id)}" placeholder="Nota da reunião..." style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter'){event.preventDefault();meetingAddPenNote('${escapeHtml(p.id)}')}" />
-        <button class="btn btn-sm btn-secondary" onclick="meetingAddPenNote('${escapeHtml(p.id)}')">📝 Nota</button>
-      </div>
+      <form style="display:flex;gap:6px" data-submit="meetingAddPenNote" data-arg="${escapeHtml(p.id)}">
+        <input class="form-input" id="meeting-note-${escapeHtml(p.id)}" placeholder="Nota da reunião..." style="flex:1;font-size:12px" />
+        <button type="submit" class="btn btn-sm btn-secondary">📝 Nota</button>
+      </form>
     </div>`;
 }
 
@@ -594,8 +594,8 @@ function _renderMeetingComplete() {
       </div>
 
       <div style="display:flex;gap:8px;justify-content:center">
-        <button class="btn btn-secondary" onclick="renderMeetingFlow()">← Voltar ao Carrossel</button>
-        <button class="btn btn-danger" onclick="endReuniao()">Encerrar Reunião</button>
+        <button class="btn btn-secondary" data-action="renderMeetingFlow">← Voltar ao Carrossel</button>
+        <button class="btn btn-danger" data-action="endReuniao">Encerrar Reunião</button>
       </div>
     </div>`;
 }
@@ -734,13 +734,13 @@ function meetingUseTemplate(clientId) {
   openModal(`Usar modelo — ${escapeHtml(clientName)}`, `
     <div style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
       ${templates.map(t => `
-        <button class="card" style="text-align:left;padding:10px;cursor:pointer" onclick="meetingApplyTemplate('${escapeHtml(clientId)}','${escapeHtml(t.id)}')">
+        <button class="card" style="text-align:left;padding:10px;cursor:pointer" data-action="meetingApplyTemplate" data-client="${escapeHtml(clientId)}" data-template="${escapeHtml(t.id)}">
           <div style="font-weight:600;font-size:13px">${escapeHtml(t.title)}</div>
           ${t.category ? `<span class="tag tag-blue" style="font-size:10px">${escapeHtml(t.category)}</span>` : ''}
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px;max-height:40px;overflow:hidden">${escapeHtml((t.content||'').slice(0,120))}</div>
         </button>`).join('')}
     </div>
-    <div class="form-actions" style="margin-top:12px"><button class="btn btn-secondary" onclick="closeModal();renderMeetingFlow()">Voltar</button></div>
+    <div class="form-actions" style="margin-top:12px"><button class="btn btn-secondary" data-action="meetingCloseModalAndRender">Voltar</button></div>
   `);
 }
 
@@ -768,7 +768,7 @@ function openMeetingCompareModal() {
       <div class="form-group" style="flex:1"><label class="form-label">Mês A</label><select class="form-select" id="compareMesA">${opts}</select></div>
       <div class="form-group" style="flex:1"><label class="form-label">Mês B</label><select class="form-select" id="compareMesB">${opts}</select></div>
     </div>
-    <button class="btn btn-primary" onclick="renderMeetingCompare()">Comparar</button>
+    <button class="btn btn-primary" data-action="renderMeetingCompare">Comparar</button>
     <div id="meetingCompareResult" style="margin-top:16px"></div>
   `);
   // Default: two most recent
@@ -873,8 +873,8 @@ function showMeetingReport(meetingId) {
   openModal('Relatório — ' + _getMesAnoLabel(m.mesAno || ''), `
     <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:500px;overflow-y:auto;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">${escapeHtml(m.relatorio)}</div>
     <div class="form-actions" style="margin-top:16px">
-      <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
-      <button class="btn btn-primary" onclick="copyToClipboard(document.querySelector('.modal-body div[style*=white-space]').textContent)">Copiar Relatório</button>
+      <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
+      <button class="btn btn-primary" data-action="meetingCopyReport">Copiar Relatório</button>
     </div>
   `);
 }
@@ -892,4 +892,35 @@ function _calcDuration(start, end) {
   const rem = mins % 60;
   if (hrs === 0) return rem + 'min';
   return `${hrs}h${rem ? ' ' + rem + 'min' : ''}`;
+}
+
+// Ações da Reunião Mensal (delegação via js/actions.js). closeModal é ação global.
+if (typeof registerActions === 'function') {
+  registerActions({
+    startReuniao: (_el, mesAno) => startReuniao(mesAno),
+    showMeetingReport: (_el, id) => showMeetingReport(id),
+    openMeetingCompareModal: () => openMeetingCompareModal(),
+    enterPresentationMode: () => enterPresentationMode(),
+    exitPresentationMode: () => exitPresentationMode(),
+    endReuniao: () => endReuniao(),
+    prevMeetingClient: () => prevMeetingClient(),
+    nextMeetingClient: () => nextMeetingClient(),
+    renderMeetingFlow: () => renderMeetingFlow(),
+    renderMeetingCompare: () => renderMeetingCompare(),
+    meetingToggleReviewed: (_el, id) => meetingToggleReviewed(id),
+    meetingToggleDesc: (_el, id) => meetingToggleDesc(id),
+    meetingChangePenStatus: (_el, id) => meetingChangePenStatus(id),
+    meetingAddPenNote: (_el, penId) => meetingAddPenNote(penId),
+    meetingUseTemplate: (_el, cid) => meetingUseTemplate(cid),
+    meetingApplyTemplate: (el) => meetingApplyTemplate(el.dataset.client, el.dataset.template),
+    meetingCreateInlinePendencia: (_el, cid) => meetingCreateInlinePendencia(cid),
+    toggleMeetingInlineForm: (_el, cid) => toggleMeetingInlineForm(cid),
+    openReassignPendencia: (_el, id) => { if (typeof openReassignPendencia === 'function') openReassignPendencia(id); },
+    openCorrectCompletion: (_el, id) => { if (typeof openCorrectCompletion === 'function') openCorrectCompletion(id); },
+    meetingCloseModalAndRender: () => { closeModal(); renderMeetingFlow(); },
+    meetingCopyReport: () => {
+      const box = document.querySelector('.modal-body div[style*=white-space]');
+      if (box && typeof copyToClipboard === 'function') copyToClipboard(box.textContent);
+    },
+  });
 }

@@ -29,17 +29,17 @@ function renderVisitas() {
       <div class="vis-searchrow page-toolbar">
         <div class="vis-search pt-search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <input id="visitSearch" type="search" placeholder="Buscar cliente, motivo ou relatório" aria-label="Buscar" oninput="saveVisitFilters();debouncedRenderVisitView()" />
+          <input id="visitSearch" type="search" placeholder="Buscar cliente, motivo ou relatório" aria-label="Buscar" data-input="visitSearchInput" />
         </div>
-        <button class="vis-fbtn" id="visitFilterBtn" onclick="openVisitFiltersSheet()" aria-label="Filtros" title="Filtros">
+        <button class="vis-fbtn" id="visitFilterBtn" data-action="openVisitFiltersSheet" aria-label="Filtros" title="Filtros">
           <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
         </button>
       </div>
       <div class="vis-kpis" id="visitStats"></div>
       <div class="vis-chips" id="visitChips" role="group" aria-label="Filtrar por status"></div>
-      <div class="vis-monthrow"><h2 id="visitCount"></h2><span><button type="button" data-campo-rota>Rota de hoje</button> ${typeof levarPodeEditarRegras === 'function' && levarPodeEditarRegras() ? '<button type="button" data-levar-regras>O que levar</button> ' : ''}<button type="button" onclick="openVisitMonthReportModal()">Relatório do mês</button></span></div>
+      <div class="vis-monthrow"><h2 id="visitCount"></h2><span><button type="button" data-campo-rota>Rota de hoje</button> ${typeof levarPodeEditarRegras === 'function' && levarPodeEditarRegras() ? '<button type="button" data-levar-regras>O que levar</button> ' : ''}<button type="button" data-action="openVisitMonthReportModal">Relatório do mês</button></span></div>
       <div class="vis-list" id="visitViewArea"></div>
-      <button type="button" class="vis-fab" onclick="openVisitForm()" aria-label="Nova Visita">
+      <button type="button" class="vis-fab" data-action="newVisit" aria-label="Nova Visita">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         Nova Visita
       </button>
@@ -85,7 +85,7 @@ function renderVisitChips() {
   const box = document.getElementById('visitChips');
   if (!box) return;
   box.innerHTML = VISIT_STATUS_CHIPS.map(function (c) {
-    return '<button type="button" class="vis-chip" data-s="' + c.value + '" aria-pressed="' + (_visitFilter.status === c.value) + '" onclick="setVisitStatusFilter(\'' + c.value + '\')">' + escapeHtml(c.label) + '</button>';
+    return '<button type="button" class="vis-chip" data-s="' + c.value + '" aria-pressed="' + (_visitFilter.status === c.value) + '" data-action="setVisitStatusFilter" data-arg="' + escapeHtml(c.value) + '">' + escapeHtml(c.label) + '</button>';
   }).join('');
 }
 
@@ -123,8 +123,8 @@ function openVisitFiltersSheet() {
         <input type="date" class="form-input" id="fVisitTo" value="${escapeHtml(_visitFilter.to)}" /></div>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn btn-danger btn-sm" onclick="clearVisitFiltersSheet()">Limpar</button>
-      <button type="button" class="btn btn-primary" onclick="applyVisitFiltersSheet()">Aplicar</button>
+      <button type="button" class="btn btn-danger btn-sm" data-action="clearVisitFiltersSheet">Limpar</button>
+      <button type="button" class="btn btn-primary" data-action="applyVisitFiltersSheet">Aplicar</button>
     </div>`);
 }
 function applyVisitFiltersSheet() {
@@ -245,7 +245,7 @@ function visitCardHtml(v) {
     ? clientAvatar(c, 32)
     : '<span class="vis-av" style="--c:#555">' + escapeHtml(visitInitials(avName)) + '</span>';
   const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : formatVisitTimeRange(v);
-  return '<button type="button" class="vis-card" style="--st:' + m.color + '" onclick="openVisitDetail(\'' + escapeHtml(v.id) + '\')">'
+  return '<button type="button" class="vis-card" style="--st:' + m.color + '" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">'
     + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
     + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
     + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span>'
@@ -310,7 +310,7 @@ function renderVisitTable(area) {
       || _visitFilter.client || _visitFilter.operator || _visitFilter.status || _visitFilter.from || _visitFilter.to);
     wrap.innerHTML = hasFilter
       ? `<div class="vis-empty empty-state"><p>Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</p></div>`
-      : `<div class="vis-empty empty-state"><p>Nenhuma visita registrada ainda.</p><button class="btn btn-primary btn-sm" onclick="openVisitForm()">+ Nova Visita</button></div>`;
+      : `<div class="vis-empty empty-state"><p>Nenhuma visita registrada ainda.</p><button class="btn btn-primary btn-sm" data-action="newVisit">+ Nova Visita</button></div>`;
     return;
   }
   const totalPages = Math.ceil(visits.length / VISIT_PAGE_SIZE);
@@ -335,9 +335,9 @@ function renderVisitTable(area) {
     <div class="vis-pager">
       <div>Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button class="btn btn-sm btn-secondary" ${_visitPage===1?'disabled':''} onclick="_visitPage--;renderVisitView(false)">← Anterior</button>
+        <button class="btn btn-sm btn-secondary" ${_visitPage===1?'disabled':''} data-action="visitPrevPage">← Anterior</button>
         <span>${_visitPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} onclick="_visitPage++;renderVisitView(false)">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} data-action="visitNextPage">Próxima →</button>
       </div>
     </div>` : '');
   // Status dos chamados no Milvus: consulta em segundo plano (TTL/throttle no módulo).
@@ -356,7 +356,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
   const timeEnd = (v.timeEnd || '').toString().slice(0, 5);
 
   openModal(id ? ('Editar ' + visitDisplayTitle(v)) : 'Nova Visita', `
-    <form onsubmit="submitVisitForm(event,'${escapeHtml(id||'')}')">
+    <form data-submit="submitVisitForm" data-arg="${escapeHtml(id||'')}">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cliente *</label>
           <select class="form-select" name="clientId" required>
@@ -376,7 +376,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
           <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || localDateISO())}" required /></div>
         <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--bg-base)">
-            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} onchange="toggleVisitAllDayFields()" style="width:16px;height:16px;accent-color:var(--accent)" />
+            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} data-change="toggleVisitAllDayFields" style="width:16px;height:16px;accent-color:var(--accent)" />
             Dia inteiro
           </label>
         </div>
@@ -412,7 +412,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
           </select></div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
     </form>`);
@@ -530,11 +530,11 @@ function openVisitDetail(id) {
           if (fs.kind === 'finalizado') fin = ` <span class="mchip mchip--ok">✓ Finalizado</span>`;
           else if (fs.kind === 'pendente') fin = ` <span class="mchip mchip--warn">⏳ Pendente de finalização</span>`;
           else if (fs.kind === 'finalizando') fin = ` <span class="mchip mchip--info">🔄 Finalizando…</span>`;
-          else if (fs.kind === 'erro') fin = ` <span class="mchip mchip--bad">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">↻ Tentar novamente</button>`;
+          else if (fs.kind === 'erro') fin = ` <span class="mchip mchip--bad">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`;
           // Visita concluída antes da etapa 2 (ou sem transição nova): nunca
           // entrou sozinha (sem bulk-finalize). Ação manual explícita —
           // só aparece com chamado já criado (sem codigo, sem botão).
-          else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusFinalizar('${escapeHtml(id)}')">✓ Finalizar chamado no Milvus</button>`;
+          else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">✓ Finalizar chamado no Milvus</button>`;
         }
         const back = typeof milvusStatusDetailHtml === 'function' ? milvusStatusDetailHtml(v) : '';
         return box(`<span class="mchip mchip--ok">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`);
@@ -542,7 +542,7 @@ function openVisitDetail(id) {
       if (ms.kind === 'pendente') return box(`<span class="mchip mchip--warn">⏳ Aguardando criação do chamado</span>`);
       if (ms.kind === 'criando') return box(`<span class="mchip mchip--info">🔄 Criando chamado no Milvus…</span>`);
       if (ms.kind === 'sem_token') return box(`<span class="mchip">Cliente sem integração Milvus</span>`);
-      return box(`<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" onclick="retryMilvusChamado('${escapeHtml(id)}')">↻ Tentar novamente</button>`);
+      return box(`<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusChamado" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`);
     })()}
     ${typeof visitaCampoHtml === 'function' ? visitaCampoHtml(v) : ''}
     <hr class="divider"/>
@@ -559,7 +559,7 @@ function openVisitDetail(id) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Relatório de Atendimento (O que foi feito)
         </label>
-        <button type="button" class="btn btn-sm btn-secondary" onclick="openEditVisitReportModal('${escapeHtml(id)}')">
+        <button type="button" class="btn btn-sm btn-secondary" data-action="openEditVisitReportModal" data-arg="${escapeHtml(id)}">
           ${hasReport ? '✎ Editar Relatório' : '+ Adicionar Relatório'}
         </button>
       </div>
@@ -577,18 +577,18 @@ function openVisitDetail(id) {
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
       if (!linked.length) return `<div style="margin-top:var(--space-5);padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
-      return `<div style="margin-top:var(--space-5)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" onclick="closeModal();navigateTo('pendencias');setTimeout(()=>openPendenciaDetail('${escapeHtml(p.id)}'),100)">Abrir</button></div>`).join('')}</div></div>`;
+      return `<div style="margin-top:var(--space-5)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" data-action="openPendenciaFromVisit" data-arg="${escapeHtml(p.id)}">Abrir</button></div>`).join('')}</div></div>`;
     })()}
     <div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Alterar status</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select class="form-select" id="chgVisitStatus" style="width:180px">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
         </select>
-        <button class="btn btn-primary btn-sm" onclick="changeVisitStatus('${escapeHtml(id)}')">Atualizar Status</button>
-        ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="openConcludeVisitModal('${escapeHtml(id)}')">✅ Concluir com Relatório</button>` : ''}
+        <button class="btn btn-primary btn-sm" data-action="changeVisitStatus" data-arg="${escapeHtml(id)}">Atualizar Status</button>
+        ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" data-action="openConcludeVisitModal" data-arg="${escapeHtml(id)}">✅ Concluir com Relatório</button>` : ''}
 ${typeof printVisitReport === 'function' ? `<button type="button" class="btn btn-secondary btn-sm" data-action="visitPrint" data-arg="${escapeHtml(id)}" title="Relatório da visita com a assinatura (imprimir ou salvar em PDF)">🖨 Relatório</button>` : ''}
-                <button class="btn btn-secondary btn-sm" onclick="closeModal();openVisitForm('${escapeHtml(id)}')">✎ Editar Tudo</button>
-        <button class="btn btn-sm btn-danger" onclick="closeModal();deleteVisitConfirm('${escapeHtml(id)}')" title="Excluir visita">Excluir</button>
+                <button class="btn btn-secondary btn-sm" data-action="visitEditAll" data-arg="${escapeHtml(id)}">✎ Editar Tudo</button>
+        <button class="btn btn-sm btn-danger" data-action="visitDeleteFromDetail" data-arg="${escapeHtml(id)}" title="Excluir visita">Excluir</button>
       </div>
     </div>
   `);
@@ -629,7 +629,7 @@ function openConcludeVisitModal(id) {
   if (!v) return;
 
   openModal('Concluir Visita — Relatório de Atendimento', `
-    <form onsubmit="submitConcludeVisit(event, '${escapeHtml(id)}')">
+    <form data-submit="submitConcludeVisit" data-arg="${escapeHtml(id)}">
       <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;font-size:13px;border-left:3px solid #16a34a">
         <strong>Cliente:</strong> ${escapeHtml(v.clientName||'—')}<br>
         <strong>Motivo:</strong> ${escapeHtml(v.motivo||'—')}
@@ -651,7 +651,7 @@ function openConcludeVisitModal(id) {
         </label>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Voltar</button>
+        <button type="button" class="btn btn-secondary" data-action="openVisit" data-arg="${escapeHtml(id)}">Voltar</button>
         <button type="submit" class="btn" style="background:#16a34a;color:#fff;border:none">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Salvar Relatório e Concluir Visita
@@ -723,13 +723,13 @@ function openEditVisitReportModal(id) {
   if (!v) return;
 
   openModal('Relatório de Atendimento', `
-    <form onsubmit="submitEditVisitReport(event, '${escapeHtml(id)}')">
+    <form data-submit="submitEditVisitReport" data-arg="${escapeHtml(id)}">
       <div class="form-group">
         <label class="form-label" style="font-weight:700">Relatório (O que foi feito na visita)</label>
         <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('editVisitReportText', id) : ''}
       </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="openVisitDetail('${escapeHtml(id)}')">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="openVisit" data-arg="${escapeHtml(id)}">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar Relatório</button>
       </div>
     </form>
@@ -775,7 +775,7 @@ function openVisitMonthReportModal() {
   const now = new Date();
   const def = window._visitReportDefaultMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   openModal('Relatório mensal de visitas', `
-    <form onsubmit="return false;">
+    <form data-submit="visitMonthReportNoop">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
         Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong>, <strong>resumo por técnico</strong> e <strong>detalhe das visitas</strong>
         (horários previstos e reais de chegada/saída, observações, chamado, assinatura do cliente e o que foi feito em cada atendimento).
@@ -786,17 +786,17 @@ function openVisitMonthReportModal() {
         <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
       </div>
       <div class="btn-pair-grid">
-        <button type="button" class="btn btn-primary" onclick="exportVisitMonthReport('excel')" style="justify-content:center">
+        <button type="button" class="btn btn-primary" data-action="exportVisitMonthReport" data-arg="excel" style="justify-content:center">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
           Excel (.xls)
         </button>
-        <button type="button" class="btn btn-secondary" onclick="exportVisitMonthReport('csv')" style="justify-content:center">
+        <button type="button" class="btn btn-secondary" data-action="exportVisitMonthReport" data-arg="csv" style="justify-content:center">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV (Sheets)
         </button>
       </div>
       <div class="form-actions" style="margin-top:14px">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Fechar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>
       </div>
     </form>`);
 }
@@ -1217,3 +1217,42 @@ function _exportVisitMonthExcel(data) {
     }catch(_){}
   });
 })();
+
+// Ações delegadas (js/actions.js): eram handlers inline nos templates acima.
+// Nome da ação = função global chamada; multi-instrução virou ação dedicada.
+if (typeof registerActions === 'function') {
+  registerActions({
+    visitSearchInput: () => { saveVisitFilters(); if (typeof debouncedRenderVisitView === 'function') debouncedRenderVisitView(); },
+    openVisitFiltersSheet: () => openVisitFiltersSheet(),
+    applyVisitFiltersSheet: () => applyVisitFiltersSheet(),
+    clearVisitFiltersSheet: () => clearVisitFiltersSheet(),
+    setVisitStatusFilter: (_el, status) => setVisitStatusFilter(status),
+    openVisitMonthReportModal: () => openVisitMonthReportModal(),
+    visitPrevPage: () => { _visitPage--; renderVisitView(false); },
+    visitNextPage: () => { _visitPage++; renderVisitView(false); },
+    submitVisitForm: (_el, id, ev) => submitVisitForm(ev, id),
+    toggleVisitAllDayFields: () => toggleVisitAllDayFields(),
+    retryMilvusFinalizar: (_el, id) => { if (typeof retryMilvusFinalizar === 'function') retryMilvusFinalizar(id); },
+    retryMilvusChamado: (_el, id) => { if (typeof retryMilvusChamado === 'function') retryMilvusChamado(id); },
+    openEditVisitReportModal: (_el, id) => openEditVisitReportModal(id),
+    openConcludeVisitModal: (_el, id) => openConcludeVisitModal(id),
+    changeVisitStatus: (_el, id) => changeVisitStatus(id),
+    openPendenciaFromVisit: (_el, id) => {
+      if (typeof closeModal === 'function') closeModal();
+      if (typeof navigateTo === 'function') navigateTo('pendencias');
+      setTimeout(() => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); }, 100);
+    },
+    visitEditAll: (_el, id) => {
+      if (typeof closeModal === 'function') closeModal();
+      openVisitForm(id);
+    },
+    visitDeleteFromDetail: (_el, id) => {
+      if (typeof closeModal === 'function') closeModal();
+      deleteVisitConfirm(id);
+    },
+    submitConcludeVisit: (_el, id, ev) => submitConcludeVisit(ev, id),
+    submitEditVisitReport: (_el, id, ev) => submitEditVisitReport(ev, id),
+    visitMonthReportNoop: () => {}, // form de exportação: só suprime o submit (actions.js já dá preventDefault)
+    exportVisitMonthReport: (_el, format) => exportVisitMonthReport(format),
+  });
+}

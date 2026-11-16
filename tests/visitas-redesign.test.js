@@ -137,7 +137,7 @@ describe('visitCardHtml (mock)', () => {
     expect(html).toContain('PB');
     expect(html).toContain('Pedro Bento');
     expect(html).toContain('Dia inteiro');
-    expect(html).toContain("openVisitDetail('v1')");
+    expect(html).toContain('data-action="openVisit" data-arg="v1"');
     expect(html).toContain('vis-card');
   });
 
@@ -198,7 +198,9 @@ describe('contrato do template e do CSS', () => {
   });
 
   it('excluir migrou para dentro do detalhe', () => {
-    expect(src).toContain("closeModal();deleteVisitConfirm(");
+    // Migrado para delegação: a ação visitDeleteFromDetail chama closeModal + deleteVisitConfirm.
+    expect(src).toContain('data-action="visitDeleteFromDetail"');
+    expect(src).toContain('visitDeleteFromDetail:');
   });
 
   it('CSS do redesign presente + fonte única do app (sem Schibsted/Inter)', () => {

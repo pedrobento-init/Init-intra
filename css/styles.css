@@ -7857,3 +7857,18 @@ body.dark-theme .pen-board .kanban-col.drag-over {
   .cal-day-card-main { flex-basis:calc(100% - 44px); }
   .cal-day-card-tags { margin-left:42px;justify-content:flex-start; }
 }
+
+/* Card de pendência no modal de operador (antes: onmouseover/onmouseout inline). */
+.opd-pendencia-delay-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color .15s;
+  background: var(--bg-surface);
+}
+.opd-pendencia-delay-card:hover { border-color: var(--accent, #1a56db); }

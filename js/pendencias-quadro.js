@@ -68,9 +68,9 @@ function _penPagerBar() {
   }
   // Multi-página: mantém navegação, texto enxuto
   return '<div class="pen-pager" role="navigation" aria-label="Paginação de pendências">' +
-    '<button class="btn btn-secondary btn-sm" onclick="penGotoPage(-1)"' + (_penPage <= 0 ? ' disabled' : '') + ' title="Página anterior">‹ Anterior</button>' +
+    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="-1"' + (_penPage <= 0 ? ' disabled' : '') + ' title="Página anterior">‹ Anterior</button>' +
     '<span class="pen-pager-info">Página ' + (_penPage + 1) + ' de ' + totalPages + ' · ' + _filteredPens.length + ' de ' + _penTotal + '</span>' +
-    '<button class="btn btn-secondary btn-sm" onclick="penGotoPage(1)"' + ((_penPage + 1) >= totalPages ? ' disabled' : '') + ' title="Próxima página">Próxima ›</button>' +
+    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="1"' + ((_penPage + 1) >= totalPages ? ' disabled' : '') + ' title="Próxima página">Próxima ›</button>' +
   '</div>';
 }
 
@@ -196,9 +196,7 @@ function renderPenKanban(area) {
       // as colunas com cards caberem na tela sem rolagem lateral.
       return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" style="--c:' + penColColor(col.id) + '"' +
         ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
-        ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
-        ' ondragleave="this.classList.remove(\'drag-over\')"' +
-        ' ondrop="onPenKanbanDrop(event,\'' + col.id + '\')">' +
+        ' data-col-id="' + escapeHtml(col.id) + '">' +
         '<div class="kanban-col-header">' +
           '<h2 class="kanban-col-title">' +
             '<span class="kb-dot" aria-hidden="true"></span>' +
@@ -352,7 +350,7 @@ function penTimerCell(p) {
       // esquecimento é o que importa e não pode depender do mouse (audit. #8).
       var agoHtml = ago
         ? '<span class="kb-timer-ago">ligado há ' + escapeHtml(ago) + '</span>' : '';
-      return '<button type="button" class="kb-timer-forgot" onclick="event.stopPropagation();openTimerAdjust(\'' + escapeHtml(p.id) + '\')"' +
+      return '<button type="button" class="kb-timer-forgot" data-action="openTimerAdjust" data-arg="' + escapeHtml(p.id) + '" data-stop="1"' +
         ' title="Cronômetro ligado há ' + escapeHtml(ago) + ' — esqueceu ligado? Clique para parar e ajustar o tempo."' +
         ' aria-label="Cronômetro ligado há ' + escapeHtml(ago) + '. Parar e ajustar tempo">' +
         PEN_ICO_WARN + display + agoHtml + '</button>';
@@ -414,8 +412,6 @@ function penKanbanCard(p) {
   return '<article class="kanban-card"' +
     ' style="border-left:4px solid ' + penColColor(p.status) + '"' +
     ' draggable="true"' +
-    ' ondragstart="onPenKanbanDragStart(event,\'' + escapeHtml(p.id) + '\')"' +
-    ' ondragend="onPenKanbanDragEnd(event)"' +
     // Ordem manual (062): só data-*, sem handler inline. Os eventos de arrasto
     // são tratados por delegação em _bindPenBoardDrag() — a catraca de CSP
     // (tests/no-inline-handlers.test.js) não pode crescer.
@@ -438,7 +434,7 @@ function penKanbanCard(p) {
       (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
     '</button>' +
     '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +
-      ' onclick="openPenQuickMenu(event,\'' + escapeHtml(p.id) + '\')" ondragstart="event.preventDefault()">' + PEN_ICO_DOTS + '</button>' +
+      ' data-action="openPenQuickMenu" data-arg="' + escapeHtml(p.id) + '" data-stop="1" draggable="false">' + PEN_ICO_DOTS + '</button>' +
     '<div class="kanban-card-meta">' +
       '<span class="kc-client" title="' + escapeHtml(clientName) + '">' +
         clientAvatarHtml +
@@ -464,11 +460,13 @@ function penKanbanCard(p) {
 function onPenKanbanDragStart(e, id) {
   e.dataTransfer.setData('penId', id);
   e.dataTransfer.effectAllowed = 'move';
-  e.currentTarget.classList.add('dragging');
+  var card = e.target && e.target.closest ? e.target.closest('.kanban-card') : null;
+  if (card) card.classList.add('dragging');
 }
 
 function onPenKanbanDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
+  var card = e.target && e.target.closest ? e.target.closest('.kanban-card') : null;
+  if (card) card.classList.remove('dragging');
 }
 
 function onPenKanbanDrop(e, colId) {
@@ -539,20 +537,47 @@ function _penClearDropMark() {
 function _bindPenBoardDrag() {
   if (_penDragBound || typeof document === 'undefined' || !document.addEventListener) return;
   _penDragBound = true;
+  document.addEventListener('dragstart', function(ev) {
+    var card = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
+    if (!card) return;
+    onPenKanbanDragStart(ev, card.getAttribute('data-pen-id'));
+  });
+  document.addEventListener('dragend', function(ev) {
+    var card = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
+    if (card) onPenKanbanDragEnd(ev);
+  });
   document.addEventListener('dragover', function(ev) {
+    // Realce de coluna inteira (inclusive vazia), seja o alvo o fundo da
+    // coluna ou um card dentro dela.
+    var col = ev.target && ev.target.closest ? ev.target.closest('.kanban-col') : null;
+    if (col && !col.classList.contains('drag-over')) col.classList.add('drag-over');
     var el = _penDropCard(ev);
-    if (!el) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (!el.classList.contains('kb-drop-before')) { _penClearDropMark(); el.classList.add('kb-drop-before'); }
+    if (el) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!el.classList.contains('kb-drop-before')) { _penClearDropMark(); el.classList.add('kb-drop-before'); }
+      return;
+    }
+    if (col) ev.preventDefault();
   });
   document.addEventListener('dragleave', function(ev) {
+    var col = ev.target && ev.target.closest ? ev.target.closest('.kanban-col') : null;
+    if (col) col.classList.remove('drag-over');
     var el = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
     if (el) el.classList.remove('kb-drop-before');
   });
   document.addEventListener('drop', function(ev) {
     var el = _penDropCard(ev);
-    if (!el) return;
+    if (!el) {
+      // Soltando fora de um card: vale a coluna (inclusive vazia).
+      var col = ev.target && ev.target.closest ? ev.target.closest('.kanban-col') : null;
+      if (!col) return;
+      ev.preventDefault();
+      var colId = col.getAttribute('data-col-id') || '';
+      if (!colId) return;
+      onPenKanbanDrop(ev, colId);
+      return;
+    }
     ev.preventDefault();
     ev.stopPropagation();
     _penClearDropMark();
@@ -574,6 +599,8 @@ if (typeof registerActions === 'function') {
     // Play/pause do rodapé do card: o closest() da delegação pega o botão,
     // então o clique nunca abre o detalhe do card por acidente.
     penTimerToggle: (el, id) => { if (typeof toggleTimer === 'function') toggleTimer('pendencia', id, el); },
+    penGotoPage: (_el, d) => penGotoPage(d),
+    openTimerAdjust: (_el, id) => { if (typeof openTimerAdjust === 'function') openTimerAdjust(id); },
   });
 }
 

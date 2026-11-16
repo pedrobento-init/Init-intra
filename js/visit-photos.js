@@ -142,7 +142,7 @@ function visitPhotosSectionHtml(visitId) {
     '<label class="btn btn-secondary btn-sm vp-add">' +
       '<svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
       ' Adicionar foto' +
-      '<input type="file" accept="image/*" capture="environment" multiple hidden onchange="addVisitPhotos(\'' + id + '\', this.files).then(() => renderVisitPhotos(\'' + id + '\')); this.value=\'\'" />' +
+      '<input type="file" accept="image/*" capture="environment" multiple hidden data-change="visitPhotoAdd" data-arg="' + id + '" />' +
     '</label></div>' +
     '<div class="vp-grid" id="vpGrid-' + id + '"><p class="vp-empty">Carregando…</p></div>' +
   '</div>';
@@ -156,10 +156,10 @@ async function renderVisitPhotos(visitId) {
   grid.innerHTML = photos.map((p) => {
     const pid = escapeHtml(p.id);
     return '<figure class="vp-item' + (p.pending ? ' is-pending' : '') + '">' +
-      '<button type="button" class="vp-thumb" onclick="openVisitPhotoViewer(\'' + escapeHtml(visitId) + '\',\'' + pid + '\')" aria-label="Ampliar foto">' +
+      '<button type="button" class="vp-thumb" data-action="visitPhotoOpen" data-arg="' + escapeHtml(visitId) + '" data-pid="' + pid + '" aria-label="Ampliar foto">' +
         '<img src="' + escapeHtml(p.url) + '" alt="Foto da visita" loading="lazy" /></button>' +
       (p.pending ? '<figcaption>Aguardando envio</figcaption>' : '') +
-      '<button type="button" class="vp-del" aria-label="Excluir foto" onclick="deleteVisitPhoto(\'' + escapeHtml(visitId) + '\',\'' + pid + '\',\'' + escapeHtml(p.path || '') + '\')">×</button>' +
+      '<button type="button" class="vp-del" aria-label="Excluir foto" data-action="visitPhotoDelete" data-arg="' + escapeHtml(visitId) + '" data-pid="' + pid + '" data-path="' + escapeHtml(p.path || '') + '">×</button>' +
     '</figure>';
   }).join('');
 }
@@ -178,6 +178,20 @@ async function openVisitPhotoViewer(visitId, photoId) {
   box.addEventListener('click', close);
   document.addEventListener('keydown', onKey, true);
   document.body.appendChild(box);
+}
+
+// Ações delegadas (js/actions.js): eram handlers inline nos templates acima.
+if (typeof registerActions === 'function') {
+  registerActions({
+    visitPhotoAdd: (el) => {
+      // actions.js entrega el.value (fakepath) no change — o id vem do data-arg do elemento.
+      const visitId = el.dataset.arg;
+      Promise.resolve(addVisitPhotos(visitId, el.files)).then(() => renderVisitPhotos(visitId));
+      el.value = '';
+    },
+    visitPhotoOpen: (el, visitId) => openVisitPhotoViewer(visitId, el.dataset.pid),
+    visitPhotoDelete: (el, visitId) => deleteVisitPhoto(visitId, el.dataset.pid, el.dataset.path || ''),
+  });
 }
 
 if (typeof window !== 'undefined' && !window._vpBound) {

@@ -214,18 +214,18 @@ function renderEquipamentos() {
     <div class="search-bar equip-search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="form-input" id="equipSearch" placeholder="Buscar equipamento, OS ou cliente..." oninput="saveEquipFilters();debouncedRenderEquipView()" aria-label="Buscar equipamento" />
+        <input class="form-input" id="equipSearch" placeholder="Buscar equipamento, OS ou cliente..." data-input="eqSearchInput" aria-label="Buscar equipamento" />
       </div>
-      <select class="form-select filter-select-md pt-filter" id="equipClient" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por cliente">
+      <select class="form-select filter-select-md pt-filter" id="equipClient" data-change="eqFiltersChange" aria-label="Filtrar por cliente">
         <option value="">Todos os clientes</option>
         <option value="__estoque__">Estoque Initnet</option>
         ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select class="form-select filter-select pt-filter" id="equipTipo" onchange="saveEquipFilters();renderEquipView()" aria-label="Filtrar por tipo">
+      <select class="form-select filter-select pt-filter" id="equipTipo" data-change="eqFiltersChange" aria-label="Filtrar por tipo">
         <option value="">Todos os tipos</option>
         ${EQUIP_TIPO_OPTIONS.map(t => `<option value="${t}">${escapeHtml(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary pt-filter pt-full" id="equipMoreFiltersBtn" onclick="toggleEquipMoreFilters(event)" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
+      <button class="btn btn-secondary pt-filter pt-full" id="equipMoreFiltersBtn" data-action="eqToggleMoreFilters" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
         <span class="pen-more-badge" id="equipMoreFiltersBadge" style="display:none"></span>
@@ -233,18 +233,18 @@ function renderEquipamentos() {
       <div class="pen-more-panel" id="equipMoreFiltersPanel" data-open="0" style="display:none">
         <div class="filter-date-wrap">
           <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
-          <input type="date" id="equipFrom" class="form-input filter-date" onchange="saveEquipFilters();renderEquipView();_equipUpdateMoreFiltersBadge()" />
+          <input type="date" id="equipFrom" class="form-input filter-date" data-change="eqFiltersChangeBadge" />
         </div>
         <div class="filter-date-wrap">
           <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">Até:</span>
-          <input type="date" id="equipTo" class="form-input filter-date" onchange="saveEquipFilters();renderEquipView();_equipUpdateMoreFiltersBadge()" />
+          <input type="date" id="equipTo" class="form-input filter-date" data-change="eqFiltersChangeBadge" />
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);white-space:nowrap">
-          <input type="checkbox" id="equipOnlyOS" onchange="saveEquipFilters();renderEquipView();_equipUpdateMoreFiltersBadge()" /> Somente com OS
+          <input type="checkbox" id="equipOnlyOS" data-change="eqFiltersChangeBadge" /> Somente com OS
         </label>
       </div>
       <div class="pt-actions">
-      <button class="btn btn-secondary" onclick="exportEquipamentosPlanilha()" title="Exportar planilha de acerto (OS, cliente, serviço, valor)">
+      <button class="btn btn-secondary" data-action="exportEquipamentosPlanilha" title="Exportar planilha de acerto (OS, cliente, serviço, valor)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Planilha
       </button>
@@ -252,7 +252,7 @@ function renderEquipamentos() {
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Filtrar por status">
-        ${EQUIP_TABS.map(t => `<button role="tab" aria-selected="${_equipTab === t.value}" class="pen-scope-tab ${_equipTab === t.value ? 'is-active' : ''}" onclick="setEquipTab('${t.value}')">${escapeHtml(t.label)}</button>`).join('')}
+        ${EQUIP_TABS.map(t => `<button role="tab" aria-selected="${_equipTab === t.value}" class="pen-scope-tab ${_equipTab === t.value ? 'is-active' : ''}" data-action="setEquipTab" data-arg="${escapeHtml(t.value)}">${escapeHtml(t.label)}</button>`).join('')}
       </div>
       <span class="pen-scope-count" id="equipScopeCount" aria-live="polite"></span>
     </div>
@@ -462,7 +462,7 @@ function equipOSCell(e) {
     } catch (_) {}
     const shown = osText || penLabel || penId;
     const title = penLabel && osText && penLabel !== osText ? `Pendência ${penLabel}` : 'Abrir pendência vinculada';
-    return `<a href="#" class="os-link" title="${esc(title)}" onclick="event.preventDefault();goToEquipOS('${esc(penId)}')">${esc(shown)} 🔗</a>`;
+    return `<a href="#" class="os-link" title="${esc(title)}" data-action="goToEquipOS" data-arg="${esc(penId)}">${esc(shown)} 🔗</a>`;
   }
   return esc(osText);
 }
@@ -494,7 +494,7 @@ function renderEquipTable(area) {
     wrap.innerHTML = `<div class="empty-state" style="padding:40px;text-align:center">
       <p>Nenhum equipamento encontrado.</p>
       <p style="color:var(--text-muted);font-size:12.5px">Ajuste os filtros ou cadastre um novo equipamento.</p>
-      <br><button class="btn btn-primary btn-sm" onclick="openEquipForm()">+ Novo Equipamento</button></div>`;
+      <br><button class="btn btn-primary btn-sm" data-action="openEquipForm">+ Novo Equipamento</button></div>`;
     return;
   }
   const totalPages = Math.max(1, Math.ceil(list.length / EQUIP_PAGE_SIZE));
@@ -518,7 +518,7 @@ function renderEquipTable(area) {
             <td>${equipStatusTag(e.status)}</td>
             <td class="value" style="text-align:right;font-weight:600">${esc(formatEquipValor(e.valor))}</td>
             <td style="white-space:nowrap">${esc(e.updatedAt ? fmtDate(e.updatedAt) : '—')}</td>
-            <td class="row-menu"><button class="btn-icon" title="Ações" aria-label="Ações do equipamento" onclick="toggleEquipMenu(event,'${esc(e.id)}')">⋮</button></td>
+            <td class="row-menu"><button class="btn-icon" title="Ações" aria-label="Ações do equipamento" data-action="toggleEquipMenu" data-stop="1" data-arg="${esc(e.id)}">⋮</button></td>
           </tr>`).join('')}
       </tbody>
     </table></div>
@@ -526,9 +526,9 @@ function renderEquipTable(area) {
     <div class="vis-pager" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12.5px;color:var(--text-muted)">
       <div>Mostrando ${startIdx + 1}–${Math.min(startIdx + EQUIP_PAGE_SIZE, list.length)} de ${list.length}</div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button class="btn btn-sm btn-secondary" ${_equipPage === 1 ? 'disabled' : ''} onclick="_equipPage--;renderEquipView(false)">← Anterior</button>
+        <button class="btn btn-sm btn-secondary" ${_equipPage === 1 ? 'disabled' : ''} data-action="eqPrevPage">← Anterior</button>
         <span>${_equipPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_equipPage === totalPages ? 'disabled' : ''} onclick="_equipPage++;renderEquipView(false)">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_equipPage === totalPages ? 'disabled' : ''} data-action="eqNextPage">Próxima →</button>
       </div>
     </div>` : ''}`;
 }
@@ -542,13 +542,12 @@ function toggleEquipMenu(e, id) {
   const menu = document.createElement('div');
   menu.id = 'equipRowMenu';
   menu.className = 'equip-row-menu';
-  const q = s => String(s).replace(/'/g, "\\'");
   menu.innerHTML = `
-    <button onclick="closeEquipMenu();openEquipForm('${q(id)}')">✏️ Editar</button>
-    <button onclick="closeEquipMenu();openEquipLinkModal('${q(id)}')">🔗 Vincular pendência</button>
+    <button data-action="eqMenuOpenForm" data-arg="${escapeHtml(id)}">✏️ Editar</button>
+    <button data-action="eqMenuLink" data-arg="${escapeHtml(id)}">🔗 Vincular pendência</button>
     <button type="button" data-qr-equip="${escapeHtml(id)}">🏷️ Etiqueta QR</button>
-    ${(() => { try { const eq = getEquipamentoById(id); const penId = getEquipPendenciaId(eq); return penId ? `<button onclick="closeEquipMenu();goToEquipOS('${q(penId)}')">↗ Ver pendência</button>` : ''; } catch (_) { return ''; } })()}
-    <button class="danger" onclick="closeEquipMenu();deleteEquipFlow('${q(id)}')">🗑️ Excluir</button>`;
+    ${(() => { try { const eq = getEquipamentoById(id); const penId = getEquipPendenciaId(eq); return penId ? `<button data-action="eqMenuViewPen" data-arg="${escapeHtml(penId)}">↗ Ver pendência</button>` : ''; } catch (_) { return ''; } })()}
+    <button class="danger" data-action="eqMenuDelete" data-arg="${escapeHtml(id)}">🗑️ Excluir</button>`;
   menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
   menu.style.left = Math.max(8, (rect.right + window.scrollX - 170)) + 'px';
   document.body.appendChild(menu);
@@ -591,7 +590,7 @@ function openEquipLinkModal(id) {
   const pens = _equipActivePens();
   const cur = getEquipPendenciaId(eq);
   openModal('Vincular pendência', `
-    <form onsubmit="submitEquipLink(event,'${esc(eq.id)}')">
+    <form data-submit="submitEquipLink" data-arg="${esc(eq.id)}">
       <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Equipamento: <strong style="color:var(--text-primary)">${esc(eq.nome || '—')}</strong>${eq.osVinculada ? ` · OS <strong style="color:var(--text-primary)">${esc(eq.osVinculada)}</strong>` : ''}</p>
       <div class="form-group"><label class="form-label" for="eqLinkPen">Pendência</label>
         <select class="form-select" id="eqLinkPen">
@@ -599,7 +598,7 @@ function openEquipLinkModal(id) {
           ${pens.map(p => `<option value="${esc(p.id)}" ${cur === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
         </select></div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Vincular</button>
       </div>
     </form>`);
@@ -629,7 +628,7 @@ function openEquipForm(id) {
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
   const curPen = getEquipPendenciaId(eq);
   openModal(eq ? 'Editar Equipamento' : 'Novo Equipamento', `
-    <form onsubmit="submitEquipForm(event,'${esc(eq?.id || '')}')">
+    <form data-submit="submitEquipForm" data-arg="${esc(eq?.id || '')}">
       <div class="form-group"><label class="form-label" for="eqNome">Nome *</label>
         <input class="form-input" id="eqNome" required maxlength="120" placeholder='Ex: Notebook Dell Latitude 5420' value="${esc(eq?.nome || '')}" /></div>
       <div class="form-row">
@@ -667,7 +666,7 @@ function openEquipForm(id) {
       <div class="form-group"><label class="form-label" for="eqObs">Observações</label>
         <textarea class="form-textarea" id="eqObs" rows="3" placeholder="Patrimônio, acessórios, estado...">${esc(eq?.observacoes || '')}</textarea></div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">${eq ? 'Salvar' : 'Cadastrar'}</button>
       </div>
     </form>`);
@@ -954,6 +953,30 @@ function exportEquipamentosCSV() {
     eq.updatedAt || eq.createdAt || '',
   ]);
   if (typeof exportCSV === 'function') exportCSV('equipamentos_init_intra', headers, rows);
+}
+
+// Ações do arquivo — delegação via js/actions.js (data-action/data-change/data-input/data-submit).
+if (typeof registerActions === 'function') {
+  registerActions({
+    eqSearchInput: () => { saveEquipFilters(); if (typeof debouncedRenderEquipView === 'function') debouncedRenderEquipView(); else renderEquipView(false); },
+    eqFiltersChange: () => { saveEquipFilters(); renderEquipView(); },
+    eqFiltersChangeBadge: () => { saveEquipFilters(); renderEquipView(); _equipUpdateMoreFiltersBadge(); },
+    eqToggleMoreFilters: (_el, _arg, ev) => toggleEquipMoreFilters(ev),
+    exportEquipamentosPlanilha: () => exportEquipamentosPlanilha(),
+    setEquipTab: (_el, arg) => setEquipTab(arg),
+    goToEquipOS: (_el, arg) => goToEquipOS(arg),
+    openEquipForm: (_el, arg) => openEquipForm(arg),
+    // data-stop="1" no botão já impede a propagação; aqui só repassamos o botão como currentTarget.
+    toggleEquipMenu: (el, arg) => toggleEquipMenu({ currentTarget: el }, arg),
+    eqPrevPage: () => { _equipPage--; renderEquipView(false); },
+    eqNextPage: () => { _equipPage++; renderEquipView(false); },
+    eqMenuOpenForm: (_el, arg) => { closeEquipMenu(); openEquipForm(arg); },
+    eqMenuLink: (_el, arg) => { closeEquipMenu(); openEquipLinkModal(arg); },
+    eqMenuViewPen: (_el, arg) => { closeEquipMenu(); goToEquipOS(arg); },
+    eqMenuDelete: (_el, arg) => { closeEquipMenu(); deleteEquipFlow(arg); },
+    submitEquipLink: (_el, arg, ev) => submitEquipLink(ev, arg),
+    submitEquipForm: (_el, arg, ev) => submitEquipForm(ev, arg),
+  });
 }
 
 // Export para testes (Node/Vitest). Em browser, `module` não existe e as
