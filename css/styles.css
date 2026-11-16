@@ -4418,93 +4418,191 @@ body.dark-theme .vis-chip[aria-pressed="true"] { background:#f1f5f9; color:#0b0f
 .pen-inline-select:focus, .pen-inline-date:focus { border-color: var(--accent); background: var(--bg-surface); outline: none; }
 /* Descrição como bloco de conteúdo principal. */
 
-/* Caixa de entrada (js/caixa-entrada.js): lista à esquerda, conversa à
-   direita. No celular só cabe uma das duas, então abrir a conversa esconde a
-   lista e o "Voltar" aparece. */
-.cx-corpo-tela { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 12px; align-items: start; }
-.cx-lista { display: flex; flex-direction: column; gap: 6px; }
-.cx-item {
-  display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
-  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--bg-card); color: var(--text); cursor: pointer;
+/* Caixa de entrada (js/caixa-entrada.js) — layout do atendimento (lista à
+   esquerda, conversa ao centro, detalhes à direita). Paleta própria, clara por
+   padrão e navy escura em body.dark-theme, fiel ao mockup pedido pelo Rafael.
+   No celular só cabe um painel por vez; "Voltar" volta para a lista. */
+.cx {
+  --cx-bg: #f4f6fb; --cx-s1: #ffffff; --cx-s2: #f3f5fb; --cx-bd: #dbe1ee;
+  --cx-tx: #18213a; --cx-mut: #5f6b87; --cx-ac: #2f5bea; --cx-sel: rgba(47,91,234,.09);
+  --cx-out: #dbe6ff; --cx-wa: #128c4a; --cx-wa-dim: rgba(18,140,74,.12); --cx-mail: #3b4fc4;
+  --cx-red: #d33a3a; --cx-amb: #a86a00; --cx-green: #128c4a;
+  --cx-in: #f0f2f9; --cx-nota: #fdf6e3;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 12px;
+  height: min(880px, calc(100dvh - 150px));
+  min-height: 520px;
+  color: var(--cx-tx);
 }
-.cx-item.pendente { border-left: 3px solid var(--yellow); }
-.cx-item.ativo { background: var(--accent-dim2); }
-.cx-item-topo { display: flex; gap: 8px; align-items: baseline; }
-.cx-quando { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.cx-assunto { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cx-n { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text-secondary); }
-.cx-meta { font-size: 12px; color: var(--text-secondary); }
-.cx-conversa { min-height: 200px; }
-.cx-conv-topo { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
-.cx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.cx-chip { font-size: 12px; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--border); color: var(--text-secondary); }
-.cx-st-pendente { border-color: var(--yellow); color: var(--yellow); }
-.cx-chamado { font-size: 13px; }
-.cx-nota { font-size: 13px; padding: 6px 10px; border-radius: 6px; background: var(--accent-dim2); margin-top: 8px; }
-.cx-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-.cx-conv-grade { display: grid; grid-template-columns: 1fr 240px; gap: 16px; align-items: start; }
-.cx-timeline { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.cx-dia { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); }
-.cx-dia::before, .cx-dia::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
-.cx-msg { display: flex; gap: 10px; align-items: flex-start; }
-.cx-avatar {
-  flex: none; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 600; background: var(--accent-dim2); color: var(--accent);
+body.dark-theme .cx {
+  --cx-bg: #0a0f1e; --cx-s1: #111a2e; --cx-s2: #0d1527; --cx-bd: #1e2a44;
+  --cx-tx: #e6ebf5; --cx-mut: #8a97b3; --cx-ac: #4f7cff; --cx-sel: rgba(79,124,255,.12);
+  --cx-out: #1c3470; --cx-wa: #25d366; --cx-wa-dim: rgba(37,211,102,.14); --cx-mail: #8ea2ff;
+  --cx-red: #ff6b6b; --cx-amb: #f5b942; --cx-green: #25d366;
+  --cx-in: #141d33; --cx-nota: #2a2410;
 }
-.cx-balao { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px 10px 10px 10px; background: var(--bg-card); }
-.cx-balao header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
-.cx-corpo { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.5; }
-.cx-lado { display: flex; flex-direction: column; gap: 16px; padding-left: 16px; border-left: 1px solid var(--border); font-size: 13px; }
-.cx-lado h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 0 0 8px; }
-.cx-lado dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 8px 0 0; }
-.cx-lado dt { color: var(--text-muted); }
-.cx-lado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.cx-pessoa { display: flex; gap: 8px; align-items: center; }
-.cx-pessoa > div { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
-.cx-sub { display: block; font-size: 12px; color: var(--text-muted); }
-@media (max-width: 1100px) {
-  .cx-conv-grade { grid-template-columns: 1fr; }
-  .cx-lado { order: -1; padding-left: 0; border-left: 0; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.cx-list-panel, .cx-main {
+  min-height: 0; min-width: 0;
+  background: var(--cx-s1);
+  border: 1px solid var(--cx-bd);
+  border-radius: 14px;
+  overflow: hidden;
 }
-.cx-voltar { display: none; align-self: flex-start; }
-/* Lista e conversa rolam por dentro: a tela inteira rolando perdia o cabeçalho da conversa. */
-.cx-lista, .cx-timeline { max-height: calc(100vh - 220px); overflow-y: auto; }
-.cx-item.nao-lida .cx-assunto, .cx-item.nao-lida .cx-item-topo strong { font-weight: 700; }
-.cx-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; align-self: center; }
-.cx-previa { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cx-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.cx-alerta { color: var(--yellow); }
-.cx-chip-alerta { border-color: var(--yellow); color: var(--yellow); }
-.cx-balao { max-width: 760px; }
-.cx-assinatura { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
-.cx-assinatura summary { cursor: pointer; }
-.cx-sugestao { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--yellow); border-radius: 6px; }
-.cx-historico { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.cx-historico a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
-.cx-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 240px; color: var(--text-muted); text-align: center; }
-/* Canal da conversa (075): discreto, porque a maioria ainda é e-mail; o verde
-   só aparece no WhatsApp, que é o que muda o jeito de responder. */
-.cx-canal { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
-.cx-canal svg { flex: none; }
-.cx-canal-whatsapp { border-color: var(--green); background: var(--green-dim); color: var(--green); }
-.cx-saida { flex-direction: row-reverse; }
-.cx-saida .cx-balao { border-radius: 10px 4px 10px 10px; background: var(--accent-dim2); }
-.cx-saida .cx-balao header { flex-direction: row-reverse; }
-.cx-interna .cx-balao { border-style: dashed; border-color: var(--yellow); background: var(--yellow-dim, var(--bg-card)); }
-.cx-composer { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-.cx-composer-opcoes, .cx-composer-envio { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.cx-composer-opcoes .form-select { width: auto; }
-.cx-imagem { display: block; max-width: min(100%, 360px); max-height: 360px; border-radius: 8px; margin-top: 8px; }
-.cx-audio { display: block; width: min(100%, 360px); margin-top: 8px; }
-.cx-anexo { display: inline-block; margin-top: 8px; overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  .cx-corpo-tela { grid-template-columns: 1fr; }
-  .cx-corpo-tela.cx-aberta .cx-lista { display: none; }
-  .cx-corpo-tela:not(.cx-aberta) .cx-conversa { display: none; }
-  .cx-voltar { display: inline-flex; }
-}
+.cx-list-panel { display: flex; flex-direction: column; }
+.cx-lh { padding: 12px; display: grid; gap: 10px; border-bottom: 1px solid var(--cx-bd); }
+.cx-search-wrap { position: relative; }
+.cx-search-ic { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--cx-mut); pointer-events: none; }
+.cx-search { width: 100%; height: 38px; padding: 0 12px 0 36px; background: var(--cx-s2); color: var(--cx-tx); border: 1px solid var(--cx-bd); border-radius: 9px; font: inherit; outline: none; }
+.cx-search::placeholder { color: var(--cx-mut); }
+.cx-search:focus { border-color: var(--cx-ac); }
+.cx-chips, .cx-tabs { display: flex; gap: 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--cx-bd); background: transparent; color: var(--cx-mut); border-radius: 999px; font-size: 12px; font-weight: 500; }
+.chip.on { border-color: var(--cx-ac); color: var(--cx-tx); background: var(--cx-sel); }
+.cx-tabs { border-bottom: 1px solid var(--cx-bd); margin: 0 -12px -1px; padding: 0 12px; overflow-x: auto; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 7px 2px; margin-right: 14px; color: var(--cx-mut); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.tab.on { color: var(--cx-tx); border-color: var(--cx-ac); }
+.cx-tab-n { font-size: 11px; color: var(--cx-mut); font-variant-numeric: tabular-nums; }
+.tab.on .cx-tab-n { color: var(--cx-ac); }
+.cx-cards { flex: 1; overflow-y: auto; padding: 10px; display: grid; gap: 8px; align-content: start; }
+.cx-lista-vazia { padding: 22px 14px; text-align: center; color: var(--cx-mut); display: grid; gap: 10px; justify-items: center; }
 
+/* Item da lista: avatar com selo do canal; nome (com bolinha quando não lida);
+   relógio de espera colorido por idade; empresa + Nº do chamado. */
+.cx-item { display: flex; gap: 10px; padding: 11px; text-align: left; width: 100%; border: 1px solid var(--cx-bd); border-radius: 12px; background: var(--cx-s2); color: var(--cx-tx); cursor: pointer; }
+.cx-item:hover { border-color: var(--cx-mut); }
+.cx-item.sel { border-color: var(--cx-ac); background: var(--cx-sel); }
+.cx-av { position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--cx-bd); display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--cx-tx); }
+.cx-av-md { width: 46px; height: 46px; font-size: 15px; }
+.cx-av-lg { width: 46px; height: 46px; font-size: 15px; }
+.cx-av-badge { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%; background: var(--cx-s1); border: 1px solid var(--cx-bd); display: grid; place-items: center; }
+.cx-av-badge.wa { color: var(--cx-wa); }
+.cx-av-badge.em { color: var(--cx-mail); }
+.cx-cm { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cx-r1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.cx-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cx-ac); flex: none; align-self: center; }
+.cx-nm { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-quando { margin-left: auto; font-size: 12px; color: var(--cx-mut); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cx-late-y { color: var(--cx-amb); }
+.cx-late-r { color: var(--cx-red); font-weight: 600; }
+.cx-assunto { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-previa { font-size: 13px; color: var(--cx-mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-meta { display: flex; gap: 6px; align-items: center; margin-top: 2px; font-size: 12px; color: var(--cx-mut); min-width: 0; }
+.cx-emp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-meta-com { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-meta-com::before { content: '· '; }
+.cx-badge { border: 1px solid var(--cx-bd); border-radius: 999px; padding: 0 8px; font-size: 11px; white-space: nowrap; color: var(--cx-tx); }
+.cx-item.nao-lida .cx-assunto, .cx-item.nao-lida .cx-previa { color: var(--cx-tx); font-weight: 600; }
+
+/* Conversa aberta: cabeçalho com avatar/identidade e ações; grade conversa +
+   painel de detalhes (a chave do toggle .cx-det-fechado). */
+.cx-main { display: flex; flex-direction: column; position: relative; }
+.cx-conv-topo { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--cx-bd); }
+.cx-conv-id { min-width: 0; display: grid; }
+.cx-conv-id b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.cx-conv-id span { font-size: 12px; color: var(--cx-mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-conv-flex { flex: 1; }
+.cx-vol-existing { display: none; }
+.cx-chip { font-size: 12px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--cx-bd); color: var(--cx-mut); white-space: nowrap; }
+.cx-st-pendente { color: var(--cx-amb); border-color: var(--cx-amb); }
+.cx-chip-alerta { color: var(--cx-amb); border-color: var(--cx-amb); }
+.cx-conv-grade { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
+.cx-conv-main { min-height: 0; display: flex; flex-direction: column; }
+.cx-det-fechado.cx-conv-grade { grid-template-columns: 1fr; }
+.cx-det-fechado .cx-lado { display: none; }
+.cx-timeline { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.cx-dia { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--cx-mut); margin: 8px 0; }
+.cx-dia::before, .cx-dia::after { content: ''; flex: 1; border-top: 1px solid var(--cx-bd); }
+
+/* WhatsApp: bolhas leves; entrada à esquerda, nossa à direita; interna tracejada. */
+.cx-bubble { max-width: 74%; padding: 8px 11px 6px; border-radius: 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.cx-bubble small { display: block; font-size: 11px; color: var(--cx-mut); margin-top: 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.cx-bubble-in { align-self: flex-start; background: var(--cx-in); border: 1px solid var(--cx-bd); border-top-left-radius: 4px; }
+.cx-bubble-out { align-self: flex-end; background: var(--cx-out); border-top-right-radius: 4px; }
+.cx-bubble-nota { align-self: center; max-width: 88%; border: 1px dashed var(--cx-amb); background: var(--cx-nota); font-size: 13px; }
+.cx-bubble-nota-tag { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cx-amb); margin-bottom: 4px; }
+
+/* E-mail: assunto + cartões de mensagem; mais antigos dobrados até clicar. */
+.cx-subj { font-size: 17px; font-weight: 600; margin: 2px 4px 10px; }
+.cx-em { border: 1px solid var(--cx-bd); border-radius: 12px; background: var(--cx-s2); padding: 12px 14px; }
+.cx-em-out { border-color: var(--cx-ac); }
+.cx-em-nota { border-style: dashed; border-color: var(--cx-amb); }
+.cx-em-eh { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--cx-bd); margin-bottom: 8px; font-size: 13px; }
+.cx-em-eh .cx-quando { margin-left: 0; }
+.cx-em-eb { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+.cx-em-fold { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--cx-bd); border-radius: 10px; background: transparent; color: var(--cx-mut); font-size: 13px; padding: 8px 12px; }
+.cx-em-fold b { color: var(--cx-tx); }
+.cx-em-fold:hover { border-color: var(--cx-mut); }
+
+/* Composer: linha de contexto (para: / o cliente vê seu nome) + ações rápidas
+   + campo com anexo à esquerda e envio à direita. */
+.cx-composer { border-top: 1px solid var(--cx-bd); padding: 10px 12px; display: grid; gap: 8px; background: var(--cx-s1); }
+.cx-comp-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cx-comp-info { font-size: 12px; color: var(--cx-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-comp-grp { display: inline-flex; gap: 8px; align-items: center; }
+.cx-comp-grp .form-select { width: auto; }
+.cx-comp-row { display: flex; gap: 8px; align-items: flex-end; }
+.cx-tx { flex: 1; resize: none; min-height: 42px; max-height: 180px; padding: 10px 12px; background: var(--cx-s2); color: var(--cx-tx); border: 1px solid var(--cx-bd); border-radius: 10px; font: inherit; line-height: 1.4; outline: none; }
+.cx-tx::placeholder { color: var(--cx-mut); }
+.cx-tx:focus { border-color: var(--cx-ac); }
+.cx-filehidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cx-ic-btn { flex: none; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--cx-bd); background: var(--cx-s2); color: var(--cx-mut); border-radius: 9px; }
+.cx-ic-btn:hover { color: var(--cx-tx); border-color: var(--cx-mut); }
+.cx-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid var(--cx-bd); background: var(--cx-s2); color: var(--cx-tx); border-radius: 9px; font-weight: 500; font-size: 13px; }
+.cx-btn:hover { border-color: var(--cx-mut); }
+.cx-send { flex: none; width: 44px; height: 44px; padding: 0; justify-content: center; background: var(--cx-ac); border-color: var(--cx-ac); color: #fff; border-radius: 10px; }
+.cx-send:hover { filter: brightness(1.08); }
+
+/* Painel lateral (Quem pediu / Chamado / Atendimento / Ações). */
+.cx-lado { display: flex; flex-direction: column; gap: 15px; padding: 14px; border-left: 1px solid var(--cx-bd); background: var(--cx-s1); font-size: 13px; overflow-y: auto; }
+.cx-lado h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: var(--cx-mut); text-transform: uppercase; letter-spacing: .05em; }
+.cx-lado section { display: grid; gap: 6px; }
+.cx-lado dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; }
+.cx-lado dt { color: var(--cx-mut); }
+.cx-lado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.cx-pessoa { display: flex; gap: 10px; align-items: center; }
+.cx-pessoa > div { display: flex; flex-direction: column; min-width: 0; }
+.cx-sub { font-size: 12px; color: var(--cx-mut); overflow-wrap: anywhere; }
+.cx-chamado { color: var(--cx-ac); }
+.cx-nota { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--cx-sel); }
+.cx-sugestao { display: grid; gap: 6px; padding: 9px 10px; border: 1px dashed var(--cx-amb); border-radius: 8px; font-size: 13px; }
+.cx-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cx-historico a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cx-ac); }
+.cx-acoes-ver { display: grid; gap: 8px; }
+.cx-acoes-ver .cx-btn { width: 100%; justify-content: flex-start; }
+
+/* Estado vazio (nada selecionado). */
+.cx-empty { margin: auto; text-align: center; padding: 24px; display: grid; gap: 10px; justify-items: center; max-width: 420px; color: var(--cx-tx); }
+.cx-empty-ic { width: 48px; height: 48px; border-radius: 12px; background: var(--cx-sel); color: var(--cx-ac); display: grid; place-items: center; }
+.cx-empty-sub { color: var(--cx-mut); font-size: 13px; }
+.cx-empty b { font-size: 17px; }
+
+/* Corpo dos anexos/mídia dentro das bolhas e cartões. */
+.cx-corpo { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.5; }
+.cx-assinatura { margin-top: 8px; font-size: 12px; color: var(--cx-mut); }
+.cx-assinatura summary { cursor: pointer; }
+.cx-imagem { display: block; max-width: min(100%, 330px); max-height: 330px; border-radius: 10px; margin-top: 8px; }
+.cx-audio { display: block; width: min(100%, 330px); margin-top: 8px; }
+.cx-anexo { display: inline-block; margin-top: 8px; overflow-wrap: anywhere; color: var(--cx-ac); }
+.cx-dia { flex: none; }
+
+/* Celular: uma tela por vez; a conversa tem "Voltar" para a lista. */
+@media (max-width: 900px) {
+  .cx { grid-template-columns: 1fr; height: calc(100dvh - 120px); min-height: 0; }
+  .cx .cx-main { display: none; }
+  .cx.cx-aberta .cx-main { display: flex; }
+  .cx.cx-aberta .cx-list-panel { display: none; }
+  .cx-conv-grade { grid-template-columns: 1fr; }
+  .cx-lado { border-left: 0; border-top: 1px solid var(--cx-bd); max-height: 45vh; }
+  .cx-voltar { display: inline-flex; }
+  .cx-bubble { max-width: 88%; }
+}
+@media (min-width: 901px) and (max-width: 1180px) {
+  .cx { grid-template-columns: 300px minmax(0, 1fr); height: calc(100dvh - 130px); }
+  .cx-conv-grade { grid-template-columns: 1fr; }
+  .cx-lado { display: none; }
+}
+@media (min-width: 1181px) and (max-width: 1400px) { .cx { grid-template-columns: 310px minmax(0, 1fr); } }
 /* Painel do robô (js/robo-execucoes.js). Borda vermelha só com problema: o
    estado normal fica discreto para não competir com a caixa de e-mails. */
 .rbx-box {

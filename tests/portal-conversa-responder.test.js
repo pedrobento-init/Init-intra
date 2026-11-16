@@ -12,6 +12,9 @@ const ENV = {
   GMAIL_USER: 'robo@initnet.com.br',
   GMAIL_APP_PASSWORD: 'senha-de-app',
   GMAIL_FROM: 'robo@initnet.com.br',
+  WAHA_BASE_URL: 'https://waha.teste',
+  WAHA_API_KEY: 'waha-key-teste',
+  WAHA_SESSION: 'default',
 };
 
 const OPERADOR = { id: 'op-1', auth_user_id: 'user-1', name: 'Ana', active: true, team: 'init' };
@@ -33,7 +36,7 @@ function entrada(over) {
   }, over);
 }
 
-async function chamar({ linhas = [entrada()], body = { thread_id: 't1', text: 'Vamos verificar.' } } = {}) {
+async function chamar({ linhas = [entrada()], body = { thread_id: 't1', text: 'Vamos verificar.' }, fetchStub, contatos = [] } = {}) {
   const queries = [];
   const enviados = [];
   const { handler } = await loadHandler('conversa-responder', {
@@ -41,12 +44,13 @@ async function chamar({ linhas = [entrada()], body = { thread_id: 't1', text: 'V
     createClient: fakeSupabase({
       user: { id: 'user-1' },
       queries,
-      tabelas: { operators: [OPERADOR], emails_triagem: linhas },
+      tabelas: { operators: [OPERADOR], emails_triagem: linhas, whatsapp_conversas: contatos },
     }),
     createTransport: () => ({
       sendMail: async (msg) => { enviados.push(msg); return { messageId: 'novo@initnet.com.br' }; },
       close: () => {},
     }),
+    fetch: fetchStub,
   });
   const res = await handler(reqPost(body, 'jwt-valido'));
   return { res, dados: await res.json(), queries, enviados };
@@ -106,6 +110,38 @@ describe('conversa-responder: destino e escopo', () => {
     const { res, enviados } = await chamar({ linhas: [] });
     expect(res.status).toBe(404);
     expect(enviados).toEqual([]);
+  });
+
+  it('no WhatsApp o texto vai com o nome de quem atende, para o cliente saber', async () => {
+    const enviadosWA = [];
+    const { res, queries } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      body: { thread_id: 't1', text: 'Vamos verificar.' },
+      contatos: [{ telefone: '5511987654321' }],
+      fetchStub: async (url, init) => {
+        enviadosWA.push({ url: String(url), body: JSON.parse(String(init && init.body)) });
+        return new Response(JSON.stringify({ id: 'wa-1' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(enviadosWA).toHaveLength(1);
+    expect(enviadosWA[0].url).toContain('/api/sendText');
+    expect(enviadosWA[0].body.text).toBe('Ana: Vamos verificar.');
+    // O histórico mostra a mesma mensagem que o cliente recebeu.
+    const ins = queries.find((q) => q.insert);
+    expect(ins.insert.direcao).toBe('saida');
+    expect(ins.insert.corpo).toBe('Ana: Vamos verificar.');
+  });
+
+  it('nota interna não leva o nome de quem atende (não vai para o cliente)', async () => {
+    const { res, queries } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      body: { thread_id: 't1', text: 'só anotação interna', kind: 'internal' },
+    });
+    expect(res.status).toBe(200);
+    const ins = queries.find((q) => q.insert);
+    expect(ins.insert.direcao).toBe('interna');
+    expect(ins.insert.corpo).toBe('só anotação interna');
   });
 
   it('arquivo com base64 inválido é recusado antes de enviar', async () => {
