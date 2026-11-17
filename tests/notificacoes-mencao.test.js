@@ -8,9 +8,13 @@ import vm from 'node:vm';
 //     o resto para admin ou mesma equipe — marcar alguém de fora não vaza o título;
 //   * quem escreveu não avisa a si mesmo.
 
-const _escape = (s) => String(s == null ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const _escape = (s) =>
+  String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 const OPS = [
   { name: 'Ana Souza', email: 'ana@x.com', team: 'init', active: true },
@@ -30,7 +34,12 @@ function criarSandbox() {
     escapeHtml: _escape,
     window: { location: { origin: 'https://intra.test', pathname: '/' }, addEventListener() {} },
     document: { addEventListener() {}, getElementById: () => null },
-    localStorage: { getItem: (k) => (k in prefs ? prefs[k] : null), setItem: (k, v) => { prefs[k] = String(v); } },
+    localStorage: {
+      getItem: (k) => (k in prefs ? prefs[k] : null),
+      setItem: (k, v) => {
+        prefs[k] = String(v);
+      },
+    },
     getOperators: () => OPS,
     isPendenciaGestao: (p) => /^gest[aã]o$/i.test(String((p && p.tipo) || '')),
     isGestaoOperator: (o) => !!o && o.active !== false && o.isGestao === true,
@@ -39,7 +48,9 @@ function criarSandbox() {
   };
   sb.globalThis = sb;
   vm.createContext(sb);
-  vm.runInContext(fs.readFileSync('js/notifications.js', 'utf8'), sb, { filename: 'notifications.js' });
+  vm.runInContext(fs.readFileSync('js/notifications.js', 'utf8'), sb, {
+    filename: 'notifications.js',
+  });
   return sb;
 }
 
@@ -47,39 +58,70 @@ const sb = criarSandbox();
 let emails;
 let pushes;
 
-const pen = (extra) => ({ id: 'P1', assunto: 'Impressora parada', responsible: 'Ana Souza', team: 'init', tipo: 'Suporte', ...extra });
+const pen = (extra) => ({
+  id: 'P1',
+  assunto: 'Impressora parada',
+  responsible: 'Ana Souza',
+  team: 'init',
+  tipo: 'Suporte',
+  ...extra,
+});
 const nota = (texto, mencionados, autor = 'Beto Reis') => ({
-  text: texto, author: autor, createdAt: '2026-11-04T12:00:00.000Z', mentionedOperators: mencionados, visibility: 'interna',
+  text: texto,
+  author: autor,
+  createdAt: '2026-11-04T12:00:00.000Z',
+  mentionedOperators: mencionados,
+  visibility: 'interna',
 });
 
 beforeEach(() => {
   emails = [];
   pushes = [];
-  sb.sendEmailNotification = (m) => { emails.push(m); return Promise.resolve({ success: true }); };
-  sb.sendPushNotification = (m) => { pushes.push(m); return Promise.resolve({ success: true }); };
-  sb.localStorage.setItem('intra_notif_prefs', JSON.stringify({ onPendenciaCreate: true, onPendenciaUpdate: true, onPendenciaNote: true }));
+  sb.sendEmailNotification = (m) => {
+    emails.push(m);
+    return Promise.resolve({ success: true });
+  };
+  sb.sendPushNotification = (m) => {
+    pushes.push(m);
+    return Promise.resolve({ success: true });
+  };
+  sb.localStorage.setItem(
+    'intra_notif_prefs',
+    JSON.stringify({ onPendenciaCreate: true, onPendenciaUpdate: true, onPendenciaNote: true })
+  );
 });
 
 describe('collectMentionRecipients', () => {
   it('marcado da mesma equipe entra', () => {
-    expect(sb.collectMentionRecipients(pen(), nota('@Felipe', ['Felipe Lima']))).toEqual(['felipe@x.com']);
+    expect(sb.collectMentionRecipients(pen(), nota('@Felipe', ['Felipe Lima']))).toEqual([
+      'felipe@x.com',
+    ]);
   });
 
   it('quem escreveu não avisa a si mesmo', () => {
-    expect(sb.collectMentionRecipients(pen(), nota('@Beto', ['Beto Reis'], 'Beto Reis'))).toEqual([]);
+    expect(sb.collectMentionRecipients(pen(), nota('@Beto', ['Beto Reis'], 'Beto Reis'))).toEqual(
+      []
+    );
   });
 
   it('de outra equipe só entra se for admin', () => {
-    expect(sb.collectMentionRecipients(pen(), nota('@Caio @Duda', ['Caio Mam', 'Duda Admin']))).toEqual(['duda@x.com']);
+    expect(
+      sb.collectMentionRecipients(pen(), nota('@Caio @Duda', ['Caio Mam', 'Duda Admin']))
+    ).toEqual(['duda@x.com']);
   });
 
   it('pendência de Gestão: só quem é Gestão, nem admin de fora', () => {
-    const r = sb.collectMentionRecipients(pen({ tipo: 'Gestão' }), nota('@Felipe @Ana @Duda', ['Felipe Lima', 'Ana Souza', 'Duda Admin']));
+    const r = sb.collectMentionRecipients(
+      pen({ tipo: 'Gestão' }),
+      nota('@Felipe @Ana @Duda', ['Felipe Lima', 'Ana Souza', 'Duda Admin'])
+    );
     expect(r).toEqual(['felipe@x.com']);
   });
 
   it('inativo ou sem e-mail fica de fora', () => {
-    expect(sb.collectMentionRecipients(pen(), nota('@Eva @Gil', ['Eva Inativa', 'Gil Sem Email']))).toEqual([]);
+    expect(
+      sb.collectMentionRecipients(pen(), nota('@Eva @Gil', ['Eva Inativa', 'Gil Sem Email']))
+    ).toEqual([]);
   });
 
   it('nota sem menção (ou antiga, sem o campo) não avisa ninguém', () => {
@@ -97,13 +139,18 @@ describe('notifyPendenciaNote com menção', () => {
     const geral = emails.find((m) => m.subject.indexOf('Nova nota') !== -1);
     expect(geral.to).toContain('ana@x.com');
     expect(geral.to).not.toContain('felipe@x.com');
-    expect(pushes.find((m) => m.title.indexOf('Você foi mencionado') === 0)).toMatchObject({ to: ['felipe@x.com'], url: '#chamados/P1' });
+    expect(pushes.find((m) => m.title.indexOf('Você foi mencionado') === 0)).toMatchObject({
+      to: ['felipe@x.com'],
+      url: '#chamados/P1',
+    });
   });
 
   it('marcar o responsável: ele recebe só o aviso de menção, não os dois', () => {
     sb.notifyPendenciaNote(pen(), nota('@Ana confere?', ['Ana Souza']));
     const paraAna = emails.filter((m) => m.to.includes('ana@x.com'));
-    expect(paraAna.map((m) => m.subject)).toEqual(['[Init Intra] Você foi mencionado em: Impressora parada']);
+    expect(paraAna.map((m) => m.subject)).toEqual([
+      '[Init Intra] Você foi mencionado em: Impressora parada',
+    ]);
     expect(pushes.filter((m) => m.to.includes('ana@x.com'))).toHaveLength(1);
   });
 
@@ -121,7 +168,10 @@ describe('notifyPendenciaNote com menção', () => {
   });
 
   it('escapa o texto e o autor da nota no e-mail', () => {
-    sb.notifyPendenciaNote(pen(), nota('<img src=x onerror=alert(1)> @Felipe', ['Felipe Lima'], '<b>Beto</b>'));
+    sb.notifyPendenciaNote(
+      pen(),
+      nota('<img src=x onerror=alert(1)> @Felipe', ['Felipe Lima'], '<b>Beto</b>')
+    );
     const html = emails[0].html;
     expect(html).not.toContain('<img src=x');
     expect(html).not.toContain('<b>Beto</b>');

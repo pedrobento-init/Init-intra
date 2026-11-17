@@ -9,63 +9,63 @@ idb.version(1).stores({
   procedure_templates: 'id, category',
   operators: 'id, email, role',
   tickets: 'id, clientId, status',
-  keyvalue: 'key'
+  keyvalue: 'key',
 });
 
 idb.version(2).stores({
   user_profile: 'key',
   counters: 'key',
   sessions: 'key',
-  audit_logs: '++id, type, target, timestamp, operatorId'
+  audit_logs: '++id, type, target, timestamp, operatorId',
 });
 
 idb.version(3).stores({
-  visits: 'id, clientId, operator, status, date'
+  visits: 'id, clientId, operator, status, date',
 });
 
 idb.version(4).stores({
-  reunioes: 'id, status, mesAno'
+  reunioes: 'id, status, mesAno',
 });
 
 idb.version(5).stores({
-  client_devices: 'id, client_id, milvus_device_id'
+  client_devices: 'id, client_id, milvus_device_id',
 });
 
 idb.version(6).stores({
-  client_milvus_tickets: 'id, client_id, codigo'
+  client_milvus_tickets: 'id, client_id, codigo',
 });
 
 idb.version(7).stores({
-  equipamentos: 'id, clientId, status, tipo'
+  equipamentos: 'id, clientId, status, tipo',
 });
 
 // v8 (offline-first): fila persistente de operações (outbox pattern).
 // Aditiva — não toca nas tabelas existentes, upgrade seguro.
 idb.version(8).stores({
-  outbox: '++seq, entity, targetId, createdAt'
+  outbox: '++seq, entity, targetId, createdAt',
 });
 
 // v9: checklist do cliente — modelo global (por tipo) + marcações
 // por cliente. Aditiva, mesmo padrão das versões anteriores.
 idb.version(9).stores({
   checklist_modelo_itens: 'id, tipo, ordem',
-  checklist_marcacoes: 'id, clientId, itemId'
+  checklist_marcacoes: 'id, clientId, itemId',
 });
 
 // v10: entidade "checklists" (nome/ativo/ordem) — os itens passam a
 // apontar para ela pelo campo `tipo` (id do checklist).
 idb.version(10).stores({
-  checklists: 'id, ativo, ordem'
+  checklists: 'id, ativo, ordem',
 });
 
 // v11: vencimentos (licenças, SSL, domínios, garantias…). Aditiva.
 idb.version(11).stores({
-  vencimentos: 'id, clientId, dataVencimento'
+  vencimentos: 'id, clientId, dataVencimento',
 });
 
 // v12: lançamentos de horas (uma linha por sessão de trabalho). Aditiva.
 idb.version(12).stores({
-  time_entries: 'id, pendenciaId, clientId, endedAt'
+  time_entries: 'id, pendenciaId, clientId, endedAt',
 });
 
 // Cache síncrono em memória para garantir compatibilidade imediata com toda a UI
@@ -89,7 +89,7 @@ const _dbCache = {
   user_profile: {},
   counters: {},
   sessions: {},
-  audit_logs: []
+  audit_logs: [],
 };
 
 let _dbReady = false;
@@ -114,7 +114,7 @@ async function initIndexedDB() {
       user: 'intra_user',
       counter: 'intra_counter',
       session: 'intra_session',
-      logs: 'intra_logs'
+      logs: 'intra_logs',
     };
 
     let hasLegacyData = false;
@@ -132,7 +132,9 @@ async function initIndexedDB() {
         try {
           const raw = localStorage.getItem(k);
           return raw ? JSON.parse(raw) : def;
-        } catch { return def; }
+        } catch {
+          return def;
+        }
       };
 
       const legacyClients = parseLS(legacyKeys.clients, []);
@@ -153,7 +155,7 @@ async function initIndexedDB() {
         { key: 'intra_user', value: parseLS(legacyKeys.user, {}) },
         { key: 'intra_counter', value: parseLS(legacyKeys.counter, {}) },
         { key: 'intra_session', value: parseLS(legacyKeys.session, null) },
-        { key: 'intra_logs', value: parseLS(legacyKeys.logs, []) }
+        { key: 'intra_logs', value: parseLS(legacyKeys.logs, []) },
       ];
 
       for (const item of kvItems) {
@@ -173,8 +175,15 @@ async function initIndexedDB() {
     // próprio try/catch: uma falha isolada não esvazia os demais caches (e
     // registra a marca para o setCacheStore não apagar linhas que não leu).
     const _loadStore = async (name, loader) => {
-      try { _dbCache[name] = await loader(); }
-      catch (_e) { _dbLoadFailed[name] = true; console.warn('⚠️ Falha ao carregar store "' + name + '" do IndexedDB (mantida a tabela):', _e); }
+      try {
+        _dbCache[name] = await loader();
+      } catch (_e) {
+        _dbLoadFailed[name] = true;
+        console.warn(
+          '⚠️ Falha ao carregar store "' + name + '" do IndexedDB (mantida a tabela):',
+          _e
+        );
+      }
     };
     await _loadStore('clients', () => idb.clients.toArray());
     await _loadStore('pendencias', () => idb.pendencias.toArray());
@@ -193,7 +202,7 @@ async function initIndexedDB() {
     await _loadStore('time_entries', () => idb.time_entries.toArray());
 
     const allKV = await idb.keyvalue.toArray();
-    allKV.forEach(item => {
+    allKV.forEach((item) => {
       _dbCache.keyvalue[item.key] = item.value;
     });
 
@@ -202,14 +211,17 @@ async function initIndexedDB() {
       { key: 'intra_user', table: 'user_profile' },
       { key: 'intra_counter', table: 'counters' },
       { key: 'intra_session', table: 'sessions' },
-      { key: 'intra_logs', table: 'audit_logs' }
+      { key: 'intra_logs', table: 'audit_logs' },
     ];
 
     for (const { key, table } of kvMigrations) {
       const val = _dbCache.keyvalue[key];
       if (val !== undefined && val !== null) {
         if (table === 'audit_logs' && Array.isArray(val)) {
-          if (val.length) await idb.audit_logs.bulkPut(val.map((entry, i) => ({ ...entry, id: entry.id || i + 1 })));
+          if (val.length)
+            await idb.audit_logs.bulkPut(
+              val.map((entry, i) => ({ ...entry, id: entry.id || i + 1 }))
+            );
         } else {
           await idb[table].put({ key, value: val });
         }
@@ -223,21 +235,33 @@ async function initIndexedDB() {
     try {
       const userProfile = await idb.user_profile.toArray();
       _dbCache.user_profile = userProfile.length ? userProfile[0] : {};
-    } catch (_e) { _dbLoadFailed.user_profile = true; console.warn('⚠️ Falha ao carregar store "user_profile":', _e); }
+    } catch (_e) {
+      _dbLoadFailed.user_profile = true;
+      console.warn('⚠️ Falha ao carregar store "user_profile":', _e);
+    }
 
     try {
       const counters = await idb.counters.toArray();
       _dbCache.counters = counters.length ? counters[0] : {};
-    } catch (_e) { _dbLoadFailed.counters = true; console.warn('⚠️ Falha ao carregar store "counters":', _e); }
+    } catch (_e) {
+      _dbLoadFailed.counters = true;
+      console.warn('⚠️ Falha ao carregar store "counters":', _e);
+    }
 
     try {
       const sessions = await idb.sessions.toArray();
       _dbCache.sessions = sessions.length ? sessions[0] : {};
-    } catch (_e) { _dbLoadFailed.sessions = true; console.warn('⚠️ Falha ao carregar store "sessions":', _e); }
+    } catch (_e) {
+      _dbLoadFailed.sessions = true;
+      console.warn('⚠️ Falha ao carregar store "sessions":', _e);
+    }
 
     try {
       _dbCache.audit_logs = await idb.audit_logs.toArray();
-    } catch (_e) { _dbLoadFailed.audit_logs = true; console.warn('⚠️ Falha ao carregar store "audit_logs":', _e); }
+    } catch (_e) {
+      _dbLoadFailed.audit_logs = true;
+      console.warn('⚠️ Falha ao carregar store "audit_logs":', _e);
+    }
 
     _dbReady = true;
     console.debug('⚡ IndexedDB carregado no cache com sucesso.');
@@ -261,17 +285,21 @@ function setCacheStore(storeName, items) {
     // FASE 5: sem clear() integral — upsert + remove só chaves obsoletas.
     // Todos os chamadores passam o array COMPLETO (lista, filtrada ou merge),
     // então o resultado final é idêntico ao clear+bulkPut, com ~metade do I/O.
-    _storeWriteQueues[storeName] = previous.then(() => idb.transaction('rw', idb[storeName], async () => {
-      if (!Array.isArray(data)) return;
-      const keep = new Set(data.map(d => d && (d.id ?? d.key)));
-      const keys = await idb[storeName].toCollection().primaryKeys();
-      // Leitura do boot falhou: o cache não sabe o que existe — só faz upsert,
-      // nunca apaga (as "stale" podem ser linhas que não foram lidas).
-      const stale = _dbLoadFailed[storeName] ? [] : keys.filter(k => !keep.has(k));
-      if (stale.length) await idb[storeName].bulkDelete(stale);
-      if (data.length) await idb[storeName].bulkPut(data);
-      else if (!_dbLoadFailed[storeName]) await idb[storeName].clear();
-    })).catch(err => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
+    _storeWriteQueues[storeName] = previous
+      .then(() =>
+        idb.transaction('rw', idb[storeName], async () => {
+          if (!Array.isArray(data)) return;
+          const keep = new Set(data.map((d) => d && (d.id ?? d.key)));
+          const keys = await idb[storeName].toCollection().primaryKeys();
+          // Leitura do boot falhou: o cache não sabe o que existe — só faz upsert,
+          // nunca apaga (as "stale" podem ser linhas que não foram lidas).
+          const stale = _dbLoadFailed[storeName] ? [] : keys.filter((k) => !keep.has(k));
+          if (stale.length) await idb[storeName].bulkDelete(stale);
+          if (data.length) await idb[storeName].bulkPut(data);
+          else if (!_dbLoadFailed[storeName]) await idb[storeName].clear();
+        })
+      )
+      .catch((err) => console.error(`❌ Erro ao persistir ${storeName} no IndexedDB:`, err));
   }
 }
 
@@ -281,12 +309,16 @@ function getCacheKV(key, defaultValue = null) {
 
 function setCacheKV(key, value) {
   _dbCache.keyvalue[key] = value;
-  idb.keyvalue.put({ key, value }).catch(err => console.error(`❌ Erro ao salvar chave ${key} no IndexedDB:`, err));
+  idb.keyvalue
+    .put({ key, value })
+    .catch((err) => console.error(`❌ Erro ao salvar chave ${key} no IndexedDB:`, err));
 }
 
 function removeCacheKV(key) {
   delete _dbCache.keyvalue[key];
-  idb.keyvalue.delete(key).catch(err => console.error(`❌ Erro ao remover chave ${key} no IndexedDB:`, err));
+  idb.keyvalue
+    .delete(key)
+    .catch((err) => console.error(`❌ Erro ao remover chave ${key} no IndexedDB:`, err));
 }
 
 // ── Funções para tabelas v2 dedicadas ──
@@ -300,18 +332,24 @@ function setCacheTable(tableName, data) {
   if (Array.isArray(data)) {
     const previous = _storeWriteQueues[tableName] || Promise.resolve();
     // FASE 5: idem setCacheStore — sem clear() integral.
-    _storeWriteQueues[tableName] = previous.then(() => idb.transaction('rw', idb[tableName], async () => {
-      const keep = new Set(data.map(d => d && (d.id ?? d.key)));
-      const keys = await idb[tableName].toCollection().primaryKeys();
-      const stale = _dbLoadFailed[tableName] ? [] : keys.filter(k => !keep.has(k));
-      if (stale.length) await idb[tableName].bulkDelete(stale);
-      if (data.length) await idb[tableName].bulkPut(data);
-      else if (!_dbLoadFailed[tableName]) await idb[tableName].clear();
-    })).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
+    _storeWriteQueues[tableName] = previous
+      .then(() =>
+        idb.transaction('rw', idb[tableName], async () => {
+          const keep = new Set(data.map((d) => d && (d.id ?? d.key)));
+          const keys = await idb[tableName].toCollection().primaryKeys();
+          const stale = _dbLoadFailed[tableName] ? [] : keys.filter((k) => !keep.has(k));
+          if (stale.length) await idb[tableName].bulkDelete(stale);
+          if (data.length) await idb[tableName].bulkPut(data);
+          else if (!_dbLoadFailed[tableName]) await idb[tableName].clear();
+        })
+      )
+      .catch((err) => console.error(`❌ Erro ao persistir ${tableName}:`, err));
   } else if (data && typeof data === 'object' && data.key) {
-    idb.transaction('rw', idb[tableName], async () => {
-      await idb[tableName].put(data);
-    }).catch(err => console.error(`❌ Erro ao persistir ${tableName}:`, err));
+    idb
+      .transaction('rw', idb[tableName], async () => {
+        await idb[tableName].put(data);
+      })
+      .catch((err) => console.error(`❌ Erro ao persistir ${tableName}:`, err));
   }
 }
 

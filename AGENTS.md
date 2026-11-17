@@ -22,18 +22,35 @@ npm run dev                            # vercel dev
 npm test                               # vitest run
 npm run test:e2e                       # playwright
 npm run lint                           # eslint js tools --max-warnings 0
+npm run typecheck                      # tsc: só arquivos com // @ts-check
+npm run format:check                   # prettier --check .
 ```
 
+**Formatação.** O repositório inteiro é formatado com prettier. Antes de commitar, rode
+`npx prettier --write <arquivos>` nos arquivos que você tocou; o CI falha em
+`format:check`.
+
+**Type-check gradual.** `tsconfig.json` tem `allowJs` e `checkJs: false`: o tsc só
+confere os arquivos de `js/` que começam com `// @ts-check` (hoje `app-events.js`,
+`lazy-libs.js` e `sw-register.js`). Para ampliar: escolha um arquivo pequeno, ponha
+`// @ts-check` na primeira linha e rode `npm run typecheck`. Nome global que o
+arquivo usa e o tsc não acha entra em `js/globals.d.ts` (arquivo só de tipos: não
+é carregado pelo `index.html` nem vai ao bundle). Isso acontece sobretudo com
+funções de arquivos que terminam em `module.exports`, que o tsc trata como módulo.
+
 Sem `js/config.js`, o app roda em modo local com dados de demonstração. O CI
-roda `lint`, `test` e `node tools/build-assets.js --check` em cada PR.
+roda `lint`, `format:check`, `typecheck`, `test`, o E2E (job separado) e `node tools/build-assets.js --check` em cada PR.
 
 ## As armadilhas que custam caro
 
-**`js/` é modo script, não módulo.** Os 69 arquivos são carregados por `<script>`
+**`js/` é modo script, não módulo.** Os 83 arquivos (fora o `config.example.js`) são carregados por `<script>`
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,
-procure se já existe.
+procure se já existe. `tests/globais-colisao.test.js` falha se dois arquivos
+declaram o mesmo nome, e o ESLint (`no-undef`) usa as declarações de topo do
+`index.html` como lista de globais — global criado só via `window.X` precisa entrar
+em `eslint.config.mjs`.
 
 **Nada de handler inline no HTML.** As ações passam por delegação em
 `js/actions.js`. `onclick="..."` no markup não é o padrão daqui.
@@ -59,7 +76,10 @@ existe. `tests/edge-functions-guard.test.js` tranca isso e o `verify_jwt` do
 **Migrations são aplicadas à mão** no SQL Editor, em ordem numérica. Cada arquivo
 traz no cabeçalho o que muda, como verificar e como reverter —
 mantenha esse padrão. `supabase migration list` **não** reflete o banco: a
-tabela de controle do CLI só conhece as primeiras.
+tabela de controle do CLI só conhece as primeiras. Para ver o estado real
+(RLS, policies, grants, buckets, funções), rode `tools/check-schema.sql` no SQL
+Editor — só `SELECT`, sem efeito colateral. O prefixo `011` aparece em dois
+arquivos: a ordem está no cabeçalho de ambos, e o prefixo **não** se renomeia.
 
 **Windows gera CRLF.** Teste que compara texto de arquivo normaliza a quebra de
 linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
@@ -73,12 +93,16 @@ linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
   `tests/_storage.cjs` (`requireStorage()` carrega a fonte de `js/storage.js`),
   `tests/_parts.cjs` (utilitários de UI) e `createRequire(import.meta.url)` para
   CJS.
+- Teste que lê código-fonte como texto (contrato de Edge Function, CSS, SQL) não pode
+  depender da formatação: use `tests/_fonte.cjs` (`fonte()` lê e `norm()` normaliza
+  CRLF, aspas, espaços e vírgula final — passe o trecho esperado por `norm()` também)
+  ou regex com `\s*` e `["']`. Prefira testar comportamento quando for simples.
 - Query do Supabase se mocka com o padrão `mockQ()` — builder que registra as
   chamadas encadeáveis. Referência: `tests/pagination.test.js`.
 - Um `it()` por comportamento. Prefira caso-limite e regra de negócio (escopo de
   team, RLS, estados de pendência) a asserção trivial.
 - Antes de escrever, leia um ou dois testes do mesmo domínio e espelhe o estilo.
-  São 95 arquivos; o estilo já está decidido.
+  São 149 arquivos (~1.950 testes); o estilo já está decidido.
 - Teste novo não quebra teste existente: rode `npm test` até verde.
 
 ## Idioma e escrita
@@ -95,6 +119,10 @@ nisso, siga o tom dos arquivos vizinhos.
 problema que existia antes e por que a solução é essa; invariante que o teste
 protege merece uma linha dizendo isso. Trabalho entra por PR, não por push
 direto na `main`.
+
+Commit de formatação em massa (prettier no repo todo) entra em
+`.git-blame-ignore-revs`, para o `git blame` não apontar para ele. Uma vez por
+clone: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## Dois agentes no mesmo diretório
 
@@ -114,5 +142,6 @@ termina, commita antes de passar a bola — o git é a única coordenação que 
 | [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                 |
 
 Agentes especializados ficam em `.claude/agents/` (Claude Code) e
-`.opencode/agent/` (opencode). Eles herdam este arquivo — contêm só o que é
-próprio do papel.
+`.opencode/agent/` (opencode): `revisor-seguranca` (XSS, RLS, escopo de team) e
+`escritor-testes` (estilo de `tests/`). Eles herdam este arquivo — contêm só o
+que é próprio do papel; o conteúdo dos dois lados deve andar junto.

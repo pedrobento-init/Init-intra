@@ -5,12 +5,11 @@
 
 // ── VISITS (Visitas Técnicas) ──
 const VISIT_STATUS_MAP = {
-  agendada:     { label: 'Agendada',     color: '#0ea5e9' },
+  agendada: { label: 'Agendada', color: '#0ea5e9' },
   em_andamento: { label: 'Em andamento', color: '#f59e0b' },
-  concluida:    { label: 'Concluída',    color: '#16a34a' },
-  cancelada:    { label: 'Cancelada',    color: '#94a3b8' },
+  concluida: { label: 'Concluída', color: '#16a34a' },
+  cancelada: { label: 'Cancelada', color: '#94a3b8' },
 };
-
 
 function formatVisitTimeRange(v) {
   if (!v) return '—';
@@ -22,20 +21,28 @@ function formatVisitTimeRange(v) {
   if (end) return 'até ' + end;
   return '—';
 }
-function getVisits() { return dbGet(DB.VISITS); }
+function getVisits() {
+  return dbGet(DB.VISITS);
+}
 function getVisitsByTeam(team) {
   const all = getVisits();
   if (!team) return all;
-  return all.filter(v => (v.team || 'init') === team);
+  return all.filter((v) => (v.team || 'init') === team);
 }
-function getMyVisits() { return filterByTeam(getVisits()); }
-function getVisitById(id) { return getVisits().find(v => v.id === id) || null; }
+function getMyVisits() {
+  return filterByTeam(getVisits());
+}
+function getVisitById(id) {
+  return getVisits().find((v) => v.id === id) || null;
+}
 function getVisitsByClient(clientId) {
-  return getVisits().filter(v => v.clientId === clientId)
+  return getVisits()
+    .filter((v) => v.clientId === clientId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
 function getVisitsByOperator(operatorName) {
-  return getVisits().filter(v => v.operator === operatorName)
+  return getVisits()
+    .filter((v) => v.operator === operatorName)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
 
@@ -53,21 +60,31 @@ const VISIT_NUMERO_SEQ_KEY = 'intra_visita_numero_seq';
 
 function _visitNumeroOf(v) {
   const n = Number(v && v.numero);
-  return (Number.isInteger(n) && n > 0) ? n : null;
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 function nextVisitNumero() {
   let maxSeen = 0;
   try {
-    for (const v of (getVisits() || [])) {
+    for (const v of getVisits() || []) {
       const n = _visitNumeroOf(v);
       if (n !== null && n > maxSeen) maxSeen = n;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+  }
   let mark = 0;
-  try { mark = Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+  try {
+    mark = Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+  }
   const next = Math.max(maxSeen, mark) + 1;
-  try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+  try {
+    setCacheKV(VISIT_NUMERO_SEQ_KEY, next);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+  }
   return next;
 }
 
@@ -76,7 +93,11 @@ function nextVisitNumero() {
 // duplicados. Roda local, sem rede, após boot e após cada sync.
 function maintainVisitNumeros() {
   let list = [];
-  try { list = getVisits() || []; } catch (_) { return 0; }
+  try {
+    list = getVisits() || [];
+  } catch (_) {
+    return 0;
+  }
   if (!list.length) return 0;
   const byId = new Map();
   let changed = 0;
@@ -87,18 +108,30 @@ function maintainVisitNumeros() {
   const nowIso = new Date().toISOString();
   // 1) Backfill de nulos em ordem determinística (mesma ordem em qualquer
   // aparelho que veja o mesmo conjunto → mesma atribuição).
-  const missing = list.filter(v => _visitNumeroOf(v) === null)
-    .sort((a, b) => keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
+  const missing = list
+    .filter((v) => _visitNumeroOf(v) === null)
+    .sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
   let next = null;
   const alloc = () => {
     if (next === null) {
       let m = 0;
-      for (const v of list) { const n = _visitNumeroOf(v); if (n !== null && n > m) m = n; }
-      try { m = Math.max(m, Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+      for (const v of list) {
+        const n = _visitNumeroOf(v);
+        if (n !== null && n > m) m = n;
+      }
+      try {
+        m = Math.max(m, Number(getCacheKV(VISIT_NUMERO_SEQ_KEY, 0)) || 0);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+      }
       next = m;
     }
     next += 1;
-    try { setCacheKV(VISIT_NUMERO_SEQ_KEY, next); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+    try {
+      setCacheKV(VISIT_NUMERO_SEQ_KEY, next);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
     return next;
   };
   for (const v of missing) {
@@ -111,11 +144,14 @@ function maintainVisitNumeros() {
   // 2) Colisões (mesmo número, ids distintos): mantém o mais antigo
   // (createdAt, id); demais ganham max+1 em ordem determinística.
   const seen = new Map();
-  const ordered = list.slice().sort((a, b) => keyOf(a) < keyOf(b) ? -1 : 1);
+  const ordered = list.slice().sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : 1));
   for (const v of ordered) {
     const n = _visitNumeroOf(v);
     if (n === null || !v.id) continue;
-    if (!seen.has(n)) { seen.set(n, v.id); continue; }
+    if (!seen.has(n)) {
+      seen.set(n, v.id);
+      continue;
+    }
     v.numero = alloc();
     v.updatedAt = nowIso;
     changed++;
@@ -123,9 +159,17 @@ function maintainVisitNumeros() {
   if (changed) {
     const prev = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
     if (typeof window !== 'undefined') window._suppressPendingSync = true;
-    try { dbSet(DB.VISITS, list); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+    try {
+      dbSet(DB.VISITS, list);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
     if (typeof window !== 'undefined') window._suppressPendingSync = prev;
-    try { console.debug('[visitas] maintainVisitNumeros: ' + changed + ' ajuste(s) aplicado(s).'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+    try {
+      console.debug('[visitas] maintainVisitNumeros: ' + changed + ' ajuste(s) aplicado(s).');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
   }
   return changed;
 }
@@ -139,7 +183,9 @@ function saveVisit(data) {
   }
   if (!data.team) data.team = getCurrentTeam();
   // Pessoas por id (049): o id acompanha o nome gravado.
-  if ('operator' in data) data.operatorId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.operator) : null;
+  if ('operator' in data)
+    data.operatorId =
+      typeof operatorIdByName === 'function' ? operatorIdByName(data.operator) : null;
   data.allDay = data.allDay === true;
   if (data.allDay) {
     data.time = '';
@@ -151,9 +197,11 @@ function saveVisit(data) {
   const now = new Date().toISOString();
   let oldStatus = null;
   if (isEdit) {
-    const i = list.findIndex(v => v.id === data.id);
-    if (i !== -1) { oldStatus = list[i].status; list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now }); }
-    else list.push({ ...data, createdAt: now, updatedAt: now });
+    const i = list.findIndex((v) => v.id === data.id);
+    if (i !== -1) {
+      oldStatus = list[i].status;
+      list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
+    } else list.push({ ...data, createdAt: now, updatedAt: now });
   } else {
     data.id = nextId('VIS');
     data.createdAt = now;
@@ -175,19 +223,28 @@ function saveVisit(data) {
   // persistiria. Relatórios de visitas antigas (sem codigo ou sem transição
   // nova) nunca entram sozinhos: sem bulk-finalize.
   // A conclusão local jamais é bloqueada por isso (offline-first).
-  if (data.status === 'concluida' && oldStatus !== 'concluida'
-      && data.milvusChamadoCodigo && Number(data.milvusChamadoCodigo) > 0
-      && !data.milvusFinalizarStatus) {
+  if (
+    data.status === 'concluida' &&
+    oldStatus !== 'concluida' &&
+    data.milvusChamadoCodigo &&
+    Number(data.milvusChamadoCodigo) > 0 &&
+    !data.milvusFinalizarStatus
+  ) {
     data.milvusFinalizarStatus = 'pendente';
     if (data.milvusFinalizarTentativas === undefined) data.milvusFinalizarTentativas = 0;
-    const j = list.findIndex(v => v.id === data.id);
+    const j = list.findIndex((v) => v.id === data.id);
     if (j !== -1) {
       list[j].milvusFinalizarStatus = data.milvusFinalizarStatus;
       list[j].milvusFinalizarTentativas = data.milvusFinalizarTentativas;
     }
   }
   dbSet(DB.VISITS, list);
-  addLog(isEdit ? 'Editou' : 'Criou', 'Visita', data.id, data.clientName + ' – ' + (data.motivo || ''));
+  addLog(
+    isEdit ? 'Editou' : 'Criou',
+    'Visita',
+    data.id,
+    data.clientName + ' – ' + (data.motivo || '')
+  );
 
   if (data.status === 'concluida' && oldStatus !== 'concluida' && data.recurrence) {
     try {
@@ -195,12 +252,19 @@ function saveVisit(data) {
       // Idempotência: concluir a mesma visita 2× (reload, offline/online, 2
       // dispositivos) não pode duplicar a ocorrência. Chave lógica: mesmo
       // cliente + mesma data + mesmo motivo.
-      const already = nextDate && getVisits().some(x => x.id !== data.id
-        && (x.clientId || '') === (data.clientId || '')
-        && (x.date || '') === nextDate
-        && (x.motivo || '') === (data.motivo || ''));
+      const already =
+        nextDate &&
+        getVisits().some(
+          (x) =>
+            x.id !== data.id &&
+            (x.clientId || '') === (data.clientId || '') &&
+            (x.date || '') === nextDate &&
+            (x.motivo || '') === (data.motivo || '')
+        );
       if (already) {
-        console.debug('[recorrência] visita de ' + nextDate + ' já existe — geração pulada (sem duplicar).');
+        console.debug(
+          '[recorrência] visita de ' + nextDate + ' já existe — geração pulada (sem duplicar).'
+        );
       } else {
         saveVisit({
           clientId: data.clientId,
@@ -216,103 +280,171 @@ function saveVisit(data) {
           team: data.team || 'init',
           recurrence: data.recurrence,
           // A próxima ocorrência leva a mesma lista, toda por separar.
-          ...(Array.isArray(data.levar) ? { levar: data.levar.map(i => ({ t: i.t, ok: false })) } : {}),
+          ...(Array.isArray(data.levar)
+            ? { levar: data.levar.map((i) => ({ t: i.t, ok: false })) }
+            : {}),
         });
       }
-    } catch (e) { console.warn('⚠️ Erro ao gerar visita recorrente:', e); }
+    } catch (e) {
+      console.warn('⚠️ Erro ao gerar visita recorrente:', e);
+    }
   }
 
   // Payload remoto da visita a partir do registro MESCLADO (numero, categories,
   // checklist e campos milvus_* preservados) — ver SYNC-07.
-  const _idxV = list.findIndex(v => v.id === data.id);
+  const _idxV = list.findIndex((v) => v.id === data.id);
   const _fullV = _idxV !== -1 ? list[_idxV] : data;
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('visits').upsert({
-      id: _fullV.id,
-      client_id: _fullV.clientId,
-      client_name: _fullV.clientName,
-      operator: _fullV.operator,
-      date: _fullV.date,
-      time: _fullV.allDay ? null : (_fullV.time || null),
-      time_end: _fullV.allDay ? null : (_fullV.timeEnd || null),
-      all_day: _fullV.allDay === true,
-      motivo: _fullV.motivo,
-      observacoes: _fullV.observacoes || '',
-      relatorio: _fullV.relatorio || '',
-      status: _fullV.status,
-      recurrence: _fullV.recurrence || null,
-      team: _fullV.team || 'init',
-      categories: _fullV.categories || [],
-      checklist: _fullV.checklist || [],
-      numero: _visitNumeroOf(_fullV),
-      milvus_chamado_codigo: _fullV.milvusChamadoCodigo ?? null,
-      milvus_chamado_status: _fullV.milvusChamadoStatus ?? null,
-      milvus_chamado_erro: _fullV.milvusChamadoErro ?? null,
-      milvus_chamado_tentativas: _fullV.milvusChamadoTentativas ?? 0,
-      milvus_finalizar_status: _fullV.milvusFinalizarStatus ?? null,
-      milvus_finalizar_erro: _fullV.milvusFinalizarErro ?? null,
-      milvus_finalizar_tentativas: _fullV.milvusFinalizarTentativas ?? 0,
-      // 058: só vai quando a visita tem a lista (banco sem a coluna não quebra).
-      ...(Array.isArray(_fullV.levar) ? { levar: _fullV.levar } : {}),
-      // 060: idem para Cheguei/Saí.
-      ...(_fullV.checkinAt ? { checkin_at: _fullV.checkinAt } : {}),
-      ...(_fullV.checkoutAt ? { checkout_at: _fullV.checkoutAt } : {}),
-      // 054: assinatura do cliente (sem ela aqui, o servidor ficava sem a
-      // assinatura e o próximo sync apagava a cópia local).
-      ...(_fullV.assinatura ? { assinatura: _fullV.assinatura, assinatura_nome: _fullV.assinaturaNome || '', assinatura_em: _fullV.assinaturaEm || null } : {}),
-      // 049: id do técnico acompanha o nome.
-      ...(_fullV.operatorId ? { operator_id: _fullV.operatorId } : {}),
-      created_at: _fullV.createdAt,
-      updated_at: now
-    }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('visits')
+      .upsert({
+        id: _fullV.id,
+        client_id: _fullV.clientId,
+        client_name: _fullV.clientName,
+        operator: _fullV.operator,
+        date: _fullV.date,
+        time: _fullV.allDay ? null : _fullV.time || null,
+        time_end: _fullV.allDay ? null : _fullV.timeEnd || null,
+        all_day: _fullV.allDay === true,
+        motivo: _fullV.motivo,
+        observacoes: _fullV.observacoes || '',
+        relatorio: _fullV.relatorio || '',
+        status: _fullV.status,
+        recurrence: _fullV.recurrence || null,
+        team: _fullV.team || 'init',
+        categories: _fullV.categories || [],
+        checklist: _fullV.checklist || [],
+        numero: _visitNumeroOf(_fullV),
+        milvus_chamado_codigo: _fullV.milvusChamadoCodigo ?? null,
+        milvus_chamado_status: _fullV.milvusChamadoStatus ?? null,
+        milvus_chamado_erro: _fullV.milvusChamadoErro ?? null,
+        milvus_chamado_tentativas: _fullV.milvusChamadoTentativas ?? 0,
+        milvus_finalizar_status: _fullV.milvusFinalizarStatus ?? null,
+        milvus_finalizar_erro: _fullV.milvusFinalizarErro ?? null,
+        milvus_finalizar_tentativas: _fullV.milvusFinalizarTentativas ?? 0,
+        // 058: só vai quando a visita tem a lista (banco sem a coluna não quebra).
+        ...(Array.isArray(_fullV.levar) ? { levar: _fullV.levar } : {}),
+        // 060: idem para Cheguei/Saí.
+        ...(_fullV.checkinAt ? { checkin_at: _fullV.checkinAt } : {}),
+        ...(_fullV.checkoutAt ? { checkout_at: _fullV.checkoutAt } : {}),
+        // 054: assinatura do cliente (sem ela aqui, o servidor ficava sem a
+        // assinatura e o próximo sync apagava a cópia local).
+        ...(_fullV.assinatura
+          ? {
+              assinatura: _fullV.assinatura,
+              assinatura_nome: _fullV.assinaturaNome || '',
+              assinatura_em: _fullV.assinaturaEm || null,
+            }
+          : {}),
+        // 049: id do técnico acompanha o nome.
+        ...(_fullV.operatorId ? { operator_id: _fullV.operatorId } : {}),
+        created_at: _fullV.createdAt,
+        updated_at: now,
+      })
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase visita:', String(res.error.message || res.error));
+          markSyncPushFailed();
+          _outboxFail('visits', 'upsert', _fullV, res.error);
+        }
+      })
+      .catch(() => {
+        markSyncPushFailed();
+        _outboxFail('visits', 'upsert', _fullV, null, true);
+      });
+  } else {
+    _outboxOffline('visits', 'upsert', _fullV);
   }
 
   // Integração Milvus (fire-and-forget, só em criações): com rede, tenta
   // criar o chamado já; offline, a visita segue 'pendente' no local e o
   // processador retoma no pós-sync/online/boot. Nunca bloqueia nem lança.
   if (!isEdit) {
-    try { if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+    try {
+      if (typeof enqueueMilvusChamado === 'function') enqueueMilvusChamado(data.id);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
   }
   // Finalização Milvus (etapa 2, fire-and-forget): visita concluída com
   // finalização pendente tenta finalizar já; offline/sem rede o processador
   // retoma depois. Nunca bloqueia a conclusão nem lança.
   if (data.status === 'concluida') {
-    try { if (typeof enqueueMilvusFinalizar === 'function') enqueueMilvusFinalizar(data.id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+    try {
+      if (typeof enqueueMilvusFinalizar === 'function') enqueueMilvusFinalizar(data.id);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
   }
   return data;
 }
 function deleteVisit(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir visitas.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir visitas.', 'error');
     return false;
   }
   const v = getVisitById(id);
-  const desc = v ? (v.clientName + ' – ' + (v.motivo || '')) : 'Desconhecido';
-  dbSet(DB.VISITS, getVisits().filter(x => x.id !== id));
+  const desc = v ? v.clientName + ' – ' + (v.motivo || '') : 'Desconhecido';
+  dbSet(
+    DB.VISITS,
+    getVisits().filter((x) => x.id !== id)
+  );
   _addTombstone(DB.VISITS, id);
   addLog('Excluiu', 'Visita', id, desc);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir visita:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    _outboxDropTarget(id);
+    supabaseClient
+      .from('visits')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir visita:', res.error);
+          markSyncPushFailed();
+          _outboxFail('visits', 'delete', { id }, res.error);
+        }
+      })
+      .catch(() => {
+        markSyncPushFailed();
+        _outboxFail('visits', 'delete', { id }, null, true);
+      });
+  } else {
+    _outboxOffline('visits', 'delete', { id });
   }
 }
 
 // ── REUNIÕES (Reunião Mensal) ──
-function getReunioes() { return dbGet(DB.REUNIOES); }
+function getReunioes() {
+  return dbGet(DB.REUNIOES);
+}
 function getReunioesByTeam(team) {
   const all = getReunioes();
   if (!team) return all;
-  return all.filter(r => (r.team || 'init') === team);
+  return all.filter((r) => (r.team || 'init') === team);
 }
-function getMyReunioes() { return filterByTeam(getReunioes()); }
-function getReuniaoById(id) { return getReunioes().find(r => r.id === id) || null; }
+function getMyReunioes() {
+  return filterByTeam(getReunioes());
+}
+function getReuniaoById(id) {
+  return getReunioes().find((r) => r.id === id) || null;
+}
 function saveReuniao(data) {
   const list = getReunioes();
   const isEdit = !!data.id;
   const now = new Date().toISOString();
   if (!data.team) data.team = getCurrentTeam();
   if (isEdit) {
-    const i = list.findIndex(r => r.id === data.id);
+    const i = list.findIndex((r) => r.id === data.id);
     if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
     else list.push({ ...data, createdAt: now, updatedAt: now });
   } else {
@@ -324,67 +456,115 @@ function saveReuniao(data) {
   dbSet(DB.REUNIOES, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Reunião', data.id, data.mesAno || '');
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('reunioes').upsert({
-      id: data.id,
-      mes_ano: data.mesAno || null,
-      status: data.status || 'aberta',
-      started_at: data.startedAt || null,
-      ended_at: data.endedAt || null,
-      team: data.team || 'init',
-      relatorio: data.relatorio || '',
-      participants: data.participants || [],
-      created_at: data.createdAt || now,
-      updated_at: now
-    }).then(res => {
-      if (res.error) { console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); }
-    }).catch(err => {
-      console.warn('⚠️ Erro de rede Supabase reunião:', err.message);
-      markSyncPushFailed();
-    });
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('reunioes')
+      .upsert({
+        id: data.id,
+        mes_ano: data.mesAno || null,
+        status: data.status || 'aberta',
+        started_at: data.startedAt || null,
+        ended_at: data.endedAt || null,
+        team: data.team || 'init',
+        relatorio: data.relatorio || '',
+        participants: data.participants || [],
+        created_at: data.createdAt || now,
+        updated_at: now,
+      })
+      .then((res) => {
+        if (res.error) {
+          console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message);
+          markSyncPushFailed();
+          _outboxFail('reunioes', 'upsert', data, res.error);
+        }
+      })
+      .catch((err) => {
+        console.warn('⚠️ Erro de rede Supabase reunião:', err.message);
+        markSyncPushFailed();
+        _outboxFail('reunioes', 'upsert', data, null, true);
+      });
+  } else {
+    _outboxOffline('reunioes', 'upsert', data);
   }
 
   return data;
 }
 function deleteReuniao(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir reuniões.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir reuniões.', 'error');
     return false;
   }
   const r = getReuniaoById(id);
   const desc = r ? r.mesAno : 'Desconhecida';
-  dbSet(DB.REUNIOES, getReunioes().filter(x => x.id !== id));
+  dbSet(
+    DB.REUNIOES,
+    getReunioes().filter((x) => x.id !== id)
+  );
   _addTombstone(DB.REUNIOES, id);
   addLog('Excluiu', 'Reunião', id, desc);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir reunião:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    _outboxDropTarget(id);
+    supabaseClient
+      .from('reunioes')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir reunião:', res.error);
+          markSyncPushFailed();
+          _outboxFail('reunioes', 'delete', { id }, res.error);
+        }
+      })
+      .catch(() => {
+        markSyncPushFailed();
+        _outboxFail('reunioes', 'delete', { id }, null, true);
+      });
+  } else {
+    _outboxOffline('reunioes', 'delete', { id });
   }
 }
 
 // ── EQUIPAMENTOS ──
-function getEquipamentos() { return dbGet(DB.EQUIPAMENTOS); }
+function getEquipamentos() {
+  return dbGet(DB.EQUIPAMENTOS);
+}
 function getEquipamentosByTeam(team) {
   const all = getEquipamentos();
   if (!team) return all;
-  return all.filter(e => (e.team || 'init') === team);
+  return all.filter((e) => (e.team || 'init') === team);
 }
-function getMyEquipamentos() { return filterByTeam(getEquipamentos()); }
-function getEquipamentoById(id) { return getEquipamentos().find(e => e.id === id) || null; }
+function getMyEquipamentos() {
+  return filterByTeam(getEquipamentos());
+}
+function getEquipamentoById(id) {
+  return getEquipamentos().find((e) => e.id === id) || null;
+}
 function getEquipamentosByClient(clientId) {
-  return getEquipamentos().filter(e => e.clientId === clientId)
+  return getEquipamentos()
+    .filter((e) => e.clientId === clientId)
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' }));
 }
 function saveEquipamento(data) {
   const list = getEquipamentos();
   const isEdit = !!data.id;
-  const prev = isEdit ? list.find(e => e.id === data.id) : null;
+  const prev = isEdit ? list.find((e) => e.id === data.id) : null;
   // Edição cruzada de equipe é recusada na storage, não só na tela — e o
   // dono do registro não muda por edição: sem team explícito, vale o da
   // ficha atual (antes um ativo de estoque sem cliente herdava o team de
   // quem editou e passava a ser dele).
   if (isEdit && prev && typeof canViewTeam === 'function' && !canViewTeam(prev.team || 'init')) {
-    if (typeof showToast === 'function') showToast('Permissão negada: equipamento de outra equipe.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada: equipamento de outra equipe.', 'error');
     return null;
   }
   const now = new Date().toISOString();
@@ -394,14 +574,23 @@ function saveEquipamento(data) {
   if (!data.pendenciaId && data.osVinculada) {
     try {
       const maybe = String(data.osVinculada).trim();
-      if (maybe && typeof getPendenciaById === 'function' && getPendenciaById(maybe)) data.pendenciaId = maybe;
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+      if (maybe && typeof getPendenciaById === 'function' && getPendenciaById(maybe))
+        data.pendenciaId = maybe;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
   }
   if (!data.team && data.clientId && data.clientId !== '__estoque__') {
     const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
     if (client) data.team = client.team || 'init';
   }
-  if (!data.team) data.team = (isEdit && prev && prev.team) ? prev.team : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init');
+  if (!data.team)
+    data.team =
+      isEdit && prev && prev.team
+        ? prev.team
+        : typeof getCurrentTeam === 'function'
+          ? getCurrentTeam()
+          : 'init';
   // Estoque Initnet é valor interno: sem vínculo de cliente.
   if (data.clientId === '__estoque__' || data.clientId === 'estoque-initnet') {
     data.clientId = null;
@@ -412,7 +601,7 @@ function saveEquipamento(data) {
     if (client) data.clientName = client.name;
   }
   if (isEdit) {
-    const i = list.findIndex(e => e.id === data.id);
+    const i = list.findIndex((e) => e.id === data.id);
     if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
     else list.push({ ...data, createdAt: data.createdAt || now, updatedAt: now });
   } else {
@@ -422,70 +611,149 @@ function saveEquipamento(data) {
     list.push(data);
   }
   dbSet(DB.EQUIPAMENTOS, list);
-  if (typeof addLog === 'function') addLog(isEdit ? 'Editou' : 'Criou', 'Equipamento', data.id, data.nome || '');
+  if (typeof addLog === 'function')
+    addLog(isEdit ? 'Editou' : 'Criou', 'Equipamento', data.id, data.nome || '');
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    typeof window !== 'undefined' &&
+    window._supabaseAuthActive
+  ) {
     try {
-      supabaseClient.from('equipamentos').upsert({
-        id: data.id,
-        nome: data.nome || '',
-        numero_serie: data.numeroSerie || '',
-        tipo: data.tipo || 'outro',
-        client_id: data.clientId || null,
-        client_name: data.clientName || 'Estoque Initnet',
-        os_vinculada: data.osVinculada || null,
-        pendencia_id: data.pendenciaId || null,
-        status: data.status || 'estoque',
-        valor: (data.valor === '' || data.valor == null) ? null : Number(data.valor) || 0,
-        data_aquisicao: data.dataAquisicao || null,
-        observacoes: data.observacoes || '',
-        team: data.team || 'init',
-        created_at: data.createdAt || now,
-        updated_at: now
-      }).then(res => { if (res.error) { console.warn('⚠️ Supabase equipamento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
-    } catch (_) { /* tabela pode não existir ainda — sync genérico cobre quando existir */ }
+      supabaseClient
+        .from('equipamentos')
+        .upsert({
+          id: data.id,
+          nome: data.nome || '',
+          numero_serie: data.numeroSerie || '',
+          tipo: data.tipo || 'outro',
+          client_id: data.clientId || null,
+          client_name: data.clientName || 'Estoque Initnet',
+          os_vinculada: data.osVinculada || null,
+          pendencia_id: data.pendenciaId || null,
+          status: data.status || 'estoque',
+          valor: data.valor === '' || data.valor == null ? null : Number(data.valor) || 0,
+          data_aquisicao: data.dataAquisicao || null,
+          observacoes: data.observacoes || '',
+          team: data.team || 'init',
+          created_at: data.createdAt || now,
+          updated_at: now,
+        })
+        .then((res) => {
+          if (res.error) {
+            console.warn('⚠️ Supabase equipamento:', res.error.message);
+            markSyncPushFailed();
+            _outboxFail('equipamentos', 'upsert', data, res.error);
+          }
+        })
+        .catch(() => {
+          markSyncPushFailed();
+          _outboxFail('equipamentos', 'upsert', data, null, true);
+        });
+    } catch (_) {
+      /* tabela pode não existir ainda — sync genérico cobre quando existir */
+    }
+  } else {
+    _outboxOffline('equipamentos', 'upsert', data);
   }
 
   return data;
 }
 function deleteEquipamento(id) {
   if (typeof canDelete === 'function' && !canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir equipamentos.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir equipamentos.', 'error');
     return false;
   }
   const eq = getEquipamentoById(id);
-  const desc = eq ? (eq.nome || 'Desconhecido') : 'Desconhecido';
-  dbSet(DB.EQUIPAMENTOS, getEquipamentos().filter(e => e.id !== id));
+  const desc = eq ? eq.nome || 'Desconhecido' : 'Desconhecido';
+  dbSet(
+    DB.EQUIPAMENTOS,
+    getEquipamentos().filter((e) => e.id !== id)
+  );
   _addTombstone(DB.EQUIPAMENTOS, id);
   if (typeof addLog === 'function') addLog('Excluiu', 'Equipamento', id, desc);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    typeof window !== 'undefined' &&
+    window._supabaseAuthActive
+  ) {
     try {
-      supabaseClient.from('equipamentos').delete().eq('id', id)
-        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir equipamento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+      _outboxDropTarget(id);
+      supabaseClient
+        .from('equipamentos')
+        .delete()
+        .eq('id', id)
+        .then((res) => {
+          if (res.error) {
+            console.warn('⚠️ Supabase excluir equipamento:', res.error.message);
+            markSyncPushFailed();
+            _outboxFail('equipamentos', 'delete', { id }, res.error);
+          }
+        })
+        .catch(() => {
+          markSyncPushFailed();
+          _outboxFail('equipamentos', 'delete', { id }, null, true);
+        });
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
+  } else {
+    _outboxOffline('equipamentos', 'delete', { id });
   }
 }
 
 // ── VENCIMENTOS ──
-function getVencimentos() { return dbGet(DB.VENCIMENTOS); }
+function getVencimentos() {
+  return dbGet(DB.VENCIMENTOS);
+}
 function getMyVencimentos() {
-  const team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam : null;
+  const team =
+    typeof isTeamAdmin === 'function' &&
+    isTeamAdmin() &&
+    typeof _selectedTeam !== 'undefined' &&
+    _selectedTeam
+      ? _selectedTeam
+      : null;
   const all = getVencimentos();
-  if (team) return all.filter(v => (v.team || 'init') === team);
+  if (team) return all.filter((v) => (v.team || 'init') === team);
   return filterByTeam(all);
 }
-function getVencimentoById(id) { return getVencimentos().find(v => v.id === id) || null; }
+function getVencimentoById(id) {
+  return getVencimentos().find((v) => v.id === id) || null;
+}
 function _pushVencimento(data) {
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || typeof window === 'undefined' || !window._supabaseAuthActive) return;
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof window === 'undefined' ||
+    !window._supabaseAuthActive
+  ) {
+    _outboxOffline('vencimentos', 'upsert', data);
+    return;
+  }
   try {
-    const e = ENTITIES.find(x => x.table === 'vencimentos');
-    supabaseClient.from('vencimentos').upsert(_mapToRemote(data, e.fields, e.optionalFields))
-      .then(res => { if (res.error) { console.warn('⚠️ Supabase vencimento:', res.error.message); markSyncPushFailed(); } })
-      .catch(() => markSyncPushFailed());
-  } catch (_) { /* tabela pode não existir ainda — o sync genérico cobre */ }
+    const e = ENTITIES.find((x) => x.table === 'vencimentos');
+    supabaseClient
+      .from('vencimentos')
+      .upsert(_mapToRemote(data, e.fields, e.optionalFields))
+      .then((res) => {
+        if (res.error) {
+          console.warn('⚠️ Supabase vencimento:', res.error.message);
+          markSyncPushFailed();
+          _outboxFail('vencimentos', 'upsert', data, res.error);
+        }
+      })
+      .catch(() => {
+        markSyncPushFailed();
+        _outboxFail('vencimentos', 'upsert', data, null, true);
+      });
+  } catch (_) {
+    /* tabela pode não existir ainda — o sync genérico cobre */
+  }
 }
 /** @param {{ silent?: boolean }} [opts] silent: sem log (marcação interna de aviso enviado) */
 function saveVencimento(data, opts) {
@@ -494,42 +762,86 @@ function saveVencimento(data, opts) {
   const now = new Date().toISOString();
   if (data.clientId) {
     const client = typeof getClientById === 'function' ? getClientById(data.clientId) : null;
-    if (client) { data.clientName = client.name; if (!data.team) data.team = client.team || 'init'; }
+    if (client) {
+      data.clientName = client.name;
+      if (!data.team) data.team = client.team || 'init';
+    }
   } else {
     data.clientId = null;
     data.clientName = data.clientName || 'Interno';
   }
   if (!data.team) data.team = typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init';
-  if ('responsavel' in data) data.responsavelId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.responsavel) : null;
+  if ('responsavel' in data)
+    data.responsavelId =
+      typeof operatorIdByName === 'function' ? operatorIdByName(data.responsavel) : null;
   let saved;
   if (isEdit) {
-    const i = list.findIndex(v => v.id === data.id);
-    saved = i !== -1 ? _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now }) : { ...data, createdAt: data.createdAt || now, updatedAt: now };
-    if (i !== -1) list[i] = saved; else list.push(saved);
+    const i = list.findIndex((v) => v.id === data.id);
+    saved =
+      i !== -1
+        ? _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now })
+        : { ...data, createdAt: data.createdAt || now, updatedAt: now };
+    if (i !== -1) list[i] = saved;
+    else list.push(saved);
   } else {
-    saved = { status: 'ativo', avisos: [], historico: [], ...data, id: nextId('VEN'), createdAt: now, updatedAt: now };
+    saved = {
+      status: 'ativo',
+      avisos: [],
+      historico: [],
+      ...data,
+      id: nextId('VEN'),
+      createdAt: now,
+      updatedAt: now,
+    };
     list.push(saved);
   }
   dbSet(DB.VENCIMENTOS, list);
-  if (!(opts && opts.silent) && typeof addLog === 'function') addLog(isEdit ? 'Editou' : 'Criou', 'Vencimento', saved.id, saved.descricao || '');
+  if (!(opts && opts.silent) && typeof addLog === 'function')
+    addLog(isEdit ? 'Editou' : 'Criou', 'Vencimento', saved.id, saved.descricao || '');
   _pushVencimento(saved);
   return saved;
 }
 function deleteVencimento(id) {
   if (typeof canDelete === 'function' && !canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir vencimentos.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir vencimentos.', 'error');
     return false;
   }
   const cur = getVencimentoById(id);
-  dbSet(DB.VENCIMENTOS, getVencimentos().filter(v => v.id !== id));
+  dbSet(
+    DB.VENCIMENTOS,
+    getVencimentos().filter((v) => v.id !== id)
+  );
   _addTombstone(DB.VENCIMENTOS, id);
   if (typeof addLog === 'function') addLog('Excluiu', 'Vencimento', id, cur ? cur.descricao : '');
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    typeof window !== 'undefined' &&
+    window._supabaseAuthActive
+  ) {
     try {
-      supabaseClient.from('vencimentos').delete().eq('id', id)
-        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir vencimento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+      _outboxDropTarget(id);
+      supabaseClient
+        .from('vencimentos')
+        .delete()
+        .eq('id', id)
+        .then((res) => {
+          if (res.error) {
+            console.warn('⚠️ Supabase excluir vencimento:', res.error.message);
+            markSyncPushFailed();
+            _outboxFail('vencimentos', 'delete', { id }, res.error);
+          }
+        })
+        .catch(() => {
+          markSyncPushFailed();
+          _outboxFail('vencimentos', 'delete', { id }, null, true);
+        });
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas');
+    }
+  } else {
+    _outboxOffline('vencimentos', 'delete', { id });
   }
   return true;
 }
@@ -537,14 +849,14 @@ function deleteVencimento(id) {
 // ── PROCEDURES ──
 function getProcedures(clientId) {
   const all = dbGet(DB.PROCEDURES);
-  return clientId ? all.filter(p => p.clientId === clientId) : all;
+  return clientId ? all.filter((p) => p.clientId === clientId) : all;
 }
 function saveProcedure(data) {
   const list = dbGet(DB.PROCEDURES);
   const isEdit = !!data.id;
   var now = new Date().toISOString();
   if (isEdit) {
-    const i = list.findIndex(p => p.id === data.id);
+    const i = list.findIndex((p) => p.id === data.id);
     if (i !== -1) list[i] = _withDirtyFields(list[i], { ...list[i], ...data, updatedAt: now });
   } else {
     data.id = nextId('PROC');
@@ -555,36 +867,69 @@ function saveProcedure(data) {
   dbSet(DB.PROCEDURES, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Procedimento', data.id, data.title);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedures').upsert({
-      id: data.id,
-      client_id: data.clientId,
-      title: data.title,
-      category: data.category,
-      content: data.content,
-      created_at: data.createdAt || now,
-      updated_at: now,
-      // Artigo da base (sem cliente) leva a equipe — a RLS da 042 decide por ela.
-      ...(list.find(p => p.id === data.id)?.team ? { team: list.find(p => p.id === data.id).team } : {})
-    }).then(res => { if(res.error) { console.error('❌ Supabase procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('procedures')
+      .upsert({
+        id: data.id,
+        client_id: data.clientId,
+        title: data.title,
+        category: data.category,
+        content: data.content,
+        created_at: data.createdAt || now,
+        updated_at: now,
+        // Artigo da base (sem cliente) leva a equipe — a RLS da 042 decide por ela.
+        ...(list.find((p) => p.id === data.id)?.team
+          ? { team: list.find((p) => p.id === data.id).team }
+          : {}),
+      })
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase procedimento:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
   }
 
   return data;
 }
 function deleteProcedure(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir procedimentos.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir procedimentos.', 'error');
     return false;
   }
   const list = dbGet(DB.PROCEDURES);
-  const proc = list.find(p => p.id === id);
+  const proc = list.find((p) => p.id === id);
   const title = proc ? proc.title : 'Desconhecido';
-  dbSet(DB.PROCEDURES, list.filter(p => p.id !== id));
+  dbSet(
+    DB.PROCEDURES,
+    list.filter((p) => p.id !== id)
+  );
   _addTombstone(DB.PROCEDURES, id);
   addLog('Excluiu', 'Procedimento', id, title);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedures').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('procedures')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir procedimento:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
   }
 }
 
@@ -593,7 +938,7 @@ function getProcedureTemplates() {
   return dbGet(DB.PROCEDURE_TEMPLATES);
 }
 function getProcedureTemplateById(id) {
-  return getProcedureTemplates().find(t => t.id === id) || null;
+  return getProcedureTemplates().find((t) => t.id === id) || null;
 }
 function saveProcedureTemplate(data) {
   const list = dbGet(DB.PROCEDURE_TEMPLATES);
@@ -603,7 +948,7 @@ function saveProcedureTemplate(data) {
   var now = new Date().toISOString();
 
   if (isEdit) {
-    const i = list.findIndex(t => t.id === data.id);
+    const i = list.findIndex((t) => t.id === data.id);
     if (i !== -1) list[i] = { ...list[i], ...data, createdBy: author, updatedAt: now };
   } else {
     data.id = nextId('TPL');
@@ -615,34 +960,65 @@ function saveProcedureTemplate(data) {
   dbSet(DB.PROCEDURE_TEMPLATES, list);
   addLog(isEdit ? 'Editou' : 'Criou', 'Modelo Procedimento', data.id, data.title);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedure_templates').upsert({
-      id: data.id,
-      title: data.title,
-      category: data.category,
-      content: data.content,
-      created_by: data.createdBy,
-      created_at: data.createdAt || now,
-      updated_at: now
-    }).then(res => { if(res.error) { console.error('❌ Supabase modelo procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('procedure_templates')
+      .upsert({
+        id: data.id,
+        title: data.title,
+        category: data.category,
+        content: data.content,
+        created_by: data.createdBy,
+        created_at: data.createdAt || now,
+        updated_at: now,
+      })
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase modelo procedimento:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
   }
 
   return data;
 }
 function deleteProcedureTemplate(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir modelos de procedimento.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir modelos de procedimento.', 'error');
     return false;
   }
   const list = dbGet(DB.PROCEDURE_TEMPLATES);
-  const tpl = list.find(t => t.id === id);
+  const tpl = list.find((t) => t.id === id);
   const title = tpl ? tpl.title : 'Desconhecido';
-  dbSet(DB.PROCEDURE_TEMPLATES, list.filter(t => t.id !== id));
+  dbSet(
+    DB.PROCEDURE_TEMPLATES,
+    list.filter((t) => t.id !== id)
+  );
   _addTombstone(DB.PROCEDURE_TEMPLATES, id);
   addLog('Excluiu', 'Modelo Procedimento', id, title);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('procedure_templates').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir modelo procedimento:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('procedure_templates')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir modelo procedimento:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
   }
   return true;
 }

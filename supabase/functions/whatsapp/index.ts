@@ -29,9 +29,9 @@
 //   (o envio usa WAHA_BASE_URL, WAHA_API_KEY e WAHA_SESSION, mas só no
 //   whatsapp-responder.)
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { type EmailEntrada, entradaDaCaixa, notaDoSolicitante } from "../robo/campo.ts";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+import { type SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { type EmailEntrada, entradaDaCaixa, notaDoSolicitante } from '../robo/campo.ts';
 import {
   assuntoDaMensagem,
   chaveTelefone,
@@ -43,8 +43,8 @@ import {
   type MensagemWhats,
   PEN_FECHADOS,
   tempoConstante,
-} from "./mensagem.ts";
-import { mensagensDoWebhook } from "./provedor.ts";
+} from './mensagem.ts';
+import { mensagensDoWebhook } from './provedor.ts';
 
 type ClienteFone = {
   id: string;
@@ -66,7 +66,7 @@ type Aberto = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -75,10 +75,10 @@ async function todosOsClientes(db: SupabaseClient): Promise<ClienteFone[]> {
   const out: ClienteFone[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db
-      .from("clients")
-      .select("id, name, team, technician, owner_phone, responsible_phone")
+      .from('clients')
+      .select('id, name, team, technician, owner_phone, responsible_phone')
       .range(from, from + 999);
-    if (error) throw new Error("clients: " + error.message);
+    if (error) throw new Error('clients: ' + error.message);
     out.push(...((data || []) as ClienteFone[]));
     if (!data || data.length < 1000) return out;
   }
@@ -93,17 +93,17 @@ async function clienteDaMensagem(
 ): Promise<ClienteFone | null> {
   const chave = chaveTelefone(telefone);
   if (!chave) return null;
-  const { data, error } = await db.rpc("clientes_do_telefone", { p_chave: chave });
+  const { data, error } = await db.rpc('clientes_do_telefone', { p_chave: chave });
   if (!error) return clienteDoTelefone((data || []) as ClienteFone[], telefone);
   // Erro de verdade não derruba a mensagem: a chave de dedupe já foi gravada,
   // então um 500 aqui faria a reentrega ser ignorada e a mensagem sumir. Sem
   // cliente, ela ao menos chega na caixa para alguém escolher.
   if (!funcaoAusente(error)) {
-    console.error("whatsapp clientes_do_telefone:", error.message);
+    console.error('whatsapp clientes_do_telefone:', error.message);
     return null;
   }
   if (!cache.todos) {
-    console.warn("whatsapp: migration 077 não aplicada, casando cliente pela tabela inteira");
+    console.warn('whatsapp: migration 077 não aplicada, casando cliente pela tabela inteira');
     cache.todos = await todosOsClientes(db);
   }
   return clienteDoTelefone(cache.todos, telefone);
@@ -116,17 +116,23 @@ async function clienteDaMensagem(
 // como pedido novo, em vez de sumir.
 type Anexo = { ok: true } | { ok: false; naoAchou: boolean; erro: string };
 async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Promise<Anexo> {
-  const { data, error } = await db.rpc("append_pendencia_note", { p_id: aberto.id, p_team: aberto.team, p_nota: nota });
+  const { data, error } = await db.rpc('append_pendencia_note', {
+    p_id: aberto.id,
+    p_team: aberto.team,
+    p_nota: nota,
+  });
   if (!error)
-    return data === true ? { ok: true } : { ok: false, naoAchou: true, erro: "chamado mudou de equipe ou sumiu" };
+    return data === true
+      ? { ok: true }
+      : { ok: false, naoAchou: true, erro: 'chamado mudou de equipe ou sumiu' };
   if (!funcaoAusente(error)) return { ok: false, naoAchou: false, erro: error.message };
-  console.warn("whatsapp: migration 077 não aplicada, anexando nota por ler-e-regravar");
+  console.warn('whatsapp: migration 077 não aplicada, anexando nota por ler-e-regravar');
   const anteriores = Array.isArray(aberto.notes) ? aberto.notes : [];
   let q = db
-    .from("pendencias")
+    .from('pendencias')
     .update({ notes: [...anteriores, nota], updated_at: new Date().toISOString() })
-    .eq("id", aberto.id);
-  q = aberto.team == null ? q.is("team", null) : q.eq("team", aberto.team);
+    .eq('id', aberto.id);
+  q = aberto.team == null ? q.is('team', null) : q.eq('team', aberto.team);
   const { error: erroUpdate } = await q;
   return erroUpdate ? { ok: false, naoAchou: false, erro: erroUpdate.message } : { ok: true };
 }
@@ -137,12 +143,12 @@ async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Pr
 async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<number> {
   const desde = new Date(Date.now() - 60_000).toISOString();
   const { count, error } = await db
-    .from("emails_triagem")
-    .select("id", { count: "exact", head: true })
-    .eq("telefone", telefone)
-    .gte("recebido_em", desde);
+    .from('emails_triagem')
+    .select('id', { count: 'exact', head: true })
+    .eq('telefone', telefone)
+    .gte('recebido_em', desde);
   if (error) {
-    console.error("whatsapp limite:", error.message);
+    console.error('whatsapp limite:', error.message);
     return 0;
   }
   return count || 0;
@@ -157,13 +163,13 @@ async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<n
 async function chamadoDaConversa(db: SupabaseClient, conversa: string): Promise<Aberto | null> {
   if (!conversa) return null;
   const { data, error } = await db
-    .from("pendencias")
-    .select("id, status, notes, client_id, team")
-    .eq("email_thread_id", conversa)
-    .order("created_at", { ascending: false })
+    .from('pendencias')
+    .select('id, status, notes, client_id, team')
+    .eq('email_thread_id', conversa)
+    .order('created_at', { ascending: false })
     .limit(10);
   if (error) {
-    console.error("whatsapp conversa:", error.message);
+    console.error('whatsapp conversa:', error.message);
     return null;
   }
   return ((data || []) as Aberto[]).find((p) => !PEN_FECHADOS.includes(String(p.status))) || null;
@@ -172,8 +178,8 @@ async function chamadoDaConversa(db: SupabaseClient, conversa: string): Promise<
 // A mensagem no formato que os helpers da caixa (robo/campo.ts) já entendem.
 function entradaDe(m: MensagemWhats): EmailEntrada {
   return {
-    id: "whatsapp:" + m.id,
-    de: m.nome || "+" + m.telefone,
+    id: 'whatsapp:' + m.id,
+    de: m.nome || '+' + m.telefone,
     assunto: assuntoDaMensagem(m.texto),
     data: m.quando,
     trecho: m.texto,
@@ -188,25 +194,29 @@ function entradaDe(m: MensagemWhats): EmailEntrada {
 async function baixarMidia(m: MensagemWhats) {
   if (!m.media) return null;
   try {
-    const base = Deno.env.get("WAHA_BASE_URL") || "";
-    const key = Deno.env.get("WAHA_API_KEY") || "";
+    const base = Deno.env.get('WAHA_BASE_URL') || '';
+    const key = Deno.env.get('WAHA_API_KEY') || '';
     const raiz = new URL(base);
     const origem = new URL(m.media.url);
     // `//host` no pathname do anexo resolveria como URL protocol-relative e
     // mandaria a X-Api-Key para outro host. O host do download é sempre o da
     // WAHA; o resto é recusado antes do fetch.
-    const url = new URL(origem.pathname.replace(/^\/+/, "/") + origem.search, raiz);
+    const url = new URL(origem.pathname.replace(/^\/+/, '/') + origem.search, raiz);
     if (url.origin !== raiz.origin) {
       console.error(`whatsapp mídia ${m.id}: host fora da WAHA, download ignorado`);
       return null;
     }
-    const resp = await fetch(url.toString(), { headers: { "X-Api-Key": key }, signal: AbortSignal.timeout(20000) });
-    const tamanho = Number(resp.headers.get("content-length") || 0);
+    const resp = await fetch(url.toString(), {
+      headers: { 'X-Api-Key': key },
+      signal: AbortSignal.timeout(20000),
+    });
+    const tamanho = Number(resp.headers.get('content-length') || 0);
     if (!resp.ok || tamanho > 5 * 1024 * 1024) return null;
     const bytes = new Uint8Array(await resp.arrayBuffer());
     if (bytes.length > 5 * 1024 * 1024) return null;
-    let binario = "";
-    for (let i = 0; i < bytes.length; i += 32768) binario += String.fromCharCode(...bytes.subarray(i, i + 32768));
+    let binario = '';
+    for (let i = 0; i < bytes.length; i += 32768)
+      binario += String.fromCharCode(...bytes.subarray(i, i + 32768));
     return { nome: m.media.nome, tipo: m.media.tipo, dados: btoa(binario) };
   } catch (err) {
     console.error(`whatsapp mídia ${m.id}:`, (err as Error).message);
@@ -219,8 +229,8 @@ async function baixarMidia(m: MensagemWhats) {
 // sem o retry, a mensagem sumiria da caixa por causa de uma coluna que é só do
 // portal. O histórico do portal fica para quando a migration rodar.
 function colunaDoPortalAusente(error: { code?: string; message?: string }): boolean {
-  if (error.code === "42703" || error.code === "PGRST204") return true;
-  const msg = error.message || "";
+  if (error.code === '42703' || error.code === 'PGRST204') return true;
+  const msg = error.message || '';
   return /(direcao|media)/.test(msg) && /does not exist|schema cache/i.test(msg);
 }
 
@@ -236,19 +246,19 @@ async function guardarNaCaixa(
   }
 ): Promise<boolean> {
   const linha = {
-    ...entradaDaCaixa(entradaDe(m), opcoes, "ETR-" + crypto.randomUUID()),
-    canal: "whatsapp",
+    ...entradaDaCaixa(entradaDe(m), opcoes, 'ETR-' + crypto.randomUUID()),
+    canal: 'whatsapp',
     telefone: m.telefone,
-    direcao: "entrada",
+    direcao: 'entrada',
     media: await baixarMidia(m),
   };
-  const { error } = await db.from("emails_triagem").insert(linha);
-  if (!error || error.code === "23505") return true;
+  const { error } = await db.from('emails_triagem').insert(linha);
+  if (!error || error.code === '23505') return true;
   if (colunaDoPortalAusente(error)) {
     console.warn(`whatsapp caixa ${m.id}: migration 082 não aplicada, gravando sem direcao/media`);
     const { direcao: _direcao, media: _media, ...semPortal } = linha;
-    const { error: erroAntigo } = await db.from("emails_triagem").insert(semPortal);
-    if (!erroAntigo || erroAntigo.code === "23505") return true;
+    const { error: erroAntigo } = await db.from('emails_triagem').insert(semPortal);
+    if (!erroAntigo || erroAntigo.code === '23505') return true;
     console.error(`whatsapp caixa ${m.id} (a mensagem NÃO apareceu na caixa):`, erroAntigo.message);
     return false;
   }
@@ -257,22 +267,24 @@ async function guardarNaCaixa(
 }
 
 async function handle(req: Request, ctx: SupabaseContext) {
-  if (req.method !== "POST") return json({ ok: false }, 405);
-  const esperado = Deno.env.get("WHATSAPP_WEBHOOK_TOKEN") || "";
-  const recebido = new URL(req.url).searchParams.get("token") || "";
-  if (!esperado || !recebido || !tempoConstante(recebido, esperado)) return json({ ok: false }, 401);
+  if (req.method !== 'POST') return json({ ok: false }, 405);
+  const esperado = Deno.env.get('WHATSAPP_WEBHOOK_TOKEN') || '';
+  const recebido = new URL(req.url).searchParams.get('token') || '';
+  if (!esperado || !recebido || !tempoConstante(recebido, esperado))
+    return json({ ok: false }, 401);
 
   let payload: unknown;
   try {
     payload = await req.json();
   } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
+    return json({ ok: false, error: 'invalid_json' }, 400);
   }
   // Evento que não é mensagem de texto (status, entrega, presença) responde 200
   // vazio: erro faria a WAHA reentregar algo que nunca vai ser tratado.
   const todas = mensagensDoWebhook(payload);
   if (!todas.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0 });
-  if (todas.length > LOTE_MAX) console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
+  if (todas.length > LOTE_MAX)
+    console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
   const msgs = todas.slice(0, LOTE_MAX);
 
   const db = ctx.supabaseAdmin;
@@ -283,18 +295,20 @@ async function handle(req: Request, ctx: SupabaseContext) {
       limitadas = 0;
     const cache: { todos: ClienteFone[] | null } = { todos: null };
     for (const m of msgs) {
-      const key = "whatsapp:" + m.id;
-      const { error: erroChave } = await db.from("avisos_enviados").insert({ key });
+      const key = 'whatsapp:' + m.id;
+      const { error: erroChave } = await db.from('avisos_enviados').insert({ key });
       if (erroChave) {
-        if (erroChave.code === "23505") continue;
-        throw new Error("avisos_enviados: " + erroChave.message);
+        if (erroChave.code === '23505') continue;
+        throw new Error('avisos_enviados: ' + erroChave.message);
       }
 
       // Depois da chave de dedupe: reentrega da mesma mensagem não conta duas
       // vezes, e a descartada aqui não volta numa reentrega.
-      if (await recentesDoNumero(db, m.telefone) >= LIMITE_POR_MINUTO) {
+      if ((await recentesDoNumero(db, m.telefone)) >= LIMITE_POR_MINUTO) {
         limitadas++;
-        console.warn(`whatsapp: ${m.id} descartada, número passou de ${LIMITE_POR_MINUTO} mensagens por minuto`);
+        console.warn(
+          `whatsapp: ${m.id} descartada, número passou de ${LIMITE_POR_MINUTO} mensagens por minuto`
+        );
         continue;
       }
 
@@ -302,8 +316,11 @@ async function handle(req: Request, ctx: SupabaseContext) {
       // o whatsapp-responder recusa enviar para quem não está aqui (076). Falha
       // não segura a mensagem — o pior caso é a resposta ser recusada depois.
       const { error: erroConversa } = await db
-        .from("whatsapp_conversas")
-        .upsert({ telefone: m.telefone, ultima_em: new Date().toISOString() }, { onConflict: "telefone" });
+        .from('whatsapp_conversas')
+        .upsert(
+          { telefone: m.telefone, ultima_em: new Date().toISOString() },
+          { onConflict: 'telefone' }
+        );
       if (erroConversa) console.error(`whatsapp conversa ${m.id}:`, erroConversa.message);
 
       const aberto = await chamadoDaConversa(db, conversaDoTelefone(m.telefone));
@@ -313,10 +330,10 @@ async function handle(req: Request, ctx: SupabaseContext) {
           notas++;
           if (
             await guardarNaCaixa(db, m, {
-              status: "anexado",
+              status: 'anexado',
               pendenciaId: aberto.id,
               clientId: aberto.client_id,
-              team: aberto.team || "init",
+              team: aberto.team || 'init',
             })
           )
             caixa++;
@@ -324,7 +341,7 @@ async function handle(req: Request, ctx: SupabaseContext) {
         }
         console.error(`whatsapp nota ${m.id}:`, anexo.erro);
         if (!anexo.naoAchou) {
-          await db.from("avisos_enviados").delete().eq("key", key); // tenta de novo na reentrega
+          await db.from('avisos_enviados').delete().eq('key', key); // tenta de novo na reentrega
           continue;
         }
       }
@@ -335,15 +352,15 @@ async function handle(req: Request, ctx: SupabaseContext) {
         db,
         m,
         c
-          ? { motivo: null, status: "pendente", clientId: c.id, team: c.team || "init" }
-          : { motivo: "sem_cliente", status: "pendente", team: "init" }
+          ? { motivo: null, status: 'pendente', clientId: c.id, team: c.team || 'init' }
+          : { motivo: 'sem_cliente', status: 'pendente', team: 'init' }
       );
       if (!ok) {
         // Sem chamado, a caixa é o único lugar onde a mensagem existiria.
         // Devolver a chave e falhar faz a WAHA reentregar; repetir é melhor que
         // a mensagem sumir sem ninguém ver.
-        await db.from("avisos_enviados").delete().eq("key", key);
-        throw new Error("whatsapp: mensagem " + m.id + " não entrou na caixa");
+        await db.from('avisos_enviados').delete().eq('key', key);
+        throw new Error('whatsapp: mensagem ' + m.id + ' não entrou na caixa');
       }
       caixa++;
     }
@@ -351,9 +368,9 @@ async function handle(req: Request, ctx: SupabaseContext) {
   } catch (err) {
     // 500 faz a WAHA reentregar; a chave de dedupe impede processar duas vezes
     // o que já passou.
-    console.error("whatsapp:", (err as Error).message);
+    console.error('whatsapp:', (err as Error).message);
     return json({ ok: false }, 500);
   }
 }
 
-export default { fetch: withSupabase({ auth: "none" }, handle) };
+export default { fetch: withSupabase({ auth: 'none' }, handle) };

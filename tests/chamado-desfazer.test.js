@@ -9,9 +9,12 @@ import vm from 'node:vm';
 // devolve a mão a quem errou é o "Desfazer" do toast, não um diálogo antes.
 
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const STATUS = {
@@ -62,14 +65,21 @@ try {
 // Toasts viram registro em memória; `desfazer` guarda o callback do botão.
 let toasts, undos, salvos;
 function instrumentar(pen) {
-  toasts = []; undos = []; salvos = [];
+  toasts = [];
+  undos = [];
+  salvos = [];
   sandbox.showToast = (msg) => toasts.push(msg);
   sandbox.showUndoToast = (msg, onUndo) => undos.push({ msg, onUndo });
   const atual = { ...pen };
   sandbox.getPendenciaById = () => ({ ...atual });
-  sandbox.savePendencia = (next) => { salvos.push(next); Object.assign(atual, next); };
+  sandbox.savePendencia = (next) => {
+    salvos.push(next);
+    Object.assign(atual, next);
+  };
   sandbox.updatePendenciaAssignee = (_id, patch) => {
-    salvos.push(patch); Object.assign(atual, patch); return { pen: { ...atual } };
+    salvos.push(patch);
+    Object.assign(atual, patch);
+    return { pen: { ...atual } };
   };
   return atual;
 }
@@ -106,7 +116,7 @@ describe('mover card de coluna', () => {
 
   it('desfazer antigo não engole um movimento feito depois', () => {
     sandbox.penMoveTo('PEN-1', 'em_andamento'); // toast 1
-    sandbox.penMoveTo('PEN-1', 'pausado');       // movimento novo, dentro dos 5s
+    sandbox.penMoveTo('PEN-1', 'pausado'); // movimento novo, dentro dos 5s
     expect(undos.length).toBe(2);
     undos[0].onUndo(); // clique no toast do primeiro gesto
     expect(salvos.map((s) => s.status)).toEqual(['em_andamento', 'pausado']);
@@ -133,7 +143,9 @@ describe('atribuir responsável pelo menu ⋯', () => {
   });
 
   it('erro ao atribuir continua sendo erro, sem botão de desfazer', () => {
-    sandbox.updatePendenciaAssignee = () => { throw new Error('Operador afastado.'); };
+    sandbox.updatePendenciaAssignee = () => {
+      throw new Error('Operador afastado.');
+    };
     sandbox.penQuickAssign('PEN-1', 'Lia');
     expect(undos).toEqual([]);
     expect(toasts).toEqual(['Operador afastado.']);
@@ -141,7 +153,7 @@ describe('atribuir responsável pelo menu ⋯', () => {
 
   it('desfazer antigo não reverte o responsável que já mudou', () => {
     sandbox.penQuickAssign('PEN-1', 'Beto'); // toast 1
-    sandbox.penQuickAssign('PEN-1', 'Cris');  // gesto novo, dentro dos 5s
+    sandbox.penQuickAssign('PEN-1', 'Cris'); // gesto novo, dentro dos 5s
     expect(undos.length).toBe(2);
     undos[0].onUndo(); // clique no toast do primeiro gesto
     expect(salvos.map((s) => s.responsible)).toEqual(['Beto', 'Cris']);

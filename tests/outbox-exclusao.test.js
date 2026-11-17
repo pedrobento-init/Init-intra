@@ -8,8 +8,11 @@ const require = createRequire(import.meta.url);
 // fila; o drain seguinte recriava o registro no servidor. O teste exercita o
 // `deletePendencia` real contra uma outbox em memória.
 function _setGlobal(name, value) {
-  try { Object.defineProperty(globalThis, name, { value, writable: true, configurable: true }); }
-  catch (_) { globalThis[name] = value; }
+  try {
+    Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
+  } catch (_) {
+    globalThis[name] = value;
+  }
 }
 
 function fakeOutboxTable() {
@@ -18,11 +21,24 @@ function fakeOutboxTable() {
   const sorted = () => [...rows.values()].sort((a, b) => a.seq - b.seq);
   return {
     all: sorted,
-    async add(entry) { const seq = next++; rows.set(seq, { ...entry, seq }); return seq; },
-    async delete(seq) { rows.delete(seq); },
-    async update(seq, patch) { const r = rows.get(seq); if (r) rows.set(seq, { ...r, ...patch }); },
-    async count() { return rows.size; },
-    orderBy() { return { toArray: async () => sorted() }; },
+    async add(entry) {
+      const seq = next++;
+      rows.set(seq, { ...entry, seq });
+      return seq;
+    },
+    async delete(seq) {
+      rows.delete(seq);
+    },
+    async update(seq, patch) {
+      const r = rows.get(seq);
+      if (r) rows.set(seq, { ...r, ...patch });
+    },
+    async count() {
+      return rows.size;
+    },
+    orderBy() {
+      return { toArray: async () => sorted() };
+    },
     where(field) {
       return {
         equals(val) {
@@ -47,13 +63,35 @@ const _ls = {};
 let stores;
 let table;
 
-_setGlobal('window', { _pendingSyncCount: 0, _supabaseAuthActive: true, _suppressPendingSync: false, addEventListener() {}, dispatchEvent() {} });
+_setGlobal('window', {
+  _pendingSyncCount: 0,
+  _supabaseAuthActive: true,
+  _suppressPendingSync: false,
+  addEventListener() {},
+  dispatchEvent() {},
+});
 _setGlobal('navigator', { onLine: true });
-_setGlobal('document', { visibilityState: 'visible', getElementById: () => null, addEventListener() {} });
-_setGlobal('localStorage', { getItem: (k) => (k in _ls ? _ls[k] : null), setItem: (k, v) => { _ls[k] = String(v); }, removeItem: (k) => { delete _ls[k]; } });
+_setGlobal('document', {
+  visibilityState: 'visible',
+  getElementById: () => null,
+  addEventListener() {},
+});
+_setGlobal('localStorage', {
+  getItem: (k) => (k in _ls ? _ls[k] : null),
+  setItem: (k, v) => {
+    _ls[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _ls[k];
+  },
+});
 _setGlobal('getCacheStore', (t) => stores[t] || []);
-_setGlobal('setCacheStore', (t, v) => { stores[t] = v; });
-_setGlobal('getCacheTable', (t) => (t === 'sessions' ? { value: { opId: 'OP-1', ts: Date.now() } } : null));
+_setGlobal('setCacheStore', (t, v) => {
+  stores[t] = v;
+});
+_setGlobal('getCacheTable', (t) =>
+  t === 'sessions' ? { value: { opId: 'OP-1', ts: Date.now() } } : null
+);
 _setGlobal('setCacheTable', () => {});
 _setGlobal('getCacheKV', (_k, d) => d);
 _setGlobal('setCacheKV', () => {});
@@ -72,7 +110,9 @@ describe('Excluir pendência limpa a fila (SYNC-10)', () => {
     _setGlobal('idb', { outbox: table });
     stores = {
       operators: [{ id: 'OP-1', name: 'Admin', isAdmin: true, active: true, team: 'init' }],
-      pendencias: [{ id: 'PEN-1', assunto: 'Trocar HD', team: 'init', updatedAt: '2026-10-01T00:00:00.000Z' }],
+      pendencias: [
+        { id: 'PEN-1', assunto: 'Trocar HD', team: 'init', updatedAt: '2026-10-01T00:00:00.000Z' },
+      ],
     };
     _setGlobal('supabaseClient', {
       from: () => ({
@@ -89,7 +129,10 @@ describe('Excluir pendência limpa a fila (SYNC-10)', () => {
 
     expect(storage.deletePendencia('PEN-1')).toBe(true);
 
-    await until(() => table.all().every((r) => r.op === 'delete'), 'nenhum upsert pendente para PEN-1');
+    await until(
+      () => table.all().every((r) => r.op === 'delete'),
+      'nenhum upsert pendente para PEN-1'
+    );
     expect(table.all().some((r) => r.targetId === 'PEN-1' && r.op === 'upsert')).toBe(false);
   });
 
@@ -100,7 +143,10 @@ describe('Excluir pendência limpa a fila (SYNC-10)', () => {
 
       expect(storage.deletePendencia('PEN-1')).toBe(true);
 
-      await until(() => table.all().some((r) => r.targetId === 'PEN-1' && r.op === 'delete'), 'delete enfileirado');
+      await until(
+        () => table.all().some((r) => r.targetId === 'PEN-1' && r.op === 'delete'),
+        'delete enfileirado'
+      );
       expect(table.all().filter((r) => r.targetId === 'PEN-1')).toHaveLength(1);
     } finally {
       _setGlobal('isSupabaseConnected', () => true);

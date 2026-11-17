@@ -144,10 +144,10 @@ describe('higiene de segredos', () => {
         .map((l, i) => ({ n: i + 1, l }))
         .filter(({ l }) => /\bMILVUS_API_TOKEN\b/.test(l))
         .filter(({ l }) => !/^\s*\/\//.test(l))
-        .filter(({ l }) => !/Deno\.env\.get\("MILVUS_API_TOKEN"\)/.test(l))
+        .filter(({ l }) => !/Deno\.env\.get\(["']MILVUS_API_TOKEN["']\)/.test(l))
         .filter(({ l }) => !/if \(!MILVUS_API_TOKEN\)/.test(l))
-        .filter(({ l }) => !/"[^"]*MILVUS_API_TOKEN[^"]*"\s*\)/.test(l))
-        .filter(({ l }) => !/"Authorization":\s*MILVUS_API_TOKEN/.test(l));
+        .filter(({ l }) => !/(["'])[^"']*MILVUS_API_TOKEN[^"']*\1\s*\)/.test(l))
+        .filter(({ l }) => !/["']?Authorization["']?:\s*MILVUS_API_TOKEN/.test(l));
       expect(
         usos.map((u) => `${f.name}:${u.n}`),
         `uso inesperado do token em ${f.name}`

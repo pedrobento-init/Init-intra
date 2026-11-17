@@ -11,11 +11,24 @@ function fakeOutboxTable() {
   return {
     rows,
     all: sorted,
-    async add(entry) { const seq = next++; rows.set(seq, { ...entry, seq }); return seq; },
-    async delete(seq) { rows.delete(seq); },
-    async update(seq, patch) { const r = rows.get(seq); if (r) rows.set(seq, { ...r, ...patch }); },
-    async count() { return rows.size; },
-    orderBy() { return { toArray: async () => sorted() }; },
+    async add(entry) {
+      const seq = next++;
+      rows.set(seq, { ...entry, seq });
+      return seq;
+    },
+    async delete(seq) {
+      rows.delete(seq);
+    },
+    async update(seq, patch) {
+      const r = rows.get(seq);
+      if (r) rows.set(seq, { ...r, ...patch });
+    },
+    async count() {
+      return rows.size;
+    },
+    orderBy() {
+      return { toArray: async () => sorted() };
+    },
     where(field) {
       return {
         equals(val) {
@@ -31,15 +44,22 @@ function fakeOutboxTable() {
 function fakeSupabase({ failIds = [] } = {}) {
   const ops = [];
   const fails = (id) => failIds.includes(id);
-  const answer = (id) => Promise.resolve(fails(id) ? { error: { message: 'boom' } } : { error: null });
+  const answer = (id) =>
+    Promise.resolve(fails(id) ? { error: { message: 'boom' } } : { error: null });
   return {
     ops,
     from(table) {
       return {
-        upsert(row) { ops.push(['upsert', table, row]); return answer(row && row.id); },
+        upsert(row) {
+          ops.push(['upsert', table, row]);
+          return answer(row && row.id);
+        },
         delete() {
           return {
-            eq(col, val) { ops.push(['delete', table, col, val]); return answer(val); },
+            eq(col, val) {
+              ops.push(['delete', table, col, val]);
+              return answer(val);
+            },
           };
         },
       };
@@ -121,7 +141,9 @@ describe('Outbox — uma entrada ruim não bloqueia a fila para sempre (SYNC-09)
     expect(ruim.attempts).toBe(outbox.OUTBOX_MAX_ATTEMPTS);
     expect(ruim.dead).toBe(true);
     // A de trás na fila chegou ao servidor e saiu da fila.
-    expect(globalThis.supabaseClient.ops.some((o) => o[0] === 'upsert' && o[2].id === 'PEN-bom')).toBe(true);
+    expect(
+      globalThis.supabaseClient.ops.some((o) => o[0] === 'upsert' && o[2].id === 'PEN-bom')
+    ).toBe(true);
     expect(table.all().some((r) => r.targetId === 'PEN-bom')).toBe(false);
   });
 
@@ -137,7 +159,9 @@ describe('Outbox — uma entrada ruim não bloqueia a fila para sempre (SYNC-09)
 
   it('entrada morta não conta como pendente (o contador precisa poder zerar)', async () => {
     globalThis.supabaseClient = fakeSupabase();
-    const seq = await table.add(outbox.buildOutboxEntry('pendencias', 'upsert', { id: 'PEN-morta' }));
+    const seq = await table.add(
+      outbox.buildOutboxEntry('pendencias', 'upsert', { id: 'PEN-morta' })
+    );
     await table.update(seq, { dead: true });
 
     expect(await outbox.outboxCount()).toBe(0);
@@ -146,7 +170,9 @@ describe('Outbox — uma entrada ruim não bloqueia a fila para sempre (SYNC-09)
 
   it('entrada morta é ignorada pelo drain em vez de tentada de novo', async () => {
     globalThis.supabaseClient = fakeSupabase();
-    const seq = await table.add(outbox.buildOutboxEntry('pendencias', 'upsert', { id: 'PEN-morta' }));
+    const seq = await table.add(
+      outbox.buildOutboxEntry('pendencias', 'upsert', { id: 'PEN-morta' })
+    );
     await table.update(seq, { dead: true });
 
     const res = await outbox.outboxDrain();

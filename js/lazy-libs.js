@@ -1,3 +1,4 @@
+// @ts-check
 // ── Bibliotecas carregadas só quando usadas ───────────────────────────────
 // SheetJS (861 KB), mammoth (628 KB) e motion (136 KB) saíram do index.html:
 // eram baixadas e interpretadas em todo acesso, mas só servem para
@@ -33,7 +34,8 @@ const _lazyLibPending = {};
 function loadLib(name) {
   const lib = LAZY_LIBS[name];
   if (!lib) return Promise.reject(new Error('Biblioteca desconhecida: ' + name));
-  if (typeof window !== 'undefined' && window[lib.global]) return Promise.resolve(window[lib.global]);
+  if (typeof window !== 'undefined' && window[lib.global])
+    return Promise.resolve(window[lib.global]);
   if (_lazyLibPending[name]) return _lazyLibPending[name];
   _lazyLibPending[name] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -41,11 +43,16 @@ function loadLib(name) {
     s.integrity = lib.integrity;
     s.crossOrigin = 'anonymous';
     s.async = true;
-    s.onload = () => (window[lib.global] ? resolve(window[lib.global]) : reject(new Error(name + ' carregou sem ' + lib.global)));
+    s.onload = () =>
+      window[lib.global]
+        ? resolve(window[lib.global])
+        : reject(new Error(name + ' carregou sem ' + lib.global));
     s.onerror = () => {
       delete _lazyLibPending[name];
       s.remove();
-      reject(new Error('Não foi possível carregar ' + name + '. Verifique a conexão e tente de novo.'));
+      reject(
+        new Error('Não foi possível carregar ' + name + '. Verifique a conexão e tente de novo.')
+      );
     };
     document.head.appendChild(s);
   });
@@ -55,12 +62,16 @@ function loadLib(name) {
 // Animações: chegam depois que a tela já abriu (até lá, tudo funciona sem elas).
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const _motionLater = () => {
-    const reduz = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduz =
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduz) return; // quem pediu menos movimento não precisa da biblioteca
-    loadLib('motion').catch((e) => { if (typeof _logSilent === 'function') _logSilent(e, 'lazy-libs'); });
+    loadLib('motion').catch((e) => {
+      if (typeof _logSilent === 'function') _logSilent(e, 'lazy-libs');
+    });
   };
   window.addEventListener('load', () => {
-    if ('requestIdleCallback' in window) window.requestIdleCallback(_motionLater, { timeout: 4000 });
+    if ('requestIdleCallback' in window)
+      window.requestIdleCallback(_motionLater, { timeout: 4000 });
     else setTimeout(_motionLater, 1500);
   });
 }

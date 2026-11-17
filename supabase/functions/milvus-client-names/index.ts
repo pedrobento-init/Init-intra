@@ -20,11 +20,10 @@
 // clients a partir das variaveis que a plataforma injeta -- por isso nao ha
 // mais createClient/SERVICE_ROLE_KEY aqui. verify_jwt = true no config.toml
 // continua valendo (auth: "user"). O team/admin-check segue sendo nosso.
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
 const MAX_PAGES = 60;
 const PAGE_SIZE = 1000;
@@ -34,11 +33,11 @@ const PAGE_SIZE = 1000;
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/cliente/busca`;
+const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/cliente/busca`;
 
 // GET genérico ao Milvus (clientes/tipos): status antes do corpo,
 // 1 retry para 429/5xx/conexão, nunca para 401/403.
@@ -52,7 +51,7 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { "Authorization": MILVUS_API_TOKEN },
+        headers: { Authorization: MILVUS_API_TOKEN },
         signal: ctrl.signal,
       });
     } catch (e) {
@@ -61,11 +60,13 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+      throw new Error(
+        `Falha de conexão com o Milvus: ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'rede'}`
+      );
     }
     if (res.status === 401 || res.status === 403) {
       clearTimeout(timer);
-      throw new Error("Falha de autenticação com o Milvus");
+      throw new Error('Falha de autenticação com o Milvus');
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
       clearTimeout(timer);
@@ -85,25 +86,27 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
       return data;
     } catch {
       clearTimeout(timer);
-      throw new Error("Resposta inválida do Milvus");
+      throw new Error('Resposta inválida do Milvus');
     }
   }
-  throw new Error("Falha inesperada ao consultar o Milvus");
+  throw new Error('Falha inesperada ao consultar o Milvus');
 }
 
 function _milvusList(data: unknown): Record<string, unknown>[] {
-  const lista = (data as Record<string, unknown> | null)?.["lista"] as unknown;
+  const lista = (data as Record<string, unknown> | null)?.['lista'] as unknown;
   if (Array.isArray(lista)) return lista as Record<string, unknown>[];
   if (Array.isArray(data)) return data as Record<string, unknown>[];
   return [];
 }
 
-async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current: number; last: number }> {
-  const url = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/listagem`;
+async function fetchMilvusPage(
+  page: number
+): Promise<{ list: unknown[]; current: number; last: number }> {
+  const url = `${MILVUS_API_URL.replace(/\/$/, '')}/api/dispositivos/listagem`;
   const body = {
     is_paginate: true,
     is_descending: false,
-    order_by: "id",
+    order_by: 'id',
     total_registros: PAGE_SIZE,
     pagina: page,
   };
@@ -119,10 +122,10 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
     let res: Response;
     try {
       res = await fetch(url, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": MILVUS_API_TOKEN,
+          'Content-Type': 'application/json',
+          Authorization: MILVUS_API_TOKEN,
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
@@ -133,7 +136,9 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+      throw new Error(
+        `Falha de conexão com o Milvus: ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'rede'}`
+      );
     }
     let data: unknown;
     // Status ANTES do corpo: 429/5xx com corpo vazio precisam do retry
@@ -141,7 +146,7 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
     if (res.status === 401 || res.status === 403) {
       clearTimeout(timer);
       // Erro de autenticação: NUNCA repetir automaticamente.
-      throw new Error("Falha de autenticação com o Milvus");
+      throw new Error('Falha de autenticação com o Milvus');
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
       clearTimeout(timer);
@@ -165,28 +170,31 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error("Resposta inválida do Milvus");
+      throw new Error('Resposta inválida do Milvus');
     }
     clearTimeout(timer);
 
     const d = data as Record<string, unknown>;
-    const lista = (d["lista"] ?? d["data"] ?? d["devices"] ?? null) as unknown;
-    if (!Array.isArray(lista)) throw new Error("Resposta do Milvus sem lista de dispositivos");
-    const pag = (((d["meta"] as Record<string, unknown> | undefined)?.["paginate"]) ?? {}) as Record<string, unknown>;
-    const current = Number(pag["current_page"] ?? page) || page;
-    const last = Number(pag["last_page"] ?? page) || page;
+    const lista = (d['lista'] ?? d['data'] ?? d['devices'] ?? null) as unknown;
+    if (!Array.isArray(lista)) throw new Error('Resposta do Milvus sem lista de dispositivos');
+    const pag = ((d['meta'] as Record<string, unknown> | undefined)?.['paginate'] ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const current = Number(pag['current_page'] ?? page) || page;
+    const last = Number(pag['last_page'] ?? page) || page;
     return { list: lista as unknown[], current, last };
   }
-  throw new Error("Falha inesperada ao consultar o Milvus");
+  throw new Error('Falha inesperada ao consultar o Milvus');
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-client-names: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-client-names: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   const startedAt = Date.now();
@@ -196,17 +204,17 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   // 1) Quem chama (claims do JWT — mesma base do RLS).
   const callerUid = ctx.userClaims?.id ?? null;
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
 
   // 2) Somente administradores ativos (diferença p/ milvus-devices,
   //    que admite operador do próprio team).
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
   if (!callerOp || callerOp.active === false || callerOp.is_admin !== true) {
-    return json({ error: "Somente administradores" }, 403);
+    return json({ error: 'Somente administradores' }, 403);
   }
 
   // 3) Lista completa de clientes (id + fantasia + CNPJ) + contagens
@@ -215,25 +223,30 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // nomes fora dela vêm com quantidade null ("—" na tela).
   const byFantasia = new Map<string, { nome: string; ids: number[]; cnpj: string }>();
   try {
-    const data = await milvusGet(CLIENTS_URL, { status: "3" });
+    const data = await milvusGet(CLIENTS_URL, { status: '3' });
     for (const c of _milvusList(data)) {
-      const nome = String(c["nome_fantasia"] ?? "").trim();
-      const id = Number(c["id"]);
+      const nome = String(c['nome_fantasia'] ?? '').trim();
+      const id = Number(c['id']);
       if (!nome || !Number.isFinite(id)) continue;
       const key = nome.toLowerCase();
       const entry = byFantasia.get(key);
       if (entry) {
         if (!entry.ids.includes(id)) entry.ids.push(id);
       } else {
-        byFantasia.set(key, { nome, ids: [id], cnpj: String(c["cnpj_cpf"] ?? "") });
+        byFantasia.set(key, { nome, ids: [id], cnpj: String(c['cnpj_cpf'] ?? '') });
       }
     }
   } catch (e) {
-    console.error(`milvus-client-names: clientes erro: ${(e as Error)?.message ?? "erro"}`);
-    return json({ error: `Falha ao consultar clientes do Milvus: ${(e as Error)?.message ?? "erro inesperado"}` }, 502);
+    console.error(`milvus-client-names: clientes erro: ${(e as Error)?.message ?? 'erro'}`);
+    return json(
+      {
+        error: `Falha ao consultar clientes do Milvus: ${(e as Error)?.message ?? 'erro inesperado'}`,
+      },
+      502
+    );
   }
   if (!byFantasia.size) {
-    return json({ error: "Nenhum cliente retornado pelo Milvus" }, 502);
+    return json({ error: 'Nenhum cliente retornado pelo Milvus' }, 502);
   }
 
   const counts = new Map<string, number>();
@@ -246,9 +259,9 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     let fresh = 0;
     received += list.length;
     for (const raw of list) {
-      const nome = String((raw as Record<string, unknown>)?.["nome_fantasia"] ?? "").trim();
+      const nome = String((raw as Record<string, unknown>)?.['nome_fantasia'] ?? '').trim();
       if (!nome) continue;
-      const id = String((raw as Record<string, unknown>)?.["id"] ?? "");
+      const id = String((raw as Record<string, unknown>)?.['id'] ?? '');
       if (id) {
         if (seenIds.has(id)) continue;
         seenIds.add(id);
@@ -265,7 +278,9 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     ingest(first.list);
     let last = first.last;
     if (last > MAX_PAGES) {
-      console.log(`milvus-client-names: teto de páginas (${MAX_PAGES}) atingido (last_page=${last})`);
+      console.log(
+        `milvus-client-names: teto de páginas (${MAX_PAGES}) atingido (last_page=${last})`
+      );
       last = MAX_PAGES;
     }
     if (first.current < last && first.list.length > 0) {
@@ -288,27 +303,30 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     }
   } catch (e) {
     // Amostra é complementar: falha aqui não derruba a lista de clientes.
-    console.log(`milvus-client-names: amostra indisponível (${(e as Error)?.message ?? "erro"})`);
+    console.log(`milvus-client-names: amostra indisponível (${(e as Error)?.message ?? 'erro'})`);
   }
 
-  const nomes = [...byFantasia.values()].map((c) => ({
-    nome: c.nome,
-    milvusClienteId: c.ids[0],
-    milvusClienteIds: c.ids,
-    duplicado: c.ids.length > 1,
-    cnpj: c.cnpj,
-    quantidadeDispositivos: counts.get(c.nome.toLowerCase()) ?? null,
-  })).sort((a, b) =>
-    (b.quantidadeDispositivos ?? -1) - (a.quantidadeDispositivos ?? -1) ||
-    a.nome.localeCompare(b.nome, "pt-BR"),
-  );
+  const nomes = [...byFantasia.values()]
+    .map((c) => ({
+      nome: c.nome,
+      milvusClienteId: c.ids[0],
+      milvusClienteIds: c.ids,
+      duplicado: c.ids.length > 1,
+      cnpj: c.cnpj,
+      quantidadeDispositivos: counts.get(c.nome.toLowerCase()) ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        (b.quantidadeDispositivos ?? -1) - (a.quantidadeDispositivos ?? -1) ||
+        a.nome.localeCompare(b.nome, 'pt-BR')
+    );
 
   const durationMs = Date.now() - startedAt;
   console.log(
     `milvus-client-names: ok names=${nomes.length} sample_devices=${received} ` +
-    `pages=${pages} duration_ms=${durationMs}`,
+      `pages=${pages} duration_ms=${durationMs}`
   );
   return json({ success: true, nomes, totalNomes: nomes.length });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

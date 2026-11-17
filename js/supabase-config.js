@@ -13,154 +13,197 @@ const _cfg = (typeof window !== 'undefined' && window.SUPABASE_CONFIG) || {};
 const SUPABASE_URL = _cfg.url || '';
 const SUPABASE_ANON_KEY = _cfg.anonKey || '';
 // Limpa a substituição antiga de quem já tinha usado.
-try { localStorage.removeItem('intra_supabase_url'); localStorage.removeItem('intra_supabase_key'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
+try {
+  localStorage.removeItem('intra_supabase_url');
+  localStorage.removeItem('intra_supabase_key');
+} catch (_e) {
+  if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
+}
 
 let supabaseClient = null;
 
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-    try {
-        if (typeof supabase !== 'undefined') {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: true,
-                    storage: window.localStorage,
-                }
-            });
-        }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
+  try {
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storage: window.localStorage,
+        },
+      });
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
+  }
 }
 
-function isSupabaseConnected() { return !!supabaseClient; }
+function isSupabaseConnected() {
+  return !!supabaseClient;
+}
 
 // Inicializador de escutadores em Tempo Real (Realtime WebSockets)
 let _realtimeChannel = null;
 
 // Metadados de Realtime derivados do registro central (js/schema.js)
 const _RT_TABLE_META = {};
-ENTITIES.forEach(e => { if (e.realtime !== false) _RT_TABLE_META[e.table] = e; });
+ENTITIES.forEach((e) => {
+  if (e.realtime !== false) _RT_TABLE_META[e.table] = e;
+});
 
 function _realtimeTeamFilter() {
-    // null = sem filtro (admin vendo todas as equipes)
-    if (typeof isTeamAdmin === 'function' && isTeamAdmin()) {
-        return (typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam : null;
-    }
-    return typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
+  // null = sem filtro (admin vendo todas as equipes)
+  if (typeof isTeamAdmin === 'function' && isTeamAdmin()) {
+    return typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : null;
+  }
+  return typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
 }
 
 function _applyRealtimePayload(table, payload) {
-    const meta = _RT_TABLE_META[table];
-    if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
-    // Escrita de origem remota — nunca conta como pendência local.
-    const _prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
-    if (typeof window !== 'undefined') window._suppressPendingSync = true;
+  const meta = _RT_TABLE_META[table];
+  if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
+  // Escrita de origem remota — nunca conta como pendência local.
+  const _prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
+  if (typeof window !== 'undefined') window._suppressPendingSync = true;
+  try {
+    let list = dbGet(meta.dbKey);
+    if (!Array.isArray(list)) list = [];
+    // Anti-ressuscitação (C1): ignora INSERT/UPDATE de id com tombstone
+    // local, salvo se o remoto for mais novo (recriado de verdade).
     try {
-        let list = dbGet(meta.dbKey);
-        if (!Array.isArray(list)) list = [];
-        // Anti-ressuscitação (C1): ignora INSERT/UPDATE de id com tombstone
-        // local, salvo se o remoto for mais novo (recriado de verdade).
-        try {
-          if (typeof _tombTimeFor === 'function') {
-            const pid = (payload.new && payload.new.id) || (payload.old && payload.old.id);
-            const tAt = pid ? _tombTimeFor(meta.dbKey, pid) : null;
-            if (tAt) {
-              const rAt = (payload.new && (payload.new.updated_at || payload.new.updatedAt)) || null;
-              if (!rAt || new Date(rAt).getTime() <= new Date(tAt).getTime()) return;
-              if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
-            }
-          }
-        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
-        const event = payload.eventType || payload.event;
-        // O que chega do servidor está, por definição, confirmado no servidor
-        // (faixa "aguardando envio" não conta mudança de colega como nossa).
-        try {
-          if (event === 'DELETE' && payload.old && typeof markServerDeleted === 'function') markServerDeleted(table, payload.old.id);
-          else if (payload.new && typeof markServerSeen === 'function') markServerSeen(table, [payload.new]);
-        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
-        if (event === 'DELETE' && payload.old) {
-            const id = payload.old.id;
-            list = list.filter(x => x.id !== id);
-        } else if ((event === 'INSERT' || event === 'UPDATE') && payload.new) {
-            const row = (typeof meta.mapRow === 'function') ? meta.mapRow(payload.new) : _mapFromRemote(payload.new, meta.fields);
-            // Defesa em profundidade: não aplica dados de outra equipe no cache local
-            if (meta.hasTeam && typeof row.team === 'string' && typeof canViewTeam === 'function' && !canViewTeam(row.team)) return;
-            const idx = list.findIndex(x => x.id === row.id);
-            if (idx !== -1) {
-                const localT = new Date(list[idx].updatedAt || list[idx].timestamp || 0).getTime();
-                const remoteT = new Date(row.updatedAt || row.timestamp || 0).getTime();
-                if (remoteT >= localT) {
-                    list[idx] = (typeof _keepLocalEdits === 'function')
-                        ? _keepLocalEdits({ ...list[idx], ...row }, list[idx])
-                        : { ...list[idx], ...row };
-                    delete list[idx].pinHash; delete list[idx].pinSalt; // hash de senha não é mais guardado
-                }
-            } else {
-                list.unshift(row);
-            }
+      if (typeof _tombTimeFor === 'function') {
+        const pid = (payload.new && payload.new.id) || (payload.old && payload.old.id);
+        const tAt = pid ? _tombTimeFor(meta.dbKey, pid) : null;
+        if (tAt) {
+          const rAt = (payload.new && (payload.new.updated_at || payload.new.updatedAt)) || null;
+          if (!rAt || new Date(rAt).getTime() <= new Date(tAt).getTime()) return;
+          if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
         }
-        if (meta.cacheTable && typeof setCacheTable === 'function') {
-            setCacheTable(meta.cacheTable, list);
-        } else {
-            dbSet(meta.dbKey, list);
-        }
-        if (typeof meta.onChange === 'function') meta.onChange();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); } finally {
-        if (typeof window !== 'undefined') window._suppressPendingSync = _prevSuppress;
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
     }
+    const event = payload.eventType || payload.event;
+    // O que chega do servidor está, por definição, confirmado no servidor
+    // (faixa "aguardando envio" não conta mudança de colega como nossa).
+    try {
+      if (event === 'DELETE' && payload.old && typeof markServerDeleted === 'function')
+        markServerDeleted(table, payload.old.id);
+      else if (payload.new && typeof markServerSeen === 'function')
+        markServerSeen(table, [payload.new]);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
+    }
+    if (event === 'DELETE' && payload.old) {
+      const id = payload.old.id;
+      list = list.filter((x) => x.id !== id);
+    } else if ((event === 'INSERT' || event === 'UPDATE') && payload.new) {
+      const row =
+        typeof meta.mapRow === 'function'
+          ? meta.mapRow(payload.new)
+          : _mapFromRemote(payload.new, meta.fields);
+      // Defesa em profundidade: não aplica dados de outra equipe no cache local
+      if (
+        meta.hasTeam &&
+        typeof row.team === 'string' &&
+        typeof canViewTeam === 'function' &&
+        !canViewTeam(row.team)
+      )
+        return;
+      const idx = list.findIndex((x) => x.id === row.id);
+      if (idx !== -1) {
+        const localT = new Date(list[idx].updatedAt || list[idx].timestamp || 0).getTime();
+        const remoteT = new Date(row.updatedAt || row.timestamp || 0).getTime();
+        if (remoteT >= localT) {
+          list[idx] =
+            typeof _keepLocalEdits === 'function'
+              ? _keepLocalEdits({ ...list[idx], ...row }, list[idx])
+              : { ...list[idx], ...row };
+          delete list[idx].pinHash;
+          delete list[idx].pinSalt; // hash de senha não é mais guardado
+        }
+      } else {
+        list.unshift(row);
+      }
+    }
+    if (meta.cacheTable && typeof setCacheTable === 'function') {
+      setCacheTable(meta.cacheTable, list);
+    } else {
+      dbSet(meta.dbKey, list);
+    }
+    if (typeof meta.onChange === 'function') meta.onChange();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
+  } finally {
+    if (typeof window !== 'undefined') window._suppressPendingSync = _prevSuppress;
+  }
 }
 
 function initSupabaseRealtime() {
-    if (!supabaseClient || !window._supabaseAuthActive) return;
+  if (!supabaseClient || !window._supabaseAuthActive) return;
 
-    if (_realtimeChannel) {
-        try { supabaseClient.removeChannel(_realtimeChannel); } catch (e) {}
-        _realtimeChannel = null;
+  if (_realtimeChannel) {
+    try {
+      supabaseClient.removeChannel(_realtimeChannel);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config');
     }
+    _realtimeChannel = null;
+  }
 
-    const teamFilter = _realtimeTeamFilter();
-    let channel = supabaseClient.channel('public-changes');
-    Object.keys(_RT_TABLE_META).forEach(table => {
-        const meta = _RT_TABLE_META[table];
-        const opts = { event: '*', schema: 'public', table };
-        if (teamFilter && meta.hasTeam) opts.filter = `team=eq.${teamFilter}`;
-        channel = channel.on('postgres_changes', opts, payload => {
-            _applyRealtimePayload(table, payload);
-        });
+  const teamFilter = _realtimeTeamFilter();
+  let channel = supabaseClient.channel('public-changes');
+  Object.keys(_RT_TABLE_META).forEach((table) => {
+    const meta = _RT_TABLE_META[table];
+    const opts = { event: '*', schema: 'public', table };
+    if (teamFilter && meta.hasTeam) opts.filter = `team=eq.${teamFilter}`;
+    channel = channel.on('postgres_changes', opts, (payload) => {
+      _applyRealtimePayload(table, payload);
     });
-    _realtimeChannel = channel.subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
-                syncSupabaseToLocal().catch(() => {});
-            }
-            setTimeout(() => {
-                if (supabaseClient && document.visibilityState === 'visible' && window._supabaseAuthActive) {
-                    initSupabaseRealtime();
-                }
-            }, 3000);
+  });
+  _realtimeChannel = channel.subscribe((status) => {
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (typeof syncSupabaseToLocal === 'function' && window._supabaseAuthActive) {
+        syncSupabaseToLocal().catch(() => {});
+      }
+      setTimeout(() => {
+        if (
+          supabaseClient &&
+          document.visibilityState === 'visible' &&
+          window._supabaseAuthActive
+        ) {
+          initSupabaseRealtime();
         }
-    });
+      }, 3000);
+    }
+  });
 }
 
 if (typeof window !== 'undefined') {
-    // `_realtimeChannel` nunca é mais atribuído (initSupabaseRealtime foi
-    // substituído pelo SyncManager em sync-manager.js), então a condição
-    // `!_realtimeChannel` é SEMPRE verdadeira: sem este guard, cada volta
-    // para a aba recriava o canal inteiro (status connecting→live → repintava
-    // o chip e piscava o "atualizando..." do header sem necessidade).
-    // O SyncManager já cuida de reconnect (backoff) e do canal ativo.
-    const _supersededBySyncManager = () =>
-        typeof SyncManager !== 'undefined' && SyncManager && typeof SyncManager.connect === 'function';
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && supabaseClient && window._supabaseAuthActive && !_realtimeChannel) {
-            if (_supersededBySyncManager()) return;
-            initSupabaseRealtime();
-        }
-    });
-    window.addEventListener('pageshow', (e) => {
-        if (e.persisted && supabaseClient && window._supabaseAuthActive) {
-            if (_supersededBySyncManager()) return;
-            initSupabaseRealtime();
-        }
-    });
+  // `_realtimeChannel` nunca é mais atribuído (initSupabaseRealtime foi
+  // substituído pelo SyncManager em sync-manager.js), então a condição
+  // `!_realtimeChannel` é SEMPRE verdadeira: sem este guard, cada volta
+  // para a aba recriava o canal inteiro (status connecting→live → repintava
+  // o chip e piscava o "atualizando..." do header sem necessidade).
+  // O SyncManager já cuida de reconnect (backoff) e do canal ativo.
+  const _supersededBySyncManager = () =>
+    typeof SyncManager !== 'undefined' && SyncManager && typeof SyncManager.connect === 'function';
+  document.addEventListener('visibilitychange', () => {
+    if (
+      document.visibilityState === 'visible' &&
+      supabaseClient &&
+      window._supabaseAuthActive &&
+      !_realtimeChannel
+    ) {
+      if (_supersededBySyncManager()) return;
+      initSupabaseRealtime();
+    }
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted && supabaseClient && window._supabaseAuthActive) {
+      if (_supersededBySyncManager()) return;
+      initSupabaseRealtime();
+    }
+  });
 }

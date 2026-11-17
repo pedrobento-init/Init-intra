@@ -13,13 +13,26 @@
 // global (ver AGENTS.md).
 
 var EMAIL_TRIAGEM_MOTIVOS = {
-  sem_cliente: { label: 'Sem cliente', dica: 'O remetente não casou com nenhuma ficha. Cadastre o cliente, ou ponha o domínio na ficha dele.' },
-  ignorado_ia: { label: 'A IA ignorou', dica: 'O Make classificou como propaganda ou aviso automático. Confira se não era pedido.' },
-  auto_resposta: { label: 'Resposta automática', dica: 'Férias, confirmação de recebimento ou aviso de não entrega. Não virou nota no chamado; confira se não era gente escrevendo.' }
+  sem_cliente: {
+    label: 'Sem cliente',
+    dica: 'O remetente não casou com nenhuma ficha. Cadastre o cliente, ou ponha o domínio na ficha dele.',
+  },
+  ignorado_ia: {
+    label: 'A IA ignorou',
+    dica: 'O Make classificou como propaganda ou aviso automático. Confira se não era pedido.',
+  },
+  auto_resposta: {
+    label: 'Resposta automática',
+    dica: 'Férias, confirmação de recebimento ou aviso de não entrega. Não virou nota no chamado; confira se não era gente escrevendo.',
+  },
 };
 
 function getEmailsTriagem() {
-  try { return dbGet(DB.EMAILS_TRIAGEM) || []; } catch (_e) { return []; }
+  try {
+    return dbGet(DB.EMAILS_TRIAGEM) || [];
+  } catch (_e) {
+    return [];
+  }
 }
 
 /** Só o que ninguém tratou, do mais novo para o mais velho. */
@@ -28,28 +41,40 @@ function entradasEmailPendentes() {
     return e && e.status === 'pendente';
   });
   if (typeof filterByTeam === 'function') {
-    try { lista = filterByTeam(lista); } catch (_e) { /* sem equipe: mostra tudo */ }
+    try {
+      lista = filterByTeam(lista);
+    } catch (_e) {
+      /* sem equipe: mostra tudo */
+    }
   }
   return lista.sort(function (a, b) {
-    return String(b.recebidoEm || b.createdAt || '').localeCompare(String(a.recebidoEm || a.createdAt || ''));
+    return String(b.recebidoEm || b.createdAt || '').localeCompare(
+      String(a.recebidoEm || a.createdAt || '')
+    );
   });
 }
 
 var _EMAIL_TRIAGEM_COLUNAS_073 = [
-  ['client_id', 'clientId'], ['team', 'team'], ['atribuido_a', 'atribuidoA'],
-  ['atribuido_em', 'atribuidoEm'], ['atribuicao_nota', 'atribuicaoNota']
+  ['client_id', 'clientId'],
+  ['team', 'team'],
+  ['atribuido_a', 'atribuidoA'],
+  ['atribuido_em', 'atribuidoEm'],
+  ['atribuicao_nota', 'atribuicaoNota'],
 ];
 
 /** A caixa (#caixa) é a única superfície de triagem: quem muda uma entrada lá
  *  redesenha a própria lista (a antiga caixa embutida em Pendências saiu). */
 function _emailTriagemRedesenhar() {
-  if (typeof renderCaixaEntrada === 'function' && document.getElementById('caixaLista')) renderCaixaEntrada();
+  if (typeof renderCaixaEntrada === 'function' && document.getElementById('caixaLista'))
+    renderCaixaEntrada();
 }
 
 /** Grava a decisão na entrada e empurra para o banco, como o resto do app. */
 function _emailTriagemSalvar(id, patch) {
   var lista = getEmailsTriagem();
-  var i = lista.findIndex(function (e) { return e && e.id === id; });
+  var i = lista.findIndex(function (e) {
+    return e && e.id === id;
+  });
   if (i === -1) return null;
   var agora = new Date().toISOString();
   // Só quem DECIDIU leva nome e data. O desfazer devolve status 'pendente',
@@ -61,29 +86,50 @@ function _emailTriagemSalvar(id, patch) {
   var mudaStatus = !!(patch && 'status' in patch);
   var anterior = lista[i];
   lista[i] = Object.assign({}, anterior, patch, {
-    tratadoPor: mudaStatus ? (decidida ? ((typeof getUser === 'function' && getUser()) ? getUser().name : '') : null) : (anterior.tratadoPor || null),
-    tratadoEm: mudaStatus ? (decidida ? agora : null) : (anterior.tratadoEm || null),
+    tratadoPor: mudaStatus
+      ? decidida
+        ? typeof getUser === 'function' && getUser()
+          ? getUser().name
+          : ''
+        : null
+      : anterior.tratadoPor || null,
+    tratadoEm: mudaStatus ? (decidida ? agora : null) : anterior.tratadoEm || null,
     // O sync resolve conflito por updatedAt: sem isto, duas abas decidindo a
     // mesma entrada não teriam como saber qual decisão é a mais nova.
-    updatedAt: agora
+    updatedAt: agora,
   });
   dbSet(DB.EMAILS_TRIAGEM, lista);
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
     var payload = {
       status: lista[i].status,
       pendencia_id: lista[i].pendenciaId || null,
       tratado_por: lista[i].tratadoPor,
       tratado_em: lista[i].tratadoEm,
-      updated_at: lista[i].updatedAt
+      updated_at: lista[i].updatedAt,
     };
     // As colunas da 073 só vão quando a ação mexeu nelas: um banco ainda sem
     // a migration recusaria o update inteiro, e descartar deixaria de funcionar.
     _EMAIL_TRIAGEM_COLUNAS_073.forEach(function (par) {
-      if (patch && par[1] in patch) payload[par[0]] = lista[i][par[1]] == null ? null : lista[i][par[1]];
+      if (patch && par[1] in patch)
+        payload[par[0]] = lista[i][par[1]] == null ? null : lista[i][par[1]];
     });
-    supabaseClient.from('emails_triagem').update(payload).eq('id', id).then(function (res) {
-      if (res.error) { console.error('❌ Supabase emails_triagem:', res.error); markSyncPushFailed(); }
-    }).catch(function () { markSyncPushFailed(); });
+    supabaseClient
+      .from('emails_triagem')
+      .update(payload)
+      .eq('id', id)
+      .then(function (res) {
+        if (res.error) {
+          console.error('❌ Supabase emails_triagem:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(function () {
+        markSyncPushFailed();
+      });
   }
   return lista[i];
 }
@@ -98,8 +144,13 @@ function _emailTriagemSalvar(id, patch) {
  * perderia o e-mail se a pessoa desistisse no meio do formulário.
  */
 function emailTriagemAbrirChamado(id) {
-  var e = getEmailsTriagem().find(function (x) { return x && x.id === id; });
-  if (!e) { showToast('Entrada não encontrada.', 'error'); return; }
+  var e = getEmailsTriagem().find(function (x) {
+    return x && x.id === id;
+  });
+  if (!e) {
+    showToast('Entrada não encontrada.', 'error');
+    return;
+  }
   // Card velho na tela (sem realtime, outra aba, colega tratou primeiro):
   // abrir o formulário em cima dele viraria um SEGUNDO chamado para a mesma
   // mensagem. O status é conferido aqui, onde ainda dá para recusar.
@@ -113,7 +164,7 @@ function emailTriagemAbrirChamado(id) {
     assunto: String(e.assunto || '').slice(0, 120),
     descricao: String(e.corpo || ''),
     canal: 'email',
-    solicitante: (typeof _emailTriagemNome === 'function') ? _emailTriagemNome(e.de) : '',
+    solicitante: typeof _emailTriagemNome === 'function' ? _emailTriagemNome(e.de) : '',
     solicitanteEmail: _emailTriagemEndereco(e.de),
     emailThreadId: e.threadId || null,
     emailMessageId: e.messageId || null,
@@ -123,7 +174,7 @@ function emailTriagemAbrirChamado(id) {
     // window._emailTriagemPendente sobrevivia ao cancelamento, e o PRÓXIMO
     // chamado criado pelo formulário marcava a entrada abandonada como
     // virou_chamado — apontando para o chamado errado.
-    etrEntrada: id
+    etrEntrada: id,
   });
 }
 
@@ -145,7 +196,9 @@ function _emailTriagemNome(de) {
 /** Chamado criado a partir de uma entrada: fecha o ciclo. Chamado por pendencias, com o id vindo do formulário. */
 function emailTriagemMarcarAberta(pendenciaId, id, clientId) {
   if (!id || !pendenciaId) return;
-  var e = getEmailsTriagem().find(function (x) { return x && x.id === id; });
+  var e = getEmailsTriagem().find(function (x) {
+    return x && x.id === id;
+  });
   // Entre abrir o formulário e salvar, o colega pode ter tratado a entrada:
   // por cima da decisão dele, o pendenciaId novo apontaria para o chamado errado.
   if (!e || e.status !== 'pendente') {
@@ -163,9 +216,21 @@ function emailTriagemMarcarAberta(pendenciaId, id, clientId) {
 // provedor pessoal fora desta lista teria o DOMÍNIO aprendido, e todo mundo que
 // escreve dele viraria chamado do mesmo cliente.
 var _EMAIL_TRIAGEM_PESSOAIS = [
-  'gmail.com', 'hotmail.com', 'hotmail.com.br', 'outlook.com', 'outlook.com.br',
-  'live.com', 'yahoo.com', 'yahoo.com.br', 'icloud.com', 'me.com', 'msn.com',
-  'uol.com.br', 'bol.com.br', 'terra.com.br', 'globo.com'
+  'gmail.com',
+  'hotmail.com',
+  'hotmail.com.br',
+  'outlook.com',
+  'outlook.com.br',
+  'live.com',
+  'yahoo.com',
+  'yahoo.com.br',
+  'icloud.com',
+  'me.com',
+  'msn.com',
+  'uol.com.br',
+  'bol.com.br',
+  'terra.com.br',
+  'globo.com',
 ];
 
 /**
@@ -175,7 +240,7 @@ var _EMAIL_TRIAGEM_PESSOAIS = [
  */
 function _emailTriagemAprender(de, clientId) {
   var endereco = _emailTriagemEndereco(de);
-  var c = (clientId && typeof getClientById === 'function') ? getClientById(clientId) : null;
+  var c = clientId && typeof getClientById === 'function' ? getClientById(clientId) : null;
   if (!endereco || !c) return null;
   var dominio = endereco.split('@')[1];
   var pessoal = _EMAIL_TRIAGEM_PESSOAIS.indexOf(dominio) !== -1;
@@ -192,15 +257,22 @@ function _emailTriagemAprender(de, clientId) {
     client_id: c.id,
     team: team,
     created_by: u ? u.name : null,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   };
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
     // Falhar aqui não é falha de sync: sem a 072, ou com o cliente ainda não
     // enviado, o robô só deixa de aprender. O chamado já está salvo.
-    supabaseClient.from('clientes_remetentes').upsert(linha, { onConflict: 'team,remetente' }).then(function (res) {
-      if (res && res.error) console.warn('⚠️ clientes_remetentes:', res.error.message);
-    }).catch(function () {});
+    supabaseClient
+      .from('clientes_remetentes')
+      .upsert(linha, { onConflict: 'team,remetente' })
+      .then(function (res) {
+        if (res && res.error) console.warn('⚠️ clientes_remetentes:', res.error.message);
+      })
+      .catch(function () {});
   }
   return linha;
 }
-

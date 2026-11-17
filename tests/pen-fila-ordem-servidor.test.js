@@ -12,9 +12,15 @@ function mockQ(resposta) {
   const calls = [];
   const q = {};
   for (const m of ['eq', 'in', 'not', 'or', 'order', 'select']) {
-    q[m] = (...args) => { calls.push([m, ...args]); return q; };
+    q[m] = (...args) => {
+      calls.push([m, ...args]);
+      return q;
+    };
   }
-  q.range = (...args) => { calls.push(['range', ...args]); return Promise.resolve(resposta); };
+  q.range = (...args) => {
+    calls.push(['range', ...args]);
+    return Promise.resolve(resposta);
+  };
   q.calls = calls;
   return q;
 }
@@ -27,7 +33,10 @@ beforeEach(() => {
   globalThis.escapeHtml = (s) => String(s ?? '');
   globalThis.ENTITIES = [{ table: 'pendencias', fields: { id: 'id', created_at: 'createdAt' } }];
   globalThis.supabaseClient = {
-    from: () => { ultimaQ = mockQ({ data: [], count: 0, error: null }); return ultimaQ; },
+    from: () => {
+      ultimaQ = mockQ({ data: [], count: 0, error: null });
+      return ultimaQ;
+    },
   };
   storage = requireStorage();
 });
@@ -95,7 +104,11 @@ describe('fetchPendenciasPage: a ordem vira ORDER BY', () => {
   });
 
   it('a paginação segue igual: a ordem não mexe no range', async () => {
-    await storage.fetchPendenciasPage({ page: 2, pageSize: 50, sort: { col: 'prazo', dir: 'asc' } });
+    await storage.fetchPendenciasPage({
+      page: 2,
+      pageSize: 50,
+      sort: { col: 'prazo', dir: 'asc' },
+    });
     expect(ultimaQ.calls.find(([m]) => m === 'range')).toEqual(['range', 100, 149]);
   });
 });

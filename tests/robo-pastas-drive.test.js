@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const { criarDrive } = require('./_driveapp.cjs');
 const fonte = fs.readFileSync(
-  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)),
+  'utf8'
+);
 
 const ROOT = 'raiz';
 let drive, root, logs;
@@ -19,9 +21,17 @@ let drive, root, logs;
 function rodar(plano, { rootId = ROOT } = {}) {
   const ctx = {
     DriveApp: drive.DriveApp,
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'CLIENTES_ROOT_ID' ? rootId : null) }) },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => (k === 'CLIENTES_ROOT_ID' ? rootId : null),
+      }),
+    },
     Logger: { log: (s) => logs.push(String(s)) },
-    UrlFetchApp: { fetch: () => { throw new Error('rede no teste'); } },
+    UrlFetchApp: {
+      fetch: () => {
+        throw new Error('rede no teste');
+      },
+    },
   };
   vm.createContext(ctx);
   vm.runInContext(fonte, ctx);
@@ -35,8 +45,11 @@ function rodar(plano, { rootId = ROOT } = {}) {
   return enviado;
 }
 
-const nomesNaRaiz = () => [...drive.itens.values()]
-  .filter((x) => x.tipo === 'pasta' && x.pais.includes(ROOT)).map((x) => x.nome).sort();
+const nomesNaRaiz = () =>
+  [...drive.itens.values()]
+    .filter((x) => x.tipo === 'pasta' && x.pais.includes(ROOT))
+    .map((x) => x.nome)
+    .sort();
 
 beforeEach(() => {
   drive = criarDrive();
@@ -93,7 +106,9 @@ describe('roboPastas no Drive', () => {
   it('pasta vigiada com nome antigo fora da raiz: renomeia e move para a raiz', () => {
     const outra = drive.pasta('Outro lugar');
     const f = drive.pasta('Nome velho', [outra.getId()], { id: 'f1' });
-    const r = rodar({ vigiar: [{ client_id: 'c1', folder_id: 'f1', nome: 'Nome novo', compartilhada: false }] });
+    const r = rodar({
+      vigiar: [{ client_id: 'c1', folder_id: 'f1', nome: 'Nome novo', compartilhada: false }],
+    });
     expect(f.nome).toBe('Nome novo');
     expect(f.pais).toEqual([ROOT]);
     expect(r.testes).toEqual([{ client_id: 'c1', status: 'ok' }]);
@@ -101,10 +116,12 @@ describe('roboPastas no Drive', () => {
 
   it('pasta compartilhada por dois clientes: confere, mas não renomeia nem move', () => {
     const f = drive.pasta('Grupo', ['fora'], { id: 'f1' });
-    rodar({ vigiar: [
-      { client_id: 'a', folder_id: 'f1', nome: 'Matriz', compartilhada: true },
-      { client_id: 'b', folder_id: 'f1', nome: 'Filial', compartilhada: true },
-    ] });
+    rodar({
+      vigiar: [
+        { client_id: 'a', folder_id: 'f1', nome: 'Matriz', compartilhada: true },
+        { client_id: 'b', folder_id: 'f1', nome: 'Filial', compartilhada: true },
+      ],
+    });
     expect(f.nome).toBe('Grupo');
     expect(f.pais).toEqual(['fora']);
   });
@@ -119,11 +136,16 @@ describe('roboPastas no Drive', () => {
 
   it('pasta vigiada na lixeira ou sumida fica inacessível e não é mexida', () => {
     const f = drive.pasta('Velha', ['fora'], { id: 'f1', lixeira: true });
-    const r = rodar({ vigiar: [
-      { client_id: 'c1', folder_id: 'f1', nome: 'Nova', compartilhada: false },
-      { client_id: 'c2', folder_id: 'sumiu', nome: 'X', compartilhada: false },
-    ] });
-    expect(r.testes).toEqual([{ client_id: 'c1', status: 'inacessivel' }, { client_id: 'c2', status: 'inacessivel' }]);
+    const r = rodar({
+      vigiar: [
+        { client_id: 'c1', folder_id: 'f1', nome: 'Nova', compartilhada: false },
+        { client_id: 'c2', folder_id: 'sumiu', nome: 'X', compartilhada: false },
+      ],
+    });
+    expect(r.testes).toEqual([
+      { client_id: 'c1', status: 'inacessivel' },
+      { client_id: 'c2', status: 'inacessivel' },
+    ]);
     expect(f.nome).toBe('Velha');
   });
 
@@ -159,10 +181,13 @@ describe('roboPastas no Drive', () => {
   it('CLIENTES_ROOT_ID vazio: registra o erro e não cria, move nem lista órfã', () => {
     const f = drive.pasta('Velha', ['fora'], { id: 'f1' });
     const total = drive.itens.size;
-    const r = rodar({
-      buscar: [{ client_id: 'c1', nome: 'Nova' }],
-      vigiar: [{ client_id: 'c2', folder_id: 'f1', nome: 'Velha', compartilhada: false }],
-    }, { rootId: '' });
+    const r = rodar(
+      {
+        buscar: [{ client_id: 'c1', nome: 'Nova' }],
+        vigiar: [{ client_id: 'c2', folder_id: 'f1', nome: 'Velha', compartilhada: false }],
+      },
+      { rootId: '' }
+    );
     expect(r.erros).toEqual(['CLIENTES_ROOT_ID vazio: nada criado, movido nem listado']);
     expect(drive.itens.size).toBe(total);
     expect(f.pais).toEqual(['fora']);

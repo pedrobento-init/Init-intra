@@ -21,9 +21,14 @@ test('criar e concluir visita com relatório', async ({ page }) => {
   await page.locator('#chgVisitStatus').selectOption('concluida');
   await page.getByRole('button', { name: 'Atualizar Status' }).click();
   await page.locator('#concludeRelatorio').fill('Troca de filtros e teste do nobreak.');
-  await page.locator('#modal').getByRole('button', { name: /Concluir/ }).click();
+  await page
+    .locator('#modal')
+    .getByRole('button', { name: /Concluir/ })
+    .click();
 
   await expect(page.locator('#modalBody')).toContainText('Troca de filtros e teste do nobreak.');
-  const status = await page.evaluate(() => getVisits().find((v) => v.motivo === 'E2E — manutenção preventiva')?.status);
+  const status = await page.evaluate(
+    () => getVisits().find((v) => v.motivo === 'E2E — manutenção preventiva')?.status
+  );
   expect(status).toBe('concluida');
 });

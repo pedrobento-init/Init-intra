@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { loginLocal } from './helpers.js';
 
-test('xlsx e mammoth não carregam na abertura; a planilha baixa a biblioteca quando é exportada', async ({ page }) => {
+test('xlsx e mammoth não carregam na abertura; a planilha baixa a biblioteca quando é exportada', async ({
+  page,
+}) => {
   const cdn = [];
-  page.on('request', (r) => { if (/xlsx|mammoth/.test(r.url())) cdn.push(r.url()); });
+  page.on('request', (r) => {
+    if (/xlsx|mammoth/.test(r.url())) cdn.push(r.url());
+  });
   await loginLocal(page, { hash: 'equipamentos' });
   expect(cdn).toEqual([]);
   expect(await page.evaluate(() => typeof XLSX)).toBe('undefined');
@@ -11,7 +15,14 @@ test('xlsx e mammoth não carregam na abertura; a planilha baixa a biblioteca qu
   // Precisa de um equipamento na lista para exportar.
   await page.evaluate(() => {
     const c = getClients()[0];
-    saveEquipamento({ clientId: c.id, clientName: c.name, tipo: 'notebook', descricao: 'E2E notebook', status: 'recebido', valor: 150 });
+    saveEquipamento({
+      clientId: c.id,
+      clientName: c.name,
+      tipo: 'notebook',
+      descricao: 'E2E notebook',
+      status: 'recebido',
+      valor: 150,
+    });
     renderEquipamentos();
   });
   const download = page.waitForEvent('download');

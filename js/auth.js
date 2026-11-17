@@ -1,29 +1,112 @@
 // auth.js – Autenticação exclusiva via Supabase Auth
 // =====================================================================
 
-const OP_SAFE_COLS = 'id,name,initials,color,role,phone,email,is_admin,is_gestao,active,team,auth_user_id,created_at,updated_at';
+const OP_SAFE_COLS =
+  'id,name,initials,color,role,phone,email,is_admin,is_gestao,active,team,auth_user_id,created_at,updated_at';
 
-const _loginGuard = { fails: 0, lockUntil: 0 };
+// Trava de tentativas de login — ATENÇÃO: é só conforto/atrito no CLIENTE.
+// Quem quer burlar limpa o storage, abre outra aba anônima ou fala direto com a
+// API; a defesa real contra força bruta é server-side (rate limit e proteção
+// do Supabase Auth, mais senhas fortes). Aqui só persistimos o estado para o
+// reload não zerar a contagem e damos feedback claro (tempo restante).
+// Backoff exponencial: a cada 5 falhas a trava dobra (30 s, 1, 2, 4… até 30 min);
+// sucesso zera tudo, e 1 h sem falhar também zera o nível.
+const LOGIN_GUARD_KEY = 'initintra:login-guard';
+const LOGIN_GUARD_MAX_FAILS = 5;
+const LOGIN_GUARD_BASE_MS = 30 * 1000;
+const LOGIN_GUARD_MAX_MS = 30 * 60 * 1000;
+const LOGIN_GUARD_DECAY_MS = 60 * 60 * 1000;
+
+// Espelho em memória: vale quando o storage falha (modo privado, bloqueado).
+const _loginGuard = { fails: 0, lockUntil: 0, level: 0, lastFail: 0 };
+
+function _loginGuardNum(v, max) {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0;
+}
+
+function _loginGuardLoad(now) {
+  try {
+    const raw = localStorage.getItem(LOGIN_GUARD_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        _loginGuard.fails = Math.floor(_loginGuardNum(o.fails, 1000));
+        _loginGuard.level = Math.floor(_loginGuardNum(o.level, 30));
+        _loginGuard.lastFail = _loginGuardNum(o.lastFail, now);
+        // relógio voltado para trás não pode render uma trava maior que o teto
+        _loginGuard.lockUntil = _loginGuardNum(o.lockUntil, now + LOGIN_GUARD_MAX_MS);
+      }
+    }
+  } catch (_) {
+    /* storage indisponível ou JSON corrompido: segue com a memória */
+  }
+  if (
+    _loginGuard.level > 0 &&
+    now >= _loginGuard.lockUntil &&
+    now - _loginGuard.lastFail > LOGIN_GUARD_DECAY_MS
+  ) {
+    _loginGuard.fails = 0;
+    _loginGuard.level = 0;
+    _loginGuard.lastFail = 0;
+    _loginGuard.lockUntil = 0;
+  }
+  return _loginGuard;
+}
+
+function _loginGuardSave() {
+  try {
+    localStorage.setItem(LOGIN_GUARD_KEY, JSON.stringify(_loginGuard));
+  } catch (_) {
+    /* fica só em memória */
+  }
+}
+
+/** Milissegundos que faltam para liberar o login (0 = liberado). */
+function loginLockRemainingMs(now) {
+  const t = now == null ? Date.now() : now;
+  return Math.max(0, _loginGuardLoad(t).lockUntil - t);
+}
+
+/** "45 s" ou "2 min 10 s". */
+function formatLoginLockWait(ms) {
+  const total = Math.max(1, Math.ceil(ms / 1000));
+  if (total < 60) return total + ' s';
+  const m = Math.floor(total / 60),
+    sec = total % 60;
+  return m + ' min' + (sec ? ' ' + sec + ' s' : '');
+}
 
 function _assertLoginAllowed() {
-  const now = Date.now();
-  if (now < _loginGuard.lockUntil) {
-    const mins = Math.ceil((_loginGuard.lockUntil - now) / 60000);
-    throw new Error(`Muitas tentativas. Aguarde ${mins} min e tente novamente.`);
+  const left = loginLockRemainingMs();
+  if (left > 0) {
+    throw new Error(`Muitas tentativas. Aguarde ${formatLoginLockWait(left)} e tente novamente.`);
   }
 }
 
 function _recordLoginFailure() {
-  _loginGuard.fails += 1;
-  if (_loginGuard.fails >= 5) {
-    _loginGuard.lockUntil = Date.now() + 15 * 60 * 1000;
-    _loginGuard.fails = 0;
+  const now = Date.now();
+  const g = _loginGuardLoad(now);
+  g.fails += 1;
+  g.lastFail = now;
+  if (g.fails >= LOGIN_GUARD_MAX_FAILS) {
+    g.lockUntil = now + Math.min(LOGIN_GUARD_BASE_MS * Math.pow(2, g.level), LOGIN_GUARD_MAX_MS);
+    g.level += 1;
+    g.fails = 0;
   }
+  _loginGuardSave();
 }
 
 function _recordLoginSuccess() {
   _loginGuard.fails = 0;
+  _loginGuard.level = 0;
+  _loginGuard.lastFail = 0;
   _loginGuard.lockUntil = 0;
+  try {
+    localStorage.removeItem(LOGIN_GUARD_KEY);
+  } catch (_) {
+    /* nada a limpar */
+  }
 }
 
 /**
@@ -47,7 +130,7 @@ async function authSignIn(email, password) {
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: trimmedEmail,
-    password: password
+    password: password,
   });
   if (error) {
     _recordLoginFailure();
@@ -91,7 +174,10 @@ async function authSignIn(email, password) {
 
   try {
     await syncSupabaseToLocal();
-  } catch (_) {}
+  } catch (_e) {
+    console.warn('[auth] sync pós-login falhou', _e);
+    if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+  }
 
   _recordLoginSuccess();
   setSession(op.id);
@@ -126,12 +212,18 @@ async function _resolveOperatorForAuth(authUser) {
               .from('operators')
               .update({ auth_user_id: authUser.id, updated_at: new Date().toISOString() })
               .eq('id', byEmail.id);
-          } catch (_) {}
+          } catch (_e) {
+            console.error('[auth] vínculo operador/auth_user não gravado', _e);
+            if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+          }
         }
         return _upsertOperatorFromRemote(byEmail);
       }
     }
-  } catch (_) {}
+  } catch (_e) {
+    console.error('[auth] resolver operador remoto falhou', _e);
+    if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+  }
   return null;
 }
 
@@ -176,26 +268,31 @@ async function _refreshOperatorFromSupabase(localOp, authUser) {
 function _upsertOperatorFromRemote(remote, _localFallback) {
   const list = getOperators();
   const merged = {
-    id:           remote.id,
-    name:         remote.name,
-    initials:     remote.initials,
-    color:        remote.color,
-    role:         remote.role,
-    phone:        remote.phone,
-    email:        remote.email,
-    isAdmin:      remote.is_admin === true,
-    isGestao:     remote.is_gestao === true,
-    active:       remote.active !== false,
-    team:         remote.team || 'init',
+    id: remote.id,
+    name: remote.name,
+    initials: remote.initials,
+    color: remote.color,
+    role: remote.role,
+    phone: remote.phone,
+    email: remote.email,
+    isAdmin: remote.is_admin === true,
+    isGestao: remote.is_gestao === true,
+    active: remote.active !== false,
+    team: remote.team || 'init',
     auth_user_id: remote.auth_user_id,
-    createdAt:    remote.created_at,
-    updatedAt:    remote.updated_at,
+    createdAt: remote.created_at,
+    updatedAt: remote.updated_at,
   };
-  const idx = list.findIndex(o => o.id === merged.id);
+  const idx = list.findIndex((o) => o.id === merged.id);
   if (idx !== -1) list[idx] = { ...list[idx], ...merged };
   else list.push(merged);
   // Hash de senha não é mais guardado (cópias antigas do aparelho saem aqui).
-  for (const o of list) { if (o) { delete o.pinHash; delete o.pinSalt; } }
+  for (const o of list) {
+    if (o) {
+      delete o.pinHash;
+      delete o.pinSalt;
+    }
+  }
   dbSet(DB.OPERATORS, list);
   return merged;
 }
@@ -205,18 +302,27 @@ function _upsertOperatorFromRemote(remote, _localFallback) {
  */
 async function _linkOperator(operatorId, authUserId, email) {
   const list = getOperators();
-  const idx = list.findIndex(o => o.id === operatorId);
+  const idx = list.findIndex((o) => o.id === operatorId);
   if (idx === -1) return;
   list[idx].auth_user_id = authUserId;
   if (email) list[idx].email = email;
   list[idx].updatedAt = new Date().toISOString();
   dbSet(DB.OPERATORS, list);
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('operators').update({
-      auth_user_id: authUserId,
-      email,
-      updated_at: new Date().toISOString()
-    }).eq('id', operatorId).then(() => {}).catch(() => {});
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('operators')
+      .update({
+        auth_user_id: authUserId,
+        email,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', operatorId)
+      .then(() => {})
+      .catch(() => {});
   }
 }
 
@@ -234,12 +340,17 @@ async function authSignOut() {
         localStorage.removeItem(key);
       }
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+  }
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     try {
       await supabaseClient.auth.signOut({ scope: 'global' });
-    } catch (_) {}
+    } catch (_e) {
+      console.error('[auth] signOut remoto falhou', _e);
+      if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+    }
   }
 }
 
@@ -255,7 +366,9 @@ async function authGetCurrentUser() {
         const op = getOperatorByAuthId(data.user.id) || getOperatorByEmail(data.user.email);
         return { authUser: data.user, operator: op };
       }
-    } catch (_) {}
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+    }
   }
   return null;
 }
@@ -278,7 +391,7 @@ function authOnStateChange(callback) {
 async function authResetPassword(email) {
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: window.location.origin + window.location.pathname
+      redirectTo: window.location.origin + window.location.pathname,
     });
     if (error) throw error;
     return true;
@@ -294,7 +407,11 @@ async function authCreateUser(email, password) {
     return { ok: false, reason: 'offline', message: 'Sem conexão com o servidor.' };
   }
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    return { ok: false, reason: 'forbidden', message: 'Apenas administradores podem criar usuários.' };
+    return {
+      ok: false,
+      reason: 'forbidden',
+      message: 'Apenas administradores podem criar usuários.',
+    };
   }
   const trimmed = (email || '').trim().toLowerCase();
   if (!trimmed || !password) {
@@ -312,15 +429,17 @@ async function authCreateUser(email, password) {
       adminAccess = cur.session.access_token;
       adminRefresh = cur.session.refresh_token;
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+  }
 
   try {
     const { data, error } = await supabaseClient.auth.signUp({
       email: trimmed,
       password,
       options: {
-        emailRedirectTo: window.location.origin + window.location.pathname
-      }
+        emailRedirectTo: window.location.origin + window.location.pathname,
+      },
     });
     if (error) {
       const msg = (error.message || '').toLowerCase();
@@ -338,25 +457,33 @@ async function authCreateUser(email, password) {
       try {
         await supabaseClient.auth.setSession({
           access_token: adminAccess,
-          refresh_token: adminRefresh
+          refresh_token: adminRefresh,
         });
         window._supabaseAuthActive = true;
-      } catch (_) {}
+      } catch (_e) {
+        console.error('[auth] sessão do admin não restaurada', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+        if (typeof showToast === 'function')
+          showToast('A sessão do administrador não foi restaurada. Entre novamente.', 'error');
+      }
     }
 
     return {
       ok: true,
       needsEmailConfirm: !data.session,
-      authUserId: newUser.id
+      authUserId: newUser.id,
     };
   } catch (err) {
     if (adminAccess && adminRefresh) {
       try {
         await supabaseClient.auth.setSession({
           access_token: adminAccess,
-          refresh_token: adminRefresh
+          refresh_token: adminRefresh,
         });
-      } catch (_) {}
+      } catch (_e) {
+        console.error('[auth] sessão do admin não restaurada', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'auth');
+      }
     }
     return { ok: false, reason: 'error', message: err.message || String(err) };
   }
@@ -375,7 +502,7 @@ async function authResendInvite(email) {
   const trimmed = (email || '').trim().toLowerCase();
   try {
     const { error } = await supabaseClient.auth.resetPasswordForEmail(trimmed, {
-      redirectTo: window.location.origin + window.location.pathname
+      redirectTo: window.location.origin + window.location.pathname,
     });
     if (error) return { ok: false, message: error.message };
     return { ok: true };

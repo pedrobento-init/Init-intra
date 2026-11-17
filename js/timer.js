@@ -40,7 +40,7 @@ function formatTimer(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = Math.floor(totalSeconds % 60);
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 /**
@@ -49,7 +49,8 @@ function formatTimer(totalSeconds) {
  * é das notas de sessão que o relatório mensal tira as horas do período.
  */
 function timerClosedSessionNote(operator, sessionSeconds, totalSeconds) {
-  const me = (typeof getUser === 'function' && getUser() && getUser().name) || operator || 'Operador';
+  const me =
+    (typeof getUser === 'function' && getUser() && getUser().name) || operator || 'Operador';
   return {
     text: `⏹ Cronômetro de ${operator || me} parado ao concluir. Sessão registrada: ${formatTimer(sessionSeconds)}. Total: ${formatTimer(totalSeconds)}.`,
     author: me,
@@ -102,13 +103,17 @@ function timerApplyStopOnStatus(cur, next, stop) {
   next.timerRunning = false;
   next.timerStartedAt = null;
   next.timerOperator = null;
-  const me = (typeof getUser === 'function' && getUser() && getUser().name) || stop.operator || 'Operador';
+  const me =
+    (typeof getUser === 'function' && getUser() && getUser().name) || stop.operator || 'Operador';
   const note = stop.closed
     ? timerClosedSessionNote(stop.operator, stop.elapsed, stop.total)
     : timerPausedSessionNote(stop.operator, stop.elapsed, stop.total, me);
   next.notes = [...(cur.notes || []), note];
   if (typeof recordTimeSession === 'function') {
-    recordTimeSession(cur, stop.elapsed, { source: stop.closed ? 'conclusao' : 'timer', operatorName: stop.operator });
+    recordTimeSession(cur, stop.elapsed, {
+      source: stop.closed ? 'conclusao' : 'timer',
+      operatorName: stop.operator,
+    });
   }
 }
 
@@ -153,7 +158,9 @@ function formatDurationWords(totalSeconds) {
 /** Texto do display conforme o formato pedido pelo elemento. */
 function _timerText(el, item) {
   const secs = getElapsedSeconds(item);
-  return el && el.dataset && el.dataset.format === 'compact' ? formatTimerCompact(secs) : formatTimer(secs);
+  return el && el.dataset && el.dataset.format === 'compact'
+    ? formatTimerCompact(secs)
+    : formatTimer(secs);
 }
 
 /**
@@ -186,10 +193,14 @@ function timerActionBtnHTML(item, type = 'pendencia') {
     // Ninguém trabalhando — play com rótulo coerente com o status (mesma ação/funcionalidade).
     // aberto: iniciar move para em_andamento; em_andamento parado: retomar mantém o status.
     var _st = item && item.status;
-    var _playTitle = _st === 'aberto' ? 'Iniciar atendimento (move para Em Andamento)'
-      : _st === 'em_andamento' ? 'Retomar trabalho (já em andamento)'
-      : _st === 'pausado' ? 'Retomar trabalho (move para Em Andamento)'
-      : 'Iniciar trabalho neste chamado';
+    var _playTitle =
+      _st === 'aberto'
+        ? 'Iniciar atendimento (move para Em Andamento)'
+        : _st === 'em_andamento'
+          ? 'Retomar trabalho (já em andamento)'
+          : _st === 'pausado'
+            ? 'Retomar trabalho (move para Em Andamento)'
+            : 'Iniciar trabalho neste chamado';
     return `<button class="timer-btn" title="${_playTitle}" data-action="toggleTimer" data-arg="${escapeHtml(item.id)}" data-type="${escapeHtml(type)}">▶</button>`;
   }
 
@@ -199,7 +210,7 @@ function timerActionBtnHTML(item, type = 'pendencia') {
   }
 
   // Outro operador trabalhando — mostrar bloqueado/desabilitado
-  return `<button class="timer-btn" disabled title="${escapeHtml(worker)} já está trabalhando neste item" style="opacity:.5;cursor:not-allowed">🔒</button>`;
+  return `<button class="timer-btn u-71f920" disabled title="${escapeHtml(worker)} já está trabalhando neste item">🔒</button>`;
 }
 
 /**
@@ -209,7 +220,9 @@ function timerActionBtnHTML(item, type = 'pendencia') {
 function _isTimerClosedStatus(status) {
   try {
     if (typeof isPendenciaClosed === 'function') return isPendenciaClosed(status);
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+  }
   return ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(status || '');
 }
 
@@ -220,14 +233,21 @@ function _isTimerClosedStatus(status) {
  */
 function timerWidget(item, type = 'pendencia') {
   var _wid = '';
-  try { _wid = (typeof escapeHtml === 'function') ? escapeHtml(item && item.id) : String((item && item.id) || ''); } catch (_) { _wid = String((item && item.id) || ''); }
+  try {
+    _wid =
+      typeof escapeHtml === 'function'
+        ? escapeHtml(item && item.id)
+        : String((item && item.id) || '');
+  } catch (_) {
+    _wid = String((item && item.id) || '');
+  }
   if (item && _isTimerClosedStatus(item.status)) {
     const secs = getElapsedSeconds(item);
-    return `<span class="timer-widget" data-timer-widget="${_wid}" title="Tempo total trabalhado (chamado finalizado)"><span style="font-size:11px;color:var(--text-muted)">⏱ ${formatTimer(secs)}</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}" title="Tempo total trabalhado (chamado finalizado)"><span class="u-749148">⏱ ${formatTimer(secs)}</span></span>`;
   }
   const worker = getCurrentWorker(item);
   if (!worker) {
-    return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)" title="Ninguém trabalhando agora">Ninguém</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} <span class="u-749148" title="Ninguém trabalhando agora">Ninguém</span></span>`;
   }
   return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} ${workerBadgeHTML(item)} ${timerDisplayHTML(item)}</span>`;
 }
@@ -245,7 +265,10 @@ function toggleTimer(type, id, btnEl) {
   const renderFn = renderPenView;
   const updateLabel = 'Pendência';
 
-  if (!cur) { showToast('Item não encontrado.', 'error'); return; }
+  if (!cur) {
+    showToast('Item não encontrado.', 'error');
+    return;
+  }
 
   // Chamado finalizado não pode iniciar/retomar execução pelo card.
   // Reabra (mude o status) para voltar a trabalhar — evita resolvido com timer rodando.
@@ -264,7 +287,13 @@ function toggleTimer(type, id, btnEl) {
   }
 
   // Anti duplo-clique: o botão antigo será substituído pelo full refresh abaixo.
-  if (btnEl && !btnEl.disabled) { try { btnEl.disabled = true; } catch (_) {} }
+  if (btnEl && !btnEl.disabled) {
+    try {
+      btnEl.disabled = true;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
+  }
 
   try {
     if (worker && worker === myName) {
@@ -272,7 +301,11 @@ function toggleTimer(type, id, btnEl) {
       const started = cur.timerStartedAt ? new Date(cur.timerStartedAt).getTime() : Date.now();
       const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
       const total = (Number(cur.timerTotalSeconds) || 0) + elapsed;
-      const note = { text: `⏸ ${myName} pausou. Tempo sessão: ${formatTimer(elapsed)}. Total: ${formatTimer(total)}.`, author: myName, createdAt: now };
+      const note = {
+        text: `⏸ ${myName} pausou. Tempo sessão: ${formatTimer(elapsed)}. Total: ${formatTimer(total)}.`,
+        author: myName,
+        createdAt: now,
+      };
       const next = {
         ...cur,
         timerTotalSeconds: total,
@@ -284,7 +317,8 @@ function toggleTimer(type, id, btnEl) {
         updatedAt: now,
       };
       saveFn(next);
-      if (typeof recordTimeSession === 'function') recordTimeSession(cur, elapsed, { source: 'timer', operatorName: myName, endedAt: now });
+      if (typeof recordTimeSession === 'function')
+        recordTimeSession(cur, elapsed, { source: 'timer', operatorName: myName, endedAt: now });
       showToast('Trabalho pausado — item movido para Pausados.', 'info');
     } else {
       // INICIAR
@@ -293,23 +327,51 @@ function toggleTimer(type, id, btnEl) {
         timerRunning: true,
         timerOperator: myName,
         timerStartedAt: now,
-        timerTotalSeconds: (typeof cur.timerTotalSeconds === 'number') ? cur.timerTotalSeconds : 0,
+        timerTotalSeconds: typeof cur.timerTotalSeconds === 'number' ? cur.timerTotalSeconds : 0,
         responsible: cur.responsible || myName,
-        status: (cur.status === 'pausado' || cur.status === 'aberto') ? 'em_andamento' : cur.status,
-        notes: [...(cur.notes || []), { text: `▶ ${myName} iniciou o trabalho nesta ${updateLabel.toLowerCase()}.`, author: myName, createdAt: now }],
+        status: cur.status === 'pausado' || cur.status === 'aberto' ? 'em_andamento' : cur.status,
+        notes: [
+          ...(cur.notes || []),
+          {
+            text: `▶ ${myName} iniciou o trabalho nesta ${updateLabel.toLowerCase()}.`,
+            author: myName,
+            createdAt: now,
+          },
+        ],
         updatedAt: now,
       };
       saveFn(next);
       showToast(`Você iniciou o trabalho nesta ${updateLabel.toLowerCase()}!`, 'success');
     }
   } finally {
-    try { if (btnEl && btnEl.isConnected) btnEl.disabled = false; } catch (_) {}
+    try {
+      if (btnEl && btnEl.isConnected) btnEl.disabled = false;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
   }
 
   _refreshTimerFull(id, type);
-  if (typeof renderFn === 'function') { try { renderFn(); } catch (_) {} }
-  if (typeof updateDashboardBadge === 'function') { try { updateDashboardBadge(); } catch (_) {} }
-  else if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof renderFn === 'function') {
+    try {
+      renderFn();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
+  }
+  if (typeof updateDashboardBadge === 'function') {
+    try {
+      updateDashboardBadge();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
+  } else if (typeof updateBadges === 'function') {
+    try {
+      updateBadges();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
+  }
 }
 
 /**
@@ -321,14 +383,23 @@ function _canAdjustTimer(item) {
   const worker = getCurrentWorker(item);
   if (!worker) return false;
   if (worker === getUser()?.name) return true;
-  try { return typeof isCurrentAdmin === 'function' && isCurrentAdmin(); } catch (_) { return false; }
+  try {
+    return typeof isCurrentAdmin === 'function' && isCurrentAdmin();
+  } catch (_) {
+    return false;
+  }
 }
 
 function openTimerAdjust(id) {
   const item = getPendenciaById(id);
   if (!item || !item.timerRunning) return;
   if (!_canAdjustTimer(item)) {
-    showToast('Só ' + (getCurrentWorker(item) || 'quem iniciou') + ' ou um administrador pode parar este cronômetro.', 'warning');
+    showToast(
+      'Só ' +
+        (getCurrentWorker(item) || 'quem iniciou') +
+        ' ou um administrador pode parar este cronômetro.',
+      'warning'
+    );
     return;
   }
   const session = getSessionSeconds(item);
@@ -338,9 +409,13 @@ function openTimerAdjust(id) {
   const sh = Math.floor(suggested / 3600);
   const sm = Math.round((suggested % 3600) / 60 / 5) * 5;
   const started = item.timerStartedAt ? new Date(item.timerStartedAt) : null;
-  const startedTxt = started ? started.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-  openModal('Parar e ajustar tempo', `
-    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+  const startedTxt = started
+    ? started.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : '—';
+  openModal(
+    'Parar e ajustar tempo',
+    `
+    <p class="u-4ded6d">
       O cronômetro de <strong>${escapeHtml(getCurrentWorker(item))}</strong> está ligado desde
       <strong>${escapeHtml(startedTxt)}</strong> (${escapeHtml(formatDurationWords(session))}).
       Informe quanto tempo foi realmente trabalhado nesta sessão — só isso entra no total.
@@ -351,26 +426,38 @@ function openTimerAdjust(id) {
       <div class="form-group"><label class="form-label" for="timerAdjM">Minutos</label>
         <input type="number" class="form-input" id="timerAdjM" min="0" max="59" step="5" value="${Math.min(sm, 55)}" /></div>
     </div>
-    <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
+    <p class="u-6025e9">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
     <div class="form-actions">
       <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
       <button type="button" class="btn btn-primary" data-action="submitTimerAdjust" data-arg="${escapeHtml(id)}">Parar e salvar</button>
-    </div>`, 'sm');
+    </div>`,
+    'sm'
+  );
 }
 
 function submitTimerAdjust(id) {
   const cur = getPendenciaById(id);
-  if (!cur || !cur.timerRunning) { closeModal(); return; }
-  if (!_canAdjustTimer(cur)) { showToast('Permissão negada.', 'error'); return; }
+  if (!cur || !cur.timerRunning) {
+    closeModal();
+    return;
+  }
+  if (!_canAdjustTimer(cur)) {
+    showToast('Permissão negada.', 'error');
+    return;
+  }
   const h = Math.max(0, parseInt(document.getElementById('timerAdjH')?.value, 10) || 0);
-  const m = Math.min(59, Math.max(0, parseInt(document.getElementById('timerAdjM')?.value, 10) || 0));
+  const m = Math.min(
+    59,
+    Math.max(0, parseInt(document.getElementById('timerAdjM')?.value, 10) || 0)
+  );
   const sessionReal = Math.min(h * 3600 + m * 60, getSessionSeconds(cur));
   const total = (Number(cur.timerTotalSeconds) || 0) + sessionReal;
   const now = new Date().toISOString();
   const me = getUser()?.name || 'Operador';
   const note = {
     text: `⏹ ${me} parou o cronômetro de ${getCurrentWorker(cur)} (ligado há ${formatDurationWords(getSessionSeconds(cur))}). Sessão registrada: ${formatTimer(sessionReal)}. Total: ${formatTimer(total)}.`,
-    author: me, createdAt: now,
+    author: me,
+    createdAt: now,
   };
   savePendencia({
     ...cur,
@@ -382,11 +469,22 @@ function submitTimerAdjust(id) {
     notes: [...(cur.notes || []), note],
     updatedAt: now,
   });
-  if (typeof recordTimeSession === 'function') recordTimeSession(cur, sessionReal, { source: 'ajuste', operatorName: getCurrentWorker(cur), endedAt: now });
+  if (typeof recordTimeSession === 'function')
+    recordTimeSession(cur, sessionReal, {
+      source: 'ajuste',
+      operatorName: getCurrentWorker(cur),
+      endedAt: now,
+    });
   closeModal();
   showToast('Cronômetro parado — tempo ajustado.', 'success');
   _refreshTimerFull(id, 'pendencia');
-  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
+  if (typeof renderPenView === 'function') {
+    try {
+      renderPenView();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
+  }
 }
 
 /**
@@ -398,8 +496,9 @@ function _refreshTimerUI(id) {
   if (!item) return;
   const seconds = getElapsedSeconds(item);
   const running = item.timerRunning ? 'true' : 'false';
-  displays.forEach(el => {
-    el.textContent = el.dataset.format === 'compact' ? formatTimerCompact(seconds) : formatTimer(seconds);
+  displays.forEach((el) => {
+    el.textContent =
+      el.dataset.format === 'compact' ? formatTimerCompact(seconds) : formatTimer(seconds);
     el.dataset.running = running;
   });
 }
@@ -411,8 +510,13 @@ function _refreshPenWorkBox(workBox, item) {
   var valEl = workBox.querySelector('.pen-work-value');
   if (valEl) {
     if (w2) {
-      var esc = (typeof escapeHtml === 'function') ? escapeHtml(w2) : String(w2);
-      valEl.innerHTML = '<strong>' + esc + '</strong> <span class="pen-work-time">' + timerDisplayHTML(item) + '</span>';
+      var esc = typeof escapeHtml === 'function' ? escapeHtml(w2) : String(w2);
+      valEl.innerHTML =
+        '<strong>' +
+        esc +
+        '</strong> <span class="pen-work-time">' +
+        timerDisplayHTML(item) +
+        '</span>';
     } else {
       valEl.innerHTML = '<strong>Ninguém</strong> <span class="pen-work-hint">· Disponível</span>';
     }
@@ -428,7 +532,9 @@ function _refreshPenWorkBox(workBox, item) {
       } else if (typeof formatElapsedFriendly === 'function') {
         friendly = formatElapsedFriendly(secs);
       }
-    } catch (_) {}
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+    }
     timeEl.textContent = '⏱ ' + friendly;
   }
 }
@@ -442,23 +548,35 @@ function _refreshPenWorkBox(workBox, item) {
 function _refreshTimerFull(id, type) {
   var t = type || 'pendencia';
   var item = null;
-  try { item = getPendenciaById(id); } catch (_) { item = null; }
+  try {
+    item = getPendenciaById(id);
+  } catch (_) {
+    item = null;
+  }
   if (!item) return;
   // 1. Displays (texto do cronômetro)
-  try { _refreshTimerUI(id); } catch (_) {}
+  try {
+    _refreshTimerUI(id);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+  }
   // 2. Widgets completos (botão + badge + tempo) nos cards e no modal
   try {
     var widgets = document.querySelectorAll('[data-timer-widget]');
-    widgets.forEach(function(w) {
+    widgets.forEach(function (w) {
       try {
         if (w.getAttribute('data-timer-widget') !== String(id)) return;
         var tmp = document.createElement('span');
         tmp.innerHTML = timerWidget(item, t);
         var fresh = tmp.firstChild;
         if (fresh) w.replaceWith(fresh);
-      } catch (_) {}
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+      }
     });
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+  }
   // 3. Bloco "Trabalhando agora" do modal de detalhe (se aberto para este id)
   try {
     var overlay = document.getElementById('modalOverlay');
@@ -467,11 +585,15 @@ function _refreshTimerFull(id, type) {
       var workBox = document.querySelector('#modalBody .pen-work');
       if (workBox) _refreshPenWorkBox(workBox, item);
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+  }
   // 4. Badges da sidebar
   try {
     if (typeof updateBadges === 'function') updateBadges();
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'timer');
+  }
 }
 
 /**
@@ -483,7 +605,7 @@ function _startTimerInterval() {
   if (_timerInterval) return;
   _timerInterval = setInterval(() => {
     const activeDisplays = document.querySelectorAll('.timer-display[data-running="true"]');
-    activeDisplays.forEach(el => {
+    activeDisplays.forEach((el) => {
       const id = el.dataset.timerId;
       const item = getPendenciaById(id);
       if (item && item.timerRunning) {
@@ -513,12 +635,18 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Aliases de compatibilidade para uso nos modais
-function timerButtonHTML(item, type) { return timerActionBtnHTML(item, type); }
+function timerButtonHTML(item, type) {
+  return timerActionBtnHTML(item, type);
+}
 
 // Ações dos botões do cronômetro (clique por delegação em js/actions.js).
 if (typeof registerActions === 'function') {
   registerActions({
-    toggleTimer: (el, id) => { if (typeof toggleTimer === 'function') toggleTimer(el.dataset.type || 'pendencia', id, el); },
-    submitTimerAdjust: (_el, id) => { if (typeof submitTimerAdjust === 'function') submitTimerAdjust(id); },
+    toggleTimer: (el, id) => {
+      if (typeof toggleTimer === 'function') toggleTimer(el.dataset.type || 'pendencia', id, el);
+    },
+    submitTimerAdjust: (_el, id) => {
+      if (typeof submitTimerAdjust === 'function') submitTimerAdjust(id);
+    },
   });
 }

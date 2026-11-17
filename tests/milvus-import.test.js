@@ -5,10 +5,10 @@ const milvus = require('../js/milvus-devices.js');
 
 const ROW = {
   'Nome do dispositivo': 'PB-27',
-  'Usuário': 'Não possui',
-  'Apelido': 'Kaua',
+  Usuário: 'Não possui',
+  Apelido: 'Kaua',
   'Sistema operacional': 'Microsoft Windows 11 Pro',
-  'Processador': '12th Gen Intel(R) Core(TM) i5-1235U',
+  Processador: '12th Gen Intel(R) Core(TM) i5-1235U',
   'Memória RAM total': '8 GB',
   'Armazenamento interno total': '236.25 GB',
   'Usuário logado': 'Kauã',
@@ -60,14 +60,17 @@ describe('normalizeMilvusExportRow (linha real do export)', () => {
     expect(d.nome_fantasia).toBe('PANOBIANCO');
     expect(d.data_ultima_atualizacao).not.toBeNull();
     const dt = new Date(d.data_ultima_atualizacao);
-    expect([dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes()])
-      .toEqual([2026, 8, 14, 17, 17]);
+    expect([dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes()]).toEqual(
+      [2026, 8, 14, 17, 17]
+    );
     expect(d.observacao).toBe('RAM: 8 GB | Armazenamento: 236.25 GB');
   });
   it('"Não possui" não vira dado; sem fantasia descarta', () => {
     const d = milvus.normalizeMilvusExportRow(ROW);
     expect(d.observacao).not.toContain('Não possui');
-    expect(milvus.normalizeMilvusExportRow({ ...ROW, 'Nome fantasia do cliente': '  ' })).toBeNull();
+    expect(
+      milvus.normalizeMilvusExportRow({ ...ROW, 'Nome fantasia do cliente': '  ' })
+    ).toBeNull();
     expect(milvus.normalizeMilvusExportRow(null)).toBeNull();
   });
   it('cabeçalho com outra caixa/variante continua achando', () => {
@@ -88,8 +91,11 @@ describe('buildImportDeviceId', () => {
     expect(a).toBe(b);
     expect(a.startsWith('CLI-1:imp-')).toBe(true);
     expect(milvus.buildImportDeviceId('CLI-1', d)).not.toBe(
-      milvus.buildImportDeviceId('CLI-1', { ...d, numero_serial: 'OUTRO' }));
-    expect(milvus.buildImportDeviceId('CLI-1', { numero_serial: '', hostname: '', mac_address: '' })).toBeNull();
+      milvus.buildImportDeviceId('CLI-1', { ...d, numero_serial: 'OUTRO' })
+    );
+    expect(
+      milvus.buildImportDeviceId('CLI-1', { numero_serial: '', hostname: '', mac_address: '' })
+    ).toBeNull();
   });
 });
 
@@ -114,9 +120,16 @@ describe('mergeImportWithExisting', () => {
   });
   it('casa com linha da API pelo serial: reaproveita id e preserva o que a planilha não traz', () => {
     const api = {
-      id: 'CLI-1:milvus-99', client_id: 'CLI-1', team: 'mam', milvus_device_id: 99,
-      hostname: 'PB-27', numero_serial: 'PE0BMF84', ip_interno: '10.0.0.5',
-      sistema_operacional: '', observacao: '', apelido: '',
+      id: 'CLI-1:milvus-99',
+      client_id: 'CLI-1',
+      team: 'mam',
+      milvus_device_id: 99,
+      hostname: 'PB-27',
+      numero_serial: 'PE0BMF84',
+      ip_interno: '10.0.0.5',
+      sistema_operacional: '',
+      observacao: '',
+      apelido: '',
     };
     const r = milvus.mergeImportWithExisting('CLI-1', 'mam', [draft], [api]);
     expect(r.created).toBe(0);
@@ -139,7 +152,16 @@ describe('mergeImportWithExisting', () => {
 describe('importClientDevicesFromRows (orquestração)', () => {
   const _g = globalThis;
   const _keep = {};
-  for (const k of ['isSupabaseConnected', 'supabaseClient', 'getClientById', 'getSession', 'getOperators', 'getClientDevices', 'setMilvusLastSyncAt', 'addLog']) {
+  for (const k of [
+    'isSupabaseConnected',
+    'supabaseClient',
+    'getClientById',
+    'getSession',
+    'getOperators',
+    'getClientDevices',
+    'setMilvusLastSyncAt',
+    'addLog',
+  ]) {
     _keep[k] = _g[k];
   }
   afterEach(() => {
@@ -155,7 +177,12 @@ describe('importClientDevicesFromRows (orquestração)', () => {
         if (table === 'milvus_client_map') {
           return { select: () => ({ eq: async () => ({ data: mapRows, error: null }) }) };
         }
-        return { upsert: async (rows) => { upsertCalls.push(rows); return { error: null }; } };
+        return {
+          upsert: async (rows) => {
+            upsertCalls.push(rows);
+            return { error: null };
+          },
+        };
       },
     };
     _g.getClientById = () => ({ id: 'CLI-1', team: 'mam' });
@@ -168,7 +195,10 @@ describe('importClientDevicesFromRows (orquestração)', () => {
   it('filtra pelo mapa e faz upsert (PK id)', async () => {
     const calls = [];
     _stub(calls, [{ milvus_nome: 'PANOBIANCO' }]);
-    const res = await milvus.importClientDevicesFromRows('CLI-1', [ROW, { ...ROW, 'Nome fantasia do cliente': 'OUTRO' }]);
+    const res = await milvus.importClientDevicesFromRows('CLI-1', [
+      ROW,
+      { ...ROW, 'Nome fantasia do cliente': 'OUTRO' },
+    ]);
     expect(res).toEqual({ imported: 1, created: 1, updated: 0, skipped: 1 });
     expect(calls).toHaveLength(1);
     expect(calls[0][0].id.startsWith('CLI-1:imp-')).toBe(true);
@@ -185,7 +215,9 @@ describe('importClientDevicesFromRows (orquestração)', () => {
     _stub(calls, [{ milvus_nome: 'PANOBIANCO' }]);
     _g.getOperators = () => [{ id: 'OP-1', team: 'bt', isAdmin: false, active: true }];
     _g.getSession = () => ({ opId: 'OP-1', team: 'bt', isAdmin: false });
-    await expect(milvus.importClientDevicesFromRows('CLI-1', [ROW])).rejects.toThrow('Acesso negado');
+    await expect(milvus.importClientDevicesFromRows('CLI-1', [ROW])).rejects.toThrow(
+      'Acesso negado'
+    );
     expect(calls).toHaveLength(0);
   });
 });

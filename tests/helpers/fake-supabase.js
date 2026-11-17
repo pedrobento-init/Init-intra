@@ -14,7 +14,12 @@
  *                 — é como o teste confere o ESCOPO de um update/insert sem
  *                 reimplementar a function.
  */
-export function fakeSupabase({ tabelas = {}, token = 'jwt-valido', user = null, queries = [] } = {}) {
+export function fakeSupabase({
+  tabelas = {},
+  token = 'jwt-valido',
+  user = null,
+  queries = [],
+} = {}) {
   return function createClient(_url, _key, opts = {}) {
     const doHeader = String(opts?.global?.headers?.Authorization ?? '').replace(/^Bearer\s+/i, '');
     return {

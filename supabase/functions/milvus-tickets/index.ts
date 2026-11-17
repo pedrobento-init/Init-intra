@@ -26,12 +26,11 @@
 // - NÃO persiste: contato, e-mails, telefone, CPF/CNPJ, tokens,
 //   avaliações, HTML, logs extras e dados de dispositivo.
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
-const TICKETS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/listagem`;
+const TICKETS_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/listagem`;
 const KEEP_TOP = 10;
 
 // CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
@@ -39,25 +38,25 @@ const KEEP_TOP = 10;
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 const _toText = (v: unknown): string => {
-  if (v === null || v === undefined) return "";
+  if (v === null || v === undefined) return '';
   return String(v);
 };
 
 const _toIntOrNull = (v: unknown): number | null => {
-  if (v === null || v === undefined || v === "") return null;
+  if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
 // "2026-09-10 13:51:41" (sem TZ na origem) → ISO. Inválido → null.
 const _toIsoOrNull = (v: unknown): string | null => {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).trim().replace(" ", "T");
+  if (v === null || v === undefined || v === '') return null;
+  const s = String(v).trim().replace(' ', 'T');
   const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
@@ -66,30 +65,35 @@ const _toIsoOrNull = (v: unknown): string | null => {
 // aqui mesmo (contato, e-mails, telefone, CPF/CNPJ, token, avaliações,
 // HTML, logs extras, dispositivo). Licença sequer existe neste endpoint.
 function normalizeTicket(raw: Record<string, unknown>, clientId: string, team: string) {
-  const mid = _toIntOrNull(raw["id"]);
+  const mid = _toIntOrNull(raw['id']);
   if (mid === null) return null;
   const now = new Date().toISOString();
-  const log = (raw["ultima_log"] && typeof raw["ultima_log"] === "object")
-    ? (raw["ultima_log"] as Record<string, unknown>)
-    : null;
+  const log =
+    raw['ultima_log'] && typeof raw['ultima_log'] === 'object'
+      ? (raw['ultima_log'] as Record<string, unknown>)
+      : null;
   return {
     id: `${clientId}:ticket-${mid}`,
     client_id: clientId,
     team,
     milvus_ticket_id: mid,
-    codigo: _toIntOrNull(raw["codigo"]),
-    assunto: _toText(raw["assunto"]),
-    descricao: _toText(raw["descricao"]),
-    status: _toText(raw["status"]),
-    prioridade: _toText(raw["prioridade"]),
-    categoria_primaria: _toText(raw["categoria_primaria"]),
-    categoria_secundaria: _toText(raw["categoria_secundaria"]),
-    tecnico: _toText(raw["tecnico"]),
-    data_criacao: _toIsoOrNull(raw["data_criacao"]),
-    data_modificacao: _toIsoOrNull(raw["data_modificacao"]),
-    data_solucao: _toIsoOrNull(raw["data_solucao"]),
+    codigo: _toIntOrNull(raw['codigo']),
+    assunto: _toText(raw['assunto']),
+    descricao: _toText(raw['descricao']),
+    status: _toText(raw['status']),
+    prioridade: _toText(raw['prioridade']),
+    categoria_primaria: _toText(raw['categoria_primaria']),
+    categoria_secundaria: _toText(raw['categoria_secundaria']),
+    tecnico: _toText(raw['tecnico']),
+    data_criacao: _toIsoOrNull(raw['data_criacao']),
+    data_modificacao: _toIsoOrNull(raw['data_modificacao']),
+    data_solucao: _toIsoOrNull(raw['data_solucao']),
     ultima_log: log
-      ? { texto: _toText(log["texto"]), data: _toIsoOrNull(log["data"]), tecnico: _toText(log["tecnico"]) }
+      ? {
+          texto: _toText(log['texto']),
+          data: _toIsoOrNull(log['data']),
+          tecnico: _toText(log['tecnico']),
+        }
       : null,
     synced_at: now,
     updated_at: now,
@@ -100,7 +104,7 @@ async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknow
   const body = {
     is_paginate: true,
     is_descending: true,
-    order_by: "codigo",
+    order_by: 'codigo',
     total_registros: 50,
     pagina: 1,
     filtro_body: filter,
@@ -114,10 +118,10 @@ async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknow
     let res: Response;
     try {
       res = await fetch(TICKETS_URL, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": MILVUS_API_TOKEN,
+          'Content-Type': 'application/json',
+          Authorization: MILVUS_API_TOKEN,
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
@@ -128,12 +132,14 @@ async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknow
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+      throw new Error(
+        `Falha de conexão com o Milvus: ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'rede'}`
+      );
     }
     let data: unknown;
     if (res.status === 401 || res.status === 403) {
       clearTimeout(timer);
-      throw new Error("Falha de autenticação com o Milvus");
+      throw new Error('Falha de autenticação com o Milvus');
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
       clearTimeout(timer);
@@ -155,24 +161,24 @@ async function fetchTicketsPage(filter: Record<string, unknown>): Promise<unknow
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error("Resposta inválida do Milvus");
+      throw new Error('Resposta inválida do Milvus');
     }
     clearTimeout(timer);
     const d = data as Record<string, unknown>;
-    const lista = (d["lista"] ?? d["data"] ?? null) as unknown;
-    if (!Array.isArray(lista)) throw new Error("Resposta do Milvus sem lista de chamados");
+    const lista = (d['lista'] ?? d['data'] ?? null) as unknown;
+    if (!Array.isArray(lista)) throw new Error('Resposta do Milvus sem lista de chamados');
     return lista as unknown[];
   }
-  throw new Error("Falha inesperada ao consultar o Milvus");
+  throw new Error('Falha inesperada ao consultar o Milvus');
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-tickets: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-tickets: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   const startedAt = Date.now();
@@ -180,65 +186,75 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // pronto no contexto.
   const admin = ctx.supabaseAdmin;
   const callerUid = ctx.userClaims?.id ?? null;
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
 
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, team, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, team, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
   if (!callerOp || callerOp.active === false) {
-    return json({ error: "Operador sem acesso" }, 403);
+    return json({ error: 'Operador sem acesso' }, 403);
   }
 
   // 2) Qual cliente.
-  let clientId = "";
+  let clientId = '';
   try {
     const body = await req.json();
-    clientId = String(body?.clientId ?? "").trim();
+    clientId = String(body?.clientId ?? '').trim();
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
-  if (!clientId) return json({ error: "clientId é obrigatório" }, 400);
+  if (!clientId) return json({ error: 'clientId é obrigatório' }, 400);
 
   const { data: client } = await admin
-    .from("clients")
-    .select("id, name, team, milvus_client_token")
-    .eq("id", clientId)
+    .from('clients')
+    .select('id, name, team, milvus_client_token')
+    .eq('id', clientId)
     .maybeSingle();
-  if (!client) return json({ error: "Cliente não encontrado" }, 404);
+  if (!client) return json({ error: 'Cliente não encontrado' }, 404);
 
   // 3) Autorização: mesma regra das policies (sem bypass).
   const isAdmin = callerOp.is_admin === true;
-  const opTeam = callerOp.team || "init";
-  const cliTeam = client.team || "init";
+  const opTeam = callerOp.team || 'init';
+  const cliTeam = client.team || 'init';
   if (!isAdmin && opTeam !== cliTeam) {
-    return json({ error: "Acesso negado a este cliente" }, 403);
+    return json({ error: 'Acesso negado a este cliente' }, 403);
   }
 
   console.log(`milvus-tickets: início client_id=${clientId} team=${cliTeam}`);
 
   // 4) Filtro preferencial: clients.milvus_client_token (trim; nunca o
   // segredo da API). Fallback: ids do mapa explícito (sem fuzzy).
-  const clientToken = String(client.milvus_client_token ?? "").trim();
+  const clientToken = String(client.milvus_client_token ?? '').trim();
   const { data: mapRows } = await admin
-    .from("milvus_client_map")
-    .select("milvus_nome,milvus_cliente_id")
-    .eq("client_id", clientId);
-  const clienteIds = [...new Set((mapRows || [])
-    .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
-    .filter((n): n is number => typeof n === "number"))];
+    .from('milvus_client_map')
+    .select('milvus_nome,milvus_cliente_id')
+    .eq('client_id', clientId);
+  const clienteIds = [
+    ...new Set(
+      (mapRows || [])
+        .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
+        .filter((n): n is number => typeof n === 'number')
+    ),
+  ];
   if (!clientToken && !clienteIds.length) {
     return json({
-      success: false, code: "MILVUS_CLIENT_TOKEN_NOT_CONFIGURED",
-      clientId, unmapped: true, synced: 0, created: 0, updated: 0, pruned: 0,
+      success: false,
+      code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED',
+      clientId,
+      unmapped: true,
+      synced: 0,
+      created: 0,
+      updated: 0,
+      pruned: 0,
       lastSyncAt: new Date().toISOString(),
     });
   }
 
   // 5) 1 consulta por filtro (sem paginar os 20k+). Log registra só a
   // presença do token, nunca o valor.
-  const via = clientToken ? "token" : "map";
+  const via = clientToken ? 'token' : 'map';
   console.log(`milvus-tickets: filtro client_id=${clientId} via=${via} hasToken=${!!clientToken}`);
   const seen = new Map<number, Record<string, unknown>>();
   try {
@@ -255,39 +271,44 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       }
     }
   } catch (e) {
-    console.error(`milvus-tickets: erro client_id=${clientId}: ${(e as Error)?.message ?? "erro"}`);
-    return json({ error: "Não foi possível atualizar os chamados do Milvus." }, 502);
+    console.error(`milvus-tickets: erro client_id=${clientId}: ${(e as Error)?.message ?? 'erro'}`);
+    return json({ error: 'Não foi possível atualizar os chamados do Milvus.' }, 502);
   }
 
   // Top 10 por código descrescente (a API ignora total_registros).
   const top = [...seen.values()]
-    .sort((a, b) => Number(b["codigo"] ?? 0) - Number(a["codigo"] ?? 0))
+    .sort((a, b) => Number(b['codigo'] ?? 0) - Number(a['codigo'] ?? 0))
     .slice(0, KEEP_TOP);
 
   // 6) Upsert + contagem (chave client_id + milvus_ticket_id).
   const { data: existing } = await admin
-    .from("client_milvus_tickets")
-    .select("milvus_ticket_id")
-    .eq("client_id", clientId);
-  const existingIds = new Set((existing || []).map((r: { milvus_ticket_id: number }) => r.milvus_ticket_id));
+    .from('client_milvus_tickets')
+    .select('milvus_ticket_id')
+    .eq('client_id', clientId);
+  const existingIds = new Set(
+    (existing || []).map((r: { milvus_ticket_id: number }) => r.milvus_ticket_id)
+  );
   let created = 0;
   let updated = 0;
   const keepIds = new Set<number>();
   const rows = [];
   for (const r of top) {
-    const mid = r["milvus_ticket_id"] as number;
+    const mid = r['milvus_ticket_id'] as number;
     keepIds.add(mid);
     rows.push(r);
     if (existingIds.has(mid)) updated++;
-    else { created++; existingIds.add(mid); }
+    else {
+      created++;
+      existingIds.add(mid);
+    }
   }
   if (rows.length) {
     const { error } = await admin
-      .from("client_milvus_tickets")
-      .upsert(rows, { onConflict: "client_id,milvus_ticket_id" });
+      .from('client_milvus_tickets')
+      .upsert(rows, { onConflict: 'client_id,milvus_ticket_id' });
     if (error) {
       console.error(`milvus-tickets: upsert falhou client_id=${clientId}: ${error.message}`);
-      return json({ error: "Não foi possível atualizar os chamados do Milvus." }, 500);
+      return json({ error: 'Não foi possível atualizar os chamados do Milvus.' }, 500);
     }
   }
 
@@ -297,20 +318,20 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   let pruned = 0;
   if (keepIds.size > 0) {
     const { data: all } = await admin
-      .from("client_milvus_tickets")
-      .select("milvus_ticket_id")
-      .eq("client_id", clientId)
-      .order("codigo", { ascending: false })
+      .from('client_milvus_tickets')
+      .select('milvus_ticket_id')
+      .eq('client_id', clientId)
+      .order('codigo', { ascending: false })
       .limit(200);
     const stale = (all || [])
       .map((r: { milvus_ticket_id: number }) => r.milvus_ticket_id)
       .filter((mid) => !keepIds.has(mid));
     if (stale.length) {
       const { error, count } = await admin
-        .from("client_milvus_tickets")
-        .delete({ count: "exact" })
-        .eq("client_id", clientId)
-        .in("milvus_ticket_id", stale);
+        .from('client_milvus_tickets')
+        .delete({ count: 'exact' })
+        .eq('client_id', clientId)
+        .in('milvus_ticket_id', stale);
       if (!error) pruned = count || 0;
     }
   }
@@ -319,9 +340,18 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   const lastSyncAt = new Date().toISOString();
   console.log(
     `milvus-tickets: fim client_id=${clientId} via=${via} synced=${rows.length} ` +
-    `created=${created} updated=${updated} pruned=${pruned} duration_ms=${durationMs} ok`,
+      `created=${created} updated=${updated} pruned=${pruned} duration_ms=${durationMs} ok`
   );
-  return json({ success: true, clientId, via, synced: rows.length, created, updated, pruned, lastSyncAt });
+  return json({
+    success: true,
+    clientId,
+    via,
+    synced: rows.length,
+    created,
+    updated,
+    pruned,
+    lastSyncAt,
+  });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

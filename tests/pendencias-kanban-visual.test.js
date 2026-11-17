@@ -7,9 +7,12 @@ import vm from 'node:vm';
 // ── Quadro Kanban de Pendências no design system "Meu dia":
 // faixa lateral de 4px na cor da coluna + linha-resumo com vencidas ─────────
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const sandbox = {
@@ -54,12 +57,24 @@ const setPager = (serverMode, total, page, rows) =>
     `_penServerMode = ${serverMode}; _penTotal = ${total}; _penPage = ${page}; _filteredPens = ${rows};`,
     sandbox
   );
-const basePen = (over = {}) => Object.assign(
-  { id: 'PEN-1', status: 'em_andamento', clientId: 'c1', clientName: 'Acme', priority: 'alta', responsible: 'Felipe', assunto: 'Teste', createdAt: '2026-09-01T10:00:00.000Z' },
-  over
-);
+const basePen = (over = {}) =>
+  Object.assign(
+    {
+      id: 'PEN-1',
+      status: 'em_andamento',
+      clientId: 'c1',
+      clientName: 'Acme',
+      priority: 'alta',
+      responsible: 'Felipe',
+      assunto: 'Teste',
+      createdAt: '2026-09-01T10:00:00.000Z',
+    },
+    over
+  );
 // togglePenClientChip com select/stubs isolados (restaura tudo ao fim)
-const runToggle = (initial, clickId) => vm.runInContext(`
+const runToggle = (initial, clickId) =>
+  vm.runInContext(
+    `
   (function(){
     var calls = { saved: 0, rendered: 0 };
     var sel = { value: '${initial}' };
@@ -81,7 +96,9 @@ const runToggle = (initial, clickId) => vm.runInContext(`
     }
     return { value: sel.value, calls: calls };
   })()
-`, sandbox);
+`,
+    sandbox
+  );
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -94,12 +111,18 @@ describe('kanban desktop: faixa lateral com a cor da coluna', () => {
   });
 
   it('aberto usa accent; pausado usa amber', () => {
-    expect(T.penKanbanCard(basePen({ status: 'aberto' }))).toContain('border-left:4px solid var(--kb-accent)');
-    expect(T.penKanbanCard(basePen({ status: 'pausado' }))).toContain('border-left:4px solid var(--kb-amber)');
+    expect(T.penKanbanCard(basePen({ status: 'aberto' }))).toContain(
+      'border-left:4px solid var(--kb-accent)'
+    );
+    expect(T.penKanbanCard(basePen({ status: 'pausado' }))).toContain(
+      'border-left:4px solid var(--kb-amber)'
+    );
   });
 
   it('status desconhecido cai no cinza neutro (kb-muted)', () => {
-    expect(T.penKanbanCard(basePen({ status: 'xpto' }))).toContain('border-left:4px solid var(--kb-muted)');
+    expect(T.penKanbanCard(basePen({ status: 'xpto' }))).toContain(
+      'border-left:4px solid var(--kb-muted)'
+    );
   });
 
   it('cores das 5 colunas do quadro (ordem/semântica do protótipo)', () => {
@@ -120,7 +143,10 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
   });
 
   it('usa a logo cadastrada quando o cliente tem imagem', () => {
-    vm.runInContext('getClientById = () => ({ id: "c1", name: "Acme", logo: "https://cdn.exemplo/acme.png" });', sandbox);
+    vm.runInContext(
+      'getClientById = () => ({ id: "c1", name: "Acme", logo: "https://cdn.exemplo/acme.png" });',
+      sandbox
+    );
     const html = T.penKanbanCard(basePen());
     expect(html).toContain('<img src="https://cdn.exemplo/acme.png"');
     expect(html).toContain('alt="Acme"');
@@ -148,40 +174,64 @@ describe('card: avatar, prioridade, prazo e ação Iniciar', () => {
   });
 
   it('meu cronômetro rodando: o card oferece o pause, não só o tempo', () => {
-    vm.runInContext(`
+    vm.runInContext(
+      `
       isCurrentWorker = () => true;
       getCurrentWorker = () => 'Felipe';
       getElapsedSeconds = () => 3661;
       formatTimerCompact = () => '01:01:01';
-    `, sandbox);
+    `,
+      sandbox
+    );
     try {
-      const html = T.penKanbanCard(basePen({ timerRunning: true, timerOperator: 'Felipe', timerStartedAt: new Date().toISOString() }));
+      const html = T.penKanbanCard(
+        basePen({
+          timerRunning: true,
+          timerOperator: 'Felipe',
+          timerStartedAt: new Date().toISOString(),
+        })
+      );
       expect(html).toContain('kb-pause-btn');
       expect(html).toContain('kb-pause');
       expect(html).toContain('data-action="penTimerToggle" data-arg="PEN-1"');
       expect(html).toContain('Pausar');
       expect(html).not.toContain('kb-timer-busy');
     } finally {
-      vm.runInContext('delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;', sandbox);
+      vm.runInContext(
+        'delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;',
+        sandbox
+      );
     }
   });
 
   it('cronômetro de outro operador: cadeado explica a falta de ação', () => {
-    vm.runInContext(`
+    vm.runInContext(
+      `
       isCurrentWorker = () => false;
       getCurrentWorker = () => 'Joarli';
       getElapsedSeconds = () => 3661;
       formatTimerCompact = () => '01:01:01';
-    `, sandbox);
+    `,
+      sandbox
+    );
     try {
-      const html = T.penKanbanCard(basePen({ timerRunning: true, timerOperator: 'Joarli', timerStartedAt: new Date().toISOString() }));
+      const html = T.penKanbanCard(
+        basePen({
+          timerRunning: true,
+          timerOperator: 'Joarli',
+          timerStartedAt: new Date().toISOString(),
+        })
+      );
       expect(html).toContain('kb-timer-busy');
       expect(html).toContain('kb-lock');
       expect(html).toContain('Joarli está trabalhando');
       expect(html).not.toContain('kb-pause-btn');
       expect(html).not.toContain('toggleTimer');
     } finally {
-      vm.runInContext('delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;', sandbox);
+      vm.runInContext(
+        'delete isCurrentWorker; delete getCurrentWorker; delete getElapsedSeconds; delete formatTimerCompact;',
+        sandbox
+      );
     }
   });
 });
@@ -294,13 +344,15 @@ describe('selo "Parada": o tamanho do problema no texto', () => {
   // Antes era só "Parada", com o "há quanto tempo" preso no title: 8 dias e 3
   // meses pediam a mesma atenção e o celular não alcançava nenhum dos dois.
   it('diz há quantos dias a pendência não é tocada', () => {
-    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 12 * 86400000).toISOString() }))
-      .toBe('Parada há 12 dias');
+    expect(
+      T.penParadaLabel({ updatedAt: new Date(Date.now() - 12 * 86400000).toISOString() })
+    ).toBe('Parada há 12 dias');
   });
 
   it('um dia só não vira "1 dias"', () => {
-    expect(T.penParadaLabel({ updatedAt: new Date(Date.now() - 1 * 86400000 - 1000).toISOString() }))
-      .toBe('Parada há 1 dia');
+    expect(
+      T.penParadaLabel({ updatedAt: new Date(Date.now() - 1 * 86400000 - 1000).toISOString() })
+    ).toBe('Parada há 1 dia');
   });
 
   it('sem data de referência, cai no rótulo curto em vez de inventar prazo', () => {

@@ -7,15 +7,27 @@
 function closePenQuickMenu() {
   var m = document.getElementById('penQuickMenu');
   if (m) m.remove();
-  document.querySelectorAll('.kc-menu[aria-expanded="true"]').forEach(function(b) { b.setAttribute('aria-expanded', 'false'); });
+  document.querySelectorAll('.kc-menu[aria-expanded="true"]').forEach(function (b) {
+    b.setAttribute('aria-expanded', 'false');
+  });
 }
 
 // Itens do menu (puro, testável): status de destino + operadores.
 function penQuickMenuModel(p, cols, operators) {
-  var statuses = (cols || []).filter(function(c) { return c.id !== p.status; })
-    .map(function(c) { return { id: c.id, label: c.label }; });
-  var people = (operators || []).filter(function(o) { return o && o.active !== false; })
-    .map(function(o) { return { name: o.name, current: o.name === (p.responsible || ''), away: o.onLeave === true }; });
+  var statuses = (cols || [])
+    .filter(function (c) {
+      return c.id !== p.status;
+    })
+    .map(function (c) {
+      return { id: c.id, label: c.label };
+    });
+  var people = (operators || [])
+    .filter(function (o) {
+      return o && o.active !== false;
+    })
+    .map(function (o) {
+      return { name: o.name, current: o.name === (p.responsible || ''), away: o.onLeave === true };
+    });
   return { statuses: statuses, people: people };
 }
 
@@ -27,11 +39,22 @@ function openPenQuickMenu(btn, id) {
   if (already) return;
   var p = getPendenciaById(id);
   if (!p) return;
-  var team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam
-    : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : null);
-  var ops = (typeof getOperators === 'function' ? getOperators() : []).filter(function(o) { return !team || (o.team || 'init') === team; });
+  var team =
+    typeof isTeamAdmin === 'function' &&
+    isTeamAdmin() &&
+    typeof _selectedTeam !== 'undefined' &&
+    _selectedTeam
+      ? _selectedTeam
+      : typeof getCurrentTeam === 'function'
+        ? getCurrentTeam()
+        : null;
+  var ops = (typeof getOperators === 'function' ? getOperators() : []).filter(function (o) {
+    return !team || (o.team || 'init') === team;
+  });
   // Ativas: colunas do quadro + "Resolvido" (concluir direto do card).
-  var cols = PEN_KANBAN_COLS.filter(function(c) { return !isPendenciaClosed(c.id) || c.id === 'resolvido'; });
+  var cols = PEN_KANBAN_COLS.filter(function (c) {
+    return !isPendenciaClosed(c.id) || c.id === 'resolvido';
+  });
   var m = penQuickMenuModel(p, cols, ops);
   var sid = escapeHtml(id);
   var menu = document.createElement('div');
@@ -42,27 +65,58 @@ function openPenQuickMenu(btn, id) {
   menu.setAttribute('role', 'menu');
   menu.innerHTML =
     '<div class="pqm-label">Mover para</div>' +
-    m.statuses.map(function(s) {
-      return '<button type="button" role="menuitem" data-action="penQuickMoveTo" data-arg="' + sid + '" data-status="' + escapeHtml(s.id) + '">' +
-        '<span class="pqm-dot" style="--c:' + penColColor(s.id) + '"></span>' + escapeHtml(s.label) + '</button>';
-    }).join('') +
+    m.statuses
+      .map(function (s) {
+        return (
+          '<button type="button" role="menuitem" data-action="penQuickMoveTo" data-arg="' +
+          sid +
+          '" data-status="' +
+          escapeHtml(s.id) +
+          '">' +
+          '<span class="pqm-dot" data-sty="--c:' +
+          penColColor(s.id) +
+          '"></span>' +
+          escapeHtml(s.label) +
+          '</button>'
+        );
+      })
+      .join('') +
     '<div class="pqm-label">Atribuir a</div>' +
     '<div class="pqm-scroll">' +
-    m.people.map(function(o) {
-      var n = escapeHtml(o.name);
-      // Afastado não pode receber (updatePendenciaAssignee recusa): desabilitado.
-      return '<button type="button" role="menuitemradio" aria-checked="' + o.current + '"' + (o.current || o.away ? ' disabled' : '') +
-        ' data-action="penQuickAssign" data-arg="' + sid + '" data-name="' + n + '">' +
-        '<span class="pqm-check">' + (o.current ? '✓' : '') + '</span>' + n + (o.away ? ' <small>afastado</small>' : '') + '</button>';
-    }).join('') +
+    m.people
+      .map(function (o) {
+        var n = escapeHtml(o.name);
+        // Afastado não pode receber (updatePendenciaAssignee recusa): desabilitado.
+        return (
+          '<button type="button" role="menuitemradio" aria-checked="' +
+          o.current +
+          '"' +
+          (o.current || o.away ? ' disabled' : '') +
+          ' data-action="penQuickAssign" data-arg="' +
+          sid +
+          '" data-name="' +
+          n +
+          '">' +
+          '<span class="pqm-check">' +
+          (o.current ? '✓' : '') +
+          '</span>' +
+          n +
+          (o.away ? ' <small>afastado</small>' : '') +
+          '</button>'
+        );
+      })
+      .join('') +
     '</div>' +
     '<div class="pqm-sep"></div>' +
-    '<button type="button" role="menuitem" data-action="penQuickOpenDetail" data-arg="' + sid + '">Abrir detalhes</button>';
+    '<button type="button" role="menuitem" data-action="penQuickOpenDetail" data-arg="' +
+    sid +
+    '">Abrir detalhes</button>';
   document.body.appendChild(menu);
   if (btn) {
     btn.setAttribute('aria-expanded', 'true');
     var r = btn.getBoundingClientRect();
-    var w = menu.offsetWidth, h = menu.offsetHeight;
+    var w = menu.offsetWidth,
+      h = menu.offsetHeight;
     var left = Math.min(window.innerWidth - w - 8, Math.max(8, r.right - w));
     var top = r.bottom + 4;
     if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
@@ -78,23 +132,38 @@ function penQuickAssign(id, name, opts) {
   // Trocar o dono de um chamado por engano no menu ⋯ é um clique só; o
   // nome anterior precisa ser lido ANTES da gravação para o desfazer.
   var antes = '';
-  try { var atual = getPendenciaById(id); antes = (atual && atual.responsible) || ''; } catch (_) {}
+  try {
+    var atual = getPendenciaById(id);
+    antes = (atual && atual.responsible) || '';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   try {
     var res = updatePendenciaAssignee(id, { responsible: name });
-    try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {}
+    try {
+      _optimisticPenUpsert({ ...res.pen });
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
     var msg = name ? 'Atribuída a ' + name + '.' : 'Responsável removido.';
-    if ((opts && opts.semDesfazer) || typeof showUndoToast !== 'function') showToast(msg, 'success');
-    else showUndoToast(msg, function() {
-      // Mesma janela de 5s do desfazer do card: sem revalidar, clicar no
-      // toast antigo restauraria o nome de antes do último gesto, não deste.
-      var depois = null;
-      try { depois = getPendenciaById(id); } catch (_) {}
-      if (((depois && depois.responsible) || '') !== (name || '')) {
-        showToast('O responsável mudou depois disso — nada a desfazer.', 'info');
-        return;
-      }
-      penQuickAssign(id, antes, { semDesfazer: true });
-    });
+    if ((opts && opts.semDesfazer) || typeof showUndoToast !== 'function')
+      showToast(msg, 'success');
+    else
+      showUndoToast(msg, function () {
+        // Mesma janela de 5s do desfazer do card: sem revalidar, clicar no
+        // toast antigo restauraria o nome de antes do último gesto, não deste.
+        var depois = null;
+        try {
+          depois = getPendenciaById(id);
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+        }
+        if (((depois && depois.responsible) || '') !== (name || '')) {
+          showToast('O responsável mudou depois disso — nada a desfazer.', 'info');
+          return;
+        }
+        penQuickAssign(id, antes, { semDesfazer: true });
+      });
   } catch (err) {
     showToast((err && err.message) || 'Não foi possível atribuir.', 'error');
     return;
@@ -104,21 +173,32 @@ function penQuickAssign(id, name, opts) {
   if (typeof penPaginaAtualizar === 'function') penPaginaAtualizar(id);
 }
 
-if (typeof document !== 'undefined' && document.addEventListener && !(typeof window !== 'undefined' && window._penQuickMenuBound)) {
+if (
+  typeof document !== 'undefined' &&
+  document.addEventListener &&
+  !(typeof window !== 'undefined' && window._penQuickMenuBound)
+) {
   if (typeof window !== 'undefined') window._penQuickMenuBound = true;
-  document.addEventListener('click', function(e) {
+  document.addEventListener('click', function (e) {
     var m = document.getElementById('penQuickMenu');
     if (m && !m.contains(e.target)) closePenQuickMenu();
   });
-  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePenQuickMenu(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closePenQuickMenu();
+  });
   // Rolagem/redimensionamento só fecham o menu se a página mudou DE VERDADE
   // desde a abertura. O evento `scroll` chega no frame seguinte: uma rolagem
   // de inércia no celular (ou o scroll que leva o card à vista antes do
   // toque) fechava o menu que a pessoa tinha acabado de abrir.
-  window.addEventListener('scroll', function () {
-    var m = document.getElementById('penQuickMenu');
-    if (m && Math.abs((window.scrollY || 0) - Number(m.dataset.openY || 0)) > 48) closePenQuickMenu();
-  }, { passive: true });
+  window.addEventListener(
+    'scroll',
+    function () {
+      var m = document.getElementById('penQuickMenu');
+      if (m && Math.abs((window.scrollY || 0) - Number(m.dataset.openY || 0)) > 48)
+        closePenQuickMenu();
+    },
+    { passive: true }
+  );
   window.addEventListener('resize', function () {
     var m = document.getElementById('penQuickMenu');
     // Só largura: o teclado do celular muda apenas a altura.
@@ -128,24 +208,36 @@ if (typeof document !== 'undefined' && document.addEventListener && !(typeof win
 
 // Origens e-mail nascem só na Caixa de entrada: nunca aparecem aqui.
 function getFilteredPendencias() {
-  const q    = (document.getElementById('penSearch')?.value||'').toLowerCase();
-  const cid  = document.getElementById('penClient')?.value||'';
-  const resp = document.getElementById('penResponsible')?.value||'';
-  const st   = document.getElementById('penStatus')?.value||'';
-  const pr   = document.getElementById('penPriority')?.value||'';
-  var base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getPendenciasByTeam(_selectedTeam) : getMyPendencias();
+  const q = (document.getElementById('penSearch')?.value || '').toLowerCase();
+  const cid = document.getElementById('penClient')?.value || '';
+  const resp = document.getElementById('penResponsible')?.value || '';
+  const st = document.getElementById('penStatus')?.value || '';
+  const pr = document.getElementById('penPriority')?.value || '';
+  var base =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getPendenciasByTeam(_selectedTeam)
+      : getMyPendencias();
   // Defesa em profundidade: getters já filtram Gestão, mas garante que nenhum
   // caminho (cache/otimista) vaze Gestão para não-Gestão.
   try {
     if (typeof filterGestaoPendencias === 'function') base = filterGestaoPendencias(base);
     else if (typeof canViewPendencia === 'function') base = base.filter(canViewPendencia);
-  } catch (_) {}
-  return base.filter(p => {
-    if (q && !p.assunto?.toLowerCase().includes(q) && !p.descricao?.toLowerCase().includes(q) && !p.clientName?.toLowerCase().includes(q) && !p.responsible?.toLowerCase().includes(q)) return false;
-    if (cid  && p.clientId   !== cid)  return false;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
+  return base.filter((p) => {
+    if (
+      q &&
+      !p.assunto?.toLowerCase().includes(q) &&
+      !p.descricao?.toLowerCase().includes(q) &&
+      !p.clientName?.toLowerCase().includes(q) &&
+      !p.responsible?.toLowerCase().includes(q)
+    )
+      return false;
+    if (cid && p.clientId !== cid) return false;
     if (resp && p.responsible !== resp) return false;
-    if (st   && p.status     !== st)   return false;
-    if (pr   && p.priority   !== pr)   return false;
+    if (st && p.status !== st) return false;
+    if (pr && p.priority !== pr) return false;
     if (penScope === 'archived' && !isPendenciaClosed(p.status)) return false;
     if (penScope === 'active' && isPendenciaClosed(p.status)) return false;
     // Origem e-mail não aparece nas Pendências (fica na Caixa de entrada).
@@ -154,19 +246,21 @@ function getFilteredPendencias() {
   });
 }
 
-
-
 function savePenFilters() {
   saveFilterState('pendencias', {
-    search: document.getElementById('penSearch')?.value||'',
-    client: document.getElementById('penClient')?.value||'',
-    resp: document.getElementById('penResponsible')?.value||'',
-    status: document.getElementById('penStatus')?.value||'',
-    priority: document.getElementById('penPriority')?.value||'',
-    savedFilterName: document.getElementById('penSavedFilter')?.value||'',
-    view: penView
+    search: document.getElementById('penSearch')?.value || '',
+    client: document.getElementById('penClient')?.value || '',
+    resp: document.getElementById('penResponsible')?.value || '',
+    status: document.getElementById('penStatus')?.value || '',
+    priority: document.getElementById('penPriority')?.value || '',
+    savedFilterName: document.getElementById('penSavedFilter')?.value || '',
+    view: penView,
   });
-  try{ _penUpdateMoreFiltersBadge(); }catch(_){}
+  try {
+    _penUpdateMoreFiltersBadge();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
 }
 
 function setPenScope(scope) {
@@ -190,13 +284,23 @@ function saveCurrentPenFilter() {
     status: document.getElementById('penStatus')?.value || '',
     priority: document.getElementById('penPriority')?.value || '',
   };
-  const idx = list.findIndex(f => f.name === filter.name);
-  if (idx !== -1) list[idx] = filter; else list.push(filter);
+  const idx = list.findIndex((f) => f.name === filter.name);
+  if (idx !== -1) list[idx] = filter;
+  else list.push(filter);
   if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
   try {
-    if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = filter.name;
-  } catch (_) {}
-  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
+    if (document.getElementById('penSavedFilter'))
+      document.getElementById('penSavedFilter').value = filter.name;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
+  if (typeof savePenFilters === 'function') {
+    try {
+      savePenFilters();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
   renderPendencias();
   showToast('Filtro salvo!', 'success');
 }
@@ -205,18 +309,27 @@ function applySavedPenFilter() {
   const sel = document.getElementById('penSavedFilter');
   const name = sel?.value;
   if (!name) return;
-  const f = getSavedPenFilters().find(x => x.name === name);
+  const f = getSavedPenFilters().find((x) => x.name === name);
   if (!f) return;
   // Aplica TODOS os campos (inclusive vazios): sem isso, trocar de um filtro
   // com busca/cliente para um filtro salvo sem esses campos mantinha os valores
   // antigos "grudados", parecendo que o filtro não foi aplicado/limpo.
-  if (document.getElementById('penSearch')) document.getElementById('penSearch').value = f.search || '';
-  if (document.getElementById('penClient')) document.getElementById('penClient').value = f.client || '';
-  if (document.getElementById('penResponsible')) document.getElementById('penResponsible').value = f.resp || '';
-  if (document.getElementById('penStatus')) document.getElementById('penStatus').value = f.status || '';
-  if (document.getElementById('penPriority')) document.getElementById('penPriority').value = f.priority || '';
+  if (document.getElementById('penSearch'))
+    document.getElementById('penSearch').value = f.search || '';
+  if (document.getElementById('penClient'))
+    document.getElementById('penClient').value = f.client || '';
+  if (document.getElementById('penResponsible'))
+    document.getElementById('penResponsible').value = f.resp || '';
+  if (document.getElementById('penStatus'))
+    document.getElementById('penStatus').value = f.status || '';
+  if (document.getElementById('penPriority'))
+    document.getElementById('penPriority').value = f.priority || '';
   if (typeof savePenFilters === 'function') savePenFilters();
-  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
+  try {
+    _penUpdateMoreFiltersBadge();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   if (typeof renderPenView === 'function') renderPenView(false);
 }
 
@@ -227,14 +340,34 @@ function clearPenFilters() {
   try {
     if (document.getElementById('penSearch')) document.getElementById('penSearch').value = '';
     if (document.getElementById('penClient')) document.getElementById('penClient').value = '';
-    if (document.getElementById('penResponsible')) document.getElementById('penResponsible').value = '';
+    if (document.getElementById('penResponsible'))
+      document.getElementById('penResponsible').value = '';
     if (document.getElementById('penStatus')) document.getElementById('penStatus').value = '';
     if (document.getElementById('penPriority')) document.getElementById('penPriority').value = '';
-    if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = '';
-  } catch (_) {}
-  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
-  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
-  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
+    if (document.getElementById('penSavedFilter'))
+      document.getElementById('penSavedFilter').value = '';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
+  if (typeof savePenFilters === 'function') {
+    try {
+      savePenFilters();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
+  try {
+    _penUpdateMoreFiltersBadge();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
+  if (typeof renderPenView === 'function') {
+    try {
+      renderPenView();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
 }
 
 function deleteSavedPenFilter() {
@@ -242,8 +375,11 @@ function deleteSavedPenFilter() {
   const name = sel?.value;
   // Sem filtro salvo selecionado, o ✕ age como "limpar filtros ativos" para
   // nunca parecer que "não funciona" (antes era early-return silencioso).
-  if (!name) { clearPenFilters(); return; }
-  const list = getSavedPenFilters().filter(f => f.name !== name);
+  if (!name) {
+    clearPenFilters();
+    return;
+  }
+  const list = getSavedPenFilters().filter((f) => f.name !== name);
   if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
   // Se o estado persistido apontava para o filtro excluído, limpa a referência
   // para o select não tentar restaurar um valor inexistente após o re-render.
@@ -255,7 +391,9 @@ function deleteSavedPenFilter() {
         saveFilterState('pendencias', st);
       }
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   renderPendencias();
   showToast('Filtro removido.', 'info');
 }
@@ -265,44 +403,89 @@ if (typeof window !== 'undefined') window.debouncedRenderPenView = debounce(rend
 function _penRichDesc(text) {
   try {
     if (typeof renderRichText === 'function') return renderRichText(text);
-    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichText === 'function') return globalThis.renderRichText(text);
-  } catch (_) {}
+    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichText === 'function')
+      return globalThis.renderRichText(text);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   return _escapeHtmlFallback(text);
 }
 function _penRichNote(text) {
   try {
     if (typeof renderRichNoteText === 'function') return renderRichNoteText(text);
-    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichNoteText === 'function') return globalThis.renderRichNoteText(text);
-  } catch (_) {}
+    if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichNoteText === 'function')
+      return globalThis.renderRichNoteText(text);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   try {
     if (typeof highlightMentions === 'function') return highlightMentions(text);
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   return _escapeHtmlFallback(text);
 }
 function _penFriendlyTime(p) {
   var secs = 0;
-  try { secs = (typeof getElapsedSeconds === 'function') ? getElapsedSeconds(p) : 0; } catch (_) {}
+  try {
+    secs = typeof getElapsedSeconds === 'function' ? getElapsedSeconds(p) : 0;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   var exact = '00:00:00';
-  try { exact = (typeof formatTimer === 'function') ? formatTimer(secs) : exact; } catch (_) {}
+  try {
+    exact = typeof formatTimer === 'function' ? formatTimer(secs) : exact;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   var friendly = exact;
   try {
     if (typeof formatElapsedFriendly === 'function') friendly = formatElapsedFriendly(secs);
-    else if (typeof globalThis !== 'undefined' && typeof globalThis.formatElapsedFriendly === 'function') friendly = globalThis.formatElapsedFriendly(secs);
-  } catch (_) {}
+    else if (
+      typeof globalThis !== 'undefined' &&
+      typeof globalThis.formatElapsedFriendly === 'function'
+    )
+      friendly = globalThis.formatElapsedFriendly(secs);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   return { secs: secs, exact: exact, friendly: friendly };
 }
 // Edição inline: passa pelas MESMAS validações/regras do form
 // (validatePendencia + savePendencia). Só campos seguros: priority,
 // deadline, responsible, status.
 function quickUpdatePendenciaField(id, field, value) {
-  var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
+  var p = typeof getPendenciaById === 'function' ? getPendenciaById(id) : null;
   if (!p) return;
   // Cópia: o registro guardado só muda via savePendencia (que compara antes/depois, ex.: SLA da 1ª resposta).
   p = Object.assign({}, p);
-  if (['priority', 'deadline', 'responsible', 'canal', 'categoria', 'solicitante'].indexOf(field) === -1) return;
-  if (field === 'canal' && value && typeof PEN_CANAIS !== 'undefined' && !PEN_CANAIS.some(function (c) { return c.value === value; })) return;
-  if (field === 'categoria' && value && typeof PEN_CATEGORIAS !== 'undefined' && !PEN_CATEGORIAS.some(function (c) { return c.value === value; })) return;
-  if (field === 'solicitante') value = String(value || '').trim().slice(0, 120);
+  if (
+    ['priority', 'deadline', 'responsible', 'canal', 'categoria', 'solicitante'].indexOf(field) ===
+    -1
+  )
+    return;
+  if (
+    field === 'canal' &&
+    value &&
+    typeof PEN_CANAIS !== 'undefined' &&
+    !PEN_CANAIS.some(function (c) {
+      return c.value === value;
+    })
+  )
+    return;
+  if (
+    field === 'categoria' &&
+    value &&
+    typeof PEN_CATEGORIAS !== 'undefined' &&
+    !PEN_CATEGORIAS.some(function (c) {
+      return c.value === value;
+    })
+  )
+    return;
+  if (field === 'solicitante')
+    value = String(value || '')
+      .trim()
+      .slice(0, 120);
   if (field === 'priority' && ['baixa', 'media', 'alta', 'critica'].indexOf(value) === -1) {
     if (typeof showToast === 'function') showToast('Prioridade inválida.', 'error');
     _penRedesenharDetalhe(id);
@@ -314,32 +497,68 @@ function quickUpdatePendenciaField(id, field, value) {
   }
   if (field === 'responsible') {
     value = String(value || '').trim();
-    if (!value) { if (typeof showToast === 'function') showToast('Selecione um responsável.', 'error'); return; }
+    if (!value) {
+      if (typeof showToast === 'function') showToast('Selecione um responsável.', 'error');
+      return;
+    }
   }
   p[field] = value;
   var errors = [];
-  try { errors = (typeof validatePendencia === 'function') ? (validatePendencia(p) || []) : []; } catch (_) {}
+  try {
+    errors = typeof validatePendencia === 'function' ? validatePendencia(p) || [] : [];
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+  }
   if (errors.length) {
     if (typeof showToast === 'function') showToast(errors[0], 'error');
     _penRedesenharDetalhe(id);
     return;
   }
   savePendencia(p);
-  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof updateBadges === 'function') {
+    try {
+      updateBadges();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
   if (typeof showToast === 'function') showToast('Atualizado!', 'success');
   _penRedesenharDetalhe(id);
-  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_) {} }
-  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_) {} }
+  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) {
+    try {
+      renderPenView(false);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) {
+    try {
+      refreshCalendar();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes');
+    }
+  }
 }
 
 // Ações do menu ⋯ (clique por delegação em js/actions.js).
 if (typeof registerActions === 'function') {
   registerActions({
-    openPenQuickMenu: (el, id) => { if (typeof openPenQuickMenu === 'function') openPenQuickMenu(el, id); },
-    penQuickMoveTo: (el, id) => { closePenQuickMenu(); if (typeof penMoveTo === 'function') penMoveTo(id, el.dataset.status); },
+    openPenQuickMenu: (el, id) => {
+      if (typeof openPenQuickMenu === 'function') openPenQuickMenu(el, id);
+    },
+    penQuickMoveTo: (el, id) => {
+      closePenQuickMenu();
+      if (typeof penMoveTo === 'function') penMoveTo(id, el.dataset.status);
+    },
     // O nome cru passa por data-name (escapeHtml no atributo, dataset
     // devolve a string original); o status vai em data-status.
-    penQuickAssign: (el, id) => { closePenQuickMenu(); if (typeof penQuickAssign === 'function') penQuickAssign(id, el.dataset.name); },
-    penQuickOpenDetail: (_el, id) => { closePenQuickMenu(); if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+    penQuickAssign: (el, id) => {
+      closePenQuickMenu();
+      if (typeof penQuickAssign === 'function') penQuickAssign(id, el.dataset.name);
+    },
+    penQuickOpenDetail: (_el, id) => {
+      closePenQuickMenu();
+      if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+    },
   });
 }

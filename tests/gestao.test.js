@@ -11,7 +11,10 @@ function mockQ() {
   const calls = [];
   const q = {};
   for (const m of ['eq', 'in', 'not', 'or', 'order', 'range', 'select']) {
-    q[m] = (...args) => { calls.push([m, ...args]); return q; };
+    q[m] = (...args) => {
+      calls.push([m, ...args]);
+      return q;
+    };
   }
   q.calls = calls;
   return q;
@@ -20,20 +23,38 @@ function mockQ() {
 function setGlobal(name, value) {
   try {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
-  } catch (_) { globalThis[name] = value; }
+  } catch (_) {
+    globalThis[name] = value;
+  }
 }
 
 const _stores = { clients: [], pendencias: [], operators: [], visits: [] };
 let _session = null;
 
-setGlobal('window', { _pendingSyncCount: 0, _syncPending: 0, _supabaseAuthActive: false, _suppressPendingSync: true, addEventListener() {}, location: { hash: '' } });
-setGlobal('document', { addEventListener() {}, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] });
+setGlobal('window', {
+  _pendingSyncCount: 0,
+  _syncPending: 0,
+  _supabaseAuthActive: false,
+  _suppressPendingSync: true,
+  addEventListener() {},
+  location: { hash: '' },
+});
+setGlobal('document', {
+  addEventListener() {},
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+});
 setGlobal('navigator', { onLine: true });
 setGlobal('getCacheStore', (name) => _stores[name] || []);
-setGlobal('setCacheStore', (name, items) => { _stores[name] = Array.isArray(items) ? [...items] : items; });
+setGlobal('setCacheStore', (name, items) => {
+  _stores[name] = Array.isArray(items) ? [...items] : items;
+});
 setGlobal('getCacheKV', (k, d) => d);
 setGlobal('setCacheKV', () => {});
-setGlobal('getCacheTable', (t) => (t === 'sessions' && _session ? { key: 's', value: _session } : {}));
+setGlobal('getCacheTable', (t) =>
+  t === 'sessions' && _session ? { key: 's', value: _session } : {}
+);
 setGlobal('setCacheTable', () => {});
 setGlobal('getOperatorNames', () => []);
 setGlobal('escapeHtml', (s) => String(s));
@@ -50,12 +71,14 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
       { id: 'OP-9', name: 'Ana', team: 'init', isAdmin: false, active: true, role: 'Técnico' },
     ];
     _session = null;
-        storage = requireStorage();
+    storage = requireStorage();
     try {
       const src = partsSource('pendencias');
       const m = src.match(/const TIPOS = \[(.*?)\];/);
       globalThis.__TIPOS_SRC__ = m ? m[1] : '';
-    } catch (_) { globalThis.__TIPOS_SRC__ = ''; }
+    } catch (_) {
+      globalThis.__TIPOS_SRC__ = '';
+    }
   });
 
   it('TIPOS contém Gestão', () => {
@@ -78,16 +101,28 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
     expect(storage.isGestaoOperator({ name: 'Pedro', active: true })).toBe(false);
     expect(storage.isGestaoOperator({ name: 'Ana', active: true })).toBe(false);
     expect(storage.isGestaoOperator({ name: 'Qualquer', isGestao: true, active: true })).toBe(true);
-    expect(storage.isGestaoOperator({ name: 'Qualquer', is_gestao: true, active: true })).toBe(true);
+    expect(storage.isGestaoOperator({ name: 'Qualquer', is_gestao: true, active: true })).toBe(
+      true
+    );
     expect(storage.isGestaoOperator(null)).toBe(false);
   });
 
   it('applyPendenciaPageFilters exclui Gestão do servidor para não-Gestão', () => {
     const q1 = mockQ();
-    storage.applyPendenciaPageFilters(q1, { scope: 'active', team: 'init', adminSeeAll: true, canSeeGestao: false });
+    storage.applyPendenciaPageFilters(q1, {
+      scope: 'active',
+      team: 'init',
+      adminSeeAll: true,
+      canSeeGestao: false,
+    });
     expect(q1.calls.some(([m, a, b]) => m === 'not' && a === 'tipo' && b === 'in')).toBe(true);
     const q2 = mockQ();
-    storage.applyPendenciaPageFilters(q2, { scope: 'active', team: 'init', adminSeeAll: true, canSeeGestao: true });
+    storage.applyPendenciaPageFilters(q2, {
+      scope: 'active',
+      team: 'init',
+      adminSeeAll: true,
+      canSeeGestao: true,
+    });
     expect(q2.calls.some(([m, a]) => m === 'not' && a === 'tipo')).toBe(false);
   });
 
@@ -98,11 +133,15 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
       { id: 'PEN-3', tipo: 'Gestao' },
     ];
     _session = null;
-    expect(storage.filterGestaoPendencias(list).map(p => p.id)).toEqual(['PEN-1']);
+    expect(storage.filterGestaoPendencias(list).map((p) => p.id)).toEqual(['PEN-1']);
     _session = { opId: 'OP-5', name: 'Felipe', team: 'init' };
-    expect(storage.filterGestaoPendencias(list).map(p => p.id)).toEqual(['PEN-1', 'PEN-2', 'PEN-3']);
+    expect(storage.filterGestaoPendencias(list).map((p) => p.id)).toEqual([
+      'PEN-1',
+      'PEN-2',
+      'PEN-3',
+    ]);
     _session = { opId: 'OP-1', name: 'Pedro', team: 'init' };
-    expect(storage.filterGestaoPendencias(list).map(p => p.id)).toEqual(['PEN-1']);
+    expect(storage.filterGestaoPendencias(list).map((p) => p.id)).toEqual(['PEN-1']);
   });
 
   it('canViewPendencia bloqueia Gestão para Pedro e libera para Joarli', () => {
@@ -119,17 +158,26 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
       { id: 'PEN-2', tipo: 'Gestão', team: 'init', status: 'aberto' },
     ];
     _session = { opId: 'OP-1', name: 'Pedro', team: 'init', isAdmin: true };
-    expect(storage.getMyPendencias().map(p => p.id)).toEqual(['PEN-1']);
+    expect(storage.getMyPendencias().map((p) => p.id)).toEqual(['PEN-1']);
     _session = { opId: 'OP-5', name: 'Felipe', team: 'init', isAdmin: true };
-    expect(storage.getMyPendencias().map(p => p.id).sort()).toEqual(['PEN-1', 'PEN-2']);
+    expect(
+      storage
+        .getMyPendencias()
+        .map((p) => p.id)
+        .sort()
+    ).toEqual(['PEN-1', 'PEN-2']);
   });
 
   it('savePendencia bloqueia criar Gestão como Pedro e permite como Felipe', () => {
     _stores.pendencias = [];
     _session = { opId: 'OP-1', name: 'Pedro', team: 'init', isAdmin: true };
-    expect(() => storage.savePendencia({ tipo: 'Gestão', assunto: 'x', descricao: 'y', status: 'aberto' })).toThrow(/Apenas Gestão/);
+    expect(() =>
+      storage.savePendencia({ tipo: 'Gestão', assunto: 'x', descricao: 'y', status: 'aberto' })
+    ).toThrow(/Apenas Gestão/);
     _session = { opId: 'OP-5', name: 'Felipe', team: 'init', isAdmin: true };
-    expect(() => storage.savePendencia({ tipo: 'Gestão', assunto: 'x', descricao: 'y', status: 'aberto' })).not.toThrow();
+    expect(() =>
+      storage.savePendencia({ tipo: 'Gestão', assunto: 'x', descricao: 'y', status: 'aberto' })
+    ).not.toThrow();
     expect(_stores.pendencias.length).toBe(1);
   });
 
@@ -157,8 +205,18 @@ describe('Gestão — tipo restrito só Felipe e Joarli', () => {
       { id: 'LOG-3', type: 'Cliente', targetId: 'CLI-1', details: 'cliente y' },
     ];
     _session = { opId: 'OP-1', name: 'Pedro', team: 'init', isAdmin: true };
-    expect(storage.filterGestaoLogs(logs).map(l => l.id).sort()).toEqual(['LOG-1', 'LOG-3']);
+    expect(
+      storage
+        .filterGestaoLogs(logs)
+        .map((l) => l.id)
+        .sort()
+    ).toEqual(['LOG-1', 'LOG-3']);
     _session = { opId: 'OP-4', name: 'Joarli', team: 'init', isAdmin: true };
-    expect(storage.filterGestaoLogs(logs).map(l => l.id).sort()).toEqual(['LOG-1', 'LOG-2', 'LOG-3']);
+    expect(
+      storage
+        .filterGestaoLogs(logs)
+        .map((l) => l.id)
+        .sort()
+    ).toEqual(['LOG-1', 'LOG-2', 'LOG-3']);
   });
 });

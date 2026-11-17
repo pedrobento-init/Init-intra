@@ -7,12 +7,24 @@ import vm from 'node:vm';
 // como no index.html.
 // js/chamado-canal.js vem antes, como no index.html: a caixa usa dele a chave
 // de telefone e a formatação do número.
-const FONTES = ['js/chamado-canal.js', 'js/emails-triagem.js', 'js/caixa-entrada.js'].map((f) => fs.readFileSync(f, 'utf8'));
+const FONTES = ['js/chamado-canal.js', 'js/emails-triagem.js', 'js/caixa-entrada.js'].map((f) =>
+  fs.readFileSync(f, 'utf8')
+);
 
 let lista, toasts, undoCb, clientes, acoes, updates, upserts, conectado, elementos, formAberto;
 
 function elemento() {
-  return { innerHTML: '', textContent: '', classes: new Set(), classList: { toggle(c, on) { if (on) this._el.classes.add(c); else this._el.classes.delete(c); } } };
+  return {
+    innerHTML: '',
+    textContent: '',
+    classes: new Set(),
+    classList: {
+      toggle(c, on) {
+        if (on) this._el.classes.add(c);
+        else this._el.classes.delete(c);
+      },
+    },
+  };
 }
 
 function carregar() {
@@ -27,13 +39,19 @@ function carregar() {
     document: { getElementById: (id) => elementos[id] || null },
     DB: { EMAILS_TRIAGEM: 'emails_triagem' },
     dbGet: () => lista,
-    dbSet: (_k, v) => { lista = v; },
+    dbSet: (_k, v) => {
+      lista = v;
+    },
     getUser: () => ({ name: 'Ana' }),
     isSupabaseConnected: () => conectado,
     filterByTeam: (l) => l,
     showToast: (m, t) => toasts.push([m, t]),
-    showUndoToast: (_m, cb) => { undoCb = cb; },
-    openPendenciaForm: (...args) => { formAberto = args; },
+    showUndoToast: (_m, cb) => {
+      undoCb = cb;
+    },
+    openPendenciaForm: (...args) => {
+      formAberto = args;
+    },
     openModal: () => {},
     closeModal: () => {},
     registerActions: (a) => Object.assign(acoes, a),
@@ -41,42 +59,63 @@ function carregar() {
     getMyClients: () => clientes,
     getPendenciaById: () => null,
     markSyncPushFailed: () => {},
-    escapeHtml: (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
+    escapeHtml: (s) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'),
     formatDateTime: (s) => String(s || ''),
     getClientById: (id) => clientes.find((c) => c.id === id) || null,
     supabaseClient: {
       from: (tabela) => ({
-        update: (p) => ({ eq: (_c, id) => { updates.push({ tabela, id, p }); return Promise.resolve({}); } }),
-        upsert: (l) => { upserts.push({ tabela, l }); return Promise.resolve({}); }
-      })
-    }
+        update: (p) => ({
+          eq: (_c, id) => {
+            updates.push({ tabela, id, p });
+            return Promise.resolve({});
+          },
+        }),
+        upsert: (l) => {
+          upserts.push({ tabela, l });
+          return Promise.resolve({});
+        },
+      }),
+    },
   };
   sandbox.globalThis = sandbox;
   sandbox.window.window = sandbox.window;
   vm.createContext(sandbox);
   const erro = console.error;
   console.error = () => {};
-  try { for (const src of FONTES) vm.runInContext(src, sandbox); } finally { console.error = erro; }
+  try {
+    for (const src of FONTES) vm.runInContext(src, sandbox);
+  } finally {
+    console.error = erro;
+  }
   return sandbox;
 }
 
 function entrada(over) {
-  return Object.assign({
-    id: 'ETR-1',
-    de: 'Márcia Prado <marcia@acme.com.br>',
-    assunto: 'Impressora não imprime',
-    corpo: 'Bom dia, a impressora parou.',
-    motivo: 'sem_cliente',
-    status: 'pendente',
-    pendenciaId: null,
-    threadId: 'thread-9',
-    messageId: '<m1@acme.com.br>',
-    team: 'init',
-    recebidoEm: '2026-10-26T12:00:00.000Z',
-    tratadoPor: null,
-    tratadoEm: null,
-    updatedAt: '2026-10-26T12:00:00.000Z'
-  }, over);
+  return Object.assign(
+    {
+      id: 'ETR-1',
+      de: 'Márcia Prado <marcia@acme.com.br>',
+      assunto: 'Impressora não imprime',
+      corpo: 'Bom dia, a impressora parou.',
+      motivo: 'sem_cliente',
+      status: 'pendente',
+      pendenciaId: null,
+      threadId: 'thread-9',
+      messageId: '<m1@acme.com.br>',
+      team: 'init',
+      recebidoEm: '2026-10-26T12:00:00.000Z',
+      tratadoPor: null,
+      tratadoEm: null,
+      updatedAt: '2026-10-26T12:00:00.000Z',
+    },
+    over
+  );
 }
 
 let s;
@@ -97,7 +136,7 @@ describe('caixaAgruparConversas', () => {
   it('junta as mensagens do mesmo thread em ordem de chegada', () => {
     const c = s.caixaAgruparConversas([
       entrada({ id: 'B', recebidoEm: '2026-10-26T14:00:00.000Z' }),
-      entrada({ id: 'A', recebidoEm: '2026-10-26T10:00:00.000Z' })
+      entrada({ id: 'A', recebidoEm: '2026-10-26T10:00:00.000Z' }),
     ]);
     expect(c).toHaveLength(1);
     expect(c[0].mensagens.map((m) => m.id)).toEqual(['A', 'B']);
@@ -107,7 +146,7 @@ describe('caixaAgruparConversas', () => {
   it('e-mail sem thread vira conversa própria, e a mais recente vem primeiro', () => {
     const c = s.caixaAgruparConversas([
       entrada({ id: 'velho', threadId: null, recebidoEm: '2026-10-20T10:00:00.000Z' }),
-      entrada({ id: 'novo', threadId: null, recebidoEm: '2026-10-27T10:00:00.000Z' })
+      entrada({ id: 'novo', threadId: null, recebidoEm: '2026-10-27T10:00:00.000Z' }),
     ]);
     expect(c.map((x) => x.id)).toEqual(['novo', 'velho']);
   });
@@ -115,25 +154,55 @@ describe('caixaAgruparConversas', () => {
   it('a conversa segue pendente se qualquer mensagem dela ainda está pendente', () => {
     const [c] = s.caixaAgruparConversas([
       entrada({ id: 'A', status: 'pendente', recebidoEm: '2026-10-26T10:00:00.000Z' }),
-      entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T14:00:00.000Z' })
+      entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T14:00:00.000Z' }),
     ]);
     expect(c.pendente).toBe(true);
   });
 });
 
 describe('caixaFiltrar', () => {
-  const conversas = () => s.caixaAgruparConversas([
-    entrada({ id: 'A', threadId: 't1', status: 'pendente', atribuidoA: 'Ana', assunto: 'Impressora' }),
-    entrada({ id: 'B', threadId: 't2', status: 'descartado', atribuidoA: 'Ana', assunto: 'Boleto' }),
-    entrada({ id: 'C', threadId: 't3', status: 'pendente', atribuidoA: 'Bruno', assunto: 'Wi-fi', de: 'zeca@x.com' })
-  ]);
+  const conversas = () =>
+    s.caixaAgruparConversas([
+      entrada({
+        id: 'A',
+        threadId: 't1',
+        status: 'pendente',
+        atribuidoA: 'Ana',
+        assunto: 'Impressora',
+      }),
+      entrada({
+        id: 'B',
+        threadId: 't2',
+        status: 'descartado',
+        atribuidoA: 'Ana',
+        assunto: 'Boleto',
+      }),
+      entrada({
+        id: 'C',
+        threadId: 't3',
+        status: 'pendente',
+        atribuidoA: 'Bruno',
+        assunto: 'Wi-fi',
+        de: 'zeca@x.com',
+      }),
+    ]);
 
   it('pendentes mostra só o que aguarda decisão', () => {
-    expect(s.caixaFiltrar(conversas(), 'pendentes', '', 'Ana').map((c) => c.id).sort()).toEqual(['t1', 't3']);
+    expect(
+      s
+        .caixaFiltrar(conversas(), 'pendentes', '', 'Ana')
+        .map((c) => c.id)
+        .sort()
+    ).toEqual(['t1', 't3']);
   });
 
   it('minhas mostra o que está com o usuário, decidido ou não', () => {
-    expect(s.caixaFiltrar(conversas(), 'minhas', '', 'Ana').map((c) => c.id).sort()).toEqual(['t1', 't2']);
+    expect(
+      s
+        .caixaFiltrar(conversas(), 'minhas', '', 'Ana')
+        .map((c) => c.id)
+        .sort()
+    ).toEqual(['t1', 't2']);
   });
 
   it('todas inclui as já tratadas', () => {
@@ -194,7 +263,12 @@ describe('vincular', () => {
     lista = [entrada()];
     s.caixaVincularSalvar('thread-9', 'CLI-1');
     const u = upserts.find((x) => x.tabela === 'clientes_remetentes');
-    expect(u.l).toMatchObject({ id: 'suporte|acme.com.br', remetente: 'acme.com.br', client_id: 'CLI-1', team: 'suporte' });
+    expect(u.l).toMatchObject({
+      id: 'suporte|acme.com.br',
+      remetente: 'acme.com.br',
+      client_id: 'CLI-1',
+      team: 'suporte',
+    });
   });
 
   it('sem cliente escolhido, nada muda', () => {
@@ -228,7 +302,10 @@ describe('payload do Supabase', () => {
 
 describe('descartar', () => {
   it('descarta as pendentes do thread e o desfazer devolve para pendente', () => {
-    lista = [entrada({ id: 'A' }), entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' })];
+    lista = [
+      entrada({ id: 'A' }),
+      entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+    ];
     s.caixaDescartar('thread-9');
     expect(lista.map((e) => e.status)).toEqual(['descartado', 'anexado']);
     undoCb();
@@ -238,7 +315,9 @@ describe('descartar', () => {
 
 describe('renderCaixaEntrada', () => {
   it('assunto e corpo do e-mail entram escapados', () => {
-    lista = [entrada({ assunto: '<img src=x onerror=alert(1)>', corpo: '<script>alert(1)</script>' })];
+    lista = [
+      entrada({ assunto: '<img src=x onerror=alert(1)>', corpo: '<script>alert(1)</script>' }),
+    ];
     s._caixaSelecionada = 'thread-9';
     s.renderCaixaEntrada();
     const html = elementos.caixaLista.innerHTML + elementos.caixaConversa.innerHTML;
@@ -257,7 +336,9 @@ describe('renderCaixaEntrada', () => {
 
 describe('corpo e prévia', () => {
   it('corta a citação da resposta anterior e separa a assinatura', () => {
-    const r = s.caixaCorpoLimpo('Segue o print.\n--\nMárcia\nAcme\nEm seg, 26 de out, Ana escreveu:\n> texto velho');
+    const r = s.caixaCorpoLimpo(
+      'Segue o print.\n--\nMárcia\nAcme\nEm seg, 26 de out, Ana escreveu:\n> texto velho'
+    );
     expect(r.texto).toBe('Segue o print.');
     expect(r.assinatura).toBe('Márcia\nAcme');
   });
@@ -277,7 +358,11 @@ describe('corpo e prévia', () => {
 });
 
 describe('sugestão de cliente', () => {
-  const conv = (id, de, clientId) => ({ id, clientId: clientId || null, ultima: { id: 'm-' + id, de } });
+  const conv = (id, de, clientId) => ({
+    id,
+    clientId: clientId || null,
+    ultima: { id: 'm-' + id, de },
+  });
 
   it('domínio corporativo já vinculado sugere o mesmo cliente', () => {
     const alvo = conv('t1', 'Márcia <marcia@acme.com.br>');
@@ -305,7 +390,10 @@ describe('sugestão de cliente', () => {
 
 describe('contagem e não lidas', () => {
   it('conta conversas por filtro', () => {
-    const convs = s.caixaAgruparConversas([entrada(), entrada({ id: 'ETR-2', threadId: 'thread-8', status: 'convertido' })]);
+    const convs = s.caixaAgruparConversas([
+      entrada(),
+      entrada({ id: 'ETR-2', threadId: 'thread-8', status: 'convertido' }),
+    ]);
     const n = s.caixaContarFiltros(convs, 'Ana');
     expect(n.todas).toBe(2);
     expect(n.pendentes).toBe(2);
@@ -319,7 +407,19 @@ describe('contagem e não lidas', () => {
 });
 
 describe('canal da entrada', () => {
-  const whats = (over) => entrada(Object.assign({ canal: 'whatsapp', telefone: '5511987654321', threadId: null, de: 'Márcia Prado', corpo: 'Oi, a impressora parou' }, over));
+  const whats = (over) =>
+    entrada(
+      Object.assign(
+        {
+          canal: 'whatsapp',
+          telefone: '5511987654321',
+          threadId: null,
+          de: 'Márcia Prado',
+          corpo: 'Oi, a impressora parou',
+        },
+        over
+      )
+    );
 
   it('entrada sem canal conta como e-mail: linha anterior à 075 não muda de lugar', () => {
     const [c] = s.caixaAgruparConversas([entrada()]);
@@ -335,7 +435,7 @@ describe('canal da entrada', () => {
   it('o mesmo telefone escrito com e sem 55 e nono dígito é uma conversa só', () => {
     const c = s.caixaAgruparConversas([
       whats({ id: 'A', telefone: '5511987654321', recebidoEm: '2026-10-26T10:00:00.000Z' }),
-      whats({ id: 'B', telefone: '(11) 8765-4321', recebidoEm: '2026-10-26T11:00:00.000Z' })
+      whats({ id: 'B', telefone: '(11) 8765-4321', recebidoEm: '2026-10-26T11:00:00.000Z' }),
     ]);
     expect(c).toHaveLength(1);
     expect(c[0].id).toBe('whatsapp:1187654321');
@@ -344,7 +444,10 @@ describe('canal da entrada', () => {
   });
 
   it('telefone não colide com thread id do e-mail', () => {
-    const c = s.caixaAgruparConversas([whats({ id: 'A', telefone: '1187654321' }), entrada({ id: 'B', threadId: '1187654321' })]);
+    const c = s.caixaAgruparConversas([
+      whats({ id: 'A', telefone: '1187654321' }),
+      entrada({ id: 'B', threadId: '1187654321' }),
+    ]);
     expect(c).toHaveLength(2);
   });
 
@@ -361,7 +464,9 @@ describe('canal da entrada', () => {
 
   it('a busca acha a conversa pelo telefone em qualquer formato', () => {
     const convs = s.caixaAgruparConversas([entrada(), whats({ id: 'W' })]);
-    expect(s.caixaFiltrar(convs, 'todas', '98765-4321', 'Ana').map((c) => c.canal)).toEqual(['whatsapp']);
+    expect(s.caixaFiltrar(convs, 'todas', '98765-4321', 'Ana').map((c) => c.canal)).toEqual([
+      'whatsapp',
+    ]);
   });
 
   it('a ação de canal troca o filtro e valor desconhecido volta para todos', () => {
@@ -374,7 +479,14 @@ describe('canal da entrada', () => {
   });
 
   it('nome e corpo do WhatsApp entram escapados na lista e na conversa', () => {
-    lista = [whats({ id: 'W', de: '<img src=x onerror=alert(1)>', corpo: '<script>alert(1)</script>', assunto: '' })];
+    lista = [
+      whats({
+        id: 'W',
+        de: '<img src=x onerror=alert(1)>',
+        corpo: '<script>alert(1)</script>',
+        assunto: '',
+      }),
+    ];
     s._caixaSelecionada = 'whatsapp:1187654321';
     s.renderCaixaEntrada();
     const html = elementos.caixaLista.innerHTML + elementos.caixaConversa.innerHTML;
@@ -384,7 +496,9 @@ describe('canal da entrada', () => {
   });
 
   it('remetente que é só o número aparece formatado', () => {
-    expect(s._caixaNomeDe({ de: '5511987654321', telefone: '5511987654321' }, 'whatsapp')).toBe('(11) 98765-4321');
+    expect(s._caixaNomeDe({ de: '5511987654321', telefone: '5511987654321' }, 'whatsapp')).toBe(
+      '(11) 98765-4321'
+    );
     expect(s._caixaNomeDe({ de: 'Márcia', telefone: '5511987654321' }, 'whatsapp')).toBe('Márcia');
   });
 
@@ -397,16 +511,24 @@ describe('canal da entrada', () => {
 
 describe('cliente pelo telefone', () => {
   it('casa o número do WhatsApp com o telefone do dono no cadastro', () => {
-    const cl = [{ id: 'CLI-1', ownerPhone: '(11) 98765-4321' }, { id: 'CLI-2', ownerPhone: '(21) 3333-4444' }];
+    const cl = [
+      { id: 'CLI-1', ownerPhone: '(11) 98765-4321' },
+      { id: 'CLI-2', ownerPhone: '(21) 3333-4444' },
+    ];
     expect(s.caixaClientePorTelefone('5511987654321', cl)).toBe('CLI-1');
   });
 
   it('casa também o telefone do responsável', () => {
-    expect(s.caixaClientePorTelefone('11987654321', [{ id: 'CLI-3', responsiblePhone: '1187654321' }])).toBe('CLI-3');
+    expect(
+      s.caixaClientePorTelefone('11987654321', [{ id: 'CLI-3', responsiblePhone: '1187654321' }])
+    ).toBe('CLI-3');
   });
 
   it('dois clientes com o mesmo número é ambíguo e não sugere nenhum', () => {
-    const cl = [{ id: 'CLI-1', ownerPhone: '11987654321' }, { id: 'CLI-2', responsiblePhone: '(11) 98765-4321' }];
+    const cl = [
+      { id: 'CLI-1', ownerPhone: '11987654321' },
+      { id: 'CLI-2', responsiblePhone: '(11) 98765-4321' },
+    ];
     expect(s.caixaClientePorTelefone('5511987654321', cl)).toBeNull();
   });
 
@@ -416,15 +538,39 @@ describe('cliente pelo telefone', () => {
 
   it('a sugestão da conversa de WhatsApp vem do cadastro de clientes', () => {
     clientes = [{ id: 'CLI-1', name: 'Acme', team: 'suporte', ownerPhone: '(11) 98765-4321' }];
-    const conversa = { id: 'whatsapp:1187654321', canal: 'whatsapp', telefone: '5511987654321', clientId: null, ultima: { de: 'Márcia' } };
+    const conversa = {
+      id: 'whatsapp:1187654321',
+      canal: 'whatsapp',
+      telefone: '5511987654321',
+      clientId: null,
+      ultima: { de: 'Márcia' },
+    };
     expect(s.caixaSugerirCliente(conversa, [conversa])).toBe('CLI-1');
   });
 
   it('no WhatsApp o mesmo telefone já é uma conversa só, então não há histórico à parte', () => {
     const linhas = [
-      { id: 'w1', canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia', recebidoEm: '2026-10-30T10:00:00Z' },
-      { id: 'w2', canal: 'whatsapp', telefone: '1187654321', de: 'Márcia', recebidoEm: '2026-10-30T11:00:00Z' },
-      { id: 'w3', canal: 'whatsapp', telefone: '21999998888', de: 'Outro', recebidoEm: '2026-10-30T12:00:00Z' },
+      {
+        id: 'w1',
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Márcia',
+        recebidoEm: '2026-10-30T10:00:00Z',
+      },
+      {
+        id: 'w2',
+        canal: 'whatsapp',
+        telefone: '1187654321',
+        de: 'Márcia',
+        recebidoEm: '2026-10-30T11:00:00Z',
+      },
+      {
+        id: 'w3',
+        canal: 'whatsapp',
+        telefone: '21999998888',
+        de: 'Outro',
+        recebidoEm: '2026-10-30T12:00:00Z',
+      },
     ];
     const conversas = s.caixaAgruparConversas(linhas);
     expect(conversas).toHaveLength(2);
@@ -435,7 +581,9 @@ describe('cliente pelo telefone', () => {
 
   it('vincular conversa de WhatsApp não ensina domínio ao robô', () => {
     conectado = true;
-    lista = [entrada({ canal: 'whatsapp', telefone: '5511987654321', threadId: null, de: 'Márcia' })];
+    lista = [
+      entrada({ canal: 'whatsapp', telefone: '5511987654321', threadId: null, de: 'Márcia' }),
+    ];
     expect(s.caixaVincularSalvar('whatsapp:1187654321', 'CLI-1')).toBe(true);
     expect(upserts.find((x) => x.tabela === 'clientes_remetentes')).toBeUndefined();
   });
@@ -443,7 +591,18 @@ describe('cliente pelo telefone', () => {
 
 describe('abrir chamado do WhatsApp', () => {
   it('abre o formulário com canal e telefone no thread id, sem e-mail de resposta', () => {
-    lista = [entrada({ id: 'W', canal: 'whatsapp', telefone: '5511987654321', threadId: null, de: 'Márcia', assunto: '', corpo: 'A impressora parou', clientId: 'CLI-1' })];
+    lista = [
+      entrada({
+        id: 'W',
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        threadId: null,
+        de: 'Márcia',
+        assunto: '',
+        corpo: 'A impressora parou',
+        clientId: 'CLI-1',
+      }),
+    ];
     s.caixaAbrirChamado('whatsapp:1187654321');
     const [pendId, clientId, , prefill] = formAberto;
     expect(pendId).toBeNull();
@@ -455,22 +614,38 @@ describe('abrir chamado do WhatsApp', () => {
       solicitanteEmail: '',
       assunto: 'WhatsApp de Márcia',
       descricao: 'A impressora parou',
-      etrEntrada: 'W'
+      etrEntrada: 'W',
     });
   });
 
   it('conversa de WhatsApp já tratada ainda pode virar chamado opcional', () => {
-    lista = [entrada({ canal: 'whatsapp', telefone: '5511987654321', threadId: null, status: 'convertido' })];
+    lista = [
+      entrada({
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        threadId: null,
+        status: 'convertido',
+      }),
+    ];
     s.caixaAbrirChamado('whatsapp:1187654321');
     expect(formAberto[3].emailThreadId).toBe('whatsapp:5511987654321');
     expect(toasts).toEqual([]);
   });
 });
 
-
 describe('portal de conversas', () => {
   it('resposta da equipe não deixa a conversa pendente nem vira mensagem do cliente', () => {
-    lista = [entrada({ status: 'anexado' }), entrada({ id: 'portal:1', emailId: 'portal:1', direcao: 'saida', status: 'anexado', de: 'Ana', corpo: 'Vamos verificar.' })];
+    lista = [
+      entrada({ status: 'anexado' }),
+      entrada({
+        id: 'portal:1',
+        emailId: 'portal:1',
+        direcao: 'saida',
+        status: 'anexado',
+        de: 'Ana',
+        corpo: 'Vamos verificar.',
+      }),
+    ];
     const c = s.caixaAgruparConversas(lista)[0];
     expect(c.pendente).toBe(false);
     expect(c.mensagens.map((m) => m.direcao || 'entrada')).toEqual(['entrada', 'saida']);
@@ -497,7 +672,12 @@ describe('portal de conversas', () => {
   it('mensagem nova depois do descarte volta a conversa para Em atendimento', () => {
     const convs = s.caixaAgruparConversas([
       entrada({ id: 'A', threadId: 't1', status: 'descartado' }),
-      entrada({ id: 'B', threadId: 't1', status: 'pendente', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+      entrada({
+        id: 'B',
+        threadId: 't1',
+        status: 'pendente',
+        recebidoEm: '2026-10-26T13:00:00.000Z',
+      }),
     ]);
     expect(convs[0].descartada).toBe(false);
     expect(s.caixaFiltrar(convs, 'pendentes', '', 'Ana')).toHaveLength(1);
@@ -509,7 +689,12 @@ describe('portal de conversas', () => {
   it('mensagem nova depois de encerrar tira a conversa de Encerradas', () => {
     const convs = s.caixaAgruparConversas([
       entrada({ id: 'A', threadId: 't1', status: 'encerrado' }),
-      entrada({ id: 'B', threadId: 't1', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+      entrada({
+        id: 'B',
+        threadId: 't1',
+        status: 'anexado',
+        recebidoEm: '2026-10-26T13:00:00.000Z',
+      }),
     ]);
     expect(convs[0].encerrada).toBe(false);
     expect(s.caixaFiltrar(convs, 'encerradas', '', 'Ana')).toHaveLength(0);
@@ -528,7 +713,10 @@ describe('portal de conversas', () => {
   });
 
   it('o rascunho não vaza para outra conversa', () => {
-    lista = [entrada({ id: 'E1', threadId: 't1' }), entrada({ id: 'E2', threadId: 't2', recebidoEm: '2026-10-26T13:00:00.000Z' })];
+    lista = [
+      entrada({ id: 'E1', threadId: 't1' }),
+      entrada({ id: 'E2', threadId: 't2', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+    ];
     s._caixaSelecionada = 't1';
     s.renderCaixaEntrada();
     acoes.caixaRascunho({}, 'texto da conversa t1');
@@ -547,9 +735,14 @@ describe('portal de conversas', () => {
   // A tela agrupa pelo telefone normalizado (sem 55/nono dígito), mas o banco
   // guarda a chave inteira. Responder com a chave da tela dava 404 na function.
   it('a resposta usa o thread id do banco, com o telefone inteiro', () => {
-    const [c] = s.caixaAgruparConversas([entrada({
-      canal: 'whatsapp', telefone: '5511987654321', threadId: 'whatsapp:5511987654321', de: 'Márcia',
-    })]);
+    const [c] = s.caixaAgruparConversas([
+      entrada({
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        threadId: 'whatsapp:5511987654321',
+        de: 'Márcia',
+      }),
+    ]);
     expect(c.id).toBe('whatsapp:1187654321');
     expect(s.caixaThreadId(c)).toBe('whatsapp:5511987654321');
   });
@@ -557,7 +750,12 @@ describe('portal de conversas', () => {
   it('linha antiga sem thread id reconstrói a chave do banco pelo telefone', () => {
     // O webhook grava o telefone como a WAHA manda: com 55. Sem o thread id
     // sincronizado, é dele que sai a chave que a function reconhece.
-    const c = { id: 'whatsapp:1187654321', canal: 'whatsapp', telefone: '5511987654321', ultima: { id: 'W' } };
+    const c = {
+      id: 'whatsapp:1187654321',
+      canal: 'whatsapp',
+      telefone: '5511987654321',
+      ultima: { id: 'W' },
+    };
     expect(s.caixaThreadId(c)).toBe('whatsapp:5511987654321');
   });
 
@@ -571,10 +769,21 @@ describe('portal de conversas', () => {
   // saem da última mensagem de ENTRADA, não da resposta.
   it('depois da resposta, a lista e o painel continuam mostrando o cliente', () => {
     lista = [
-      entrada({ id: 'E1', threadId: 't1', de: 'Márcia <marcia@acme.com.br>', recebidoEm: '2026-10-26T10:00:00Z' }),
       entrada({
-        id: 'S1', threadId: 't1', direcao: 'saida', status: 'anexado', de: 'Ana',
-        assunto: 'Re: Impressora', corpo: 'Vamos verificar.', recebidoEm: '2026-10-26T11:00:00Z',
+        id: 'E1',
+        threadId: 't1',
+        de: 'Márcia <marcia@acme.com.br>',
+        recebidoEm: '2026-10-26T10:00:00Z',
+      }),
+      entrada({
+        id: 'S1',
+        threadId: 't1',
+        direcao: 'saida',
+        status: 'anexado',
+        de: 'Ana',
+        assunto: 'Re: Impressora',
+        corpo: 'Vamos verificar.',
+        recebidoEm: '2026-10-26T11:00:00Z',
       }),
     ];
     s._caixaSelecionada = 't1';
@@ -587,14 +796,29 @@ describe('portal de conversas', () => {
   it('a sugestão de cliente olha o remetente da entrada, não a nossa resposta', () => {
     const todas = s.caixaAgruparConversas([
       entrada({ id: 'E1', threadId: 't1', de: 'Márcia <marcia@acme.com.br>' }),
-      entrada({ id: 'S1', threadId: 't1', direcao: 'saida', de: 'Ana', recebidoEm: '2026-10-26T11:00:00Z' }),
+      entrada({
+        id: 'S1',
+        threadId: 't1',
+        direcao: 'saida',
+        de: 'Ana',
+        recebidoEm: '2026-10-26T11:00:00Z',
+      }),
       entrada({ id: 'E2', threadId: 't2', de: 'José <jose@acme.com.br>', clientId: 'CLI-1' }),
     ]);
-    expect(s.caixaSugerirCliente(todas.find((c) => c.id === 't1'), todas)).toBe('CLI-1');
+    expect(
+      s.caixaSugerirCliente(
+        todas.find((c) => c.id === 't1'),
+        todas
+      )
+    ).toBe('CLI-1');
   });
 
   it('mídia usa apenas URL http(s) ou dados e escapa o nome', () => {
-    expect(s._caixaMediaHTML({ nome: '<img src=x>', tipo: 'text/plain', url: 'javascript:alert(1)' })).not.toContain('javascript:');
-    expect(s._caixaMediaHTML({ nome: 'foto.png', tipo: 'image/png', dados: 'AAAA' })).toContain('<img');
+    expect(
+      s._caixaMediaHTML({ nome: '<img src=x>', tipo: 'text/plain', url: 'javascript:alert(1)' })
+    ).not.toContain('javascript:');
+    expect(s._caixaMediaHTML({ nome: 'foto.png', tipo: 'image/png', dados: 'AAAA' })).toContain(
+      '<img'
+    );
   });
 });

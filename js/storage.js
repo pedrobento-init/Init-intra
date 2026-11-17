@@ -19,6 +19,49 @@ const DB = {
   LOGS: 'intra_logs',
 };
 
+// Atalhos usados pelos saves de storage-pendencias/storage-visitas. Vivem aqui
+// (storage.js carrega antes de outbox.js) e delegam ao outbox só se ele existir:
+// enfileirar é melhor-esforço e nunca pode derrubar o save/delete que já deu
+// certo local — nem mesmo se outbox.js falhar ao carregar.
+// `_outboxOffline`: sem conexão no momento da escrita. `_outboxFail`: o envio
+// falhou (só enfileira se a causa for conectividade). `_outboxDropTarget`: o
+// delete foi direto ao servidor, então uma entrada pendente do mesmo id não pode
+// recriar o registro no próximo drain (SYNC-10).
+function _outboxSwallow(p) {
+  if (p && typeof p.catch === 'function')
+    p.catch(function (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'outbox');
+    });
+}
+function _outboxOffline(entity, op, record) {
+  try {
+    if (typeof outboxQueueUpsert !== 'function') return;
+    _outboxSwallow(
+      op === 'delete'
+        ? outboxQueueDelete(entity, record && record.id)
+        : outboxQueueUpsert(entity, record)
+    );
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'outbox');
+  }
+}
+function _outboxFail(entity, op, record, err, thrown) {
+  try {
+    if (typeof outboxQueueIfTransient !== 'function') return;
+    _outboxSwallow(outboxQueueIfTransient(entity, op, record, err, thrown));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'outbox');
+  }
+}
+function _outboxDropTarget(id) {
+  try {
+    if (typeof outboxRemoveTarget !== 'function') return;
+    _outboxSwallow(outboxRemoveTarget(id));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'outbox');
+  }
+}
+
 // ── FILA DE SINCRONIZAÇÃO VISÍVEL ───────────────────────────────────────────
 // Contador em memória (NÃO persistido): 1 por registro criado/editado
 // localmente enquanto o push está indisponível. Boot sempre começa em 0.
@@ -29,7 +72,11 @@ if (typeof window !== 'undefined') {
   if (typeof window._syncPending !== 'number') window._syncPending = window._pendingSyncCount;
 }
 function _isPendingSuppressed() {
-  try { if (typeof window !== 'undefined' && window._suppressPendingSync) return true; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    if (typeof window !== 'undefined' && window._suppressPendingSync) return true;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   return false;
 }
 function getPendingSyncCount() {
@@ -43,8 +90,10 @@ function getPendingSyncCount() {
 function _refreshSyncBanner() {
   if (typeof window === 'undefined') return;
   try {
-    const banner = typeof document !== 'undefined' ? document.getElementById('offlineBanner') : null;
-    const msgEl = typeof document !== 'undefined' ? document.getElementById('offlineBannerMsg') : null;
+    const banner =
+      typeof document !== 'undefined' ? document.getElementById('offlineBanner') : null;
+    const msgEl =
+      typeof document !== 'undefined' ? document.getElementById('offlineBannerMsg') : null;
     const syncBtn = typeof document !== 'undefined' ? document.getElementById('syncNowBtn') : null;
     if (!banner || !msgEl) return;
     const cnt = getPendingSyncCount();
@@ -60,7 +109,9 @@ function _refreshSyncBanner() {
       msgEl.textContent = 'Sem conexão – modo offline ativo';
       banner.className = 'offline-banner offline visible';
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 function incrementPendingSync() {
   if (typeof window !== 'undefined') {
@@ -74,9 +125,11 @@ function incrementPendingSync() {
 // então conta como pendente. Offline já foi contado no dbSet (sem duplicar).
 function markSyncPushFailed() {
   try {
-    const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (!offline) incrementPendingSync();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 function resetPendingSyncCount() {
   let prev = 0;
@@ -86,7 +139,11 @@ function resetPendingSyncCount() {
     window._syncPending = 0;
   }
   // TEMP-DEBUG: confirmar visualmente no console que o reset ocorreu após o sync.
-  try { console.debug('[sync] concluída, contador resetado de ' + prev + ' para 0'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    console.debug('[sync] concluída, contador resetado de ' + prev + ' para 0');
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   _refreshSyncBanner();
 }
 
@@ -110,16 +167,25 @@ function _loadTombstones() {
   if (typeof localStorage !== 'undefined') {
     try {
       const raw = localStorage.getItem(TOMBSTONE_LS_KEY);
-      if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') return p; }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === 'object') return p;
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
   }
   if (!_memTombstones) _memTombstones = {};
   return _memTombstones;
 }
 function _saveTombstones(t) {
   if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem(TOMBSTONE_LS_KEY, JSON.stringify(t || {})); return; }
-    catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      localStorage.setItem(TOMBSTONE_LS_KEY, JSON.stringify(t || {}));
+      return;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
   }
   _memTombstones = t || {};
 }
@@ -130,51 +196,86 @@ function _addTombstone(dbKey, id, at) {
     if (!t[dbKey]) t[dbKey] = {};
     t[dbKey][id] = at || new Date().toISOString();
     _saveTombstones(t);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 function _removeTombstone(dbKey, id) {
   try {
     const t = _loadTombstones();
-    if (t && t[dbKey] && t[dbKey][id]) { delete t[dbKey][id]; _saveTombstones(t); }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    if (t && t[dbKey] && t[dbKey][id]) {
+      delete t[dbKey][id];
+      _saveTombstones(t);
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 // Guarda para o realtime (supabase-config.js): retorna o ISO ou null.
 function _tombTimeFor(dbKey, id) {
-  try { const t = _loadTombstones(); return (t && t[dbKey] && t[dbKey][id]) || null; }
-  catch (_) { return null; }
+  try {
+    const t = _loadTombstones();
+    return (t && t[dbKey] && t[dbKey][id]) || null;
+  } catch (_) {
+    return null;
+  }
 }
-function _clearTombstone(dbKey, id) { _removeTombstone(dbKey, id); }
+function _clearTombstone(dbKey, id) {
+  _removeTombstone(dbKey, id);
+}
 function _pruneTombstonesPersisted() {
   try {
-    const ttl = (typeof TOMBSTONE_TTL_MS === 'number') ? TOMBSTONE_TTL_MS : 30 * 86400000;
-    const pruned = (typeof _pruneTombstones === 'function')
-      ? _pruneTombstones(_loadTombstones(), Date.now(), ttl)
-      : _loadTombstones();
+    const ttl = typeof TOMBSTONE_TTL_MS === 'number' ? TOMBSTONE_TTL_MS : 30 * 86400000;
+    const pruned =
+      typeof _pruneTombstones === 'function'
+        ? _pruneTombstones(_loadTombstones(), Date.now(), ttl)
+        : _loadTombstones();
     _saveTombstones(pruned);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 function _loadSyncAt() {
   if (typeof localStorage !== 'undefined') {
     try {
       const raw = localStorage.getItem(SYNC_AT_LS_KEY);
-      if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') return p; }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === 'object') return p;
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
   }
   if (!_memSyncAt) _memSyncAt = {};
   return _memSyncAt;
 }
 function _saveSyncAt(m) {
   if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem(SYNC_AT_LS_KEY, JSON.stringify(m || {})); return; }
-    catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      localStorage.setItem(SYNC_AT_LS_KEY, JSON.stringify(m || {}));
+      return;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
   }
   _memSyncAt = m || {};
 }
 function _getLastSyncAt(table) {
-  try { return _loadSyncAt()[table] || null; } catch (_) { return null; }
+  try {
+    return _loadSyncAt()[table] || null;
+  } catch (_) {
+    return null;
+  }
 }
 function _setLastSyncAt(table, iso) {
-  try { const m = _loadSyncAt(); m[table] = iso; _saveSyncAt(m); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    const m = _loadSyncAt();
+    m[table] = iso;
+    _saveSyncAt(m);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 
 // ── PULL PAGINADO + SYNC PARCIAL (P-9 / SYNC-01 / PERF-01) ───────────────────
@@ -196,7 +297,10 @@ async function _pullPaged(table, columns, timed, what) {
     // Cliente sem paginação (mocks/antigos): uma leitura só, como antes.
     if (!ordered || typeof ordered.range !== 'function') {
       const res = await timed(q, what);
-      return { data: (res && res.data) || (res && res.error ? null : []), error: (res && res.error) || null };
+      return {
+        data: (res && res.data) || (res && res.error ? null : []),
+        error: (res && res.error) || null,
+      };
     }
     const res = await timed(ordered.range(from, from + SYNC_PAGE_SIZE - 1), what + '@' + from);
     if (res && res.error) return { data: null, error: res.error };
@@ -208,10 +312,23 @@ async function _pullPaged(table, columns, timed, what) {
 }
 
 async function _pullEntityRows(e, local, timed) {
-  const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields, e.optionalFields);
+  const mapPayload = (rec) =>
+    typeof e.buildUpsert === 'function'
+      ? e.buildUpsert(rec)
+      : _mapToRemote(rec, e.fields, e.optionalFields);
   // Tudo que o servidor devolve no pull está confirmado lá (faixa de pendentes).
-  const _seen = (rows) => { try { if (rows && typeof markServerSeen === 'function') markServerSeen(e.table, rows); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } };
-  const fullPull = async () => { const r = await _pullPaged(e.table, '*', timed, 'pull:' + e.table); _seen(r.data); return { ...r, mode: 'full' }; };
+  const _seen = (rows) => {
+    try {
+      if (rows && typeof markServerSeen === 'function') markServerSeen(e.table, rows);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
+  };
+  const fullPull = async () => {
+    const r = await _pullPaged(e.table, '*', timed, 'pull:' + e.table);
+    _seen(r.data);
+    return { ...r, mode: 'full' };
+  };
   const canDelta = typeof _shouldFullSync === 'function' && typeof _planDeltaPull === 'function';
   if (!canDelta || _shouldFullSync(e, _getLastSyncAt(_FULL_KEY(e.table)))) return fullPull();
 
@@ -226,18 +343,33 @@ async function _pullEntityRows(e, local, timed) {
   for (let i = 0; i < plan.changedIds.length; i += SYNC_DELTA_CHUNK) {
     const q = supabaseClient.from(e.table).select('*');
     if (!q || typeof q.in !== 'function') return fullPull();
-    const res = await timed(q.in('id', plan.changedIds.slice(i, i + SYNC_DELTA_CHUNK)), 'pull-delta:' + e.table);
+    const res = await timed(
+      q.in('id', plan.changedIds.slice(i, i + SYNC_DELTA_CHUNK)),
+      'pull-delta:' + e.table
+    );
     if (res && res.error) return { data: null, error: res.error, mode: 'delta' };
-    for (const r of ((res && res.data) || [])) rows.push(r);
+    for (const r of (res && res.data) || []) rows.push(r);
   }
-  const localById = new Map((local || []).map(r => [r.id, r]));
-  const lightById = new Map(light.data.map(r => [r.id, r]));
+  const localById = new Map((local || []).map((r) => [r.id, r]));
+  const lightById = new Map(light.data.map((r) => [r.id, r]));
   for (const id of plan.sameIds) {
     const loc = localById.get(id);
     if (!loc) continue;
     rows.push({ ...mapPayload(loc), id, updated_at: lightById.get(id).updated_at });
   }
-  try { console.debug('[sync] ' + e.table + ': parcial — ' + plan.changedIds.length + ' alterado(s), ' + plan.sameIds.length + ' igual(is).'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    console.debug(
+      '[sync] ' +
+        e.table +
+        ': parcial — ' +
+        plan.changedIds.length +
+        ' alterado(s), ' +
+        plan.sameIds.length +
+        ' igual(is).'
+    );
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   return { data: rows, error: null, mode: 'delta' };
 }
 
@@ -278,13 +410,12 @@ const TEAM_OPTIONS = [
   { value: 'bt', label: 'BT' },
 ];
 
-function normalizeTeam(team){
-  if(!team) return team;
-  var t=String(team).toLowerCase().trim();
-  if(t.indexOf('poiesis_')===0) return 'poiesis';
+function normalizeTeam(team) {
+  if (!team) return team;
+  var t = String(team).toLowerCase().trim();
+  if (t.indexOf('poiesis_') === 0) return 'poiesis';
   return t;
 }
-
 
 // ── SESSÃO ──
 const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 horas
@@ -296,17 +427,24 @@ const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 horas
 // esses campos, em vez de descartar a edição inteira (schema.js).
 function _withDirtyFields(prev, next) {
   if (!prev || !next) return next;
-  try { if (_isPendingSuppressed()) return next; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } // merge/sync interno não é edição
+  try {
+    if (_isPendingSuppressed()) return next;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  } // merge/sync interno não é edição
   const dirty = new Set(Array.isArray(prev._dirtyFields) ? prev._dirtyFields : []);
   for (const k of Object.keys(next)) {
     if (k === 'updatedAt' || k === 'createdAt' || k === '_dirtyFields') continue;
-    const a = prev[k], b = next[k];
-    const differ = (a && typeof a === 'object') || (b && typeof b === 'object')
-      ? JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)
-      : (a ?? null) !== (b ?? null);
+    const a = prev[k],
+      b = next[k];
+    const differ =
+      (a && typeof a === 'object') || (b && typeof b === 'object')
+        ? JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)
+        : (a ?? null) !== (b ?? null);
     if (differ) dirty.add(k);
   }
-  if (dirty.size) next._dirtyFields = [...dirty]; else delete next._dirtyFields;
+  if (dirty.size) next._dirtyFields = [...dirty];
+  else delete next._dirtyFields;
   return next;
 }
 
@@ -319,12 +457,19 @@ function _clearDirtyFields(table, id, confirmedIso) {
     const r = list.find((x) => x && x.id === id);
     if (!r || !Array.isArray(r._dirtyFields)) return;
     // Só limpa se o que foi confirmado é a versão atual (sem edição posterior).
-    if (confirmedIso && new Date(r.updatedAt || 0).getTime() > new Date(confirmedIso).getTime()) return;
+    if (confirmedIso && new Date(r.updatedAt || 0).getTime() > new Date(confirmedIso).getTime())
+      return;
     delete r._dirtyFields;
     const prev = typeof window !== 'undefined' ? window._suppressPendingSync : undefined;
     if (typeof window !== 'undefined') window._suppressPendingSync = true;
-    try { dbSet(e.dbKey, list); } finally { if (typeof window !== 'undefined') window._suppressPendingSync = prev; }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      dbSet(e.dbKey, list);
+    } finally {
+      if (typeof window !== 'undefined') window._suppressPendingSync = prev;
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 
 // ── PESSOAS POR ID (049) ──
@@ -332,11 +477,23 @@ function _clearDirtyFields(table, id, confirmedIso) {
 // id do nome a cada gravação; aqui o app faz o mesmo localmente, para a
 // "minha fila" acertar antes do próximo sync.
 function operatorIdByName(name) {
-  const n = String(name || '').trim().toLowerCase();
+  const n = String(name || '')
+    .trim()
+    .toLowerCase();
   if (!n) return null;
   let ops = [];
-  try { ops = (typeof getOperators === 'function' ? getOperators() : []) || []; } catch (_) { ops = []; }
-  const hits = ops.filter((o) => o && String(o.name || '').trim().toLowerCase() === n);
+  try {
+    ops = (typeof getOperators === 'function' ? getOperators() : []) || [];
+  } catch (_) {
+    ops = [];
+  }
+  const hits = ops.filter(
+    (o) =>
+      o &&
+      String(o.name || '')
+        .trim()
+        .toLowerCase() === n
+  );
   const active = hits.filter((o) => o.active !== false);
   if (active.length === 1) return active[0].id;
   if (!active.length && hits.length === 1) return hits[0].id;
@@ -346,7 +503,10 @@ function operatorIdByName(name) {
 /** Mesma pessoa? Usa o id quando os dois lados têm; senão compara o nome. */
 function isSameOperator(recId, recName, opId, opName) {
   if (recId && opId) return recId === opId;
-  return String(recName || '').trim() !== '' && String(recName || '').trim() === String(opName || '').trim();
+  return (
+    String(recName || '').trim() !== '' &&
+    String(recName || '').trim() === String(opName || '').trim()
+  );
 }
 
 function getSession() {
@@ -354,9 +514,14 @@ function getSession() {
     const cache = typeof getCacheTable === 'function' ? getCacheTable('sessions') : null;
     const s = cache?.value || null;
     if (!s) return null;
-    if (Date.now() - s.ts > SESSION_TTL) { clearSession(); return null; }
+    if (Date.now() - s.ts > SESSION_TTL) {
+      clearSession();
+      return null;
+    }
     return s;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setSession(opId) {
@@ -364,21 +529,23 @@ function setSession(opId) {
   if (!op) return null;
   const session = {
     opId,
-    name:     op.name,
+    name: op.name,
     initials: op.initials || op.name.substring(0, 2).toUpperCase(),
-    color:    op.color || '#1a56db',
-    role:     op.role || 'Técnico',
-    isAdmin:  op.isAdmin === true,
-    isGestao: (typeof isGestaoOperator === 'function') ? isGestaoOperator(op) : false,
-    team:     op.team || 'init',
+    color: op.color || '#1a56db',
+    role: op.role || 'Técnico',
+    isAdmin: op.isAdmin === true,
+    isGestao: typeof isGestaoOperator === 'function' ? isGestaoOperator(op) : false,
+    team: op.team || 'init',
     ts: Date.now(),
   };
-  if (typeof setCacheTable === 'function') setCacheTable('sessions', { key: DB.SESSION, value: session });
+  if (typeof setCacheTable === 'function')
+    setCacheTable('sessions', { key: DB.SESSION, value: session });
   return session;
 }
 
 function clearSession() {
-  if (typeof setCacheTable === 'function') setCacheTable('sessions', { key: DB.SESSION, value: null });
+  if (typeof setCacheTable === 'function')
+    setCacheTable('sessions', { key: DB.SESSION, value: null });
 }
 
 // ── TEAM HELPERS ──
@@ -399,7 +566,7 @@ function canViewTeam(targetTeam) {
 function filterByTeam(items) {
   if (isTeamAdmin()) return items;
   const myTeam = normalizeTeam(getCurrentTeam());
-  return items.filter(i => normalizeTeam(i.team || 'init') === myTeam);
+  return items.filter((i) => normalizeTeam(i.team || 'init') === myTeam);
 }
 
 // ── GESTÃO (tipo de ação restrito: só Felipe e Joarli) ──────────────────────
@@ -410,10 +577,15 @@ function filterByTeam(items) {
 // sincronizou. Pedro fica de fora por definição (só Felipe e Joarli).
 function _normGestaoText(s) {
   try {
-    return String(s || '').trim().toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return String(s || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   } catch (_) {
-    return String(s || '').trim().toLowerCase();
+    return String(s || '')
+      .trim()
+      .toLowerCase();
   }
 }
 function isPendenciaGestao(p) {
@@ -436,7 +608,9 @@ function canViewGestao() {
     if (session.isGestao === true) return true;
     if (typeof getOperatorById !== 'function') return false;
     return isGestaoOperator(getOperatorById(session.opId));
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 function canViewPendencia(p) {
   if (!p) return false;
@@ -446,7 +620,7 @@ function canViewPendencia(p) {
 function filterGestaoPendencias(list) {
   const arr = Array.isArray(list) ? list : [];
   if (canViewGestao()) return arr;
-  return arr.filter(p => !isPendenciaGestao(p));
+  return arr.filter((p) => !isPendenciaGestao(p));
 }
 // Log de pendência Gestão: esconder por completo de quem não é Gestão
 // (Histórico global, histórico do cliente, export CSV). Usa o vínculo
@@ -456,21 +630,32 @@ function filterGestaoPendencias(list) {
 function isGestaoLog(log) {
   try {
     if (!log) return false;
-    var _t = String(log.type || '').trim().toLowerCase();
-    try { _t = _t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    var _t = String(log.type || '')
+      .trim()
+      .toLowerCase();
+    try {
+      _t = _t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     if (_t !== 'pendencia') return false;
-    if (typeof getPendenciaById !== 'function' || typeof isPendenciaGestao !== 'function') return false;
+    if (typeof getPendenciaById !== 'function' || typeof isPendenciaGestao !== 'function')
+      return false;
     var _p = log.targetId ? getPendenciaById(log.targetId) : null;
     return !!(_p && isPendenciaGestao(_p));
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 function filterGestaoLogs(logs) {
   try {
     const arr = Array.isArray(logs) ? logs : [];
     if (typeof canViewGestao === 'function' && canViewGestao()) return arr;
     if (typeof isGestaoLog !== 'function') return arr;
-    return arr.filter(l => !isGestaoLog(l));
-  } catch (_) { return Array.isArray(logs) ? logs : []; }
+    return arr.filter((l) => !isGestaoLog(l));
+  } catch (_) {
+    return Array.isArray(logs) ? logs : [];
+  }
 }
 
 // Migra registros locais legados poiesis_1..6 -> poiesis (idempotente).
@@ -479,53 +664,90 @@ function filterGestaoLogs(logs) {
 // 8 tabelas a cada boot). O servidor já foi unificado pela 031, então nenhum
 // registro poiesis_N novo pode chegar depois do carimbo.
 var _POIESIS_MIG_FLAG = 'intra_poiesis_migrated_v1';
-async function _migratePoiesisTeamsLocal(){
-  try{
+async function _migratePoiesisTeamsLocal() {
+  try {
     try {
-      if (typeof localStorage !== 'undefined' && localStorage.getItem(_POIESIS_MIG_FLAG) === '1') return;
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-    if(typeof getCacheStore!=='function' || typeof setCacheStore!=='function') return;
-    var tables=['clients','pendencias','operators','visits','reunioes','equipamentos','tickets','client_devices','client_milvus_tickets'];
-    var anyChanged=false;
-    for(var ti=0; ti<tables.length; ti++){
-      var t=tables[ti];
-      try{
-        var rows=getCacheStore(t);
-        if(!Array.isArray(rows) || !rows.length) continue;
-        var changed=false;
-        var now=new Date().toISOString();
-        for(var i=0;i<rows.length;i++){
-          var r=rows[i];
-          if(r && r.team && String(r.team).indexOf('poiesis_')===0){
-            r.team='poiesis';
-            if('updatedAt' in r) r.updatedAt=now;
-            if('updated_at' in r) r.updated_at=now;
-            changed=true;
+      if (typeof localStorage !== 'undefined' && localStorage.getItem(_POIESIS_MIG_FLAG) === '1')
+        return;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
+    if (typeof getCacheStore !== 'function' || typeof setCacheStore !== 'function') return;
+    var tables = [
+      'clients',
+      'pendencias',
+      'operators',
+      'visits',
+      'reunioes',
+      'equipamentos',
+      'tickets',
+      'client_devices',
+      'client_milvus_tickets',
+    ];
+    var anyChanged = false;
+    for (var ti = 0; ti < tables.length; ti++) {
+      var t = tables[ti];
+      try {
+        var rows = getCacheStore(t);
+        if (!Array.isArray(rows) || !rows.length) continue;
+        var changed = false;
+        var now = new Date().toISOString();
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          if (r && r.team && String(r.team).indexOf('poiesis_') === 0) {
+            r.team = 'poiesis';
+            if ('updatedAt' in r) r.updatedAt = now;
+            if ('updated_at' in r) r.updated_at = now;
+            changed = true;
           }
         }
-        if(changed){ setCacheStore(t, rows); anyChanged=true; }
-      }catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+        if (changed) {
+          setCacheStore(t, rows);
+          anyChanged = true;
+        }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
     }
     // sessão legada
-    try{
-      var sess=getSession();
-      if(sess && sess.team && String(sess.team).indexOf('poiesis_')===0){
-        sess.team='poiesis';
-        if(typeof setCacheTable==='function') setCacheTable('sessions', {key: DB.SESSION, value: sess});
-        anyChanged=true;
+    try {
+      var sess = getSession();
+      if (sess && sess.team && String(sess.team).indexOf('poiesis_') === 0) {
+        sess.team = 'poiesis';
+        if (typeof setCacheTable === 'function')
+          setCacheTable('sessions', { key: DB.SESSION, value: sess });
+        anyChanged = true;
       }
-    }catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-    if(!anyChanged){
-      try { if (typeof localStorage !== 'undefined') localStorage.setItem(_POIESIS_MIG_FLAG, '1'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
     }
-  }catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-}
-if(typeof window!=='undefined'){
-  // tenta após DB pronto, com fallback imediato
-  if(typeof _initDBPromise!=='undefined' && _initDBPromise && typeof _initDBPromise.then==='function'){
-    _initDBPromise.then(function(){ _migratePoiesisTeamsLocal(); }).catch(function(){});
+    if (!anyChanged) {
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(_POIESIS_MIG_FLAG, '1');
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
   }
-  window.addEventListener('load', function(){ setTimeout(_migratePoiesisTeamsLocal, 800); });
+}
+if (typeof window !== 'undefined') {
+  // tenta após DB pronto, com fallback imediato
+  if (
+    typeof _initDBPromise !== 'undefined' &&
+    _initDBPromise &&
+    typeof _initDBPromise.then === 'function'
+  ) {
+    _initDBPromise
+      .then(function () {
+        _migratePoiesisTeamsLocal();
+      })
+      .catch(function () {});
+  }
+  window.addEventListener('load', function () {
+    setTimeout(_migratePoiesisTeamsLocal, 800);
+  });
 }
 
 // ── Migração one-shot: status legados de pendência ───────────────────────────
@@ -547,9 +769,11 @@ function _migrateLegacyPenStatuses() {
     // empatados faz o remoto (legado) vencer o merge e o status antigo volta.
     var now3 = new Date().toISOString();
     var changed = false;
+    var idsByTo = { resolvido: [], cancelado: [] }; // remoto só toca o que é nosso (por id), não a tabela inteira
     for (var i = 0; i < list.length; i++) {
       var to = list[i] && map[list[i].status];
       if (to) {
+        if (list[i].id) idsByTo[to].push(list[i].id);
         list[i] = { ...list[i], status: to, updatedAt: now3 };
         touched++;
         changed = true;
@@ -557,31 +781,84 @@ function _migrateLegacyPenStatuses() {
     }
     if (!changed) return 0;
     dbSet(DB.PENDENCIAS, list); // emite bus → UI/badges acompanham
-  } catch (_) { return 0; }
+  } catch (_) {
+    return 0;
+  }
   try {
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()
-        && typeof window !== 'undefined' && window._supabaseAuthActive
-        && typeof supabaseClient !== 'undefined' && supabaseClient) {
+    if (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive &&
+      typeof supabaseClient !== 'undefined' &&
+      supabaseClient
+    ) {
       var now2 = new Date().toISOString();
-      supabaseClient.from('pendencias').update({ status: 'resolvido', updated_at: now2 }).in('status', ['concluido'])
-        .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ resolvido:', res.error.message); })
-        .catch(function() {});
-      supabaseClient.from('pendencias').update({ status: 'cancelado', updated_at: now2 }).in('status', ['fechado'])
-        .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ cancelado:', res.error.message); })
-        .catch(function() {});
+      if (idsByTo.resolvido.length)
+        supabaseClient
+          .from('pendencias')
+          .update({ status: 'resolvido', updated_at: now2 })
+          .in('id', idsByTo.resolvido)
+          .in('status', ['concluido'])
+          .then(function (res) {
+            if (res && res.error)
+              console.warn('⚠️ Migração status p/ resolvido:', res.error.message);
+          })
+          .catch(function () {});
+      if (idsByTo.cancelado.length)
+        supabaseClient
+          .from('pendencias')
+          .update({ status: 'cancelado', updated_at: now2 })
+          .in('id', idsByTo.cancelado)
+          .in('status', ['fechado'])
+          .then(function (res) {
+            if (res && res.error)
+              console.warn('⚠️ Migração status p/ cancelado:', res.error.message);
+          })
+          .catch(function () {});
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   try {
-    if (touched > 0 && typeof showToast === 'function') showToast(touched + (touched === 1 ? ' pendência antiga atualizada' : ' pendências antigas atualizadas') + ' para os novos status.', 'info');
+    if (touched > 0 && typeof showToast === 'function')
+      showToast(
+        touched +
+          (touched === 1 ? ' pendência antiga atualizada' : ' pendências antigas atualizadas') +
+          ' para os novos status.',
+        'info'
+      );
     else console.debug('[migração] status legados convertidos: ' + touched);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   return touched;
 }
-if(typeof window!=='undefined'){
-  if(typeof _initDBPromise!=='undefined' && _initDBPromise && typeof _initDBPromise.then==='function'){
-    _initDBPromise.then(function(){ try { _migrateLegacyPenStatuses(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } }).catch(function(){});
+if (typeof window !== 'undefined') {
+  if (
+    typeof _initDBPromise !== 'undefined' &&
+    _initDBPromise &&
+    typeof _initDBPromise.then === 'function'
+  ) {
+    _initDBPromise
+      .then(function () {
+        try {
+          _migrateLegacyPenStatuses();
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+        }
+      })
+      .catch(function () {});
   }
-  window.addEventListener('load', function(){ setTimeout(function(){ try { _migrateLegacyPenStatuses(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } }, 1200); });
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      try {
+        _migrateLegacyPenStatuses();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
+    }, 1200);
+  });
 }
 
 const KEY_TO_TABLE = {
@@ -594,14 +871,14 @@ const KEY_TO_TABLE = {
   [DB.REUNIOES]: 'reunioes',
   [DB.EQUIPAMENTOS]: 'equipamentos',
   [DB.VENCIMENTOS]: 'vencimentos',
-  [DB.TIME_ENTRIES]: 'time_entries'
+  [DB.TIME_ENTRIES]: 'time_entries',
 };
 
 const KV_TO_V2TABLE = {
   [DB.USER]: 'user_profile',
   [DB.COUNTER]: 'counters',
   [DB.SESSION]: 'sessions',
-  [DB.LOGS]: 'audit_logs'
+  [DB.LOGS]: 'audit_logs',
 };
 
 function dbGet(key) {
@@ -636,11 +913,16 @@ function dbGetObj(key, def = {}) {
 function dbSet(key, value) {
   try {
     if (!_isPendingSuppressed()) {
-      const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
-      const notConnected = typeof isSupabaseConnected === 'function' ? (!isSupabaseConnected() || !window._supabaseAuthActive) : false;
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      const notConnected =
+        typeof isSupabaseConnected === 'function'
+          ? !isSupabaseConnected() || !window._supabaseAuthActive
+          : false;
       if (offline || notConnected) incrementPendingSync();
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   if (typeof setCacheStore === 'function') {
     if (KEY_TO_TABLE[key]) {
       setCacheStore(KEY_TO_TABLE[key], value);
@@ -650,13 +932,29 @@ function dbSet(key, value) {
     } else {
       setCacheKV(key, value);
     }
-    try{
-      if(!_isPendingSuppressed() && typeof window!=='undefined' && typeof window.emitDataChanged==='function'){
-        var _map={}; _map[DB.CLIENTS]='clientes'; _map[DB.PENDENCIAS]='pendencias'; _map[DB.OPERATORS]='operadores'; _map[DB.VISITS]='visitas'; _map[DB.REUNIOES]='reunioes'; _map[DB.EQUIPAMENTOS]='equipamentos'; _map[DB.VENCIMENTOS]='vencimentos'; _map[DB.TIME_ENTRIES]='horas'; _map[DB.PROCEDURES]='procedimentos'; _map[DB.PROCEDURE_TEMPLATES]='templates';
-        var _ent=_map[key];
-        if(_ent) window.emitDataChanged(_ent, {key:key, via:'dbSet'});
+    try {
+      if (
+        !_isPendingSuppressed() &&
+        typeof window !== 'undefined' &&
+        typeof window.emitDataChanged === 'function'
+      ) {
+        var _map = {};
+        _map[DB.CLIENTS] = 'clientes';
+        _map[DB.PENDENCIAS] = 'pendencias';
+        _map[DB.OPERATORS] = 'operadores';
+        _map[DB.VISITS] = 'visitas';
+        _map[DB.REUNIOES] = 'reunioes';
+        _map[DB.EQUIPAMENTOS] = 'equipamentos';
+        _map[DB.VENCIMENTOS] = 'vencimentos';
+        _map[DB.TIME_ENTRIES] = 'horas';
+        _map[DB.PROCEDURES] = 'procedimentos';
+        _map[DB.PROCEDURE_TEMPLATES] = 'templates';
+        var _ent = _map[key];
+        if (_ent) window.emitDataChanged(_ent, { key: key, via: 'dbSet' });
       }
-    }catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     return;
   }
   console.error('dbSet called before IndexedDB is ready for key:', key);
@@ -676,7 +974,9 @@ function nextId(prefix) {
 function _secureRandStr(len) {
   const arr = new Uint8Array(Math.ceil(len / 2));
   crypto.getRandomValues(arr);
-  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('').slice(0, len);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, len);
 }
 
 // ── SUPABASE CLOUD SYNC HELPERS ──
@@ -699,8 +999,11 @@ const SYNC_RETRY_DELAY_MS = 30000;
 let _syncRetryTimer = null;
 
 function _isBrowserOnline() {
-  try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return false; }
-  catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   return true;
 }
 
@@ -713,11 +1016,29 @@ function _withSyncTimeout(promise, ms, label) {
       err.code = 'SYNC_TIMEOUT';
       reject(err);
     }, ms);
-    try { if (timer && typeof timer.unref === 'function') timer.unref(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      if (timer && typeof timer.unref === 'function') timer.unref();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
   });
   return Promise.race([Promise.resolve(promise), guard]).then(
-    (v) => { try { clearTimeout(timer); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } return v; },
-    (e) => { try { clearTimeout(timer); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); } throw e; }
+    (v) => {
+      try {
+        clearTimeout(timer);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
+      return v;
+    },
+    (e) => {
+      try {
+        clearTimeout(timer);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
+      throw e;
+    }
   );
 }
 
@@ -731,9 +1052,13 @@ function _isConnectivityError(err) {
     const status = Number(err.status ?? err.statusCode ?? (err.error && err.error.status));
     if (status === 502 || status === 503 || status === 504) return true;
     if (status >= 400 && status < 500) return false;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
   const msg = String((err && err.message) || err || '').toLowerCase();
-  return /timeout|timed out|failed to fetch|fetch failed|networkerror|network request failed|failed to load|load failed|offline|econn|enotfound|eai_again|ehostunreach|enetunreach|socket|dns|abort|aborted|connection|internet|503|502|504|temporar|unavailable|indispon/.test(msg);
+  return /timeout|timed out|failed to fetch|fetch failed|networkerror|network request failed|failed to load|load failed|offline|econn|enotfound|eai_again|ehostunreach|enetunreach|socket|dns|abort|aborted|connection|internet|503|502|504|temporar|unavailable|indispon/.test(
+    msg
+  );
 }
 
 // Erro de AUTENTICAÇÃO (401/JWT expirado): não é rede nem dado inválido —
@@ -746,17 +1071,22 @@ function _isAuthError(err) {
   // Assinatura de SESSÃO expirada/inválida (log real: "JWT expired").
   // 401 puro com mensagem genérica (ex: RLS "permissão") é erro de DADOS,
   // não de sessão — mantém o legado (reachable na checagem, "pulado" no item).
-  return /jwt expired|invalid jwt|token expired|expired token|session expired|expired session|unauthorized|invalid token|missing[^a-z]*token|token[^a-z]*missing|refresh token/.test(msg);
+  return /jwt expired|invalid jwt|token expired|expired token|session expired|expired session|unauthorized|invalid token|missing[^a-z]*token|token[^a-z]*missing|refresh token/.test(
+    msg
+  );
 }
 
 // Tenta renovar a sessão Supabase (uma vez). Retorna true se há sessão válida.
 async function _refreshSupabaseSession() {
   try {
-    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth) return false;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth)
+      return false;
     const { data, error } = await supabaseClient.auth.refreshSession();
     if (error || !data || !data.session) return false;
     return true;
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 
 // Verificação REAL do backend (não só navigator.onLine): leitura barata com
@@ -764,7 +1094,12 @@ async function _refreshSupabaseSession() {
 async function checkBackendConnectivity(opts) {
   const o = opts || {};
   const timeoutMs = Number(o.timeoutMs) > 0 ? Number(o.timeoutMs) : BACKEND_CHECK_TIMEOUT_MS;
-  if (!_isBrowserOnline()) return { ok: false, reason: 'offline', detail: 'navegador sem conexão (navigator.onLine=false)' };
+  if (!_isBrowserOnline())
+    return {
+      ok: false,
+      reason: 'offline',
+      detail: 'navegador sem conexão (navigator.onLine=false)',
+    };
   try {
     if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
       return { ok: false, reason: 'not-configured', detail: 'cliente Supabase ausente' };
@@ -791,7 +1126,11 @@ async function checkBackendConnectivity(opts) {
           return { ok: true, reason: 'reachable', latencyMs: Date.now() - t0, refreshed: true };
         }
       }
-      return { ok: false, reason: 'not-authenticated', detail: 'sessão Supabase expirada e refresh falhou' };
+      return {
+        ok: false,
+        reason: 'not-authenticated',
+        detail: 'sessão Supabase expirada e refresh falhou',
+      };
     }
     if (res && res.error && _isConnectivityError(res.error)) {
       return { ok: false, reason: 'connectivity', detail: String(res.error.message || res.error) };
@@ -800,7 +1139,11 @@ async function checkBackendConnectivity(opts) {
     return { ok: true, reason: 'reachable', latencyMs: Date.now() - t0 };
   } catch (err) {
     const connective = _isConnectivityError(err);
-    return { ok: false, reason: connective ? 'connectivity' : 'error', detail: String((err && err.message) || err) };
+    return {
+      ok: false,
+      reason: connective ? 'connectivity' : 'error',
+      detail: String((err && err.message) || err),
+    };
   }
 }
 
@@ -815,11 +1158,19 @@ function _scheduleSyncRetry(syncReason) {
           _scheduleSyncRetry(syncReason); // aba oculta: adia sem gastar rede
           return;
         }
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
       triggerStartupSync('retry:' + (syncReason || 'sync'));
     }, SYNC_RETRY_DELAY_MS);
-    try { if (_syncRetryTimer && typeof _syncRetryTimer.unref === 'function') _syncRetryTimer.unref(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      if (_syncRetryTimer && typeof _syncRetryTimer.unref === 'function') _syncRetryTimer.unref();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 
 // Disparo padrão (boot, online, aba visível, retry): nunca bloqueia a UI e
@@ -827,24 +1178,50 @@ function _scheduleSyncRetry(syncReason) {
 // Ao assentar (ok ou falha), acorda o processador de chamados Milvus
 // pendentes (js/milvus-chamado.js) — sem alterar o resultado do sync.
 function _kickMilvusChamados(reason) {
-  try { if (typeof processPendingMilvusChamados === 'function') processPendingMilvusChamados('post-sync:' + (reason || 'startup')); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-  try { if (typeof processPendingMilvusFinalizar === 'function') processPendingMilvusFinalizar('post-sync:' + (reason || 'startup')); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    if (typeof processPendingMilvusChamados === 'function')
+      processPendingMilvusChamados('post-sync:' + (reason || 'startup'));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
+  try {
+    if (typeof processPendingMilvusFinalizar === 'function')
+      processPendingMilvusFinalizar('post-sync:' + (reason || 'startup'));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 // Manutenção local dos números amigáveis (backfill + anti-colisão).
 // Roda após boot e após cada sync (mesmo offline/falho): só escreve no
 // banco local, nunca depende de rede, nunca relança.
 function _kickVisitNumeros(_reason) {
-  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+  try {
+    if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+  }
 }
 function triggerStartupSync(reason) {
   try {
     const p = syncSupabaseToLocal({ reason: reason || 'startup' });
     if (p && typeof p.then === 'function') {
       return p.then(
-        (r) => { _kickVisitNumeros(reason); _kickMilvusChamados(reason); return r; },
+        (r) => {
+          _kickVisitNumeros(reason);
+          _kickMilvusChamados(reason);
+          return r;
+        },
         (err) => {
-          console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
-          try { _refreshSyncBanner(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+          console.warn(
+            '[sync] falha inesperada (' + (reason || 'startup') + '):',
+            (err && err.message) || err,
+            '— dados locais preservados.'
+          );
+          try {
+            _refreshSyncBanner();
+          } catch (_e) {
+            if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+          }
           _kickVisitNumeros(reason);
           _kickMilvusChamados(reason);
           return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
@@ -855,8 +1232,16 @@ function triggerStartupSync(reason) {
     _kickMilvusChamados(reason);
     return Promise.resolve(p);
   } catch (err) {
-    console.warn('[sync] falha inesperada (' + (reason || 'startup') + '):', (err && err.message) || err, '— dados locais preservados.');
-    return Promise.resolve({ ok: false, reason: 'unexpected', detail: String((err && err.message) || err) });
+    console.warn(
+      '[sync] falha inesperada (' + (reason || 'startup') + '):',
+      (err && err.message) || err,
+      '— dados locais preservados.'
+    );
+    return Promise.resolve({
+      ok: false,
+      reason: 'unexpected',
+      detail: String((err && err.message) || err),
+    });
   }
 }
 
@@ -867,27 +1252,40 @@ let _syncPromise = null;
 async function syncSupabaseToLocal(opts) {
   const reason = (opts && opts.reason) || 'manual';
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
-    console.info('[sync] pulada (motivo: ' + reason + '): backend não configurado — mantendo dados locais.');
+    console.info(
+      '[sync] pulada (motivo: ' + reason + '): backend não configurado — mantendo dados locais.'
+    );
     return { ok: false, reason: 'not-configured' };
   }
   if (_syncPromise) return _syncPromise;
   _syncPromise = _runSupabaseSync(reason, opts);
-  try { return await _syncPromise; } finally { _syncPromise = null; }
+  try {
+    return await _syncPromise;
+  } finally {
+    _syncPromise = null;
+  }
 }
 
 async function _runSupabaseSync(reason, opts) {
   const label = reason || 'startup';
   const o = opts || {};
   const opTimeoutMs = Number(o.opTimeoutMs) > 0 ? Number(o.opTimeoutMs) : SUPABASE_OP_TIMEOUT_MS;
-  const checkTimeoutMs = Number(o.checkTimeoutMs) > 0 ? Number(o.checkTimeoutMs) : BACKEND_CHECK_TIMEOUT_MS;
+  const checkTimeoutMs =
+    Number(o.checkTimeoutMs) > 0 ? Number(o.checkTimeoutMs) : BACKEND_CHECK_TIMEOUT_MS;
   const allowRetry = o.retry !== false;
   console.info('[sync] iniciada (motivo: ' + label + ')');
 
   // Caminho rápido offline: sem internet, nenhuma chamada ao backend (evita
   // timeouts longos) — a UI já está utilizável com o banco local.
   if (!_isBrowserOnline()) {
-    console.info('[sync] sem conectividade (navegador offline) — mantendo dados locais; tentativa pendente.');
-    try { _refreshSyncBanner(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    console.info(
+      '[sync] sem conectividade (navegador offline) — mantendo dados locais; tentativa pendente.'
+    );
+    try {
+      _refreshSyncBanner();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     if (allowRetry) _scheduleSyncRetry(label);
     return { ok: false, reason: 'offline' };
   }
@@ -896,11 +1294,22 @@ async function _runSupabaseSync(reason, opts) {
   const check = await checkBackendConnectivity({ timeoutMs: checkTimeoutMs });
   if (!check.ok) {
     if (check.reason === 'not-authenticated') {
-      console.info('[sync] pulada (motivo: ' + label + '): sessão inativa — mantendo dados locais.');
+      console.info(
+        '[sync] pulada (motivo: ' + label + '): sessão inativa — mantendo dados locais.'
+      );
       return { ok: false, reason: 'not-authenticated' };
     }
-    console.warn('[sync] backend indisponível (' + check.reason + (check.detail ? ': ' + check.detail : '') + ') — mantendo dados locais; tenta de novo depois.');
-    try { _refreshSyncBanner(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    console.warn(
+      '[sync] backend indisponível (' +
+        check.reason +
+        (check.detail ? ': ' + check.detail : '') +
+        ') — mantendo dados locais; tenta de novo depois.'
+    );
+    try {
+      _refreshSyncBanner();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     if (allowRetry) _scheduleSyncRetry(label);
     return { ok: false, reason: check.reason, detail: check.detail };
   }
@@ -917,11 +1326,17 @@ async function _runSupabaseSync(reason, opts) {
     authFailed = true;
     if (!_authWarned) {
       _authWarned = true;
-      console.warn('[sync] sessão expirada (' + where + ') — renovando e pulando o restante deste ciclo; dados locais preservados.');
+      console.warn(
+        '[sync] sessão expirada (' +
+          where +
+          ') — renovando e pulando o restante deste ciclo; dados locais preservados.'
+      );
       try {
         const r = _refreshSupabaseSession();
         if (r && typeof r.catch === 'function') r.catch(function () {});
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
     }
   }
 
@@ -934,7 +1349,11 @@ async function _runSupabaseSync(reason, opts) {
     // Sem conectividade no meio do sync: pula as demais entidades de imediato
     // (evita N timeouts em sequência); o local fica intacto e pendente.
     if (connectivityFailed) {
-      console.info('[sync] ' + e.table + ' pulada: conectividade perdida nesta sincronização — dados locais preservados.');
+      console.info(
+        '[sync] ' +
+          e.table +
+          ' pulada: conectividade perdida nesta sincronização — dados locais preservados.'
+      );
       return false;
     }
     // Sessão expirada: pula as demais entidades de imediato (evita N 401s).
@@ -947,7 +1366,13 @@ async function _runSupabaseSync(reason, opts) {
     } catch (err) {
       if (_isConnectivityError(err)) {
         connectivityFailed = true;
-        console.warn('[sync] ' + e.table + ': sem conectividade (' + ((err && err.message) || err) + ') — mantendo dados locais.');
+        console.warn(
+          '[sync] ' +
+            e.table +
+            ': sem conectividade (' +
+            ((err && err.message) || err) +
+            ') — mantendo dados locais.'
+        );
       } else {
         console.warn('[sync] ' + e.table + ' (erro de leitura):', (err && err.message) || err);
       }
@@ -965,7 +1390,11 @@ async function _runSupabaseSync(reason, opts) {
       }
       if (_isConnectivityError(error)) {
         connectivityFailed = true;
-        console.warn(`[sync] ${e.table} (conectividade):`, error.message || error, '— mantendo dados locais.');
+        console.warn(
+          `[sync] ${e.table} (conectividade):`,
+          error.message || error,
+          '— mantendo dados locais.'
+        );
         return false;
       }
       console.warn(`Supabase ${e.table} error:`, error);
@@ -976,20 +1405,32 @@ async function _runSupabaseSync(reason, opts) {
     }
     if (!remoteRaw) return true;
     const nowIso = new Date().toISOString();
-    const mapPayload = (rec) => (typeof e.buildUpsert === 'function') ? e.buildUpsert(rec) : _mapToRemote(rec, e.fields, e.optionalFields);
+    const mapPayload = (rec) =>
+      typeof e.buildUpsert === 'function'
+        ? e.buildUpsert(rec)
+        : _mapToRemote(rec, e.fields, e.optionalFields);
     // 1. Push de deletes pendentes (tombstones) — idempotente.
     let tombsForKey = {};
-    try { tombsForKey = _loadTombstones()[e.dbKey] || {}; } catch (_) { tombsForKey = {}; }
+    try {
+      tombsForKey = _loadTombstones()[e.dbKey] || {};
+    } catch (_) {
+      tombsForKey = {};
+    }
     for (const tid of Object.keys(tombsForKey)) {
       try {
-        const res = await timed(supabaseClient.from(e.table).delete().eq('id', tid), 'push-delete:' + e.table);
+        const res = await timed(
+          supabaseClient.from(e.table).delete().eq('id', tid),
+          'push-delete:' + e.table
+        );
         if (res && res.error) throw new Error(res.error.message || 'delete falhou');
       } catch (err) {
         if (_isAuthError(err)) {
           _noteAuthFailure('push-delete:' + e.table);
         } else if (_isConnectivityError(err)) {
           connectivityFailed = true;
-          console.warn(`[sync] ${e.table} (delete ${tid}): sem conectividade — exclusão segue pendente.`);
+          console.warn(
+            `[sync] ${e.table} (delete ${tid}): sem conectividade — exclusão segue pendente.`
+          );
         } else {
           console.warn(`Supabase ${e.table} (delete ${tid} pulado):`, err && err.message);
         }
@@ -999,28 +1440,40 @@ async function _runSupabaseSync(reason, opts) {
     // 2. Filtra o remoto contra tombstones (revive só se recriado depois).
     let remote = remoteRaw;
     try {
-      const fr = (typeof _filterRemoteByTombstones === 'function')
-        ? _filterRemoteByTombstones(remoteRaw, tombsForKey, 'updated_at')
-        : { remote: remoteRaw, revived: [] };
+      const fr =
+        typeof _filterRemoteByTombstones === 'function'
+          ? _filterRemoteByTombstones(remoteRaw, tombsForKey, 'updated_at')
+          : { remote: remoteRaw, revived: [] };
       remote = fr.remote;
-      (fr.revived || []).forEach(id => _removeTombstone(e.dbKey, id));
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-    const remoteById = new Map(remote.map(r => [r.id, r]));
+      (fr.revived || []).forEach((id) => _removeTombstone(e.dbKey, id));
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
+    const remoteById = new Map(remote.map((r) => [r.id, r]));
     // 3. Locais sem correspondente: push (criado offline) vs drop (deletado
     //    no servidor). Classificação pura e testável em schema.js.
     const local = dbGet(e.dbKey);
     let toPush = [];
     try {
-      const cls = (typeof _classifyLocalOnly === 'function')
-        ? _classifyLocalOnly(local.filter(l => !remoteById.has(l.id)), _getLastSyncAt(e.table))
-        : { toPush: [], toDrop: [] };
+      const cls =
+        typeof _classifyLocalOnly === 'function'
+          ? _classifyLocalOnly(
+              local.filter((l) => !remoteById.has(l.id)),
+              _getLastSyncAt(e.table)
+            )
+          : { toPush: [], toDrop: [] };
       toPush = cls.toPush;
-    } catch (_) { toPush = []; }
+    } catch (_) {
+      toPush = [];
+    }
     const synthRemote = [];
     const failedPush = [];
     for (const rec of toPush) {
       try {
-        const res = await timed(supabaseClient.from(e.table).upsert(mapPayload(rec)), 'push-create:' + e.table);
+        const res = await timed(
+          supabaseClient.from(e.table).upsert(mapPayload(rec)),
+          'push-create:' + e.table
+        );
         if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
         const synth = mapPayload(rec);
         if (synth && typeof synth === 'object') {
@@ -1034,7 +1487,9 @@ async function _runSupabaseSync(reason, opts) {
           _noteAuthFailure('push-create:' + e.table);
         } else if (_isConnectivityError(err)) {
           connectivityFailed = true;
-          console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — registro segue pendente, sem perda local.`);
+          console.warn(
+            `[sync] ${e.table} (push ${rec.id}): sem conectividade — registro segue pendente, sem perda local.`
+          );
         } else {
           console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
         }
@@ -1044,34 +1499,58 @@ async function _runSupabaseSync(reason, opts) {
     }
     // 4. Merge (genérico, inalterado) + persistência local. Registros cujo
     // push falhou são retidos no merged: descartá-los seria perda de dados.
-    const { merged, conflicts, conflictDetails } = _mergeRecords(local, remote.concat(synthRemote), e.fields);
+    const { merged, conflicts, conflictDetails } = _mergeRecords(
+      local,
+      remote.concat(synthRemote),
+      e.fields
+    );
     totalConflicts += conflicts;
-    allConflictDetails.push(...conflictDetails.map(d => ({ ...d, table: e.label })));
-    let final = (typeof e.onMerged === 'function') ? e.onMerged(merged, local, remote) : merged;
+    allConflictDetails.push(...conflictDetails.map((d) => ({ ...d, table: e.label })));
+    let final = typeof e.onMerged === 'function' ? e.onMerged(merged, local, remote) : merged;
     try {
-      if (typeof _retainFailedPush === 'function') final = _retainFailedPush(final, failedPush) || final;
+      if (typeof _retainFailedPush === 'function')
+        final = _retainFailedPush(final, failedPush) || final;
       else if (failedPush.length) {
-        const ids = new Set(final.map(m => m && m.id));
-        for (const rec of failedPush) if (rec && rec.id && !ids.has(rec.id)) { final.push(rec); ids.add(rec.id); }
+        const ids = new Set(final.map((m) => m && m.id));
+        for (const rec of failedPush)
+          if (rec && rec.id && !ids.has(rec.id)) {
+            final.push(rec);
+            ids.add(rec.id);
+          }
       }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
+    // SYNC-03: houve awaits desde a leitura de `local` — reconcilia com o que
+    // o usuário/realtime gravou nesse intervalo antes de reescrever a lista.
+    try {
+      if (typeof _reconcileConcurrentEdits === 'function')
+        final = _reconcileConcurrentEdits(final, local, dbGet(e.dbKey)) || final;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     dbSet(e.dbKey, final);
     // 5. Push de updates — por item (um item com falha não trava os demais).
     // Falha de background NÃO incrementa o contador (ele conta alterações
     // do usuário, já contabilizadas; inflar aqui prendia o banner).
-    const remoteById2 = new Map(remote.concat(synthRemote).map(r => [r.id, r]));
+    const remoteById2 = new Map(remote.concat(synthRemote).map((r) => [r.id, r]));
     for (const rec of final) {
       const r = remoteById2.get(rec.id);
       if (_needsPush(rec, r)) {
         try {
-          const res = await timed(supabaseClient.from(e.table).upsert(mapPayload(rec)), 'push-update:' + e.table);
+          const res = await timed(
+            supabaseClient.from(e.table).upsert(mapPayload(rec)),
+            'push-update:' + e.table
+          );
           if (res && res.error) throw new Error(res.error.message || 'upsert falhou');
         } catch (err) {
           if (_isAuthError(err)) {
             _noteAuthFailure('push-update:' + e.table);
           } else if (_isConnectivityError(err)) {
             connectivityFailed = true;
-            console.warn(`[sync] ${e.table} (push ${rec.id}): sem conectividade — alteração segue pendente, sem perda local.`);
+            console.warn(
+              `[sync] ${e.table} (push ${rec.id}): sem conectividade — alteração segue pendente, sem perda local.`
+            );
           } else {
             console.warn(`Supabase ${e.table} (push ${rec.id} pulado):`, err && err.message);
           }
@@ -1091,28 +1570,44 @@ async function _runSupabaseSync(reason, opts) {
   if (typeof window !== 'undefined') window._suppressPendingSync = true;
   let syncHadErrors = false;
   try {
-    try { _pruneTombstonesPersisted(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      _pruneTombstonesPersisted();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     // Entidades são independentes (tabelas distintas): sincronizam em paralelo
     // com concorrência limitada — a ordem interna de cada entidade (C1:
     // push-deletes → pull → push → merge) é preservada. Cai de soma(N) para
     // ~soma(N)/3 no tempo de boot. Semântica de erro idêntica à serial.
     const _runEntity = async (e) => {
       if (e.optional) {
-        try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
-        catch (err) { console.warn(`Supabase ${e.table} (sync pulado — tabela ausente?):`, err.message); }
+        try {
+          if ((await _syncEntity(e)) === false) syncHadErrors = true;
+        } catch (err) {
+          console.warn(`Supabase ${e.table} (sync pulado — tabela ausente?):`, err.message);
+        }
       } else {
-        try { if ((await _syncEntity(e)) === false) syncHadErrors = true; }
-        catch (err) { console.warn(`Supabase ${e.table} (sync pulado):`, err.message); syncHadErrors = true; }
+        try {
+          if ((await _syncEntity(e)) === false) syncHadErrors = true;
+        } catch (err) {
+          console.warn(`Supabase ${e.table} (sync pulado):`, err.message);
+          syncHadErrors = true;
+        }
       }
     };
     {
       const _queue = SYNC_ENTITIES.slice();
-      const _poolSize = (typeof SYNC_ENTITY_CONCURRENCY === 'number' && SYNC_ENTITY_CONCURRENCY >= 1)
-        ? Math.floor(SYNC_ENTITY_CONCURRENCY) : 3;
-      const _workers = Array.from(
-        { length: Math.min(_poolSize, _queue.length) || 1 },
-        async () => { while (_queue.length) { const _e = _queue.shift(); if (!_e) return; await _runEntity(_e); } }
-      );
+      const _poolSize =
+        typeof SYNC_ENTITY_CONCURRENCY === 'number' && SYNC_ENTITY_CONCURRENCY >= 1
+          ? Math.floor(SYNC_ENTITY_CONCURRENCY)
+          : 3;
+      const _workers = Array.from({ length: Math.min(_poolSize, _queue.length) || 1 }, async () => {
+        while (_queue.length) {
+          const _e = _queue.shift();
+          if (!_e) return;
+          await _runEntity(_e);
+        }
+      });
       await Promise.all(_workers);
     }
 
@@ -1124,17 +1619,36 @@ async function _runSupabaseSync(reason, opts) {
     // Pulado direto se a sessão expirou (evita mais um 401).
     try {
       if (authFailed) throw { status: 401, message: 'skipped: sessão expirada neste ciclo' };
-      const logsRes = await timed(supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500), 'pull:audit_logs');
+      const logsRes = await timed(
+        supabaseClient
+          .from('audit_logs')
+          .select('id,operator_name,action,type,target_id,details,timestamp')
+          .order('timestamp', { ascending: false })
+          .limit(500),
+        'pull:audit_logs'
+      );
       const { data: remoteLogs, error: logErr } = logsRes || {};
       if (logErr && _isAuthError(logErr)) throw logErr;
       if (logErr) console.warn('Supabase logs error:', logErr);
       if (remoteLogs && remoteLogs.length > 0) {
-        const mapped = remoteLogs.map(l => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
+        const mapped = remoteLogs.map((l) => ({
+          id: l.id,
+          operatorName: l.operator_name,
+          action: l.action,
+          type: l.type,
+          targetId: l.target_id,
+          details: l.details,
+          timestamp: l.timestamp,
+        }));
         const localLogs = getLogs();
-        const logKey = l => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
-        const allIds = new Map(localLogs.map(l => [logKey(l), l]));
-        for (const l of mapped) { allIds.set(logKey(l), l); }
-        const mergedLogs = [...allIds.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        const logKey = (l) => l.id || `${l.timestamp || ''}-${l.action || ''}-${l.targetId || ''}`;
+        const allIds = new Map(localLogs.map((l) => [logKey(l), l]));
+        for (const l of mapped) {
+          allIds.set(logKey(l), l);
+        }
+        const mergedLogs = [...allIds.values()].sort(
+          (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+        );
         if (typeof setCacheTable === 'function') setCacheTable('audit_logs', mergedLogs);
         else dbSet(DB.LOGS, mergedLogs);
       }
@@ -1142,7 +1656,10 @@ async function _runSupabaseSync(reason, opts) {
       if (_isConnectivityError(err)) {
         connectivityFailed = true;
         syncHadErrors = true;
-        console.warn('[sync] logs (sem conectividade — mantidos locais):', (err && err.message) || err);
+        console.warn(
+          '[sync] logs (sem conectividade — mantidos locais):',
+          (err && err.message) || err
+        );
       } else {
         console.warn('[sync] logs (pulados):', (err && err.message) || err);
       }
@@ -1153,26 +1670,65 @@ async function _runSupabaseSync(reason, opts) {
     // alterações do usuário, e inflá-lo prendia o banner para sempre).
     if (!syncHadErrors) {
       if (allConflictDetails.length > 0) {
-        console.debug('[sync]', `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`);
+        console.debug(
+          '[sync]',
+          `${allConflictDetails.length} registro(s) alinhado(s) com o servidor em background.`
+        );
       }
-      console.info('[sync] concluída com sucesso (motivo: ' + label + '): ' + SYNC_ENTITIES.length + ' entidade(s), ' + totalConflicts + ' conflito(s).');
+      console.info(
+        '[sync] concluída com sucesso (motivo: ' +
+          label +
+          '): ' +
+          SYNC_ENTITIES.length +
+          ' entidade(s), ' +
+          totalConflicts +
+          ' conflito(s).'
+      );
       resetPendingSyncCount();
       return { ok: true, reason: 'synced', conflicts: totalConflicts };
     }
     if (authFailed) {
-      console.warn('[sync] interrompida por sessão expirada (motivo: ' + label + ') — sessão renovada em background; dados locais preservados.');
+      console.warn(
+        '[sync] interrompida por sessão expirada (motivo: ' +
+          label +
+          ') — sessão renovada em background; dados locais preservados.'
+      );
     } else if (connectivityFailed) {
-      console.warn('[sync] interrompida por falha de conectividade (motivo: ' + label + ') — dados locais preservados; pendências mantidas para a próxima tentativa.');
+      console.warn(
+        '[sync] interrompida por falha de conectividade (motivo: ' +
+          label +
+          ') — dados locais preservados; pendências mantidas para a próxima tentativa.'
+      );
     } else {
-      console.warn('[sync] concluída com erros parciais de dados (motivo: ' + label + ') — itens não confirmados seguem pendentes.');
+      console.warn(
+        '[sync] concluída com erros parciais de dados (motivo: ' +
+          label +
+          ') — itens não confirmados seguem pendentes.'
+      );
     }
-    try { _refreshSyncBanner(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      _refreshSyncBanner();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     if (allowRetry) _scheduleSyncRetry(label);
-    return { ok: false, reason: authFailed ? 'not-authenticated' : (connectivityFailed ? 'connectivity' : 'partial'), conflicts: totalConflicts };
+    return {
+      ok: false,
+      reason: authFailed ? 'not-authenticated' : connectivityFailed ? 'connectivity' : 'partial',
+      conflicts: totalConflicts,
+    };
   } catch (err) {
-    console.warn('[sync] falhou (erro inesperado, motivo: ' + label + '):', (err && err.message) || err, '— dados locais preservados.');
+    console.warn(
+      '[sync] falhou (erro inesperado, motivo: ' + label + '):',
+      (err && err.message) || err,
+      '— dados locais preservados.'
+    );
     // Sync falhou: mantém a contagem real e reflete no banner (sem zerar).
-    try { _refreshSyncBanner(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    try {
+      _refreshSyncBanner();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+    }
     if (allowRetry) _scheduleSyncRetry(label);
     return { ok: false, reason: 'unexpected', detail: String((err && err.message) || err) };
   } finally {
@@ -1186,8 +1742,13 @@ async function _runSupabaseSync(reason, opts) {
 // com sessão já ativa. triggerStartupSync nunca bloqueia a interface e nunca
 // lança exceção (verificação de backend com timeout + fallback local).
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => setTimeout(() => {
-    try { if (typeof triggerStartupSync === 'function') triggerStartupSync('window-load'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
-  }, 500));
+  window.addEventListener('load', () =>
+    setTimeout(() => {
+      try {
+        if (typeof triggerStartupSync === 'function') triggerStartupSync('window-load');
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'storage');
+      }
+    }, 500)
+  );
 }
-

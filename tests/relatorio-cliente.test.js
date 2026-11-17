@@ -1,21 +1,39 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
-globalThis.escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+globalThis.escapeHtml = (s) =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
 const require = createRequire(import.meta.url);
 const R = require('../js/relatorio-cliente.js');
 
 describe('helpers do relatório', () => {
   it('intervalo do mês (inclui fevereiro bissexto)', () => {
-    expect(R.rptMonthRange('2026-10')).toMatchObject({ start: '2026-10-01', end: '2026-10-31', label: 'outubro de 2026' });
+    expect(R.rptMonthRange('2026-10')).toMatchObject({
+      start: '2026-10-01',
+      end: '2026-10-31',
+      label: 'outubro de 2026',
+    });
     expect(R.rptMonthRange('2028-02').end).toBe('2028-02-29');
   });
 
   it('lê as sessões de cronômetro das notas (pausa, ajuste e conclusão)', () => {
     const notes = [
-      { text: '⏸ Ana pausou. Tempo sessão: 01:30:00. Total: 01:30:00.', createdAt: '2026-10-02T12:00:00Z', author: 'Ana' },
-      { text: '⏹ Beto parou o cronômetro de Ana (ligado há 12h). Sessão registrada: 00:45:00. Total: 02:15:00.', createdAt: '2026-10-03T12:00:00Z' },
-      { text: '⏹ Cronômetro de Ana parado ao concluir. Sessão registrada: 00:10:30. Total: 02:25:30.', createdAt: '2026-10-04T12:00:00Z' },
+      {
+        text: '⏸ Ana pausou. Tempo sessão: 01:30:00. Total: 01:30:00.',
+        createdAt: '2026-10-02T12:00:00Z',
+        author: 'Ana',
+      },
+      {
+        text: '⏹ Beto parou o cronômetro de Ana (ligado há 12h). Sessão registrada: 00:45:00. Total: 02:15:00.',
+        createdAt: '2026-10-03T12:00:00Z',
+      },
+      {
+        text: '⏹ Cronômetro de Ana parado ao concluir. Sessão registrada: 00:10:30. Total: 02:25:30.',
+        createdAt: '2026-10-04T12:00:00Z',
+      },
       { text: '▶ Ana iniciou o trabalho.', createdAt: '2026-10-04T13:00:00Z' },
     ];
     expect(R.parseTimerSessions(notes).map((s) => s.seconds)).toEqual([5400, 2700, 630]);
@@ -34,20 +52,57 @@ describe('helpers do relatório', () => {
 describe('buildClientMonthReport', () => {
   const client = { id: 'C1', name: 'Acme <Ltda>' };
   const visits = [
-    { id: 'V1', date: '2026-10-05', time: '09:00', timeEnd: '11:00', status: 'concluida', operator: 'Ana', motivo: 'Servidor', milvusChamadoCodigo: 501,
-      observacoes: 'Entrada pela portaria B', checkinAt: '2026-10-05T09:07:00', checkoutAt: '2026-10-05T11:24:00',
-      assinaturaNome: 'Maria Silva', assinaturaEm: '2026-10-05T11:25:00' },
-    { id: 'V2', date: '2026-10-20', time: '14:00', timeEnd: '15:00', status: 'agendada', operator: 'Beto' },
+    {
+      id: 'V1',
+      date: '2026-10-05',
+      time: '09:00',
+      timeEnd: '11:00',
+      status: 'concluida',
+      operator: 'Ana',
+      motivo: 'Servidor',
+      milvusChamadoCodigo: 501,
+      observacoes: 'Entrada pela portaria B',
+      checkinAt: '2026-10-05T09:07:00',
+      checkoutAt: '2026-10-05T11:24:00',
+      assinaturaNome: 'Maria Silva',
+      assinaturaEm: '2026-10-05T11:25:00',
+    },
+    {
+      id: 'V2',
+      date: '2026-10-20',
+      time: '14:00',
+      timeEnd: '15:00',
+      status: 'agendada',
+      operator: 'Beto',
+    },
     { id: 'V3', date: '2026-10-21', status: 'cancelada' },
     { id: 'V4', date: '2026-09-30', time: '09:00', timeEnd: '10:00', status: 'concluida' },
   ];
   const pens = [
-    { id: 'P1', status: 'concluido', completedAt: '2026-10-10T15:00:00Z', createdAt: '2026-09-20T10:00:00Z', assunto: 'Backup', notes: [
-      { text: 'Tempo sessão: 01:00:00', createdAt: '2026-09-29T12:00:00Z' },
-      { text: 'Sessão registrada: 00:30:00', createdAt: '2026-10-10T12:00:00Z' },
-    ] },
-    { id: 'P2', status: 'aberto', createdAt: '2026-10-02T10:00:00Z', deadline: '2000-01-01', assunto: 'Impressora' },
-    { id: 'P3', status: 'resolvido', completedAt: '2026-09-28T15:00:00Z', createdAt: '2026-09-01T10:00:00Z' },
+    {
+      id: 'P1',
+      status: 'concluido',
+      completedAt: '2026-10-10T15:00:00Z',
+      createdAt: '2026-09-20T10:00:00Z',
+      assunto: 'Backup',
+      notes: [
+        { text: 'Tempo sessão: 01:00:00', createdAt: '2026-09-29T12:00:00Z' },
+        { text: 'Sessão registrada: 00:30:00', createdAt: '2026-10-10T12:00:00Z' },
+      ],
+    },
+    {
+      id: 'P2',
+      status: 'aberto',
+      createdAt: '2026-10-02T10:00:00Z',
+      deadline: '2000-01-01',
+      assunto: 'Impressora',
+    },
+    {
+      id: 'P3',
+      status: 'resolvido',
+      completedAt: '2026-09-28T15:00:00Z',
+      createdAt: '2026-09-01T10:00:00Z',
+    },
   ];
   const atend = [
     { codigo: '501', assunto: 'Servidor', tecnico: 'Ana', total_horas_atendimento: '01:15' },
@@ -70,7 +125,10 @@ describe('buildClientMonthReport', () => {
 
   it('chamados: une os das visitas com os atendimentos (horas por chamado)', () => {
     const m = R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10');
-    expect(m.tickets.map((t) => [t.codigo, t.minutes || 0])).toEqual([['501', 120], ['777', 30]]);
+    expect(m.tickets.map((t) => [t.codigo, t.minutes || 0])).toEqual([
+      ['501', 120],
+      ['777', 30],
+    ]);
   });
 
   it('sem Milvus (offline): marca indisponível e usa só os chamados das visitas', () => {
@@ -82,14 +140,18 @@ describe('buildClientMonthReport', () => {
   });
 
   it('HTML escapa os dados', () => {
-    const html = R.renderClientReportHtml(R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10'));
+    const html = R.renderClientReportHtml(
+      R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10')
+    );
     expect(html).toContain('Acme &lt;Ltda&gt;');
     expect(html).not.toContain('<Ltda>');
     expect(html).toContain('Chamado #501');
   });
 
   it('visitas mostram chegada/saída previstas, reais, observações e assinatura', () => {
-    const html = R.renderClientReportHtml(R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10'));
+    const html = R.renderClientReportHtml(
+      R.buildClientMonthReport({ client, pens, visits, atend }, '2026-10')
+    );
     // Previstas nas colunas, reais em sub-linha (sem segundos, fuso local).
     expect(html).toContain('09:00<div class="rpt-sub">real 09:07</div>');
     expect(html).toContain('11:00<div class="rpt-sub">real 11:24</div>');
@@ -103,13 +165,28 @@ describe('buildClientMonthReport', () => {
   });
 
   it('escapa observações e assinatura no HTML', () => {
-    const m = R.buildClientMonthReport({
-      client,
-      pens: [],
-      visits: [{ id: 'VX', date: '2026-10-07', time: '10:00', timeEnd: '11:00', status: 'concluida', operator: 'Ana',
-        motivo: 'X', observacoes: '<b>obs</b>', assinaturaNome: '<i>Maria</i>', assinaturaEm: '2026-10-07T11:00:00' }],
-      atend: null,
-    }, '2026-10');
+    const m = R.buildClientMonthReport(
+      {
+        client,
+        pens: [],
+        visits: [
+          {
+            id: 'VX',
+            date: '2026-10-07',
+            time: '10:00',
+            timeEnd: '11:00',
+            status: 'concluida',
+            operator: 'Ana',
+            motivo: 'X',
+            observacoes: '<b>obs</b>',
+            assinaturaNome: '<i>Maria</i>',
+            assinaturaEm: '2026-10-07T11:00:00',
+          },
+        ],
+        atend: null,
+      },
+      '2026-10'
+    );
     const html = R.renderClientReportHtml(m);
     expect(html).toContain('Obs.: &lt;b&gt;obs&lt;/b&gt;');
     expect(html).toContain('Ass.: &lt;i&gt;Maria&lt;/i&gt;');
@@ -120,14 +197,25 @@ describe('buildClientMonthReport', () => {
 describe('horas pelos lançamentos (048)', () => {
   it('pendência com lançamentos usa só eles; sem lançamentos cai nas notas', () => {
     const pens = [
-      { id: 'A', status: 'aberto', notes: [{ text: 'Sessão registrada: 05:00:00', createdAt: '2026-10-05T12:00:00Z' }] },
-      { id: 'B', status: 'aberto', notes: [{ text: 'Tempo sessão: 00:30:00', createdAt: '2026-10-06T12:00:00Z' }] },
+      {
+        id: 'A',
+        status: 'aberto',
+        notes: [{ text: 'Sessão registrada: 05:00:00', createdAt: '2026-10-05T12:00:00Z' }],
+      },
+      {
+        id: 'B',
+        status: 'aberto',
+        notes: [{ text: 'Tempo sessão: 00:30:00', createdAt: '2026-10-06T12:00:00Z' }],
+      },
     ];
     const entries = [
       { pendenciaId: 'A', seconds: 3600, endedAt: '2026-10-05T12:00:00Z' },
       { pendenciaId: 'A', seconds: 1800, endedAt: '2026-09-30T12:00:00Z' }, // fora do mês
     ];
-    const m = R.buildClientMonthReport({ client: { name: 'X' }, pens, visits: [], entries }, '2026-10');
+    const m = R.buildClientMonthReport(
+      { client: { name: 'X' }, pens, visits: [], entries },
+      '2026-10'
+    );
     expect(m.penMinutes).toBe(60 + 30); // A: 1h do lançamento (não as 5h da nota); B: 30min da nota
   });
 });

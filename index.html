@@ -1,431 +1,1126 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
-  <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <title>Init Intra</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a56db'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='central' text-anchor='middle' fill='white' font-family='Inter,sans-serif' font-weight='800' font-size='20'%3EI%3C/text%3E%3C/svg%3E" />
-  <meta name="description" content="Portal intranet Init Intra – acesso restrito." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/pagina-pendencia.css" />
-  <link rel="stylesheet" href="css/pagina-projeto.css" />
-  <link rel="stylesheet" href="css/pagina-chamado.css" />
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1a56db" />
-  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
-</head>
-<body>
-  <a href="#contentArea" class="skip-link" data-action="focusContent">Pular para o conteúdo</a>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Init Intra</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a56db'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='central' text-anchor='middle' fill='white' font-family='Inter,sans-serif' font-weight='800' font-size='20'%3EI%3C/text%3E%3C/svg%3E"
+    />
+    <meta name="description" content="Portal intranet Init Intra – acesso restrito." />
+    <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/fonts.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/pagina-pendencia.css" />
+    <link rel="stylesheet" href="css/pagina-projeto.css" />
+    <link rel="stylesheet" href="css/pagina-chamado.css" />
+    <link rel="stylesheet" href="css/utilidades.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#1a56db" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+  </head>
+  <body>
+    <a href="#contentArea" class="skip-link" data-action="focusContent">Pular para o conteúdo</a>
 
-  <!-- Busca Global Modal (Sprint 7) -->
-  <div id="globalSearchModal" class="global-search-modal" style="display:none" data-action="closeSearchOverlay">
-    <div class="global-search-box" role="dialog" aria-modal="true" aria-label="Busca global">
-      <div class="global-search-input-row">
-        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="globalSearchInput" type="search" aria-label="Buscar ou digitar uma ação" enterkeyhint="search" placeholder="Buscar ou digitar uma ação (ex.: nova visita)…" autocomplete="off" />
-        <button type="button" class="esc-key" data-action="closeSearch" aria-label="Fechar busca">ESC</button>
-      </div>
-      <div class="search-results-container" id="searchResultsContainer">
-        <div class="search-empty">Digite para pesquisar…</div>
-      </div>
-      <div class="search-footer">
-        <span><kbd>↑↓</kbd> navegar</span>
-        <span><kbd>↵</kbd> selecionar</span>
-        <span><kbd>ESC</kbd> fechar</span>
-      </div>
-    </div>
-  </div>
-
-  <div id="app">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <img src="logo-initnet.svg" alt="InitNET" class="logo-img" />
-        </div>
-        <button class="sidebar-toggle" id="sidebarToggle" title="Recolher menu" aria-label="Recolher menu lateral">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="15 18 9 12 15 6"/>
+    <!-- Busca Global Modal (Sprint 7) -->
+    <div
+      id="globalSearchModal"
+      class="global-search-modal u-6b99de"
+      data-action="closeSearchOverlay"
+    >
+      <div class="global-search-box" role="dialog" aria-modal="true" aria-label="Busca global">
+        <div class="global-search-input-row">
+          <svg
+            aria-hidden="true"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-        </button>
+          <input
+            id="globalSearchInput"
+            type="search"
+            aria-label="Buscar ou digitar uma ação"
+            enterkeyhint="search"
+            placeholder="Buscar ou digitar uma ação (ex.: nova visita)…"
+            autocomplete="off"
+          />
+          <button type="button" class="esc-key" data-action="closeSearch" aria-label="Fechar busca">
+            ESC
+          </button>
+        </div>
+        <div class="search-results-container" id="searchResultsContainer">
+          <div class="search-empty">Digite para pesquisar…</div>
+        </div>
+        <div class="search-footer">
+          <span><kbd>↑↓</kbd> navegar</span>
+          <span><kbd>↵</kbd> selecionar</span>
+          <span><kbd>ESC</kbd> fechar</span>
+        </div>
       </div>
+    </div>
 
-      <div id="teamSelectorWrap" style="display:none;padding:8px 12px;border-bottom:1px solid var(--sidebar-border)">
-        <select id="teamSelector" class="form-select" style="width:100%;font-size:12px" data-change="teamChange">
-          <option value="">Todas as equipes</option>
-        </select>
-      </div>
-      <nav class="sidebar-nav" role="navigation" aria-label="Menu principal">
-        <a class="nav-item" id="nav-fila" title="Minha fila" data-action="nav" data-arg="fila" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h13M3 12h13M3 18h9"/><path d="m16 17 2 2 4-4"/></svg>
-          <span>Minha fila</span>
-          <span class="badge hidden" id="badge-fila">0</span>
-        </a>
-        <div class="nav-section" role="presentation">Dia a dia</div>
-        <a class="nav-item" id="nav-pendencias" title="Pendências" data-action="nav" data-arg="pendencias" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          <span>Pendências</span>
-          <span class="badge hidden" id="badge-pendencias">0</span>
-        </a>
-        <a class="nav-item" id="nav-caixa" title="Caixa de entrada" data-action="nav" data-arg="caixa" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-          <span>Caixa de entrada</span>
-          <span class="badge hidden" id="badge-caixa">0</span>
-        </a>
-        <a class="nav-item" id="nav-calendario" title="Agenda" data-action="nav" data-arg="calendario" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span>Agenda</span>
-        </a>
-        <a class="nav-item" id="nav-visitas" title="Visitas" data-action="nav" data-arg="visitas" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h12"/><circle cx="7" cy="18" r="2"/><path d="M17 18l2 2 4-4"/></svg>
-          <span>Visitas</span>
-          <span class="badge hidden" id="badge-visitas">0</span>
-        </a>
-        <div class="nav-section" role="presentation">Cadastros</div>
-        <a class="nav-item" id="nav-clientes" title="Clientes" data-action="nav" data-arg="clientes" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Clientes</span>
-        </a>
-        <a class="nav-item" id="nav-equipamentos" title="Equipamentos" data-action="nav" data-arg="equipamentos" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span>Equipamentos</span>
-          <span class="badge hidden" id="badge-equipamentos">0</span>
-        </a>
-        <a class="nav-item" id="nav-vencimentos" title="Vencimentos" data-action="nav" data-arg="vencimentos" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z"/><path d="M12 6v6l4 2"/><path d="M19 3l2 2"/></svg>
-          <span>Vencimentos</span>
-          <span class="badge hidden" id="badge-vencimentos">0</span>
-        </a>
-        <a class="nav-item" id="nav-conhecimento" title="Base de conhecimento" data-action="nav" data-arg="conhecimento" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/></svg>
-          <span>Conhecimento</span>
-        </a>
-        <a class="nav-item" id="nav-operadores" title="Operadores" data-action="nav" data-arg="operadores" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          <span>Operadores</span>
-        </a>
-        <div class="nav-section" role="presentation">Gestão</div>
-        <a class="nav-item active" id="nav-dashboard" title="Dashboard" data-action="nav" data-arg="dashboard" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          <span>Dashboard</span>
-        </a>
-        <a class="nav-item" id="nav-prazos" title="Prazos e SLA" data-action="nav" data-arg="prazos" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v3l2 1"/></svg>
-          <span>Prazos</span>
-        </a>
-        <a class="nav-item" id="nav-relatorios" title="Atendimentos Milvus (horas e chamados)" data-action="nav" data-arg="relatorios" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          <span>Atendimentos Milvus</span>
-        </a>
-        <a class="nav-item" id="nav-reuniao" title="Reunião" data-action="nav" data-arg="reuniao" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="M7 21h10"/><path d="M12 17v4"/></svg>
-          <span>Reunião</span>
-        </a>
-        <a class="nav-item" id="nav-historico" title="Histórico" data-action="nav" data-arg="historico" tabindex="0" role="link">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Histórico</span>
-        </a>
-      </nav>
+    <div id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <img src="logo-initnet.svg" alt="InitNET" class="logo-img" />
+          </div>
+          <button
+            class="sidebar-toggle"
+            id="sidebarToggle"
+            title="Recolher menu"
+            aria-label="Recolher menu lateral"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        </div>
 
-      <div class="sidebar-footer">
-        <!-- Exportar / Importar / Instalar ficam num único item "Mais opções"
+        <div id="teamSelectorWrap" class="u-12edec">
+          <select id="teamSelector" class="form-select u-a1fa25" data-change="teamChange">
+            <option value="">Todas as equipes</option>
+          </select>
+        </div>
+        <nav class="sidebar-nav" role="navigation" aria-label="Menu principal">
+          <a
+            class="nav-item"
+            id="nav-fila"
+            title="Minha fila"
+            data-action="nav"
+            data-arg="fila"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 6h13M3 12h13M3 18h9" />
+              <path d="m16 17 2 2 4-4" />
+            </svg>
+            <span>Minha fila</span>
+            <span class="badge hidden" id="badge-fila">0</span>
+          </a>
+          <div class="nav-section" role="presentation">Dia a dia</div>
+          <a
+            class="nav-item"
+            id="nav-pendencias"
+            title="Pendências"
+            data-action="nav"
+            data-arg="pendencias"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            <span>Pendências</span>
+            <span class="badge hidden" id="badge-pendencias">0</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-caixa"
+            title="Caixa de entrada"
+            data-action="nav"
+            data-arg="caixa"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+              <path
+                d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
+              />
+            </svg>
+            <span>Caixa de entrada</span>
+            <span class="badge hidden" id="badge-caixa">0</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-calendario"
+            title="Agenda"
+            data-action="nav"
+            data-arg="calendario"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span>Agenda</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-visitas"
+            title="Visitas"
+            data-action="nav"
+            data-arg="visitas"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 12h18M3 6h18M3 18h12" />
+              <circle cx="7" cy="18" r="2" />
+              <path d="M17 18l2 2 4-4" />
+            </svg>
+            <span>Visitas</span>
+            <span class="badge hidden" id="badge-visitas">0</span>
+          </a>
+          <div class="nav-section" role="presentation">Cadastros</div>
+          <a
+            class="nav-item"
+            id="nav-clientes"
+            title="Clientes"
+            data-action="nav"
+            data-arg="clientes"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span>Clientes</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-equipamentos"
+            title="Equipamentos"
+            data-action="nav"
+            data-arg="equipamentos"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <span>Equipamentos</span>
+            <span class="badge hidden" id="badge-equipamentos">0</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-vencimentos"
+            title="Vencimentos"
+            data-action="nav"
+            data-arg="vencimentos"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z" />
+              <path d="M12 6v6l4 2" />
+              <path d="M19 3l2 2" />
+            </svg>
+            <span>Vencimentos</span>
+            <span class="badge hidden" id="badge-vencimentos">0</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-conhecimento"
+            title="Base de conhecimento"
+            data-action="nav"
+            data-arg="conhecimento"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              <path d="M9 7h7M9 11h5" />
+            </svg>
+            <span>Conhecimento</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-operadores"
+            title="Operadores"
+            data-action="nav"
+            data-arg="operadores"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+              />
+            </svg>
+            <span>Operadores</span>
+          </a>
+          <div class="nav-section" role="presentation">Gestão</div>
+          <a
+            class="nav-item active"
+            id="nav-dashboard"
+            title="Dashboard"
+            data-action="nav"
+            data-arg="dashboard"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            <span>Dashboard</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-prazos"
+            title="Prazos e SLA"
+            data-action="nav"
+            data-arg="prazos"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 9h18M8 2v4M16 2v4M12 13v3l2 1" />
+            </svg>
+            <span>Prazos</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-relatorios"
+            title="Atendimentos Milvus (horas e chamados)"
+            data-action="nav"
+            data-arg="relatorios"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            <span>Atendimentos Milvus</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-reuniao"
+            title="Reunião"
+            data-action="nav"
+            data-arg="reuniao"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M2 3h20" />
+              <path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3" />
+              <path d="M7 21h10" />
+              <path d="M12 17v4" />
+            </svg>
+            <span>Reunião</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-historico"
+            title="Histórico"
+            data-action="nav"
+            data-arg="historico"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>Histórico</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <!-- Exportar / Importar / Instalar ficam num único item "Mais opções"
              (popover) para não ocupar três linhas do rodapé da sidebar. -->
-        <button class="btn-more" id="sidebarMoreBtn" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false" aria-controls="sidebarMoreMenu" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-          <span>Mais opções</span>
-        </button>
-        <div class="current-user" id="userQuickBtn" title="Meu perfil" role="button" tabindex="0" aria-label="Meu perfil">
-          <div class="avatar" id="user-avatar" style="background:#1a56db">TI</div>
-          <div class="user-info">
-            <span class="user-name" id="user-name-display">Suporte TI</span>
-            <span class="user-role" id="user-role-display">Técnico</span>
+          <button
+            class="btn-more u-6b99de"
+            id="sidebarMoreBtn"
+            type="button"
+            title="Mais opções"
+            aria-label="Mais opções"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="sidebarMoreMenu"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+            <span>Mais opções</span>
+          </button>
+          <div
+            class="current-user"
+            id="userQuickBtn"
+            title="Meu perfil"
+            role="button"
+            tabindex="0"
+            aria-label="Meu perfil"
+          >
+            <div class="avatar u-1f7582" id="user-avatar">TI</div>
+            <div class="user-info">
+              <span class="user-name" id="user-name-display">Suporte TI</span>
+              <span class="user-role" id="user-role-display">Técnico</span>
+            </div>
           </div>
+          <button
+            class="btn-logout"
+            id="logoutBtn"
+            data-action="logout"
+            title="Sair"
+            aria-label="Sair do sistema"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span>Sair</span>
+          </button>
         </div>
-        <button class="btn-logout" id="logoutBtn" data-action="logout" title="Sair" aria-label="Sair do sistema">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span>Sair</span>
+      </aside>
+      <div
+        class="sidebar-more-menu"
+        id="sidebarMoreMenu"
+        role="menu"
+        aria-label="Mais opções"
+        hidden
+      >
+        <button
+          class="sidebar-more-item"
+          id="configBtn"
+          type="button"
+          role="menuitem"
+          data-more-action="abrirConfiguracoes"
+          title="Configurações e status do robô"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"
+            />
+          </svg>
+          <span>Configurações</span>
+        </button>
+        <button
+          class="sidebar-more-item"
+          id="exportDataBtn"
+          type="button"
+          role="menuitem"
+          data-more-action="exportData"
+          title="Exportar backup dos dados"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Exportar dados</span>
+        </button>
+        <button
+          class="sidebar-more-item"
+          id="importDataBtn"
+          type="button"
+          role="menuitem"
+          data-more-action="importData"
+          title="Importar backup de dados"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <span>Importar dados</span>
+        </button>
+        <button
+          class="sidebar-more-item u-6b99de"
+          id="installAppBtn"
+          type="button"
+          role="menuitem"
+          data-more-action="promptInstall"
+          title="Instalar o app no dispositivo"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Instalar app</span>
         </button>
       </div>
-    </aside>
-    <div class="sidebar-more-menu" id="sidebarMoreMenu" role="menu" aria-label="Mais opções" hidden>
-      <button class="sidebar-more-item" id="configBtn" type="button" role="menuitem" data-more-action="abrirConfiguracoes" title="Configurações e status do robô">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8 7 17M17 7l2.8-2.8"/></svg>
-        <span>Configurações</span>
-      </button>
-      <button class="sidebar-more-item" id="exportDataBtn" type="button" role="menuitem" data-more-action="exportData" title="Exportar backup dos dados">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Exportar dados</span>
-      </button>
-      <button class="sidebar-more-item" id="importDataBtn" type="button" role="menuitem" data-more-action="importData" title="Importar backup de dados">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span>Importar dados</span>
-      </button>
-      <button class="sidebar-more-item" id="installAppBtn" type="button" role="menuitem" data-more-action="promptInstall" title="Instalar o app no dispositivo" style="display:none">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Instalar app</span>
-      </button>
+
+      <main class="main-content" id="mainContent">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="hamburger-btn" id="mobileMenuBtn" aria-label="Abrir Menu">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <h1 class="page-title" id="pageTitle">Dashboard</h1>
+          </div>
+          <div class="topbar-right u-95fd83">
+            <!-- Busca Global -->
+            <div class="global-search-wrap" id="globalSearchWrap">
+              <button
+                class="global-search-trigger"
+                id="globalSearchTrigger"
+                data-action="openSearch"
+                title="Buscar (Ctrl+K)"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                Buscar…
+                <span class="kbd">Ctrl+K</span>
+              </button>
+            </div>
+            <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
+            <button
+              type="button"
+              class="sync-status"
+              id="syncStatus"
+              data-sync="idle"
+              title="Status de sincronização — clique para sincronizar agora"
+              data-action="syncNow"
+              aria-live="polite"
+            >
+              <i class="sync-dot" aria-hidden="true"></i
+              ><span class="sync-label">Sincronizando…</span>
+            </button>
+            <button
+              class="theme-toggle-btn"
+              id="notifSettingsBtn"
+              title="Configurar notificações"
+              data-action="notifSettings"
+              aria-label="Configurar notificações"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </button>
+            <button
+              class="theme-toggle-btn"
+              id="refreshBtn"
+              title="Recarregar página"
+              data-action="refreshPage"
+              aria-label="Recarregar página atual"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+            <button
+              class="theme-toggle-btn"
+              id="themeToggleBtn"
+              title="Alternar tema"
+              aria-label="Alternar tema claro/escuro"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="theme-icon-moon"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            <button
+              class="btn btn-primary btn-sm u-6b99de"
+              id="topbarActionBtn"
+              data-action="topbarAction"
+              aria-label="Criar novo registro"
+            >
+              <svg
+                class="topbar-action-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span class="topbar-action-text">Novo</span>
+            </button>
+            <!-- Menu suspenso mobile: agrupa as ações do topbar (visível só ≤768px) -->
+            <div class="topbar-more-wrap">
+              <button
+                class="theme-toggle-btn"
+                id="topbarMoreBtn"
+                data-action="topbarMore"
+                aria-label="Mais ações"
+                aria-expanded="false"
+                aria-controls="topbarMoreMenu"
+                title="Mais ações"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.8" />
+                  <circle cx="12" cy="12" r="1.8" />
+                  <circle cx="12" cy="19" r="1.8" />
+                </svg>
+              </button>
+              <nav
+                class="topbar-more-menu"
+                id="topbarMoreMenu"
+                data-open="0"
+                hidden
+                aria-label="Ações"
+              >
+                <button
+                  class="topbar-more-item topbar-more-item--action"
+                  id="topbarMoreAction"
+                  data-action="topbarAction"
+                  data-arg="closeMore"
+                >
+                  <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" /></svg
+                  ><span class="topbar-more-action-text">Novo</span>
+                </button>
+                <button class="topbar-more-item" data-action="notifSettings" data-arg="closeMore">
+                  <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg
+                  ><span>Notificações</span>
+                </button>
+                <button class="topbar-more-item" data-action="refreshPage" data-arg="closeMore">
+                  <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M23 4v6h-6M1 20v-6h6" />
+                    <path
+                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                    /></svg
+                  ><span>Recarregar</span>
+                </button>
+                <button class="topbar-more-item" data-action="themeToggle" data-arg="closeMore">
+                  <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg
+                  ><span>Alternar tema</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+        </header>
+        <div class="alert-strip" id="alertStrip" role="status" hidden></div>
+        <div class="pending-strip" id="pendingStrip" role="status" aria-live="polite" hidden></div>
+        <div class="content-area" id="contentArea" tabindex="-1"></div>
+      </main>
     </div>
 
-    <main class="main-content" id="mainContent">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="hamburger-btn" id="mobileMenuBtn" aria-label="Abrir Menu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <h1 class="page-title" id="pageTitle">Dashboard</h1>
-        </div>
-        <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
-          <!-- Busca Global -->
-          <div class="global-search-wrap" id="globalSearchWrap">
-            <button class="global-search-trigger" id="globalSearchTrigger" data-action="openSearch" title="Buscar (Ctrl+K)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              Buscar…
-              <span class="kbd">Ctrl+K</span>
-            </button>
-          </div>
-          <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
-          <button type="button" class="sync-status" id="syncStatus" data-sync="idle" title="Status de sincronização — clique para sincronizar agora" data-action="syncNow" aria-live="polite"><i class="sync-dot" aria-hidden="true"></i><span class="sync-label">Sincronizando…</span></button>
-          <button class="theme-toggle-btn" id="notifSettingsBtn" title="Configurar notificações" data-action="notifSettings" aria-label="Configurar notificações">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </button>
-          <button class="theme-toggle-btn" id="refreshBtn" title="Recarregar página" data-action="refreshPage" aria-label="Recarregar página atual">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          </button>
-          <button class="theme-toggle-btn" id="themeToggleBtn" title="Alternar tema" aria-label="Alternar tema claro/escuro">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon-moon">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
-          </button>
-          <button class="btn btn-primary btn-sm" id="topbarActionBtn" style="display:none" data-action="topbarAction" aria-label="Criar novo registro">
-            <svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span class="topbar-action-text">Novo</span>
-          </button>
-          <!-- Menu suspenso mobile: agrupa as ações do topbar (visível só ≤768px) -->
-          <div class="topbar-more-wrap">
-            <button class="theme-toggle-btn" id="topbarMoreBtn" data-action="topbarMore" aria-label="Mais ações" aria-expanded="false" aria-controls="topbarMoreMenu" title="Mais ações">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
-            </button>
-            <nav class="topbar-more-menu" id="topbarMoreMenu" data-open="0" hidden aria-label="Ações">
-              <button class="topbar-more-item topbar-more-item--action" id="topbarMoreAction" data-action="topbarAction" data-arg="closeMore">
-                <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="topbar-more-action-text">Novo</span>
-              </button>
-              <button class="topbar-more-item" data-action="notifSettings" data-arg="closeMore">
-                <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Notificações</span>
-              </button>
-              <button class="topbar-more-item" data-action="refreshPage" data-arg="closeMore">
-                <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Recarregar</span>
-              </button>
-              <button class="topbar-more-item" data-action="themeToggle" data-arg="closeMore">
-                <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span>Alternar tema</span>
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
-      <div class="alert-strip" id="alertStrip" role="status" hidden></div>
-      <div class="pending-strip" id="pendingStrip" role="status" aria-live="polite" hidden></div>
-      <div class="content-area" id="contentArea" tabindex="-1"></div>
-    </main>
-  </div>
-
-  <!-- Navegação inferior (só celular): os 3 destinos do dia a dia + "Mais"
+    <!-- Navegação inferior (só celular): os 3 destinos do dia a dia + "Mais"
        (abre o menu lateral completo). -->
-  <nav class="bottom-nav" id="bottomNav" aria-label="Navegação principal">
-    <button type="button" class="bottom-nav-item" data-page="fila" data-action="nav" data-arg="fila">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h13M3 12h13M3 18h9"/><path d="m16 17 2 2 4-4"/></svg>
-      <span>Minha fila</span>
-    </button>
-    <button type="button" class="bottom-nav-item" data-page="pendencias" data-action="nav" data-arg="pendencias">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      <span>Pendências</span>
-    </button>
-    <button type="button" class="bottom-nav-item" data-page="calendario" data-action="nav" data-arg="calendario">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-      <span>Agenda</span>
-    </button>
-    <button type="button" class="bottom-nav-item" data-page="__more" data-action="mobileMenu" aria-label="Mais opções do menu">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-      <span>Mais</span>
-    </button>
-  </nav>
+    <nav class="bottom-nav" id="bottomNav" aria-label="Navegação principal">
+      <button
+        type="button"
+        class="bottom-nav-item"
+        data-page="fila"
+        data-action="nav"
+        data-arg="fila"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 6h13M3 12h13M3 18h9" />
+          <path d="m16 17 2 2 4-4" />
+        </svg>
+        <span>Minha fila</span>
+      </button>
+      <button
+        type="button"
+        class="bottom-nav-item"
+        data-page="pendencias"
+        data-action="nav"
+        data-arg="pendencias"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+        <span>Pendências</span>
+      </button>
+      <button
+        type="button"
+        class="bottom-nav-item"
+        data-page="calendario"
+        data-action="nav"
+        data-arg="calendario"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+        <span>Agenda</span>
+      </button>
+      <button
+        type="button"
+        class="bottom-nav-item"
+        data-page="__more"
+        data-action="mobileMenu"
+        aria-label="Mais opções do menu"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.6" />
+          <circle cx="12" cy="12" r="1.6" />
+          <circle cx="19" cy="12" r="1.6" />
+        </svg>
+        <span>Mais</span>
+      </button>
+    </nav>
 
-  <!-- Overlay para menu mobile -->
-  <div class="sidebar-overlay" id="sidebarOverlay" style="display:none"></div>
+    <!-- Overlay para menu mobile -->
+    <div class="sidebar-overlay u-6b99de" id="sidebarOverlay"></div>
 
-  <!-- Modal principal -->
-  <div class="modal-overlay" id="modalOverlay" style="display:none">
-    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header">
-        <h2 class="modal-title" id="modalTitle"></h2>
-        <button class="modal-close" data-action="closeModal" aria-label="Fechar modal">&times;</button>
-      </div>
-      <div class="modal-body" id="modalBody"></div>
-    </div>
-  </div>
-
-  <!-- Modal usuário -->
-  <div class="modal-overlay" id="userModalOverlay" style="display:none">
-    <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
-      <div class="modal-header">
-        <h2 class="modal-title" id="userModalTitle">Meu Perfil</h2>
-        <button class="modal-close" data-action="hideOverlay" data-arg="userModalOverlay" aria-label="Fechar configurações">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group"><label class="form-label" for="userNameInput">Seu nome</label><input type="text" class="form-input" id="userNameInput" autocomplete="name" placeholder="Ex: João Silva" /></div>
-        <div class="form-group"><label class="form-label" for="userInitialsInput">Iniciais (avatar)</label><input autocomplete="off" type="text" class="form-input" id="userInitialsInput" maxlength="2" placeholder="Ex: JS" /></div>
-        <button class="btn btn-primary" style="width:100%" data-action="saveUserConfig">Salvar</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
-
-  <!-- Modal de recorte de imagem -->
-  <div class="modal-overlay" id="cropModalOverlay" style="display:none">
-    <div class="modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
-      <div class="modal-header">
-        <h2 class="modal-title" id="cropModalTitle">Recortar Logo</h2>
-        <button class="modal-close" data-action="closeCrop" aria-label="Fechar recorte de imagem">&times;</button>
-      </div>
-      <div class="modal-body" style="padding:16px">
-        <div class="crop-container" id="cropContainer">
-          <img id="cropImage" alt="Imagem a recortar" />
-          <div id="cropSelection" class="crop-selection" hidden></div>
+    <!-- Modal principal -->
+    <div class="modal-overlay u-6b99de" id="modalOverlay">
+      <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modalTitle"></h2>
+          <button class="modal-close" data-action="closeModal" aria-label="Fechar modal">
+            &times;
+          </button>
         </div>
-        <div class="crop-actions">
-          <div style="display:flex;gap:8px">
-            <button type="button" class="btn btn-secondary" data-action="closeCrop" aria-label="Cancelar recorte">Cancelar</button>
-            <button type="button" class="btn btn-primary" data-action="applyCrop" aria-label="Aplicar recorte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><path d="M6 21V9m0 0h12M18 3v12m0 0H6"/></svg> Aplicar Recorte</button>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <!-- Modal usuário -->
+    <div class="modal-overlay u-6b99de" id="userModalOverlay">
+      <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+        <div class="modal-header">
+          <h2 class="modal-title" id="userModalTitle">Meu Perfil</h2>
+          <button
+            class="modal-close"
+            data-action="hideOverlay"
+            data-arg="userModalOverlay"
+            aria-label="Fechar configurações"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="userNameInput">Seu nome</label
+            ><input
+              type="text"
+              class="form-input"
+              id="userNameInput"
+              autocomplete="name"
+              placeholder="Ex: João Silva"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="userInitialsInput">Iniciais (avatar)</label
+            ><input
+              autocomplete="off"
+              type="text"
+              class="form-input"
+              id="userInitialsInput"
+              maxlength="2"
+              placeholder="Ex: JS"
+            />
+          </div>
+          <button class="btn btn-primary u-046678" data-action="saveUserConfig">Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+
+    <!-- Modal de recorte de imagem -->
+    <div class="modal-overlay u-6b99de" id="cropModalOverlay">
+      <div class="modal u-765d57" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
+        <div class="modal-header">
+          <h2 class="modal-title" id="cropModalTitle">Recortar Logo</h2>
+          <button class="modal-close" data-action="closeCrop" aria-label="Fechar recorte de imagem">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body u-287f77">
+          <div class="crop-container" id="cropContainer">
+            <img id="cropImage" alt="Imagem a recortar" />
+            <div id="cropSelection" class="crop-selection" hidden></div>
+          </div>
+          <div class="crop-actions">
+            <div class="u-a76d59">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-action="closeCrop"
+                aria-label="Cancelar recorte"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                data-action="applyCrop"
+                aria-label="Aplicar recorte"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="6" cy="6" r="3" />
+                  <path d="M6 21V9m0 0h12M18 3v12m0 0H6" />
+                </svg>
+                Aplicar Recorte
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal de Configurações de Notificação -->
-  <div class="modal-overlay" id="notifModalOverlay" style="display:none">
-    <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
-      <div class="modal-header">
-        <h2 class="modal-title" id="notifModalTitle">Configurar notificações</h2>
-        <button class="modal-close" data-action="hideOverlay" data-arg="notifModalOverlay" aria-label="Fechar notificações">&times;</button>
+    <!-- Modal de Configurações de Notificação -->
+    <div class="modal-overlay u-6b99de" id="notifModalOverlay">
+      <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
+        <div class="modal-header">
+          <h2 class="modal-title" id="notifModalTitle">Configurar notificações</h2>
+          <button
+            class="modal-close"
+            data-action="hideOverlay"
+            data-arg="notifModalOverlay"
+            aria-label="Fechar notificações"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body" id="notifModalBody"></div>
       </div>
-      <div class="modal-body" id="notifModalBody"></div>
     </div>
-  </div>
 
-  <!-- Overlay de Login -->
-  <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:500;background:linear-gradient(135deg,#0f172a 0%,#1e2a3a 50%,#1a2332 100%);overflow-y:auto">
-    <div id="loginContent" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px"></div>
-  </div>
+    <!-- Overlay de Login -->
+    <div id="loginOverlay" class="u-7f3487">
+      <div id="loginContent" class="u-cb6198"></div>
+    </div>
 
-  <!-- Modal filho do Checklist: "Ver procedimento" (fica DEPOIS do #modalOverlay
+    <!-- Modal filho do Checklist: "Ver procedimento" (fica DEPOIS do #modalOverlay
        principal para vencer no z-index e abrir por cima dele) -->
-  <div class="modal-overlay" id="ckProcOverlay" style="display:none">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ckProcTitle">
-      <div class="modal-header">
-        <h2 class="modal-title">Procedimento — <span id="ckProcTitle"></span></h2>
-        <button class="modal-close" id="ckProcClose" aria-label="Fechar procedimento">&times;</button>
+    <div class="modal-overlay u-6b99de" id="ckProcOverlay">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ckProcTitle">
+        <div class="modal-header">
+          <h2 class="modal-title">Procedimento — <span id="ckProcTitle"></span></h2>
+          <button class="modal-close" id="ckProcClose" aria-label="Fechar procedimento">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body" id="ckProcBody"></div>
       </div>
-      <div class="modal-body" id="ckProcBody"></div>
     </div>
-  </div>
 
-  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js"
-    integrity="sha384-nH2beB85991GFOe5+WLnL1JpeSyR8ncwd7HZXPJppzmxyfWS9WgftZQQAeQjyIai"
-    crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"
-    integrity="sha384-vG8R9Zn5YZHCeXt9gLNp8MnsUCqmIy7HPxhdOdLGa/30/c8uZXFrrN0iKGID/ZvC"
-    crossorigin="anonymous"></script>
-  <!-- xlsx, mammoth e motion: carregados sob demanda (js/lazy-libs.js) -->
-  <!-- config.js: gitignored file with real Supabase credentials (copy from config.example.js) -->
-  <script defer src="js/config.js"></script>
-  <script defer src="js/error-log.js"></script>
-  <script defer src="js/lazy-libs.js"></script>
-  <script defer src="js/actions.js"></script>
-  <script defer src="js/schema.js"></script>
-  <script defer src="js/supabase-config.js"></script>
-  <script defer src="js/db.js"></script>
-  <script defer src="js/storage.js"></script>
-  <script defer src="js/storage-anexos.js"></script>
-  <script defer src="js/storage-pendencias.js"></script>
-  <script defer src="js/storage-visitas.js"></script>
-  <script defer src="js/storage-operadores.js"></script>
-  <script defer src="js/app-events.js"></script>
-  <script defer src="js/outbox.js"></script>
-  <script defer src="js/sync-manager.js"></script>
-  <script defer src="js/auth.js"></script>
-  <script defer src="js/ui.js"></script>
-  <script defer src="js/client-secrets.js"></script>
-  <script defer src="js/clients.js"></script>
-  <script defer src="js/clients-ficha.js"></script>
-  <script defer src="js/clients-abas.js"></script>
-  <script defer src="js/clients-form.js"></script>
-  <script defer src="js/pendencias.js"></script>
-  <script defer src="js/pendencias-quadro.js"></script>
-  <script defer src="js/pendencias-fila.js"></script>
-  <script defer src="js/pendencias-acoes.js"></script>
-  <script defer src="js/chamado-canal.js"></script>
-  <script defer src="js/pendencias-detalhe.js"></script>
-  <script defer src="js/pendencias-comando.js"></script>
-  <script defer src="js/chamado-detalhe.js"></script>
-  <script defer src="js/pagina-pendencia.js"></script>
-  <script defer src="js/projeto-pagina.js"></script>
-  <script defer src="js/chamado-pagina.js"></script>
-  <script defer src="js/emails-triagem.js"></script>
-  <script defer src="js/respostas-prontas.js"></script>
-  <script defer src="js/caixa-entrada.js"></script>
-  <script defer src="js/robo-execucoes.js"></script>
-  <script defer src="js/sla.js"></script>
-  <script defer src="js/pendencias-rapida.js"></script>
-  <script defer src="js/operadores.js"></script>
-  <script defer src="js/notifications.js"></script>
-  <script defer src="js/push.js"></script>
-  <script defer src="js/calendar.js"></script>
-  <script defer src="js/visita-levar.js"></script>
-  <script defer src="js/visita-campo.js"></script>
-  <script defer src="js/cliente-saude.js"></script>
-  <script defer src="js/cliente-timeline.js"></script>
-  <script defer src="js/etiquetas-qr.js"></script>
-  <script defer src="js/visitas.js"></script>
-  <script defer src="js/visit-photos.js"></script>
-  <script defer src="js/visit-signature.js"></script>
-  <script defer src="js/visita-acompanhamento.js"></script>
-  <script defer src="js/visita-guiada.js"></script>
-  <script defer src="js/ia-relatorio.js"></script>
-  <script defer src="js/passos.js"></script>
-  <script defer src="js/templates.js"></script>
-  <script defer src="js/global-search.js"></script>
-  <script defer src="js/timer.js"></script>
-  <script defer src="js/time-entries.js"></script>
-  <script defer src="js/metrics.js"></script>
-  <script defer src="js/reunioes.js"></script>
-  <script defer src="js/equipamentos.js"></script>
-  <script defer src="js/milvus-devices.js"></script>
-  <script defer src="js/milvus-tickets.js"></script>
-  <script defer src="js/milvus-clients-import.js"></script>
-  <script defer src="js/milvus-token-backfill.js"></script>
-  <script defer src="js/milvus-atendimentos.js"></script>
-  <script defer src="js/milvus-chamado.js"></script>
-  <script defer src="js/checklist.js"></script>
-  <script defer src="js/roteiro.js"></script>
-  <script defer src="js/fila.js"></script>
-  <script defer src="js/pendentes.js"></script>
-  <script defer src="js/prazos.js"></script>
-  <script defer src="js/vencimentos.js"></script>
-  <script defer src="js/conhecimento.js"></script>
-  <script defer src="js/agenda-feed.js"></script>
-  <script defer src="js/relatorio-cliente.js"></script>
-  <script defer src="js/milvus-status.js"></script>
-  <script defer src="js/operacional.js"></script>
-  <script defer src="js/app.js"></script>
-  <script defer src="js/sw-register.js"></script>
-</body>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.min.js"
+      integrity="sha384-nH2beB85991GFOe5+WLnL1JpeSyR8ncwd7HZXPJppzmxyfWS9WgftZQQAeQjyIai"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"
+      integrity="sha384-vG8R9Zn5YZHCeXt9gLNp8MnsUCqmIy7HPxhdOdLGa/30/c8uZXFrrN0iKGID/ZvC"
+      crossorigin="anonymous"
+    ></script>
+    <!-- xlsx, mammoth e motion: carregados sob demanda (js/lazy-libs.js) -->
+    <!-- config.js: gitignored file with real Supabase credentials (copy from config.example.js) -->
+    <script defer src="js/config.js"></script>
+    <script defer src="js/error-log.js"></script>
+    <script defer src="js/estilo-dinamico.js"></script>
+    <script defer src="js/lazy-libs.js"></script>
+    <script defer src="js/actions.js"></script>
+    <script defer src="js/schema.js"></script>
+    <script defer src="js/supabase-config.js"></script>
+    <script defer src="js/db.js"></script>
+    <script defer src="js/storage.js"></script>
+    <script defer src="js/storage-anexos.js"></script>
+    <script defer src="js/storage-pendencias.js"></script>
+    <script defer src="js/storage-visitas.js"></script>
+    <script defer src="js/storage-operadores.js"></script>
+    <script defer src="js/app-events.js"></script>
+    <script defer src="js/outbox.js"></script>
+    <script defer src="js/sync-manager.js"></script>
+    <script defer src="js/auth.js"></script>
+    <script defer src="js/ui.js"></script>
+    <script defer src="js/client-secrets.js"></script>
+    <script defer src="js/clients.js"></script>
+    <script defer src="js/clients-ficha.js"></script>
+    <script defer src="js/clients-abas.js"></script>
+    <script defer src="js/clients-form.js"></script>
+    <script defer src="js/pendencias.js"></script>
+    <script defer src="js/pendencias-quadro.js"></script>
+    <script defer src="js/pendencias-fila.js"></script>
+    <script defer src="js/pendencias-acoes.js"></script>
+    <script defer src="js/chamado-canal.js"></script>
+    <script defer src="js/pendencias-detalhe.js"></script>
+    <script defer src="js/pendencias-comando.js"></script>
+    <script defer src="js/chamado-detalhe.js"></script>
+    <script defer src="js/pagina-pendencia.js"></script>
+    <script defer src="js/projeto-pagina.js"></script>
+    <script defer src="js/chamado-pagina.js"></script>
+    <script defer src="js/emails-triagem.js"></script>
+    <script defer src="js/respostas-prontas.js"></script>
+    <script defer src="js/caixa-entrada.js"></script>
+    <script defer src="js/robo-execucoes.js"></script>
+    <script defer src="js/sla.js"></script>
+    <script defer src="js/pendencias-rapida.js"></script>
+    <script defer src="js/operadores.js"></script>
+    <script defer src="js/notifications.js"></script>
+    <script defer src="js/push.js"></script>
+    <script defer src="js/calendar.js"></script>
+    <script defer src="js/visita-levar.js"></script>
+    <script defer src="js/visita-campo.js"></script>
+    <script defer src="js/cliente-saude.js"></script>
+    <script defer src="js/cliente-timeline.js"></script>
+    <script defer src="js/etiquetas-qr.js"></script>
+    <script defer src="js/visitas.js"></script>
+    <script defer src="js/visit-photos.js"></script>
+    <script defer src="js/visit-signature.js"></script>
+    <script defer src="js/visita-acompanhamento.js"></script>
+    <script defer src="js/visita-guiada.js"></script>
+    <script defer src="js/ia-relatorio.js"></script>
+    <script defer src="js/passos.js"></script>
+    <script defer src="js/templates.js"></script>
+    <script defer src="js/global-search.js"></script>
+    <script defer src="js/timer.js"></script>
+    <script defer src="js/time-entries.js"></script>
+    <script defer src="js/metrics.js"></script>
+    <script defer src="js/reunioes.js"></script>
+    <script defer src="js/equipamentos.js"></script>
+    <script defer src="js/milvus-devices.js"></script>
+    <script defer src="js/milvus-tickets.js"></script>
+    <script defer src="js/milvus-clients-import.js"></script>
+    <script defer src="js/milvus-token-backfill.js"></script>
+    <script defer src="js/milvus-atendimentos.js"></script>
+    <script defer src="js/milvus-chamado.js"></script>
+    <script defer src="js/checklist.js"></script>
+    <script defer src="js/roteiro.js"></script>
+    <script defer src="js/fila.js"></script>
+    <script defer src="js/pendentes.js"></script>
+    <script defer src="js/prazos.js"></script>
+    <script defer src="js/vencimentos.js"></script>
+    <script defer src="js/conhecimento.js"></script>
+    <script defer src="js/agenda-feed.js"></script>
+    <script defer src="js/relatorio-cliente.js"></script>
+    <script defer src="js/milvus-status.js"></script>
+    <script defer src="js/operacional.js"></script>
+    <script defer src="js/dashboard.js"></script>
+    <script defer src="js/app-login.js"></script>
+    <script defer src="js/app.js"></script>
+    <script defer src="js/sw-register.js"></script>
+  </body>
 </html>

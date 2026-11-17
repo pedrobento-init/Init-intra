@@ -8,7 +8,9 @@ const anonKey = process.env.SUPABASE_ANON_KEY || '';
 const inCi = !!(process.env.VERCEL || process.env.CI);
 
 if (!inCi && !url && !anonKey) {
-  console.log('ℹ️ build-config: fora da Vercel/CI e sem SUPABASE_URL — js/config.js local mantido.');
+  console.log(
+    'ℹ️ build-config: fora da Vercel/CI e sem SUPABASE_URL — js/config.js local mantido.'
+  );
   process.exit(0);
 }
 
@@ -20,4 +22,6 @@ window.SUPABASE_CONFIG = {
 `;
 
 fs.writeFileSync('js/config.js', content);
-console.log('✅ js/config.js gerado a partir das Environment Variables' + (url ? '' : ' (vazias)') + '.');
+console.log(
+  '✅ js/config.js gerado a partir das Environment Variables' + (url ? '' : ' (vazias)') + '.'
+);

@@ -10,16 +10,22 @@ import vm from 'node:vm';
 // havia filtro — nunca qual.
 
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 // Campos da barra: cada um responde por id, como no DOM real.
 const campos = {};
 const campo = (id, tag, value, optLabel) => {
   campos[id] = {
-    ..._dummyEl, id, tagName: tag, value,
+    ..._dummyEl,
+    id,
+    tagName: tag,
+    value,
     selectedOptions: optLabel ? [{ textContent: optLabel }] : [],
   };
 };
@@ -56,7 +62,9 @@ try {
   console.error = _quietErr;
 }
 
-beforeEach(() => { for (const k of Object.keys(campos)) delete campos[k]; });
+beforeEach(() => {
+  for (const k of Object.keys(campos)) delete campos[k];
+});
 
 describe('penFiltrosAtivos: o que está preso agora', () => {
   it('campo vazio não vira selo', () => {
@@ -81,7 +89,11 @@ describe('penFiltrosAtivos: o que está preso agora', () => {
     campo('penSearch', 'INPUT', 'vpn');
     campo('penPriority', 'SELECT', 'alta', 'Alta');
     campo('penStatus', 'SELECT', 'aberto', 'Aberto');
-    expect(sandbox.penFiltrosAtivos().map((f) => f.nome)).toEqual(['Busca', 'Status', 'Prioridade']);
+    expect(sandbox.penFiltrosAtivos().map((f) => f.nome)).toEqual([
+      'Busca',
+      'Status',
+      'Prioridade',
+    ]);
   });
 });
 
@@ -91,7 +103,9 @@ describe('penFiltroChipsHtml: a fila de selos', () => {
   });
 
   it('cada selo tem o ✕ que remove só aquele filtro', () => {
-    const html = sandbox.penFiltroChipsHtml([{ campo: 'penStatus', nome: 'Status', texto: 'Aberto' }]);
+    const html = sandbox.penFiltroChipsHtml([
+      { campo: 'penStatus', nome: 'Status', texto: 'Aberto' },
+    ]);
     expect(html).toContain('data-action="penClearFilter" data-arg="penStatus"');
     expect(html).toContain('aria-label="Remover filtro Status: Aberto"');
   });
@@ -102,13 +116,17 @@ describe('penFiltroChipsHtml: a fila de selos', () => {
   });
 
   it('nome de cliente com < > não escapa para o HTML', () => {
-    const html = sandbox.penFiltroChipsHtml([{ campo: 'penClient', nome: 'Cliente', texto: '<img onerror=x>' }]);
+    const html = sandbox.penFiltroChipsHtml([
+      { campo: 'penClient', nome: 'Cliente', texto: '<img onerror=x>' },
+    ]);
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');
   });
 
   it('nada de handler inline: os selos passam pela delegação', () => {
-    const html = sandbox.penFiltroChipsHtml([{ campo: 'penStatus', nome: 'Status', texto: 'Aberto' }]);
+    const html = sandbox.penFiltroChipsHtml([
+      { campo: 'penStatus', nome: 'Status', texto: 'Aberto' },
+    ]);
     expect(html).not.toMatch(/\son(click|change)=/);
   });
 });

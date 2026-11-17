@@ -7,21 +7,35 @@ function mockQ() {
   const calls = [];
   const q = {};
   for (const m of ['eq', 'in', 'not', 'or', 'order', 'range', 'select']) {
-    q[m] = (...args) => { calls.push([m, ...args]); return q; };
+    q[m] = (...args) => {
+      calls.push([m, ...args]);
+      return q;
+    };
   }
   q.calls = calls;
   return q;
 }
 const has = (q, method, ...prefix) =>
-  q.calls.some(([m, ...a]) => m === method && prefix.every((p, i) => JSON.stringify(a[i]) === JSON.stringify(p)));
+  q.calls.some(
+    ([m, ...a]) =>
+      m === method && prefix.every((p, i) => JSON.stringify(a[i]) === JSON.stringify(p))
+  );
 const temFiltroCanal = (q) =>
-  q.calls.some(([m, a]) => (m === 'eq' && a === 'canal') || (m === 'or' && String(a).includes('canal.')));
+  q.calls.some(
+    ([m, a]) => (m === 'eq' && a === 'canal') || (m === 'or' && String(a).includes('canal.'))
+  );
 
 describe('origem da pendência (abas Internas × E-mail)', () => {
   let storage;
   beforeEach(() => {
     globalThis.getOperatorNames = () => [];
-    globalThis.escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    globalThis.escapeHtml = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     storage = requireStorage();
   });
 
@@ -42,7 +56,9 @@ describe('origem da pendência (abas Internas × E-mail)', () => {
       expect(storage.penOrigemDe({ canal: 'Email' })).toBe('interna');
     });
     it('descrição com bloco de e-mail não muda a origem: quem decide é o canal', () => {
-      expect(storage.penOrigemDe({ descricao: 'De: cliente@x.com\nAssunto: queda', canal: null })).toBe('interna');
+      expect(
+        storage.penOrigemDe({ descricao: 'De: cliente@x.com\nAssunto: queda', canal: null })
+      ).toBe('interna');
     });
     it('pendência nula ou indefinida não quebra e cai em interna', () => {
       expect(storage.penOrigemDe(null)).toBe('interna');
@@ -52,7 +68,13 @@ describe('origem da pendência (abas Internas × E-mail)', () => {
 
   describe('penContarOrigens', () => {
     it('conta cada pendência em exatamente uma aba', () => {
-      const lista = [{ canal: 'email' }, { canal: 'email' }, {}, { canal: 'whatsapp' }, { canal: null }];
+      const lista = [
+        { canal: 'email' },
+        { canal: 'email' },
+        {},
+        { canal: 'whatsapp' },
+        { canal: null },
+      ];
       expect(storage.penContarOrigens(lista)).toEqual({ interna: 3, email: 2 });
     });
     it('lista vazia ou ausente devolve zeros nas duas abas', () => {
@@ -64,12 +86,22 @@ describe('origem da pendência (abas Internas × E-mail)', () => {
   describe('applyPendenciaPageFilters com origem', () => {
     it("origem 'email' filtra canal = email", () => {
       const q = mockQ();
-      storage.applyPendenciaPageFilters(q, { scope: 'active', team: 'mam', adminSeeAll: false, origem: 'email' });
+      storage.applyPendenciaPageFilters(q, {
+        scope: 'active',
+        team: 'mam',
+        adminSeeAll: false,
+        origem: 'email',
+      });
       expect(has(q, 'eq', 'canal', 'email')).toBe(true);
     });
     it("origem 'interna' inclui canal nulo (neq sozinho perderia as sem canal)", () => {
       const q = mockQ();
-      storage.applyPendenciaPageFilters(q, { scope: 'active', team: 'mam', adminSeeAll: false, origem: 'interna' });
+      storage.applyPendenciaPageFilters(q, {
+        scope: 'active',
+        team: 'mam',
+        adminSeeAll: false,
+        origem: 'interna',
+      });
       expect(has(q, 'or', 'canal.is.null,canal.neq.email')).toBe(true);
       expect(q.calls.some(([m, a]) => m === 'eq' && a === 'canal')).toBe(false);
     });
@@ -80,18 +112,34 @@ describe('origem da pendência (abas Internas × E-mail)', () => {
     });
     it('origem desconhecida é ignorada em vez de esconder tudo', () => {
       const q = mockQ();
-      storage.applyPendenciaPageFilters(q, { scope: 'active', team: 'mam', adminSeeAll: false, origem: 'fax' });
+      storage.applyPendenciaPageFilters(q, {
+        scope: 'active',
+        team: 'mam',
+        adminSeeAll: false,
+        origem: 'fax',
+      });
       expect(temFiltroCanal(q)).toBe(false);
     });
     it('origem não afrouxa o escopo de team de quem não é admin', () => {
       const q = mockQ();
-      storage.applyPendenciaPageFilters(q, { scope: 'active', team: 'bt', adminSeeAll: false, origem: 'email' });
+      storage.applyPendenciaPageFilters(q, {
+        scope: 'active',
+        team: 'bt',
+        adminSeeAll: false,
+        origem: 'email',
+      });
       expect(has(q, 'eq', 'team', 'bt')).toBe(true);
       expect(has(q, 'eq', 'canal', 'email')).toBe(true);
     });
     it('origem convive com a busca: os dois or ficam separados', () => {
       const q = mockQ();
-      storage.applyPendenciaPageFilters(q, { scope: 'active', team: 'mam', adminSeeAll: false, origem: 'interna', search: 'dell' });
+      storage.applyPendenciaPageFilters(q, {
+        scope: 'active',
+        team: 'mam',
+        adminSeeAll: false,
+        origem: 'interna',
+        search: 'dell',
+      });
       const ors = q.calls.filter(([m]) => m === 'or');
       expect(ors).toHaveLength(2);
       expect(ors[0][1]).toBe('canal.is.null,canal.neq.email');

@@ -10,7 +10,11 @@ function _setGlobal(name, value) {
 
 _setGlobal('window', { _supabaseAuthActive: true, addEventListener() {} });
 _setGlobal('navigator', { onLine: true });
-_setGlobal('document', { visibilityState: 'visible', addEventListener() {}, getElementById: () => null });
+_setGlobal('document', {
+  visibilityState: 'visible',
+  addEventListener() {},
+  getElementById: () => null,
+});
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -80,7 +84,10 @@ describe('estado de UI (resolveMilvusChamadoState)', () => {
     expect(resolveMilvusChamadoState({ milvusChamadoStatus: 'pendente' }).kind).toBe('pendente');
     expect(resolveMilvusChamadoState({ milvusChamadoStatus: 'criando' }).kind).toBe('criando');
     expect(resolveMilvusChamadoState({ milvusChamadoStatus: 'sem_token' }).kind).toBe('sem_token');
-    const e = resolveMilvusChamadoState({ milvusChamadoStatus: 'erro', milvusChamadoErro: 'HTTP 400' });
+    const e = resolveMilvusChamadoState({
+      milvusChamadoStatus: 'erro',
+      milvusChamadoErro: 'HTTP 400',
+    });
     expect(e.kind).toBe('erro');
     expect(e.erro).toBe('HTTP 400');
   });
@@ -92,16 +99,31 @@ describe('estado de UI (resolveMilvusChamadoState)', () => {
 
 describe('política de retry (shouldRetryMilvusChamado)', () => {
   it('pendente retenta; com codigo não; teto respeitado', () => {
-    expect(shouldRetryMilvusChamado({ milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 })).toBe(true);
-    expect(shouldRetryMilvusChamado({ milvusChamadoStatus: 'pendente', milvusChamadoCodigo: 5 })).toBe(false);
-    expect(shouldRetryMilvusChamado({ milvusChamadoStatus: 'pendente', milvusChamadoTentativas: MILVUS_CHAMADO_MAX_TENTATIVAS })).toBe(false);
+    expect(
+      shouldRetryMilvusChamado({ milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 })
+    ).toBe(true);
+    expect(
+      shouldRetryMilvusChamado({ milvusChamadoStatus: 'pendente', milvusChamadoCodigo: 5 })
+    ).toBe(false);
+    expect(
+      shouldRetryMilvusChamado({
+        milvusChamadoStatus: 'pendente',
+        milvusChamadoTentativas: MILVUS_CHAMADO_MAX_TENTATIVAS,
+      })
+    ).toBe(false);
     expect(shouldRetryMilvusChamado({ milvusChamadoStatus: 'erro' })).toBe(false);
     expect(shouldRetryMilvusChamado({ milvusChamadoStatus: 'sem_token' })).toBe(false);
   });
   it('criando recente espera; criando stale retoma', () => {
     const now = Date.now();
-    const fresh = { milvusChamadoStatus: 'criando', updatedAt: new Date(now - 60 * 1000).toISOString() };
-    const stale = { milvusChamadoStatus: 'criando', updatedAt: new Date(now - 60 * 60 * 1000).toISOString() };
+    const fresh = {
+      milvusChamadoStatus: 'criando',
+      updatedAt: new Date(now - 60 * 1000).toISOString(),
+    };
+    const stale = {
+      milvusChamadoStatus: 'criando',
+      updatedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+    };
     expect(shouldRetryMilvusChamado(fresh, now)).toBe(false);
     expect(shouldRetryMilvusChamado(stale, now)).toBe(true);
   });
@@ -125,25 +147,48 @@ describe('parse do código (extractMilvusCodigo)', () => {
 
 describe('classificação de resultado (classifyMilvusChamadoResult)', () => {
   it('sucesso com código = created (com recovered)', () => {
-    expect(classifyMilvusChamadoResult({ data: { success: true, codigo: 123 } }).outcome).toBe('created');
-    const r = classifyMilvusChamadoResult({ data: { success: true, codigo: 123, recovered: true } });
+    expect(classifyMilvusChamadoResult({ data: { success: true, codigo: 123 } }).outcome).toBe(
+      'created'
+    );
+    const r = classifyMilvusChamadoResult({
+      data: { success: true, codigo: 123, recovered: true },
+    });
     expect(r.outcome).toBe('created');
     expect(r.recovered).toBe(true);
   });
   it('sem token = no-token; validação/token = permanent', () => {
-    expect(classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED' } }).outcome).toBe('no-token');
-    expect(classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_VALIDATION_ERROR' } }).outcome).toBe('permanent');
-    expect(classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_INVALID_TOKEN' } }).outcome).toBe('permanent');
+    expect(
+      classifyMilvusChamadoResult({
+        data: { success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED' },
+      }).outcome
+    ).toBe('no-token');
+    expect(
+      classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_VALIDATION_ERROR' } })
+        .outcome
+    ).toBe('permanent');
+    expect(
+      classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_INVALID_TOKEN' } })
+        .outcome
+    ).toBe('permanent');
   });
   it('erro de invoke / indisponível = transient', () => {
-    expect(classifyMilvusChamadoResult(null, new TypeError('Failed to fetch')).outcome).toBe('transient');
-    expect(classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_UNAVAILABLE' } }).outcome).toBe('transient');
+    expect(classifyMilvusChamadoResult(null, new TypeError('Failed to fetch')).outcome).toBe(
+      'transient'
+    );
+    expect(
+      classifyMilvusChamadoResult({ data: { success: false, code: 'MILVUS_UNAVAILABLE' } }).outcome
+    ).toBe('transient');
   });
 });
 
 describe('A. criar visita online → chamado criado, código salvo', () => {
   it('processa pendente e grava código sem duplicar invoke', async () => {
-    _visits.push({ id: 'VIS-1', clientId: 'CLI-1', milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      clientId: 'CLI-1',
+      milvusChamadoStatus: 'pendente',
+      milvusChamadoTentativas: 0,
+    });
     const res = await processPendingMilvusChamados('test');
     expect(res.created).toBe(1);
     expect(invokeCalls).toHaveLength(1);
@@ -158,7 +203,12 @@ describe('A. criar visita online → chamado criado, código salvo', () => {
 describe('B. criar visita offline → pendente, sem erro', () => {
   it('enqueue offline não chama a Edge e mantém pendente', async () => {
     globalThis.navigator.onLine = false;
-    _visits.push({ id: 'VIS-1', clientId: 'CLI-1', milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      clientId: 'CLI-1',
+      milvusChamadoStatus: 'pendente',
+      milvusChamadoTentativas: 0,
+    });
     enqueueMilvusChamado('VIS-1');
     await new Promise((r) => setTimeout(r, 30));
     expect(invokeCalls).toHaveLength(0);
@@ -168,7 +218,12 @@ describe('B. criar visita offline → pendente, sem erro', () => {
 
 describe('C. voltar online → pendência processada, código salvo', () => {
   it('processa ao recuperar conectividade', async () => {
-    _visits.push({ id: 'VIS-1', clientId: 'CLI-1', milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      clientId: 'CLI-1',
+      milvusChamadoStatus: 'pendente',
+      milvusChamadoTentativas: 0,
+    });
     globalThis.navigator.onLine = true;
     await processPendingMilvusChamados('online');
     expect(globalThis.getVisitById('VIS-1').milvusChamadoCodigo).toBe(123);
@@ -178,10 +233,18 @@ describe('C. voltar online → pendência processada, código salvo', () => {
 describe('D. reload antes do sync → visita e pendência persistem', () => {
   it('criando recente não é tocado; criando stale retoma', async () => {
     const now = Date.now();
-    _visits.push({ id: 'VIS-fresh', milvusChamadoStatus: 'criando', updatedAt: new Date(now - 30 * 1000).toISOString() });
+    _visits.push({
+      id: 'VIS-fresh',
+      milvusChamadoStatus: 'criando',
+      updatedAt: new Date(now - 30 * 1000).toISOString(),
+    });
     await processPendingMilvusChamados('boot');
     expect(invokeCalls).toHaveLength(0);
-    _visits.push({ id: 'VIS-stale', milvusChamadoStatus: 'criando', updatedAt: new Date(now - 3600 * 1000).toISOString() });
+    _visits.push({
+      id: 'VIS-stale',
+      milvusChamadoStatus: 'criando',
+      updatedAt: new Date(now - 3600 * 1000).toISOString(),
+    });
     await processPendingMilvusChamados('boot');
     expect(invokeCalls).toHaveLength(1);
     expect(globalThis.getVisitById('VIS-stale').milvusChamadoStatus).toBe('criado');
@@ -224,7 +287,10 @@ describe('F. Milvus indisponível → visita ok, pendente mantida', () => {
 
 describe('G. cliente sem cliente_id → sem chamada incorreta', () => {
   it('vira sem_token e não retenta sozinho', async () => {
-    invokeBehavior = () => ({ data: { success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED' }, error: null });
+    invokeBehavior = () => ({
+      data: { success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED' },
+      error: null,
+    });
     _visits.push({ id: 'VIS-1', milvusChamadoStatus: 'pendente', milvusChamadoTentativas: 0 });
     await processPendingMilvusChamados('run1');
     const v = globalThis.getVisitById('VIS-1');
@@ -244,7 +310,10 @@ describe('G. cliente sem cliente_id → sem chamada incorreta', () => {
 
 describe('ETAPA 2 — payload/espelho (TESTE 7)', () => {
   it('servico = relatorio real; equipamento/material vazios (sem inventar)', () => {
-    const p = buildMilvusFinalizarPayload({ milvusChamadoCodigo: 1234, relatorio: 'Troca de HD + backup' });
+    const p = buildMilvusFinalizarPayload({
+      milvusChamadoCodigo: 1234,
+      relatorio: 'Troca de HD + backup',
+    });
     expect(p).toEqual({
       chamado_codigo: '1234',
       chamado_servico_realizado: 'Troca de HD + backup',
@@ -256,45 +325,106 @@ describe('ETAPA 2 — payload/espelho (TESTE 7)', () => {
 
 describe('ETAPA 2 — estado e retry puros', () => {
   it('resolveMilvusFinalizarState: finalizado/pendente/finalizando/erro/nulo', () => {
-    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'finalizado' }).kind).toBe('finalizado');
-    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'pendente' }).kind).toBe('pendente');
-    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'finalizando' }).kind).toBe('finalizando');
-    const e = resolveMilvusFinalizarState({ milvusFinalizarStatus: 'erro', milvusFinalizarErro: 'HTTP 400' });
+    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'finalizado' }).kind).toBe(
+      'finalizado'
+    );
+    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'pendente' }).kind).toBe(
+      'pendente'
+    );
+    expect(resolveMilvusFinalizarState({ milvusFinalizarStatus: 'finalizando' }).kind).toBe(
+      'finalizando'
+    );
+    const e = resolveMilvusFinalizarState({
+      milvusFinalizarStatus: 'erro',
+      milvusFinalizarErro: 'HTTP 400',
+    });
     expect(e.kind).toBe('erro');
     expect(e.erro).toBe('HTTP 400');
     expect(resolveMilvusFinalizarState({}).kind).toBe(null);
   });
   it('shouldRetryMilvusFinalizar exige codigo; respeita teto e stale', () => {
     expect(shouldRetryMilvusFinalizar({ milvusFinalizarStatus: 'pendente' })).toBe(false); // sem codigo
-    expect(shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'pendente' })).toBe(true);
-    expect(shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'finalizado' })).toBe(false);
-    expect(shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: MILVUS_FINALIZAR_MAX_TENTATIVAS })).toBe(false);
-    expect(shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'erro' })).toBe(false);
+    expect(
+      shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'pendente' })
+    ).toBe(true);
+    expect(
+      shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'finalizado' })
+    ).toBe(false);
+    expect(
+      shouldRetryMilvusFinalizar({
+        milvusChamadoCodigo: 5,
+        milvusFinalizarStatus: 'pendente',
+        milvusFinalizarTentativas: MILVUS_FINALIZAR_MAX_TENTATIVAS,
+      })
+    ).toBe(false);
+    expect(
+      shouldRetryMilvusFinalizar({ milvusChamadoCodigo: 5, milvusFinalizarStatus: 'erro' })
+    ).toBe(false);
     const now = Date.now();
-    const fresh = { milvusChamadoCodigo: 5, milvusFinalizarStatus: 'finalizando', updatedAt: new Date(now - 60 * 1000).toISOString() };
-    const stale = { milvusChamadoCodigo: 5, milvusFinalizarStatus: 'finalizando', updatedAt: new Date(now - 3600 * 1000).toISOString() };
+    const fresh = {
+      milvusChamadoCodigo: 5,
+      milvusFinalizarStatus: 'finalizando',
+      updatedAt: new Date(now - 60 * 1000).toISOString(),
+    };
+    const stale = {
+      milvusChamadoCodigo: 5,
+      milvusFinalizarStatus: 'finalizando',
+      updatedAt: new Date(now - 3600 * 1000).toISOString(),
+    };
     expect(shouldRetryMilvusFinalizar(fresh, now)).toBe(false);
     expect(shouldRetryMilvusFinalizar(stale, now)).toBe(true);
   });
   it('classifyMilvusFinalizarResult: sucesso/permanente/transitório', () => {
-    expect(classifyMilvusFinalizarResult({ data: { success: true, codigo: 1234 } }).outcome).toBe('finalized');
-    expect(classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_VISIT_WITHOUT_CODIGO' } }).outcome).toBe('permanent');
-    expect(classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_VALIDATION_ERROR' } }).outcome).toBe('permanent');
-    expect(classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_INVALID_TOKEN' } }).outcome).toBe('permanent');
-    const np = classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS' } });
+    expect(classifyMilvusFinalizarResult({ data: { success: true, codigo: 1234 } }).outcome).toBe(
+      'finalized'
+    );
+    expect(
+      classifyMilvusFinalizarResult({
+        data: { success: false, code: 'MILVUS_VISIT_WITHOUT_CODIGO' },
+      }).outcome
+    ).toBe('permanent');
+    expect(
+      classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_VALIDATION_ERROR' } })
+        .outcome
+    ).toBe('permanent');
+    expect(
+      classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_INVALID_TOKEN' } })
+        .outcome
+    ).toBe('permanent');
+    const np = classifyMilvusFinalizarResult({
+      data: { success: false, code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS' },
+    });
     expect(np.outcome).toBe('permanent');
     expect(np.detail).toMatch(/play/i);
-    const npMsg = classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS', message: 'Dê play manualmente no Milvus' } });
+    const npMsg = classifyMilvusFinalizarResult({
+      data: {
+        success: false,
+        code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS',
+        message: 'Dê play manualmente no Milvus',
+      },
+    });
     expect(npMsg.outcome).toBe('permanent');
     expect(npMsg.detail).toBe('Dê play manualmente no Milvus');
-    expect(classifyMilvusFinalizarResult(null, new TypeError('Failed to fetch')).outcome).toBe('transient');
-    expect(classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_UNAVAILABLE' } }).outcome).toBe('transient');
+    expect(classifyMilvusFinalizarResult(null, new TypeError('Failed to fetch')).outcome).toBe(
+      'transient'
+    );
+    expect(
+      classifyMilvusFinalizarResult({ data: { success: false, code: 'MILVUS_UNAVAILABLE' } })
+        .outcome
+    ).toBe('transient');
   });
 });
 
 describe('TESTE 1 — conclusão online finaliza (PUT com codigo correto)', () => {
   it('varredura finaliza e grava estado; invoke leva visitId+action', async () => {
-    _visits.push({ id: 'VIS-1', status: 'concluida', relatorio: 'Ok', milvusChamadoCodigo: 1234, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      relatorio: 'Ok',
+      milvusChamadoCodigo: 1234,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     const res = await processPendingMilvusFinalizar('test');
     expect(res.finalized).toBe(1);
     expect(invokeCalls).toHaveLength(1);
@@ -310,7 +440,13 @@ describe('TESTE 1 — conclusão online finaliza (PUT com codigo correto)', () =
 describe('TESTE 2/3 — offline conclui local; online finaliza', () => {
   it('enqueue offline não chama a Edge; online processa', async () => {
     globalThis.navigator.onLine = false;
-    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 1234, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      milvusChamadoCodigo: 1234,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     enqueueMilvusFinalizar('VIS-1');
     await new Promise((r) => setTimeout(r, 30));
     expect(invokeCalls).toHaveLength(0);
@@ -324,18 +460,42 @@ describe('TESTE 2/3 — offline conclui local; online finaliza', () => {
 describe('TESTE 4 — reload: pendência persiste, fresh espera, stale retoma', () => {
   it('comportamento de retomada', async () => {
     const now = Date.now();
-    _visits.push({ id: 'VIS-p', status: 'concluida', milvusChamadoCodigo: 1, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
-    _visits.push({ id: 'VIS-f', status: 'concluida', milvusChamadoCodigo: 2, milvusFinalizarStatus: 'finalizando', updatedAt: new Date(now - 30 * 1000).toISOString() });
+    _visits.push({
+      id: 'VIS-p',
+      status: 'concluida',
+      milvusChamadoCodigo: 1,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
+    _visits.push({
+      id: 'VIS-f',
+      status: 'concluida',
+      milvusChamadoCodigo: 2,
+      milvusFinalizarStatus: 'finalizando',
+      updatedAt: new Date(now - 30 * 1000).toISOString(),
+    });
     await processPendingMilvusFinalizar('boot');
     expect(invokeCalls).toHaveLength(1); // só a pendente; fresh espera
     expect(globalThis.getVisitById('VIS-p').milvusFinalizarStatus).toBe('finalizado');
-    _visits.push({ id: 'VIS-s', status: 'concluida', milvusChamadoCodigo: 3, milvusFinalizarStatus: 'finalizando', updatedAt: new Date(now - 3600 * 1000).toISOString() });
+    _visits.push({
+      id: 'VIS-s',
+      status: 'concluida',
+      milvusChamadoCodigo: 3,
+      milvusFinalizarStatus: 'finalizando',
+      updatedAt: new Date(now - 3600 * 1000).toISOString(),
+    });
     await processPendingMilvusFinalizar('boot');
     expect(globalThis.getVisitById('VIS-s').milvusFinalizarStatus).toBe('finalizado');
   });
   it('falha transitória volta a pendente com tentativa contada', async () => {
     invokeBehavior = () => ({ data: { success: false, code: 'MILVUS_UNAVAILABLE' }, error: null });
-    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 1, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      milvusChamadoCodigo: 1,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     await processPendingMilvusFinalizar('test');
     const v = globalThis.getVisitById('VIS-1');
     expect(v.milvusFinalizarStatus).toBe('pendente');
@@ -346,7 +506,13 @@ describe('TESTE 4 — reload: pendência persiste, fresh espera, stale retoma', 
 
 describe('TESTE 5 — sem codigo: nenhuma requisição inválida', () => {
   it('varredura pula visita sem codigo', async () => {
-    _visits.push({ id: 'VIS-1', status: 'concluida', relatorio: 'Ok', milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      relatorio: 'Ok',
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     await processPendingMilvusFinalizar('test');
     expect(invokeCalls).toHaveLength(0);
     expect(globalThis.getVisitById('VIS-1').status).toBe('concluida');
@@ -355,12 +521,24 @@ describe('TESTE 5 — sem codigo: nenhuma requisição inválida', () => {
 
 describe('TESTE 6 — finalização repetida não repete operação', () => {
   it('segunda varredura e gatilhos concorrentes não re-invocam', async () => {
-    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 9, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      milvusChamadoCodigo: 9,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     await processPendingMilvusFinalizar('run1');
     await processPendingMilvusFinalizar('run2');
     expect(invokeCalls).toHaveLength(1);
     // concorrência com pendência real: o 2º encontra o mutex do 1º
-    _visits.push({ id: 'VIS-2', status: 'concluida', milvusChamadoCodigo: 10, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-2',
+      status: 'concluida',
+      milvusChamadoCodigo: 10,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     const [r1, r2] = await Promise.all([
       processPendingMilvusFinalizar('a'),
       processPendingMilvusFinalizar('b'),
@@ -371,7 +549,14 @@ describe('TESTE 6 — finalização repetida não repete operação', () => {
   });
   it('retry manual reenfileira erro (sem criar chamado, sem tocar relatório)', async () => {
     invokeBehavior = () => ({ data: { success: true, codigo: 55 }, error: null });
-    _visits.push({ id: 'VIS-1', status: 'concluida', relatorio: 'R', milvusChamadoCodigo: 55, milvusFinalizarStatus: 'erro', milvusFinalizarErro: 'x' });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      relatorio: 'R',
+      milvusChamadoCodigo: 55,
+      milvusFinalizarStatus: 'erro',
+      milvusFinalizarErro: 'x',
+    });
     retryMilvusFinalizar('VIS-1');
     await new Promise((r) => setTimeout(r, 30));
     const v = globalThis.getVisitById('VIS-1');
@@ -380,18 +565,31 @@ describe('TESTE 6 — finalização repetida não repete operação', () => {
     expect(v.milvusChamadoCodigo).toBe(55);
   });
   it('visita concluída antes da etapa 2 (finalizar null) entra via retry manual', async () => {
-    _visits.push({ id: 'VIS-old', status: 'concluida', relatorio: 'Antigo', milvusChamadoCodigo: 42, milvusChamadoStatus: 'criado' });
+    _visits.push({
+      id: 'VIS-old',
+      status: 'concluida',
+      relatorio: 'Antigo',
+      milvusChamadoCodigo: 42,
+      milvusChamadoStatus: 'criado',
+    });
     expect(resolveMilvusFinalizarState(globalThis.getVisitById('VIS-old')).kind).toBe(null);
     retryMilvusFinalizar('VIS-old');
     // entrou no fluxo (pendente ou já finalizando pelo processador online)
-    expect(['pendente', 'finalizando', 'finalizado']).toContain(globalThis.getVisitById('VIS-old').milvusFinalizarStatus);
+    expect(['pendente', 'finalizando', 'finalizado']).toContain(
+      globalThis.getVisitById('VIS-old').milvusFinalizarStatus
+    );
     await new Promise((r) => setTimeout(r, 30));
     expect(globalThis.getVisitById('VIS-old').milvusFinalizarStatus).toBe('finalizado');
     expect(invokeCalls).toHaveLength(1);
     expect(invokeCalls[0].body).toEqual({ visitId: 'VIS-old', action: 'finalizar' });
   });
   it('retry manual ignora visita já finalizada', () => {
-    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 1, milvusFinalizarStatus: 'finalizado' });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      milvusChamadoCodigo: 1,
+      milvusFinalizarStatus: 'finalizado',
+    });
     retryMilvusFinalizar('VIS-1');
     expect(invokeCalls).toHaveLength(0);
   });
@@ -409,7 +607,13 @@ describe('P3.12 — visita excluída durante o voo não é ressuscitada', () => 
     expect(res.created).toBe(0);
   });
   it('finalização: delete no meio do invoke não gera registro fantasma', async () => {
-    _visits.push({ id: 'VIS-1', status: 'concluida', milvusChamadoCodigo: 7, milvusFinalizarStatus: 'pendente', milvusFinalizarTentativas: 0 });
+    _visits.push({
+      id: 'VIS-1',
+      status: 'concluida',
+      milvusChamadoCodigo: 7,
+      milvusFinalizarStatus: 'pendente',
+      milvusFinalizarTentativas: 0,
+    });
     invokeBehavior = async () => {
       _visits.length = 0;
       return { data: { success: true, codigo: 7 }, error: null };

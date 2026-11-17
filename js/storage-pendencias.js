@@ -28,9 +28,11 @@ function getClients() {
   // Memoiza a ordenação por identidade do array. Retorna slice() para
   // preservar o contrato de "array novo".
   if (_clientsArr !== all || !_clientsSorted) {
-    _clientsSorted = (all || []).slice().sort((a, b) =>
-      (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true })
-    );
+    _clientsSorted = (all || [])
+      .slice()
+      .sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true })
+      );
     _clientsArr = all;
     _clientByIdMap = null;
   }
@@ -39,7 +41,7 @@ function getClients() {
 function getClientsByTeam(team) {
   const all = getClients();
   if (!team) return all;
-  return all.filter(c => (c.team || 'init') === team);
+  return all.filter((c) => (c.team || 'init') === team);
 }
 function getMyClients() {
   return filterByTeam(getClients());
@@ -52,14 +54,20 @@ function getClientById(id) {
     const all = dbGet(DB.CLIENTS) || [];
     if (_clientsArr !== all || !_clientByIdMap) {
       _clientByIdMap = new Map();
-      for (const c of all) { if (c && c.id != null && !_clientByIdMap.has(c.id)) _clientByIdMap.set(c.id, c); }
+      for (const c of all) {
+        if (c && c.id != null && !_clientByIdMap.has(c.id)) _clientByIdMap.set(c.id, c);
+      }
       _clientsArr = all;
       _clientsSorted = null;
     }
     if (id == null) return null;
-    return _clientByIdMap.has(id) ? (_clientByIdMap.get(id) || null) : null;
+    return _clientByIdMap.has(id) ? _clientByIdMap.get(id) || null : null;
   } catch (_) {
-    try { return (dbGet(DB.CLIENTS) || []).find(c => c && c.id === id) || null; } catch (_) { return null; }
+    try {
+      return (dbGet(DB.CLIENTS) || []).find((c) => c && c.id === id) || null;
+    } catch (_) {
+      return null;
+    }
   }
 }
 function saveClient(data) {
@@ -70,16 +78,20 @@ function saveClient(data) {
   try {
     var _edSession = typeof getSession === 'function' ? getSession() : null;
     data.updatedBy = (_edSession && _edSession.name) || data.updatedBy || '';
-  } catch (_) { data.updatedBy = data.updatedBy || ''; }
+  } catch (_) {
+    data.updatedBy = data.updatedBy || '';
+  }
   // Criação restrita a admin (backstop além da UI — edição e undo passam).
   if (!isEdit && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    if (typeof showToast === 'function') showToast('Apenas administradores podem cadastrar clientes.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Apenas administradores podem cadastrar clientes.', 'error');
     throw new Error('Permissão negada para criar clientes.');
   }
   if (!data.team) data.team = getCurrentTeam();
   if (isEdit) {
-    const i = clients.findIndex(c => c.id === data.id);
-    if (i !== -1) clients[i] = _withDirtyFields(clients[i], { ...clients[i], ...data, updatedAt: now });
+    const i = clients.findIndex((c) => c.id === data.id);
+    if (i !== -1)
+      clients[i] = _withDirtyFields(clients[i], { ...clients[i], ...data, updatedAt: now });
     else {
       // Undo/restauração: reinsere preservando o id (antes era perdido em silêncio).
       data.createdAt = data.createdAt || now;
@@ -95,75 +107,118 @@ function saveClient(data) {
   dbSet(DB.CLIENTS, clients);
   addLog(isEdit ? 'Editou' : 'Criou', 'Cliente', data.id, data.name);
 
-  // Sync Supabase
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('clients').upsert({
-      id: data.id,
-      name: data.name,
-      cnpj: data.cnpj,
-      segment: data.segment,
-      color: data.color,
-      initials: data.initials,
-      logo: data.logo,
-      logo_shape: data.logoShape || 'circle',
-      owner: data.owner,
-      owner_phone: data.ownerPhone,
-      responsible: data.responsible,
-      responsible_phone: data.responsiblePhone,
-      technician: data.technician,
-      server: data.server,
-      hosting: data.hosting,
-      backup: data.backup,
-      licenses: data.licenses,
-      emails: data.emails,
-      google_sheet_url: data.googleSheetUrl || null,
-      milvus_client_token: data.milvusClientToken || null,
-      notes: data.notes,
-      team: data.team || 'init',
-      attachments: data.attachments || [],
-      documents: data.documents || [],
-      created_at: data.createdAt || now,
-      updated_by: data.updatedBy || null,
-      updated_at: now,
-      // Coluna da 044: só vai quando preenchida (banco sem a coluna segue salvando o resto).
-      ...(data.address ? { address: data.address } : {}),
-      // Coluna da 068, condicionada à PRESENÇA da chave, não ao valor: só os
-      // fluxos que mexem na pasta mandam a coluna (banco sem a 068 segue
-      // salvando o resto), e desvincular precisa mandar null — o push genérico
-      // descarta null em coluna opcional (_mapToRemote), então este upsert é o
-      // único caminho que apaga o valor no servidor.
-      ...('driveFolderUrl' in data ? { drive_folder_url: data.driveFolderUrl || null } : {})
-    }).then(res => {
-      if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); }
-    }).catch(err => {
-      console.error('❌ Erro de rede Supabase cliente:', String(err.message));
-      markSyncPushFailed();
-    });
+  // Sync Supabase. A fila offline leva o registro MESCLADO (o `data` pode ser parcial).
+  const _fullC = clients.find((c) => c.id === data.id) || data;
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('clients')
+      .upsert({
+        id: data.id,
+        name: data.name,
+        cnpj: data.cnpj,
+        segment: data.segment,
+        color: data.color,
+        initials: data.initials,
+        logo: data.logo,
+        logo_shape: data.logoShape || 'circle',
+        owner: data.owner,
+        owner_phone: data.ownerPhone,
+        responsible: data.responsible,
+        responsible_phone: data.responsiblePhone,
+        technician: data.technician,
+        server: data.server,
+        hosting: data.hosting,
+        backup: data.backup,
+        licenses: data.licenses,
+        emails: data.emails,
+        google_sheet_url: data.googleSheetUrl || null,
+        milvus_client_token: data.milvusClientToken || null,
+        notes: data.notes,
+        team: data.team || 'init',
+        attachments: data.attachments || [],
+        documents: data.documents || [],
+        created_at: data.createdAt || now,
+        updated_by: data.updatedBy || null,
+        updated_at: now,
+        // Coluna da 044: só vai quando preenchida (banco sem a coluna segue salvando o resto).
+        ...(data.address ? { address: data.address } : {}),
+        // Coluna da 068, condicionada à PRESENÇA da chave, não ao valor: só os
+        // fluxos que mexem na pasta mandam a coluna (banco sem a 068 segue
+        // salvando o resto), e desvincular precisa mandar null — o push genérico
+        // descarta null em coluna opcional (_mapToRemote), então este upsert é o
+        // único caminho que apaga o valor no servidor.
+        ...('driveFolderUrl' in data ? { drive_folder_url: data.driveFolderUrl || null } : {}),
+      })
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase cliente:', String(res.error.message || res.error));
+          markSyncPushFailed();
+          _outboxFail('clients', 'upsert', _fullC, res.error);
+        }
+      })
+      .catch((err) => {
+        console.error('❌ Erro de rede Supabase cliente:', String(err.message));
+        markSyncPushFailed();
+        _outboxFail('clients', 'upsert', _fullC, null, true);
+      });
+  } else {
+    _outboxOffline('clients', 'upsert', _fullC);
   }
 
   return data;
 }
 function deleteClient(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir clientes.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir clientes.', 'error');
     return false;
   }
   const client = getClientById(id);
   const name = client ? client.name : 'Desconhecido';
-  dbSet(DB.CLIENTS, getClients().filter(c => c.id !== id));
+  dbSet(
+    DB.CLIENTS,
+    getClients().filter((c) => c.id !== id)
+  );
   _addTombstone(DB.CLIENTS, id);
   addLog('Excluiu', 'Cliente', id, name);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    _outboxDropTarget(id);
+    supabaseClient
+      .from('clients')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error));
+          markSyncPushFailed();
+          _outboxFail('clients', 'delete', { id }, res.error);
+        }
+      })
+      .catch(() => {
+        markSyncPushFailed();
+        _outboxFail('clients', 'delete', { id }, null, true);
+      });
+  } else {
+    _outboxOffline('clients', 'delete', { id });
   }
 }
 
 // ── PENDÊNCIAS ──
-function getPendencias() { return dbGet(DB.PENDENCIAS); }
+function getPendencias() {
+  return dbGet(DB.PENDENCIAS);
+}
 function getPendenciasByTeam(team) {
   const all = getPendencias();
-  const scoped = !team ? all : all.filter(p => (p.team || 'init') === team);
+  const scoped = !team ? all : all.filter((p) => (p.team || 'init') === team);
   return filterGestaoPendencias(scoped);
 }
 function getMyPendencias() {
@@ -188,27 +243,42 @@ function _penServerAvailable() {
     if (typeof window !== 'undefined' && !window._supabaseAuthActive) return false;
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
     return true;
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 
 function _penPageScope() {
   // Retorna { team: string|null, adminSeeAll: boolean, canSeeGestao: boolean }.
   var canSeeGestao = false;
-  try { canSeeGestao = (typeof canViewGestao === 'function') ? !!canViewGestao() : false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
   try {
-    const admin = (typeof isTeamAdmin === 'function') ? isTeamAdmin() : false;
-    const sel = (typeof _selectedTeam !== 'undefined') ? _selectedTeam : '';
+    canSeeGestao = typeof canViewGestao === 'function' ? !!canViewGestao() : false;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
+  try {
+    const admin = typeof isTeamAdmin === 'function' ? isTeamAdmin() : false;
+    const sel = typeof _selectedTeam !== 'undefined' ? _selectedTeam : '';
     if (admin && sel) return { team: sel, adminSeeAll: false, canSeeGestao: canSeeGestao };
     if (admin) return { team: null, adminSeeAll: true, canSeeGestao: canSeeGestao };
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   try {
-    if (typeof getCurrentTeam === 'function') return { team: getCurrentTeam(), adminSeeAll: false, canSeeGestao: canSeeGestao };
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    if (typeof getCurrentTeam === 'function')
+      return { team: getCurrentTeam(), adminSeeAll: false, canSeeGestao: canSeeGestao };
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   return { team: 'init', adminSeeAll: false, canSeeGestao: canSeeGestao };
 }
 
 function _sanitizeIlike(s) {
-  return String(s || '').replace(/[%_\\]/g, '').replace(/[,()]/g, ' ').trim().slice(0, 80);
+  return String(s || '')
+    .replace(/[%_\\]/g, '')
+    .replace(/[,()]/g, ' ')
+    .trim()
+    .slice(0, 80);
 }
 
 // ── Origem: interna × e-mail ──────────────────────────────────────────────
@@ -226,7 +296,7 @@ function penOrigemDe(p) {
 /** Quantas pendências de cada origem há na lista: { interna, email }. */
 function penContarOrigens(lista) {
   const out = { interna: 0, email: 0 };
-  for (const p of (lista || [])) out[penOrigemDe(p)]++;
+  for (const p of lista || []) out[penOrigemDe(p)]++;
   return out;
 }
 
@@ -238,9 +308,12 @@ function applyPendenciaPageFilters(q, opts) {
   else q = q.not('status', 'in', '(' + PEN_CLOSED_LIST.join(',') + ')');
   // Gestão: quem não é Gestão nunca recebe linhas Gestão do servidor
   // (defesa em profundidade junto ao RLS; Gestão vê tudo do seu escopo).
-  var _canSeeGestao = (typeof o.canSeeGestao === 'boolean')
-    ? o.canSeeGestao
-    : ((typeof canViewGestao === 'function') ? !!canViewGestao() : true);
+  var _canSeeGestao =
+    typeof o.canSeeGestao === 'boolean'
+      ? o.canSeeGestao
+      : typeof canViewGestao === 'function'
+        ? !!canViewGestao()
+        : true;
   if (!_canSeeGestao) q = q.not('tipo', 'in', '(Gestão,Gestao)');
   if (o.clientId) q = q.eq('client_id', o.clientId);
   if (o.responsible) q = q.eq('responsible', o.responsible);
@@ -253,7 +326,16 @@ function applyPendenciaPageFilters(q, opts) {
   const sq = _sanitizeIlike(o.search);
   if (sq) {
     const pat = '%' + sq + '%';
-    q = q.or('assunto.ilike.' + pat + ',descricao.ilike.' + pat + ',client_name.ilike.' + pat + ',responsible.ilike.' + pat);
+    q = q.or(
+      'assunto.ilike.' +
+        pat +
+        ',descricao.ilike.' +
+        pat +
+        ',client_name.ilike.' +
+        pat +
+        ',responsible.ilike.' +
+        pat
+    );
   }
   return q;
 }
@@ -261,10 +343,12 @@ function applyPendenciaPageFilters(q, opts) {
 function _penFields() {
   try {
     if (typeof ENTITIES !== 'undefined') {
-      const e = ENTITIES.find(x => x.table === 'pendencias');
+      const e = ENTITIES.find((x) => x.table === 'pendencias');
       if (e && e.fields) return e.fields;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   return null;
 }
 
@@ -292,12 +376,16 @@ const PEN_SORT_REMOTE = {
 /** Coluna do banco para a coluna da fila, ou null se a ordem fica local. */
 function penSortRemoteCol(colId) {
   if (!colId) return null;
-  return Object.prototype.hasOwnProperty.call(PEN_SORT_REMOTE, colId) ? PEN_SORT_REMOTE[colId] : null;
+  return Object.prototype.hasOwnProperty.call(PEN_SORT_REMOTE, colId)
+    ? PEN_SORT_REMOTE[colId]
+    : null;
 }
 
 async function fetchPendenciasPage(opts) {
-
-  const o = Object.assign({ scope: 'active', page: 0, pageSize: PEN_PAGE_DEFAULT_SIZE }, opts || {});
+  const o = Object.assign(
+    { scope: 'active', page: 0, pageSize: PEN_PAGE_DEFAULT_SIZE },
+    opts || {}
+  );
   const sc = _penPageScope();
   const page = Math.max(0, parseInt(o.page, 10) || 0);
   const pageSize = Math.min(200, Math.max(1, parseInt(o.pageSize, 10) || PEN_PAGE_DEFAULT_SIZE));
@@ -306,10 +394,15 @@ async function fetchPendenciasPage(opts) {
   let q = supabaseClient.from('pendencias').select('*', { count: 'exact' });
   q = applyPendenciaPageFilters(q, {
     scope: o.scope === 'archived' ? 'archived' : 'active',
-    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao,
-    clientId: o.clientId || '', responsible: o.responsible || '',
-    status: o.status || '', priority: o.priority || '', search: o.search || '',
-    origem: o.origem || ''
+    team: sc.team,
+    adminSeeAll: sc.adminSeeAll,
+    canSeeGestao: sc.canSeeGestao,
+    clientId: o.clientId || '',
+    responsible: o.responsible || '',
+    status: o.status || '',
+    priority: o.priority || '',
+    search: o.search || '',
+    origem: o.origem || '',
   });
   const sortCol = penSortRemoteCol(o.sort && o.sort.col);
   if (sortCol) {
@@ -323,8 +416,8 @@ async function fetchPendenciasPage(opts) {
   const from = page * pageSize;
   const res = await q.range(from, from + pageSize - 1);
   if (res.error) throw new Error(res.error.message || 'Falha na consulta paginada');
-  const rows = (res.data || []).map(r => _mapFromRemote(r, fields));
-  return { rows, total: (typeof res.count === 'number') ? res.count : rows.length, page, pageSize };
+  const rows = (res.data || []).map((r) => _mapFromRemote(r, fields));
+  return { rows, total: typeof res.count === 'number' ? res.count : rows.length, page, pageSize };
 }
 
 // ── FASE 6: contadores no banco ────────────────────────────────────────────
@@ -340,7 +433,7 @@ function countPendenciaStatuses(statusRows, todayISO) {
   const today = todayISO ? String(todayISO) : '';
   let total = 0;
   let vencidas = 0;
-  for (const r of (statusRows || [])) {
+  for (const r of statusRows || []) {
     const s = (r && r.status) || 'aberto';
     byStatus[s] = (byStatus[s] || 0) + 1;
     total++;
@@ -355,48 +448,67 @@ async function fetchPendenciaStatusCounts(scope, origem) {
   let q = supabaseClient.from('pendencias').select('status,deadline');
   q = applyPendenciaPageFilters(q, {
     scope: scope === 'archived' ? 'archived' : 'active',
-    team: sc.team, adminSeeAll: sc.adminSeeAll, canSeeGestao: sc.canSeeGestao,
-    origem: origem || ''
+    team: sc.team,
+    adminSeeAll: sc.adminSeeAll,
+    canSeeGestao: sc.canSeeGestao,
+    origem: origem || '',
   });
   const res = await q;
   if (res.error) throw new Error(res.error.message || 'Falha na contagem');
-  const today = (typeof localDateISO === 'function')
-    ? localDateISO()
-    : new Date().toISOString().slice(0, 10);
+  const today =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
   return countPendenciaStatuses(res.data || [], today);
 }
-function getPendenciaById(id) { return getPendencias().find(p => p.id === id) || null; }
+function getPendenciaById(id) {
+  return getPendencias().find((p) => p.id === id) || null;
+}
 function uniquePendenciaId(list) {
   let id;
   do {
     id = `PEN-${Date.now().toString(36)}-${_secureRandStr(6)}`;
-  } while (list.some(p => p.id === id));
+  } while (list.some((p) => p.id === id));
   return id;
 }
 // Colunas da 056 (remoto, local). Antes da migration o banco não as tem.
-const _PEN_056_COLS = [['solicitante', 'solicitante'], ['canal', 'canal'], ['categoria', 'categoria'],
-  ['first_response_due', 'firstResponseDue'], ['first_response_at', 'firstResponseAt'], ['first_response_by', 'firstResponseBy']];
+const _PEN_056_COLS = [
+  ['solicitante', 'solicitante'],
+  ['canal', 'canal'],
+  ['categoria', 'categoria'],
+  ['first_response_due', 'firstResponseDue'],
+  ['first_response_at', 'firstResponseAt'],
+  ['first_response_by', 'firstResponseBy'],
+];
 let _penWarned056 = false;
 function _penMissingColumn(err) {
-  return !!err && (err.code === 'PGRST204' || err.code === '42703' || /column/i.test(err.message || ''));
+  return (
+    !!err && (err.code === 'PGRST204' || err.code === '42703' || /column/i.test(err.message || ''))
+  );
 }
-function _penHas056(row) { return _PEN_056_COLS.some(function (c) { return c[0] in row; }); }
+function _penHas056(row) {
+  return _PEN_056_COLS.some(function (c) {
+    return c[0] in row;
+  });
+}
 function _penWithout056(row) {
   const out = Object.assign({}, row);
-  _PEN_056_COLS.forEach(function (c) { delete out[c[0]]; });
+  _PEN_056_COLS.forEach(function (c) {
+    delete out[c[0]];
+  });
   return out;
 }
 
 function savePendencia(data) {
   // Gestão: só Felipe/Joarli criam ou convertem para Gestão.
   try {
-    var _isGest = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(data) : false;
-    var _canG = (typeof canViewGestao === 'function') ? canViewGestao() : true;
-    if (_isGest && !_canG) throw new Error('Apenas Gestão (Felipe e Joarli) pode criar pendências do tipo Gestão.');
+    var _isGest = typeof isPendenciaGestao === 'function' ? isPendenciaGestao(data) : false;
+    var _canG = typeof canViewGestao === 'function' ? canViewGestao() : true;
+    if (_isGest && !_canG)
+      throw new Error('Apenas Gestão (Felipe e Joarli) pode criar pendências do tipo Gestão.');
     if (!!data.id && typeof getPendenciaById === 'function') {
       var _old = getPendenciaById(data.id);
-      var _wasGest = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(_old) : false;
-      if ((_wasGest || _isGest) && !_canG) throw new Error('Apenas Gestão (Felipe e Joarli) pode editar pendências do tipo Gestão.');
+      var _wasGest = typeof isPendenciaGestao === 'function' ? isPendenciaGestao(_old) : false;
+      if ((_wasGest || _isGest) && !_canG)
+        throw new Error('Apenas Gestão (Felipe e Joarli) pode editar pendências do tipo Gestão.');
     }
   } catch (e) {
     if (e && e.message && e.message.indexOf('Apenas Gestão') === 0) throw e;
@@ -411,24 +523,43 @@ function savePendencia(data) {
   }
   if (!data.team) data.team = getCurrentTeam();
   // Pessoas por id (049): o id acompanha o nome gravado.
-  if ('responsible' in data) data.responsibleId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.responsible) : null;
-  if ('timerOperator' in data) data.timerOperatorId = (typeof operatorIdByName === 'function') ? operatorIdByName(data.timerOperator) : null;
+  if ('responsible' in data)
+    data.responsibleId =
+      typeof operatorIdByName === 'function' ? operatorIdByName(data.responsible) : null;
+  if ('timerOperator' in data)
+    data.timerOperatorId =
+      typeof operatorIdByName === 'function' ? operatorIdByName(data.timerOperator) : null;
   // Safety: status final nunca mantém timer rodando (evita tempo fantasma
   // quando a conclusão chega por kanban, reunião, import ou outro caller
   // que não passou pelo auto-stop de changePenStatus).
   try {
-    var _sClosed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(data.status) : ['concluido', 'resolvido', 'cancelado', 'fechado'].indexOf(data.status || '') !== -1;
+    var _sClosed =
+      typeof isPendenciaClosed === 'function'
+        ? isPendenciaClosed(data.status)
+        : ['concluido', 'resolvido', 'cancelado', 'fechado'].indexOf(data.status || '') !== -1;
     if (_sClosed && data.timerRunning) {
       var _sEl = 0;
-      if (data.timerStartedAt) { _sEl = Math.max(0, Math.floor((Date.now() - new Date(data.timerStartedAt).getTime()) / 1000)); }
+      if (data.timerStartedAt) {
+        _sEl = Math.max(
+          0,
+          Math.floor((Date.now() - new Date(data.timerStartedAt).getTime()) / 1000)
+        );
+      }
       data.timerTotalSeconds = (Number(data.timerTotalSeconds) || 0) + _sEl;
-      if (typeof timerClosedSessionNote === 'function') data.notes = [...(data.notes || []), timerClosedSessionNote(data.timerOperator, _sEl, data.timerTotalSeconds)];
-      if (typeof recordTimeSession === 'function') recordTimeSession({ ...data }, _sEl, { source: 'conclusao' });
+      if (typeof timerClosedSessionNote === 'function')
+        data.notes = [
+          ...(data.notes || []),
+          timerClosedSessionNote(data.timerOperator, _sEl, data.timerTotalSeconds),
+        ];
+      if (typeof recordTimeSession === 'function')
+        recordTimeSession({ ...data }, _sEl, { source: 'conclusao' });
       data.timerRunning = false;
       data.timerStartedAt = null;
       data.timerOperator = null;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   let oldStatus = null;
   // Linha do tempo (063): o que ACONTECEU, complementar a `notes`, que é o
   // que a equipe ESCREVEU. Só campos que contam uma história — texto, anexos
@@ -452,14 +583,24 @@ function savePendencia(data) {
   };
   // SLA (056): prazo da 1ª resposta e registro da 1ª resposta (js/sla.js).
   var _slaActor = '';
-  try { _slaActor = typeof getUser === 'function' ? (getUser().name || '') : ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  try {
+    _slaActor = typeof getUser === 'function' ? getUser().name || '' : '';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   var _sla = function (prev, cur) {
-    try { if (typeof slaOnSave === 'function') slaOnSave(prev, cur, now, _slaActor); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
-    ['firstResponseDue', 'firstResponseAt', 'firstResponseBy'].forEach(function (k) { if (cur[k] && cur !== data) data[k] = cur[k]; });
+    try {
+      if (typeof slaOnSave === 'function') slaOnSave(prev, cur, now, _slaActor);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+    }
+    ['firstResponseDue', 'firstResponseAt', 'firstResponseBy'].forEach(function (k) {
+      if (cur[k] && cur !== data) data[k] = cur[k];
+    });
     return cur;
   };
   if (isEdit) {
-    const i = list.findIndex(p => p.id === data.id);
+    const i = list.findIndex((p) => p.id === data.id);
     if (i !== -1) {
       oldStatus = list[i].status;
       var _antes = list[i];
@@ -484,24 +625,35 @@ function savePendencia(data) {
     data.updatedAt = now;
     data.status = data.status || 'em_andamento';
     _sla(null, data);
-    _penComEventos(data, [{ at: now, by: _slaActor || '', type: 'criado', de: null, para: data.status }]);
+    _penComEventos(data, [
+      { at: now, by: _slaActor || '', type: 'criado', de: null, para: data.status },
+    ]);
     list.push(data);
   }
   // Êxito agora é 'resolvido' ('concluido' legado conta igual): a transição
   // para resolvida dispara completedAt + próxima ocorrência recorrente.
-  var _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  var _isResolvida = function (s) {
+    return ['concluido', 'resolvido'].indexOf(s || '') !== -1;
+  };
+  try {
+    if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   const justConcluded = _isResolvida(data.status) && !_isResolvida(oldStatus);
   if (justConcluded) {
     data.completedAt = now;
-    const idx = list.findIndex(p => p.id === data.id);
+    const idx = list.findIndex((p) => p.id === data.id);
     if (idx !== -1) list[idx].completedAt = data.completedAt;
     // Quem concluiu: responsável atual (ou usuário da sessão). Correções
     // posteriores usam updatePendenciaAssignee; legados ficam sem valor.
     if (!data.completedBy) {
       try {
-        data.completedBy = data.responsible || (typeof getUser === 'function' ? (getUser().name || '') : '') || '';
-      } catch (_) { data.completedBy = data.completedBy || data.responsible || ''; }
+        data.completedBy =
+          data.responsible || (typeof getUser === 'function' ? getUser().name || '' : '') || '';
+      } catch (_) {
+        data.completedBy = data.completedBy || data.responsible || '';
+      }
       if (!data.completedBy) delete data.completedBy;
       else if (idx !== -1) list[idx].completedBy = data.completedBy;
     }
@@ -510,26 +662,39 @@ function savePendencia(data) {
   // Gestão: histórico nunca recebe assunto/descrição (só marcador restrito).
   var _logDetails = (data.assunto || '').trim() || data.descricao;
   try {
-    if (typeof isPendenciaGestao === 'function' && isPendenciaGestao(data)) _logDetails = '[Gestão – restrito]';
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    if (typeof isPendenciaGestao === 'function' && isPendenciaGestao(data))
+      _logDetails = '[Gestão – restrito]';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   addLog(isEdit ? 'Editou' : 'Criou', 'Pendência', data.id, _logDetails);
 
   if (justConcluded && data.recurrence) {
     try {
       // Concluída com atraso: a próxima não nasce já vencida (pula ciclos passados).
       const _todayRec = typeof localDateISO === 'function' ? localDateISO() : null;
-      const nextDeadline = typeof nextRecurrenceDateFrom === 'function'
-        ? nextRecurrenceDateFrom(data.deadline || data.completedAt, data.recurrence, _todayRec)
-        : nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence);
+      const nextDeadline =
+        typeof nextRecurrenceDateFrom === 'function'
+          ? nextRecurrenceDateFrom(data.deadline || data.completedAt, data.recurrence, _todayRec)
+          : nextRecurrenceDate(data.deadline || data.completedAt, data.recurrence);
       // Idempotência (idem visitas): mesma chave lógica — cliente + deadline
       // + assunto — impede duplicata em conclusão repetida/offline/2 devices.
-      const penKey = p => ((p.assunto || '').trim() || p.descricao);
-      const already = nextDeadline && getPendencias().some(x => x.id !== data.id
-        && (x.clientId || '') === (data.clientId || '')
-        && (x.deadline || '') === nextDeadline
-        && penKey(x) === penKey(data));
+      const penKey = (p) => (p.assunto || '').trim() || p.descricao;
+      const already =
+        nextDeadline &&
+        getPendencias().some(
+          (x) =>
+            x.id !== data.id &&
+            (x.clientId || '') === (data.clientId || '') &&
+            (x.deadline || '') === nextDeadline &&
+            penKey(x) === penKey(data)
+        );
       if (already) {
-        console.debug('[recorrência] pendência de ' + nextDeadline + ' já existe — geração pulada (sem duplicar).');
+        console.debug(
+          '[recorrência] pendência de ' +
+            nextDeadline +
+            ' já existe — geração pulada (sem duplicar).'
+        );
       } else {
         savePendencia({
           clientId: data.clientId,
@@ -545,15 +710,23 @@ function savePendencia(data) {
           tags: data.tags || [],
           team: data.team || 'init',
           recurrence: data.recurrence,
-          solicitante: data.solicitante, canal: data.canal, categoria: data.categoria,
+          solicitante: data.solicitante,
+          canal: data.canal,
+          categoria: data.categoria,
           // O checklist da rotina (ex.: passos do backup) segue para a próxima,
           // desmarcado — antes a nova ocorrência nascia sem checklist.
           checklist: (Array.isArray(data.checklist) ? data.checklist : [])
-            .filter(function (it) { return it && String(it.text || '').trim(); })
-            .map(function (it) { return { text: it.text, done: false }; }),
+            .filter(function (it) {
+              return it && String(it.text || '').trim();
+            })
+            .map(function (it) {
+              return { text: it.text, done: false };
+            }),
         });
       }
-    } catch (e) { console.warn('⚠️ Erro ao gerar pendência recorrente:', e); }
+    } catch (e) {
+      console.warn('⚠️ Erro ao gerar pendência recorrente:', e);
+    }
   }
 
   // Notificação por e-mail (não bloqueia a operação)
@@ -564,7 +737,9 @@ function savePendencia(data) {
       } else if (!isEdit && typeof notifyPendenciaCreated === 'function') {
         notifyPendenciaCreated(data);
       }
-    } catch (e) { console.warn('📧 Erro na notificação de pendência:', e); }
+    } catch (e) {
+      console.warn('📧 Erro na notificação de pendência:', e);
+    }
   }, 100);
 
   // Push fire-and-forget + outbox: offline ou falha de conectividade
@@ -573,11 +748,11 @@ function savePendencia(data) {
   // O payload remoto sai do registro MESCLADO (fonte completa), nunca do objeto
   // parcial montado no form: sem isso, campos ausentes do form subiriam como
   // []/null e o pull/realtime espalharia o zeramento para todos os aparelhos (SYNC-06).
-  const _idx = list.findIndex(p => p.id === data.id);
+  const _idx = list.findIndex((p) => p.id === data.id);
   const _full = _idx !== -1 ? list[_idx] : data;
   var _remotePen = {
     id: _full.id,
-    client_id: _full.clientId || null,  // "" (chamado sem cliente, vindo da triagem) quebra a FK; NULL passa
+    client_id: _full.clientId || null, // "" (chamado sem cliente, vindo da triagem) quebra a FK; NULL passa
     client_name: _full.clientName,
     tipo: _full.tipo,
     assunto: _full.assunto || '',
@@ -602,42 +777,75 @@ function savePendencia(data) {
     completed_at: _full.completedAt || null,
     completed_by: _full.completedBy || null,
     created_at: _full.createdAt || now,
-    updated_at: now
+    updated_at: now,
   };
   // Atendimento e SLA (056): só vão quando o registro tem o campo, e caem
   // fora num 2º envio se o banco ainda não tiver as colunas (PGRST204).
-  _PEN_056_COLS.forEach(function (c) { if (_full[c[1]] !== undefined) _remotePen[c[0]] = _full[c[1]] || null; });
+  _PEN_056_COLS.forEach(function (c) {
+    if (_full[c[1]] !== undefined) _remotePen[c[0]] = _full[c[1]] || null;
+  });
   function _enqueuePen(reason) {
     try {
-      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function') Outbox.enqueue('pendencias', 'upsert', _full);
+      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.enqueue === 'function')
+        Outbox.enqueue('pendencias', 'upsert', _full);
       else if (typeof outboxEnqueue === 'function') outboxEnqueue('pendencias', 'upsert', _full);
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
-    try { if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted') markSyncPushFailed(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+    }
+    try {
+      if (typeof markSyncPushFailed === 'function' && reason !== 'offline-counted')
+        markSyncPushFailed();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+    }
   }
   try {
     var _penOnline = !(typeof navigator !== 'undefined' && navigator.onLine === false);
-    var _penConn = !(typeof isSupabaseConnected === 'function' && (!isSupabaseConnected() || !window._supabaseAuthActive));
+    var _penConn = !(
+      typeof isSupabaseConnected === 'function' &&
+      (!isSupabaseConnected() || !window._supabaseAuthActive)
+    );
     if (!_penOnline || !_penConn) {
       _enqueuePen('offline-counted'); // dbSet acima já contou 1 pendência
-    } else if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-      supabaseClient.from('pendencias').upsert(_remotePen).then(res => {
-        if (res && res.error && _penMissingColumn(res.error) && _penHas056(_remotePen)) {
-          if (!_penWarned056) { _penWarned056 = true; console.warn('⚠️ Supabase pendências sem as colunas da migration 056 — enviando sem solicitante/canal/categoria/SLA.'); }
-          return supabaseClient.from('pendencias').upsert(_penWithout056(_remotePen));
-        }
-        return res;
-      }).then(res => {
-        if (res && res.error) {
-          console.warn('⚠️ Supabase pendência (sync pulado — verifique schema):', res.error.message);
-          if (typeof _isConnectivityError === 'function' && _isConnectivityError(res.error)) _enqueuePen('push-failed');
-          else if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
-        }
-      }).catch(err => {
-        console.warn('⚠️ Erro de rede Supabase pendência:', err.message);
-        _enqueuePen('push-failed');
-      });
+    } else if (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      window._supabaseAuthActive
+    ) {
+      supabaseClient
+        .from('pendencias')
+        .upsert(_remotePen)
+        .then((res) => {
+          if (res && res.error && _penMissingColumn(res.error) && _penHas056(_remotePen)) {
+            if (!_penWarned056) {
+              _penWarned056 = true;
+              console.warn(
+                '⚠️ Supabase pendências sem as colunas da migration 056 — enviando sem solicitante/canal/categoria/SLA.'
+              );
+            }
+            return supabaseClient.from('pendencias').upsert(_penWithout056(_remotePen));
+          }
+          return res;
+        })
+        .then((res) => {
+          if (res && res.error) {
+            console.warn(
+              '⚠️ Supabase pendência (sync pulado — verifique schema):',
+              res.error.message
+            );
+            if (typeof _isConnectivityError === 'function' && _isConnectivityError(res.error))
+              _enqueuePen('push-failed');
+            else if (typeof markSyncPushFailed === 'function') markSyncPushFailed();
+          }
+        })
+        .catch((err) => {
+          console.warn('⚠️ Erro de rede Supabase pendência:', err.message);
+          _enqueuePen('push-failed');
+        });
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
 
   return data;
 }
@@ -655,28 +863,36 @@ function _findAnyOperator(name) {
   const nm = String(name || '').trim();
   if (!nm) return null;
   let ops = [];
-  try { ops = (typeof getOperators === 'function' ? getOperators() : []) || []; } catch (_) { ops = []; }
+  try {
+    ops = (typeof getOperators === 'function' ? getOperators() : []) || [];
+  } catch (_) {
+    ops = [];
+  }
   if (!ops.length) return { name: nm, _unverified: true };
-  return ops.find(o => o && String(o.name || '') === nm) || null;
+  return ops.find((o) => o && String(o.name || '') === nm) || null;
 }
 
 function updatePendenciaAssignee(penId, patch) {
-  const pen = (typeof getPendenciaById === 'function') ? getPendenciaById(penId) : null;
+  const pen = typeof getPendenciaById === 'function' ? getPendenciaById(penId) : null;
   if (!pen) throw new Error('Pendência não encontrada.');
   try {
     if (typeof canViewPendencia === 'function' && !canViewPendencia(pen)) {
       throw new Error('Acesso negado a esta pendência.');
     }
-  } catch (e) { if (e && /negado/i.test(e.message || '')) throw e; }
+  } catch (e) {
+    if (e && /negado/i.test(e.message || '')) throw e;
+  }
   const p = patch || {};
   const changed = { responsible: false, completedBy: false };
   let nextResponsible = pen.responsible;
   let nextCompletedBy = pen.completedBy;
 
   if (Object.prototype.hasOwnProperty.call(p, 'responsible')) {
-    const v = (p.responsible === null || p.responsible === undefined) ? '' : String(p.responsible).trim();
-    if (v === (pen.responsible || '')) { /* igual: sem mudança, sem log */ }
-    else {
+    const v =
+      p.responsible === null || p.responsible === undefined ? '' : String(p.responsible).trim();
+    if (v === (pen.responsible || '')) {
+      /* igual: sem mudança, sem log */
+    } else {
       if (v) {
         const any = _findAnyOperator(v);
         if (any && !any._unverified) {
@@ -691,12 +907,21 @@ function updatePendenciaAssignee(penId, patch) {
     }
   }
   if (Object.prototype.hasOwnProperty.call(p, 'completedBy')) {
-    let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-    try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
-    if (!_isResolvida(pen.status)) throw new Error('Só é possível informar quem concluiu em pendência concluída.');
-    const v = (p.completedBy === null || p.completedBy === undefined) ? '' : String(p.completedBy).trim();
-    if (v === (pen.completedBy || '')) { /* igual: sem mudança, sem log */ }
-    else {
+    let _isResolvida = function (s) {
+      return ['concluido', 'resolvido'].indexOf(s || '') !== -1;
+    };
+    try {
+      if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+    }
+    if (!_isResolvida(pen.status))
+      throw new Error('Só é possível informar quem concluiu em pendência concluída.');
+    const v =
+      p.completedBy === null || p.completedBy === undefined ? '' : String(p.completedBy).trim();
+    if (v === (pen.completedBy || '')) {
+      /* igual: sem mudança, sem log */
+    } else {
       if (v) {
         // Quem concluiu é fato passado: basta o operador existir (vale
         // afastado/inativo); só barra nome inexistente.
@@ -709,34 +934,59 @@ function updatePendenciaAssignee(penId, patch) {
   if (!changed.responsible && !changed.completedBy) {
     return { pen: getPendenciaById(penId), changed };
   }
-  const saved = savePendencia({ ...pen, responsible: nextResponsible, completedBy: nextCompletedBy });
+  const saved = savePendencia({
+    ...pen,
+    responsible: nextResponsible,
+    completedBy: nextCompletedBy,
+  });
   try {
     if (typeof addLog === 'function') {
-      if (changed.responsible) addLog('Reatribuiu', 'Pendência', penId, (pen.responsible || '—') + ' → ' + (nextResponsible || '—'));
-      if (changed.completedBy) addLog('Corrigiu conclusão', 'Pendência', penId, (pen.completedBy || '—') + ' → ' + (nextCompletedBy || '—'));
+      if (changed.responsible)
+        addLog(
+          'Reatribuiu',
+          'Pendência',
+          penId,
+          (pen.responsible || '—') + ' → ' + (nextResponsible || '—')
+        );
+      if (changed.completedBy)
+        addLog(
+          'Corrigiu conclusão',
+          'Pendência',
+          penId,
+          (pen.completedBy || '—') + ' → ' + (nextCompletedBy || '—')
+        );
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   return { pen: saved, changed };
 }
 function deletePendencia(id) {
   if (!canDelete()) {
-    if (typeof showToast === 'function') showToast('Permissão negada para excluir pendências.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Permissão negada para excluir pendências.', 'error');
     return false;
   }
   const pen = getPendenciaById(id);
-  const desc = pen ? ((pen.assunto || '').trim() || pen.descricao || 'Desconhecido') : 'Desconhecido';
-  const remaining = getPendencias().filter(p => p.id !== id);
+  const desc = pen ? (pen.assunto || '').trim() || pen.descricao || 'Desconhecido' : 'Desconhecido';
+  const remaining = getPendencias().filter((p) => p.id !== id);
   if (remaining.length === getPendencias().length) return false;
   dbSet(DB.PENDENCIAS, remaining);
   _addTombstone(DB.PENDENCIAS, id);
   // Gestão: addLog central já não encontraria o registro (deletado) — redige aqui.
   var _delDesc = desc;
   try {
-    if (typeof isPendenciaGestao === 'function' && pen && isPendenciaGestao(pen)) _delDesc = '[Gestão – restrito]';
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    if (typeof isPendenciaGestao === 'function' && pen && isPendenciaGestao(pen))
+      _delDesc = '[Gestão – restrito]';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   addLog('Excluiu', 'Pendência', id, _delDesc);
 
-  var _penConnected = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  var _penConnected =
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive;
 
   // O que estava enfileirado para este id não pode sobreviver à exclusão: o
   // drain seguinte faria upsert e recriaria no servidor o registro apagado.
@@ -747,10 +997,22 @@ function deletePendencia(id) {
       if (_penConnected) Outbox.removeTarget(id);
       else Outbox.enqueue('pendencias', 'delete', { id: id });
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
 
   if (_penConnected) {
-    supabaseClient.from('pendencias').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    supabaseClient
+      .from('pendencias')
+      .delete()
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase excluir pendência:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
   }
   return true;
 }
@@ -758,17 +1020,32 @@ function deletePendencia(id) {
 function _getOperatorNamesList() {
   try {
     if (typeof getOperatorNames === 'function') return getOperatorNames();
-    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperatorNames === 'function') return globalThis.getOperatorNames();
-    if (typeof getOperators === 'function') return getOperators().map(function(o){ return o.name; });
-    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperators === 'function') return globalThis.getOperators().map(function(o){ return o.name; });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperatorNames === 'function')
+      return globalThis.getOperatorNames();
+    if (typeof getOperators === 'function')
+      return getOperators().map(function (o) {
+        return o.name;
+      });
+    if (typeof globalThis !== 'undefined' && typeof globalThis.getOperators === 'function')
+      return globalThis.getOperators().map(function (o) {
+        return o.name;
+      });
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   return [];
 }
-function _escapeHtmlLocal(str){
+function _escapeHtmlLocal(str) {
   if (typeof escapeHtml === 'function') return escapeHtml(str);
-  if (typeof globalThis !== 'undefined' && typeof globalThis.escapeHtml === 'function') return globalThis.escapeHtml(str);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.escapeHtml === 'function')
+    return globalThis.escapeHtml(str);
   if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function parseMentionedOperators(text) {
   if (!text) return [];
@@ -781,13 +1058,19 @@ function parseMentionedOperators(text) {
   if (!mentions.length) return [];
   var result = [];
   var seen = new Set();
-  mentions.forEach(function(tok){
+  mentions.forEach(function (tok) {
     var tokLower = tok.toLowerCase();
-    names.forEach(function(n){
+    names.forEach(function (n) {
       var nLower = n.toLowerCase();
       var parts = nLower.split(/\s+/);
-      var matches = parts.some(function(p){ return p === tokLower; }) || nLower === tokLower;
-      if (matches && !seen.has(n)) { seen.add(n); result.push(n); }
+      var matches =
+        parts.some(function (p) {
+          return p === tokLower;
+        }) || nLower === tokLower;
+      if (matches && !seen.has(n)) {
+        seen.add(n);
+        result.push(n);
+      }
     });
   });
   return result;
@@ -797,13 +1080,17 @@ function highlightMentions(text) {
   var esc = _escapeHtmlLocal(text);
   var names = _getOperatorNamesList();
   if (!names.length) return esc;
-  return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function(match, p1){
+  return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function (match, p1) {
     var tokLower = p1.toLowerCase();
-    var isMention = names.some(function(n){
+    var isMention = names.some(function (n) {
       var parts = n.toLowerCase().split(/\s+/);
-      return parts.some(function(part){ return part === tokLower; }) || n.toLowerCase() === tokLower;
+      return (
+        parts.some(function (part) {
+          return part === tokLower;
+        }) || n.toLowerCase() === tokLower
+      );
     });
-    if (isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@' + p1 + '</span>';
+    if (isMention) return '<span class="u-3b66ce">@' + p1 + '</span>';
     return match;
   });
 }
@@ -818,17 +1105,27 @@ function highlightMentions(text) {
  */
 function addPendenciaNote(id, text, author, visibility) {
   const list = getPendencias();
-  const i = list.findIndex(p => p.id === id);
+  const i = list.findIndex((p) => p.id === id);
   if (i === -1) return false;
   if (!list[i].notes) list[i].notes = [];
   var mentionedOperators = parseMentionedOperators(text);
   var _vis = visibility === 'interna' ? 'interna' : 'resposta';
-  const note = { text, author, createdAt: new Date().toISOString(), mentionedOperators, visibility: _vis };
+  const note = {
+    text,
+    author,
+    createdAt: new Date().toISOString(),
+    mentionedOperators,
+    visibility: _vis,
+  };
   const _prevSla = { ...list[i], notes: list[i].notes.slice() };
   list[i].notes.push(note);
   list[i].updatedAt = new Date().toISOString();
   // 1ª resposta (056): só a nota marcada como resposta conta — ver slaOnSave.
-  try { if (typeof slaOnSave === 'function') slaOnSave(_prevSla, list[i], list[i].updatedAt, author); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias'); }
+  try {
+    if (typeof slaOnSave === 'function') slaOnSave(_prevSla, list[i], list[i].updatedAt, author);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'storage-pendencias');
+  }
   const _respondeuAgora = !_prevSla.firstResponseAt && !!list[i].firstResponseAt;
   dbSet(DB.PENDENCIAS, list);
 
@@ -838,18 +1135,43 @@ function addPendenciaNote(id, text, author, visibility) {
       if (typeof notifyPendenciaNote === 'function') {
         notifyPendenciaNote(list[i], note);
       }
-    } catch (e) { console.warn('📧 Erro na notificação de nota:', e); }
+    } catch (e) {
+      console.warn('📧 Erro na notificação de nota:', e);
+    }
   }, 100);
 
-  if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('pendencias').update({
-      notes: list[i].notes,
-      updated_at: list[i].updatedAt
-    }).eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase atualizar pendência:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+  if (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  ) {
+    supabaseClient
+      .from('pendencias')
+      .update({
+        notes: list[i].notes,
+        updated_at: list[i].updatedAt,
+      })
+      .eq('id', id)
+      .then((res) => {
+        if (res.error) {
+          console.error('❌ Supabase atualizar pendência:', res.error);
+          markSyncPushFailed();
+        }
+      })
+      .catch(() => markSyncPushFailed());
     // Separado da nota: se o banco ainda não tiver a 056, só isto falha.
     if (_respondeuAgora) {
-      supabaseClient.from('pendencias').update({ first_response_at: list[i].firstResponseAt, first_response_by: list[i].firstResponseBy || null })
-        .eq('id', id).then(res => { if (res.error && !_penMissingColumn(res.error) && typeof _logSilent === 'function') _logSilent(new Error(res.error.message), 'storage-pendencias:1a-resposta'); })
+      supabaseClient
+        .from('pendencias')
+        .update({
+          first_response_at: list[i].firstResponseAt,
+          first_response_by: list[i].firstResponseBy || null,
+        })
+        .eq('id', id)
+        .then((res) => {
+          if (res.error && !_penMissingColumn(res.error) && typeof _logSilent === 'function')
+            _logSilent(new Error(res.error.message), 'storage-pendencias:1a-resposta');
+        })
         .catch(() => {});
     }
   }

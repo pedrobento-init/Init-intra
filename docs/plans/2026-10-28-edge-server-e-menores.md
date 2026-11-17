@@ -55,27 +55,29 @@ cada uma (`x-agenda-secret`, `x-cron-secret`, token na query) **fica como está*
 
 ## Mapa de arquivos
 
-| Arquivo | Ação | Responsabilidade |
-| --- | --- | --- |
-| `tests/edge-functions-server.test.js` | Criar | Trava o padrão novo nas quatro functions, uma linha por tarefa |
-| `tests/edge-functions-secret-auth.test.js` | Criar | Contrato externo: 405/401/404/400/200 das quatro (review, Importante 2) |
-| `tests/helpers/edge-harness.js` | Modificar | Sai o stub de `serve()`, que ficou morto com a migração |
-| `supabase/functions/agenda-ics/index.ts` | Modificar | Entrypoint + `ctx.supabaseAdmin` |
-| `supabase/functions/avisos-prazo/index.ts` | Modificar | Idem |
-| `supabase/functions/google-agenda/index.ts` | Modificar | Idem |
-| `supabase/functions/robo/index.ts` | Modificar | Idem |
-| `tests/drive-folder-url.test.js` | Modificar | Menores 1–4 do review |
-| `docs/plans/2026-10-27-pasta-drive-menores.md` | Modificar | Menores 6–7 (caixas e contagem) |
+| Arquivo                                        | Ação      | Responsabilidade                                                        |
+| ---------------------------------------------- | --------- | ----------------------------------------------------------------------- |
+| `tests/edge-functions-server.test.js`          | Criar     | Trava o padrão novo nas quatro functions, uma linha por tarefa          |
+| `tests/edge-functions-secret-auth.test.js`     | Criar     | Contrato externo: 405/401/404/400/200 das quatro (review, Importante 2) |
+| `tests/helpers/edge-harness.js`                | Modificar | Sai o stub de `serve()`, que ficou morto com a migração                 |
+| `supabase/functions/agenda-ics/index.ts`       | Modificar | Entrypoint + `ctx.supabaseAdmin`                                        |
+| `supabase/functions/avisos-prazo/index.ts`     | Modificar | Idem                                                                    |
+| `supabase/functions/google-agenda/index.ts`    | Modificar | Idem                                                                    |
+| `supabase/functions/robo/index.ts`             | Modificar | Idem                                                                    |
+| `tests/drive-folder-url.test.js`               | Modificar | Menores 1–4 do review                                                   |
+| `docs/plans/2026-10-27-pasta-drive-menores.md` | Modificar | Menores 6–7 (caixas e contagem)                                         |
 
 ---
 
 ### Tarefa 1: `agenda-ics`
 
 **Arquivos:**
+
 - Criar: `tests/edge-functions-server.test.js`
 - Modificar: `supabase/functions/agenda-ics/index.ts:13-30, 65`
 
 **Interfaces:**
+
 - Produz: `MIGRADAS` no teste (array de nomes) — as tarefas 2–4 acrescentam nomes.
 
 - [x] **Passo 1: escrever o teste que falha**
@@ -133,6 +135,7 @@ Esperado: PASS nos dois arquivos.
 ### Tarefa 2: `avisos-prazo`
 
 **Arquivos:**
+
 - Modificar: `tests/edge-functions-server.test.js` (acrescentar `'avisos-prazo'` em `MIGRADAS`)
 - Modificar: `supabase/functions/avisos-prazo/index.ts:21-22, 40-41, 59-68, 167`
 
@@ -161,6 +164,7 @@ Esperado: PASS.
 ### Tarefa 3: `google-agenda`
 
 **Arquivos:**
+
 - Modificar: `tests/edge-functions-server.test.js`
 - Modificar: `supabase/functions/google-agenda/index.ts:27-34, 242-258`
 
@@ -189,6 +193,7 @@ Esperado: PASS.
 ### Tarefa 4: `robo`
 
 **Arquivos:**
+
 - Modificar: `tests/edge-functions-server.test.js`
 - Modificar: `supabase/functions/robo/index.ts:40-42, 56-58, 500-525`
 
@@ -219,6 +224,7 @@ Esperado: PASS, 4 nomes.
 ### Tarefa 5: menores do review do PR #59
 
 **Arquivos:**
+
 - Modificar: `tests/drive-folder-url.test.js:1-10, 150-156, 237-255`
 - Modificar: `docs/plans/2026-10-27-pasta-drive-menores.md` (caixas e "70 arquivos")
 
@@ -244,7 +250,7 @@ it('descarta o tail depois de ?/# e devolve só o ID', () => {
 
 - [x] **Passo 3: menor 3 — comentário do snapshot**
 
-Trocar o texto das linhas 7–10 por *por que* o snapshot é na carga do módulo
+Trocar o texto das linhas 7–10 por _por que_ o snapshot é na carga do módulo
 ("em `beforeEach` ele capturaria o que o teste anterior deixou").
 
 - [x] **Passo 4: menor 4 — guarda do emoji deixa de ser frouxa**

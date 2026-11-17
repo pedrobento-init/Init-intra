@@ -18,7 +18,9 @@ const HEALTH_THRESHOLDS = {
 // ── Status de êxito (puro, testável; espelha isPendenciaResolvida de ui.js) ───
 // Concluído + Resolvido contam como "resolvidas" no Dashboard.
 // Cancelado/Fechado são finais, mas não contam como resolvidas.
-function isPendenciaResolvida(status) { return ['concluido', 'resolvido'].includes(status || ''); }
+function isPendenciaResolvida(status) {
+  return ['concluido', 'resolvido'].includes(status || '');
+}
 
 // ── SLA por cliente ─────────────────────────────────────────────────────────
 function _isOverduePure(p, todayISO, isClosedFn) {
@@ -28,23 +30,28 @@ function _isOverduePure(p, todayISO, isClosedFn) {
 }
 
 function getSlaStatsForClient(pendencias, clientId, todayISO, isClosedFn) {
-  const isClosed = isClosedFn || (s => ['concluido','resolvido','cancelado','fechado'].includes(s));
-  const abertas = pendencias.filter(p => p.clientId === clientId && !isClosed(p.status));
-  const vencidas = abertas.filter(p => _isOverduePure(p, todayISO, isClosed)).length;
+  const isClosed =
+    isClosedFn || ((s) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s));
+  const abertas = pendencias.filter((p) => p.clientId === clientId && !isClosed(p.status));
+  const vencidas = abertas.filter((p) => _isOverduePure(p, todayISO, isClosed)).length;
   return { totalAbertas: abertas.length, vencidas, dentroPrazo: abertas.length - vencidas };
 }
 
 function getAllSlaStats(pendencias, todayISO, isClosedFn) {
-  const isClosed = isClosedFn || (s => ['concluido','resolvido','cancelado','fechado'].includes(s));
+  const isClosed =
+    isClosedFn || ((s) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s));
   const map = {};
-  pendencias.forEach(p => {
+  pendencias.forEach((p) => {
     if (isClosed(p.status)) return;
     const cid = p.clientId || '_sem_cliente';
-    if (!map[cid]) map[cid] = { totalAbertas: 0, vencidas: 0, dentroPrazo: 0, clientName: p.clientName || cid };
+    if (!map[cid])
+      map[cid] = { totalAbertas: 0, vencidas: 0, dentroPrazo: 0, clientName: p.clientName || cid };
     map[cid].totalAbertas++;
     if (_isOverduePure(p, todayISO, isClosed)) map[cid].vencidas++;
   });
-  Object.values(map).forEach(v => { v.dentroPrazo = v.totalAbertas - v.vencidas; });
+  Object.values(map).forEach((v) => {
+    v.dentroPrazo = v.totalAbertas - v.vencidas;
+  });
   return map;
 }
 
@@ -55,19 +62,26 @@ function sortClientsBySla(clients, slaMap) {
     const sb = slaMap[b.id] || { vencidas: 0, totalAbertas: 0 };
     if (sb.vencidas !== sa.vencidas) return sb.vencidas - sa.vencidas;
     if (sb.totalAbertas !== sa.totalAbertas) return sb.totalAbertas - sa.totalAbertas;
-    return (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base', numeric: true });
+    return (a.name || '').localeCompare(b.name || '', 'pt-BR', {
+      sensitivity: 'base',
+      numeric: true,
+    });
   });
 }
 
 // ── Tempo médio de resolução ────────────────────────────────────────────────
 function calculateAvgResolutionHours(pendenciasConcluidas) {
   if (!pendenciasConcluidas.length) return null;
-  let total = 0, count = 0;
-  pendenciasConcluidas.forEach(p => {
+  let total = 0,
+    count = 0;
+  pendenciasConcluidas.forEach((p) => {
     if (!p.createdAt || (!p.completedAt && !p.updatedAt)) return;
     const end = p.completedAt || p.updatedAt;
     const h = (new Date(end) - new Date(p.createdAt)) / 3600000;
-    if (h >= 0 && h < 365*24) { total += h; count++; }
+    if (h >= 0 && h < 365 * 24) {
+      total += h;
+      count++;
+    }
   });
   return count ? total / count : null;
 }
@@ -77,30 +91,55 @@ function calculateHealthScore({ totalAbertas, vencidas, avgHours }) {
   // avgHours pode ser null (sem concluídas) — trata como 0 para não penalizar
   const avg = avgHours == null ? 0 : avgHours;
   let level, emoji, color, label;
-  if (vencidas <= HEALTH_THRESHOLDS.greenMaxVencidas && totalAbertas <= HEALTH_THRESHOLDS.greenMaxAbertas && avg <= HEALTH_THRESHOLDS.greenMaxAvgHours) {
-    level = 'green'; emoji = '🟢'; color = '#16a34a'; label = 'Saudável';
-  } else if (vencidas <= HEALTH_THRESHOLDS.yellowMaxVencidas && totalAbertas <= HEALTH_THRESHOLDS.yellowMaxAbertas && avg <= HEALTH_THRESHOLDS.yellowMaxAvgHours) {
-    level = 'yellow'; emoji = '🟡'; color = '#d97706'; label = 'Atenção';
+  if (
+    vencidas <= HEALTH_THRESHOLDS.greenMaxVencidas &&
+    totalAbertas <= HEALTH_THRESHOLDS.greenMaxAbertas &&
+    avg <= HEALTH_THRESHOLDS.greenMaxAvgHours
+  ) {
+    level = 'green';
+    emoji = '🟢';
+    color = '#16a34a';
+    label = 'Saudável';
+  } else if (
+    vencidas <= HEALTH_THRESHOLDS.yellowMaxVencidas &&
+    totalAbertas <= HEALTH_THRESHOLDS.yellowMaxAbertas &&
+    avg <= HEALTH_THRESHOLDS.yellowMaxAvgHours
+  ) {
+    level = 'yellow';
+    emoji = '🟡';
+    color = '#d97706';
+    label = 'Atenção';
   } else {
-    level = 'red'; emoji = '🔴'; color = '#dc2626'; label = 'Crítico';
+    level = 'red';
+    emoji = '🔴';
+    color = '#dc2626';
+    label = 'Crítico';
   }
   return { level, emoji, color, label, totalAbertas, vencidas, avgHours: avg };
 }
 
 function getHealthForClient(pendencias, clientId, todayISO, isClosedFn) {
   const sla = getSlaStatsForClient(pendencias, clientId, todayISO, isClosedFn);
-  const concluidas = pendencias.filter(p => p.clientId === clientId && isPendenciaResolvida(p.status));
+  const concluidas = pendencias.filter(
+    (p) => p.clientId === clientId && isPendenciaResolvida(p.status)
+  );
   const avg = calculateAvgResolutionHours(concluidas);
-  const base = calculateHealthScore({ totalAbertas: sla.totalAbertas, vencidas: sla.vencidas, avgHours: avg });
+  const base = calculateHealthScore({
+    totalAbertas: sla.totalAbertas,
+    vencidas: sla.vencidas,
+    avgHours: avg,
+  });
   // No navegador, cliente-saude.js soma vencimentos, backups, dispositivos e
   // tempo sem visita (nota 0–100 + motivos). Sem ele (testes), só pendências.
-  return typeof ajustarSaudeCliente === 'function' ? ajustarSaudeCliente(base, clientId, todayISO) : base;
+  return typeof ajustarSaudeCliente === 'function'
+    ? ajustarSaudeCliente(base, clientId, todayISO)
+    : base;
 }
 
 // ── Carga por operador (timer.js) ───────────────────────────────────────────
 function getWorkloadByOperator(pendencias, getElapsedSecondsFn) {
   const map = {};
-  pendencias.forEach(p => {
+  pendencias.forEach((p) => {
     const secs = getElapsedSecondsFn(p) || 0;
     if (secs <= 0) return;
     const key = p.timerOperator || p.responsible || 'Sem responsável';
@@ -120,22 +159,28 @@ function compareMeetings(mesA, mesB, pendencias, clients) {
   // e snapshot atual de abertas por cliente
   const idA = 'REU-' + mesA;
   const idB = 'REU-' + mesB;
-  const isClosed = s => ['concluido','resolvido','cancelado','fechado'].includes(s);
-  return clients.map(c => {
-    const pensA = pendencias.filter(p => p.clientId === c.id && p.reviewedInMeeting === idA);
-    const pensB = pendencias.filter(p => p.clientId === c.id && p.reviewedInMeeting === idB);
-    const abertasA = pensA.filter(p => !isClosed(p.status)).length;
-    const fechadasA = pensA.filter(p => isClosed(p.status)).length;
-    const abertasB = pensB.filter(p => !isClosed(p.status)).length;
-    const fechadasB = pensB.filter(p => isClosed(p.status)).length;
-    return {
-      clientId: c.id, clientName: c.name,
-      abertasA, fechadasA,
-      abertasB, fechadasB,
-      deltaAbertas: abertasB - abertasA,
-      totalReviewedA: pensA.length, totalReviewedB: pensB.length,
-    };
-  }).filter(r => r.totalReviewedA > 0 || r.totalReviewedB > 0);
+  const isClosed = (s) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s);
+  return clients
+    .map((c) => {
+      const pensA = pendencias.filter((p) => p.clientId === c.id && p.reviewedInMeeting === idA);
+      const pensB = pendencias.filter((p) => p.clientId === c.id && p.reviewedInMeeting === idB);
+      const abertasA = pensA.filter((p) => !isClosed(p.status)).length;
+      const fechadasA = pensA.filter((p) => isClosed(p.status)).length;
+      const abertasB = pensB.filter((p) => !isClosed(p.status)).length;
+      const fechadasB = pensB.filter((p) => isClosed(p.status)).length;
+      return {
+        clientId: c.id,
+        clientName: c.name,
+        abertasA,
+        fechadasA,
+        abertasB,
+        fechadasB,
+        deltaAbertas: abertasB - abertasA,
+        totalReviewedA: pensA.length,
+        totalReviewedB: pensB.length,
+      };
+    })
+    .filter((r) => r.totalReviewedA > 0 || r.totalReviewedB > 0);
 }
 
 // ── Streak N meses seguidos ─────────────────────────────────────────────────
@@ -144,8 +189,8 @@ function getConsecutiveMeetingStreak(clientId, reunioesSortedDesc, pendencias) {
   // Conta quantas reuniões consecutivas o cliente teve pendência com reviewedInMeeting preenchido
   let streak = 0;
   for (const r of reunioesSortedDesc) {
-    const mid = r.id || ('REU-' + r.mesAno);
-    const has = pendencias.some(p => p.clientId === clientId && p.reviewedInMeeting === mid);
+    const mid = r.id || 'REU-' + r.mesAno;
+    const has = pendencias.some((p) => p.clientId === clientId && p.reviewedInMeeting === mid);
     if (has) streak++;
     else break;
   }
@@ -163,23 +208,32 @@ function _addDaysISO(iso, days) {
 
 function getMinhaFilaDoDia(pendencias, userName, todayISO, opts) {
   opts = opts || {};
-  const isClosed = opts.isClosedFn || function(s) { return ['concluido','resolvido','cancelado','fechado'].includes(s); };
-  const isStale = opts.isStaleFn || function(p) {
-    if (!p || isClosed(p.status)) return false;
-    const ref = p.updatedAt || p.createdAt;
-    if (!ref) return false;
-    return ((Date.now() - new Date(ref).getTime()) / 86400000) >= 7;
-  };
+  const isClosed =
+    opts.isClosedFn ||
+    function (s) {
+      return ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s);
+    };
+  const isStale =
+    opts.isStaleFn ||
+    function (p) {
+      if (!p || isClosed(p.status)) return false;
+      const ref = p.updatedAt || p.createdAt;
+      if (!ref) return false;
+      return (Date.now() - new Date(ref).getTime()) / 86400000 >= 7;
+    };
   const tomorrowISO = opts.tomorrowISO || _addDaysISO(todayISO, 1);
-  const filtered = (pendencias || []).filter(function(p) {
+  const filtered = (pendencias || []).filter(function (p) {
     if (isClosed(p.status)) return false;
     if ((p.responsible || '') !== (userName || '')) return false;
-    const highPri = ['alta','critica'].includes(p.priority);
-    const dueSoon = p.deadline === todayISO || p.deadline === tomorrowISO || (p.deadline && p.deadline < todayISO);
+    const highPri = ['alta', 'critica'].includes(p.priority);
+    const dueSoon =
+      p.deadline === todayISO ||
+      p.deadline === tomorrowISO ||
+      (p.deadline && p.deadline < todayISO);
     const stale = isStale(p);
     return highPri || dueSoon || stale === true;
   });
-  filtered.sort(function(a, b) {
+  filtered.sort(function (a, b) {
     const aOver = a.deadline && a.deadline < todayISO ? 1 : 0;
     const bOver = b.deadline && b.deadline < todayISO ? 1 : 0;
     if (bOver !== aOver) return bOver - aOver;
@@ -189,7 +243,8 @@ function getMinhaFilaDoDia(pendencias, userName, todayISO, opts) {
     const aStale = isStale(a) ? 1 : 0;
     const bStale = isStale(b) ? 1 : 0;
     if (bStale !== aStale) return bStale - aStale;
-    if (a.deadline && b.deadline && a.deadline !== b.deadline) return a.deadline.localeCompare(b.deadline);
+    if (a.deadline && b.deadline && a.deadline !== b.deadline)
+      return a.deadline.localeCompare(b.deadline);
     return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
   });
   return filtered;
@@ -199,21 +254,28 @@ function getMinhaFilaDoDia(pendencias, userName, todayISO, opts) {
 // Minhas visitas de hoje (agendadas/em andamento), dia inteiro primeiro e
 // depois por horário. Concluídas e canceladas saem da fila.
 function getTodayVisitsForOperator(visits, operatorName, todayISO) {
-  return (visits || []).filter(function (v) {
-    if (!v || v.date !== todayISO) return false;
-    if ((v.operator || '') !== (operatorName || '')) return false;
-    return v.status !== 'cancelada' && v.status !== 'concluida';
-  }).sort(function (a, b) {
-    const aT = a.allDay ? '' : (a.time || '99');
-    const bT = b.allDay ? '' : (b.time || '99');
-    return String(aT).localeCompare(String(bT));
-  });
+  return (visits || [])
+    .filter(function (v) {
+      if (!v || v.date !== todayISO) return false;
+      if ((v.operator || '') !== (operatorName || '')) return false;
+      return v.status !== 'cancelada' && v.status !== 'concluida';
+    })
+    .sort(function (a, b) {
+      const aT = a.allDay ? '' : a.time || '99';
+      const bT = b.allDay ? '' : b.time || '99';
+      return String(aT).localeCompare(String(bT));
+    });
 }
 
 // ── Busca global helpers (puros) ────────────────────────────────────────────
 function _escapeForSnippet(str) {
   if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function getNoteSnippet(text, query, radius) {
@@ -228,7 +290,12 @@ function getNoteSnippet(text, query, radius) {
   const before = text.slice(start, idx);
   const match = text.slice(idx, idx + query.length);
   const after = text.slice(idx + query.length, end);
-  let snippet = _escapeForSnippet(before) + '<mark>' + _escapeForSnippet(match) + '</mark>' + _escapeForSnippet(after);
+  let snippet =
+    _escapeForSnippet(before) +
+    '<mark>' +
+    _escapeForSnippet(match) +
+    '</mark>' +
+    _escapeForSnippet(after);
   if (start > 0) snippet = '…' + snippet;
   if (end < text.length) snippet = snippet + '…';
   return snippet;
@@ -326,17 +393,24 @@ function filterItemsByDateRange(items, start, end) {
 // Agregado reutilizado pelo comparativo (evita duplicar lógica do Dashboard).
 // Retorna { open, avgSlaHours, completionRate }
 function calcPeriodStats(pens, isClosedFn) {
-  const isClosed = isClosedFn || ((s) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s));
+  const isClosed =
+    isClosedFn || ((s) => ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(s));
   const list = pens || [];
   const active = list.filter((p) => !isClosed(p.status));
   const open = active.length;
   const resolved = list.filter((p) => isPendenciaResolvida(p.status)).length;
   const completionRate = list.length ? Math.round((resolved / list.length) * 100) : 0;
-  const done = list.filter((p) => isPendenciaResolvida(p.status) && p.createdAt && (p.completedAt || p.updatedAt));
-  let total = 0; let count = 0;
+  const done = list.filter(
+    (p) => isPendenciaResolvida(p.status) && p.createdAt && (p.completedAt || p.updatedAt)
+  );
+  let total = 0;
+  let count = 0;
   done.forEach((p) => {
     const h = (new Date(p.completedAt || p.updatedAt) - new Date(p.createdAt)) / 3600000;
-    if (h >= 0 && h < 365 * 24) { total += h; count++; }
+    if (h >= 0 && h < 365 * 24) {
+      total += h;
+      count++;
+    }
   });
   const avgSlaHours = count > 0 ? Number((total / count).toFixed(1)) : 0;
   return { open, avgSlaHours, completionRate };
@@ -359,7 +433,9 @@ function getClientLastContact(clientId, pendencias, visits, nowMs) {
   (pendencias || []).forEach((p) => {
     if (p.clientId !== clientId) return;
     last = Math.max(last, _toTime(p.createdAt), _toTime(p.updatedAt));
-    (p.notes || []).forEach((n) => { last = Math.max(last, _toTime(n.createdAt || n.timestamp)); });
+    (p.notes || []).forEach((n) => {
+      last = Math.max(last, _toTime(n.createdAt || n.timestamp));
+    });
   });
   (visits || []).forEach((v) => {
     if (v.clientId !== clientId) return;
@@ -377,7 +453,8 @@ function getSilentClients(clients, pendencias, visits, days, nowISO) {
   (clients || []).forEach((c) => {
     const last = getClientLastContact(c.id, pendencias, visits, now);
     const daysSince = last ? Math.floor((now - last) / 86400000) : 9999;
-    if (daysSince >= threshold) out.push({ client: c, clientId: c.id, clientName: c.name, lastContact: last, daysSince });
+    if (daysSince >= threshold)
+      out.push({ client: c, clientId: c.id, clientName: c.name, lastContact: last, daysSince });
   });
   out.sort((a, b) => b.daysSince - a.daysSince);
   return out;
@@ -399,7 +476,9 @@ function getClientAnniversaries(clients, refDate) {
     if (years < 1) return;
     out.push({ client: c, clientId: c.id, clientName: c.name, years, since: c.createdAt });
   });
-  out.sort((a, b) => b.years - a.years || String(a.clientName).localeCompare(String(b.clientName), 'pt-BR'));
+  out.sort(
+    (a, b) => b.years - a.years || String(a.clientName).localeCompare(String(b.clientName), 'pt-BR')
+  );
   return out;
 }
 
@@ -412,7 +491,10 @@ function getRecurrentClients(clients, reunioesSortedDesc, pendencias, minStreak,
     const streak = getConsecutiveMeetingStreak(c.id, reunioesSortedDesc || [], pendencias || []);
     if (streak >= min) out.push({ client: c, clientId: c.id, clientName: c.name, streak });
   });
-  out.sort((a, b) => b.streak - a.streak || String(a.clientName).localeCompare(String(b.clientName), 'pt-BR'));
+  out.sort(
+    (a, b) =>
+      b.streak - a.streak || String(a.clientName).localeCompare(String(b.clientName), 'pt-BR')
+  );
   return out.slice(0, lim);
 }
 
@@ -429,10 +511,13 @@ function getRiskRanking(clients, pendencias, todayISO, limit, isClosedFn) {
     const wa = rankWeight[a.health.level] ?? 9;
     const wb = rankWeight[b.health.level] ?? 9;
     if (wa !== wb) return wa - wb;
-    if (a.health.nota != null && b.health.nota != null && a.health.nota !== b.health.nota) return a.health.nota - b.health.nota;
+    if (a.health.nota != null && b.health.nota != null && a.health.nota !== b.health.nota)
+      return a.health.nota - b.health.nota;
     if (b.health.vencidas !== a.health.vencidas) return b.health.vencidas - a.health.vencidas;
-    if (b.health.totalAbertas !== a.health.totalAbertas) return b.health.totalAbertas - a.health.totalAbertas;
-    const avgA = a.health.avgHours || 0; const avgB = b.health.avgHours || 0;
+    if (b.health.totalAbertas !== a.health.totalAbertas)
+      return b.health.totalAbertas - a.health.totalAbertas;
+    const avgA = a.health.avgHours || 0;
+    const avgB = b.health.avgHours || 0;
     if (avgB !== avgA) return avgB - avgA;
     return String(a.clientName).localeCompare(String(b.clientName), 'pt-BR');
   });
@@ -448,15 +533,26 @@ function getRiskRanking(clients, pendencias, todayISO, limit, isClosedFn) {
 function getNextMeeting(reunioes, team) {
   const list = (reunioes || []).filter((r) => !team || (r.team || 'init') === team);
   if (!list.length) return null;
-  const open = list.filter((r) => r.status === 'aberta').sort((a, b) => String(a.mesAno || '').localeCompare(String(b.mesAno || '')));
+  const open = list
+    .filter((r) => r.status === 'aberta')
+    .sort((a, b) => String(a.mesAno || '').localeCompare(String(b.mesAno || '')));
   if (open.length) return open[0];
-  return list.slice().sort((a, b) => String(b.mesAno || '').localeCompare(String(a.mesAno || '')))[0] || null;
+  return (
+    list.slice().sort((a, b) => String(b.mesAno || '').localeCompare(String(a.mesAno || '')))[0] ||
+    null
+  );
 }
 
 // ── Dashboard: resumo do dia (template puro, sem IA) ────────────────────────
 function buildDaySummary({ dueToday, todayVisits, overloadedOps, onLeaveOps }) {
-  const d = (dueToday || []).length != null ? (Array.isArray(dueToday) ? dueToday.length : dueToday) : 0;
-  const v = (todayVisits || []).length != null ? (Array.isArray(todayVisits) ? todayVisits.length : todayVisits) : 0;
+  const d =
+    (dueToday || []).length != null ? (Array.isArray(dueToday) ? dueToday.length : dueToday) : 0;
+  const v =
+    (todayVisits || []).length != null
+      ? Array.isArray(todayVisits)
+        ? todayVisits.length
+        : todayVisits
+      : 0;
   let s = `Hoje: ${d} ${d === 1 ? 'pendência vence' : 'pendências vencem'}, ${v} ${v === 1 ? 'visita agendada' : 'visitas agendadas'}.`;
   const extras = [];
   (overloadedOps || []).forEach((o) => {
@@ -475,7 +571,9 @@ function buildDaySummary({ dueToday, todayVisits, overloadedOps, onLeaveOps }) {
 // ── ASSUNTO x DESCRIÇÃO da pendência (puro, testável) ────────────────────────
 // Espelha os helpers globais de ui.js: `assunto` é o título; registros antigos
 // sem `assunto` usam `descricao` como fallback de leitura.
-function getPendenciaAssunto(p) { return String((p && p.assunto) || '').trim(); }
+function getPendenciaAssunto(p) {
+  return String((p && p.assunto) || '').trim();
+}
 function getPendenciaTitulo(p) {
   const a = getPendenciaAssunto(p);
   if (a) return a;
@@ -515,16 +613,38 @@ function getPendenciaDisplayMap(pendencias) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    HEALTH_THRESHOLDS, DASH_SILENCE_DAYS,
-    getSlaStatsForClient, getAllSlaStats, sortClientsBySla,
-    calculateAvgResolutionHours, calculateHealthScore, getHealthForClient,
-    getWorkloadByOperator, getWorkloadInPeriod,
-    compareMeetings, getConsecutiveMeetingStreak,
-    PRIORITY_WEIGHT, getMinhaFilaDoDia, getTodayVisitsForOperator, getNoteSnippet, parseSearchShortcuts,
-    getPreviousDashRange, calcPeriodDelta, filterItemsByDateRange, calcPeriodStats,
-    getClientLastContact, getSilentClients, getClientAnniversaries,
-    getRecurrentClients, getRiskRanking, getNextMeeting, buildDaySummary,
-    getPendenciaDisplayNumber, getPendenciaDisplayMap, getPendenciaAssunto, getPendenciaTitulo,
+    HEALTH_THRESHOLDS,
+    DASH_SILENCE_DAYS,
+    getSlaStatsForClient,
+    getAllSlaStats,
+    sortClientsBySla,
+    calculateAvgResolutionHours,
+    calculateHealthScore,
+    getHealthForClient,
+    getWorkloadByOperator,
+    getWorkloadInPeriod,
+    compareMeetings,
+    getConsecutiveMeetingStreak,
+    PRIORITY_WEIGHT,
+    getMinhaFilaDoDia,
+    getTodayVisitsForOperator,
+    getNoteSnippet,
+    parseSearchShortcuts,
+    getPreviousDashRange,
+    calcPeriodDelta,
+    filterItemsByDateRange,
+    calcPeriodStats,
+    getClientLastContact,
+    getSilentClients,
+    getClientAnniversaries,
+    getRecurrentClients,
+    getRiskRanking,
+    getNextMeeting,
+    buildDaySummary,
+    getPendenciaDisplayNumber,
+    getPendenciaDisplayMap,
+    getPendenciaAssunto,
+    getPendenciaTitulo,
     isPendenciaResolvida,
   };
 }

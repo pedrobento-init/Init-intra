@@ -86,9 +86,11 @@ function _pgpItemLocal(id) {
 }
 
 function _pgpRemovidoLocalmente(id) {
-  return typeof _penOptimisticRemoved !== 'undefined'
-    && !!_penOptimisticRemoved
-    && !!_penOptimisticRemoved[id];
+  return (
+    typeof _penOptimisticRemoved !== 'undefined' &&
+    !!_penOptimisticRemoved &&
+    !!_penOptimisticRemoved[id]
+  );
 }
 
 // getPendencias() guarda todas as equipes que o usuário já baixou (admin vê várias).
@@ -129,7 +131,8 @@ function _pgpGarantirNoCache(p) {
 // Resolve null quando não há como buscar: a tela mostra "não encontrado".
 function _pgpCarregarPorId(id) {
   if (_pgpRemovidoLocalmente(id)) return Promise.resolve(null);
-  if (typeof _penServerAvailable !== 'function' || !_penServerAvailable()) return Promise.resolve(null);
+  if (typeof _penServerAvailable !== 'function' || !_penServerAvailable())
+    return Promise.resolve(null);
   const fields = _penFields();
   if (!fields) return Promise.reject(new Error('Schema de pendências indisponível'));
   const sc = _penPageScope();
@@ -146,18 +149,28 @@ function _pgpCarregarPorId(id) {
 function _pgpCriarRaiz(tipo, id) {
   const content = document.getElementById('contentArea');
   if (!content) return null;
-  content.innerHTML = '<div class="pgp pgp-' + tipo + '" data-pgp-id="' + escapeHtml(id)
-    + '" data-pgp-tipo="' + tipo + '"></div>';
+  content.innerHTML =
+    '<div class="pgp pgp-' +
+    tipo +
+    '" data-pgp-id="' +
+    escapeHtml(id) +
+    '" data-pgp-tipo="' +
+    tipo +
+    '"></div>';
   return content.firstElementChild;
 }
 
 function _pgpEstadoHtml(tipo, estado) {
   const e = _PGP_ESTADOS[estado] || _PGP_ESTADOS.erro;
-  return '<div class="pgp-estado" role="status">'
-    + '<h1 class="pgp-estado-titulo">' + escapeHtml(e.titulo) + '</h1>'
-    + (e.texto ? '<p class="pgp-estado-texto">' + escapeHtml(e.texto) + '</p>' : '')
-    + (estado === 'carregando' ? '' : pgpVoltarHtml('Voltar para a lista'))
-    + '</div>';
+  return (
+    '<div class="pgp-estado" role="status">' +
+    '<h1 class="pgp-estado-titulo">' +
+    escapeHtml(e.titulo) +
+    '</h1>' +
+    (e.texto ? '<p class="pgp-estado-texto">' + escapeHtml(e.texto) + '</p>' : '') +
+    (estado === 'carregando' ? '' : pgpVoltarHtml('Voltar para a lista')) +
+    '</div>'
+  );
 }
 
 function _pgpMostrarEstado(tipo, id, estado) {
@@ -169,9 +182,14 @@ function _pgpMostrarEstado(tipo, id, estado) {
 function _pgpDesenhar(tipo, p, estado) {
   const raiz = _pgpCriarRaiz(tipo, p.id);
   if (!raiz) return null;
-  const tela = tipo === 'chamado'
-    ? (typeof renderChamadoPagina === 'function' ? renderChamadoPagina : null)
-    : (typeof renderProjetoPagina === 'function' ? renderProjetoPagina : null);
+  const tela =
+    tipo === 'chamado'
+      ? typeof renderChamadoPagina === 'function'
+        ? renderChamadoPagina
+        : null
+      : typeof renderProjetoPagina === 'function'
+        ? renderProjetoPagina
+        : null;
   try {
     if (!tela) throw new Error('Tela indisponível: ' + tipo);
     tela(p, raiz, estado || null);
@@ -202,7 +220,8 @@ function _pgpMostrar(seq, tipo, p) {
     return;
   }
   // Só depois de desenhar: quem abriu está vendo o chamado de fato.
-  if (_pgpDesenhar(tipo, p) && tipo === 'chamado' && typeof chpMarcarVisto === 'function') chpMarcarVisto(p);
+  if (_pgpDesenhar(tipo, p) && tipo === 'chamado' && typeof chpMarcarVisto === 'function')
+    chpMarcarVisto(p);
 }
 
 /**
@@ -228,15 +247,17 @@ function renderPaginaPendencia(tipo, id) {
     return undefined;
   }
   _pgpMostrarEstado(t, key, 'carregando');
-  return _pgpCarregarPorId(key).then((p) => {
-    if (seq !== _pgpRenderSeq) return;
-    if (p) _pgpMostrar(seq, t, p);
-    else _pgpMostrarEstado(t, key, 'nao-encontrado');
-  }).catch((err) => {
-    if (seq !== _pgpRenderSeq) return;
-    console.warn('[pagina-pendencia] falha ao carregar', err);
-    _pgpMostrarEstado(t, key, 'erro');
-  });
+  return _pgpCarregarPorId(key)
+    .then((p) => {
+      if (seq !== _pgpRenderSeq) return;
+      if (p) _pgpMostrar(seq, t, p);
+      else _pgpMostrarEstado(t, key, 'nao-encontrado');
+    })
+    .catch((err) => {
+      if (seq !== _pgpRenderSeq) return;
+      console.warn('[pagina-pendencia] falha ao carregar', err);
+      _pgpMostrarEstado(t, key, 'erro');
+    });
 }
 
 /** Fecha modal aberto e vai para a rota do item; se já estiver nela, re-renderiza. */
@@ -321,7 +342,11 @@ function _pgpRestaurarEstado(raiz, estado) {
     if (el && raiz.contains(el)) {
       el.focus({ preventScroll: true });
       if (f.inicio !== null && typeof el.setSelectionRange === 'function') {
-        try { el.setSelectionRange(f.inicio, f.fim); } catch (_) { /* tipo de campo sem cursor */ }
+        try {
+          el.setSelectionRange(f.inicio, f.fim);
+        } catch (_) {
+          /* tipo de campo sem cursor */
+        }
       }
     }
   }
@@ -400,9 +425,16 @@ function _pgpAoMudarDados() {
 // ── Peças comuns às duas telas ───────────────────────────────────────────────
 
 function _pgpOpcaoHtml(valor, rotulo, atual, desabilitada) {
-  return '<option value="' + escapeHtml(valor) + '"'
-    + (valor === atual ? ' selected' : '')
-    + (desabilitada ? ' disabled' : '') + '>' + escapeHtml(rotulo) + '</option>';
+  return (
+    '<option value="' +
+    escapeHtml(valor) +
+    '"' +
+    (valor === atual ? ' selected' : '') +
+    (desabilitada ? ' disabled' : '') +
+    '>' +
+    escapeHtml(rotulo) +
+    '</option>'
+  );
 }
 
 /**
@@ -418,29 +450,52 @@ function pgpSeletoresHtml(p) {
   const prioridade = String(item.priority == null ? '' : item.priority);
 
   let statusOpts = Object.keys(statusMap)
-    .map((k) => _pgpOpcaoHtml(k, statusMap[k].label, status, false)).join('');
+    .map((k) => _pgpOpcaoHtml(k, statusMap[k].label, status, false))
+    .join('');
   // Status antigo continua visível, mas não pode ser escolhido de novo.
   if (status && !statusMap[status]) {
-    statusOpts += _pgpOpcaoHtml(status, (_PGP_STATUS_LEGADO[status] || status) + ' (antigo)', status, true);
+    statusOpts += _pgpOpcaoHtml(
+      status,
+      (_PGP_STATUS_LEGADO[status] || status) + ' (antigo)',
+      status,
+      true
+    );
   }
   let prioOpts = _PGP_PRIORIDADES
-    .map(([k, rotulo]) => _pgpOpcaoHtml(k, (prioMap[k] && prioMap[k].label) || rotulo, prioridade, false)).join('');
+    .map(([k, rotulo]) =>
+      _pgpOpcaoHtml(k, (prioMap[k] && prioMap[k].label) || rotulo, prioridade, false)
+    )
+    .join('');
   if (prioridade && !_PGP_PRIORIDADES.some(([k]) => k === prioridade)) {
     prioOpts += _pgpOpcaoHtml(prioridade, prioridade + ' (antigo)', prioridade, true);
   }
 
-  return '<div class="pgp-seletores">'
-    + '<div class="pgp-seletor">'
-    + '<label class="pgp-label" for="chgStatus">Status</label>'
-    + '<select id="chgStatus" class="pgp-select pgp-select-status" data-change="pgpStatus"'
-    + ' data-id="' + id + '" data-status="' + escapeHtml(status) + '">' + statusOpts + '</select>'
-    + '</div>'
-    + '<div class="pgp-seletor">'
-    + '<label class="pgp-label" for="pgpPrioridade">Prioridade</label>'
-    + '<select id="pgpPrioridade" class="pgp-select pgp-select-prioridade" data-change="penSetField"'
-    + ' data-field="priority" data-id="' + id + '" data-prioridade="' + escapeHtml(prioridade) + '">' + prioOpts + '</select>'
-    + '</div>'
-    + '</div>';
+  return (
+    '<div class="pgp-seletores">' +
+    '<div class="pgp-seletor">' +
+    '<label class="pgp-label" for="chgStatus">Status</label>' +
+    '<select id="chgStatus" class="pgp-select pgp-select-status" data-change="pgpStatus"' +
+    ' data-id="' +
+    id +
+    '" data-status="' +
+    escapeHtml(status) +
+    '">' +
+    statusOpts +
+    '</select>' +
+    '</div>' +
+    '<div class="pgp-seletor">' +
+    '<label class="pgp-label" for="pgpPrioridade">Prioridade</label>' +
+    '<select id="pgpPrioridade" class="pgp-select pgp-select-prioridade" data-change="penSetField"' +
+    ' data-field="priority" data-id="' +
+    id +
+    '" data-prioridade="' +
+    escapeHtml(prioridade) +
+    '">' +
+    prioOpts +
+    '</select>' +
+    '</div>' +
+    '</div>'
+  );
 }
 
 /** Avatar de iniciais. `tamanho` em px (padrão 32, máximo 128). */
@@ -454,9 +509,18 @@ function pgpAvatarHtml(nome, tamanho) {
   const t = Number(tamanho);
   const px = t > 0 && t <= 128 ? t : 32;
   const rotulo = escapeHtml(texto || 'Sem nome');
-  return '<span class="pgp-avatar" style="--pgp-avatar-size:' + px + 'px" role="img"'
-    + ' title="' + rotulo + '" aria-label="' + rotulo + '">'
-    + escapeHtml(iniciais.toUpperCase()) + '</span>';
+  return (
+    '<span class="pgp-avatar" data-sty="--pgp-avatar-size:' +
+    px +
+    'px" role="img"' +
+    ' title="' +
+    rotulo +
+    '" aria-label="' +
+    rotulo +
+    '">' +
+    escapeHtml(iniciais.toUpperCase()) +
+    '</span>'
+  );
 }
 
 /** "há 3 h", "há 2 dias"… '' para data inválida. `agora` só existe para os testes. */
@@ -482,7 +546,9 @@ function pgpTempoAtras(iso, agora) {
 
 /** Link de volta para a lista; é <a href> para Ctrl+clique e botão Voltar funcionarem. */
 function pgpVoltarHtml(rotulo) {
-  return '<a class="pgp-voltar" href="#pendencias">← ' + escapeHtml(rotulo || 'Pendências') + '</a>';
+  return (
+    '<a class="pgp-voltar" href="#pendencias">← ' + escapeHtml(rotulo || 'Pendências') + '</a>'
+  );
 }
 
 // ── Ligações com o resto do app ──────────────────────────────────────────────
@@ -502,10 +568,21 @@ if (typeof onDataChanged === 'function') onDataChanged('pendencias', _pgpAoMudar
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    penPaginaTipo, penPaginaHash, penPaginaHref, penPaginaRotaDe,
-    abrirPaginaPendencia, renderPaginaPendencia, penPaginaAtualizar,
-    penPaginaEstaAberta, penPaginaFechar, penPaginaVoltarSeAberta,
-    penPaginaMarcarScrollLista, penPaginaAplicarScrollLista,
-    pgpSeletoresHtml, pgpAvatarHtml, pgpTempoAtras, pgpVoltarHtml,
+    penPaginaTipo,
+    penPaginaHash,
+    penPaginaHref,
+    penPaginaRotaDe,
+    abrirPaginaPendencia,
+    renderPaginaPendencia,
+    penPaginaAtualizar,
+    penPaginaEstaAberta,
+    penPaginaFechar,
+    penPaginaVoltarSeAberta,
+    penPaginaMarcarScrollLista,
+    penPaginaAplicarScrollLista,
+    pgpSeletoresHtml,
+    pgpAvatarHtml,
+    pgpTempoAtras,
+    pgpVoltarHtml,
   };
 }

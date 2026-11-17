@@ -20,7 +20,8 @@ describe('classifyMilvusTicketStatus', () => {
 });
 
 describe('pickVisitsForMilvusStatus', () => {
-  const v = (over) => Object.assign({ id: 'V' + Math.random(), date: '2026-10-14', milvusChamadoCodigo: 100 }, over);
+  const v = (over) =>
+    Object.assign({ id: 'V' + Math.random(), date: '2026-10-14', milvusChamadoCodigo: 100 }, over);
 
   it('sem chamado não consulta; sem cache consulta', () => {
     const a = v({ id: 'A', milvusChamadoCodigo: null });
@@ -29,7 +30,12 @@ describe('pickVisitsForMilvusStatus', () => {
   });
 
   it('respeita o TTL: aberto 15 min, finalizado 12 h', () => {
-    const vs = [v({ id: 'open-fresh' }), v({ id: 'open-old' }), v({ id: 'done-fresh' }), v({ id: 'done-old' })];
+    const vs = [
+      v({ id: 'open-fresh' }),
+      v({ id: 'open-old' }),
+      v({ id: 'done-fresh' }),
+      v({ id: 'done-old' }),
+    ];
     const cache = {
       'open-fresh': { codigo: 100, kind: 'atendimento', checkedAt: iso(5 * 60e3) },
       'open-old': { codigo: 100, kind: 'atendimento', checkedAt: iso(20 * 60e3) },
@@ -53,7 +59,9 @@ describe('pickVisitsForMilvusStatus', () => {
   });
 
   it('limita a 25 por chamada, mais recentes primeiro', () => {
-    const vs = Array.from({ length: 30 }, (_, i) => v({ id: 'V' + i, date: '2026-10-' + String(i % 28 + 1).padStart(2, '0') }));
+    const vs = Array.from({ length: 30 }, (_, i) =>
+      v({ id: 'V' + i, date: '2026-10-' + String((i % 28) + 1).padStart(2, '0') })
+    );
     const ids = S.pickVisitsForMilvusStatus(vs, {}, NOW);
     expect(ids).toHaveLength(25);
     expect(ids[0]).toBe('V27');
@@ -63,15 +71,52 @@ describe('pickVisitsForMilvusStatus', () => {
 describe('reconcileFinalizeFromMilvus', () => {
   const e = { codigo: 100, kind: 'finalizado' };
   it('Milvus finalizado conclui a visita e dá a finalização como feita', () => {
-    expect(S.reconcileFinalizeFromMilvus({ status: 'em_andamento', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' }, e)).toEqual({ status: 'concluida', milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
-    expect(S.reconcileFinalizeFromMilvus({ status: 'agendada', milvusChamadoCodigo: 100 }, e)).toEqual({ status: 'concluida', milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
+    expect(
+      S.reconcileFinalizeFromMilvus(
+        { status: 'em_andamento', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' },
+        e
+      )
+    ).toEqual({
+      status: 'concluida',
+      milvusFinalizarStatus: 'finalizado',
+      milvusFinalizarErro: null,
+    });
+    expect(
+      S.reconcileFinalizeFromMilvus({ status: 'agendada', milvusChamadoCodigo: 100 }, e)
+    ).toEqual({
+      status: 'concluida',
+      milvusFinalizarStatus: 'finalizado',
+      milvusFinalizarErro: null,
+    });
   });
   it('não reabre visita cancelada nem mexe em voo, já finalizado, outro código ou Milvus aberto', () => {
-    expect(S.reconcileFinalizeFromMilvus({ status: 'cancelada', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' }, e)).toBeNull();
-    expect(S.reconcileFinalizeFromMilvus({ status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizando' }, e)).toBeNull();
-    expect(S.reconcileFinalizeFromMilvus({ status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' }, e)).toBeNull();
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 101, milvusFinalizarStatus: 'erro' }, e)).toBeNull();
-    expect(S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' }, { codigo: 100, kind: 'atendimento' })).toBeNull();
+    expect(
+      S.reconcileFinalizeFromMilvus(
+        { status: 'cancelada', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' },
+        e
+      )
+    ).toBeNull();
+    expect(
+      S.reconcileFinalizeFromMilvus(
+        { status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizando' },
+        e
+      )
+    ).toBeNull();
+    expect(
+      S.reconcileFinalizeFromMilvus(
+        { status: 'concluida', milvusChamadoCodigo: 100, milvusFinalizarStatus: 'finalizado' },
+        e
+      )
+    ).toBeNull();
+    expect(
+      S.reconcileFinalizeFromMilvus({ milvusChamadoCodigo: 101, milvusFinalizarStatus: 'erro' }, e)
+    ).toBeNull();
+    expect(
+      S.reconcileFinalizeFromMilvus(
+        { milvusChamadoCodigo: 100, milvusFinalizarStatus: 'erro' },
+        { codigo: 100, kind: 'atendimento' }
+      )
+    ).toBeNull();
   });
 });
 
@@ -80,7 +125,24 @@ describe('toMilvusStatusEntry', () => {
     expect(S.toMilvusStatusEntry({ codigo: 5, found: false }, 'x').kind).toBe('nao_encontrado');
   });
   it('guarda técnico, datas e última log', () => {
-    const e = S.toMilvusStatusEntry({ codigo: 5, found: true, status: 'Atendendo', tecnico: 'Ana', data_modificacao: 'm', ultima_log: { texto: 'Trocado HD', tecnico: 'Ana' } }, 'now');
-    expect(e).toMatchObject({ codigo: 5, kind: 'atendimento', tecnico: 'Ana', modificado: 'm', ultimaLog: { texto: 'Trocado HD' }, checkedAt: 'now' });
+    const e = S.toMilvusStatusEntry(
+      {
+        codigo: 5,
+        found: true,
+        status: 'Atendendo',
+        tecnico: 'Ana',
+        data_modificacao: 'm',
+        ultima_log: { texto: 'Trocado HD', tecnico: 'Ana' },
+      },
+      'now'
+    );
+    expect(e).toMatchObject({
+      codigo: 5,
+      kind: 'atendimento',
+      tecnico: 'Ana',
+      modificado: 'm',
+      ultimaLog: { texto: 'Trocado HD' },
+      checkedAt: 'now',
+    });
   });
 });

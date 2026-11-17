@@ -9,7 +9,10 @@ function normalizeImportCnpj(v) {
 }
 
 function normalizeImportName(v) {
-  return String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 // Índice local p/ detectar duplicadas (CNPJ tem precedência).
@@ -34,8 +37,12 @@ function matchMilvusClientToLocal(milvusRow, index) {
 }
 
 function clientInitialsForName(name) {
-  const parts = String(name || '').split(' ').map((w) => w[0]).filter(Boolean).join('');
-  return ((parts.substring(0, 2) || 'CL')).toUpperCase();
+  const parts = String(name || '')
+    .split(' ')
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join('');
+  return (parts.substring(0, 2) || 'CL').toUpperCase();
 }
 
 function summarizeImportPreview(rows) {
@@ -49,21 +56,29 @@ function summarizeImportPreview(rows) {
 }
 
 function _importAdminGuard() {
-  const isAdmin = typeof isMilvusMappingAdmin === 'function'
-    ? isMilvusMappingAdmin()
-    : (typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true);
+  const isAdmin =
+    typeof isMilvusMappingAdmin === 'function'
+      ? isMilvusMappingAdmin()
+      : typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true;
   if (!isAdmin) throw new Error('Somente administradores.');
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() ||
-      typeof supabaseClient === 'undefined' || !supabaseClient) {
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
 }
 
 async function _invokeClientsImport(body) {
   _importAdminGuard();
-  const { data, error } = await supabaseClient.functions.invoke('milvus-clients-import', { body: body });
+  const { data, error } = await supabaseClient.functions.invoke('milvus-clients-import', {
+    body: body,
+  });
   if (error) throw new Error('Falha na importação de clientes. Tente novamente.');
-  if (!data || data.success !== true) throw new Error('Falha na importação de clientes. Tente novamente.');
+  if (!data || data.success !== true)
+    throw new Error('Falha na importação de clientes. Tente novamente.');
   return data;
 }
 

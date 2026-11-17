@@ -1,50 +1,68 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const { norm } = createRequire(import.meta.url)('./_fonte.cjs');
 
 // Guarda estrutural da triagem que casa a conversa (migration 065), no mesmo
 // espírito de tests/edge-functions-guard.test.js: o vitest não roda Deno, e o
 // que dá para travar aqui são os invariantes que impedem a tela de mentir.
 
 const robo = fs.readFileSync(
-  fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)),
+  'utf8'
+);
 const detalhe = fs.readFileSync(
-  fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)),
+  'utf8'
+);
 const migration = fs.readFileSync(
-  fileURLToPath(new URL('../supabase/migrations/065_pendencias_email_thread.sql', import.meta.url)), 'utf8');
-const schema = fs.readFileSync(
-  fileURLToPath(new URL('../js/schema.js', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../supabase/migrations/065_pendencias_email_thread.sql', import.meta.url)),
+  'utf8'
+);
+const schema = fs.readFileSync(fileURLToPath(new URL('../js/schema.js', import.meta.url)), 'utf8');
 const robogs = fs.readFileSync(
-  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)),
+  'utf8'
+);
 
 describe('chamado fechado não recebe a resposta', () => {
   // Resposta depois de concluir é pedido NOVO. Ressuscitar o chamado antigo
   // esconderia o pedido do SLA e da fila de quem atende.
   it('a busca da conversa descarta status fechado', () => {
-    expect(robo).toContain('PEN_FECHADOS.includes(String(p.status))');
+    expect(norm(robo)).toContain(norm('PEN_FECHADOS.includes(String(p.status))'));
   });
 
   it('a lista de fechados é a mesma do resto do app', () => {
     const m = /const PEN_FECHADOS = \[(.+?)\]/s.exec(robo);
     expect(m).toBeTruthy();
-    const lista = m[1].split(',').map((s) => s.trim().replace(/"/g, '')).filter(Boolean).sort();
+    const lista = m[1]
+      .split(',')
+      .map((s) => s.trim().replace(/["']/g, ''))
+      .filter(Boolean)
+      .sort();
     expect(lista).toEqual(['cancelado', 'concluido', 'fechado', 'resolvido']);
   });
 });
 
 describe('a nota nova não pode virar chamado', () => {
   it('casando a conversa, a triagem não insere pendência: ela dá update e segue', () => {
-    const trecho = robo.slice(robo.indexOf('const aberto = await chamadoDaConversa'));
-    const corpo = trecho.slice(0, trecho.indexOf('const c = clienteDoEmail'));
-    expect(corpo).toContain('.from("pendencias").update(');
+    const roboN = norm(robo);
+    const trecho = roboN.slice(roboN.indexOf(norm('const aberto = await chamadoDaConversa')));
+    const corpo = trecho.slice(0, trecho.indexOf(norm('const c = clienteDoEmail')));
+    expect(corpo.length).toBeGreaterThan(0);
+    expect(corpo).toContain(norm('.from("pendencias").update('));
     expect(corpo).not.toContain('.insert(pen');
     expect(corpo).toContain('continue;');
   });
 
   it('a chave de dedupe é devolvida quando o update falha, para tentar de novo', () => {
-    const trecho = robo.slice(robo.indexOf('const aberto = await chamadoDaConversa'));
-    const corpo = trecho.slice(0, trecho.indexOf('const c = clienteDoEmail'));
-    expect(corpo).toContain('avisos_enviados").delete().eq("key", key)');
+    const roboN = norm(robo);
+    const trecho = roboN.slice(roboN.indexOf(norm('const aberto = await chamadoDaConversa')));
+    const corpo = trecho.slice(0, trecho.indexOf(norm('const c = clienteDoEmail')));
+    expect(corpo.length).toBeGreaterThan(0);
+    expect(corpo).toContain(norm('avisos_enviados").delete().eq("key", key)'));
   });
 });
 
@@ -58,8 +76,9 @@ describe('a fala de quem pediu não lê como anotação interna', () => {
 
   it('o selo é o do solicitante, e o de interna não aparece junto', () => {
     expect(detalhe).toContain('feed-tag-solicitante');
-    const i = detalhe.indexOf('_doSolic ?');
-    const j = detalhe.indexOf('_interna ?', i);
+    // Um ternário por selo, cada um com o seu: solicitante primeiro, interna depois.
+    const i = detalhe.search(/_doSolic\s*\?\s*'<span class="feed-tag-solicitante"/);
+    const j = detalhe.search(/_interna\s*\?\s*'<span class="feed-tag-interna"/);
     expect(i).toBeGreaterThan(-1);
     expect(j).toBeGreaterThan(i); // os dois ramos são exclusivos, na ordem
   });

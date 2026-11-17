@@ -26,10 +26,13 @@ test('visita guiada cria pendência do checklist selecionado', async ({ page }) 
 
   const visitId = await page.evaluate(() => {
     const visit = getVisits().find((v) => v.motivo === 'E2E — continuidade operacional');
-    saveVisit({ ...visit, checklist: [
-      { text: 'Revisar nobreak', done: false },
-      { text: 'Item não selecionado', done: false },
-    ] });
+    saveVisit({
+      ...visit,
+      checklist: [
+        { text: 'Revisar nobreak', done: false },
+        { text: 'Item não selecionado', done: false },
+      ],
+    });
     return visit.id;
   });
   await page.locator('.vis-card', { hasText: 'E2E — continuidade operacional' }).click();
@@ -49,7 +52,10 @@ test('visita guiada cria pendência do checklist selecionado', async ({ page }) 
 
   await expect(page.locator('#modalBody')).toContainText('Pendências geradas desta visita (1)');
   await expect(page.locator('#modalBody')).toContainText('Revisar nobreak');
-  const pendencia = await page.evaluate((id) => getPendencias().find((p) => p.visitId === id), visitId);
+  const pendencia = await page.evaluate(
+    (id) => getPendencias().find((p) => p.visitId === id),
+    visitId
+  );
   expect(pendencia).toMatchObject({
     assunto: 'Revisar nobreak',
     responsible: 'Giovane',
@@ -63,7 +69,7 @@ test('central operacional não comprime o texto dos alertas', async ({ page }) =
   await loginLocal(page, { hash: 'dashboard' });
   const texto = page.locator('section[aria-labelledby="ov-central"] .ov-it > div').first();
   await expect(texto).toBeVisible();
-  const width = await texto.evaluate(el => el.getBoundingClientRect().width);
+  const width = await texto.evaluate((el) => el.getBoundingClientRect().width);
   expect(width).toBeGreaterThan(300);
 });
 
@@ -72,7 +78,9 @@ test('central operacional exibe alerta e abre a pendência', async ({ page }) =>
   const central = page.locator('section[aria-labelledby="ov-central"]');
   await expect(central).toContainText(/\d+ alertas?/);
 
-  const alerta = central.locator('[data-action="operacionalAbrir"][data-arg="PEN-1"]', { hasText: 'Pendência vencida' });
+  const alerta = central.locator('[data-action="operacionalAbrir"][data-arg="PEN-1"]', {
+    hasText: 'Pendência vencida',
+  });
   await expect(alerta).toBeVisible();
   await alerta.click();
 

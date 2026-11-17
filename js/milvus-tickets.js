@@ -35,7 +35,7 @@ function normalizeMilvusTicket(raw, clientId, team) {
   if (mid === null) return null;
   // NUNCA carrega: contato, e-mails, telefone, CPF/CNPJ, tokens,
   // avaliações, HTML, logs extras, dispositivo.
-  const log = (raw.ultima_log && typeof raw.ultima_log === 'object') ? raw.ultima_log : null;
+  const log = raw.ultima_log && typeof raw.ultima_log === 'object' ? raw.ultima_log : null;
   return {
     id: clientId + ':ticket-' + mid,
     client_id: clientId,
@@ -61,7 +61,8 @@ function normalizeMilvusTicket(raw, clientId, team) {
 // Ordena por código desc e corta no teto (puro, testável).
 function topMilvusTickets(rows, keep) {
   const n = Math.max(1, keep || MILVUS_TICKETS_KEEP);
-  return (rows || []).slice()
+  return (rows || [])
+    .slice()
     .sort((a, b) => (Number(b && b.codigo) || 0) - (Number(a && a.codigo) || 0))
     .slice(0, n);
 }
@@ -77,17 +78,20 @@ function shouldAutoSyncMilvusTickets(lastSyncAt, nowMs) {
   if (!lastSyncAt) return true;
   const t = new Date(lastSyncAt).getTime();
   if (isNaN(t)) return true;
-  const now = (typeof nowMs === 'number') ? nowMs : Date.now();
-  return (now - t) > MILVUS_TICKETS_STALE_MS;
+  const now = typeof nowMs === 'number' ? nowMs : Date.now();
+  return now - t > MILVUS_TICKETS_STALE_MS;
 }
 
 function getMilvusTicketsLastSyncAt(clientId) {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MILVUS_TICKETS_SYNC_AT_KEY) : null;
+    const raw =
+      typeof localStorage !== 'undefined' ? localStorage.getItem(MILVUS_TICKETS_SYNC_AT_KEY) : null;
     if (!raw) return null;
     const map = JSON.parse(raw);
     return (map && map[clientId]) || null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 function setMilvusTicketsLastSyncAt(clientId, iso) {
@@ -97,7 +101,9 @@ function setMilvusTicketsLastSyncAt(clientId, iso) {
     const map = raw ? JSON.parse(raw) : {};
     map[clientId] = iso;
     localStorage.setItem(MILVUS_TICKETS_SYNC_AT_KEY, JSON.stringify(map));
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets');
+  }
 }
 
 function _ticketOpView() {
@@ -106,9 +112,17 @@ function _ticketOpView() {
     const operators = typeof getOperators === 'function' ? getOperators() : [];
     const me = session ? operators.find((o) => o.id === session.opId) : null;
     if (me) {
-      return { team: session.team || me.team, isAdmin: session.isAdmin === true || me.isAdmin === true, active: me.active };
+      return {
+        team: session.team || me.team,
+        isAdmin: session.isAdmin === true || me.isAdmin === true,
+        active: me.active,
+      };
     }
-    return { team: session ? session.team : 'init', isAdmin: session ? session.isAdmin === true : false, active: true };
+    return {
+      team: session ? session.team : 'init',
+      isAdmin: session ? session.isAdmin === true : false,
+      active: true,
+    };
   } catch (_) {
     return { team: 'init', isAdmin: false, active: true };
   }
@@ -117,8 +131,12 @@ function _ticketOpView() {
 // Leitura via RLS (isolamento por equipe) + cache local de fallback.
 async function getClientMilvusTickets(clientId) {
   try {
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() &&
-        typeof supabaseClient !== 'undefined' && supabaseClient) {
+    if (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof supabaseClient !== 'undefined' &&
+      supabaseClient
+    ) {
       const { data, error } = await supabaseClient
         .from('client_milvus_tickets')
         .select('*')
@@ -132,11 +150,15 @@ async function getClientMilvusTickets(clientId) {
             const others = cached.filter((t) => t && t.client_id !== clientId);
             setCacheStore('client_milvus_tickets', others.concat(data));
           }
-        } catch (_) {}
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets');
+        }
         return data;
       }
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets');
+  }
   try {
     if (typeof getCacheStore === 'function') {
       return (getCacheStore('client_milvus_tickets') || [])
@@ -144,7 +166,9 @@ async function getClientMilvusTickets(clientId) {
         .sort((a, b) => (b.codigo || 0) - (a.codigo || 0))
         .slice(0, MILVUS_TICKETS_KEEP);
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets');
+  }
   return [];
 }
 
@@ -156,8 +180,12 @@ async function syncClientMilvusTickets(clientId) {
   if (!canViewMilvusTickets(_ticketOpView(), client)) {
     throw new Error('Acesso negado a este cliente.');
   }
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() ||
-      typeof supabaseClient === 'undefined' || !supabaseClient) {
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
   const { data, error } = await supabaseClient.functions.invoke('milvus-tickets', {
@@ -169,7 +197,9 @@ async function syncClientMilvusTickets(clientId) {
   try {
     if (data && data.lastSyncAt) setMilvusTicketsLastSyncAt(clientId, data.lastSyncAt);
     else setMilvusTicketsLastSyncAt(clientId, new Date().toISOString());
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets');
+  }
   return data;
 }
 

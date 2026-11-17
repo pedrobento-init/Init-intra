@@ -7,7 +7,17 @@ const { buildFilaModel, buildAlertStripText } = require('../js/fila.js');
 const { matchSearchActions } = require('../js/global-search.js');
 
 const TODAY = '2026-10-15';
-const pen = (over) => Object.assign({ id: 'P' + Math.random(), status: 'aberto', responsible: 'Ana', priority: 'media', clientName: 'Acme' }, over);
+const pen = (over) =>
+  Object.assign(
+    {
+      id: 'P' + Math.random(),
+      status: 'aberto',
+      responsible: 'Ana',
+      priority: 'media',
+      clientName: 'Acme',
+    },
+    over
+  );
 
 describe('buildFilaModel', () => {
   const pens = [
@@ -47,7 +57,13 @@ describe('buildFilaModel', () => {
 
   it('cronômetro meu ligado há 11h conta como esquecido', () => {
     const started = new Date(Date.now() - 11 * 3600 * 1000).toISOString();
-    const mt = buildFilaModel([pen({ id: 't', timerRunning: true, timerOperator: 'Ana', timerStartedAt: started })], [], 'Ana', TODAY, Date.now());
+    const mt = buildFilaModel(
+      [pen({ id: 't', timerRunning: true, timerOperator: 'Ana', timerStartedAt: started })],
+      [],
+      'Ana',
+      TODAY,
+      Date.now()
+    );
     expect(mt.running.id).toBe('t');
     expect(mt.counts.forgotten).toBe(1);
   });
@@ -55,7 +71,9 @@ describe('buildFilaModel', () => {
 
 describe('faixa de alertas', () => {
   it('monta o texto só com o que existe', () => {
-    expect(buildAlertStripText({ overdue: 3, forgotten: 1, visitsToday: 2 })).toBe('3 pendências vencidas · 1 cronômetro esquecido · 2 visitas hoje');
+    expect(buildAlertStripText({ overdue: 3, forgotten: 1, visitsToday: 2 })).toBe(
+      '3 pendências vencidas · 1 cronômetro esquecido · 2 visitas hoje'
+    );
     expect(buildAlertStripText({ overdue: 1 })).toBe('1 pendência vencida');
     expect(buildAlertStripText({})).toBe('');
   });
@@ -93,9 +111,21 @@ describe('contratos de navegação', () => {
 describe('Minha fila por id (049)', () => {
   it('registro com id é meu mesmo com nome antigo; sem id cai no nome', () => {
     const pens = [
-      { id: 'a', status: 'aberto', responsible: 'Ana (antigo)', responsibleId: 'OP-1', deadline: '2026-10-10' },
+      {
+        id: 'a',
+        status: 'aberto',
+        responsible: 'Ana (antigo)',
+        responsibleId: 'OP-1',
+        deadline: '2026-10-10',
+      },
       { id: 'b', status: 'aberto', responsible: 'Ana', deadline: '2026-10-10' },
-      { id: 'c', status: 'aberto', responsible: 'Ana', responsibleId: 'OP-2', deadline: '2026-10-10' },
+      {
+        id: 'c',
+        status: 'aberto',
+        responsible: 'Ana',
+        responsibleId: 'OP-2',
+        deadline: '2026-10-10',
+      },
     ];
     const m = buildFilaModel(pens, [], 'Ana', '2026-10-15', Date.now(), 'OP-1');
     expect(m.now.map((p) => p.id).sort()).toEqual(['a', 'b']);

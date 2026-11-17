@@ -7,8 +7,16 @@ function makeBanner() {
   const el = { textContent: '', style: { display: 'none' } };
   const classes = new Set();
   Object.defineProperty(el, 'className', {
-    get() { return [...classes].join(' '); },
-    set(v) { classes.clear(); String(v || '').split(/\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
+    get() {
+      return [...classes].join(' ');
+    },
+    set(v) {
+      classes.clear();
+      String(v || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach((c) => classes.add(c));
+    },
     configurable: true,
   });
   el.classList = {
@@ -53,12 +61,18 @@ _setGlobal('document', {
 });
 _setGlobal('localStorage', {
   getItem: (k) => (k in _lsStore ? _lsStore[k] : null),
-  setItem: (k, v) => { _lsStore[k] = String(v); },
-  removeItem: (k) => { delete _lsStore[k]; },
+  setItem: (k, v) => {
+    _lsStore[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _lsStore[k];
+  },
 });
 globalThis.Dexie = class {
   constructor() {}
-  version() { return { stores() {} }; }
+  version() {
+    return { stores() {} };
+  }
 };
 
 // Entidades + helpers puros do schema.js (storage.js referencia como globais).
@@ -78,7 +92,10 @@ _setGlobal('_filterRemoteByTombstones', (remote) => ({ remote: [...(remote || []
 _setGlobal('_retainFailedPush', (merged, failed) => {
   const ids = new Set((merged || []).map((m) => m && m.id));
   for (const rec of failed || []) {
-    if (rec && rec.id && !ids.has(rec.id)) { merged.push(rec); ids.add(rec.id); }
+    if (rec && rec.id && !ids.has(rec.id)) {
+      merged.push(rec);
+      ids.add(rec.id);
+    }
   }
   return merged;
 });
@@ -148,7 +165,12 @@ function setSupabaseMock() {
   upsertCalls = [];
   deleteCalls = [];
   mockBehavior = {};
-  globalThis.supabaseClient = { from: (t) => { fromCalls.push(t); return _oneShot(t); } };
+  globalThis.supabaseClient = {
+    from: (t) => {
+      fromCalls.push(t);
+      return _oneShot(t);
+    },
+  };
   globalThis.isSupabaseConnected = () => true;
 }
 
@@ -191,8 +213,7 @@ describe('conectividade: verificação real do backend (não só navigator.onLin
   });
 
   it('falha de rede (Failed to fetch) = connectivity, sem throw', async () => {
-    mockBehavior['select-limit:operators'] = () =>
-      Promise.reject(new TypeError('Failed to fetch'));
+    mockBehavior['select-limit:operators'] = () => Promise.reject(new TypeError('Failed to fetch'));
     const res = await checkBackendConnectivity({ timeoutMs: 200 });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('connectivity');
@@ -263,8 +284,7 @@ describe('CENÁRIO 1/3 — backend ok × backend indisponível', () => {
 
   it('backend indisponível: reason connectivity, sem throw, sem perda', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mockBehavior['select-limit:operators'] = () =>
-      Promise.reject(new TypeError('Failed to fetch'));
+    mockBehavior['select-limit:operators'] = () => Promise.reject(new TypeError('Failed to fetch'));
     const res = await syncSupabaseToLocal(FAST);
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('connectivity');
@@ -336,8 +356,7 @@ describe('CENÁRIO 7 — falha no meio do sync: sem perda, pendente p/ retry', (
     });
     globalThis._needsPush = () => true;
     mockBehavior['select:pendencias'] = () => Promise.resolve({ data: [], error: null });
-    mockBehavior['upsert:pendencias'] = () =>
-      Promise.reject(new TypeError('Failed to fetch'));
+    mockBehavior['upsert:pendencias'] = () => Promise.reject(new TypeError('Failed to fetch'));
     // 1 alteração do usuário aguardando (contada offline, antes do sync)
     globalThis.navigator.onLine = false;
     dbSet(DB.PENDENCIAS, [{ id: 'PEN-off' }]);

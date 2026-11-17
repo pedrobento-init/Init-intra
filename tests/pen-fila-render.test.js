@@ -32,7 +32,11 @@ const _el = () => ({
 const store = new Map();
 const sandbox = {
   console,
-  window: { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: false }) },
+  window: {
+    addEventListener() {},
+    removeEventListener() {},
+    matchMedia: () => ({ matches: false }),
+  },
   navigator: { onLine: true },
   document: {
     addEventListener() {},
@@ -93,9 +97,42 @@ sandbox.penSortRemoteCol = requireParts('storage').penSortRemoteCol;
 const T = sandbox.__t;
 const area = _el();
 const PENS = [
-  { id: 'PEN-1', numero: 1, status: 'aberto', clientName: 'Acme', priority: 'alta', responsible: 'Ana', solicitante: 'Zélia', deadline: '2099-03-01', assunto: 'Impressora parada', createdAt: '2026-01-01T10:00:00Z' },
-  { id: 'PEN-2', numero: 2, status: 'em_andamento', clientName: 'Beta', priority: 'critica', responsible: 'Bia', solicitante: 'Yuri', deadline: '2099-01-01', assunto: 'Servidor lento', createdAt: '2026-01-02T10:00:00Z' },
-  { id: 'PEN-3', numero: 3, status: 'pausado', clientName: 'Gama', priority: 'baixa', responsible: 'Caio', solicitante: '', deadline: null, assunto: 'Trocar toner', createdAt: '2026-01-03T10:00:00Z' },
+  {
+    id: 'PEN-1',
+    numero: 1,
+    status: 'aberto',
+    clientName: 'Acme',
+    priority: 'alta',
+    responsible: 'Ana',
+    solicitante: 'Zélia',
+    deadline: '2099-03-01',
+    assunto: 'Impressora parada',
+    createdAt: '2026-01-01T10:00:00Z',
+  },
+  {
+    id: 'PEN-2',
+    numero: 2,
+    status: 'em_andamento',
+    clientName: 'Beta',
+    priority: 'critica',
+    responsible: 'Bia',
+    solicitante: 'Yuri',
+    deadline: '2099-01-01',
+    assunto: 'Servidor lento',
+    createdAt: '2026-01-02T10:00:00Z',
+  },
+  {
+    id: 'PEN-3',
+    numero: 3,
+    status: 'pausado',
+    clientName: 'Gama',
+    priority: 'baixa',
+    responsible: 'Caio',
+    solicitante: '',
+    deadline: null,
+    assunto: 'Trocar toner',
+    createdAt: '2026-01-03T10:00:00Z',
+  },
 ];
 
 function render(pens) {
@@ -133,10 +170,24 @@ describe('renderPenFila (modo local)', () => {
   });
 
   it('concluído e fechado ficam fora da visualização, como no quadro', () => {
-    const comFechadas = render(PENS.concat([
-      { id: 'PEN-4', numero: 4, status: 'concluido', assunto: 'Já concluída', createdAt: '2026-01-04T10:00:00Z' },
-      { id: 'PEN-5', numero: 5, status: 'fechado', assunto: 'Já fechada', createdAt: '2026-01-05T10:00:00Z' },
-    ]));
+    const comFechadas = render(
+      PENS.concat([
+        {
+          id: 'PEN-4',
+          numero: 4,
+          status: 'concluido',
+          assunto: 'Já concluída',
+          createdAt: '2026-01-04T10:00:00Z',
+        },
+        {
+          id: 'PEN-5',
+          numero: 5,
+          status: 'fechado',
+          assunto: 'Já fechada',
+          createdAt: '2026-01-05T10:00:00Z',
+        },
+      ])
+    );
     expect((comFechadas.match(/<tr class="pf-row"/g) || []).length).toBe(3);
     expect(comFechadas).not.toContain('Já concluída');
   });
@@ -148,12 +199,19 @@ describe('renderPenFila (modo local)', () => {
   // Fila vazia por causa de filtro é beco sem saída: o aviso leva a saída.
   it('com filtro ativo, o vazio traz o botão de limpar', () => {
     const orig = sandbox.document.getElementById;
-    sandbox.document.getElementById = (id) => (id === 'penStatus'
-      ? Object.assign(_el(), { tagName: 'SELECT', value: 'aberto', selectedOptions: [{ textContent: 'Aberto' }] })
-      : _el());
+    sandbox.document.getElementById = (id) =>
+      id === 'penStatus'
+        ? Object.assign(_el(), {
+            tagName: 'SELECT',
+            value: 'aberto',
+            selectedOptions: [{ textContent: 'Aberto' }],
+          })
+        : _el();
     try {
       expect(render([])).toContain('data-action="penClearFilters"');
-    } finally { sandbox.document.getElementById = orig; }
+    } finally {
+      sandbox.document.getElementById = orig;
+    }
   });
 
   it('sem filtro, não oferece limpar o que não existe', () => {
@@ -229,7 +287,7 @@ describe('ordem que vem do banco', () => {
     T.setTotal(3);
     area.innerHTML = '';
     T.renderPenFila(area);
-    const ordem = (area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || []);
+    const ordem = area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || [];
     expect(ordem).toEqual(['data-arg="PEN-3"', 'data-arg="PEN-1"', 'data-arg="PEN-2"']);
   });
 
@@ -239,7 +297,7 @@ describe('ordem que vem do banco', () => {
     T.setTotal(3);
     area.innerHTML = '';
     T.renderPenFila(area);
-    const ordem = (area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || []);
+    const ordem = area.innerHTML.match(/data-arg="(PEN-[0-9])"/g) || [];
     expect(ordem).toEqual(['data-arg="PEN-3"', 'data-arg="PEN-1"', 'data-arg="PEN-2"']);
     T.penFilaSort('prazo');
   });

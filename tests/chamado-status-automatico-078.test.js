@@ -10,7 +10,8 @@ import { PGlite } from '@electric-sql/pglite';
 //     cronômetro ligado, nunca recorrente que o banco não sabe regerar;
 //   * toda mudança automática deixa evento com motivo na linha do tempo.
 
-const ler = (rel) => fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+const ler = (rel) =>
+  fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const M078 = ler('../supabase/migrations/078_chamado_status_automatico.sql');
 
 const AGORA = '2026-11-04T12:00:00Z';
@@ -18,32 +19,71 @@ const DIAS_ATRAS = (d) => new Date(Date.parse(AGORA) - d * 86400000).toISOString
 
 let db;
 const um = async (sql, params) => (await db.query(sql, params)).rows[0];
-const pen = (id) => um('SELECT status, events, completed_at, completed_by FROM pendencias WHERE id = $1', [id]);
+const pen = (id) =>
+  um('SELECT status, events, completed_at, completed_by FROM pendencias WHERE id = $1', [id]);
 
 async function inserir(p) {
   const c = {
-    id: 'P1', status: 'aguardando_cliente', canal: 'email', email_thread_id: null, solicitante_email: 'cli@acme.com.br',
-    responsible: 'Ana', notes: [], events: [], timer_running: false, recurrence: null, created_at: DIAS_ATRAS(30), ...p,
+    id: 'P1',
+    status: 'aguardando_cliente',
+    canal: 'email',
+    email_thread_id: null,
+    solicitante_email: 'cli@acme.com.br',
+    responsible: 'Ana',
+    notes: [],
+    events: [],
+    timer_running: false,
+    recurrence: null,
+    created_at: DIAS_ATRAS(30),
+    ...p,
   };
   await db.query(
     `INSERT INTO pendencias (id, team, status, canal, email_thread_id, solicitante_email, responsible, notes, events,
        timer_running, recurrence, created_at, updated_at)
      VALUES ($1, 'init', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)`,
-    [c.id, c.status, c.canal, c.email_thread_id, c.solicitante_email, c.responsible, JSON.stringify(c.notes),
-      JSON.stringify(c.events), c.timer_running, c.recurrence, c.created_at],
+    [
+      c.id,
+      c.status,
+      c.canal,
+      c.email_thread_id,
+      c.solicitante_email,
+      c.responsible,
+      JSON.stringify(c.notes),
+      JSON.stringify(c.events),
+      c.timer_running,
+      c.recurrence,
+      c.created_at,
+    ]
   );
 }
 
-const notaCliente = (at = AGORA) => ({ text: 'segue o print', author: 'Márcia', createdAt: at, visibility: 'solicitante' });
-const notaEquipe = (at = AGORA, vis = 'resposta') => ({ text: 'verificando', author: 'Ana', createdAt: at, visibility: vis });
+const notaCliente = (at = AGORA) => ({
+  text: 'segue o print',
+  author: 'Márcia',
+  createdAt: at,
+  visibility: 'solicitante',
+});
+const notaEquipe = (at = AGORA, vis = 'resposta') => ({
+  text: 'verificando',
+  author: 'Ana',
+  createdAt: at,
+  visibility: vis,
+});
 
 // A mesma forma de gravar do robô e do webhook: lê o array, soma a nota, regrava.
 async function anexar(id, nota) {
-  await db.query(`UPDATE pendencias SET notes = notes || $2::jsonb, updated_at = now() WHERE id = $1`, [id, JSON.stringify([nota])]);
+  await db.query(
+    `UPDATE pendencias SET notes = notes || $2::jsonb, updated_at = now() WHERE id = $1`,
+    [id, JSON.stringify([nota])]
+  );
 }
 
 const rodar = async (agora = AGORA) =>
-  (await db.query('SELECT * FROM public.chamados_sem_interacao($1::timestamptz) ORDER BY id', [agora])).rows;
+  (
+    await db.query('SELECT * FROM public.chamados_sem_interacao($1::timestamptz) ORDER BY id', [
+      agora,
+    ])
+  ).rows;
 
 beforeAll(async () => {
   db = new PGlite();
@@ -77,7 +117,13 @@ describe('078: resposta do cliente devolve o chamado para a equipe', () => {
     const p = await pen('P1');
     expect(p.status).toBe('em_andamento');
     expect(p.events).toHaveLength(1);
-    expect(p.events[0]).toMatchObject({ by: 'Sistema', type: 'status', de: 'aguardando_cliente', para: 'em_andamento', motivo: 'Cliente respondeu' });
+    expect(p.events[0]).toMatchObject({
+      by: 'Sistema',
+      type: 'status',
+      de: 'aguardando_cliente',
+      para: 'em_andamento',
+      motivo: 'Cliente respondeu',
+    });
     // Mesmo formato do toISOString() do app: a linha do tempo ordena por instante.
     expect(p.events[0].at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
@@ -106,7 +152,10 @@ describe('078: resposta do cliente devolve o chamado para a equipe', () => {
   });
 
   it('regravar o array com a mesma nota antiga do cliente não é resposta nova', async () => {
-    await inserir({ status: 'aguardando_cliente', notes: [notaCliente(DIAS_ATRAS(3)), notaEquipe(DIAS_ATRAS(2))] });
+    await inserir({
+      status: 'aguardando_cliente',
+      notes: [notaCliente(DIAS_ATRAS(3)), notaEquipe(DIAS_ATRAS(2))],
+    });
     // O app sobe o registro inteiro (savePendencia): notes vai igual, só muda outro campo.
     await db.query(`UPDATE pendencias SET notes = notes, responsible = 'Beto' WHERE id = 'P1'`);
     expect((await pen('P1')).status).toBe('aguardando_cliente');
@@ -114,14 +163,23 @@ describe('078: resposta do cliente devolve o chamado para a equipe', () => {
 
   it('se a mesma gravação já muda o status, vale o que quem gravou escolheu', async () => {
     await inserir({ status: 'aguardando_cliente' });
-    await db.query(`UPDATE pendencias SET notes = notes || $1::jsonb, status = 'resolvido' WHERE id = 'P1'`, [JSON.stringify([notaCliente()])]);
+    await db.query(
+      `UPDATE pendencias SET notes = notes || $1::jsonb, status = 'resolvido' WHERE id = 'P1'`,
+      [JSON.stringify([notaCliente()])]
+    );
     const p = await pen('P1');
     expect(p.status).toBe('resolvido');
     expect(p.events).toEqual([]);
   });
 
   it('linha do tempo não passa do teto de 200 eventos e guarda os mais novos', async () => {
-    const antigos = Array.from({ length: 200 }, (_, i) => ({ at: DIAS_ATRAS(10), by: 'Ana', type: 'prazo', de: null, para: String(i) }));
+    const antigos = Array.from({ length: 200 }, (_, i) => ({
+      at: DIAS_ATRAS(10),
+      by: 'Ana',
+      type: 'prazo',
+      de: null,
+      para: String(i),
+    }));
     await inserir({ status: 'aguardando_cliente', events: antigos });
     await anexar('P1', notaCliente());
     const { events } = await pen('P1');
@@ -139,7 +197,12 @@ describe('078: 7 dias sem interação', () => {
     expect(p.status).toBe('resolvido');
     expect(new Date(p.completed_at).toISOString()).toBe(new Date(AGORA).toISOString());
     expect(p.completed_by).toBe('Ana');
-    expect(p.events.at(-1)).toMatchObject({ by: 'Sistema', de: 'aguardando_cliente', para: 'resolvido', motivo: 'Sem retorno do cliente em 7 dias' });
+    expect(p.events.at(-1)).toMatchObject({
+      by: 'Sistema',
+      de: 'aguardando_cliente',
+      para: 'resolvido',
+      motivo: 'Sem retorno do cliente em 7 dias',
+    });
   });
 
   it('Em Andamento parado vira Pausado', async () => {
@@ -157,21 +220,42 @@ describe('078: 7 dias sem interação', () => {
   });
 
   it('nota recente de qualquer lado conta como interação', async () => {
-    await inserir({ id: 'P1', status: 'em_andamento', notes: [notaEquipe(DIAS_ATRAS(20)), notaCliente(DIAS_ATRAS(2))] });
-    await inserir({ id: 'P2', status: 'aguardando_cliente', notes: [notaEquipe(DIAS_ATRAS(3), 'interna')] });
+    await inserir({
+      id: 'P1',
+      status: 'em_andamento',
+      notes: [notaEquipe(DIAS_ATRAS(20)), notaCliente(DIAS_ATRAS(2))],
+    });
+    await inserir({
+      id: 'P2',
+      status: 'aguardando_cliente',
+      notes: [notaEquipe(DIAS_ATRAS(3), 'interna')],
+    });
     expect(await rodar()).toEqual([]);
   });
 
   it('evento recente conta como interação: pedir informação reinicia o prazo', async () => {
     await inserir({
-      status: 'aguardando_cliente', notes: [notaEquipe(DIAS_ATRAS(20))],
-      events: [{ at: DIAS_ATRAS(1), by: 'Ana', type: 'status', de: 'em_andamento', para: 'aguardando_cliente' }],
+      status: 'aguardando_cliente',
+      notes: [notaEquipe(DIAS_ATRAS(20))],
+      events: [
+        {
+          at: DIAS_ATRAS(1),
+          by: 'Ana',
+          type: 'status',
+          de: 'em_andamento',
+          para: 'aguardando_cliente',
+        },
+      ],
     });
     expect(await rodar()).toEqual([]);
   });
 
   it('abrir o chamado (evento visto) não é atender: não segura a pausa', async () => {
-    await inserir({ status: 'em_andamento', notes: [notaEquipe(DIAS_ATRAS(9))], events: [{ at: DIAS_ATRAS(1), by: 'Ana', type: 'visto' }] });
+    await inserir({
+      status: 'em_andamento',
+      notes: [notaEquipe(DIAS_ATRAS(9))],
+      events: [{ at: DIAS_ATRAS(1), by: 'Ana', type: 'visto' }],
+    });
     expect(await rodar()).toEqual([{ id: 'P1', de: 'em_andamento', para: 'pausado' }]);
   });
 
@@ -187,7 +271,12 @@ describe('078: 7 dias sem interação', () => {
   });
 
   it('chamado de WhatsApp antigo, sem canal preenchido, entra pela thread', async () => {
-    await inserir({ status: 'em_andamento', canal: null, solicitante_email: null, email_thread_id: 'whatsapp:5511987654321' });
+    await inserir({
+      status: 'em_andamento',
+      canal: null,
+      solicitante_email: null,
+      email_thread_id: 'whatsapp:5511987654321',
+    });
     expect(await rodar()).toEqual([{ id: 'P1', de: 'em_andamento', para: 'pausado' }]);
   });
 
@@ -210,7 +299,14 @@ describe('078: 7 dias sem interação', () => {
   }
 
   it('data torta numa nota não derruba a rodada dos outros chamados', async () => {
-    await inserir({ id: 'P1', status: 'em_andamento', notes: [{ text: 'x', createdAt: '2026-13-45T99:00:00Z' }, { text: 'y', createdAt: 'ontem' }] });
+    await inserir({
+      id: 'P1',
+      status: 'em_andamento',
+      notes: [
+        { text: 'x', createdAt: '2026-13-45T99:00:00Z' },
+        { text: 'y', createdAt: 'ontem' },
+      ],
+    });
     await inserir({ id: 'P2', status: 'em_andamento' });
     expect((await rodar()).map((r) => r.id)).toEqual(['P1', 'P2']);
   });
@@ -234,16 +330,22 @@ describe('078: 7 dias sem interação', () => {
 
 describe('078: agendamento e permissões', () => {
   it('agenda uma vez só, de hora em hora, mesmo aplicando a migration duas vezes', async () => {
-    const { rows } = await db.query(`SELECT schedule, command FROM cron.job WHERE jobname = 'chamados-sem-interacao'`);
+    const { rows } = await db.query(
+      `SELECT schedule, command FROM cron.job WHERE jobname = 'chamados-sem-interacao'`
+    );
     expect(rows).toHaveLength(1);
     expect(rows[0].schedule).toBe('17 * * * *');
     expect(rows[0].command).toContain('public.chamados_sem_interacao()');
   });
 
   it('operador não chama a rodada pelo PostgREST', async () => {
-    const r = await um(`SELECT has_function_privilege('authenticated', 'public.chamados_sem_interacao(timestamptz, integer)', 'execute') AS ok`);
+    const r = await um(
+      `SELECT has_function_privilege('authenticated', 'public.chamados_sem_interacao(timestamptz, integer)', 'execute') AS ok`
+    );
     expect(r.ok).toBe(false);
-    const a = await um(`SELECT has_function_privilege('anon', 'public.chamados_sem_interacao(timestamptz, integer)', 'execute') AS ok`);
+    const a = await um(
+      `SELECT has_function_privilege('anon', 'public.chamados_sem_interacao(timestamptz, integer)', 'execute') AS ok`
+    );
     expect(a.ok).toBe(false);
   });
 });

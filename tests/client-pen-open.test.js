@@ -1,5 +1,6 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
+const { norm } = __partsReq(import.meta.url)('./_fonte.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -27,8 +28,12 @@ const sandbox = {
   clearTimeout: () => {},
   debounce: (fn) => fn,
   getPendenciaById: (id) => (id === _pen.id ? _pen : null),
-  openPendenciaDetail: (id) => { calls.detail.push(id); },
-  showToast: (msg, type) => { calls.toast.push([msg, type]); },
+  openPendenciaDetail: (id) => {
+    calls.detail.push(id);
+  },
+  showToast: (msg, type) => {
+    calls.toast.push([msg, type]);
+  },
   escapeHtml: (s) => String(s ?? ''),
   getPendenciaTitulo: (p) => (p && (p.assunto || p.descricao)) || '',
   statusTag: () => '',
@@ -67,7 +72,11 @@ describe('openClientPenRow (linha clicável)', () => {
 
   it('ignora clique em elementos interativos (botão, select, link…)', () => {
     for (const sel of ['button', 'select', 'a', 'input', 'textarea', 'label']) {
-      T.openClientPenRow({ target: { closest: (s) => (s.includes(sel) ? {} : null) } }, 'CLI-1', 'PEN-1');
+      T.openClientPenRow(
+        { target: { closest: (s) => (s.includes(sel) ? {} : null) } },
+        'CLI-1',
+        'PEN-1'
+      );
     }
     expect(calls.detail).toEqual([]);
     expect(calls.toast).toEqual([]);
@@ -112,9 +121,9 @@ describe('contrato da tabela e do retorno à aba', () => {
 
   it('linha com tabindex + Enter/Espaço (delegação) e prazo vazio como "—"', () => {
     // Enter/Espaço vêm de graça da delegação em js/actions.js (TR[role=button] não é INPUT).
-    expect(clientsSrc).toContain("class=\"cli-pen-row\" tabindex=\"0\"");
+    expect(clientsSrc).toContain('class="cli-pen-row" tabindex="0"');
     expect(clientsSrc).toContain('data-action="clientPenRow"');
-    expect(clientsSrc).toContain("${p.deadline?formatDate(p.deadline):'—'}");
+    expect(norm(clientsSrc)).toContain(norm("${p.deadline ? formatDate(p.deadline) : '—'}"));
   });
 
   it('closeModal devolve à aba só se o modal seguir fechado (Editar preservado)', () => {

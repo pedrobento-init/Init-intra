@@ -5,7 +5,10 @@
 // Match EXATO normalizado, sem fuzzy. Frontend NUNCA vê o API token.
 
 function normalizeBackfillName(v) {
-  return String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 // Espelho testável da regra do servidor: mapRows [{milvus_nome, client_id}],
@@ -43,25 +46,39 @@ function buildBackfillPreview(mapRows, clientTokens, milvusList) {
 function summarizeBackfillPreview(rows) {
   const list = rows || [];
   const c = (s) => list.filter((r) => r.status === s).length;
-  return { total: list.length, prontos: c('pronto'), jaPreenchidos: c('ja_preenchido'), naoEncontrados: c('nao_encontrado'), ambiguos: c('ambiguo') };
+  return {
+    total: list.length,
+    prontos: c('pronto'),
+    jaPreenchidos: c('ja_preenchido'),
+    naoEncontrados: c('nao_encontrado'),
+    ambiguos: c('ambiguo'),
+  };
 }
 
 function _backfillAdminGuard() {
-  const isAdmin = typeof isMilvusMappingAdmin === 'function'
-    ? isMilvusMappingAdmin()
-    : (typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true);
+  const isAdmin =
+    typeof isMilvusMappingAdmin === 'function'
+      ? isMilvusMappingAdmin()
+      : typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true;
   if (!isAdmin) throw new Error('Somente administradores.');
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() ||
-      typeof supabaseClient === 'undefined' || !supabaseClient) {
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
 }
 
 async function _invokeTokenBackfill(body) {
   _backfillAdminGuard();
-  const { data, error } = await supabaseClient.functions.invoke('milvus-token-backfill', { body: body });
+  const { data, error } = await supabaseClient.functions.invoke('milvus-token-backfill', {
+    body: body,
+  });
   if (error) throw new Error('Falha ao preencher tokens. Tente novamente.');
-  if (!data || data.success !== true) throw new Error('Falha ao preencher tokens. Tente novamente.');
+  if (!data || data.success !== true)
+    throw new Error('Falha ao preencher tokens. Tente novamente.');
   return data;
 }
 

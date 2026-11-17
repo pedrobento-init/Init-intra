@@ -21,7 +21,13 @@ test('abas do cliente e atalhos do Dashboard funcionam pelo teclado', async ({ p
 
 test('Esc com formulário alterado pede confirmação antes de fechar', async ({ page }) => {
   await loginLocal(page);
-  const open = () => page.evaluate(() => openModal('Teste', '<div class="form-group"><label class="form-label" for="tx">Campo</label><input class="form-input" id="tx"></div>'));
+  const open = () =>
+    page.evaluate(() =>
+      openModal(
+        'Teste',
+        '<div class="form-group"><label class="form-label" for="tx">Campo</label><input class="form-input" id="tx"></div>'
+      )
+    );
   const overlay = page.locator('#modalOverlay');
 
   // Sem alteração: fecha direto.

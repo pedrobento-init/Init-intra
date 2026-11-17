@@ -43,8 +43,9 @@ describe('a entrada que não virou chamado vira registro', () => {
 
   it('guarda o corpo LIMPO, não o e-mail cru', () => {
     // É o que alguém vai ler para decidir em cinco segundos se era chamado.
-    const cru = 'Bom dia, a impressora parou.\n\nAtenciosamente,\nMárcia\n(11) 99999-0000\n\n'
-      + 'Em qui., 22 de out. de 2026 às 10:30, Suporte <s@init.com> escreveu:\n> alguma novidade?';
+    const cru =
+      'Bom dia, a impressora parou.\n\nAtenciosamente,\nMárcia\n(11) 99999-0000\n\n' +
+      'Em qui., 22 de out. de 2026 às 10:30, Suporte <s@init.com> escreveu:\n> alguma novidade?';
     const r = entradaDaCaixa(email({ trecho: cru }), { motivo: 'sem_cliente' }, 'ETR-3');
     expect(r.corpo).toContain('a impressora parou');
     expect(r.corpo).not.toContain('99999-0000');
@@ -58,19 +59,33 @@ describe('a entrada que não virou chamado vira registro', () => {
   });
 
   it('e-mail sem thread não inventa id vazio', () => {
-    const r = entradaDaCaixa(email({ thread_id: '', message_id: null }), { motivo: 'sem_cliente' }, 'ETR-5');
+    const r = entradaDaCaixa(
+      email({ thread_id: '', message_id: null }),
+      { motivo: 'sem_cliente' },
+      'ETR-5'
+    );
     expect(r.thread_id).toBeNull();
     expect(r.message_id).toBeNull();
   });
 
   it('data inválida cai para agora, em vez de gravar lixo', () => {
     const agora = new Date('2026-10-26T15:00:00.000Z');
-    const r = entradaDaCaixa(email({ data: 'ontem' }), { motivo: 'sem_cliente', team: 'init' }, 'ETR-6', agora);
+    const r = entradaDaCaixa(
+      email({ data: 'ontem' }),
+      { motivo: 'sem_cliente', team: 'init' },
+      'ETR-6',
+      agora
+    );
     expect(r.recebido_em).toBe('2026-10-26T15:00:00.000Z');
   });
 
   it('a data do e-mail vale quando dá para ler', () => {
-    const r = entradaDaCaixa(email(), { motivo: 'sem_cliente', team: 'init' }, 'ETR-7', new Date('2026-10-26T15:00:00.000Z'));
+    const r = entradaDaCaixa(
+      email(),
+      { motivo: 'sem_cliente', team: 'init' },
+      'ETR-7',
+      new Date('2026-10-26T15:00:00.000Z')
+    );
     expect(r.recebido_em).toBe('2026-10-26T12:00:00.000Z');
   });
 
@@ -79,11 +94,17 @@ describe('a entrada que não virou chamado vira registro', () => {
   });
 
   it('corpo vazio vira null, não string vazia', () => {
-    expect(entradaDaCaixa(email({ trecho: '   ' }), { motivo: 'sem_cliente' }, 'ETR-9').corpo).toBeNull();
+    expect(
+      entradaDaCaixa(email({ trecho: '   ' }), { motivo: 'sem_cliente' }, 'ETR-9').corpo
+    ).toBeNull();
   });
 
   it('assunto gigante é cortado antes de bater no banco', () => {
-    const r = entradaDaCaixa(email({ assunto: 'x'.repeat(500) }), { motivo: 'sem_cliente' }, 'ETR-10');
+    const r = entradaDaCaixa(
+      email({ assunto: 'x'.repeat(500) }),
+      { motivo: 'sem_cliente' },
+      'ETR-10'
+    );
     expect(r.assunto).toHaveLength(300);
   });
 });
@@ -92,7 +113,12 @@ describe('o que o robô já resolveu também entra na caixa', () => {
   const agora = new Date('2026-10-26T15:00:00.000Z');
 
   it('e-mail que virou chamado entra resolvido pelo robô e ligado ao chamado', () => {
-    const r = entradaDaCaixa(email(), { status: 'virou_chamado', pendenciaId: 'PEN-1', clientId: 'CLI-1', team: 'init' }, 'ETR-11', agora);
+    const r = entradaDaCaixa(
+      email(),
+      { status: 'virou_chamado', pendenciaId: 'PEN-1', clientId: 'CLI-1', team: 'init' },
+      'ETR-11',
+      agora
+    );
     expect(r.status).toBe('virou_chamado');
     expect(r.pendencia_id).toBe('PEN-1');
     expect(r.client_id).toBe('CLI-1');
@@ -101,7 +127,12 @@ describe('o que o robô já resolveu também entra na caixa', () => {
   });
 
   it('resposta anexada ao chamado aberto entra como anexado', () => {
-    const r = entradaDaCaixa(email(), { status: 'anexado', pendenciaId: 'PEN-2', clientId: 'CLI-1' }, 'ETR-12', agora);
+    const r = entradaDaCaixa(
+      email(),
+      { status: 'anexado', pendenciaId: 'PEN-2', clientId: 'CLI-1' },
+      'ETR-12',
+      agora
+    );
     expect(r.status).toBe('anexado');
     expect(r.pendencia_id).toBe('PEN-2');
     expect(r.tratado_por).toBe('robo');
@@ -114,7 +145,9 @@ describe('o que o robô já resolveu também entra na caixa', () => {
   });
 
   it('pendente sem cliente fica sem client_id, e não com string vazia', () => {
-    expect(entradaDaCaixa(email(), { motivo: 'sem_cliente', clientId: '' }, 'ETR-14').client_id).toBeNull();
+    expect(
+      entradaDaCaixa(email(), { motivo: 'sem_cliente', clientId: '' }, 'ETR-14').client_id
+    ).toBeNull();
   });
 });
 
@@ -133,7 +166,8 @@ describe('o chamado guarda o e-mail inteiro', () => {
     // O texto precisa ser longo o bastante: corpoLimpo devolve o ORIGINAL
     // quando o corte deixaria menos de 20 caracteres, para um e-mail de duas
     // linhas não virar chamado vazio.
-    const cru = 'A impressora da recepção parou de imprimir hoje de manhã.\n\nAtt,\nMárcia\n(11) 99999-0000\n\nEm qui., 22 de out. de 2026 às 10:30, X <x@y.com> escreveu:\n> oi';
+    const cru =
+      'A impressora da recepção parou de imprimir hoje de manhã.\n\nAtt,\nMárcia\n(11) 99999-0000\n\nEm qui., 22 de out. de 2026 às 10:30, X <x@y.com> escreveu:\n> oi';
     const e = email({ trecho: cru });
     const pen = pendenciaDaTriagem(triagemDaIa('', e), e, cliente, 'PEN-2');
     expect(pen.email_corpo).toContain('parou de imprimir');
@@ -142,7 +176,12 @@ describe('o chamado guarda o e-mail inteiro', () => {
   });
 
   it('e-mail sem texto não grava string vazia', () => {
-    const pen = pendenciaDaTriagem(triagemDaIa('', email({ trecho: '' })), email({ trecho: '' }), cliente, 'PEN-3');
+    const pen = pendenciaDaTriagem(
+      triagemDaIa('', email({ trecho: '' })),
+      email({ trecho: '' }),
+      cliente,
+      'PEN-3'
+    );
     expect(pen.email_corpo).toBeNull();
   });
 

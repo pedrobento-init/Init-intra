@@ -4,11 +4,14 @@ let _templatesCategoryFilter = '';
 
 function renderTemplates() {
   document.getElementById('pageTitle').textContent = 'Conhecimento';
-  setTopbarAction('Novo Modelo', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+  setTopbarAction(
+    'Novo Modelo',
+    '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+  );
   window._topbarAction = () => openTemplateForm();
 
   const templates = getProcedureTemplates();
-  const categories = Array.from(new Set(templates.map(t => t.category).filter(Boolean)));
+  const categories = Array.from(new Set(templates.map((t) => t.category).filter(Boolean)));
 
   // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   document.getElementById('contentArea').innerHTML = `
@@ -22,7 +25,7 @@ function renderTemplates() {
         <div class="filter-field pt-filter pt-full">
           <select class="form-select" id="templateCategorySelect" data-change="tplFilter">
             <option value="">Todas as categorias</option>
-            ${categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
+            ${categories.map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -32,7 +35,8 @@ function renderTemplates() {
 
   const savedFilters = loadFilterState('templates', {});
   if (savedFilters.search) document.getElementById('templateSearch').value = savedFilters.search;
-  if (savedFilters.category) document.getElementById('templateCategorySelect').value = savedFilters.category;
+  if (savedFilters.category)
+    document.getElementById('templateCategorySelect').value = savedFilters.category;
 
   showSkeleton('templatesGridWrap', 4);
   renderTemplatesGrid();
@@ -43,7 +47,7 @@ window.debouncedFilterTemplatesGrid = debounce(filterTemplatesGrid, 300);
 function filterTemplatesGrid() {
   const search = document.getElementById('templateSearch')?.value || '';
   const category = document.getElementById('templateCategorySelect')?.value || '';
-  saveFilterState('templates', {search, category});
+  saveFilterState('templates', { search, category });
   renderTemplatesGrid();
 }
 
@@ -53,17 +57,45 @@ function filterTemplatesGrid() {
 function _refreshTemplateCategories() {
   try {
     var sel = document.getElementById('templateCategorySelect');
-    if (!sel) { renderTemplatesGrid(); return; }
+    if (!sel) {
+      renderTemplatesGrid();
+      return;
+    }
     var cur = sel.value || '';
     var templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
-    var cats = Array.from(new Set(templates.map(function(t) { return t.category; }).filter(Boolean)));
-    sel.innerHTML = '<option value="">Todas as categorias</option>' +
-      cats.map(function(cat) {
-        return '<option value="' + escapeHtml(cat) + '"' + (cat === cur ? ' selected' : '') + '>' + escapeHtml(cat) + '</option>';
-      }).join('');
+    var cats = Array.from(
+      new Set(
+        templates
+          .map(function (t) {
+            return t.category;
+          })
+          .filter(Boolean)
+      )
+    );
+    sel.innerHTML =
+      '<option value="">Todas as categorias</option>' +
+      cats
+        .map(function (cat) {
+          return (
+            '<option value="' +
+            escapeHtml(cat) +
+            '"' +
+            (cat === cur ? ' selected' : '') +
+            '>' +
+            escapeHtml(cat) +
+            '</option>'
+          );
+        })
+        .join('');
     if (cur && cats.indexOf(cur) === -1) sel.value = '';
     renderTemplatesGrid();
-  } catch (_) { try { renderTemplatesGrid(); } catch (_) {} }
+  } catch (_) {
+    try {
+      renderTemplatesGrid();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'templates');
+    }
+  }
 }
 
 function renderTemplatesGrid() {
@@ -71,32 +103,34 @@ function renderTemplatesGrid() {
   if (!container) return;
 
   setTimeout(() => {
-  const query = (document.getElementById('templateSearch')?.value || '').toLowerCase();
-  const selectedCat = document.getElementById('templateCategorySelect')?.value || '';
+    const query = (document.getElementById('templateSearch')?.value || '').toLowerCase();
+    const selectedCat = document.getElementById('templateCategorySelect')?.value || '';
 
-  let templates = getProcedureTemplates();
+    let templates = getProcedureTemplates();
 
-  if (query) {
-    templates = templates.filter(t => 
-      (t.title && t.title.toLowerCase().includes(query)) ||
-      (t.category && t.category.toLowerCase().includes(query)) ||
-      (t.content && t.content.toLowerCase().includes(query))
-    );
-  }
+    if (query) {
+      templates = templates.filter(
+        (t) =>
+          (t.title && t.title.toLowerCase().includes(query)) ||
+          (t.category && t.category.toLowerCase().includes(query)) ||
+          (t.content && t.content.toLowerCase().includes(query))
+      );
+    }
 
-  if (selectedCat) {
-    templates = templates.filter(t => t.category === selectedCat);
-  }
+    if (selectedCat) {
+      templates = templates.filter((t) => t.category === selectedCat);
+    }
 
-  if (!templates.length) {
-    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Nenhum modelo de procedimento encontrado.</p><button type="button" class="btn btn-primary btn-sm" data-action="tplNew">+ Novo Modelo</button></div>`;
-    return;
-  }
+    if (!templates.length) {
+      container.innerHTML = `<div class="empty-state u-068a8d"><p>Nenhum modelo de procedimento encontrado.</p><button type="button" class="btn btn-primary btn-sm" data-action="tplNew">+ Novo Modelo</button></div>`;
+      return;
+    }
 
-  container.innerHTML = templates.map(t => {
-    const n = typeof procParseSteps === 'function' ? procParseSteps(t.content).steps.length : 0;
-    const id = escapeHtml(t.id);
-    return `
+    container.innerHTML = templates
+      .map((t) => {
+        const n = typeof procParseSteps === 'function' ? procParseSteps(t.content).steps.length : 0;
+        const id = escapeHtml(t.id);
+        return `
     <!-- [UI] card no padrão Dashboard: bg/borda/radius vêm do CSS ov (#templatesGridWrap > .card) -->
     <div class="card tpl-card">
       <div>
@@ -124,14 +158,19 @@ function renderTemplatesGrid() {
         </button>
       </div>
     </div>`;
-  }).join('');
+      })
+      .join('');
   }, 10);
 }
 
 function openTemplateForm(id = null) {
   const t = (id ? getProcedureTemplateById(id) : null) || {};
-  const cats = Array.from(new Set((getProcedureTemplates() || []).map(x => x.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  openModal(id ? 'Editar Modelo de Procedimento' : 'Novo Modelo de Procedimento', `
+  const cats = Array.from(
+    new Set((getProcedureTemplates() || []).map((x) => x.category).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  openModal(
+    id ? 'Editar Modelo de Procedimento' : 'Novo Modelo de Procedimento',
+    `
     <form class="ov-form ps-form" data-submit="tplSave" data-arg="${escapeHtml(id || '')}">
       <div class="ps-form-head">
         <div class="form-group">
@@ -141,7 +180,7 @@ function openTemplateForm(id = null) {
         <div class="form-group">
           <label class="form-label" for="tplCategory">Categoria</label>
           <input class="form-input" id="tplCategory" name="category" value="${escapeHtml(t.category || '')}" list="tplCategoryList" placeholder="Backup, Acesso, Rede, Segurança…" autocomplete="off" />
-          <datalist id="tplCategoryList">${cats.map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>
+          <datalist id="tplCategoryList">${cats.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>
         </div>
       </div>
       <div class="form-group ps-form-steps">
@@ -149,21 +188,33 @@ function openTemplateForm(id = null) {
         ${procEditorHtml(t.content || '')}
       </div>
       <div class="form-actions">
-        ${id ? `<button type="button" class="btn btn-secondary ps-form-run" data-action="tplSaveRun" title="Salvar e abrir no modo execução">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg> Salvar e executar</button>` : ''}
+        ${
+          id
+            ? `<button type="button" class="btn btn-secondary ps-form-run" data-action="tplSaveRun" title="Salvar e abrir no modo execução">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg> Salvar e executar</button>`
+            : ''
+        }
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar Modelo</button>
       </div>
     </form>
-  `, 'xl');
+  `,
+    'xl'
+  );
   procEditorMount(document.querySelector('#modalBody [data-pse]'));
-  if (!id) { const ti = document.getElementById('tplTitle'); if (ti) ti.focus(); }
+  if (!id) {
+    const ti = document.getElementById('tplTitle');
+    if (ti) ti.focus();
+  }
 }
 
 function submitTemplateForm(e, id, then) {
   if (e && e.preventDefault) e.preventDefault();
   try {
-    const form = e && e.target && e.target.tagName === 'FORM' ? e.target : document.querySelector('#modalBody form.ps-form');
+    const form =
+      e && e.target && e.target.tagName === 'FORM'
+        ? e.target
+        : document.querySelector('#modalBody form.ps-form');
     if (!form) return;
     if (!form.reportValidity()) return;
     const fd = new FormData(form);
@@ -173,31 +224,40 @@ function submitTemplateForm(e, id, then) {
 
     const data = { id: id || null, title, category, content };
     const errors = validateTemplate(data);
-    if (errors.length) { showToast(errors[0], 'error'); return; }
+    if (errors.length) {
+      showToast(errors[0], 'error');
+      return;
+    }
 
     saveProcedureTemplate(data);
 
     closeModal();
     _refreshTemplateCategories(); // reconstrói o filtro (categoria nova aparece sem F5)
     showToast(id ? 'Modelo atualizado com sucesso!' : 'Novo modelo criado!', 'success');
-    if (then === 'run' && id && typeof openProcedureRunner === 'function') openProcedureRunner('tpl', id);
-  } catch (err) { showToast('Erro ao salvar modelo: ' + err.message, 'error'); }
+    if (then === 'run' && id && typeof openProcedureRunner === 'function')
+      openProcedureRunner('tpl', id);
+  } catch (err) {
+    showToast('Erro ao salvar modelo: ' + err.message, 'error');
+  }
 }
 
 function deleteTemplateConfirm(id) {
   var tpl = getProcedureTemplateById(id);
   if (!tpl) return;
-  confirmAction('Deseja realmente excluir o modelo <strong>' + escapeHtml(tpl.title) + '</strong>?', function() {
-    var snapshot = JSON.parse(JSON.stringify(tpl));
-    if (deleteProcedureTemplate(id)) {
-      _refreshTemplateCategories();
-      showUndoToast('Modelo "' + tpl.title + '" removido.', function() {
-        saveProcedureTemplate(snapshot);
+  confirmAction(
+    'Deseja realmente excluir o modelo <strong>' + escapeHtml(tpl.title) + '</strong>?',
+    function () {
+      var snapshot = JSON.parse(JSON.stringify(tpl));
+      if (deleteProcedureTemplate(id)) {
         _refreshTemplateCategories();
-        showToast('Modelo restaurado.', 'success');
-      });
+        showUndoToast('Modelo "' + tpl.title + '" removido.', function () {
+          saveProcedureTemplate(snapshot);
+          _refreshTemplateCategories();
+          showToast('Modelo restaurado.', 'success');
+        });
+      }
     }
-  });
+  );
 }
 
 /**
@@ -206,51 +266,63 @@ function deleteTemplateConfirm(id) {
 function openApplyTemplateModal(templateId) {
   const tpl = getProcedureTemplateById(templateId);
   if (!tpl) return;
-  const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
+  const clients =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getClientsByTeam(_selectedTeam)
+      : getMyClients();
 
   if (!clients.length) {
     showToast('Nenhum cliente cadastrado no sistema.', 'warning');
     return;
   }
 
-  openModal(`Aplicar Modelo: ${tpl.title || ''}`, `
+  openModal(
+    `Aplicar Modelo: ${tpl.title || ''}`,
+    `
     <form class="ov-form" data-submit="tplApplySave" data-arg="${escapeHtml(templateId)}">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+      <p class="u-f0aa70">
         Selecione os clientes que receberão uma cópia deste procedimento:
       </p>
 
-      <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg-base);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer">
+      <div class="u-a15c71">
+        <label class="u-a667d3">
           <input type="checkbox" id="selectAllClientsBtn" data-change="tplApplyAll" />
           Selecionar Todos os Clientes
         </label>
-        <span style="font-size:12px;color:var(--text-muted)" id="selectedClientsCount">0 selecionados</span>
+        <span class="u-865c33" id="selectedClientsCount">0 selecionados</span>
       </div>
 
-      <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:6px">
-        ${clients.map(c => `
-          <label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:4px;cursor:pointer;background:var(--bg-surface);transition:background 0.15s" class="client-apply-row">
+      <div class="u-31cf09">
+        ${clients
+          .map(
+            (c) => `
+          <label class="client-apply-row u-1be03c">
             <input type="checkbox" name="client_ids" value="${escapeHtml(c.id)}" data-change="tplApplyCount" />
-            <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <div class="u-ceee53">
               ${clientAvatar(c, 24)}
-              <span style="font-size:13px;font-weight:500;color:var(--text-primary)">${escapeHtml(c.name)}</span>
-              ${c.segment ? `<span class="tag tag-blue" style="font-size:10px;padding:1px 6px">${escapeHtml(c.segment)}</span>` : ''}
+              <span class="u-95f0f6">${escapeHtml(c.name)}</span>
+              ${c.segment ? `<span class="tag tag-blue u-688d26">${escapeHtml(c.segment)}</span>` : ''}
             </div>
           </label>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
 
-      <div class="form-actions" style="margin-top:16px">
+      <div class="form-actions u-1b0f49">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Aplicar aos Clientes Selecionados</button>
       </div>
     </form>
-  `);
+  `
+  );
 }
 
 function toggleSelectAllClients(masterCheckbox) {
   const checkboxes = document.querySelectorAll('input[name="client_ids"]');
-  checkboxes.forEach(cb => { cb.checked = masterCheckbox.checked; });
+  checkboxes.forEach((cb) => {
+    cb.checked = masterCheckbox.checked;
+  });
   updateSelectedClientsCount();
 }
 
@@ -270,7 +342,7 @@ function submitApplyTemplate(e, templateId) {
   if (!tpl) return;
 
   const checkboxes = document.querySelectorAll('input[name="client_ids"]:checked');
-  const clientIds = Array.from(checkboxes).map(cb => cb.value);
+  const clientIds = Array.from(checkboxes).map((cb) => cb.value);
 
   if (!clientIds.length) {
     showToast('Selecione pelo menos um cliente para aplicar o modelo.', 'warning');
@@ -278,19 +350,22 @@ function submitApplyTemplate(e, templateId) {
   }
 
   let count = 0;
-  clientIds.forEach(clientId => {
+  clientIds.forEach((clientId) => {
     saveProcedure({
       id: null,
       clientId: clientId,
       title: tpl.title,
       category: tpl.category || '',
-      content: tpl.content || ''
+      content: tpl.content || '',
     });
     count++;
   });
 
   closeModal();
-  showToast(`Procedimento "${escapeHtml(tpl.title)}" aplicado a ${plural(count, 'cliente', 'clientes')}!`, 'success');
+  showToast(
+    `Procedimento "${escapeHtml(tpl.title)}" aplicado a ${plural(count, 'cliente', 'clientes')}!`,
+    'success'
+  );
 }
 
 if (typeof registerActions === 'function') {
@@ -302,7 +377,10 @@ if (typeof registerActions === 'function') {
     tplDelete: (_el, id) => deleteTemplateConfirm(id),
     tplApply: (_el, id) => openApplyTemplateModal(id),
     tplSave: (el, id, ev) => submitTemplateForm(ev, id || ''),
-    tplSaveRun: (el) => { const f = el.closest('form'); submitTemplateForm({ target: f }, (f && f.dataset.arg) || '', 'run'); },
+    tplSaveRun: (el) => {
+      const f = el.closest('form');
+      submitTemplateForm({ target: f }, (f && f.dataset.arg) || '', 'run');
+    },
     tplApplyAll: (el) => toggleSelectAllClients(el),
     tplApplyCount: () => updateSelectedClientsCount(),
     tplApplySave: (_el, id, ev) => submitApplyTemplate(ev, id),

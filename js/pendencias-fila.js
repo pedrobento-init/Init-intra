@@ -16,8 +16,11 @@ const PEN_FILA_SORT_KEY = 'intra_pen_fila_sort';
 let _penFilaSort = (function () {
   try {
     const raw = JSON.parse(localStorage.getItem(PEN_FILA_SORT_KEY) || 'null');
-    if (raw && typeof raw.col === 'string') return { col: raw.col, dir: raw.dir === 'desc' ? 'desc' : 'asc' };
-  } catch (_) {}
+    if (raw && typeof raw.col === 'string')
+      return { col: raw.col, dir: raw.dir === 'desc' ? 'desc' : 'asc' };
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-fila');
+  }
   return { col: 'prazo', dir: 'asc' }; // o que vence primeiro, primeiro
 })();
 
@@ -27,18 +30,50 @@ const PEN_FILA_COLS = [
   // `numero` é campo de VISITA: em pendência vinha sempre undefined e a coluna
   // Protocolo não ordenava nada. O número de exibição é a posição na ordem de
   // criação (desempate por id) — ordenar por ele é ordenar por isso.
-  { id: 'numero', label: 'Protocolo', cls: 'pf-num', valor: (p) => String(p.createdAt || '') + '|' + String(p.id || '') },
+  {
+    id: 'numero',
+    label: 'Protocolo',
+    cls: 'pf-num',
+    valor: (p) => String(p.createdAt || '') + '|' + String(p.id || ''),
+  },
   { id: 'data', label: 'Aberta', cls: 'pf-data', valor: (p) => String(p.createdAt || '') },
-  { id: 'titulo', label: 'Título', cls: 'pf-titulo', valor: (p) => String(getPendenciaTitulo(p) || '').toLowerCase() },
-  { id: 'cliente', label: 'Cliente', cls: 'pf-cliente', valor: (p) => String(p.clientName || '').toLowerCase() },
-  { id: 'solicitante', label: 'Quem pediu', cls: 'pf-solic', valor: (p) => String(p.solicitante || '').toLowerCase() },
-  { id: 'responsavel', label: 'Com', cls: 'pf-resp', valor: (p) => String(p.responsible || '').toLowerCase() },
+  {
+    id: 'titulo',
+    label: 'Título',
+    cls: 'pf-titulo',
+    valor: (p) => String(getPendenciaTitulo(p) || '').toLowerCase(),
+  },
+  {
+    id: 'cliente',
+    label: 'Cliente',
+    cls: 'pf-cliente',
+    valor: (p) => String(p.clientName || '').toLowerCase(),
+  },
+  {
+    id: 'solicitante',
+    label: 'Quem pediu',
+    cls: 'pf-solic',
+    valor: (p) => String(p.solicitante || '').toLowerCase(),
+  },
+  {
+    id: 'responsavel',
+    label: 'Com',
+    cls: 'pf-resp',
+    valor: (p) => String(p.responsible || '').toLowerCase(),
+  },
   { id: 'status', label: 'Status', cls: 'pf-status', valor: (p) => String(p.status || '') },
-  { id: 'prioridade', label: 'Prioridade', cls: 'pf-pri', valor: (p) => _PEN_PRIORITY_WEIGHT[p.priority] || 0 },
+  {
+    id: 'prioridade',
+    label: 'Prioridade',
+    cls: 'pf-pri',
+    valor: (p) => _PEN_PRIORITY_WEIGHT[p.priority] || 0,
+  },
   { id: 'prazo', label: 'Prazo', cls: 'pf-prazo', valor: (p) => String(p.deadline || '') },
 ];
 
-function _penFilaCol(id) { return PEN_FILA_COLS.find((c) => c.id === id) || PEN_FILA_COLS[0]; }
+function _penFilaCol(id) {
+  return PEN_FILA_COLS.find((c) => c.id === id) || PEN_FILA_COLS[0];
+}
 
 /** Ordena a página atual. Vazio sempre por último, independente da direção. */
 function _penFilaOrdena(linhas) {
@@ -50,7 +85,7 @@ function _penFilaOrdena(linhas) {
     const vazioA = va === '' || va === null || va === undefined;
     const vazioB = vb === '' || vb === null || vb === undefined;
     if (vazioA && vazioB) return 0;
-    if (vazioA) return 1;   // sem valor vai para o fim
+    if (vazioA) return 1; // sem valor vai para o fim
     if (vazioB) return -1;
     if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
     return String(va).localeCompare(String(vb)) * dir;
@@ -59,14 +94,23 @@ function _penFilaOrdena(linhas) {
 
 function penFilaSort(colId) {
   const atual = _penFilaSort;
-  _penFilaSort = (atual.col === colId)
-    ? { col: colId, dir: atual.dir === 'asc' ? 'desc' : 'asc' }
-    : { col: colId, dir: 'asc' };
-  try { localStorage.setItem(PEN_FILA_SORT_KEY, JSON.stringify(_penFilaSort)); } catch (_) {}
+  _penFilaSort =
+    atual.col === colId
+      ? { col: colId, dir: atual.dir === 'asc' ? 'desc' : 'asc' }
+      : { col: colId, dir: 'asc' };
+  try {
+    localStorage.setItem(PEN_FILA_SORT_KEY, JSON.stringify(_penFilaSort));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-fila');
+  }
   // No servidor a ordem faz parte da consulta: trocar de coluna é refazer a
   // busca pela primeira página, não reordenar as 50 linhas que estão na tela.
-  if (_penServerMode && typeof penSortRemoteCol === 'function' && penSortRemoteCol(colId)
-      && typeof renderPenView === 'function') {
+  if (
+    _penServerMode &&
+    typeof penSortRemoteCol === 'function' &&
+    penSortRemoteCol(colId) &&
+    typeof renderPenView === 'function'
+  ) {
     renderPenView(true);
     return;
   }
@@ -76,7 +120,11 @@ function penFilaSort(colId) {
 
 function _penFilaSeta(colId) {
   if (_penFilaSort.col !== colId) return '<span class="pf-seta" aria-hidden="true">↕</span>';
-  return '<span class="pf-seta is-on" aria-hidden="true">' + (_penFilaSort.dir === 'asc' ? '↑' : '↓') + '</span>';
+  return (
+    '<span class="pf-seta is-on" aria-hidden="true">' +
+    (_penFilaSort.dir === 'asc' ? '↑' : '↓') +
+    '</span>'
+  );
 }
 
 /** Célula de prazo: data + os dois selos de SLA, que já existem. */
@@ -87,8 +135,14 @@ function _penFilaPrazo(p) {
   let selos = '';
   if (typeof penResolucaoBadge === 'function') selos += penResolucaoBadge(p, agora);
   if (typeof penRespostaBadge === 'function') selos += penRespostaBadge(p, agora);
-  return '<span class="pf-prazo-data' + (atrasada ? ' is-late' : '') + '">' + escapeHtml(venc) + '</span>'
-    + (selos ? '<span class="pf-selos">' + selos + '</span>' : '');
+  return (
+    '<span class="pf-prazo-data' +
+    (atrasada ? ' is-late' : '') +
+    '">' +
+    escapeHtml(venc) +
+    '</span>' +
+    (selos ? '<span class="pf-selos">' + selos + '</span>' : '')
+  );
 }
 
 // Link de verdade para Ctrl+clique e botão do meio abrirem em outra aba. tabindex -1
@@ -96,26 +150,59 @@ function _penFilaPrazo(p) {
 // alongariam o caminho de quem navega por Tab.
 function _penFilaTituloHtml(p, titulo) {
   if (typeof penPaginaHref !== 'function') return escapeHtml(titulo);
-  return '<a class="pgp-link-lista" href="' + escapeHtml(penPaginaHref(p)) + '" tabindex="-1">' + escapeHtml(titulo) + '</a>';
+  return (
+    '<a class="pgp-link-lista" href="' +
+    escapeHtml(penPaginaHref(p)) +
+    '" tabindex="-1">' +
+    escapeHtml(titulo) +
+    '</a>'
+  );
 }
 
 function _penFilaLinha(p) {
   const titulo = getPendenciaTitulo(p);
-  const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : (p.numero || '');
+  const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : p.numero || '';
   const st = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]) || null;
-  return '<tr class="pf-row" tabindex="0" role="button" data-action="openPen" data-arg="' + escapeHtml(p.id) + '"'
-    + ' aria-label="' + escapeHtml(num + ' — ' + titulo) + '">'
-    + '<td class="pf-num"><span class="pen-display-num">' + escapeHtml(String(num)) + '</span></td>'
-    + '<td class="pf-data">' + escapeHtml(p.createdAt ? formatDate(new Date(p.createdAt)) : '—') + '</td>'
-    + '<td class="pf-titulo" title="' + escapeHtml(titulo) + '">' + _penFilaTituloHtml(p, titulo) + '</td>'
-    + '<td class="pf-cliente">' + escapeHtml(p.clientName || '—') + '</td>'
-    + '<td class="pf-solic">' + escapeHtml(p.solicitante || '—') + '</td>'
-    + '<td class="pf-resp">' + escapeHtml(p.responsible || '—') + '</td>'
-    + '<td class="pf-status"><span class="pf-chip" style="--c:' + (st ? st.dot : 'var(--text-muted)') + '">'
-      + escapeHtml(st ? st.label : p.status || '—') + '</span></td>'
-    + '<td class="pf-pri">' + (typeof priorityTag === 'function' ? priorityTag(p.priority) : escapeHtml(p.priority || '')) + '</td>'
-    + '<td class="pf-prazo">' + _penFilaPrazo(p) + '</td>'
-    + '</tr>';
+  return (
+    '<tr class="pf-row" tabindex="0" role="button" data-action="openPen" data-arg="' +
+    escapeHtml(p.id) +
+    '"' +
+    ' aria-label="' +
+    escapeHtml(num + ' — ' + titulo) +
+    '">' +
+    '<td class="pf-num"><span class="pen-display-num">' +
+    escapeHtml(String(num)) +
+    '</span></td>' +
+    '<td class="pf-data">' +
+    escapeHtml(p.createdAt ? formatDate(new Date(p.createdAt)) : '—') +
+    '</td>' +
+    '<td class="pf-titulo" title="' +
+    escapeHtml(titulo) +
+    '">' +
+    _penFilaTituloHtml(p, titulo) +
+    '</td>' +
+    '<td class="pf-cliente">' +
+    escapeHtml(p.clientName || '—') +
+    '</td>' +
+    '<td class="pf-solic">' +
+    escapeHtml(p.solicitante || '—') +
+    '</td>' +
+    '<td class="pf-resp">' +
+    escapeHtml(p.responsible || '—') +
+    '</td>' +
+    '<td class="pf-status"><span class="pf-chip" data-sty="--c:' +
+    (st ? st.dot : 'var(--text-muted)') +
+    '">' +
+    escapeHtml(st ? st.label : p.status || '—') +
+    '</span></td>' +
+    '<td class="pf-pri">' +
+    (typeof priorityTag === 'function' ? priorityTag(p.priority) : escapeHtml(p.priority || '')) +
+    '</td>' +
+    '<td class="pf-prazo">' +
+    _penFilaPrazo(p) +
+    '</td>' +
+    '</tr>'
+  );
 }
 
 /**
@@ -129,33 +216,55 @@ function _penFilaAvisoOrdem(nLinhas) {
   if (_penTotal == null || _penTotal <= nLinhas) return '';
   if (typeof penSortRemoteCol === 'function' && penSortRemoteCol(_penFilaSort.col)) return '';
   const col = _penFilaCol(_penFilaSort.col);
-  return '<p class="pf-aviso" role="status">' + escapeHtml(col.label)
-    + ' ordena só as ' + nLinhas + ' linhas desta página, de ' + _penTotal + '.</p>';
+  return (
+    '<p class="pf-aviso" role="status">' +
+    escapeHtml(col.label) +
+    ' ordena só as ' +
+    nLinhas +
+    ' linhas desta página, de ' +
+    _penTotal +
+    '.</p>'
+  );
 }
 
 function renderPenFila(area) {
   const pens = Array.isArray(_filteredPens) ? _filteredPens : [];
   // Concluído/Fechado continuam fora da VISUALIZAÇÃO, igual ao quadro.
-  const visiveis = pens.filter(function (p) { return penColVisible(p.status); });
+  const visiveis = pens.filter(function (p) {
+    return penColVisible(p.status);
+  });
   // Quando a coluna viajou para o ORDER BY, as linhas já chegam na ordem:
   // reordenar aqui embaralharia a página que o servidor escolheu.
-  const ordemNoBanco = _penServerMode && typeof penSortRemoteCol === 'function'
-    && !!penSortRemoteCol(_penFilaSort.col);
+  const ordemNoBanco =
+    _penServerMode &&
+    typeof penSortRemoteCol === 'function' &&
+    !!penSortRemoteCol(_penFilaSort.col);
   const linhas = ordemNoBanco ? visiveis : _penFilaOrdena(visiveis);
 
   const cabecalho = PEN_FILA_COLS.map(function (c) {
     const on = _penFilaSort.col === c.id;
-    return '<th class="' + c.cls + (on ? ' is-sorted' : '') + '" aria-sort="'
-      + (on ? (_penFilaSort.dir === 'asc' ? 'ascending' : 'descending') : 'none') + '">'
-      + '<button type="button" class="pf-th" data-action="penFilaSort" data-arg="' + c.id + '">'
-      + escapeHtml(c.label) + _penFilaSeta(c.id) + '</button></th>';
+    return (
+      '<th class="' +
+      c.cls +
+      (on ? ' is-sorted' : '') +
+      '" aria-sort="' +
+      (on ? (_penFilaSort.dir === 'asc' ? 'ascending' : 'descending') : 'none') +
+      '">' +
+      '<button type="button" class="pf-th" data-action="penFilaSort" data-arg="' +
+      c.id +
+      '">' +
+      escapeHtml(c.label) +
+      _penFilaSeta(c.id) +
+      '</button></th>'
+    );
   }).join('');
 
   // Fila vazia por causa de filtro é beco sem saída: o aviso precisa trazer
   // a saída junto, não só constatar.
   const temFiltro = typeof penFiltrosAtivos === 'function' && penFiltrosAtivos().length > 0;
-  const vazio = 'Nenhuma pendência com os filtros atuais.'
-    + (temFiltro
+  const vazio =
+    'Nenhuma pendência com os filtros atuais.' +
+    (temFiltro
       ? '<button type="button" class="btn btn-secondary btn-sm pen-vazio-limpar" data-action="penClearFilters">Limpar filtros</button>'
       : '');
   const corpo = linhas.length
@@ -164,14 +273,22 @@ function renderPenFila(area) {
 
   const resumo = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
 
-  area.innerHTML = resumo
-    + _penFilaAvisoOrdem(linhas.length)
-    + '<div class="pf-wrap">'
-    + '<table class="pf-table"><caption class="sr-only">Fila de atendimento: '
-    + linhas.length + ' pendência' + (linhas.length === 1 ? '' : 's') + '</caption>'
-    + '<thead><tr>' + cabecalho + '</tr></thead>'
-    + '<tbody>' + corpo + '</tbody></table></div>'
-    + (typeof _penPagerBar === 'function' ? _penPagerBar() : '');
+  area.innerHTML =
+    resumo +
+    _penFilaAvisoOrdem(linhas.length) +
+    '<div class="pf-wrap">' +
+    '<table class="pf-table"><caption class="sr-only">Fila de atendimento: ' +
+    linhas.length +
+    ' pendência' +
+    (linhas.length === 1 ? '' : 's') +
+    '</caption>' +
+    '<thead><tr>' +
+    cabecalho +
+    '</tr></thead>' +
+    '<tbody>' +
+    corpo +
+    '</tbody></table></div>' +
+    (typeof _penPagerBar === 'function' ? _penPagerBar() : '');
 }
 
 // Abrir pelo teclado: a linha é role="button", então Enter/Espaço precisam
@@ -180,14 +297,19 @@ if (typeof registerActions === 'function') {
   registerActions({
     penSetView: (_el, v) => penSetView(v),
     penFilaSort: (_el, col) => penFilaSort(col),
-    openPen: (_el, id) => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+    openPen: (_el, id) => {
+      if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+    },
   });
 }
 
 // Despacho da visualização atual — chamado por renderPenView e pelos patches
 // otimistas do quadro.
 function _penRenderAtual(area) {
-  const res = (typeof penView !== 'undefined' && penView === 'fila') ? renderPenFila(area) : renderPenKanban(area);
+  const res =
+    typeof penView !== 'undefined' && penView === 'fila'
+      ? renderPenFila(area)
+      : renderPenKanban(area);
   // A rolagem de volta da página do chamado só faz sentido com a lista já desenhada:
   // antes disso a altura é a do "carregando" e o scroll seria cortado.
   if (typeof penPaginaAplicarScrollLista === 'function') penPaginaAplicarScrollLista();

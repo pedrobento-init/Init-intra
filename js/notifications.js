@@ -2,9 +2,7 @@
 // Usa Supabase Edge Function + Gmail do Google Workspace (SMTP) para enviar
 
 const EMAIL_CONFIG = {
-  edgeFunctionUrl: SUPABASE_URL
-    ? `${SUPABASE_URL}/functions/v1/send-email`
-    : '',
+  edgeFunctionUrl: SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/send-email` : '',
   fromName: 'Init Intra',
   fromEmail: 'notificacoes@initnet.com.br',
   enabled: true,
@@ -15,11 +13,13 @@ const NOTIF_PREFS_KEY = 'intra_notif_prefs';
 
 function getNotifPrefs() {
   try {
-    return JSON.parse(localStorage.getItem(NOTIF_PREFS_KEY)) || {
-      onPendenciaCreate: true,
-      onPendenciaUpdate: true,
-      onPendenciaNote: true,
-    };
+    return (
+      JSON.parse(localStorage.getItem(NOTIF_PREFS_KEY)) || {
+        onPendenciaCreate: true,
+        onPendenciaUpdate: true,
+        onPendenciaNote: true,
+      }
+    );
   } catch {
     return {
       onPendenciaCreate: true,
@@ -70,7 +70,11 @@ async function sendEmailNotification({ to, subject, html }) {
 
     // Resposta 200 com success:false (defesa: a função hoje devolve 502 nesse caso).
     if (data && data.success === false) {
-      const detail = { status: 200, code: data.code || '', message: data.error || data.message || 'Falha no envio' };
+      const detail = {
+        status: 200,
+        code: data.code || '',
+        message: data.error || data.message || 'Falha no envio',
+      };
       _reportEmailFailure(detail);
       return { error: detail.message, code: detail.code };
     }
@@ -95,8 +99,11 @@ async function _emailErrorDetail(error) {
       if (body && (body.error || body.message)) out.message = body.error || body.message;
       if (body && body.code) out.code = body.code;
     }
-  } catch (_) {}
-  if (!out.status && error && error.name === 'FunctionsFetchError') out.code = out.code || 'network';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'notifications');
+  }
+  if (!out.status && error && error.name === 'FunctionsFetchError')
+    out.code = out.code || 'network';
   return out;
 }
 
@@ -104,13 +111,19 @@ async function _emailErrorDetail(error) {
 function describeEmailError(detail) {
   const d = detail || {};
   const msg = String(d.message || '');
-  if (d.status === 404) return 'A função send-email não está publicada no Supabase (Edge Functions).';
-  if (d.code === 'unauthorized' || d.status === 401) return 'A função recusou o acesso: entre de novo no site.';
-  if (d.code === 'recipient_not_allowed') return 'Só é possível enviar para e-mails de operadores ativos cadastrados.';
+  if (d.status === 404)
+    return 'A função send-email não está publicada no Supabase (Edge Functions).';
+  if (d.code === 'unauthorized' || d.status === 401)
+    return 'A função recusou o acesso: entre de novo no site.';
+  if (d.code === 'recipient_not_allowed')
+    return 'Só é possível enviar para e-mails de operadores ativos cadastrados.';
   if (d.code === 'missing_credentials' || /GMAIL_USER|GMAIL_APP_PASSWORD/.test(msg)) {
     return 'Faltam GMAIL_USER e GMAIL_APP_PASSWORD nos Secrets das Edge Functions do Supabase.';
   }
-  if (d.code === 'EAUTH' || /535|Username and Password not accepted|Application-specific password required/i.test(msg)) {
+  if (
+    d.code === 'EAUTH' ||
+    /535|Username and Password not accepted|Application-specific password required/i.test(msg)
+  ) {
     return 'O Gmail recusou o login: confira GMAIL_USER e a senha de app (GMAIL_APP_PASSWORD).';
   }
   if (/limit exceeded|daily user sending limit|550[- ]5\.4\.5|421[- ]4\.7\.0/i.test(msg)) {
@@ -130,7 +143,10 @@ function _reportEmailFailure(detail) {
   const text = describeEmailError(detail);
   console.warn('📧 [Notificação] ' + text, detail);
   if (typeof _logSilent === 'function') {
-    _logSilent(new Error(text + (detail && detail.message ? ' [' + detail.message + ']' : '')), 'email');
+    _logSilent(
+      new Error(text + (detail && detail.message ? ' [' + detail.message + ']' : '')),
+      'email'
+    );
   }
 }
 
@@ -139,12 +155,25 @@ async function sendTestEmail() {
   const out = document.getElementById('notifTestResult');
   const btn = document.getElementById('notifTestBtn');
   const show = (text, ok) => {
-    if (out) { out.textContent = text; out.style.color = ok ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)'; }
+    if (out) {
+      out.textContent = text;
+      out.style.color = ok ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)';
+    }
   };
   const session = typeof getSession === 'function' ? getSession() : null;
-  const me = session && typeof getOperators === 'function' ? getOperators().find((o) => o && o.id === session.opId) : null;
-  if (!me || !me.email) { show('Seu operador não tem e-mail cadastrado.', false); return; }
-  if (!EMAIL_CONFIG.edgeFunctionUrl || typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+  const me =
+    session && typeof getOperators === 'function'
+      ? getOperators().find((o) => o && o.id === session.opId)
+      : null;
+  if (!me || !me.email) {
+    show('Seu operador não tem e-mail cadastrado.', false);
+    return;
+  }
+  if (
+    !EMAIL_CONFIG.edgeFunctionUrl ||
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected()
+  ) {
     show('Sem conexão com o Supabase.', false);
     return;
   }
@@ -153,18 +182,32 @@ async function sendTestEmail() {
   const res = await sendEmailNotification({
     to: [me.email],
     subject: '[Init Intra] E-mail de teste',
-    html: emailBody('<p style="font-size:14px;color:#475569">Se você recebeu esta mensagem, o envio de e-mails do Init Intra está funcionando.</p>'),
+    html: emailBody(
+      '<p style="font-size:14px;color:#475569">Se você recebeu esta mensagem, o envio de e-mails do Init Intra está funcionando.</p>'
+    ),
   });
   if (btn) btn.disabled = false;
-  if (res && res.success) show('Enviado para ' + me.email + '. Confira a caixa de entrada e o spam.', true);
+  if (res && res.success)
+    show('Enviado para ' + me.email + '. Confira a caixa de entrada e o spam.', true);
   else if (res && res.skipped) show('Envio de e-mail desligado neste site.', false);
-  else show(describeEmailError({ status: res && res.status, code: res && res.code, message: res && res.error }), false);
+  else
+    show(
+      describeEmailError({
+        status: res && res.status,
+        code: res && res.code,
+        message: res && res.error,
+      }),
+      false
+    );
 }
 
 if (typeof registerActions === 'function') {
   registerActions({
     sendTestEmail: () => sendTestEmail(),
-    notifHideModal: () => { const el = document.getElementById('notifModalOverlay'); if (el) el.style.display = 'none'; },
+    notifHideModal: () => {
+      const el = document.getElementById('notifModalOverlay');
+      if (el) el.style.display = 'none';
+    },
     saveNotifSettings: () => saveNotifSettings(),
   });
 }
@@ -187,7 +230,7 @@ function emailFooter() {
     <div style="background:#f8fafc;padding:16px 24px;border-radius:0 0 10px 10px;border-top:1px solid #e2e8f0;text-align:center">
       <div style="font-family:'Inter',Arial,sans-serif;font-size:11px;color:#94a3b8">
         Esta é uma notificação automática do Init Intra.<br>
-        ${new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+        ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>`;
 }
@@ -209,26 +252,37 @@ function emailBody(content) {
 }
 
 function priorityColor(priority) {
-  return { baixa:'#16a34a', media:'#d97706', alta:'#dc2626', critica:'#991b1b' }[priority] || '#64748b';
+  return (
+    { baixa: '#16a34a', media: '#d97706', alta: '#dc2626', critica: '#991b1b' }[priority] ||
+    '#64748b'
+  );
 }
 
 function priorityLabel(priority) {
-  return { baixa:'Baixa', media:'Média', alta:'Alta', critica:'Crítica' }[priority] || priority;
+  return { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' }[priority] || priority;
 }
 
 function statusLabel(status) {
-  return { aberto:'Aberto', em_andamento:'Em Andamento', aguardando:'Aguard. Terceiro', concluido:'Concluído', cancelado:'Cancelado' }[status] || status;
+  return (
+    {
+      aberto: 'Aberto',
+      em_andamento: 'Em Andamento',
+      aguardando: 'Aguard. Terceiro',
+      concluido: 'Concluído',
+      cancelado: 'Cancelado',
+    }[status] || status
+  );
 }
 
 // ── Coletar destinatários ──
 function getAdminEmails() {
   return getOperators()
-    .filter(o => o.isAdmin && o.active && o.email)
-    .map(o => o.email);
+    .filter((o) => o.isAdmin && o.active && o.email)
+    .map((o) => o.email);
 }
 
 function getResponsibleEmail(responsibleName) {
-  const op = getOperators().find(o => o.name === responsibleName && o.email);
+  const op = getOperators().find((o) => o.name === responsibleName && o.email);
   return op ? op.email : null;
 }
 
@@ -237,7 +291,9 @@ function collectRecipients(responsibleName, includeAdmins = true) {
   const respEmail = getResponsibleEmail(responsibleName);
   if (respEmail) emails.push(respEmail);
   if (includeAdmins) {
-    getAdminEmails().forEach(e => { if (!emails.includes(e)) emails.push(e); });
+    getAdminEmails().forEach((e) => {
+      if (!emails.includes(e)) emails.push(e);
+    });
   }
   return emails;
 }
@@ -248,35 +304,62 @@ function collectRecipients(responsibleName, includeAdmins = true) {
 function getGestaoEmails() {
   try {
     if (typeof getOperators !== 'function') return [];
-    const isG = (typeof isGestaoOperator === 'function') ? isGestaoOperator
-      : (typeof globalThis !== 'undefined' && typeof globalThis.isGestaoOperator === 'function' ? globalThis.isGestaoOperator : null);
+    const isG =
+      typeof isGestaoOperator === 'function'
+        ? isGestaoOperator
+        : typeof globalThis !== 'undefined' && typeof globalThis.isGestaoOperator === 'function'
+          ? globalThis.isGestaoOperator
+          : null;
     return getOperators()
-      .filter(o => {
+      .filter((o) => {
         if (!o || !o.email || o.active === false) return false;
-        try { return isG ? !!isG(o) : false; } catch (_) { return false; }
+        try {
+          return isG ? !!isG(o) : false;
+        } catch (_) {
+          return false;
+        }
       })
-      .map(o => o.email);
-  } catch (_) { return []; }
+      .map((o) => o.email);
+  } catch (_) {
+    return [];
+  }
 }
 function collectPendenciaRecipients(pendencia) {
   try {
-    var _isG = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao(pendencia)
-      : (typeof globalThis !== 'undefined' && typeof globalThis.isPendenciaGestao === 'function' ? globalThis.isPendenciaGestao(pendencia) : false);
+    var _isG =
+      typeof isPendenciaGestao === 'function'
+        ? isPendenciaGestao(pendencia)
+        : typeof globalThis !== 'undefined' && typeof globalThis.isPendenciaGestao === 'function'
+          ? globalThis.isPendenciaGestao(pendencia)
+          : false;
     if (_isG) {
       var gestaoMails = getGestaoEmails();
       // Responsável só recebe se ele próprio for Gestão.
       try {
-        var rop = (typeof getOperators === 'function' ? getOperators() : []).find(o => o && o.name === pendencia.responsible && o.email);
+        var rop = (typeof getOperators === 'function' ? getOperators() : []).find(
+          (o) => o && o.name === pendencia.responsible && o.email
+        );
         var isRopG = false;
         try {
-          var _isGop = (typeof isGestaoOperator === 'function') ? isGestaoOperator : (typeof globalThis !== 'undefined' ? globalThis.isGestaoOperator : null);
+          var _isGop =
+            typeof isGestaoOperator === 'function'
+              ? isGestaoOperator
+              : typeof globalThis !== 'undefined'
+                ? globalThis.isGestaoOperator
+                : null;
           isRopG = _isGop ? !!_isGop(rop) : false;
-        } catch (_) {}
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'notifications');
+        }
         if (rop && isRopG && !gestaoMails.includes(rop.email)) gestaoMails.push(rop.email);
-      } catch (_) {}
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'notifications');
+      }
       return gestaoMails;
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'notifications');
+  }
   return collectRecipients(pendencia.responsible);
 }
 
@@ -297,7 +380,10 @@ function notifyPendenciaCreated(pendencia) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaCreate) return;
 
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
+  const recipients =
+    typeof collectPendenciaRecipients === 'function'
+      ? collectPendenciaRecipients(pendencia)
+      : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const deadlineText = pendencia.deadline
@@ -348,7 +434,10 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaUpdate) return;
 
-  const recipients = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
+  const recipients =
+    typeof collectPendenciaRecipients === 'function'
+      ? collectPendenciaRecipients(pendencia)
+      : collectRecipients(pendencia.responsible);
   if (!recipients.length) return;
 
   const statusChanged = oldStatus && oldStatus !== pendencia.status;
@@ -360,7 +449,9 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
       <div style="display:inline-block;background:#3b82f615;color:#3b82f6;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px">Pendência Atualizada</div>
       <h2 style="margin:0;font-size:18px;font-weight:700;color:#1e293b">${escapeHtml(getPendenciaTitulo(pendencia))}</h2>
     </div>
-    ${statusChanged ? `
+    ${
+      statusChanged
+        ? `
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:16px;text-align:center">
       <div style="font-size:12px;color:#64748b;margin-bottom:4px">Status alterado</div>
       <div style="font-size:14px;font-weight:600">
@@ -368,7 +459,9 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
         <span style="margin:0 8px;color:#94a3b8">→</span>
         <span style="color:#1a56db">${newStatusLabel}</span>
       </div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
       <tr>
         <td style="padding:8px 12px;background:#f8fafc;border-radius:6px 0 0 6px;font-size:12px;color:#64748b;width:120px"><strong>Cliente</strong></td>
@@ -393,7 +486,12 @@ function notifyPendenciaUpdated(pendencia, oldStatus) {
     subject: `[Init Intra] Pendência Atualizada: ${getPendenciaTitulo(pendencia)}`,
     html,
   });
-  _pushPendencia(recipients, 'Pendência Atualizada', pendencia, statusChanged ? oldStatusLabel + ' → ' + newStatusLabel : pendencia.clientName);
+  _pushPendencia(
+    recipients,
+    'Pendência Atualizada',
+    pendencia,
+    statusChanged ? oldStatusLabel + ' → ' + newStatusLabel : pendencia.clientName
+  );
 }
 
 // ── Menções (@nome) ──
@@ -411,7 +509,11 @@ function collectMentionRecipients(pendencia, note) {
   const nomes = Array.isArray(note && note.mentionedOperators) ? note.mentionedOperators : [];
   if (!nomes.length || typeof getOperators !== 'function') return [];
   let gestao = false;
-  try { gestao = typeof isPendenciaGestao === 'function' && isPendenciaGestao(pendencia); } catch (_) { gestao = false; }
+  try {
+    gestao = typeof isPendenciaGestao === 'function' && isPendenciaGestao(pendencia);
+  } catch (_) {
+    gestao = false;
+  }
   const equipe = (pendencia && pendencia.team) || 'init';
   const autor = String((note && note.author) || '').trim();
   const emails = [];
@@ -419,8 +521,8 @@ function collectMentionRecipients(pendencia, note) {
     if (!o || !o.email || o.active === false) return;
     if (!nomes.includes(o.name) || o.name === autor) return;
     const podeVer = gestao
-      ? (typeof isGestaoOperator === 'function' && isGestaoOperator(o))
-      : (o.isAdmin === true || (o.team || 'init') === equipe);
+      ? typeof isGestaoOperator === 'function' && isGestaoOperator(o)
+      : o.isAdmin === true || (o.team || 'init') === equipe;
     if (podeVer && !emails.includes(o.email)) emails.push(o.email);
   });
   return emails;
@@ -431,7 +533,9 @@ function _notaLink(pendencia) {
   try {
     const h = typeof penPaginaHash === 'function' ? penPaginaHash(pendencia) : '';
     if (h) return '#' + h;
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'notifications');
+  }
   return '#pendencias';
 }
 
@@ -476,7 +580,10 @@ function notifyPendenciaNote(pendencia, note) {
   const prefs = getNotifPrefs();
   if (!prefs.onPendenciaNote) return;
 
-  const todos = (typeof collectPendenciaRecipients === 'function') ? collectPendenciaRecipients(pendencia) : collectRecipients(pendencia.responsible);
+  const todos =
+    typeof collectPendenciaRecipients === 'function'
+      ? collectPendenciaRecipients(pendencia)
+      : collectRecipients(pendencia.responsible);
   // Quem já recebeu o aviso de menção não recebe o mesmo texto duas vezes.
   const recipients = todos.filter((e) => !mencionados.includes(e));
   if (!recipients.length) return;
@@ -486,7 +593,12 @@ function notifyPendenciaNote(pendencia, note) {
     subject: `[Init Intra] Nova nota em: ${getPendenciaTitulo(pendencia)}`,
     html: _notaEmailHtml(pendencia, note, 'Nova Nota'),
   });
-  _pushPendencia(recipients, 'Nova nota', pendencia, (note.author ? note.author + ': ' : '') + (note.text || ''));
+  _pushPendencia(
+    recipients,
+    'Nova nota',
+    pendencia,
+    (note.author ? note.author + ': ' : '') + (note.text || '')
+  );
 }
 
 // Lembretes de prazo e avisos de vencimento: enviados pelo servidor, uma vez
@@ -500,51 +612,51 @@ function openNotifSettings() {
   const body = document.getElementById('notifModalBody');
 
   body.innerHTML = `
-    <div style="margin-bottom:16px">
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+    <div class="u-87c136">
+      <p class="u-8f2440">
         Configure quais avisos automáticos o sistema envia (e-mail e celular).
       </p>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Pendências</div>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendCreate" ${prefs.onPendenciaCreate ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+    <div class="u-49f14f">
+      <div class="u-241252">Pendências</div>
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendCreate" ${prefs.onPendenciaCreate ? 'checked' : ''} class="u-9cf325">
         <span>Ao criar nova pendência</span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendUpdate" ${prefs.onPendenciaUpdate ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendUpdate" ${prefs.onPendenciaUpdate ? 'checked' : ''} class="u-9cf325">
         <span>Ao atualizar pendência (mudança de status)</span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendNote" ${prefs.onPendenciaNote ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendNote" ${prefs.onPendenciaNote ? 'checked' : ''} class="u-9cf325">
         <span>Ao adicionar nota/ata</span>
       </label>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">No celular</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">
+    <div class="u-49f14f">
+      <div class="u-241252">No celular</div>
+      <p class="u-f82f16">
         Os mesmos avisos chegam como notificação no aparelho, mesmo com o app fechado.
       </p>
       <div id="pushSettings"><p class="push-state">Verificando…</p></div>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Lembretes de Prazo</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin:0">
+    <div class="u-49f14f">
+      <div class="u-241252">Lembretes de Prazo</div>
+      <p class="u-9edd1b">
         Enviados automaticamente pelo servidor às 8h: pendências 2 dias antes e no dia do prazo,
         vencimentos 30 e 7 dias antes e no dia. Cada lembrete sai uma vez só.
       </p>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Testar envio</div>
+    <div class="u-49f14f">
+      <div class="u-241252">Testar envio</div>
       <button type="button" class="btn btn-secondary" id="notifTestBtn" data-action="sendTestEmail">Enviar e-mail de teste para mim</button>
-      <div id="notifTestResult" style="font-size:12px;margin-top:8px"></div>
+      <div id="notifTestResult" class="u-b0cc7e"></div>
     </div>
 
-    <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+    <div class="u-5067e4">
       <button class="btn btn-secondary" data-action="notifHideModal">Cancelar</button>
       <button class="btn btn-primary" data-action="saveNotifSettings">Salvar</button>
     </div>
@@ -570,7 +682,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     const overlay = document.getElementById('notifModalOverlay');
     if (overlay) {
-      overlay.addEventListener('click', e => {
+      overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.style.display = 'none';
       });
     }

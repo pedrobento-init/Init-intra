@@ -7,8 +7,16 @@ function makeBanner() {
   const el = { textContent: '', style: { display: 'none' } };
   const classes = new Set();
   Object.defineProperty(el, 'className', {
-    get() { return [...classes].join(' '); },
-    set(v) { classes.clear(); String(v || '').split(/\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
+    get() {
+      return [...classes].join(' ');
+    },
+    set(v) {
+      classes.clear();
+      String(v || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach((c) => classes.add(c));
+    },
     configurable: true,
   });
   el.classList = {
@@ -55,7 +63,9 @@ _setGlobal('localStorage', {
 });
 globalThis.Dexie = class {
   constructor() {}
-  version() { return { stores() {} }; }
+  version() {
+    return { stores() {} };
+  }
 };
 
 // Silencia o erro esperado do initIndexedDB com Dexie fake
@@ -76,7 +86,9 @@ const {
   DB,
 } = storage;
 
-function setOnline(v) { globalThis.navigator.onLine = v; }
+function setOnline(v) {
+  globalThis.navigator.onLine = v;
+}
 function setConnected(v) {
   if (v) {
     globalThis.isSupabaseConnected = () => true;
@@ -127,7 +139,17 @@ describe('contador de sync (entidades não contam)', () => {
   it('N dbSets internos do merge (1 por entidade) não incrementam', () => {
     setOnline(false); // mesmo offline, escrita interna não conta
     globalThis.window._suppressPendingSync = true;
-    const entities = ['clients', 'pendencias', 'tickets', 'operators', 'procedures', 'visits', 'reunioes', 'procedure_templates', 'audit_logs'];
+    const entities = [
+      'clients',
+      'pendencias',
+      'tickets',
+      'operators',
+      'procedures',
+      'visits',
+      'reunioes',
+      'procedure_templates',
+      'audit_logs',
+    ];
     entities.forEach((t, i) => dbSet(DB.PENDENCIAS, [{ id: `X-${t}-${i}` }]));
     globalThis.window._suppressPendingSync = false;
     expect(getPendingSyncCount()).toBe(0);

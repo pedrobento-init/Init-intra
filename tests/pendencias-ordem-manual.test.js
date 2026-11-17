@@ -12,13 +12,19 @@ import vm from 'node:vm';
 // jogava esses cards para o TOPO. Pego ao rodar no navegador, não pelo tipo.
 
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
 };
 const sandbox = {
   console,
-  window: { matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {} },
+  window: {
+    matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
+    addEventListener() {},
+  },
   document: {
     addEventListener() {},
     getElementById: () => _dummyEl,
@@ -41,16 +47,26 @@ console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
-  vm.runInContext('globalThis.__t = { _penSortCards, _penPos, _penColSort, cyclePenColSort };', sandbox);
+  vm.runInContext(
+    'globalThis.__t = { _penSortCards, _penPos, _penColSort, cyclePenColSort };',
+    sandbox
+  );
 } finally {
   console.error = _quietErr;
 }
 const T = sandbox.__t;
 
-const ordenar = (cards, colId) => T._penSortCards(cards, colId).map((c) => c.id).join(',');
+const ordenar = (cards, colId) =>
+  T._penSortCards(cards, colId)
+    .map((c) => c.id)
+    .join(',');
 const comModoManual = (colId, fn) => {
   T._penColSort[colId] = 'manual';
-  try { return fn(); } finally { delete T._penColSort[colId]; }
+  try {
+    return fn();
+  } finally {
+    delete T._penColSort[colId];
+  }
 };
 
 describe('_penPos — "sem posição" não pode virar zero', () => {

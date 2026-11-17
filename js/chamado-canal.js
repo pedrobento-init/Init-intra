@@ -17,7 +17,7 @@ const CHAMADO_CANAL_ROTULOS = {
 
 function _chamadoCampo(p, camel, snake) {
   if (!p) return '';
-  return p[camel] != null ? p[camel] : (p[snake] != null ? p[snake] : '');
+  return p[camel] != null ? p[camel] : p[snake] != null ? p[snake] : '';
 }
 
 // O thread 'whatsapp:' vence o e-mail: a pendência do WhatsApp pode ter
@@ -28,7 +28,8 @@ function chamadoCanalDe(p) {
   if (!p) return null;
   const thread = String(_chamadoCampo(p, 'emailThreadId', 'email_thread_id') || '');
   if (thread.indexOf('whatsapp:') === 0) return 'whatsapp';
-  if (String(_chamadoCampo(p, 'solicitanteEmail', 'solicitante_email') || '').trim()) return 'email';
+  if (String(_chamadoCampo(p, 'solicitanteEmail', 'solicitante_email') || '').trim())
+    return 'email';
   return null;
 }
 
@@ -65,7 +66,11 @@ function chamadoTelefoneDe(p) {
 }
 
 function _chamadoOnline() {
-  return typeof isSupabaseConnected === 'function' && isSupabaseConnected() && !!window._supabaseAuthActive;
+  return (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    !!window._supabaseAuthActive
+  );
 }
 
 // Os textos do e-mail são os mesmos do penResponderPorEmail: quem lê o toast
@@ -75,7 +80,8 @@ function _chamadoEnviarEmail(p, texto) {
     showToast('A nota foi salva, mas o e-mail não saiu: sem conexão com o servidor.', 'error');
     return Promise.resolve();
   }
-  return supabaseClient.functions.invoke('pendencia-responder', { body: { pendencia_id: p.id, text: texto } })
+  return supabaseClient.functions
+    .invoke('pendencia-responder', { body: { pendencia_id: p.id, text: texto } })
     .then(function (r) {
       const d = r && r.data;
       if ((r && r.error) || !d || d.success !== true) {
@@ -83,8 +89,14 @@ function _chamadoEnviarEmail(p, texto) {
         showToast('A nota foi salva, mas o e-mail não saiu: ' + msg, 'error');
         return;
       }
-      showToast(d.threaded ? 'E-mail enviado para ' + d.to + '.'
-        : 'E-mail enviado para ' + d.to + ' — como conversa nova (o original não trouxe Message-ID).', 'success');
+      showToast(
+        d.threaded
+          ? 'E-mail enviado para ' + d.to + '.'
+          : 'E-mail enviado para ' +
+              d.to +
+              ' — como conversa nova (o original não trouxe Message-ID).',
+        'success'
+      );
     })
     .catch(function (e) {
       showToast('A nota foi salva, mas o e-mail não saiu.', 'error');
@@ -97,7 +109,8 @@ function _chamadoEnviarWhatsapp(p, texto) {
     showToast('A nota foi salva, mas a mensagem não saiu: sem conexão com o servidor.', 'error');
     return Promise.resolve();
   }
-  return supabaseClient.functions.invoke('whatsapp-responder', { body: { pendencia_id: p.id, text: texto } })
+  return supabaseClient.functions
+    .invoke('whatsapp-responder', { body: { pendencia_id: p.id, text: texto } })
     .then(function (r) {
       const d = r && r.data;
       if ((r && r.error) || !d || d.success !== true) {
@@ -105,7 +118,10 @@ function _chamadoEnviarWhatsapp(p, texto) {
         showToast('A nota foi salva, mas a mensagem não saiu: ' + msg, 'error');
         return;
       }
-      showToast('Mensagem enviada no WhatsApp para ' + chamadoTelefoneFormatar(d.to) + '.', 'success');
+      showToast(
+        'Mensagem enviada no WhatsApp para ' + chamadoTelefoneFormatar(d.to) + '.',
+        'success'
+      );
     })
     .catch(function (e) {
       showToast('A nota foi salva, mas a mensagem não saiu.', 'error');

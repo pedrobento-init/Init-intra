@@ -8,25 +8,53 @@ import vm from 'node:vm';
 
 // Carrega ui.js + pendencias.js num sandbox mínimo (mesmo padrão dos testes
 // do quadro) para testar as funções puras novas.
-const _el = { addEventListener() {}, removeEventListener() {}, style: {}, classList: { add() {}, remove() {}, toggle() {} }, querySelector: () => null, querySelectorAll: () => [], innerHTML: '' };
+const _el = {
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
+  classList: { add() {}, remove() {}, toggle() {} },
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  innerHTML: '',
+};
 const sandbox = {
   console,
-  window: { addEventListener() {}, location: { hash: '#pendencias' }, matchMedia: () => ({ matches: false, addEventListener() {} }) },
+  window: {
+    addEventListener() {},
+    location: { hash: '#pendencias' },
+    matchMedia: () => ({ matches: false, addEventListener() {} }),
+  },
   navigator: { onLine: true },
-  document: { addEventListener() {}, getElementById: () => _el, querySelector: () => _el, querySelectorAll: () => [], createElement: () => ({ ..._el }), body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, style: {} }, head: _el },
+  document: {
+    addEventListener() {},
+    getElementById: () => _el,
+    querySelector: () => _el,
+    querySelectorAll: () => [],
+    createElement: () => ({ ..._el }),
+    body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, style: {} },
+    head: _el,
+  },
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-  setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0,
+  setTimeout: () => 0,
+  clearTimeout() {},
+  setInterval: () => 0,
   timerWidget: () => '',
 };
 sandbox.globalThis = sandbox;
 sandbox.window.window = sandbox.window;
 vm.createContext(sandbox);
-const quiet = console.error; console.error = () => {};
+const quiet = console.error;
+console.error = () => {};
 try {
   vm.runInContext(fs.readFileSync('js/ui.js', 'utf8'), sandbox, { filename: 'ui.js' });
   vm.runInContext(partsSource('pendencias'), sandbox, { filename: 'pendencias.js' });
-  vm.runInContext('globalThis.__t = { nextRecurrenceDate, nextRecurrenceDateFrom, RECURRENCE_OPTIONS, templateStepsToChecklist, penQuickMenuModel, penKanbanCard };', sandbox);
-} finally { console.error = quiet; }
+  vm.runInContext(
+    'globalThis.__t = { nextRecurrenceDate, nextRecurrenceDateFrom, RECURRENCE_OPTIONS, templateStepsToChecklist, penQuickMenuModel, penKanbanCard };',
+    sandbox
+  );
+} finally {
+  console.error = quiet;
+}
 const T = sandbox.__t;
 
 describe('recorrência', () => {
@@ -51,7 +79,14 @@ describe('recorrência', () => {
     expect(src).toMatch(/checklist: \(Array\.isArray\(data\.checklist\)[^]*done: false/);
   });
   it('card mostra o selo de recorrência', () => {
-    const html = T.penKanbanCard({ id: 'P1', status: 'aberto', clientName: 'Acme', priority: 'media', assunto: 'Backup', recurrence: 'monthly' });
+    const html = T.penKanbanCard({
+      id: 'P1',
+      status: 'aberto',
+      clientName: 'Acme',
+      priority: 'media',
+      assunto: 'Backup',
+      recurrence: 'monthly',
+    });
     expect(html).toContain('kc-recur');
     expect(html).toContain('Repete: Mensal');
   });
@@ -59,10 +94,15 @@ describe('recorrência', () => {
 
 describe('modelos de pendência', () => {
   it('passos numerados viram itens', () => {
-    expect(T.templateStepsToChecklist('1. Criar conta\n2) Liberar VPN\n\n3 - Entregar máquina')).toEqual(['Criar conta', 'Liberar VPN', 'Entregar máquina']);
+    expect(
+      T.templateStepsToChecklist('1. Criar conta\n2) Liberar VPN\n\n3 - Entregar máquina')
+    ).toEqual(['Criar conta', 'Liberar VPN', 'Entregar máquina']);
   });
   it('marcadores e texto solto', () => {
-    expect(T.templateStepsToChecklist('Intro do modelo\n- Item A\n• Item B')).toEqual(['Item A', 'Item B']);
+    expect(T.templateStepsToChecklist('Intro do modelo\n- Item A\n• Item B')).toEqual([
+      'Item A',
+      'Item B',
+    ]);
     expect(T.templateStepsToChecklist('Linha 1\nLinha 2')).toEqual(['Linha 1', 'Linha 2']);
     expect(T.templateStepsToChecklist('')).toEqual([]);
   });
@@ -73,7 +113,11 @@ describe('modelos de pendência', () => {
 });
 
 describe('menu ⋯ do card', () => {
-  const cols = [{ id: 'aberto', label: 'Aberto' }, { id: 'em_andamento', label: 'Em Andamento' }, { id: 'resolvido', label: 'Resolvido' }];
+  const cols = [
+    { id: 'aberto', label: 'Aberto' },
+    { id: 'em_andamento', label: 'Em Andamento' },
+    { id: 'resolvido', label: 'Resolvido' },
+  ];
   const ops = [{ name: 'Ana' }, { name: 'Beto', onLeave: true }, { name: 'Caio', active: false }];
   it('não oferece o status atual; marca responsável atual e afastado', () => {
     const m = T.penQuickMenuModel({ status: 'aberto', responsible: 'Ana' }, cols, ops);
@@ -83,7 +127,13 @@ describe('menu ⋯ do card', () => {
     expect(m.people[1].away).toBe(true);
   });
   it('card tem o botão ⋯ que não dispara o arrasto', () => {
-    const html = T.penKanbanCard({ id: 'P2', status: 'aberto', clientName: 'Acme', priority: 'media', assunto: 'X' });
+    const html = T.penKanbanCard({
+      id: 'P2',
+      status: 'aberto',
+      clientName: 'Acme',
+      priority: 'media',
+      assunto: 'X',
+    });
     expect(html).toContain('class="kc-menu"');
     expect(html).toContain('data-action="openPenQuickMenu"');
     expect(html).toContain('aria-haspopup="menu"');

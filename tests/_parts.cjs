@@ -5,16 +5,32 @@ const path = require('path');
 const Module = require('module');
 
 const GROUPS = {
-  storage: ['storage.js', 'storage-anexos.js', 'storage-pendencias.js', 'storage-visitas.js', 'storage-operadores.js'],
+  storage: [
+    'storage.js',
+    'storage-anexos.js',
+    'storage-pendencias.js',
+    'storage-visitas.js',
+    'storage-operadores.js',
+  ],
   clients: ['clients.js', 'clients-ficha.js', 'clients-abas.js', 'clients-form.js'],
-  pendencias: ['pendencias.js', 'pendencias-quadro.js', 'pendencias-fila.js', 'pendencias-acoes.js', 'pendencias-detalhe.js', 'pendencias-comando.js'],
+  pendencias: [
+    'pendencias.js',
+    'pendencias-quadro.js',
+    'pendencias-fila.js',
+    'pendencias-acoes.js',
+    'pendencias-detalhe.js',
+    'pendencias-comando.js',
+  ],
   pagina: ['pagina-pendencia.js'],
+  app: ['dashboard.js', 'app-login.js', 'app.js'],
 };
 const filesOf = (g) => GROUPS[g].map((f) => path.join(__dirname, '..', 'js', f));
 
 /** Código-fonte do grupo, concatenado. */
 function partsSource(group) {
-  return filesOf(group).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+  return filesOf(group)
+    .map((f) => fs.readFileSync(f, 'utf8'))
+    .join('\n');
 }
 
 /** Equivale ao antigo `delete require.cache[...]; require('../js/<grupo>.js')`: sempre um módulo novo. */
@@ -28,7 +44,9 @@ function requireParts(group) {
 }
 
 module.exports = {
-  partsSource, requireParts, GROUPS,
+  partsSource,
+  requireParts,
+  GROUPS,
   // compatibilidade com os testes que já usavam o loader do storage
   storageSource: () => partsSource('storage'),
   requireStorage: () => requireParts('storage'),

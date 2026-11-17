@@ -15,6 +15,8 @@ test('barra inferior navega e quadro mostra a coluna visível', async ({ page })
   await expect(page.locator('.kb-pager-label')).toContainText('1/');
 
   // Sem rolagem horizontal da página
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth
+  );
   expect(overflow).toBe(false);
 });

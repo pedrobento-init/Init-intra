@@ -4,7 +4,15 @@ import { createRequire } from 'node:module';
 // Regressão: online, cada save já sobe direto ao servidor — a faixa não pode
 // listá-lo como "aguardando envio" só por ser mais novo que o último sync.
 const _ls = {};
-globalThis.localStorage = { getItem: (k) => (k in _ls ? _ls[k] : null), setItem: (k, v) => { _ls[k] = String(v); }, removeItem: (k) => { delete _ls[k]; } };
+globalThis.localStorage = {
+  getItem: (k) => (k in _ls ? _ls[k] : null),
+  setItem: (k, v) => {
+    _ls[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _ls[k];
+  },
+};
 const require = createRequire(import.meta.url);
 const P = require('../js/pendentes.js');
 
@@ -14,25 +22,49 @@ const src = (records) => [{ table: 'visits', dbKey: 'intra_visits', lastSyncAt: 
 describe('pendentes com confirmação do servidor', () => {
   it('save online confirmado não aparece (mesmo depois do último sync)', () => {
     const rec = { id: 'V1', clientName: 'Acme', updatedAt: '2026-10-15T13:00:00.000Z' };
-    const list = P.buildPendingList(src([rec]), [], {}, { up: { visits: { V1: '2026-10-15T13:00:00.000Z' } } });
+    const list = P.buildPendingList(
+      src([rec]),
+      [],
+      {},
+      { up: { visits: { V1: '2026-10-15T13:00:00.000Z' } } }
+    );
     expect(list).toEqual([]);
   });
 
   it('editado de novo depois da confirmação volta a ser pendente', () => {
     const rec = { id: 'V1', updatedAt: '2026-10-15T14:00:00.000Z' };
-    const list = P.buildPendingList(src([rec]), [], {}, { up: { visits: { V1: '2026-10-15T13:00:00.000Z' } } });
+    const list = P.buildPendingList(
+      src([rec]),
+      [],
+      {},
+      { up: { visits: { V1: '2026-10-15T13:00:00.000Z' } } }
+    );
     expect(list.map((i) => i.id)).toEqual(['V1']);
   });
 
   it('exclusão confirmada pelo servidor sai da lista (tombstone fica 30 dias)', () => {
-    const tombs = { intra_visits: { V9: '2026-10-15T13:00:00.000Z', V8: '2026-10-15T13:00:00.000Z' } };
+    const tombs = {
+      intra_visits: { V9: '2026-10-15T13:00:00.000Z', V8: '2026-10-15T13:00:00.000Z' },
+    };
     const list = P.buildPendingList(src([]), [], tombs, { del: { visits: { V9: 1 } } });
     expect(list.map((i) => i.id)).toEqual(['V8']);
   });
 
   it('entrada antiga na outbox já confirmada não conta', () => {
-    const ob = [{ entity: 'pendencias', targetId: 'P1', payload: { updatedAt: '2026-10-15T13:00:00.000Z' }, createdAt: '2026-10-15T13:00:00.000Z' }];
-    const list = P.buildPendingList([], ob, {}, { up: { pendencias: { P1: '2026-10-15T13:05:00.000Z' } } });
+    const ob = [
+      {
+        entity: 'pendencias',
+        targetId: 'P1',
+        payload: { updatedAt: '2026-10-15T13:00:00.000Z' },
+        createdAt: '2026-10-15T13:00:00.000Z',
+      },
+    ];
+    const list = P.buildPendingList(
+      [],
+      ob,
+      {},
+      { up: { pendencias: { P1: '2026-10-15T13:05:00.000Z' } } }
+    );
     expect(list).toEqual([]);
   });
 });
@@ -42,7 +74,12 @@ describe('interceptação do cliente Supabase', () => {
   const fakeClient = () => ({
     from: (table) => {
       const mk = (result) => {
-        const b = { then: (res, rej) => { requests++; return Promise.resolve(result).then(res, rej); } };
+        const b = {
+          then: (res, rej) => {
+            requests++;
+            return Promise.resolve(result).then(res, rej);
+          },
+        };
         return b;
       };
       return {
@@ -51,7 +88,10 @@ describe('interceptação do cliente Supabase', () => {
       };
     },
   });
-  beforeEach(() => { requests = 0; for (const k of Object.keys(_ls)) delete _ls[k]; });
+  beforeEach(() => {
+    requests = 0;
+    for (const k of Object.keys(_ls)) delete _ls[k];
+  });
 
   it('upsert sem erro marca confirmado; com erro, não', async () => {
     const c = P.wrapSupabaseForSeen(fakeClient());

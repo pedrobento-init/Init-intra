@@ -10,13 +10,18 @@ const PORT = 5174;
 // ou force um canal com PW_CHANNEL=chrome|msedge.
 const channel = process.env.PW_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined);
 
+// Navegador já instalado em outro caminho (ex.: sandbox sem download):
+// PW_CHROMIUM_PATH=/caminho/do/chrome.
+const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
+const launchOptions = executablePath ? { executablePath } : undefined;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.e2e.js',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,
     // O service worker cachearia assets entre testes.
@@ -26,8 +31,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], channel, viewport: { width: 1366, height: 860 } }, testIgnore: '**/mobile.e2e.js' },
-    { name: 'mobile', use: { ...devices['Pixel 7'], channel }, testMatch: '**/mobile.e2e.js' },
+    {
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        channel,
+        launchOptions,
+        viewport: { width: 1366, height: 860 },
+      },
+      testIgnore: '**/mobile.e2e.js',
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'], channel, launchOptions },
+      testMatch: '**/mobile.e2e.js',
+    },
   ],
   webServer: {
     command: `node node_modules/vite/bin/vite.js --port ${PORT} --strictPort`,

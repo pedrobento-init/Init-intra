@@ -1,0 +1,6 @@
+# Commits que só reformatam o código (sem mudar comportamento). O git blame
+# pula estes, para a autoria continuar apontando para quem escreveu a linha.
+# Uma vez por clone: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: formata o repositório inteiro com prettier
+370ef7ff26a1e03fe0a59e0368e5ee4d21d002cf

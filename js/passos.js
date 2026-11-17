@@ -22,11 +22,17 @@ const _PS_MAX_STEPS = 200;
 
 function _psEsc(s) {
   if (typeof escapeHtml === 'function') return escapeHtml(s);
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function _psTrimBlank(lines) {
-  let a = 0, b = lines.length;
+  let a = 0,
+    b = lines.length;
   while (a < b && !lines[a].trim()) a++;
   while (b > a && !lines[b - 1].trim()) b--;
   return lines.slice(a, b).map((l) => l.replace(/\s+$/, ''));
@@ -34,7 +40,9 @@ function _psTrimBlank(lines) {
 
 /** Texto → { intro, steps: [{ text, detail }] }. Puro. */
 function procParseSteps(content) {
-  const lines = String(content == null ? '' : content).replace(/\r\n?/g, '\n').split('\n');
+  const lines = String(content == null ? '' : content)
+    .replace(/\r\n?/g, '\n')
+    .split('\n');
   // Com passos numerados, só o número abre passo (marcador vira detalhe);
   // sem número, a lista de marcadores é que é o passo a passo.
   const hasNum = lines.some((l) => _PS_NUM.test(l));
@@ -62,12 +70,29 @@ function procParseSteps(content) {
 /** { intro, steps } → texto (formato que procParseSteps lê de volta). Puro. */
 function procSerializeSteps(doc) {
   const out = [];
-  const intro = _psTrimBlank(String((doc && doc.intro) || '').replace(/\r\n?/g, '\n').split('\n'));
+  const intro = _psTrimBlank(
+    String((doc && doc.intro) || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+  );
   if (intro.length) out.push(...intro, '');
-  const steps = ((doc && doc.steps) || []).filter((s) => s && (String(s.text || '').trim() || String(s.detail || '').trim()));
+  const steps = ((doc && doc.steps) || []).filter(
+    (s) => s && (String(s.text || '').trim() || String(s.detail || '').trim())
+  );
   steps.forEach((s, i) => {
-    out.push((i + 1) + ') ' + String(s.text || '').replace(/\s*\n\s*/g, ' ').trim());
-    _psTrimBlank(String(s.detail || '').replace(/\r\n?/g, '\n').split('\n')).forEach((l) => out.push(l ? '   ' + l : ''));
+    out.push(
+      i +
+        1 +
+        ') ' +
+        String(s.text || '')
+          .replace(/\s*\n\s*/g, ' ')
+          .trim()
+    );
+    _psTrimBlank(
+      String(s.detail || '')
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+    ).forEach((l) => out.push(l ? '   ' + l : ''));
   });
   while (out.length && !out[out.length - 1]) out.pop();
   return out.join('\n');
@@ -80,15 +105,26 @@ function procSerializeSteps(doc) {
 function procStepsFromPaste(text) {
   const doc = procParseSteps(text);
   if (doc.steps.length) {
-    const lead = doc.intro ? doc.intro.split('\n').map((l) => l.trim()).filter(Boolean).map((t) => ({ text: t, detail: '' })) : [];
+    const lead = doc.intro
+      ? doc.intro
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((t) => ({ text: t, detail: '' }))
+      : [];
     return lead.concat(doc.steps);
   }
-  return String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((t) => ({ text: t, detail: '' }));
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((t) => ({ text: t, detail: '' }));
 }
 
 // Trecho entre aspas ou crases (comando, nome de menu, caminho) vira um chip
 // que copia ao clicar; URL http(s) vira link. Tudo o mais é escapado.
-const _PS_TOKEN = /`([^`\n]{1,200})`|"([^"\n]{1,120})"|“([^”\n]{1,120})”|(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/g;
+const _PS_TOKEN =
+  /`([^`\n]{1,200})`|"([^"\n]{1,120})"|“([^”\n]{1,120})”|(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/g;
 
 /** Texto de um passo → HTML seguro com chips copiáveis e links. Puro. */
 function procInlineHtml(text) {
@@ -98,13 +134,25 @@ function procInlineHtml(text) {
   s.replace(_PS_TOKEN, (m, code, dq, sq, url, idx) => {
     out += _psEsc(s.slice(last, idx));
     if (url) {
-      out += '<a class="ps-link" href="' + _psEsc(url) + '" target="_blank" rel="noopener noreferrer">' + _psEsc(url) + '</a>';
+      out +=
+        '<a class="ps-link" href="' +
+        _psEsc(url) +
+        '" target="_blank" rel="noopener noreferrer">' +
+        _psEsc(url) +
+        '</a>';
     } else {
       const v = code || dq || sq;
       // <span role="button"> e não <button>: botão é bloco atômico e não
       // quebra junto com o texto, um nome de menu longo virava um bloco solto.
       // Enter/Espaço chegam pela delegação de teclado do actions.js.
-      out += '<span role="button" tabindex="0" class="ps-chip' + (code ? ' ps-chip--code' : '') + '" data-action="psCopy" data-arg="' + _psEsc(v) + '" title="Clique para copiar">' + _psEsc(v) + '</span>';
+      out +=
+        '<span role="button" tabindex="0" class="ps-chip' +
+        (code ? ' ps-chip--code' : '') +
+        '" data-action="psCopy" data-arg="' +
+        _psEsc(v) +
+        '" title="Clique para copiar">' +
+        _psEsc(v) +
+        '</span>';
     }
     last = idx + m.length;
     return m;
@@ -116,14 +164,38 @@ function procInlineHtml(text) {
 function procReadHtml(content, opts) {
   const o = opts || {};
   const doc = procParseSteps(content);
-  if (!doc.steps.length) return '<div class="ps-read-plain">' + procInlineHtml(content || o.empty || '') + '</div>';
+  if (!doc.steps.length)
+    return '<div class="ps-read-plain">' + procInlineHtml(content || o.empty || '') + '</div>';
   const limit = o.limit && doc.steps.length > o.limit ? o.limit : doc.steps.length;
-  return (doc.intro && !o.limit ? '<div class="ps-read-intro">' + procInlineHtml(doc.intro) + '</div>' : '') +
-    '<ol class="ps-read">' + doc.steps.slice(0, limit).map((s, i) =>
-      '<li><span class="ps-read-n">' + (i + 1) + '</span><div class="ps-read-b"><div>' + procInlineHtml(s.text) + '</div>' +
-      (s.detail && !o.limit ? '<div class="ps-read-d">' + procInlineHtml(s.detail) + '</div>' : '') + '</div></li>').join('') +
+  return (
+    (doc.intro && !o.limit
+      ? '<div class="ps-read-intro">' + procInlineHtml(doc.intro) + '</div>'
+      : '') +
+    '<ol class="ps-read">' +
+    doc.steps
+      .slice(0, limit)
+      .map(
+        (s, i) =>
+          '<li><span class="ps-read-n">' +
+          (i + 1) +
+          '</span><div class="ps-read-b"><div>' +
+          procInlineHtml(s.text) +
+          '</div>' +
+          (s.detail && !o.limit
+            ? '<div class="ps-read-d">' + procInlineHtml(s.detail) + '</div>'
+            : '') +
+          '</div></li>'
+      )
+      .join('') +
     '</ol>' +
-    (limit < doc.steps.length ? '<div class="ps-read-more">+ ' + (doc.steps.length - limit) + ' passo' + (doc.steps.length - limit === 1 ? '' : 's') + '</div>' : '');
+    (limit < doc.steps.length
+      ? '<div class="ps-read-more">+ ' +
+        (doc.steps.length - limit) +
+        ' passo' +
+        (doc.steps.length - limit === 1 ? '' : 's') +
+        '</div>'
+      : '')
+  );
 }
 
 function _psCountLabel(n) {
@@ -144,8 +216,10 @@ const _PS_ICONS = {
   note: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg>',
   dup: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
   plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
-  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
-  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  trash:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
+  check:
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
   play: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>',
 };
 
@@ -179,8 +253,13 @@ function procEditorHtml(content) {
     </div>`;
 }
 
-function _pseRoot(el) { return el && el.closest ? el.closest('[data-pse]') : null; }
-function _pseIdx(el) { const li = el && el.closest ? el.closest('.pse-step') : null; return li ? Number(li.dataset.i) : -1; }
+function _pseRoot(el) {
+  return el && el.closest ? el.closest('[data-pse]') : null;
+}
+function _pseIdx(el) {
+  const li = el && el.closest ? el.closest('.pse-step') : null;
+  return li ? Number(li.dataset.i) : -1;
+}
 
 function _pseGrow(ta) {
   if (!ta) return;
@@ -213,11 +292,20 @@ function _pseSync(root, dirty) {
   const st = root._ps;
   const hidden = root.querySelector('textarea[name="content"]');
   const textMode = root.dataset.mode === 'text';
-  if (hidden) hidden.value = textMode ? root.querySelector('.pse-raw').value : procSerializeSteps(st);
-  const n = st.steps.filter((s) => String(s.text || '').trim() || String(s.detail || '').trim()).length;
+  if (hidden)
+    hidden.value = textMode ? root.querySelector('.pse-raw').value : procSerializeSteps(st);
+  const n = st.steps.filter(
+    (s) => String(s.text || '').trim() || String(s.detail || '').trim()
+  ).length;
   const c = root.querySelector('.pse-count');
   if (c) c.textContent = _psCountLabel(n);
-  if (dirty) { try { _modalDirty = true; } catch (_) {} }
+  if (dirty) {
+    try {
+      _modalDirty = true;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+    }
+  }
 }
 
 function _pseRender(root, focus) {
@@ -225,7 +313,9 @@ function _pseRender(root, focus) {
   if (!st.steps.length) st.steps.push({ text: '', detail: '' });
   const list = root.querySelector('.pse-list');
   list.innerHTML = st.steps.map((s, i) => _pseStepHtml(s, i, st.steps.length)).join('');
-  list.querySelectorAll('textarea').forEach((ta) => { if (!ta.hidden) _pseGrow(ta); });
+  list.querySelectorAll('textarea').forEach((ta) => {
+    if (!ta.hidden) _pseGrow(ta);
+  });
   if (focus) _pseFocus(root, focus.i, focus.field || 'text', focus.at);
 }
 
@@ -235,20 +325,37 @@ function _pseFocus(root, i, field, at) {
   if (!ta) return;
   ta.focus();
   const pos = at === 'start' ? 0 : ta.value.length;
-  try { ta.setSelectionRange(pos, pos); } catch (_) {}
-  try { li.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+  try {
+    ta.setSelectionRange(pos, pos);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+  }
+  try {
+    li.scrollIntoView({ block: 'nearest' });
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+  }
 }
 
 function _pseLoad(root, content) {
   const doc = procParseSteps(content);
-  root._ps = { intro: doc.intro, steps: doc.steps.map((s) => ({ text: s.text, detail: s.detail, open: false })) };
+  root._ps = {
+    intro: doc.intro,
+    steps: doc.steps.map((s) => ({ text: s.text, detail: s.detail, open: false })),
+  };
   // Texto corrido sem nenhum passo: em vez de esconder tudo na introdução,
   // cada linha vira um passo (é o que a pessoa quer ao abrir o editor).
   if (!doc.steps.length && doc.intro) {
-    root._ps = { intro: '', steps: procStepsFromPaste(doc.intro).map((s) => ({ text: s.text, detail: '', open: false })) };
+    root._ps = {
+      intro: '',
+      steps: procStepsFromPaste(doc.intro).map((s) => ({ text: s.text, detail: '', open: false })),
+    };
   }
   const intro = root.querySelector('.pse-intro-in');
-  if (intro) { intro.value = root._ps.intro; _pseGrow(intro); }
+  if (intro) {
+    intro.value = root._ps.intro;
+    _pseGrow(intro);
+  }
 }
 
 /** Liga os eventos do editor (uma vez por modal aberto). */
@@ -263,8 +370,16 @@ function procEditorMount(root) {
   root.addEventListener('input', (ev) => {
     const t = ev.target;
     const st = root._ps;
-    if (t.classList.contains('pse-raw')) { _pseSync(root, true); return; }
-    if (t.classList.contains('pse-intro-in')) { st.intro = t.value; _pseGrow(t); _pseSync(root, true); return; }
+    if (t.classList.contains('pse-raw')) {
+      _pseSync(root, true);
+      return;
+    }
+    if (t.classList.contains('pse-intro-in')) {
+      st.intro = t.value;
+      _pseGrow(t);
+      _pseSync(root, true);
+      return;
+    }
     const i = _pseIdx(t);
     if (i < 0 || !st.steps[i]) return;
     if (t.classList.contains('pse-text')) st.steps[i].text = t.value;
@@ -275,13 +390,19 @@ function procEditorMount(root) {
 
   root.addEventListener('keydown', (ev) => {
     const t = ev.target;
-    if (!t.classList || !(t.classList.contains('pse-text') || t.classList.contains('pse-detail'))) return;
+    if (!t.classList || !(t.classList.contains('pse-text') || t.classList.contains('pse-detail')))
+      return;
     const st = root._ps;
     const i = _pseIdx(t);
     if (i < 0) return;
     if (ev.altKey && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
       ev.preventDefault();
-      _pseMove(root, i, ev.key === 'ArrowUp' ? -1 : 1, t.classList.contains('pse-detail') ? 'detail' : 'text');
+      _pseMove(
+        root,
+        i,
+        ev.key === 'ArrowUp' ? -1 : 1,
+        t.classList.contains('pse-detail') ? 'detail' : 'text'
+      );
       return;
     }
     if (!t.classList.contains('pse-text')) return;
@@ -299,7 +420,12 @@ function procEditorMount(root) {
         _pseRender(root, { i: pos === 0 && t.value.trim() ? i : i + 1 });
       }
       _pseSync(root, true);
-    } else if (ev.key === 'Backspace' && !t.value && !String(st.steps[i].detail || '').trim() && st.steps.length > 1) {
+    } else if (
+      ev.key === 'Backspace' &&
+      !t.value &&
+      !String(st.steps[i].detail || '').trim() &&
+      st.steps.length > 1
+    ) {
       ev.preventDefault();
       st.steps.splice(i, 1);
       _pseRender(root, { i: Math.max(0, i - 1) });
@@ -307,7 +433,11 @@ function procEditorMount(root) {
     } else if (ev.key === 'ArrowUp' && t.selectionStart === 0 && t.selectionEnd === 0 && i > 0) {
       ev.preventDefault();
       _pseFocus(root, i - 1, 'text');
-    } else if (ev.key === 'ArrowDown' && t.selectionStart === t.value.length && i < st.steps.length - 1) {
+    } else if (
+      ev.key === 'ArrowDown' &&
+      t.selectionStart === t.value.length &&
+      i < st.steps.length - 1
+    ) {
       ev.preventDefault();
       _pseFocus(root, i + 1, 'text', 'end');
     }
@@ -334,7 +464,8 @@ function procEditorMount(root) {
     if (keepDetail && !st.steps[i].detail) st.steps[i].detail = keepDetail;
     _pseRender(root, { i: i + items.length - 1 });
     _pseSync(root, true);
-    if (typeof showToast === 'function') showToast(items.length + ' passos criados a partir do texto colado.', 'success');
+    if (typeof showToast === 'function')
+      showToast(items.length + ' passos criados a partir do texto colado.', 'success');
   });
 
   // Arrastar pela alça. O <li> só fica arrastável enquanto a alça está
@@ -349,7 +480,12 @@ function procEditorMount(root) {
     if (!li || !li.draggable) return;
     dragFrom = Number(li.dataset.i);
     li.classList.add('is-drag');
-    try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(dragFrom)); } catch (_) {}
+    try {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', String(dragFrom));
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+    }
   });
   root.addEventListener('dragover', (ev) => {
     if (dragFrom < 0) return;
@@ -358,7 +494,9 @@ function procEditorMount(root) {
     ev.preventDefault();
     const r = li.getBoundingClientRect();
     const below = ev.clientY > r.top + r.height / 2;
-    root.querySelectorAll('.pse-step').forEach((x) => x.classList.remove('drop-above', 'drop-below'));
+    root
+      .querySelectorAll('.pse-step')
+      .forEach((x) => x.classList.remove('drop-above', 'drop-below'));
     li.classList.add(below ? 'drop-below' : 'drop-above');
   });
   root.addEventListener('drop', (ev) => {
@@ -377,7 +515,10 @@ function procEditorMount(root) {
   });
   root.addEventListener('dragend', () => {
     dragFrom = -1;
-    root.querySelectorAll('.pse-step').forEach((x) => { x.draggable = false; x.classList.remove('is-drag', 'drop-above', 'drop-below'); });
+    root.querySelectorAll('.pse-step').forEach((x) => {
+      x.draggable = false;
+      x.classList.remove('is-drag', 'drop-above', 'drop-below');
+    });
   });
 }
 
@@ -416,9 +557,15 @@ function _pseSetMode(root, mode) {
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-selected', on ? 'true' : 'false');
   });
-  root.querySelectorAll('.pse-pane').forEach((p) => { p.hidden = p.dataset.pane !== mode; });
+  root.querySelectorAll('.pse-pane').forEach((p) => {
+    p.hidden = p.dataset.pane !== mode;
+  });
   _pseSync(root, false);
-  if (mode === 'text') { raw.focus(); } else { _pseFocus(root, 0, 'text'); }
+  if (mode === 'text') {
+    raw.focus();
+  } else {
+    _pseFocus(root, 0, 'text');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -436,13 +583,18 @@ function _psrSig(steps) {
   return steps.length + ':' + h;
 }
 
-function _psrStoreKey(kind, id) { return 'intra_psr_' + kind + '_' + id; }
+function _psrStoreKey(kind, id) {
+  return 'intra_psr_' + kind + '_' + id;
+}
 
 function _psrLoadDone(kind, id, sig) {
   try {
     const v = JSON.parse(localStorage.getItem(_psrStoreKey(kind, id)) || 'null');
-    if (v && v.sig === sig && Array.isArray(v.done)) return v.done.filter((n) => Number.isInteger(n));
-  } catch (_) {}
+    if (v && v.sig === sig && Array.isArray(v.done))
+      return v.done.filter((n) => Number.isInteger(n));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+  }
   return [];
 }
 
@@ -451,26 +603,47 @@ function _psrSaveDone() {
   if (!s) return;
   try {
     if (!s.done.size) localStorage.removeItem(_psrStoreKey(s.kind, s.id));
-    else localStorage.setItem(_psrStoreKey(s.kind, s.id), JSON.stringify({ sig: s.sig, done: Array.from(s.done), at: Date.now() }));
-  } catch (_) {}
+    else
+      localStorage.setItem(
+        _psrStoreKey(s.kind, s.id),
+        JSON.stringify({ sig: s.sig, done: Array.from(s.done), at: Date.now() })
+      );
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+  }
 }
 
 function _psrFind(kind, id) {
-  if (kind === 'tpl') return typeof getProcedureTemplateById === 'function' ? getProcedureTemplateById(id) : null;
-  const all = typeof getProcedures === 'function' ? (getProcedures() || []) : [];
+  if (kind === 'tpl')
+    return typeof getProcedureTemplateById === 'function' ? getProcedureTemplateById(id) : null;
+  const all = typeof getProcedures === 'function' ? getProcedures() || [] : [];
   return all.find((p) => p.id === id) || null;
 }
 
 /** Abre o modo execução. kind: 'tpl' (modelo) | 'proc' (procedimento/artigo). */
 function openProcedureRunner(kind, id) {
   const item = _psrFind(kind, id);
-  if (!item) { if (typeof showToast === 'function') showToast('Procedimento não encontrado.', 'warning'); return; }
+  if (!item) {
+    if (typeof showToast === 'function') showToast('Procedimento não encontrado.', 'warning');
+    return;
+  }
   const doc = procParseSteps(item.content);
   const sig = _psrSig(doc.steps);
-  _psrState = { kind, id, item, doc, sig, done: new Set(_psrLoadDone(kind, id, sig).filter((n) => n < doc.steps.length)) };
-  const meta = [item.category ? '<span class="tag tag-blue">' + _psEsc(item.category) + '</span>' : '',
-    '<span class="psr-meta-n">' + _psCountLabel(doc.steps.length) + '</span>'].join('');
-  openModal(item.title || 'Procedimento', `
+  _psrState = {
+    kind,
+    id,
+    item,
+    doc,
+    sig,
+    done: new Set(_psrLoadDone(kind, id, sig).filter((n) => n < doc.steps.length)),
+  };
+  const meta = [
+    item.category ? '<span class="tag tag-blue">' + _psEsc(item.category) + '</span>' : '',
+    '<span class="psr-meta-n">' + _psCountLabel(doc.steps.length) + '</span>',
+  ].join('');
+  openModal(
+    item.title || 'Procedimento',
+    `
     <div class="psr" data-psr>
       <div class="psr-top">
         <div class="psr-meta">${meta}</div>
@@ -489,7 +662,9 @@ function openProcedureRunner(kind, id) {
         <button type="button" class="btn btn-secondary btn-sm" data-action="psrEdit">Editar</button>
         <button type="button" class="btn btn-primary psr-next" data-action="psrNext"></button>
       </div>
-    </div>`, 'xl');
+    </div>`,
+    'xl'
+  );
   _psrPaint(true);
 }
 
@@ -507,10 +682,11 @@ function _psrPaint(scroll) {
   const cur = _psrCurrent();
   const list = root.querySelector('.psr-list');
   if (list) {
-    list.innerHTML = s.doc.steps.map((st, i) => {
-      const done = s.done.has(i);
-      const isCur = i === cur;
-      return `<li class="psr-step${done ? ' is-done' : ''}${isCur ? ' is-current' : ''}" data-i="${i}">
+    list.innerHTML = s.doc.steps
+      .map((st, i) => {
+        const done = s.done.has(i);
+        const isCur = i === cur;
+        return `<li class="psr-step${done ? ' is-done' : ''}${isCur ? ' is-current' : ''}" data-i="${i}">
         <button type="button" class="psr-check" data-action="psrToggle" data-arg="${i}" aria-pressed="${done}" aria-label="${done ? 'Desmarcar' : 'Marcar'} passo ${i + 1}">
           <span class="psr-n">${i + 1}</span><span class="psr-ok">${_PS_ICONS.check}</span>
         </button>
@@ -519,7 +695,8 @@ function _psrPaint(scroll) {
           ${st.detail ? '<div class="psr-detail">' + procInlineHtml(st.detail) + '</div>' : ''}
         </div>
       </li>`;
-    }).join('');
+      })
+      .join('');
   }
   const pct = n ? Math.round((s.done.size / n) * 100) : 0;
   const bar = root.querySelector('.psr-bar span');
@@ -537,23 +714,41 @@ function _psrPaint(scroll) {
   }
   if (scroll && cur >= 0) {
     const li = root.querySelector('.psr-step[data-i="' + cur + '"]');
-    try { if (li) li.scrollIntoView({ block: 'center', behavior: typeof _canAnimate === 'function' && _canAnimate() ? 'smooth' : 'auto' }); } catch (_) {}
+    try {
+      if (li)
+        li.scrollIntoView({
+          block: 'center',
+          behavior: typeof _canAnimate === 'function' && _canAnimate() ? 'smooth' : 'auto',
+        });
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+    }
   }
 }
 
 function _psrSummary() {
   const s = _psrState;
   const date = new Date().toLocaleString('pt-BR');
-  const lines = [s.item.title + ' — ' + s.done.size + '/' + s.doc.steps.length + ' passos (' + date + ')'];
-  s.doc.steps.forEach((st, i) => lines.push((s.done.has(i) ? '[x] ' : '[ ] ') + (i + 1) + ') ' + st.text));
+  const lines = [
+    s.item.title + ' — ' + s.done.size + '/' + s.doc.steps.length + ' passos (' + date + ')',
+  ];
+  s.doc.steps.forEach((st, i) =>
+    lines.push((s.done.has(i) ? '[x] ' : '[ ] ') + (i + 1) + ') ' + st.text)
+  );
   return lines.join('\n');
 }
 
 function _psCopyText(text, msg) {
-  const ok = () => { if (typeof showToast === 'function') showToast(msg || 'Copiado!', 'success'); };
+  const ok = () => {
+    if (typeof showToast === 'function') showToast(msg || 'Copiado!', 'success');
+  };
   try {
-    navigator.clipboard.writeText(text).then(ok, () => { if (typeof showToast === 'function') showToast('Não foi possível copiar.', 'error'); });
-  } catch (_) {}
+    navigator.clipboard.writeText(text).then(ok, () => {
+      if (typeof showToast === 'function') showToast('Não foi possível copiar.', 'error');
+    });
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'passos');
+  }
 }
 
 if (typeof registerActions === 'function') {
@@ -564,7 +759,10 @@ if (typeof registerActions === 'function') {
       const root = _pseRoot(el);
       const st = root._ps;
       const last = st.steps[st.steps.length - 1];
-      if (last && !String(last.text || '').trim() && !String(last.detail || '').trim()) { _pseFocus(root, st.steps.length - 1, 'text'); return; }
+      if (last && !String(last.text || '').trim() && !String(last.detail || '').trim()) {
+        _pseFocus(root, st.steps.length - 1, 'text');
+        return;
+      }
       st.steps.push({ text: '', detail: '' });
       _pseRender(root, { i: st.steps.length - 1 });
       _pseSync(root, true);
@@ -591,7 +789,11 @@ if (typeof registerActions === 'function') {
       const removed = st.steps.splice(i, 1)[0];
       _pseRender(root, { i: Math.max(0, Math.min(i, st.steps.length - 1)) });
       _pseSync(root, true);
-      if (removed && (String(removed.text || '').trim() || String(removed.detail || '').trim()) && typeof showUndoToast === 'function') {
+      if (
+        removed &&
+        (String(removed.text || '').trim() || String(removed.detail || '').trim()) &&
+        typeof showUndoToast === 'function'
+      ) {
         showUndoToast('Passo ' + (i + 1) + ' removido.', () => {
           if (!root.isConnected) return;
           st.steps.splice(Math.min(i, st.steps.length), 0, removed);
@@ -630,14 +832,18 @@ if (typeof registerActions === 'function') {
       const s = _psrState;
       if (!s) return;
       const n = Number(i);
-      if (s.done.has(n)) s.done.delete(n); else s.done.add(n);
+      if (s.done.has(n)) s.done.delete(n);
+      else s.done.add(n);
       _psrSaveDone();
       _psrPaint(false);
     },
     psrNext: (el) => {
       const s = _psrState;
       if (!s) return;
-      if (el.dataset.mode === 'close') { closeModal(); return; }
+      if (el.dataset.mode === 'close') {
+        closeModal();
+        return;
+      }
       const cur = _psrCurrent();
       if (cur >= 0) s.done.add(cur);
       _psrSaveDone();
@@ -651,17 +857,29 @@ if (typeof registerActions === 'function') {
       _psrSaveDone();
       _psrPaint(true);
     },
-    psrCopy: () => { if (_psrState) _psCopyText(_psrSummary(), 'Resumo copiado.'); },
+    psrCopy: () => {
+      if (_psrState) _psCopyText(_psrSummary(), 'Resumo copiado.');
+    },
     psrEdit: () => {
       const s = _psrState;
       if (!s) return;
-      if (s.kind === 'tpl') { if (typeof openTemplateForm === 'function') openTemplateForm(s.id); return; }
-      if (s.item.clientId && typeof openProcedureForm === 'function') openProcedureForm(s.item.clientId, s.id);
+      if (s.kind === 'tpl') {
+        if (typeof openTemplateForm === 'function') openTemplateForm(s.id);
+        return;
+      }
+      if (s.item.clientId && typeof openProcedureForm === 'function')
+        openProcedureForm(s.item.clientId, s.id);
       else if (typeof openKbArticleForm === 'function') openKbArticleForm(s.id);
     },
   });
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { procParseSteps, procSerializeSteps, procStepsFromPaste, procInlineHtml, procReadHtml };
+  module.exports = {
+    procParseSteps,
+    procSerializeSteps,
+    procStepsFromPaste,
+    procInlineHtml,
+    procReadHtml,
+  };
 }

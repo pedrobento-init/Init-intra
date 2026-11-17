@@ -5,8 +5,23 @@ import fs from 'node:fs';
 // inline no HTML (onclick=...) obriga o CSP a liberar 'unsafe-inline'.
 // - Arquivos já convertidos não podem voltar a ter handler inline.
 // - O total restante só pode diminuir (ao converter uma tela, baixe o teto).
-const HANDLER = /\bon(click|change|input|submit|keydown|keyup|blur|focus|drop|dragover|dragleave)=/g;
-const CLEAN = ['js/passos.js', 'js/templates.js', 'js/prazos.js', 'js/roteiro.js', 'js/fila.js', 'js/vencimentos.js', 'js/conhecimento.js', 'js/actions.js', 'js/error-log.js', 'js/time-entries.js', 'js/caixa-entrada.js', 'js/chamado-detalhe.js', 'index.html'];
+const HANDLER =
+  /\bon(click|change|input|submit|keydown|keyup|blur|focus|drop|dragover|dragleave)=/g;
+const CLEAN = [
+  'js/passos.js',
+  'js/templates.js',
+  'js/prazos.js',
+  'js/roteiro.js',
+  'js/fila.js',
+  'js/vencimentos.js',
+  'js/conhecimento.js',
+  'js/actions.js',
+  'js/error-log.js',
+  'js/time-entries.js',
+  'js/caixa-entrada.js',
+  'js/chamado-detalhe.js',
+  'index.html',
+];
 const CEILING = 343;
 
 const count = (f) => (fs.readFileSync(f, 'utf8').match(HANDLER) || []).length;
@@ -17,7 +32,11 @@ describe('handlers inline (CSP)', () => {
   });
 
   it('o total restante não cresce', () => {
-    const files = fs.readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => 'js/' + f).concat(['index.html']);
+    const files = fs
+      .readdirSync('js')
+      .filter((f) => f.endsWith('.js'))
+      .map((f) => 'js/' + f)
+      .concat(['index.html']);
     const total = files.reduce((s, f) => s + count(f), 0);
     expect(total).toBeLessThanOrEqual(CEILING);
   });

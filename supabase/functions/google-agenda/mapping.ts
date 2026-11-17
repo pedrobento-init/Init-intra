@@ -12,12 +12,12 @@ export type VisitRow = {
   client_name?: string | null;
   motivo?: string | null;
   observacoes?: string | null;
-  date: string;               // YYYY-MM-DD (horário local de Brasília)
-  time?: string | null;       // HH:MM[:SS]
-  time_end?: string | null;   // HH:MM[:SS]
+  date: string; // YYYY-MM-DD (horário local de Brasília)
+  time?: string | null; // HH:MM[:SS]
+  time_end?: string | null; // HH:MM[:SS]
   all_day?: boolean | null;
   status?: string | null;
-  levar?: { t?: string; ok?: boolean }[] | null;  // "O que levar" (058)
+  levar?: { t?: string; ok?: boolean }[] | null; // "O que levar" (058)
 };
 
 export type GEventTime = { date?: string; dateTime?: string; timeZone?: string };
@@ -31,27 +31,31 @@ export type GEvent = {
   extendedProperties?: { private?: Record<string, string> };
 };
 
-export const TIME_ZONE = "America/Sao_Paulo";
+export const TIME_ZONE = 'America/Sao_Paulo';
 // Brasília não tem horário de verão desde 2019: UTC−3 fixo (como agenda-ics).
 const OFFSET_HOURS = 3;
 
 export function eventIdFor(visitId: string): string {
-  let hex = "";
-  for (const b of new TextEncoder().encode(visitId)) hex += b.toString(16).padStart(2, "0");
-  return "ii" + hex;
+  let hex = '';
+  for (const b of new TextEncoder().encode(visitId)) hex += b.toString(16).padStart(2, '0');
+  return 'ii' + hex;
 }
 
 export function visitIdFromEventId(eventId: string | null | undefined): string | null {
-  const m = /^ii((?:[0-9a-f]{2})+)$/.exec(String(eventId || ""));
+  const m = /^ii((?:[0-9a-f]{2})+)$/.exec(String(eventId || ''));
   if (!m) return null;
   const bytes = new Uint8Array(m[1].length / 2);
   for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(m[1].slice(i * 2, i * 2 + 2), 16);
-  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return null; }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 function hhmm(t: string | null | undefined): string {
-  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ""));
-  return m ? m[1].padStart(2, "0") + ":" + m[2] : "";
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  return m ? m[1].padStart(2, '0') + ':' + m[2] : '';
 }
 
 function addDays(date: string, n: number): string {
@@ -60,31 +64,38 @@ function addDays(date: string, n: number): string {
 }
 
 /** Campos de agenda da visita, normalizados (base da comparação e do hash). */
-function schedule(v: Pick<VisitRow, "date" | "time" | "time_end" | "all_day">) {
-  const time = v.all_day ? "" : hhmm(v.time);
-  return { date: String(v.date || ""), time, time_end: time ? hhmm(v.time_end) : "", all_day: !time };
+function schedule(v: Pick<VisitRow, 'date' | 'time' | 'time_end' | 'all_day'>) {
+  const time = v.all_day ? '' : hhmm(v.time);
+  return {
+    date: String(v.date || ''),
+    time,
+    time_end: time ? hhmm(v.time_end) : '',
+    all_day: !time,
+  };
 }
 
 /** Evento do Google para a visita. appUrl: link para abrir a visita no app.
  *  operatorName: nome do técnico no título — usado na agenda compartilhada
  *  (081), onde estão as visitas de todo mundo; na agenda pessoal do técnico
  *  o próprio nome seria redundante. */
-export function visitToEvent(v: VisitRow, appUrl = "", operatorName?: string | null): GEvent {
+export function visitToEvent(v: VisitRow, appUrl = '', operatorName?: string | null): GEvent {
   const s = schedule(v);
-  const num = v.numero ? "#" + String(v.numero).padStart(4, "0") + " " : "";
-  const cliente = v.client_name || "Cliente";
-  const check = v.status === "concluida" ? " ✓" : "";
+  const num = v.numero ? '#' + String(v.numero).padStart(4, '0') + ' ' : '';
+  const cliente = v.client_name || 'Cliente';
+  const check = v.status === 'concluida' ? ' ✓' : '';
   const summary = operatorName
-    ? cliente + " · Visita " + num + "· " + operatorName + check
-    : "Visita " + num + "· " + cliente + check;
+    ? cliente + ' · Visita ' + num + '· ' + operatorName + check
+    : 'Visita ' + num + '· ' + cliente + check;
   const levar = levarItens(v);
   const description = [
-    v.motivo ? "Motivo: " + v.motivo : "",
-    v.observacoes || "",
-    levar.length ? "O que levar:\n" + levar.map((i) => (i.ok ? "☑ " : "☐ ") + i.t).join("\n") : "",
+    v.motivo ? 'Motivo: ' + v.motivo : '',
+    v.observacoes || '',
+    levar.length ? 'O que levar:\n' + levar.map((i) => (i.ok ? '☑ ' : '☐ ') + i.t).join('\n') : '',
     appUrl,
-    "Data e horário podem ser mudados aqui ou no Init Intra; o resto, só no Init Intra.",
-  ].filter(Boolean).join("\n\n");
+    'Data e horário podem ser mudados aqui ou no Init Intra; o resto, só no Init Intra.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   let start: GEventTime, end: GEventTime;
   if (s.all_day) {
     start = { date: s.date };
@@ -92,16 +103,16 @@ export function visitToEvent(v: VisitRow, appUrl = "", operatorName?: string | n
   } else {
     let endT = s.time_end;
     if (!endT || endT <= s.time) {
-      const [h, m] = s.time.split(":").map(Number);
-      endT = String(Math.min(23, h + 1)).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-      if (endT <= s.time) endT = "23:59";
+      const [h, m] = s.time.split(':').map(Number);
+      endT = String(Math.min(23, h + 1)).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      if (endT <= s.time) endT = '23:59';
     }
-    start = { dateTime: s.date + "T" + s.time + ":00-03:00", timeZone: TIME_ZONE };
-    end = { dateTime: s.date + "T" + endT + ":00-03:00", timeZone: TIME_ZONE };
+    start = { dateTime: s.date + 'T' + s.time + ':00-03:00', timeZone: TIME_ZONE };
+    end = { dateTime: s.date + 'T' + endT + ':00-03:00', timeZone: TIME_ZONE };
   }
   return {
     id: eventIdFor(v.id),
-    status: "confirmed",
+    status: 'confirmed',
     summary,
     description,
     start,
@@ -112,7 +123,7 @@ export function visitToEvent(v: VisitRow, appUrl = "", operatorName?: string | n
 
 function levarItens(v: VisitRow): { t: string; ok: boolean }[] {
   return (Array.isArray(v.levar) ? v.levar : [])
-    .filter((i) => i && String(i.t || "").trim())
+    .filter((i) => i && String(i.t || '').trim())
     .map((i) => ({ t: String(i.t).trim(), ok: i.ok === true }));
 }
 
@@ -125,11 +136,23 @@ export async function visitHash(v: VisitRow, operatorTitle?: string | null): Pro
   const s = schedule(v);
   const levar = levarItens(v);
   // Sem lista, a chave fica igual à de antes da 058: nada é reenviado à toa.
-  const key = JSON.stringify([s.date, s.time, s.time_end, s.all_day, v.status || "", v.client_name || "",
-    v.motivo || "", v.observacoes || "", v.numero ?? null, ...(levar.length ? [levar] : []),
-    ...(operatorTitle ? [operatorTitle] : [])]);
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
-  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  const key = JSON.stringify([
+    s.date,
+    s.time,
+    s.time_end,
+    s.all_day,
+    v.status || '',
+    v.client_name || '',
+    v.motivo || '',
+    v.observacoes || '',
+    v.numero ?? null,
+    ...(levar.length ? [levar] : []),
+    ...(operatorTitle ? [operatorTitle] : []),
+  ]);
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32);
 }
 
 /** Data/hora de Brasília de um dateTime RFC 3339 com qualquer fuso. */
@@ -140,16 +163,18 @@ function localParts(dateTime: string): { date: string; time: string } | null {
   return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
-function eventSchedule(ev: GEvent): { date: string; time: string; time_end: string; all_day: boolean } | null {
+function eventSchedule(
+  ev: GEvent
+): { date: string; time: string; time_end: string; all_day: boolean } | null {
   if (ev.start?.date && /^\d{4}-\d{2}-\d{2}$/.test(ev.start.date)) {
-    return { date: ev.start.date, time: "", time_end: "", all_day: true };
+    return { date: ev.start.date, time: '', time_end: '', all_day: true };
   }
   if (!ev.start?.dateTime) return null;
   const a = localParts(ev.start.dateTime);
   if (!a) return null;
   const b = ev.end?.dateTime ? localParts(ev.end.dateTime) : null;
   // Evento que passa da meia-noite: a visita guarda só o horário de início.
-  const timeEnd = b && b.date === a.date && b.time > a.time ? b.time : "";
+  const timeEnd = b && b.date === a.date && b.time > a.time ? b.time : '';
   return { date: a.date, time: a.time, time_end: timeEnd, all_day: false };
 }
 
@@ -159,12 +184,20 @@ function eventSchedule(ev: GEvent): { date: string; time: string; time_end: stri
  * Compara com o evento que o site geraria, não com a visita crua: visita sem
  * fim vira evento de 1h, e isso não é edição do técnico.
  */
-export function eventToVisitPatch(ev: GEvent, v: VisitRow):
-  Partial<Pick<VisitRow, "date" | "time" | "time_end" | "all_day">> | null {
+export function eventToVisitPatch(
+  ev: GEvent,
+  v: VisitRow
+): Partial<Pick<VisitRow, 'date' | 'time' | 'time_end' | 'all_day'>> | null {
   const next = eventSchedule(ev);
   const cur = eventSchedule(visitToEvent(v));
   if (!next || !cur) return null;
-  if (next.date === cur.date && next.time === cur.time && next.time_end === cur.time_end && next.all_day === cur.all_day) return null;
+  if (
+    next.date === cur.date &&
+    next.time === cur.time &&
+    next.time_end === cur.time_end &&
+    next.all_day === cur.all_day
+  )
+    return null;
   return {
     date: next.date,
     time: next.time || null,

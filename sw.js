@@ -1,16 +1,21 @@
-const CACHE_NAME = 'init-intra-v58';
+const CACHE_NAME = 'init-intra-v60';
 const CDN_CACHE_NAME = 'init-intra-cdn-v52';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
   '/',
   'index.html',
+  'css/fonts.css',
   'css/styles.css',
   'css/pagina-pendencia.css',
   'css/pagina-projeto.css',
   'css/pagina-chamado.css',
+  'fonts/manrope-latin.woff2',
+  'fonts/manrope-latin-ext.woff2',
+  'css/utilidades.css',
   'js/schema.js',
   'js/error-log.js',
+  'js/estilo-dinamico.js',
   'js/lazy-libs.js',
   'js/actions.js',
   'js/supabase-config.js',
@@ -80,12 +85,14 @@ const STATIC_ASSETS = [
   'js/milvus-tickets.js',
   'js/milvus-token-backfill.js',
   'js/push.js',
+  'js/dashboard.js',
+  'js/app-login.js',
   'js/app.js',
   'js/sw-register.js',
   'manifest.json',
   'icon.svg',
   'icon-192.png',
-  'logo-initnet.svg'
+  'logo-initnet.svg',
 ];
 
 const CDN_ASSETS = [
@@ -106,36 +113,43 @@ self.addEventListener('install', (event) => {
       caches.open(CACHE_NAME).then((cache) => {
         return Promise.allSettled(
           STATIC_ASSETS.map((url) =>
-            fetch(url, { cache: 'no-store' }).then((response) => {
-              if (response.ok) return cache.put(url, response);
-            }).catch(() => {})
+            fetch(url, { cache: 'no-store' })
+              .then((response) => {
+                if (response.ok) return cache.put(url, response);
+              })
+              .catch(() => {})
           )
         );
       }),
       caches.open(CDN_CACHE_NAME).then((cache) => {
         return Promise.allSettled(
           CDN_ASSETS.map((url) =>
-            fetch(url, { cache: 'no-store' }).then((response) => {
-              if (response.ok) return cache.put(url, response);
-            }).catch(() => {})
+            fetch(url, { cache: 'no-store' })
+              .then((response) => {
+                if (response.ok) return cache.put(url, response);
+              })
+              .catch(() => {})
           )
         );
-      })
+      }),
     ])
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== CDN_CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME && cacheName !== CDN_CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .then(() => self.clients.claim())
   );
 });
 
@@ -182,29 +196,33 @@ self.addEventListener('fetch', (event) => {
 
   if (isSameOrigin) {
     event.respondWith(
-      fetch(request).then((networkResponse) => {
-        if (networkResponse.ok) {
-          const copy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        }
-        return networkResponse;
-      }).catch(() => {
-        return caches.match(request);
-      })
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse.ok) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request);
+        })
     );
   } else {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
-        const fetchPromise = fetch(request).then((networkResponse) => {
-          if (networkResponse.ok) {
-            const copy = networkResponse.clone();
-            caches.open(CDN_CACHE_NAME).then((cache) => {
-              cache.put(request, copy);
-              purgeOldestCDNEntries();
-            });
-          }
-          return networkResponse;
-        }).catch(() => cachedResponse);
+        const fetchPromise = fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse.ok) {
+              const copy = networkResponse.clone();
+              caches.open(CDN_CACHE_NAME).then((cache) => {
+                cache.put(request, copy);
+                purgeOldestCDNEntries();
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse);
 
         return cachedResponse || fetchPromise;
       })
@@ -215,29 +233,42 @@ self.addEventListener('fetch', (event) => {
 // ── Web Push (Edge Function send-push) ──
 self.addEventListener('push', (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (_) { data = { title: 'Init Intra', body: event.data ? event.data.text() : '' }; }
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_) {
+    data = { title: 'Init Intra', body: event.data ? event.data.text() : '' };
+  }
   const title = data.title || 'Init Intra';
-  event.waitUntil(self.registration.showNotification(title, {
-    body: data.body || '',
-    icon: 'icon-192.png',
-    badge: 'icon-192.png',
-    tag: data.tag || undefined,
-    data: { url: typeof data.url === 'string' && /^\/?#[a-z0-9_-]*$/i.test(data.url) ? data.url : '/' },
-  }));
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: 'icon-192.png',
+      badge: 'icon-192.png',
+      tag: data.tag || undefined,
+      data: {
+        url: typeof data.url === 'string' && /^\/?#[a-z0-9_-]*$/i.test(data.url) ? data.url : '/',
+      },
+    })
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
-  event.waitUntil((async () => {
-    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const w of wins) {
-      if (new URL(w.url).origin === self.location.origin) {
-        await w.focus();
-        if ('navigate' in w) await w.navigate(url);
-        return;
+  const url = new URL(
+    (event.notification.data && event.notification.data.url) || '/',
+    self.location.origin
+  ).href;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin) {
+          await w.focus();
+          if ('navigate' in w) await w.navigate(url);
+          return;
+        }
       }
-    }
-    await self.clients.openWindow(url);
-  })());
+      await self.clients.openWindow(url);
+    })()
+  );
 });

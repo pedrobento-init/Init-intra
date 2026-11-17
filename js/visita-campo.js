@@ -7,45 +7,70 @@
 //   saúde do cliente.
 // Eventos delegados no document (CSP).
 
-const ROTA_MAX_PARADAS = 10;  // destino + 9 paradas (limite da URL do Maps)
+const ROTA_MAX_PARADAS = 10; // destino + 9 paradas (limite da URL do Maps)
 
 /** URL de rota do Google Maps saindo de onde a pessoa está. */
 function rotaMapsUrl(paradas) {
-  const p = (paradas || []).map((s) => String(s || '').trim()).filter(Boolean).slice(0, ROTA_MAX_PARADAS);
+  const p = (paradas || [])
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+    .slice(0, ROTA_MAX_PARADAS);
   if (!p.length) return null;
   const dest = p[p.length - 1];
   const meio = p.slice(0, -1);
-  return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(dest)
-    + (meio.length ? '&waypoints=' + encodeURIComponent(meio.join('|')) : '');
+  return (
+    'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' +
+    encodeURIComponent(dest) +
+    (meio.length ? '&waypoints=' + encodeURIComponent(meio.join('|')) : '')
+  );
 }
 
 /** Onde é a visita: endereço do cliente, ou o nome dele. */
 function visitaParada(v) {
-  const c = v && v.clientId && typeof getClientById === 'function' ? getClientById(v.clientId) : null;
+  const c =
+    v && v.clientId && typeof getClientById === 'function' ? getClientById(v.clientId) : null;
   return (c && String(c.address || '').trim()) || (c && c.name) || (v && v.clientName) || '';
 }
 
 function _campoMinhasVisitasHoje() {
-  const hoje = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
+  const hoje =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
   const eu = ((typeof getUser === 'function' && getUser()) || {}).name || '';
   return (typeof getVisits === 'function' ? getVisits() : [])
-    .filter((v) => v.date === hoje && v.operator === eu && v.status !== 'cancelada' && v.status !== 'concluida')
-    .sort((a, b) => (a.allDay ? '' : String(a.time || '')).localeCompare(b.allDay ? '' : String(b.time || '')));
+    .filter(
+      (v) =>
+        v.date === hoje && v.operator === eu && v.status !== 'cancelada' && v.status !== 'concluida'
+    )
+    .sort((a, b) =>
+      (a.allDay ? '' : String(a.time || '')).localeCompare(b.allDay ? '' : String(b.time || ''))
+    );
 }
 
 function abrirRotaDeHoje() {
   const vis = _campoMinhasVisitasHoje();
   const url = rotaMapsUrl(vis.map(visitaParada));
-  if (!url) { showToast('Você não tem visitas para hoje.', 'info'); return; }
-  if (vis.some((v) => { const c = getClientById(v.clientId); return !c || !String(c.address || '').trim(); })) {
-    showToast('Algum cliente está sem endereço: a rota usa o nome dele. Preencha o endereço na ficha para acertar.', 'warning');
+  if (!url) {
+    showToast('Você não tem visitas para hoje.', 'info');
+    return;
+  }
+  if (
+    vis.some((v) => {
+      const c = getClientById(v.clientId);
+      return !c || !String(c.address || '').trim();
+    })
+  ) {
+    showToast(
+      'Algum cliente está sem endereço: a rota usa o nome dele. Preencha o endereço na ficha para acertar.',
+      'warning'
+    );
   }
   window.open(url, '_blank', 'noopener');
 }
 
 // ── Cheguei / Saí ───────────────────────────────────────────────────────────
 
-const _hhmm = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const _hhmm = (iso) =>
+  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 function _duracao(seg) {
   const m = Math.round(seg / 60);
   return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0');
@@ -56,25 +81,40 @@ function visitaCampoHtml(v) {
   if (!v || v.status === 'cancelada') return '';
   const id = escapeHtml(v.id);
   // Atendimento guiado (visita-guiada.js): o caminho principal no celular.
-  const guiada = v.status !== 'concluida' && typeof openVisitaGuiada === 'function'
-    ? `<button type="button" class="btn btn-primary btn-sm" data-action="visitaGuiada" data-arg="${id}">▶ ${v.checkinAt ? 'Continuar atendimento' : 'Iniciar atendimento'}</button>` : '';
+  const guiada =
+    v.status !== 'concluida' && typeof openVisitaGuiada === 'function'
+      ? `<button type="button" class="btn btn-primary btn-sm" data-action="visitaGuiada" data-arg="${id}">▶ ${v.checkinAt ? 'Continuar atendimento' : 'Iniciar atendimento'}</button>`
+      : '';
   let presenca;
   if (!v.checkinAt) {
-    presenca = v.status === 'concluida' ? '' : `<button type="button" class="btn btn-${guiada ? 'secondary' : 'primary'} btn-sm" data-campo-checkin="${id}">📍 Cheguei</button>`;
+    presenca =
+      v.status === 'concluida'
+        ? ''
+        : `<button type="button" class="btn btn-${guiada ? 'secondary' : 'primary'} btn-sm" data-campo-checkin="${id}">📍 Cheguei</button>`;
   } else if (!v.checkoutAt) {
     presenca = `<span class="campo-st">Chegou às <b>${_hhmm(v.checkinAt)}</b></span> <button type="button" class="btn btn-secondary btn-sm" data-campo-checkout="${id}">🚪 Saí</button>`;
   } else {
     const seg = (Date.parse(v.checkoutAt) - Date.parse(v.checkinAt)) / 1000;
     presenca = `<span class="campo-st">No cliente das <b>${_hhmm(v.checkinAt)}</b> às <b>${_hhmm(v.checkoutAt)}</b> (${_duracao(seg)}, lançadas nas horas)</span>`;
   }
-  const rota = v.status !== 'concluida' && visitaParada(v)
-    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(rotaMapsUrl([visitaParada(v)]))}" target="_blank" rel="noopener">🗺️ Como chegar</a>` : '';
+  const rota =
+    v.status !== 'concluida' && visitaParada(v)
+      ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(rotaMapsUrl([visitaParada(v)]))}" target="_blank" rel="noopener">🗺️ Como chegar</a>`
+      : '';
 
-  const health = v.clientId && typeof getHealthForClient === 'function' && typeof _getPendenciasList === 'function'
-    ? getHealthForClient(_getPendenciasList(), v.clientId, localDateISO()) : null;
-  const atencao = health && health.motivos && health.motivos.length
-    ? `<div class="campo-atencao">⚠️ No cliente: ${health.motivos.map(escapeHtml).join(' · ')}</div>` : '';
-  const ia = v.briefingIa ? `<div class="campo-ia">💡 ${escapeHtml(v.briefingIa).replace(/\n/g, '<br>')}</div>` : '';
+  const health =
+    v.clientId &&
+    typeof getHealthForClient === 'function' &&
+    typeof _getPendenciasList === 'function'
+      ? getHealthForClient(_getPendenciasList(), v.clientId, localDateISO())
+      : null;
+  const atencao =
+    health && health.motivos && health.motivos.length
+      ? `<div class="campo-atencao">⚠️ No cliente: ${health.motivos.map(escapeHtml).join(' · ')}</div>`
+      : '';
+  const ia = v.briefingIa
+    ? `<div class="campo-ia">💡 ${escapeHtml(v.briefingIa).replace(/\n/g, '<br>')}</div>`
+    : '';
   if (!guiada && !presenca && !rota && !atencao && !ia) return '';
   return `<div class="form-group campo-box">
       ${guiada || presenca || rota ? `<div class="campo-acts">${guiada}${presenca}${rota}</div>` : ''}
@@ -86,7 +126,11 @@ function visitaCampoHtml(v) {
 function registrarChegadaVisita(id) {
   const v = getVisitById(id);
   if (!v || v.checkinAt) return false;
-  saveVisit({ ...v, checkinAt: new Date().toISOString(), status: v.status === 'agendada' ? 'em_andamento' : v.status });
+  saveVisit({
+    ...v,
+    checkinAt: new Date().toISOString(),
+    status: v.status === 'agendada' ? 'em_andamento' : v.status,
+  });
   showToast('Chegada registrada.', 'success');
   return true;
 }
@@ -106,14 +150,23 @@ function registrarSaidaVisita(id) {
   const agora = new Date();
   const seg = Math.round((agora.getTime() - Date.parse(v.checkinAt)) / 1000);
   if (seg <= 0) return 0;
-  if (seg > 12 * 3600 && !window.confirm(`A chegada foi há ${_duracao(seg)}. Registrar a saída assim mesmo?`)) return 0;
+  if (
+    seg > 12 * 3600 &&
+    !window.confirm(`A chegada foi há ${_duracao(seg)}. Registrar a saída assim mesmo?`)
+  )
+    return 0;
   saveVisit({ ...v, checkoutAt: agora.toISOString() });
   if (typeof saveTimeEntry === 'function') {
     saveTimeEntry({
       clientId: v.clientId || null,
-      operatorId: v.operatorId || (typeof _operatorIdByName === 'function' ? _operatorIdByName(v.operator) : null),
+      operatorId:
+        v.operatorId ||
+        (typeof _operatorIdByName === 'function' ? _operatorIdByName(v.operator) : null),
       operatorName: v.operator || '',
-      startedAt: v.checkinAt, endedAt: agora.toISOString(), seconds: seg, source: 'visita',
+      startedAt: v.checkinAt,
+      endedAt: agora.toISOString(),
+      seconds: seg,
+      source: 'visita',
       note: typeof visitDisplayTitle === 'function' ? visitDisplayTitle(v) : 'Visita',
       team: v.team || 'init',
     });
@@ -126,9 +179,15 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('click', (e) => {
     const t = e.target && e.target.closest ? e.target : null;
     if (!t) return;
-    if (t.closest('[data-campo-rota]')) { abrirRotaDeHoje(); return; }
+    if (t.closest('[data-campo-rota]')) {
+      abrirRotaDeHoje();
+      return;
+    }
     const ci = t.closest('[data-campo-checkin]');
-    if (ci) { _campoCheckin(ci.dataset.campoCheckin); return; }
+    if (ci) {
+      _campoCheckin(ci.dataset.campoCheckin);
+      return;
+    }
     const co = t.closest('[data-campo-checkout]');
     if (co) _campoCheckout(co.dataset.campoCheckout);
   });

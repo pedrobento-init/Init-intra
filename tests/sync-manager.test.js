@@ -11,7 +11,9 @@ const { buildOutboxEntry } = outbox;
 
 describe('SyncManager — LWW por updated_at', () => {
   it('sem local aplica remoto', () => {
-    expect(shouldApplyRemote(null, { id: 'a', updatedAt: '2026-01-01T00:00:00.000Z' }, false)).toBe(true);
+    expect(shouldApplyRemote(null, { id: 'a', updatedAt: '2026-01-01T00:00:00.000Z' }, false)).toBe(
+      true
+    );
   });
   it('remoto mais novo vence', () => {
     const local = { id: 'a', updatedAt: '2026-01-01T00:00:00.000Z' };
@@ -30,8 +32,12 @@ describe('SyncManager — LWW por updated_at', () => {
   });
   it('empate usa id como desempate determinístico (clock skew)', () => {
     const t = '2026-01-01T00:00:00.000Z';
-    expect(shouldApplyRemote({ id: 'a', updatedAt: t }, { id: 'b', updatedAt: t }, false)).toBe(true);
-    expect(shouldApplyRemote({ id: 'b', updatedAt: t }, { id: 'a', updatedAt: t }, false)).toBe(false);
+    expect(shouldApplyRemote({ id: 'a', updatedAt: t }, { id: 'b', updatedAt: t }, false)).toBe(
+      true
+    );
+    expect(shouldApplyRemote({ id: 'b', updatedAt: t }, { id: 'a', updatedAt: t }, false)).toBe(
+      false
+    );
   });
 });
 
@@ -62,7 +68,9 @@ describe('Sync — detecção de sessão expirada (_isAuthError)', () => {
     expect(_isAuthError({ code: 'SYNC_TIMEOUT', message: 'timeout após 5000ms' })).toBe(false);
   });
   it('403 RLS sem marca de token NÃO é auth (segue como erro de dados)', () => {
-    expect(_isAuthError({ status: 403, message: 'new row violates row-level security' })).toBe(false);
+    expect(_isAuthError({ status: 403, message: 'new row violates row-level security' })).toBe(
+      false
+    );
   });
   it('nulo/vazio NÃO é auth', () => {
     expect(_isAuthError(null)).toBe(false);

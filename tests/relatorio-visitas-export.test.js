@@ -14,7 +14,9 @@ function _anyEl() {
       if (p === Symbol.toPrimitive) return () => '';
       if (p === 'then') return undefined;
       if (p === 'style' || p === 'dataset') return {};
-      if (p === 'classList') { return { add() {}, remove() {}, toggle() {}, contains: () => false }; }
+      if (p === 'classList') {
+        return { add() {}, remove() {}, toggle() {}, contains: () => false };
+      }
       return (..._a) => _anyEl();
     },
     set: () => true,
@@ -44,7 +46,8 @@ _setGlobal(
       get: (_t, p) => {
         if (p === 'addEventListener') return () => {};
         if (p === 'querySelectorAll') return () => [];
-        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement') return (..._a) => _anyEl();
+        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement')
+          return (..._a) => _anyEl();
         if (p === 'head' || p === 'body') return _anyEl();
         if (p === 'visibilityState') return 'visible';
         return undefined;
@@ -83,13 +86,57 @@ console.debug = () => {};
 console.warn = () => {};
 
 const VISITS = [
-  { id: 'V1', clientId: 'C1', clientName: 'Acme', operator: 'Ana', date: '2026-10-05', time: '09:00', timeEnd: '11:00', status: 'concluida',
-    motivo: 'Servidor', relatorio: 'Troca do SSD', observacoes: 'Portaria B',
-    checkinAt: '2026-10-05T09:07:00', checkoutAt: '2026-10-05T11:24:00',
-    milvusChamadoCodigo: 501, assinaturaNome: 'Maria Silva', assinaturaEm: '2026-10-05T11:25:00' },
-  { id: 'V2', clientId: 'C2', clientName: 'Beta', operator: 'Beto', date: '2026-10-06', time: '14:00', timeEnd: '15:00', status: 'agendada', motivo: 'Rede' },
-  { id: 'V3', clientId: 'C1', clientName: 'Acme', operator: 'Ana', date: '2026-10-08', time: '08:00', timeEnd: '09:00', status: 'concluida', motivo: 'Preventiva' },
-  { id: 'V4', clientId: 'C1', clientName: 'Acme', operator: 'Ana', date: '2026-09-30', time: '08:00', timeEnd: '09:00', status: 'concluida', motivo: 'Fora do mês' },
+  {
+    id: 'V1',
+    clientId: 'C1',
+    clientName: 'Acme',
+    operator: 'Ana',
+    date: '2026-10-05',
+    time: '09:00',
+    timeEnd: '11:00',
+    status: 'concluida',
+    motivo: 'Servidor',
+    relatorio: 'Troca do SSD',
+    observacoes: 'Portaria B',
+    checkinAt: '2026-10-05T09:07:00',
+    checkoutAt: '2026-10-05T11:24:00',
+    milvusChamadoCodigo: 501,
+    assinaturaNome: 'Maria Silva',
+    assinaturaEm: '2026-10-05T11:25:00',
+  },
+  {
+    id: 'V2',
+    clientId: 'C2',
+    clientName: 'Beta',
+    operator: 'Beto',
+    date: '2026-10-06',
+    time: '14:00',
+    timeEnd: '15:00',
+    status: 'agendada',
+    motivo: 'Rede',
+  },
+  {
+    id: 'V3',
+    clientId: 'C1',
+    clientName: 'Acme',
+    operator: 'Ana',
+    date: '2026-10-08',
+    time: '08:00',
+    timeEnd: '09:00',
+    status: 'concluida',
+    motivo: 'Preventiva',
+  },
+  {
+    id: 'V4',
+    clientId: 'C1',
+    clientName: 'Acme',
+    operator: 'Ana',
+    date: '2026-09-30',
+    time: '08:00',
+    timeEnd: '09:00',
+    status: 'concluida',
+    motivo: 'Fora do mês',
+  },
 ];
 
 // ISO sem 'Z' é lido/escrito no fuso local: o 'HH:MM' sai igual em qualquer TZ.
@@ -125,7 +172,9 @@ describe('_exportVisitMonthCsv', () => {
     try {
       _exportVisitMonthCsv(_visitReportCollect('2026-10'));
       expect(captured).toBeTruthy();
-      const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(new Uint8Array(await captured.arrayBuffer()));
+      const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(
+        new Uint8Array(await captured.arrayBuffer())
+      );
       expect(text.charCodeAt(0)).toBe(0xfeff);
       const body = text.slice(1);
       expect(body).toContain('Chegada real;Saída real;Duração real');

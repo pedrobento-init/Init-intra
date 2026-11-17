@@ -69,26 +69,25 @@
 // - JWT → operators → team-check ANTES de qualquer chamada/escrita;
 //   service role só depois da autorização (sem bypass p/ o frontend).
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
 const MILVUS_DEFAULTS = {
   // Nome exibido no CABEÇALHO do chamado no portal (campo contato).
-  contato: Deno.env.get("MILVUS_DEFAULT_CONTATO") ?? "Init Net",
-  tecnico: Deno.env.get("MILVUS_DEFAULT_TECNICO") ?? "",
-  mesa: Deno.env.get("MILVUS_DEFAULT_MESA") ?? "",
-  setor: Deno.env.get("MILVUS_DEFAULT_SETOR") ?? "",
-  categoria_primaria: Deno.env.get("MILVUS_DEFAULT_CATEGORIA_PRIMARIA") ?? "",
-  categoria_secundaria: Deno.env.get("MILVUS_DEFAULT_CATEGORIA_SECUNDARIA") ?? "",
-  categoria_id: Number(Deno.env.get("MILVUS_DEFAULT_CATEGORIA_ID") ?? "") || null,
+  contato: Deno.env.get('MILVUS_DEFAULT_CONTATO') ?? 'Init Net',
+  tecnico: Deno.env.get('MILVUS_DEFAULT_TECNICO') ?? '',
+  mesa: Deno.env.get('MILVUS_DEFAULT_MESA') ?? '',
+  setor: Deno.env.get('MILVUS_DEFAULT_SETOR') ?? '',
+  categoria_primaria: Deno.env.get('MILVUS_DEFAULT_CATEGORIA_PRIMARIA') ?? '',
+  categoria_secundaria: Deno.env.get('MILVUS_DEFAULT_CATEGORIA_SECUNDARIA') ?? '',
+  categoria_id: Number(Deno.env.get('MILVUS_DEFAULT_CATEGORIA_ID') ?? '') || null,
 };
 
-const CREATE_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/criar`;
-const LIST_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/listagem`;
-const ATUALIZAR_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/atualizar`;
-const FINALIZE_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/finalizar`;
+const CREATE_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/criar`;
+const LIST_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/listagem`;
+const ATUALIZAR_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/atualizar`;
+const FINALIZE_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/finalizar`;
 const FETCH_TIMEOUT_MS = 25000;
 
 // CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
@@ -96,29 +95,30 @@ const FETCH_TIMEOUT_MS = 25000;
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 const _txt = (v: unknown): string => {
-  if (v === null || v === undefined) return "";
+  if (v === null || v === undefined) return '';
   return String(v);
 };
 
 const _toCodigo = (raw: string): number | null => {
-  const s = (raw ?? "").trim();
+  const s = (raw ?? '').trim();
   if (!s) return null;
   const direct = Number(s);
   if (Number.isFinite(direct) && direct > 0) return Math.trunc(direct);
   try {
     const parsed: unknown = JSON.parse(s);
-    if (typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0) {
+    if (typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0) {
       return Math.trunc(parsed);
     }
-    if (parsed && typeof parsed === "object") {
-      const c = (parsed as Record<string, unknown>)["codigo"] ??
-        (parsed as Record<string, unknown>)["code"] ??
-        (parsed as Record<string, unknown>)["id"];
+    if (parsed && typeof parsed === 'object') {
+      const c =
+        (parsed as Record<string, unknown>)['codigo'] ??
+        (parsed as Record<string, unknown>)['code'] ??
+        (parsed as Record<string, unknown>)['id'];
       const n = Number(c);
       if (Number.isFinite(n) && n > 0) return Math.trunc(n);
     }
@@ -129,37 +129,37 @@ const _toCodigo = (raw: string): number | null => {
 };
 
 const _escHtml = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const _fmtDate = (iso: string): string => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || "—");
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || '—';
 };
 
 // Marcador de idempotência da CRIAÇÃO: identifica o chamado desta visita
 // mesmo se a resposta da criação se perdeu (cenário timeout → retry).
 const _markerFor = (visitId: string): string => `[ref:${visitId}]`;
 
-const _sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const _sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // E-mail do operador da visita (o mesmo da Intra, tabela operators).
 // '' se não houver operador/e-mail. Nunca lança.
 async function _resolveOperatorEmail(
   admin: ReturnType<typeof createClient>,
-  visitOperator: string | null,
+  visitOperator: string | null
 ): Promise<string> {
   const name = _txt(visitOperator);
-  if (!name) return "";
+  if (!name) return '';
   try {
-    const { data } = await admin.from("operators")
-      .select("name,email,active")
-      .eq("name", name)
+    const { data } = await admin
+      .from('operators')
+      .select('name,email,active')
+      .eq('name', name)
       .limit(1)
       .maybeSingle();
     return _txt((data as { email?: unknown } | null)?.email);
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -167,7 +167,7 @@ async function _resolveOperatorEmail(
 // ele usa na Intra, tabela operators); sem e-mail, cai no default abaixo.
 async function _resolvePlayTecnico(
   admin: ReturnType<typeof createClient>,
-  visitOperator: string | null,
+  visitOperator: string | null
 ): Promise<string> {
   const fallback = MILVUS_DEFAULTS.tecnico;
   const name = _txt(visitOperator);
@@ -180,7 +180,9 @@ async function _resolvePlayTecnico(
     console.log(`milvus-chamado-create: play com e-mail do operador da visita (${name})`);
     return email;
   }
-  console.log(`milvus-chamado-create: operador da visita sem e-mail (${name}) — usando técnico default`);
+  console.log(
+    `milvus-chamado-create: operador da visita sem e-mail (${name}) — usando técnico default`
+  );
   return fallback;
 }
 
@@ -193,11 +195,13 @@ async function _playChamado(
   admin: ReturnType<typeof createClient>,
   codigo: number,
   visitId: string,
-  visitOperator: string | null,
+  visitOperator: string | null
 ): Promise<boolean> {
   const tecnico = await _resolvePlayTecnico(admin, visitOperator);
   if (!tecnico) {
-    console.log(`milvus-chamado-create: play impossível visit_id=${visitId} (sem técnico default nem e-mail do operador)`);
+    console.log(
+      `milvus-chamado-create: play impossível visit_id=${visitId} (sem técnico default nem e-mail do operador)`
+    );
     return false;
   }
   try {
@@ -205,24 +209,28 @@ async function _playChamado(
       chamado_ids: String(codigo),
       chamado_tecnico: tecnico,
     });
-    const updBody = await upd.text().catch(() => "");
-    console.log(`milvus-chamado-create: play visit_id=${visitId} codigo=${codigo} http=${upd.status} body=${updBody.slice(0, 200)}`);
+    const updBody = await upd.text().catch(() => '');
+    console.log(
+      `milvus-chamado-create: play visit_id=${visitId} codigo=${codigo} http=${upd.status} body=${updBody.slice(0, 200)}`
+    );
     return upd.ok;
   } catch (e) {
-    console.warn(`milvus-chamado-create: play falhou visit_id=${visitId} codigo=${codigo} (${(e as Error)?.name ?? "erro"})`);
+    console.warn(
+      `milvus-chamado-create: play falhou visit_id=${visitId} codigo=${codigo} (${(e as Error)?.name ?? 'erro'})`
+    );
     return false;
   }
 }
 
-async function _fetchMilvus(url: string, body: unknown, method = "POST"): Promise<Response> {
+async function _fetchMilvus(url: string, body: unknown, method = 'POST'): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     return await fetch(url, {
       method,
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": MILVUS_API_TOKEN,
+        'Content-Type': 'application/json',
+        Authorization: MILVUS_API_TOKEN,
       },
       body: JSON.stringify(body),
       signal: ctrl.signal,
@@ -264,11 +272,14 @@ type Caller = { id: string; team: string; isAdmin: boolean };
 
 function _firstEmail(emails: unknown): string {
   if (Array.isArray(emails)) {
-    const found = emails.map(String).map((s) => s.trim()).find((s) => s.includes("@"));
+    const found = emails
+      .map(String)
+      .map((s) => s.trim())
+      .find((s) => s.includes('@'));
     if (found) return found;
   }
-  if (typeof emails === "string" && emails.includes("@")) return emails.trim();
-  return "";
+  if (typeof emails === 'string' && emails.includes('@')) return emails.trim();
+  return '';
 }
 
 function _timeRange(v: Visit): string {
@@ -276,7 +287,7 @@ function _timeRange(v: Visit): string {
   const te = _txt(v.time_end).slice(0, 5);
   if (t && te) return `${t}–${te}`;
   if (t) return `a partir das ${t}`;
-  return "dia todo";
+  return 'dia todo';
 }
 
 function buildCreatePayload(
@@ -284,20 +295,20 @@ function buildCreatePayload(
   c: Client,
   clienteId: string | number,
   tecnicoEmail: string,
-  operatorEmail: string,
+  operatorEmail: string
 ): Record<string, unknown> {
   const marker = _markerFor(v.id);
-  const assunto = `Visita técnica — ${_txt(v.client_name) || _txt(c.name) || "cliente"} — ${_fmtDate(_txt(v.date))}`;
+  const assunto = `Visita técnica — ${_txt(v.client_name) || _txt(c.name) || 'cliente'} — ${_fmtDate(_txt(v.date))}`;
   const lines = [
-    `Motivo: ${_txt(v.motivo) || "—"}`,
+    `Motivo: ${_txt(v.motivo) || '—'}`,
     `Data: ${_fmtDate(_txt(v.date))} (${_timeRange(v)})`,
-    `Operador: ${_txt(v.operator) || "—"}`,
+    `Operador: ${_txt(v.operator) || '—'}`,
   ];
   if (_txt(v.observacoes)) lines.push(`Observações: ${_txt(v.observacoes)}`);
   if (_txt(v.relatorio)) lines.push(`Relatório: ${_txt(v.relatorio)}`);
   lines.push(marker);
-  const descricao = lines.join("\n");
-  const descricaoHtml = "<p>" + lines.map(_escHtml).join("</p><p>") + "</p>";
+  const descricao = lines.join('\n');
+  const descricaoHtml = '<p>' + lines.map(_escHtml).join('</p><p>') + '</p>';
   return {
     cliente_id: clienteId,
     chamado_assunto: assunto,
@@ -330,8 +341,8 @@ function buildFinalizePayload(v: Visit, codigo: number): Record<string, unknown>
   return {
     chamado_codigo: String(codigo),
     chamado_servico_realizado: _txt(v.relatorio),
-    chamado_equipamento_retirado: "",
-    chamado_material_utilizado: "",
+    chamado_equipamento_retirado: '',
+    chamado_material_utilizado: '',
   };
 }
 
@@ -349,18 +360,18 @@ async function findChamadoStatus(codigo: string): Promise<string | null> {
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
-    const lista = (data["lista"] ?? data["data"] ?? []) as unknown;
+    const lista = (data['lista'] ?? data['data'] ?? []) as unknown;
     if (!Array.isArray(lista)) return null;
     const row = (lista as Record<string, unknown>[]).find(
-      (r) => Number(r["codigo"]) === Number(codigo),
+      (r) => Number(r['codigo']) === Number(codigo)
     );
     if (!row) return null;
-    const s = _txt(row["status"]).toLowerCase().replace(/\s+/g, "");
-    if (s.includes("finaliz")) return "finalizado";
-    if (["afazer", "agatendimento", "novo", "aberto", "agendado", "semtecnico"].includes(s)) {
-      return "aguardando";
+    const s = _txt(row['status']).toLowerCase().replace(/\s+/g, '');
+    if (s.includes('finaliz')) return 'finalizado';
+    if (['afazer', 'agatendimento', 'novo', 'aberto', 'agendado', 'semtecnico'].includes(s)) {
+      return 'aguardando';
     }
-    return "emandamento";
+    return 'emandamento';
   } catch {
     return null;
   }
@@ -370,27 +381,27 @@ async function findChamadoStatus(codigo: string): Promise<string | null> {
 // Retorna o código adotado ou null. Nunca lança (falha = segue p/ criar).
 async function findCreatedCodigo(
   filter: Record<string, unknown>,
-  visitId: string,
+  visitId: string
 ): Promise<number | null> {
   try {
     const res = await _fetchMilvus(LIST_URL, {
       is_paginate: true,
       is_descending: true,
-      order_by: "codigo",
+      order_by: 'codigo',
       total_registros: 50,
       pagina: 1,
       filtro_body: filter,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
-    const lista = (data["lista"] ?? data["data"] ?? []) as unknown;
+    const lista = (data['lista'] ?? data['data'] ?? []) as unknown;
     if (!Array.isArray(lista)) return null;
     const marker = _markerFor(visitId);
     for (const raw of lista) {
       const row = raw as Record<string, unknown>;
-      const desc = _txt(row["descricao"]);
+      const desc = _txt(row['descricao']);
       if (desc.includes(marker)) {
-        const cod = Number(row["codigo"]);
+        const cod = Number(row['codigo']);
         if (Number.isFinite(cod) && cod > 0) return Math.trunc(cod);
       }
     }
@@ -404,19 +415,22 @@ async function findCreatedCodigo(
 // Recebe o uid das claims (o withSupabase já verificou o JWT) em vez do token
 // cru: a verificação saiu daqui, a regra de negócio — operador existe e está
 // ativo, com time e papel — continua.
-async function _authCaller(admin: SupabaseContext["supabaseAdmin"], callerUid: string | null): Promise<Caller | Response> {
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+async function _authCaller(
+  admin: SupabaseContext['supabaseAdmin'],
+  callerUid: string | null
+): Promise<Caller | Response> {
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, team, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, team, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
   if (!callerOp || callerOp.active === false) {
-    return json({ error: "Operador sem acesso" }, 403);
+    return json({ error: 'Operador sem acesso' }, 403);
   }
   return {
     id: callerOp.id as string,
-    team: (callerOp.team as string) || "init",
+    team: (callerOp.team as string) || 'init',
     isAdmin: callerOp.is_admin === true,
   };
 }
@@ -425,39 +439,55 @@ async function _authCaller(admin: SupabaseContext["supabaseAdmin"], callerUid: s
 async function _handleFinalizar(
   admin: ReturnType<typeof createClient>,
   caller: Caller,
-  visitId: string,
+  visitId: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<Response> {
   const { data: visit } = await admin
-    .from("visits")
-    .select("id, client_id, operator, relatorio, status, milvus_chamado_codigo, milvus_finalizar_status")
-    .eq("id", visitId)
+    .from('visits')
+    .select(
+      'id, client_id, operator, relatorio, status, milvus_chamado_codigo, milvus_finalizar_status'
+    )
+    .eq('id', visitId)
     .maybeSingle();
-  const v = visit as (Pick<Visit, "id" | "client_id" | "operator" | "relatorio" | "status" | "milvus_chamado_codigo" | "milvus_finalizar_status">) | null;
-  if (!v) return json({ error: "Visita não encontrada" }, 404);
+  const v = visit as Pick<
+    Visit,
+    | 'id'
+    | 'client_id'
+    | 'operator'
+    | 'relatorio'
+    | 'status'
+    | 'milvus_chamado_codigo'
+    | 'milvus_finalizar_status'
+  > | null;
+  if (!v) return json({ error: 'Visita não encontrada' }, 404);
 
   // Idempotência rápida: já finalizado → devolve sem tocar o Milvus.
-  if (v.milvus_finalizar_status === "finalizado") {
-    return json({ success: true, already: true, codigo: Number(v.milvus_chamado_codigo) || null, visitId });
+  if (v.milvus_finalizar_status === 'finalizado') {
+    return json({
+      success: true,
+      already: true,
+      codigo: Number(v.milvus_chamado_codigo) || null,
+      visitId,
+    });
   }
   const codigo = Number(v.milvus_chamado_codigo);
   if (!Number.isFinite(codigo) || codigo <= 0) {
     // Sem chamado associado: nada a finalizar (a conclusão local segue válida).
-    return json({ success: false, code: "MILVUS_VISIT_WITHOUT_CODIGO", visitId });
+    return json({ success: false, code: 'MILVUS_VISIT_WITHOUT_CODIGO', visitId });
   }
 
   if (!v.client_id) {
-    return json({ success: false, code: "MILVUS_VISIT_WITHOUT_CLIENT", visitId });
+    return json({ success: false, code: 'MILVUS_VISIT_WITHOUT_CLIENT', visitId });
   }
   const { data: client } = await admin
-    .from("clients")
-    .select("id, team")
-    .eq("id", v.client_id)
+    .from('clients')
+    .select('id, team')
+    .eq('id', v.client_id)
     .maybeSingle();
   const c = client as { id: string; team: string | null } | null;
-  if (!c) return json({ error: "Cliente da visita não encontrado" }, 404);
-  if (!caller.isAdmin && caller.team !== (c.team || "init")) {
-    return json({ error: "Acesso negado a este cliente" }, 403);
+  if (!c) return json({ error: 'Cliente da visita não encontrado' }, 404);
+  if (!caller.isAdmin && caller.team !== (c.team || 'init')) {
+    return json({ error: 'Acesso negado a este cliente' }, 403);
   }
 
   console.log(`milvus-chamado-create: finalizar início visit_id=${visitId} codigo=${codigo}`);
@@ -467,24 +497,33 @@ async function _handleFinalizar(
   // (play → espera → reconsulta); só desiste se continuar fora de
   // atendimento. Falha na consulta? segue para o fluxo normal (o PUT decide).
   const estado = await findChamadoStatus(String(codigo));
-  if (estado === "finalizado") {
-    await admin.from("visits").update({
-      milvus_finalizar_status: "finalizado",
-      milvus_finalizar_erro: null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", visitId);
-    console.log(`milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status)`);
+  if (estado === 'finalizado') {
+    await admin
+      .from('visits')
+      .update({
+        milvus_finalizar_status: 'finalizado',
+        milvus_finalizar_erro: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', visitId);
+    console.log(
+      `milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status)`
+    );
     return json({ success: true, recovered: true, codigo, visitId });
   }
   let playJaFeito = false;
-  if (estado === "aguardando") {
-    console.log(`milvus-chamado-create: finalizar estado antes=Novo visit_id=${visitId} codigo=${codigo} (tentando play)`);
+  if (estado === 'aguardando') {
+    console.log(
+      `milvus-chamado-create: finalizar estado antes=Novo visit_id=${visitId} codigo=${codigo} (tentando play)`
+    );
     const okPlay = await _playChamado(admin, codigo, visitId, v.operator);
     if (!okPlay) {
-      console.log(`milvus-chamado-create: finalizar play não aplicado visit_id=${visitId} codigo=${codigo}`);
+      console.log(
+        `milvus-chamado-create: finalizar play não aplicado visit_id=${visitId} codigo=${codigo}`
+      );
       return json({
         success: false,
-        code: "MILVUS_CHAMADO_NOT_IN_PROGRESS",
+        code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS',
         message: `O chamado ${codigo} ainda está Novo no Milvus e o play automático não pôde ser executado. Dê play manualmente no Milvus (coloque o chamado Em atendimento) e tente concluir de novo.`,
         codigo,
         visitId,
@@ -494,27 +533,38 @@ async function _handleFinalizar(
     // Best-effort: dá tempo do Milvus transicionar antes de reconsultar.
     await _sleep(4000);
     const depois = await findChamadoStatus(String(codigo));
-    console.log(`milvus-chamado-create: finalizar estado depois=${depois ?? "desconhecido"} visit_id=${visitId} codigo=${codigo}`);
-    if (depois === "finalizado") {
-      await admin.from("visits").update({
-        milvus_finalizar_status: "finalizado",
-        milvus_finalizar_erro: null,
-        updated_at: new Date().toISOString(),
-      }).eq("id", visitId);
-      console.log(`milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status na reconsulta)`);
+    console.log(
+      `milvus-chamado-create: finalizar estado depois=${depois ?? 'desconhecido'} visit_id=${visitId} codigo=${codigo}`
+    );
+    if (depois === 'finalizado') {
+      await admin
+        .from('visits')
+        .update({
+          milvus_finalizar_status: 'finalizado',
+          milvus_finalizar_erro: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', visitId);
+      console.log(
+        `milvus-chamado-create: finalizar já aplicado no Milvus visit_id=${visitId} codigo=${codigo} (adotado por status na reconsulta)`
+      );
       return json({ success: true, recovered: true, codigo, visitId });
     }
-    if (depois !== "emandamento" && depois !== null) {
-      console.log(`milvus-chamado-create: finalizar bloqueado visit_id=${visitId} codigo=${codigo} (play não moveu para atendimento)`);
+    if (depois !== 'emandamento' && depois !== null) {
+      console.log(
+        `milvus-chamado-create: finalizar bloqueado visit_id=${visitId} codigo=${codigo} (play não moveu para atendimento)`
+      );
       return json({
         success: false,
-        code: "MILVUS_CHAMADO_NOT_IN_PROGRESS",
+        code: 'MILVUS_CHAMADO_NOT_IN_PROGRESS',
         message: `O chamado ${codigo} continua fora de atendimento no Milvus mesmo após o play. Dê play manualmente no Milvus (coloque o chamado Em atendimento) e tente concluir de novo.`,
         codigo,
         visitId,
       });
     }
-    console.log(`milvus-chamado-create: finalizar play confirmado em atendimento visit_id=${visitId} codigo=${codigo} (segue p/ finalizar)`);
+    console.log(
+      `milvus-chamado-create: finalizar play confirmado em atendimento visit_id=${visitId} codigo=${codigo} (segue p/ finalizar)`
+    );
   }
 
   // Pré-passo "play" best-effort para os demais casos (chamado já em
@@ -525,50 +575,74 @@ async function _handleFinalizar(
   }
 
   const payload = buildFinalizePayload(
-    { ...v, client_name: null, operator: null, date: null, time: null, time_end: null, motivo: null, observacoes: null } as Visit,
-    codigo,
+    {
+      ...v,
+      client_name: null,
+      operator: null,
+      date: null,
+      time: null,
+      time_end: null,
+      motivo: null,
+      observacoes: null,
+    } as Visit,
+    codigo
   );
   let res: Response;
   try {
-    res = await _fetchMilvus(FINALIZE_URL, payload, "PUT");
+    res = await _fetchMilvus(FINALIZE_URL, payload, 'PUT');
   } catch (e) {
-    console.error(`milvus-chamado-create: finalizar rede/timeout visit_id=${visitId}: ${(e as Error)?.name ?? "erro"}`);
-    return json({ success: false, code: "MILVUS_UNAVAILABLE", visitId }, 502);
+    console.error(
+      `milvus-chamado-create: finalizar rede/timeout visit_id=${visitId}: ${(e as Error)?.name ?? 'erro'}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', visitId }, 502);
   }
   if (res.status === 401 || res.status === 403) {
-    console.error(`milvus-chamado-create: finalizar auth Milvus recusada (HTTP ${res.status}) visit_id=${visitId}`);
-    return json({ success: false, code: "MILVUS_INVALID_TOKEN", visitId });
+    console.error(
+      `milvus-chamado-create: finalizar auth Milvus recusada (HTTP ${res.status}) visit_id=${visitId}`
+    );
+    return json({ success: false, code: 'MILVUS_INVALID_TOKEN', visitId });
   }
   if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
-    console.error(`milvus-chamado-create: Milvus indisponível p/ finalizar (HTTP ${res.status}) visit_id=${visitId}`);
-    return json({ success: false, code: "MILVUS_UNAVAILABLE", visitId }, 502);
+    console.error(
+      `milvus-chamado-create: Milvus indisponível p/ finalizar (HTTP ${res.status}) visit_id=${visitId}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', visitId }, 502);
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    console.error(`milvus-chamado-create: finalizar HTTP ${res.status} visit_id=${visitId} detail=${detail}`);
-    return json({ success: false, code: "MILVUS_VALIDATION_ERROR", visitId, detail });
+    const detail = (await res.text().catch(() => '')).slice(0, 300);
+    console.error(
+      `milvus-chamado-create: finalizar HTTP ${res.status} visit_id=${visitId} detail=${detail}`
+    );
+    return json({ success: false, code: 'MILVUS_VALIDATION_ERROR', visitId, detail });
   }
-  const rawBody = await res.text().catch(() => "");
+  const rawBody = await res.text().catch(() => '');
   const echoed = _toCodigo(rawBody);
-  const { error: updErr } = await admin.from("visits").update({
-    milvus_finalizar_status: "finalizado",
-    milvus_finalizar_erro: null,
-    updated_at: new Date().toISOString(),
-  }).eq("id", visitId);
+  const { error: updErr } = await admin
+    .from('visits')
+    .update({
+      milvus_finalizar_status: 'finalizado',
+      milvus_finalizar_erro: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', visitId);
   if (updErr) {
-    console.error(`milvus-chamado-create: chamado ${codigo} finalizado mas visits não atualizou visit_id=${visitId}: ${updErr.message}`);
+    console.error(
+      `milvus-chamado-create: chamado ${codigo} finalizado mas visits não atualizou visit_id=${visitId}: ${updErr.message}`
+    );
   }
-  console.log(`milvus-chamado-create: finalizar fim visit_id=${visitId} codigo=${echoed || codigo} ok`);
+  console.log(
+    `milvus-chamado-create: finalizar fim visit_id=${visitId} codigo=${echoed || codigo} ok`
+  );
   return json({ success: true, codigo: echoed || codigo, visitId });
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-chamado-create: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-chamado-create: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
@@ -580,28 +654,30 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (caller instanceof Response) return caller;
 
   // 2) Qual visita (+ ação).
-  let visitId = "";
-  let action = "criar";
+  let visitId = '';
+  let action = 'criar';
   try {
     const body = await req.json();
-    visitId = String(body?.visitId ?? "").trim();
+    visitId = String(body?.visitId ?? '').trim();
     if (body?.action) action = String(body.action).trim().toLowerCase();
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
-  if (!visitId) return json({ error: "visitId é obrigatório" }, 400);
+  if (!visitId) return json({ error: 'visitId é obrigatório' }, 400);
 
   // 3) ETAPA 2 — finalização (relatório concluído).
-  if (action === "finalizar") return _handleFinalizar(admin, caller, visitId);
-  if (action !== "criar") return json({ error: "action inválida" }, 400);
+  if (action === 'finalizar') return _handleFinalizar(admin, caller, visitId);
+  if (action !== 'criar') return json({ error: 'action inválida' }, 400);
 
   const { data: visit } = await admin
-    .from("visits")
-    .select("id, client_id, client_name, operator, date, time, time_end, motivo, observacoes, relatorio, status, milvus_chamado_codigo")
-    .eq("id", visitId)
+    .from('visits')
+    .select(
+      'id, client_id, client_name, operator, date, time, time_end, motivo, observacoes, relatorio, status, milvus_chamado_codigo'
+    )
+    .eq('id', visitId)
     .maybeSingle();
   const v = visit as Visit | null;
-  if (!v) return json({ error: "Visita não encontrada" }, 404);
+  if (!v) return json({ error: 'Visita não encontrada' }, 404);
 
   // 4) Idempotência rápida: código já gravado → devolve sem tocar o Milvus.
   if (v.milvus_chamado_codigo && Number(v.milvus_chamado_codigo) > 0) {
@@ -609,56 +685,70 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   }
 
   if (!v.client_id) {
-    return json({ success: false, code: "MILVUS_VISIT_WITHOUT_CLIENT", visitId });
+    return json({ success: false, code: 'MILVUS_VISIT_WITHOUT_CLIENT', visitId });
   }
   const { data: client } = await admin
-    .from("clients")
-    .select("id, name, team, emails, owner, owner_phone, responsible, responsible_phone, milvus_client_token")
-    .eq("id", v.client_id)
+    .from('clients')
+    .select(
+      'id, name, team, emails, owner, owner_phone, responsible, responsible_phone, milvus_client_token'
+    )
+    .eq('id', v.client_id)
     .maybeSingle();
   const c = client as Client | null;
-  if (!c) return json({ error: "Cliente da visita não encontrado" }, 404);
+  if (!c) return json({ error: 'Cliente da visita não encontrado' }, 404);
 
   // 5) Autorização: mesma regra das policies (sem bypass).
-  if (!caller.isAdmin && caller.team !== (c.team || "init")) {
-    return json({ error: "Acesso negado a este cliente" }, 403);
+  if (!caller.isAdmin && caller.team !== (c.team || 'init')) {
+    return json({ error: 'Acesso negado a este cliente' }, 403);
   }
 
-  console.log(`milvus-chamado-create: início visit_id=${visitId} client_id=${c.id} team=${c.team || "init"}`);
+  console.log(
+    `milvus-chamado-create: início visit_id=${visitId} client_id=${c.id} team=${c.team || 'init'}`
+  );
 
   // 6) Identificador do cliente no Milvus: token preferencial, senão mapa.
-  const clientToken = String(c.milvus_client_token ?? "").trim();
+  const clientToken = String(c.milvus_client_token ?? '').trim();
   let clienteId: string | number | null = clientToken || null;
   if (!clienteId) {
     const { data: mapRows } = await admin
-      .from("milvus_client_map")
-      .select("milvus_cliente_id")
-      .eq("client_id", c.id);
-    const ids = [...new Set((mapRows || [])
-      .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
-      .filter((n): n is number => typeof n === "number"))];
+      .from('milvus_client_map')
+      .select('milvus_cliente_id')
+      .eq('client_id', c.id);
+    const ids = [
+      ...new Set(
+        (mapRows || [])
+          .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
+          .filter((n): n is number => typeof n === 'number')
+      ),
+    ];
     if (ids.length) clienteId = ids[0];
   }
   if (!clienteId) {
     return json({
-      success: false, code: "MILVUS_CLIENT_TOKEN_NOT_CONFIGURED",
-      visitId, unmapped: true,
+      success: false,
+      code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED',
+      visitId,
+      unmapped: true,
     });
   }
-  const filter = typeof clienteId === "number"
-    ? { cliente_id: clienteId }
-    : { cliente_token: clienteId };
+  const filter =
+    typeof clienteId === 'number' ? { cliente_id: clienteId } : { cliente_token: clienteId };
 
   // 7) Recuperação pós-timeout: o chamado pode existir sem resposta.
   const recovered = await findCreatedCodigo(filter, visitId);
   if (recovered) {
-    await admin.from("visits").update({
-      milvus_chamado_codigo: recovered,
-      milvus_chamado_status: "criado",
-      milvus_chamado_erro: null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", visitId);
-    console.log(`milvus-chamado-create: recuperado visit_id=${visitId} codigo=${recovered} (marcador)`);
+    await admin
+      .from('visits')
+      .update({
+        milvus_chamado_codigo: recovered,
+        milvus_chamado_status: 'criado',
+        milvus_chamado_erro: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', visitId);
+    console.log(
+      `milvus-chamado-create: recuperado visit_id=${visitId} codigo=${recovered} (marcador)`
+    );
     return json({ success: true, recovered: true, codigo: recovered, visitId });
   }
 
@@ -671,37 +761,50 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   try {
     res = await _fetchMilvus(CREATE_URL, payload);
   } catch (e) {
-    console.error(`milvus-chamado-create: rede/timeout visit_id=${visitId}: ${(e as Error)?.name ?? "erro"}`);
-    return json({ success: false, code: "MILVUS_UNAVAILABLE", visitId }, 502);
+    console.error(
+      `milvus-chamado-create: rede/timeout visit_id=${visitId}: ${(e as Error)?.name ?? 'erro'}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', visitId }, 502);
   }
   if (res.status === 401 || res.status === 403) {
-    console.error(`milvus-chamado-create: auth Milvus recusada (HTTP ${res.status}) visit_id=${visitId}`);
-    return json({ success: false, code: "MILVUS_INVALID_TOKEN", visitId });
+    console.error(
+      `milvus-chamado-create: auth Milvus recusada (HTTP ${res.status}) visit_id=${visitId}`
+    );
+    return json({ success: false, code: 'MILVUS_INVALID_TOKEN', visitId });
   }
   if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
-    console.error(`milvus-chamado-create: Milvus indisponível (HTTP ${res.status}) visit_id=${visitId}`);
-    return json({ success: false, code: "MILVUS_UNAVAILABLE", visitId }, 502);
+    console.error(
+      `milvus-chamado-create: Milvus indisponível (HTTP ${res.status}) visit_id=${visitId}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', visitId }, 502);
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    const detail = (await res.text().catch(() => '')).slice(0, 300);
     console.error(`milvus-chamado-create: HTTP ${res.status} visit_id=${visitId} detail=${detail}`);
-    return json({ success: false, code: "MILVUS_VALIDATION_ERROR", visitId, detail });
+    return json({ success: false, code: 'MILVUS_VALIDATION_ERROR', visitId, detail });
   }
-  const rawBody = await res.text().catch(() => "");
+  const rawBody = await res.text().catch(() => '');
   const codigo = _toCodigo(rawBody);
   if (!codigo) {
-    console.error(`milvus-chamado-create: resposta sem código visit_id=${visitId} body=${rawBody.slice(0, 200)}`);
-    return json({ success: false, code: "MILVUS_UNAVAILABLE", visitId }, 502);
+    console.error(
+      `milvus-chamado-create: resposta sem código visit_id=${visitId} body=${rawBody.slice(0, 200)}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', visitId }, 502);
   }
 
-  const { error: updErr } = await admin.from("visits").update({
-    milvus_chamado_codigo: codigo,
-    milvus_chamado_status: "criado",
-    milvus_chamado_erro: null,
-    updated_at: new Date().toISOString(),
-  }).eq("id", visitId);
+  const { error: updErr } = await admin
+    .from('visits')
+    .update({
+      milvus_chamado_codigo: codigo,
+      milvus_chamado_status: 'criado',
+      milvus_chamado_erro: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', visitId);
   if (updErr) {
-    console.error(`milvus-chamado-create: chamado ${codigo} criado mas visits não atualizou visit_id=${visitId}: ${updErr.message}`);
+    console.error(
+      `milvus-chamado-create: chamado ${codigo} criado mas visits não atualizou visit_id=${visitId}: ${updErr.message}`
+    );
     // O código volta mesmo assim: o frontend grava o local e o sync
     // propaga; o marcador impede duplicata numa nova tentativa.
   }
@@ -709,4 +812,4 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   return json({ success: true, codigo, visitId });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

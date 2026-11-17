@@ -5,21 +5,33 @@
 
 function _penRapidaClientes() {
   const sel = typeof _selectedTeam !== 'undefined' && _selectedTeam;
-  return (typeof isTeamAdmin === 'function' && isTeamAdmin() && sel) ? getClientsByTeam(sel) : getMyClients();
+  return typeof isTeamAdmin === 'function' && isTeamAdmin() && sel
+    ? getClientsByTeam(sel)
+    : getMyClients();
 }
 
 function openPendenciaRapida(preClientId) {
-  const clients = _penRapidaClientes().slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
+  const clients = _penRapidaClientes()
+    .slice()
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
   const me = (typeof getUser === 'function' && getUser().name) || '';
-  const team = typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
+  const team =
+    typeof isTeamAdmin === 'function' &&
+    isTeamAdmin() &&
+    typeof _selectedTeam !== 'undefined' &&
+    _selectedTeam
+      ? _selectedTeam
+      : getCurrentTeam();
   const ops = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
   const opNames = ops.length ? ops : [me];
-  openModal('Nova pendência', `
+  openModal(
+    'Nova pendência',
+    `
     <form class="pen-rapida" data-submit="penRapidaSubmit" novalidate>
       <div class="form-group"><label class="form-label" for="prCliente">Cliente</label>
         <select class="form-select" id="prCliente" name="clientId">
           <option value="">Interno (sem cliente)</option>
-          ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${preClientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${clients.map((c) => `<option value="${escapeHtml(c.id)}" ${preClientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
         </select></div>
       <div class="form-group"><label class="form-label" for="prAssunto">O que precisa ser feito? *</label>
         <input class="form-input" id="prAssunto" name="assunto" maxlength="120" required autocomplete="off" placeholder="Ex.: Impressora do financeiro não imprime" /></div>
@@ -41,7 +53,7 @@ function openPendenciaRapida(preClientId) {
       </div>
       <div class="form-group"><label class="form-label" for="prResp">Responsável</label>
         <select class="form-select" id="prResp" name="responsible">
-          ${opNames.map(n => `<option value="${escapeHtml(n)}" ${n === me ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+          ${opNames.map((n) => `<option value="${escapeHtml(n)}" ${n === me ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
         </select></div>
       <details class="pen-rapida-mais">
         <summary>Detalhes (opcional)</summary>
@@ -54,7 +66,8 @@ function openPendenciaRapida(preClientId) {
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Criar pendência</button>
       </div>
-    </form>`);
+    </form>`
+  );
   const form = document.querySelector('#modalBody form.pen-rapida');
   if (!form) return;
   slaBindPrazoAuto(form);
@@ -67,7 +80,9 @@ function openPendenciaRapida(preClientId) {
 function penRapidaData(values, today) {
   const v = values || {};
   const assunto = String(v.assunto || '').trim();
-  const priority = ['baixa', 'media', 'alta', 'critica'].includes(v.priority) ? v.priority : 'media';
+  const priority = ['baixa', 'media', 'alta', 'critica'].includes(v.priority)
+    ? v.priority
+    : 'media';
   return {
     clientId: v.clientId || '',
     clientName: v.clientName || '',
@@ -90,7 +105,9 @@ function penRapidaData(values, today) {
 function _penRapidaValues(form) {
   const fd = new FormData(form);
   const o = {};
-  fd.forEach((val, k) => { o[k] = String(val); });
+  fd.forEach((val, k) => {
+    o[k] = String(val);
+  });
   return o;
 }
 
@@ -103,7 +120,10 @@ function submitPendenciaRapida(form) {
     return;
   }
   const client = vals.clientId ? getClientById(vals.clientId) : null;
-  if (vals.clientId && !client) { showToast('Cliente inválido.', 'error'); return; }
+  if (vals.clientId && !client) {
+    showToast('Cliente inválido.', 'error');
+    return;
+  }
   if (client && !isTeamAdmin() && (client.team || 'init') !== getCurrentTeam()) {
     showToast('Você não pode criar pendências para clientes de outra equipe.', 'error');
     return;
@@ -111,14 +131,30 @@ function submitPendenciaRapida(form) {
   vals.clientName = client ? client.name : '';
   const data = penRapidaData(vals, localDateISO());
   const errors = validatePendencia(data);
-  if (errors.length) { showToast(errors[0], 'error'); return; }
+  if (errors.length) {
+    showToast(errors[0], 'error');
+    return;
+  }
   try {
     savePendencia(data);
-  } catch (err) { showToast('Erro ao salvar pendência: ' + err.message, 'error'); return; }
+  } catch (err) {
+    showToast('Erro ao salvar pendência: ' + err.message, 'error');
+    return;
+  }
   closeModal();
   const page = (window.location.hash || '').replace('#', '');
-  if (page === 'pendencias' && typeof renderPenView === 'function' && document.getElementById('penViewArea')) {
-    try { _penPage = 0; _penLastSig = ''; _optimisticPenUpsert(data, { isNew: true }); } catch (_) {}
+  if (
+    page === 'pendencias' &&
+    typeof renderPenView === 'function' &&
+    document.getElementById('penViewArea')
+  ) {
+    try {
+      _penPage = 0;
+      _penLastSig = '';
+      _optimisticPenUpsert(data, { isNew: true });
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-rapida');
+    }
     renderPenView(true);
   } else if (page === 'fila' && typeof renderFila === 'function') {
     renderFila();
@@ -131,9 +167,15 @@ function submitPendenciaRapida(form) {
 function penRapidaParaCompleto(form) {
   const v = _penRapidaValues(form);
   const pre = {
-    assunto: v.assunto || '', descricao: v.descricao || '', priority: v.priority || 'media',
-    responsible: v.responsible || '', solicitante: v.solicitante || '', canal: v.canal || '',
-    categoria: v.categoria || '', tipo: 'Suporte', status: 'aberto',
+    assunto: v.assunto || '',
+    descricao: v.descricao || '',
+    priority: v.priority || 'media',
+    responsible: v.responsible || '',
+    solicitante: v.solicitante || '',
+    canal: v.canal || '',
+    categoria: v.categoria || '',
+    tipo: 'Suporte',
+    status: 'aberto',
   };
   closeModal();
   openPendenciaForm(null, v.clientId || null, null, pre);
@@ -143,8 +185,14 @@ if (typeof registerActions === 'function') {
   registerActions({
     newPendencia: () => openPendenciaRapida(),
     penRapidaSubmit: (el) => submitPendenciaRapida(el),
-    penRapidaFull: (el) => { const f = el.closest('form'); if (f) penRapidaParaCompleto(f); },
-    penSetField: (el, value) => { if (typeof quickUpdatePendenciaField === 'function') quickUpdatePendenciaField(el.dataset.id, el.dataset.field, value); },
+    penRapidaFull: (el) => {
+      const f = el.closest('form');
+      if (f) penRapidaParaCompleto(f);
+    },
+    penSetField: (el, value) => {
+      if (typeof quickUpdatePendenciaField === 'function')
+        quickUpdatePendenciaField(el.dataset.id, el.dataset.field, value);
+    },
     penEditSolicitante: (_el, id) => {
       const p = typeof getPendenciaById === 'function' ? getPendenciaById(id) : null;
       if (!p) return;

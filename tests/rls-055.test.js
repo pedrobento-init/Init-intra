@@ -11,23 +11,51 @@ import { PGlite } from '@electric-sql/pglite';
 // (4) a leitura leve do sync fica bem mais rápida.
 // Normaliza fim de linha: num checkout Windows (core.autocrlf) o .sql vem com
 // CRLF, e as buscas por fim de linha deste arquivo não casariam.
-const mig = (n) => fs.readFileSync(new URL('../supabase/migrations/' + n, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-const BEFORE = ['042_rls_completo.sql', '045_vencimentos.sql', '048_time_entries.sql', '050_client_errors.sql', '053_push_subscriptions.sql'].map(mig);
+const mig = (n) =>
+  fs
+    .readFileSync(new URL('../supabase/migrations/' + n, import.meta.url), 'utf8')
+    .replace(/\r\n/g, '\n');
+const BEFORE = [
+  '042_rls_completo.sql',
+  '045_vencimentos.sql',
+  '048_time_entries.sql',
+  '050_client_errors.sql',
+  '053_push_subscriptions.sql',
+].map(mig);
 const M055 = mig('055_grants_rls_rapido.sql');
 
 const UID = {
   admin: '00000000-0000-0000-0000-00000000000a',
-  ana: '00000000-0000-0000-0000-0000000000a1',   // técnica init
-  beto: '00000000-0000-0000-0000-0000000000b1',  // técnico mam
-  gil: '00000000-0000-0000-0000-0000000000c1',   // Gestão (init)
+  ana: '00000000-0000-0000-0000-0000000000a1', // técnica init
+  beto: '00000000-0000-0000-0000-0000000000b1', // técnico mam
+  gil: '00000000-0000-0000-0000-0000000000c1', // Gestão (init)
   inativo: '00000000-0000-0000-0000-0000000000d1',
-  novo: '00000000-0000-0000-0000-0000000000e1',  // 1º login, ainda sem vínculo
+  novo: '00000000-0000-0000-0000-0000000000e1', // 1º login, ainda sem vínculo
   semCadastro: '00000000-0000-0000-0000-0000000000f1',
 };
 const PROFILES = ['anon', ...Object.keys(UID)];
-const TABLES = ['operators', 'clients', 'pendencias', 'visits', 'procedures', 'procedure_templates', 'audit_logs',
-  'reunioes', 'tickets', 'equipamentos', 'client_devices', 'milvus_client_map', 'client_milvus_tickets', 'checklists',
-  'checklist_modelo_itens', 'checklist_marcacoes', 'vencimentos', 'time_entries', 'client_errors', 'push_subscriptions'];
+const TABLES = [
+  'operators',
+  'clients',
+  'pendencias',
+  'visits',
+  'procedures',
+  'procedure_templates',
+  'audit_logs',
+  'reunioes',
+  'tickets',
+  'equipamentos',
+  'client_devices',
+  'milvus_client_map',
+  'client_milvus_tickets',
+  'checklists',
+  'checklist_modelo_itens',
+  'checklist_marcacoes',
+  'vencimentos',
+  'time_entries',
+  'client_errors',
+  'push_subscriptions',
+];
 
 async function newDb({ defaultGrants }) {
   const db = new PGlite();
@@ -61,7 +89,10 @@ async function newDb({ defaultGrants }) {
     GRANT USAGE ON SCHEMA public TO anon, authenticated;
   `);
   // Supabase antigo: toda tabela nova vinha liberada para anon/authenticated.
-  if (defaultGrants) await db.exec('GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;');
+  if (defaultGrants)
+    await db.exec(
+      'GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;'
+    );
   for (const sql of BEFORE) await db.exec(sql);
   await db.exec(`
     INSERT INTO operators (id, name, email, auth_user_id, is_admin, is_gestao, active, team) VALUES
@@ -105,23 +136,41 @@ async function probe(db, who, sql) {
       if (who === 'anon') {
         await tx.exec('SET LOCAL ROLE anon');
       } else {
-        await tx.query("SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)",
-          [UID[who], JSON.stringify({ sub: UID[who], email: who + '@init.com', role: 'authenticated' })]);
+        await tx.query(
+          "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)",
+          [
+            UID[who],
+            JSON.stringify({ sub: UID[who], email: who + '@init.com', role: 'authenticated' }),
+          ]
+        );
         await tx.exec('SET LOCAL ROLE authenticated');
       }
       const r = await tx.query(sql);
-      out = /^\s*select/i.test(sql) ? r.rows.map((x) => String(x.id ?? x.endpoint)).sort() : r.affectedRows;
+      out = /^\s*select/i.test(sql)
+        ? r.rows.map((x) => String(x.id ?? x.endpoint)).sort()
+        : r.affectedRows;
       await tx.rollback();
     });
   } catch (e) {
-    if (out === undefined) out = /row-level security|permission denied/.test(e.message) ? 'NEGADO' : 'ERRO: ' + e.message;
+    if (out === undefined)
+      out = /row-level security|permission denied/.test(e.message)
+        ? 'NEGADO'
+        : 'ERRO: ' + e.message;
   }
   return out;
 }
 
 // Gravações de teste: dentro e fora da equipe, Gestão, papel, nome de outra pessoa...
 const WRITES = [
-  ...['clients', 'visits', 'reunioes', 'equipamentos', 'client_devices', 'client_milvus_tickets', 'checklist_marcacoes'].flatMap((t) => {
+  ...[
+    'clients',
+    'visits',
+    'reunioes',
+    'equipamentos',
+    'client_devices',
+    'client_milvus_tickets',
+    'checklist_marcacoes',
+  ].flatMap((t) => {
     const extra = t === 'clients' ? ', name' : '';
     const val = t === 'clients' ? ", 'x'" : '';
     return [
@@ -134,48 +183,64 @@ const WRITES = [
   }),
   "INSERT INTO vencimentos (id, data_vencimento, team) VALUES ('w-init', '2026-12-01', 'init')",
   "INSERT INTO vencimentos (id, data_vencimento, team) VALUES ('w-mam', '2026-12-01', 'mam')",
-  "UPDATE vencimentos SET team = 'mam'", 'UPDATE vencimentos SET descricao = descricao', 'DELETE FROM vencimentos',
+  "UPDATE vencimentos SET team = 'mam'",
+  'UPDATE vencimentos SET descricao = descricao',
+  'DELETE FROM vencimentos',
   "INSERT INTO pendencias (id, team, tipo) VALUES ('w1', 'init', 'tarefa')",
   "INSERT INTO pendencias (id, team, tipo) VALUES ('w2', 'mam', 'tarefa')",
   "INSERT INTO pendencias (id, team, tipo) VALUES ('w3', 'init', 'Gestão')",
   "INSERT INTO pendencias (id, team, tipo) VALUES ('w4', NULL, 'tarefa')",
-  'UPDATE pendencias SET responsible = responsible', "UPDATE pendencias SET tipo = 'Gestão'", "UPDATE pendencias SET team = 'mam'",
+  'UPDATE pendencias SET responsible = responsible',
+  "UPDATE pendencias SET tipo = 'Gestão'",
+  "UPDATE pendencias SET team = 'mam'",
   'DELETE FROM pendencias',
   "INSERT INTO procedures (id, client_id, team) VALUES ('w1', 'c-init', 'init')",
   "INSERT INTO procedures (id, client_id, team) VALUES ('w2', 'c-mam', 'init')",
   "INSERT INTO procedures (id, client_id, team) VALUES ('w3', NULL, 'init')",
   "INSERT INTO procedures (id, client_id, team) VALUES ('w4', NULL, 'mam')",
   "INSERT INTO procedures (id, client_id, team) VALUES ('w5', 'c-sumiu', 'init')",
-  'UPDATE procedures SET title = title', "UPDATE procedures SET client_id = 'c-mam'", 'DELETE FROM procedures',
-  "INSERT INTO milvus_client_map VALUES ('w1', 'c-init')", "INSERT INTO milvus_client_map VALUES ('w2', 'c-mam')",
-  'UPDATE milvus_client_map SET client_id = client_id', "UPDATE milvus_client_map SET client_id = 'c-mam'", 'DELETE FROM milvus_client_map',
+  'UPDATE procedures SET title = title',
+  "UPDATE procedures SET client_id = 'c-mam'",
+  'DELETE FROM procedures',
+  "INSERT INTO milvus_client_map VALUES ('w1', 'c-init')",
+  "INSERT INTO milvus_client_map VALUES ('w2', 'c-mam')",
+  'UPDATE milvus_client_map SET client_id = client_id',
+  "UPDATE milvus_client_map SET client_id = 'c-mam'",
+  'DELETE FROM milvus_client_map',
   ...['procedure_templates', 'checklists', 'checklist_modelo_itens', 'tickets'].flatMap((t) => [
-    `INSERT INTO ${t} VALUES ('w1')`, `UPDATE ${t} SET id = id`, `DELETE FROM ${t}`,
+    `INSERT INTO ${t} VALUES ('w1')`,
+    `UPDATE ${t} SET id = id`,
+    `DELETE FROM ${t}`,
   ]),
-  "UPDATE operators SET phone = '1'", "UPDATE operators SET is_admin = true, team = 'mam'",
+  "UPDATE operators SET phone = '1'",
+  "UPDATE operators SET is_admin = true, team = 'mam'",
   `UPDATE operators SET auth_user_id = '${UID.novo}' WHERE id = 'op-novo'`,
   "INSERT INTO operators (id, name, team) VALUES ('op-x', 'X', 'init')",
   `INSERT INTO operators (id, name, auth_user_id, is_admin, is_gestao, team) VALUES ('op-ana', 'Ana', '${UID.ana}', false, false, 'init') ON CONFLICT (id) DO UPDATE SET phone = '2'`,
   'DELETE FROM operators',
   "INSERT INTO audit_logs (operator_name, action) VALUES ('Ana', 'x')",
   "INSERT INTO audit_logs (operator_name, action) VALUES ('Beto', 'x')",
-  "UPDATE audit_logs SET action = 'y'", 'DELETE FROM audit_logs',
+  "UPDATE audit_logs SET action = 'y'",
+  'DELETE FROM audit_logs',
   "INSERT INTO time_entries (id, operator_id, ended_at, seconds, team) VALUES ('w1', 'op-ana', now(), 1, 'init')",
   "INSERT INTO time_entries (id, operator_id, ended_at, seconds, team) VALUES ('w2', 'op-beto', now(), 1, 'mam')",
-  'UPDATE time_entries SET seconds = 5', 'DELETE FROM time_entries',
+  'UPDATE time_entries SET seconds = 5',
+  'DELETE FROM time_entries',
   "INSERT INTO client_errors (operator_id, message) VALUES ('op-ana', 'x')",
   "INSERT INTO client_errors (operator_id, message) VALUES ('op-beto', 'x')",
   "INSERT INTO client_errors (operator_id, message) VALUES (NULL, 'x')",
   'DELETE FROM client_errors',
   "INSERT INTO push_subscriptions (endpoint, operator_id, p256dh, auth) VALUES ('w1', 'op-ana', 'k', 'a')",
   "INSERT INTO push_subscriptions (endpoint, operator_id, p256dh, auth) VALUES ('w2', 'op-beto', 'k', 'a')",
-  "UPDATE push_subscriptions SET auth = 'b'", 'DELETE FROM push_subscriptions',
+  "UPDATE push_subscriptions SET auth = 'b'",
+  'DELETE FROM push_subscriptions',
 ];
 
 async function snapshot(db) {
   const snap = {};
   for (const who of PROFILES) {
-    for (const t of TABLES) snap[`${who} lê ${t}`] = await probe(db, who, `SELECT * FROM public.${t}`);
+    for (const t of TABLES)
+      snap[`${who} lê ${t}`] = await probe(db, who, `SELECT * FROM public.${t}`);
     for (const sql of WRITES) snap[`${who}: ${sql}`] = await probe(db, who, sql);
   }
   return snap;
@@ -207,10 +272,14 @@ describe('055 mantém as mesmas regras de acesso', () => {
     expect(antes['inativo lê clients']).toEqual([]);
     expect(antes['anon lê clients']).toBe('NEGADO');
     expect(antes["ana: INSERT INTO visits (id, team) VALUES ('w-mam', 'mam')"]).toBe('NEGADO');
-    expect(antes["ana: INSERT INTO audit_logs (operator_name, action) VALUES ('Beto', 'x')"]).toBe('NEGADO');
+    expect(antes["ana: INSERT INTO audit_logs (operator_name, action) VALUES ('Beto', 'x')"]).toBe(
+      'NEGADO'
+    );
     expect(antes['ana: UPDATE time_entries SET seconds = 5']).toBe(1);
     expect(antes['admin: UPDATE time_entries SET seconds = 5']).toBe(3);
-    expect(Object.values(antes).filter((v) => typeof v === 'string' && v.startsWith('ERRO'))).toEqual([]);
+    expect(
+      Object.values(antes).filter((v) => typeof v === 'string' && v.startsWith('ERRO'))
+    ).toEqual([]);
   });
 
   it('rodar de novo não muda nada (idempotente)', async () => {
@@ -223,19 +292,28 @@ describe('055 mantém as mesmas regras de acesso', () => {
   });
 
   it('nenhuma policy chama helper ou auth.* por linha (tudo dentro de SELECT)', async () => {
-    const r = await db.query(`SELECT tablename, policyname, qual, with_check FROM pg_policies WHERE schemaname = 'public'`);
+    const r = await db.query(
+      `SELECT tablename, policyname, qual, with_check FROM pg_policies WHERE schemaname = 'public'`
+    );
     const porLinha = r.rows.filter((p) => {
-      const expr = ((p.qual || '') + ' ' + (p.with_check || ''))
-        .replace(/\(\s*SELECT\s+(public\.)?(current_op_\w+|auth\.\w+)\(\)/g, '');
+      const expr = ((p.qual || '') + ' ' + (p.with_check || '')).replace(
+        /\(\s*SELECT\s+(public\.)?(current_op_\w+|auth\.\w+)\(\)/g,
+        ''
+      );
       return /(current_op_\w+|can_see_\w+|auth\.uid|auth\.jwt)\(/.test(expr);
     });
     expect(porLinha.map((p) => p.tablename + '.' + p.policyname)).toEqual([]);
     expect(r.rows.length).toBeGreaterThan(60);
     // A consulta de VERIFICAÇÃO (a) do fim da migration, como o admin vai rodar no painel.
-    const check = M055.match(/-- a\)[^\n]*\r?\n((?:--[^\n]*\r?\n)*?--[^\n]*;)\r?\n/)[1].replace(/^--\s?/gm, '').trim().replace(/;$/, '');
+    const check = M055.match(/-- a\)[^\n]*\r?\n((?:--[^\n]*\r?\n)*?--[^\n]*;)\r?\n/)[1]
+      .replace(/^--\s?/gm, '')
+      .trim()
+      .replace(/;$/, '');
     expect((await db.query(check)).rows).toEqual([]);
     // ...e ela acusa uma policy por linha, se alguém criar uma.
-    await db.exec('CREATE POLICY teste_por_linha ON public.tickets FOR SELECT TO authenticated USING (public.current_op_is_admin())');
+    await db.exec(
+      'CREATE POLICY teste_por_linha ON public.tickets FOR SELECT TO authenticated USING (public.current_op_is_admin())'
+    );
     expect((await db.query(check)).rows.map((x) => x.policyname)).toEqual(['teste_por_linha']);
     await db.exec('DROP POLICY teste_por_linha ON public.tickets');
   });
@@ -252,7 +330,9 @@ describe('055 em projeto sem liberação automática de tabelas', () => {
     await db.exec(M055);
     expect(await probe(db, 'ana', 'SELECT * FROM public.clients')).toEqual(['c-init']);
     expect(await probe(db, 'ana', "INSERT INTO visits (id, team) VALUES ('w', 'init')")).toBe(1);
-    expect(await probe(db, 'ana', "INSERT INTO audit_logs (operator_name, action) VALUES ('Ana', 'x')")).toBe(1);
+    expect(
+      await probe(db, 'ana', "INSERT INTO audit_logs (operator_name, action) VALUES ('Ana', 'x')")
+    ).toBe(1);
     expect(await probe(db, 'ana', 'SELECT * FROM public.operators')).toHaveLength(6);
   });
 
@@ -260,9 +340,13 @@ describe('055 em projeto sem liberação automática de tabelas', () => {
     expect(await probe(db, 'admin', "UPDATE audit_logs SET action = 'y'")).toBe('NEGADO');
     expect(await probe(db, 'admin', 'SELECT * FROM public.email_notifications')).toBe('NEGADO');
     expect(await probe(db, 'anon', 'SELECT * FROM public.clients')).toBe('NEGADO');
-    const anon = await db.query("SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public'");
+    const anon = await db.query(
+      "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public'"
+    );
     expect(anon.rows).toEqual([]);
-    const srv = await db.query("SELECT count(DISTINCT table_name)::int AS n FROM information_schema.role_table_grants WHERE grantee = 'service_role' AND table_schema = 'public'");
+    const srv = await db.query(
+      "SELECT count(DISTINCT table_name)::int AS n FROM information_schema.role_table_grants WHERE grantee = 'service_role' AND table_schema = 'public'"
+    );
     expect(srv.rows[0].n).toBe(TABLES.length + 1); // + email_notifications
   });
 });
@@ -270,15 +354,18 @@ describe('055 em projeto sem liberação automática de tabelas', () => {
 describe('055 deixa a leitura leve do sync mais rápida', () => {
   it('20 mil pendências: helpers uma vez por consulta, não por linha', async () => {
     const db = await newDb({ defaultGrants: true });
-    await db.exec("INSERT INTO pendencias (id, team) SELECT 'bulk-' || g, CASE WHEN g % 3 = 0 THEN 'mam' ELSE 'init' END FROM generate_series(1, 20000) g; ANALYZE;");
-    const tempo = async () => db.transaction(async (tx) => {
-      await tx.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [UID.ana]);
-      await tx.exec('SET LOCAL ROLE authenticated');
-      await tx.query('SELECT id, updated_at FROM pendencias'); // aquece
-      const t = performance.now();
-      const r = await tx.query('SELECT id, updated_at FROM pendencias');
-      return { ms: performance.now() - t, n: r.rows.length };
-    });
+    await db.exec(
+      "INSERT INTO pendencias (id, team) SELECT 'bulk-' || g, CASE WHEN g % 3 = 0 THEN 'mam' ELSE 'init' END FROM generate_series(1, 20000) g; ANALYZE;"
+    );
+    const tempo = async () =>
+      db.transaction(async (tx) => {
+        await tx.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [UID.ana]);
+        await tx.exec('SET LOCAL ROLE authenticated');
+        await tx.query('SELECT id, updated_at FROM pendencias'); // aquece
+        const t = performance.now();
+        const r = await tx.query('SELECT id, updated_at FROM pendencias');
+        return { ms: performance.now() - t, n: r.rows.length };
+      });
     const antes = await tempo();
     await db.exec(M055);
     const depois = await tempo();

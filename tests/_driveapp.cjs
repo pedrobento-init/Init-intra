@@ -14,17 +14,31 @@ function criarDrive() {
   function no(tipo, nome, pais, extra = {}) {
     const id = extra.id || `${tipo}-${++seq}`;
     const n = {
-      tipo, id, nome, pais: [...pais], lixeira: !!extra.lixeira,
+      tipo,
+      id,
+      nome,
+      pais: [...pais],
+      lixeira: !!extra.lixeira,
       getId: () => n.id,
       getName: () => n.nome,
-      getUrl: () => (tipo === 'pasta' ? `https://drive.google.com/drive/folders/${n.id}` : `https://docs.google.com/spreadsheets/d/${n.id}`),
+      getUrl: () =>
+        tipo === 'pasta'
+          ? `https://drive.google.com/drive/folders/${n.id}`
+          : `https://docs.google.com/spreadsheets/d/${n.id}`,
       getParents: () => iterador(n.pais.map((p) => itens.get(p))),
       isTrashed: () => n.lixeira,
-      setName: (novo) => { n.nome = novo; return n; },
-      moveTo: (destino) => { n.pais = [destino.getId()]; return n; },
+      setName: (novo) => {
+        n.nome = novo;
+        return n;
+      },
+      moveTo: (destino) => {
+        n.pais = [destino.getId()];
+        return n;
+      },
     };
     if (tipo === 'pasta') {
-      const filhas = () => [...itens.values()].filter((x) => x.tipo === 'pasta' && x.pais.includes(n.id));
+      const filhas = () =>
+        [...itens.values()].filter((x) => x.tipo === 'pasta' && x.pais.includes(n.id));
       n.getFolders = () => iterador(filhas());
       n.getFoldersByName = (nome) => iterador(filhas().filter((x) => x.nome === nome));
       n.createFolder = (nome) => no('pasta', nome, [n.id]);

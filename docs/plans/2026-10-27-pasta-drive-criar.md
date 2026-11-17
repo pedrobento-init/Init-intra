@@ -8,11 +8,13 @@
 **Stack:** Deno/TypeScript (Edge Function), Google Apps Script, Vitest.
 
 ## Global Constraints
+
 - `index.ts` continua com `serve` + `createClient`; não migrar auth nem `verify_jwt` nesta mudança.
 - Gravação só com `.is("drive_folder_url", null)`; não sobrescreve vínculo humano.
 - Testes que leem arquivo normalizam CRLF.
 
 ## Review Focus
+
 1. Cliente antigo (antes de `PASTAS_CRIAR_DESDE`) nunca entra em `criar` — teste na Tarefa 1.
 2. `created_at` nulo ou inválido fica de fora — Tarefa 1.
 3. Link de planilha inválido fica de fora (pode já ter pasta) — Tarefa 1.
@@ -20,16 +22,18 @@
 5. `CLIENTES_ROOT_ID` vazio ou inacessível não cria nada e loga um erro só — guarda estrutural na Tarefa 2.
 
 ## Sources
+
 - DriveApp `Folder.createFolder`, `getFoldersByName`, `isTrashed`, `getUrl`: https://developers.google.com/apps-script/reference/drive/folder (27/10/2026).
 
 ## File Map
-| Arquivo | Ação | Responsabilidade |
-|---|---|---|
-| `supabase/functions/robo/campo.ts` | Modificar | `PASTAS_CRIAR_DESDE`, `criar` em `planoPastas`, `cand` em `gravarResultadoPastas` |
-| `supabase/functions/robo/index.ts` | Modificar | select com `name, created_at`; `pastas` devolve `criar` |
-| `tools/google-agenda-apps-script/Robo.gs` | Modificar | terceiro laço em `roboPastas`; `testarPastas` mostra `a criar` |
-| `GOOGLE-AGENDA.md` | Modificar | papel Colaborador, propriedade `CLIENTES_ROOT_ID`, limites |
-| `tests/robo-campo.test.js` | Modificar | testes de `criar` e guardas estruturais |
+
+| Arquivo                                   | Ação      | Responsabilidade                                                                  |
+| ----------------------------------------- | --------- | --------------------------------------------------------------------------------- |
+| `supabase/functions/robo/campo.ts`        | Modificar | `PASTAS_CRIAR_DESDE`, `criar` em `planoPastas`, `cand` em `gravarResultadoPastas` |
+| `supabase/functions/robo/index.ts`        | Modificar | select com `name, created_at`; `pastas` devolve `criar`                           |
+| `tools/google-agenda-apps-script/Robo.gs` | Modificar | terceiro laço em `roboPastas`; `testarPastas` mostra `a criar`                    |
+| `GOOGLE-AGENDA.md`                        | Modificar | papel Colaborador, propriedade `CLIENTES_ROOT_ID`, limites                        |
+| `tests/robo-campo.test.js`                | Modificar | testes de `criar` e guardas estruturais                                           |
 
 ### Tarefa 1: campo.ts + index.ts
 

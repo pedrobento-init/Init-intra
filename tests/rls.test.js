@@ -5,16 +5,22 @@ import { PGlite } from '@electric-sql/pglite';
 // RLS testado em Postgres de verdade (PGlite, em memória): aplica a
 // migration 042 sobre tabelas mínimas com as mesmas colunas usadas nas
 // regras, já "sujas" com policies abertas antigas, e confere cada perfil.
-const MIGRATION = fs.readFileSync(new URL('../supabase/migrations/042_rls_completo.sql', import.meta.url), 'utf8');
-const MIGRATION_047 = fs.readFileSync(new URL('../supabase/migrations/047_remove_pin_hash.sql', import.meta.url), 'utf8');
+const MIGRATION = fs.readFileSync(
+  new URL('../supabase/migrations/042_rls_completo.sql', import.meta.url),
+  'utf8'
+);
+const MIGRATION_047 = fs.readFileSync(
+  new URL('../supabase/migrations/047_remove_pin_hash.sql', import.meta.url),
+  'utf8'
+);
 
 const UID = {
   admin: '00000000-0000-0000-0000-00000000000a',
-  ana: '00000000-0000-0000-0000-0000000000a1',   // técnica init
-  beto: '00000000-0000-0000-0000-0000000000b1',  // técnico mam
-  gil: '00000000-0000-0000-0000-0000000000c1',   // Gestão (init)
+  ana: '00000000-0000-0000-0000-0000000000a1', // técnica init
+  beto: '00000000-0000-0000-0000-0000000000b1', // técnico mam
+  gil: '00000000-0000-0000-0000-0000000000c1', // Gestão (init)
   inativo: '00000000-0000-0000-0000-0000000000d1',
-  novo: '00000000-0000-0000-0000-0000000000e1',  // 1º login, ainda sem vínculo
+  novo: '00000000-0000-0000-0000-0000000000e1', // 1º login, ainda sem vínculo
   semCadastro: '00000000-0000-0000-0000-0000000000f1',
 };
 
@@ -27,18 +33,26 @@ async function as(who, sql, params) {
       await tx.exec('SET LOCAL ROLE anon');
     } else {
       const email = who === 'novo' ? 'novo@init.com' : who + '@init.com';
-      await tx.query("SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)",
-        [UID[who], JSON.stringify({ sub: UID[who], email, role: 'authenticated' })]);
+      await tx.query(
+        "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)",
+        [UID[who], JSON.stringify({ sub: UID[who], email, role: 'authenticated' })]
+      );
       await tx.exec('SET LOCAL ROLE authenticated');
     }
     return tx.query(sql, params || []);
   });
 }
 
-const ids = async (who, table) => (await as(who, `SELECT id FROM public.${table} ORDER BY id`)).rows.map((r) => r.id);
+const ids = async (who, table) =>
+  (await as(who, `SELECT id FROM public.${table} ORDER BY id`)).rows.map((r) => r.id);
 
 async function denied(who, sql, params) {
-  try { await as(who, sql, params); return false; } catch (e) { return /row-level security|permission denied/.test(e.message); }
+  try {
+    await as(who, sql, params);
+    return false;
+  } catch (e) {
+    return /row-level security|permission denied/.test(e.message);
+  }
 }
 
 beforeAll(async () => {
@@ -83,7 +97,9 @@ beforeAll(async () => {
   `);
 
   // Dados de antes da migration (procedures ainda sem coluna team).
-  await db.exec("INSERT INTO clients VALUES ('c-init', 'Acme', 'init'), ('c-mam', 'Zeta', 'mam'); INSERT INTO procedures (id, client_id, title) VALUES ('pr-init', 'c-init', 'a'), ('pr-mam', 'c-mam', 'b'), ('pr-orfao', 'c-sumiu', 'c');");
+  await db.exec(
+    "INSERT INTO clients VALUES ('c-init', 'Acme', 'init'), ('c-mam', 'Zeta', 'mam'); INSERT INTO procedures (id, client_id, title) VALUES ('pr-init', 'c-init', 'a'), ('pr-mam', 'c-mam', 'b'), ('pr-orfao', 'c-sumiu', 'c');"
+  );
   await db.exec(MIGRATION);
   await db.exec(MIGRATION_047);
   // Rodar de novo não pode quebrar (idempotente).
@@ -111,7 +127,15 @@ beforeAll(async () => {
 
 describe('anon (chave pública, sem login)', () => {
   it('não lê nem grava nenhuma tabela do app', async () => {
-    for (const t of ['clients', 'pendencias', 'visits', 'equipamentos', 'operators', 'procedures', 'audit_logs']) {
+    for (const t of [
+      'clients',
+      'pendencias',
+      'visits',
+      'equipamentos',
+      'operators',
+      'procedures',
+      'audit_logs',
+    ]) {
       expect(await denied('anon', `SELECT * FROM public.${t}`), t).toBe(true);
     }
     expect(await denied('anon', "INSERT INTO clients (id, name) VALUES ('x', 'x')")).toBe(true);
@@ -142,7 +166,9 @@ describe('isolamento por equipe', () => {
 
   it('cria e edita na própria equipe; excluir é só admin', async () => {
     await as('ana', "INSERT INTO visits (id, team) VALUES ('v-ana', 'init')");
-    expect((await as('ana', "UPDATE visits SET team = 'init' WHERE id = 'v-ana'")).affectedRows).toBe(1);
+    expect(
+      (await as('ana', "UPDATE visits SET team = 'init' WHERE id = 'v-ana'")).affectedRows
+    ).toBe(1);
     expect((await as('ana', "DELETE FROM visits WHERE id = 'v-ana'")).affectedRows).toBe(0);
     expect((await as('admin', "DELETE FROM visits WHERE id = 'v-ana'")).affectedRows).toBe(1);
   });
@@ -158,7 +184,12 @@ describe('Gestão', () => {
   it('pendência tipo Gestão só para is_gestao (nem admin comum)', async () => {
     expect(await ids('ana', 'pendencias')).toEqual(['p-init']);
     expect(await ids('gil', 'pendencias')).toEqual(['p-gestao', 'p-init']);
-    expect(await denied('ana', "INSERT INTO pendencias (id, team, tipo) VALUES ('p-x', 'init', 'Gestão')")).toBe(true);
+    expect(
+      await denied(
+        'ana',
+        "INSERT INTO pendencias (id, team, tipo) VALUES ('p-x', 'init', 'Gestão')"
+      )
+    ).toBe(true);
   });
 });
 
@@ -166,9 +197,23 @@ describe('procedimentos e base de conhecimento', () => {
   it('com cliente: pela equipe do cliente; órfão só admin; artigo sem cliente pela equipe do artigo', async () => {
     expect(await ids('ana', 'procedures')).toEqual(['kb-init', 'pr-init']);
     expect(await ids('beto', 'procedures')).toEqual(['kb-mam', 'pr-mam']);
-    expect(await ids('admin', 'procedures')).toEqual(['kb-init', 'kb-mam', 'pr-init', 'pr-mam', 'pr-orfao']);
-    expect(await denied('ana', "INSERT INTO procedures (id, client_id, team) VALUES ('kb-x', NULL, 'mam')")).toBe(true);
-    await as('ana', "INSERT INTO procedures (id, client_id, team, title) VALUES ('kb-ana', NULL, 'init', 'novo')");
+    expect(await ids('admin', 'procedures')).toEqual([
+      'kb-init',
+      'kb-mam',
+      'pr-init',
+      'pr-mam',
+      'pr-orfao',
+    ]);
+    expect(
+      await denied(
+        'ana',
+        "INSERT INTO procedures (id, client_id, team) VALUES ('kb-x', NULL, 'mam')"
+      )
+    ).toBe(true);
+    await as(
+      'ana',
+      "INSERT INTO procedures (id, client_id, team, title) VALUES ('kb-ana', NULL, 'init', 'novo')"
+    );
   });
 
   it('backfill: procedimento antigo herda a equipe do cliente', async () => {
@@ -179,19 +224,36 @@ describe('procedimentos e base de conhecimento', () => {
 
 describe('operadores', () => {
   it('técnico não se promove a admin/Gestão nem troca de equipe', async () => {
-    await as('ana', "UPDATE operators SET is_admin = true, is_gestao = true, team = 'mam', phone = '9999' WHERE id = 'op-ana'");
-    const r = await db.query("SELECT is_admin, is_gestao, team, phone FROM operators WHERE id = 'op-ana'");
+    await as(
+      'ana',
+      "UPDATE operators SET is_admin = true, is_gestao = true, team = 'mam', phone = '9999' WHERE id = 'op-ana'"
+    );
+    const r = await db.query(
+      "SELECT is_admin, is_gestao, team, phone FROM operators WHERE id = 'op-ana'"
+    );
     expect(r.rows[0]).toEqual({ is_admin: false, is_gestao: false, team: 'init', phone: '9999' });
   });
 
   it('não cria operador nem edita o de outra pessoa', async () => {
-    expect(await denied('ana', "INSERT INTO operators (id, name, auth_user_id, team) VALUES ('op-fake', 'X', '" + UID.ana + "', 'mam')")).toBe(true);
-    expect((await as('ana', "UPDATE operators SET phone = '1' WHERE id = 'op-beto'")).affectedRows).toBe(0);
+    expect(
+      await denied(
+        'ana',
+        "INSERT INTO operators (id, name, auth_user_id, team) VALUES ('op-fake', 'X', '" +
+          UID.ana +
+          "', 'mam')"
+      )
+    ).toBe(true);
+    expect(
+      (await as('ana', "UPDATE operators SET phone = '1' WHERE id = 'op-beto'")).affectedRows
+    ).toBe(0);
   });
 
   it('upsert do próprio perfil (como o app faz) passa', async () => {
-    await as('ana', `INSERT INTO operators (id, name, auth_user_id, is_admin, is_gestao, team, phone) VALUES ('op-ana', 'Ana', '${UID.ana}', false, false, 'init', '777')
-      ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone`);
+    await as(
+      'ana',
+      `INSERT INTO operators (id, name, auth_user_id, is_admin, is_gestao, team, phone) VALUES ('op-ana', 'Ana', '${UID.ana}', false, false, 'init', '777')
+      ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone`
+    );
     const r = await db.query("SELECT phone FROM operators WHERE id = 'op-ana'");
     expect(r.rows[0].phone).toBe('777');
   });
@@ -208,7 +270,9 @@ describe('operadores', () => {
 describe('auditoria e legados', () => {
   it('log só em nome próprio; leitura só admin', async () => {
     await as('ana', "INSERT INTO audit_logs VALUES ('l2', 'Ana', 'Editou')");
-    expect(await denied('ana', "INSERT INTO audit_logs VALUES ('l3', 'Beto', 'Forjou')")).toBe(true);
+    expect(await denied('ana', "INSERT INTO audit_logs VALUES ('l3', 'Beto', 'Forjou')")).toBe(
+      true
+    );
     expect(await ids('ana', 'audit_logs')).toEqual([]);
     expect(await ids('admin', 'audit_logs')).toEqual(['l1', 'l2']);
   });
@@ -232,14 +296,19 @@ describe('verificação pós-migração (as consultas do fim do arquivo)', () =>
     expect(r.rows).toEqual([]);
   });
   it('anon sem nenhum privilégio de tabela', async () => {
-    const r = await db.query("SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public'");
+    const r = await db.query(
+      "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public'"
+    );
     expect(r.rows).toEqual([]);
   });
 });
 
 describe('hash de senha (047)', () => {
   it('app antigo mandando pin_hash: o banco grava sem o hash', async () => {
-    await as('ana', "UPDATE operators SET pin_hash = 'abc', pin_salt = 'xy', phone = '5' WHERE id = 'op-ana'");
+    await as(
+      'ana',
+      "UPDATE operators SET pin_hash = 'abc', pin_salt = 'xy', phone = '5' WHERE id = 'op-ana'"
+    );
     const r = await db.query("SELECT pin_hash, pin_salt, phone FROM operators WHERE id = 'op-ana'");
     expect(r.rows[0]).toEqual({ pin_hash: null, pin_salt: null, phone: '5' });
   });
@@ -248,63 +317,118 @@ describe('hash de senha (047)', () => {
 describe('lançamentos de horas (048)', () => {
   beforeAll(async () => {
     const notes = JSON.stringify([
-      { text: '⏸ Ana pausou. Tempo sessão: 01:30:00. Total: 01:30:00.', author: 'Ana', createdAt: '2026-10-02T15:00:00Z' },
-      { text: 'Sessão registrada: 00:45:00. Total: 02:15:00.', author: 'Ana', createdAt: '2026-10-03T12:00:00Z' },
+      {
+        text: '⏸ Ana pausou. Tempo sessão: 01:30:00. Total: 01:30:00.',
+        author: 'Ana',
+        createdAt: '2026-10-02T15:00:00Z',
+      },
+      {
+        text: 'Sessão registrada: 00:45:00. Total: 02:15:00.',
+        author: 'Ana',
+        createdAt: '2026-10-03T12:00:00Z',
+      },
       { text: 'Conversei com o cliente.', author: 'Ana', createdAt: '2026-10-03T13:00:00Z' },
     ]);
-    await db.query("INSERT INTO pendencias (id, client_id, team, tipo, notes) VALUES ('p-horas', 'c-init', 'init', 'tarefa', $1::jsonb)", [notes]);
-    const sql = fs.readFileSync(new URL('../supabase/migrations/048_time_entries.sql', import.meta.url), 'utf8');
+    await db.query(
+      "INSERT INTO pendencias (id, client_id, team, tipo, notes) VALUES ('p-horas', 'c-init', 'init', 'tarefa', $1::jsonb)",
+      [notes]
+    );
+    const sql = fs.readFileSync(
+      new URL('../supabase/migrations/048_time_entries.sql', import.meta.url),
+      'utf8'
+    );
     await db.exec(sql);
     await db.exec(sql); // idempotente: não duplica
   });
 
   it('backfill: cada sessão das notas vira um lançamento, com início calculado', async () => {
-    const r = await db.query("SELECT seconds, source, operator_id, client_id, started_at, ended_at FROM time_entries WHERE pendencia_id = 'p-horas' ORDER BY ended_at");
+    const r = await db.query(
+      "SELECT seconds, source, operator_id, client_id, started_at, ended_at FROM time_entries WHERE pendencia_id = 'p-horas' ORDER BY ended_at"
+    );
     expect(r.rows.map((x) => x.seconds)).toEqual([5400, 2700]);
-    expect(r.rows[0]).toMatchObject({ source: 'notas', operator_id: 'op-ana', client_id: 'c-init' });
+    expect(r.rows[0]).toMatchObject({
+      source: 'notas',
+      operator_id: 'op-ana',
+      client_id: 'c-init',
+    });
     expect(new Date(r.rows[0].ended_at) - new Date(r.rows[0].started_at)).toBe(5400 * 1000);
   });
 
   it('equipe vê; outra equipe não; corrigir só o próprio (ou admin)', async () => {
-    expect((await as('ana', "SELECT id FROM time_entries WHERE pendencia_id = 'p-horas'")).rows).toHaveLength(2);
+    expect(
+      (await as('ana', "SELECT id FROM time_entries WHERE pendencia_id = 'p-horas'")).rows
+    ).toHaveLength(2);
     expect((await as('beto', 'SELECT id FROM time_entries')).rows).toHaveLength(0);
-    await as('gil', "INSERT INTO time_entries (id, pendencia_id, operator_id, ended_at, seconds, source, team) VALUES ('te-gil', 'p-horas', 'op-gil', now(), 600, 'manual', 'init')");
-    expect((await as('ana', "UPDATE time_entries SET seconds = 1 WHERE id = 'te-gil'")).affectedRows).toBe(0);
-    expect((await as('gil', "UPDATE time_entries SET seconds = 900 WHERE id = 'te-gil'")).affectedRows).toBe(1);
-    expect((await as('admin', "DELETE FROM time_entries WHERE id = 'te-gil'")).affectedRows).toBe(1);
+    await as(
+      'gil',
+      "INSERT INTO time_entries (id, pendencia_id, operator_id, ended_at, seconds, source, team) VALUES ('te-gil', 'p-horas', 'op-gil', now(), 600, 'manual', 'init')"
+    );
+    expect(
+      (await as('ana', "UPDATE time_entries SET seconds = 1 WHERE id = 'te-gil'")).affectedRows
+    ).toBe(0);
+    expect(
+      (await as('gil', "UPDATE time_entries SET seconds = 900 WHERE id = 'te-gil'")).affectedRows
+    ).toBe(1);
+    expect((await as('admin', "DELETE FROM time_entries WHERE id = 'te-gil'")).affectedRows).toBe(
+      1
+    );
   });
 });
 
 describe('pessoas por id (049)', () => {
   beforeAll(async () => {
-    await db.exec("INSERT INTO visits (id, team, operator) VALUES ('v-ana', 'init', 'Ana'), ('v-fantasma', 'init', 'Ninguém')");
-    await db.exec("UPDATE pendencias SET responsible = 'Ana', timer_operator = 'Ana' WHERE id = 'p-init'");
-    await db.exec(fs.readFileSync(new URL('../supabase/migrations/049_operator_ids.sql', import.meta.url), 'utf8'));
+    await db.exec(
+      "INSERT INTO visits (id, team, operator) VALUES ('v-ana', 'init', 'Ana'), ('v-fantasma', 'init', 'Ninguém')"
+    );
+    await db.exec(
+      "UPDATE pendencias SET responsible = 'Ana', timer_operator = 'Ana' WHERE id = 'p-init'"
+    );
+    await db.exec(
+      fs.readFileSync(
+        new URL('../supabase/migrations/049_operator_ids.sql', import.meta.url),
+        'utf8'
+      )
+    );
   });
 
   it('backfill: o id vem do nome; nome desconhecido fica sem id', async () => {
-    const v = await db.query("SELECT id, operator_id FROM visits WHERE id IN ('v-ana','v-fantasma') ORDER BY id");
-    expect(v.rows).toEqual([{ id: 'v-ana', operator_id: 'op-ana' }, { id: 'v-fantasma', operator_id: null }]);
-    const p = await db.query("SELECT responsible_id, timer_operator_id FROM pendencias WHERE id = 'p-init'");
+    const v = await db.query(
+      "SELECT id, operator_id FROM visits WHERE id IN ('v-ana','v-fantasma') ORDER BY id"
+    );
+    expect(v.rows).toEqual([
+      { id: 'v-ana', operator_id: 'op-ana' },
+      { id: 'v-fantasma', operator_id: null },
+    ]);
+    const p = await db.query(
+      "SELECT responsible_id, timer_operator_id FROM pendencias WHERE id = 'p-init'"
+    );
     expect(p.rows[0]).toEqual({ responsible_id: 'op-ana', timer_operator_id: 'op-ana' });
   });
 
   it('gravação só com o nome (app antigo) ganha o id; trocar o nome troca o id', async () => {
     await as('ana', "INSERT INTO visits (id, team, operator) VALUES ('v-nova', 'init', 'ana ')");
-    expect((await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id).toBe('op-ana');
+    expect(
+      (await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id
+    ).toBe('op-ana');
     await as('ana', "UPDATE visits SET operator = 'Gil' WHERE id = 'v-nova'");
-    expect((await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id).toBe('op-gil');
+    expect(
+      (await db.query("SELECT operator_id FROM visits WHERE id = 'v-nova'")).rows[0].operator_id
+    ).toBe('op-gil');
   });
 
   it('renomear o operador reescreve o nome nos registros dele', async () => {
     await db.exec("UPDATE operators SET name = 'Ana Paula' WHERE id = 'op-ana'");
     const v = await db.query("SELECT operator, operator_id FROM visits WHERE id = 'v-ana'");
     expect(v.rows[0]).toEqual({ operator: 'Ana Paula', operator_id: 'op-ana' });
-    expect((await db.query("SELECT responsible FROM pendencias WHERE id = 'p-init'")).rows[0].responsible).toBe('Ana Paula');
+    expect(
+      (await db.query("SELECT responsible FROM pendencias WHERE id = 'p-init'")).rows[0].responsible
+    ).toBe('Ana Paula');
     await db.exec("UPDATE operators SET name = 'Ana' WHERE id = 'op-ana'");
   });
 
   it('nome repetido entre ativos é bloqueado', async () => {
-    await expect(db.exec("INSERT INTO operators (id, name, team) VALUES ('op-ana2', 'ANA', 'init')")).rejects.toThrow(/unique|duplicate/i);
+    await expect(
+      db.exec("INSERT INTO operators (id, name, team) VALUES ('op-ana2', 'ANA', 'init')")
+    ).rejects.toThrow(/unique|duplicate/i);
   });
 });

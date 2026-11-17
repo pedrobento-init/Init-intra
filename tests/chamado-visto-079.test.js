@@ -9,7 +9,8 @@ import { PGlite } from '@electric-sql/pglite';
 //   * quem viu sai do login, nunca de um nome mandado pelo app;
 //   * o UPDATE passa pelo RLS de quem chamou (outra equipe não grava).
 
-const ler = (rel) => fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+const ler = (rel) =>
+  fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const M078 = ler('../supabase/migrations/078_chamado_status_automatico.sql');
 const M079 = ler('../supabase/migrations/079_chamado_visto.sql');
 
@@ -20,11 +21,26 @@ const CAIO = '00000000-0000-0000-0000-0000000000c1'; // outra equipe
 let db;
 
 async function como(uid, fn) {
-  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${uid || ''}', false); SET ROLE authenticated;`);
-  try { return await fn(); } finally { await db.exec('RESET ROLE;'); }
+  await db.exec(
+    `SELECT set_config('request.jwt.claim.sub', '${uid || ''}', false); SET ROLE authenticated;`
+  );
+  try {
+    return await fn();
+  } finally {
+    await db.exec('RESET ROLE;');
+  }
 }
-const ver = (uid, id = 'P1') => como(uid, async () => (await db.query('SELECT public.marcar_chamado_visto($1) AS r', [id])).rows[0].r);
-const pen = async (id = 'P1') => (await db.query('SELECT status, responsible, events, updated_at FROM pendencias WHERE id = $1', [id])).rows[0];
+const ver = (uid, id = 'P1') =>
+  como(
+    uid,
+    async () => (await db.query('SELECT public.marcar_chamado_visto($1) AS r', [id])).rows[0].r
+  );
+const pen = async (id = 'P1') =>
+  (
+    await db.query('SELECT status, responsible, events, updated_at FROM pendencias WHERE id = $1', [
+      id,
+    ])
+  ).rows[0];
 const vistos = async (id = 'P1') => (await pen(id)).events.filter((e) => e.type === 'visto');
 
 beforeAll(async () => {
@@ -97,13 +113,17 @@ describe('079: marcar_chamado_visto', () => {
 
   it('depois de transferido, a primeira abertura do novo responsável também entra', async () => {
     await ver(ANA);
-    await db.exec(`UPDATE pendencias SET responsible = 'Beto', responsible_id = 'OP-B' WHERE id = 'P1'`);
+    await db.exec(
+      `UPDATE pendencias SET responsible = 'Beto', responsible_id = 'OP-B' WHERE id = 'P1'`
+    );
     await ver(BETO);
     expect((await vistos()).map((v) => v.by)).toEqual(['Ana', 'Beto']);
   });
 
   it('RLS vale: responsável de outra equipe no registro não grava', async () => {
-    await db.exec(`UPDATE pendencias SET responsible = 'Caio', responsible_id = 'OP-C' WHERE id = 'P1'`);
+    await db.exec(
+      `UPDATE pendencias SET responsible = 'Caio', responsible_id = 'OP-C' WHERE id = 'P1'`
+    );
     expect(await ver(CAIO)).toBeNull();
     expect(await vistos()).toEqual([]);
   });
@@ -114,7 +134,9 @@ describe('079: marcar_chamado_visto', () => {
   });
 
   it('não muda o status nem os outros eventos', async () => {
-    await db.exec(`UPDATE pendencias SET events = '[{"at":"2026-11-01T10:00:00.000Z","by":"Ana","type":"criado","de":null,"para":"aberto"}]' WHERE id = 'P1'`);
+    await db.exec(
+      `UPDATE pendencias SET events = '[{"at":"2026-11-01T10:00:00.000Z","by":"Ana","type":"criado","de":null,"para":"aberto"}]' WHERE id = 'P1'`
+    );
     await ver(ANA);
     const p = await pen();
     expect(p.status).toBe('aberto');
@@ -122,7 +144,9 @@ describe('079: marcar_chamado_visto', () => {
   });
 
   it('anon não executa', async () => {
-    const { rows } = await db.query(`SELECT has_function_privilege('anon', 'public.marcar_chamado_visto(text)', 'execute') AS ok`);
+    const { rows } = await db.query(
+      `SELECT has_function_privilege('anon', 'public.marcar_chamado_visto(text)', 'execute') AS ok`
+    );
     expect(rows[0].ok).toBe(false);
   });
 });

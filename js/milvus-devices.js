@@ -47,9 +47,10 @@ function normalizeMilvusDevice(raw, clientId, team) {
     // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
     marca: txt(raw.marca),
     fabricante: '',
-    is_ativo: raw.is_ativo === undefined || raw.is_ativo === null
-      ? true
-      : raw.is_ativo === true || raw.is_ativo === 1 || raw.is_ativo === '1',
+    is_ativo:
+      raw.is_ativo === undefined || raw.is_ativo === null
+        ? true
+        : raw.is_ativo === true || raw.is_ativo === 1 || raw.is_ativo === '1',
     data_criacao: iso(raw.data_criacao),
     data_ultima_atualizacao: iso(raw.data_ultima_atualizacao),
     dominio: txt(raw.dominio),
@@ -88,7 +89,8 @@ function parseMilvusPage(data, fallbackPage) {
   const lista = data.lista !== undefined ? data.lista : data.data;
   if (!Array.isArray(lista)) throw new Error('Resposta do Milvus sem lista de dispositivos');
   const pag = (data.meta && data.meta.paginate) || {};
-  const current = Number(pag.current_page !== undefined ? pag.current_page : fallbackPage) || fallbackPage;
+  const current =
+    Number(pag.current_page !== undefined ? pag.current_page : fallbackPage) || fallbackPage;
   const last = Number(pag.last_page !== undefined ? pag.last_page : fallbackPage) || fallbackPage;
   return { list: lista, current: current, last: last };
 }
@@ -115,30 +117,37 @@ function diffMilvusUpsert(existingIds, rows) {
   let updated = 0;
   for (const r of rows || []) {
     if (r && seen.has(r.milvus_device_id)) updated++;
-    else if (r) { created++; seen.add(r.milvus_device_id); }
+    else if (r) {
+      created++;
+      seen.add(r.milvus_device_id);
+    }
   }
   return { created: created, updated: updated };
 }
 
 // Formata o retorno do sync p/ a tela (puro, testável).
 function formatMilvusSyncResult(res) {
-  const s = Number((res && res.synced)) || 0;
-  const c = Number((res && res.created)) || 0;
-  const u = Number((res && res.updated)) || 0;
+  const s = Number(res && res.synced) || 0;
+  const c = Number(res && res.created) || 0;
+  const u = Number(res && res.updated) || 0;
   const un = Array.isArray(res && res.unresolvedNames) ? res.unresolvedNames : [];
   let line = `${s} dispositivos sincronizados · ${c} novos · ${u} atualizados`;
-  if (un.length) line += ` · ${un.length} ${un.length === 1 ? 'nome' : 'nomes'} sem resolução:${un.slice(0, 5).join(', ')}${un.length > 5 ? '…' : ''}`;
+  if (un.length)
+    line += ` · ${un.length} ${un.length === 1 ? 'nome' : 'nomes'} sem resolução:${un.slice(0, 5).join(', ')}${un.length > 5 ? '…' : ''}`;
   return { line: line, unresolved: un.length };
 }
 
 // ── Última sincronização (local, por cliente) ──
 function getMilvusLastSyncAt(clientId) {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MILVUS_SYNC_AT_KEY) : null;
+    const raw =
+      typeof localStorage !== 'undefined' ? localStorage.getItem(MILVUS_SYNC_AT_KEY) : null;
     if (!raw) return null;
     const map = JSON.parse(raw);
     return (map && map[clientId]) || null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 function setMilvusLastSyncAt(clientId, iso) {
@@ -148,14 +157,20 @@ function setMilvusLastSyncAt(clientId, iso) {
     const map = raw ? JSON.parse(raw) : {};
     map[clientId] = iso;
     localStorage.setItem(MILVUS_SYNC_AT_KEY, JSON.stringify(map));
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
 }
 
 // ── Leitura (RLS do Supabase aplica o isolamento; fallback p/ cache) ──
 async function getClientDevices(clientId) {
   try {
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() &&
-        typeof supabaseClient !== 'undefined' && supabaseClient) {
+    if (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof supabaseClient !== 'undefined' &&
+      supabaseClient
+    ) {
       const { data, error } = await supabaseClient
         .from('client_devices')
         .select('*')
@@ -164,20 +179,27 @@ async function getClientDevices(clientId) {
       if (!error && Array.isArray(data)) {
         try {
           if (typeof setCacheStore === 'function') {
-            const cached = typeof getCacheStore === 'function' ? getCacheStore('client_devices') : [];
+            const cached =
+              typeof getCacheStore === 'function' ? getCacheStore('client_devices') : [];
             const others = (cached || []).filter((d) => d && d.client_id !== clientId);
             setCacheStore('client_devices', others.concat(data.map(mapMilvusRowToLocal)));
           }
-        } catch (_) {}
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+        }
         return data.map(mapMilvusRowToLocal);
       }
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
   try {
     if (typeof getCacheStore === 'function') {
       return (getCacheStore('client_devices') || []).filter((d) => d && d.client_id === clientId);
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
   return [];
 }
 
@@ -217,16 +239,28 @@ async function syncClientDevices(clientId) {
     const operators = typeof getOperators === 'function' ? getOperators() : [];
     const me = session ? operators.find((o) => o.id === session.opId) : null;
     const opView = me
-      ? { team: session.team || me.team, isAdmin: session.isAdmin === true || me.isAdmin === true, active: me.active }
-      : { team: session ? session.team : 'init', isAdmin: session ? session.isAdmin === true : false, active: true };
+      ? {
+          team: session.team || me.team,
+          isAdmin: session.isAdmin === true || me.isAdmin === true,
+          active: me.active,
+        }
+      : {
+          team: session ? session.team : 'init',
+          isAdmin: session ? session.isAdmin === true : false,
+          active: true,
+        };
     if (!canSyncClientDevices(opView, client)) {
       throw new Error('Acesso negado a este cliente.');
     }
   } catch (e) {
     if (e && /Acesso negado/.test(e.message)) throw e;
   }
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() ||
-      typeof supabaseClient === 'undefined' || !supabaseClient) {
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
   const { data, error } = await supabaseClient.functions.invoke('milvus-devices', {
@@ -240,7 +274,9 @@ async function syncClientDevices(clientId) {
   try {
     if (data && data.lastSyncAt) setMilvusLastSyncAt(clientId, data.lastSyncAt);
     else setMilvusLastSyncAt(clientId, new Date().toISOString());
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
   return data;
 }
 
@@ -252,8 +288,11 @@ async function syncClientDevices(clientId) {
 
 function _impNormKey(s) {
   return String(s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/\s+/g, ' ').trim();
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function _impPick(row, candidates) {
@@ -266,7 +305,9 @@ function _impPick(row, candidates) {
 }
 
 function _impClean(v) {
-  const t = String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim();
+  const t = String(v === null || v === undefined ? '' : v)
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!t) return '';
   if (/^(nao possui|não possui|n\/?a\.?|-+|—+)$/i.test(t)) return '';
   return t;
@@ -314,7 +355,9 @@ function parseBrTime(v) {
     const p = (n) => String(n).padStart(2, '0');
     return `${p(v.getHours())}:${p(v.getMinutes())}:${p(v.getSeconds())}`;
   }
-  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  const m = String(v)
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (!m) return null;
   const p = (n) => String(n).padStart(2, '0');
   return `${p(Number(m[1]))}:${p(m[2])}:${p(m[3] || '00')}`;
@@ -334,7 +377,9 @@ function normalizeMilvusExportRow(row) {
   if (!row || typeof row !== 'object') return null;
   const fantasia = _impClean(_impPick(row, ['nome fantasia do cliente']));
   if (!fantasia) return null;
-  const hostname = String(_impPick(row, ['nome do dispositivo']) || '').replace(/\s+/g, ' ').trim();
+  const hostname = String(_impPick(row, ['nome do dispositivo']) || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const usuario = _impClean(_impPick(row, ['usuario']));
   const logado = _impClean(_impPick(row, ['usuario logado']));
   const ram = _impClean(_impPick(row, ['memoria ram total']));
@@ -350,10 +395,16 @@ function normalizeMilvusExportRow(row) {
     processador: _impClean(_impPick(row, ['processador'])),
     usuario_logado: logado || usuario,
     modelo_notebook: _impClean(_impPick(row, ['modelo do notebook'])),
-    numero_serial: String(_impPick(row, ['numero do serial']) || '').replace(/\s+/g, ' ').trim(),
-    mac_address: String(_impPick(row, ['mac address']) || '').replace(/\s+/g, ' ').trim(),
+    numero_serial: String(_impPick(row, ['numero do serial']) || '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    mac_address: String(_impPick(row, ['mac address']) || '')
+      .replace(/\s+/g, ' ')
+      .trim(),
     data_ultima_atualizacao: combineBrDateTime(
-      _impPick(row, ['data de atualizacao']), _impPick(row, ['hora de atualizacao do dispositivo'])),
+      _impPick(row, ['data de atualizacao']),
+      _impPick(row, ['hora de atualizacao do dispositivo'])
+    ),
     nome_fantasia: fantasia,
     observacao: extras.join(' | '),
   };
@@ -363,19 +414,33 @@ function normalizeMilvusExportRow(row) {
 function buildImportDeviceId(clientId, draft) {
   const key = [draft.numero_serial, draft.hostname, draft.mac_address]
     .map((s) => String(s || '').toLowerCase())
-    .filter(Boolean).join('|');
+    .filter(Boolean)
+    .join('|');
   if (!key) return null;
   return `${clientId}:imp-${_impHashStr(key)}`;
 }
 
 function matchDraftToClient(draft, mappedNames) {
   if (!draft) return false;
-  return mappedNames.has(String(draft.nome_fantasia || '').trim().toLowerCase());
+  return mappedNames.has(
+    String(draft.nome_fantasia || '')
+      .trim()
+      .toLowerCase()
+  );
 }
 
-const _IMP_FILL_COLS = ['hostname', 'apelido', 'sistema_operacional', 'processador',
-  'usuario_logado', 'modelo_notebook', 'numero_serial', 'mac_address',
-  'data_ultima_atualizacao', 'nome_fantasia'];
+const _IMP_FILL_COLS = [
+  'hostname',
+  'apelido',
+  'sistema_operacional',
+  'processador',
+  'usuario_logado',
+  'modelo_notebook',
+  'numero_serial',
+  'mac_address',
+  'data_ultima_atualizacao',
+  'nome_fantasia',
+];
 
 // Junta rascunhos com o inventário atual: reaproveita o id da linha
 // existente (casa por serial, senão por hostname) e só preenche campos
@@ -459,32 +524,59 @@ function mergeImportWithExisting(clientId, team, drafts, existing) {
 // ── EXPORTAÇÃO DA PLANILHA (mesmas colunas da tabela) ─────────────────────
 // Puro, testável: cabeçalho + linhas a partir dos dispositivos já mapeados.
 function buildInventoryExportSheet(devices) {
-  const header = ['Hostname', 'Apelido', 'Processador', 'Marca', 'Modelo',
-    'Sistema operacional', 'Nº serial', 'Usuário logado', 'Tipo', 'IP interno',
-    'Status', 'Atualizado em'];
+  const header = [
+    'Hostname',
+    'Apelido',
+    'Processador',
+    'Marca',
+    'Modelo',
+    'Sistema operacional',
+    'Nº serial',
+    'Usuário logado',
+    'Tipo',
+    'IP interno',
+    'Status',
+    'Atualizado em',
+  ];
   const rows = (devices || []).map((d) => {
     const upd = d.data_ultima_atualizacao || d.updatedAt;
     let updTxt = '';
     try {
       updTxt = upd
-        ? (typeof formatDateTime === 'function' ? formatDateTime(upd) : new Date(upd).toLocaleString('pt-BR'))
+        ? typeof formatDateTime === 'function'
+          ? formatDateTime(upd)
+          : new Date(upd).toLocaleString('pt-BR')
         : '';
-    } catch (_) { updTxt = String(upd || ''); }
+    } catch (_) {
+      updTxt = String(upd || '');
+    }
     return [
-      d.hostname || '', d.apelido || '', d.processador || '', d.marca || '',
-      d.modelo_notebook || '', d.sistema_operacional || '', d.numero_serial || '',
-      d.usuario_logado || '', d.tipo_dispositivo_text || '', d.ip_interno || '',
-      d.is_ativo !== false ? 'Ativo' : 'Inativo', updTxt,
+      d.hostname || '',
+      d.apelido || '',
+      d.processador || '',
+      d.marca || '',
+      d.modelo_notebook || '',
+      d.sistema_operacional || '',
+      d.numero_serial || '',
+      d.usuario_logado || '',
+      d.tipo_dispositivo_text || '',
+      d.ip_interno || '',
+      d.is_ativo !== false ? 'Ativo' : 'Inativo',
+      updTxt,
     ];
   });
   return { header: header, rows: rows };
 }
 
 function _inventoryExportSlug(name) {
-  return String(name || 'inventario')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-    || 'inventario';
+  return (
+    String(name || 'inventario')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'inventario'
+  );
 }
 
 // Espelha exportEquipamentosPlanilha: .xlsx real com SheetJS, senão CSV.
@@ -497,13 +589,16 @@ async function exportClientInventory(clientId) {
   let devices = [];
   try {
     devices = typeof getClientDevices === 'function' ? await getClientDevices(clientId) : [];
-  } catch (_) { devices = []; }
+  } catch (_) {
+    devices = [];
+  }
   if (!devices.length) {
     if (typeof showToast === 'function') showToast('Nada para exportar.', 'warning');
     return;
   }
   const sheet = buildInventoryExportSheet(devices);
-  const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  const stamp =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
   const base = `inventario_${_inventoryExportSlug(client.name)}_${stamp}`;
   try {
     const XLSX = await loadLib('xlsx').catch(() => null);
@@ -531,11 +626,15 @@ async function exportClientInventory(clientId) {
     a.download = `${base}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    if (typeof showToast === 'function') showToast('Planilha (CSV) exportada com sucesso!', 'success');
+    if (typeof showToast === 'function')
+      showToast('Planilha (CSV) exportada com sucesso!', 'success');
   }
   try {
-    if (typeof addLog === 'function') addLog('Exportou planilha', 'Inventário', clientId, `${sheet.rows.length} dispositivos`);
-  } catch (_) {}
+    if (typeof addLog === 'function')
+      addLog('Exportou planilha', 'Inventário', clientId, `${sheet.rows.length} dispositivos`);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
 }
 
 // Lê o .xlsx no navegador (SheetJS via CDN) → linhas (objetos por cabeçalho).
@@ -550,18 +649,36 @@ async function readMilvusExportFile(file) {
         try {
           const wb = XLSX.read(reader.result, { type: 'array' });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          if (!ws) { reject(new Error('Planilha vazia ou formato inválido.')); return; }
+          if (!ws) {
+            reject(new Error('Planilha vazia ou formato inválido.'));
+            return;
+          }
           const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
-          if (!rows.length) { reject(new Error('Planilha vazia ou formato inválido.')); return; }
-          const hasFantasia = Object.keys(rows[0]).some((k) => _impNormKey(k) === 'nome fantasia do cliente');
-          if (!hasFantasia) { reject(new Error('Coluna "Nome fantasia do cliente" não encontrada.')); return; }
-          if (rows.length > 5000) { reject(new Error('Planilha com linhas demais (máx. 5000).')); return; }
+          if (!rows.length) {
+            reject(new Error('Planilha vazia ou formato inválido.'));
+            return;
+          }
+          const hasFantasia = Object.keys(rows[0]).some(
+            (k) => _impNormKey(k) === 'nome fantasia do cliente'
+          );
+          if (!hasFantasia) {
+            reject(new Error('Coluna "Nome fantasia do cliente" não encontrada.'));
+            return;
+          }
+          if (rows.length > 5000) {
+            reject(new Error('Planilha com linhas demais (máx. 5000).'));
+            return;
+          }
           resolve(rows);
-        } catch (e) { reject(new Error('Não foi possível ler a planilha.')); }
+        } catch (_e) {
+          reject(new Error('Não foi possível ler a planilha.'));
+        }
       };
       reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
       reader.readAsArrayBuffer(file);
-    } catch (e) { reject(new Error('Não foi possível ler o arquivo.')); }
+    } catch (_e) {
+      reject(new Error('Não foi possível ler o arquivo.'));
+    }
   });
 }
 
@@ -571,9 +688,17 @@ function _currentOpViewForImport() {
     const operators = typeof getOperators === 'function' ? getOperators() : [];
     const me = session ? operators.find((o) => o.id === session.opId) : null;
     if (me) {
-      return { team: session.team || me.team, isAdmin: session.isAdmin === true || me.isAdmin === true, active: me.active };
+      return {
+        team: session.team || me.team,
+        isAdmin: session.isAdmin === true || me.isAdmin === true,
+        active: me.active,
+      };
     }
-    return { team: session ? session.team : 'init', isAdmin: session ? session.isAdmin === true : false, active: true };
+    return {
+      team: session ? session.team : 'init',
+      isAdmin: session ? session.isAdmin === true : false,
+      active: true,
+    };
   } catch (_) {
     return { team: 'init', isAdmin: false, active: true };
   }
@@ -588,14 +713,27 @@ async function importClientDevicesFromRows(clientId, sheetRows) {
   if (!canSyncClientDevices(_currentOpViewForImport(), client)) {
     throw new Error('Acesso negado a este cliente.');
   }
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() ||
-      typeof supabaseClient === 'undefined' || !supabaseClient) {
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
   const { data: mapRows } = await supabaseClient
-    .from('milvus_client_map').select('milvus_nome').eq('client_id', clientId);
-  const mapped = new Set((mapRows || [])
-    .map((r) => String(r.milvus_nome || '').trim().toLowerCase()).filter(Boolean));
+    .from('milvus_client_map')
+    .select('milvus_nome')
+    .eq('client_id', clientId);
+  const mapped = new Set(
+    (mapRows || [])
+      .map((r) =>
+        String(r.milvus_nome || '')
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean)
+  );
   const drafts = (sheetRows || []).map(normalizeMilvusExportRow).filter(Boolean);
   const mine = drafts.filter((d) => matchDraftToClient(d, mapped));
   const skipped = drafts.length - mine.length;
@@ -607,12 +745,25 @@ async function importClientDevicesFromRows(clientId, sheetRows) {
     if (error) throw new Error('Falha ao gravar inventário. Tente novamente.');
   }
   try {
-    if (typeof setMilvusLastSyncAt === 'function') setMilvusLastSyncAt(clientId, new Date().toISOString());
+    if (typeof setMilvusLastSyncAt === 'function')
+      setMilvusLastSyncAt(clientId, new Date().toISOString());
     if (typeof addLog === 'function') {
-      addLog('Importou planilha', 'Inventário', clientId, `${merged.created} novos · ${merged.updated} atualizados`);
+      addLog(
+        'Importou planilha',
+        'Inventário',
+        clientId,
+        `${merged.created} novos · ${merged.updated} atualizados`
+      );
     }
-  } catch (_) {}
-  return { imported: merged.rows.length, created: merged.created, updated: merged.updated, skipped: skipped };
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices');
+  }
+  return {
+    imported: merged.rows.length,
+    created: merged.created,
+    updated: merged.updated,
+    skipped: skipped,
+  };
 }
 
 // Export para testes (Node/Vitest).

@@ -50,16 +50,16 @@ cada uma fica presa à tarefa que tem o código.
 
 ## Mapa de arquivos
 
-| Arquivo | Ação | Responsabilidade |
-| --- | --- | --- |
-| `supabase/migrations/068_clients_drive_folder.sql` | criar | a coluna, com verificar/reverter no cabeçalho |
-| `tests/drive-folder-url.test.js` | criar | parser, gate de admin, guarda de fonte |
-| `js/clients-form.js` | modificar | parser, salvar, remover, render; export em `:923-929` |
-| `js/schema.js` | modificar `:17-28` | mapa de sync + `optionalFields` |
-| `js/app.js` | modificar `:389` | coluna no payload de upsert |
-| `js/clients-ficha.js` | modificar `:746-778` | seção na aba Documentos |
-| `js/clients.js` | modificar `:114-120` | registro das ações |
-| `tests/schema.test.js` | modificar | o campo está mapeado e é opcional |
+| Arquivo                                            | Ação                 | Responsabilidade                                      |
+| -------------------------------------------------- | -------------------- | ----------------------------------------------------- |
+| `supabase/migrations/068_clients_drive_folder.sql` | criar                | a coluna, com verificar/reverter no cabeçalho         |
+| `tests/drive-folder-url.test.js`                   | criar                | parser, gate de admin, guarda de fonte                |
+| `js/clients-form.js`                               | modificar            | parser, salvar, remover, render; export em `:923-929` |
+| `js/schema.js`                                     | modificar `:17-28`   | mapa de sync + `optionalFields`                       |
+| `js/app.js`                                        | modificar `:389`     | coluna no payload de upsert                           |
+| `js/clients-ficha.js`                              | modificar `:746-778` | seção na aba Documentos                               |
+| `js/clients.js`                                    | modificar `:114-120` | registro das ações                                    |
+| `tests/schema.test.js`                             | modificar            | o campo está mapeado e é opcional                     |
 
 ---
 
@@ -89,7 +89,9 @@ const BASE = 'https://drive.google.com/drive/folders/';
 
 describe('parseDriveFolderId', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('extrai o ID com query, com barra final e na forma /u/<n>/', () => {
     expect(mod.parseDriveFolderId(BASE + ID)).toBe(ID);
@@ -104,7 +106,9 @@ describe('parseDriveFolderId', () => {
 
   it('recusa arquivo, planilha, outro domínio, vazio e nulo', () => {
     expect(mod.parseDriveFolderId('https://drive.google.com/file/d/' + ID + '/view')).toBeNull();
-    expect(mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
+    expect(
+      mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')
+    ).toBeNull();
     expect(mod.parseDriveFolderId('https://example.com/pasta')).toBeNull();
     expect(mod.parseDriveFolderId('')).toBeNull();
     expect(mod.parseDriveFolderId(null)).toBeNull();
@@ -120,11 +124,14 @@ describe('parseDriveFolderId', () => {
 
 describe('driveFolderUrl', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('remonta a URL pelo ID e descarta o que foi colado', () => {
-    expect(mod.driveFolderUrl('https://drive.google.com/drive/u/3/folders/' + ID + '?usp=sharing'))
-      .toBe(BASE + ID);
+    expect(
+      mod.driveFolderUrl('https://drive.google.com/drive/u/3/folders/' + ID + '?usp=sharing')
+    ).toBe(BASE + ID);
   });
 
   it('devolve vazio quando inválido', () => {
@@ -281,8 +288,13 @@ describe('saveDriveFolderLink', () => {
   it('salva a URL canônica, não a colada', () => {
     global.isCurrentAdmin = () => true;
     let salvo = null;
-    global.saveClient = (c) => { salvo = c; };
-    const r = mod.saveDriveFolderLink('cli-1', 'https://drive.google.com/drive/u/2/folders/' + ID + '?usp=sharing');
+    global.saveClient = (c) => {
+      salvo = c;
+    };
+    const r = mod.saveDriveFolderLink(
+      'cli-1',
+      'https://drive.google.com/drive/u/2/folders/' + ID + '?usp=sharing'
+    );
     expect(r.ok).toBe(true);
     expect(salvo.driveFolderUrl).toBe(BASE + ID);
   });
@@ -290,7 +302,9 @@ describe('saveDriveFolderLink', () => {
   it('campo vazio desvincula', () => {
     global.isCurrentAdmin = () => true;
     let salvo = null;
-    global.saveClient = (c) => { salvo = c; };
+    global.saveClient = (c) => {
+      salvo = c;
+    };
     expect(mod.saveDriveFolderLink('cli-1', '  ').ok).toBe(true);
     expect(salvo.driveFolderUrl).toBeNull();
   });

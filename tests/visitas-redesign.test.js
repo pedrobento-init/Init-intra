@@ -5,19 +5,37 @@ import vm from 'node:vm';
 // ── Redesign mobile de Visitas: KPIs, chips, cards, FAB e sheet de filtros ───
 function mkEl(id) {
   const el = {
-    _id: id, innerHTML: '', textContent: '', value: '', disabled: false,
-    hidden: false, dataset: {},
-    style: {}, attrs: {}, toggled: {},
-    setAttribute(k, v) { el.attrs[k] = String(v); },
-    getAttribute(k) { return el.attrs[k]; },
+    _id: id,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    disabled: false,
+    hidden: false,
+    dataset: {},
+    style: {},
+    attrs: {},
+    toggled: {},
+    setAttribute(k, v) {
+      el.attrs[k] = String(v);
+    },
+    getAttribute(k) {
+      return el.attrs[k];
+    },
     classList: {
-      add() {}, remove() {},
-      toggle: (k, f) => { el.toggled[k] = !!f; },
+      add() {},
+      remove() {},
+      toggle: (k, f) => {
+        el.toggled[k] = !!f;
+      },
       contains: () => false,
     },
-    addEventListener() {}, appendChild() {}, remove() {}, click() {},
+    addEventListener() {},
+    appendChild() {},
+    remove() {},
+    click() {},
     contains: () => false,
-    querySelector: () => null, querySelectorAll: () => [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
     focus() {},
   };
   return el;
@@ -49,11 +67,20 @@ const sandbox = {
   getMyClients: () => [],
   getOperatorNames: () => [],
   escapeHtml: (s) => String(s == null ? '' : s),
-  formatDate: (iso) => String(iso || '').split('-').reverse().join('/'),
-  formatVisitTimeRange: (v) => (!v || v.allDay || !v.time ? 'Dia inteiro' : String(v.time).slice(0, 5)),
+  formatDate: (iso) =>
+    String(iso || '')
+      .split('-')
+      .reverse()
+      .join('/'),
+  formatVisitTimeRange: (v) =>
+    !v || v.allDay || !v.time ? 'Dia inteiro' : String(v.time).slice(0, 5),
   formatVisitNumero: (v) => '#' + String((v && v.numero) || '----').padStart(4, '0'),
-  saveFilterState: (k, state) => { _savedStates.push(state); },
-  openModal: (title, html) => { _modals.push({ title, html }); },
+  saveFilterState: (k, state) => {
+    _savedStates.push(state);
+  },
+  openModal: (title, html) => {
+    _modals.push({ title, html });
+  },
   closeModal: () => {},
 };
 sandbox.globalThis = sandbox;
@@ -72,12 +99,47 @@ try {
 }
 const T = sandbox.__t;
 const FAKE_VISITS = [
-  { id: 'v1', numero: 7, date: '2026-09-23', time: '', allDay: true, clientId: 'c1', clientName: 'Panobianco', operator: 'Pedro Bento', motivo: 'Rotina', status: 'em_andamento' },
-  { id: 'v2', numero: 8, date: '2026-09-16', time: '10:00', clientId: 'c1', clientName: 'Panobianco', operator: 'Pedro Bento', motivo: 'Suporte', status: 'concluida' },
-  { id: 'v3', numero: 9, date: '2026-09-09', time: '', allDay: true, clientId: 'c2', clientName: 'Gmar', operator: 'Rafael', motivo: 'Instalação', status: 'agendada' },
+  {
+    id: 'v1',
+    numero: 7,
+    date: '2026-09-23',
+    time: '',
+    allDay: true,
+    clientId: 'c1',
+    clientName: 'Panobianco',
+    operator: 'Pedro Bento',
+    motivo: 'Rotina',
+    status: 'em_andamento',
+  },
+  {
+    id: 'v2',
+    numero: 8,
+    date: '2026-09-16',
+    time: '10:00',
+    clientId: 'c1',
+    clientName: 'Panobianco',
+    operator: 'Pedro Bento',
+    motivo: 'Suporte',
+    status: 'concluida',
+  },
+  {
+    id: 'v3',
+    numero: 9,
+    date: '2026-09-09',
+    time: '',
+    allDay: true,
+    clientId: 'c2',
+    clientName: 'Gmar',
+    operator: 'Rafael',
+    motivo: 'Instalação',
+    status: 'agendada',
+  },
 ];
 const setVisits = () =>
-  vm.runInContext('getMyVisits = function(){ return ' + JSON.stringify(FAKE_VISITS) + '; };', sandbox);
+  vm.runInContext(
+    'getMyVisits = function(){ return ' + JSON.stringify(FAKE_VISITS) + '; };',
+    sandbox
+  );
 
 beforeEach(() => {
   for (const k of Object.keys(_el)) delete _el[k];
@@ -86,7 +148,10 @@ beforeEach(() => {
   _el.visitSearch = mkEl('visitSearch');
   _el.visitSearch.value = '';
   _el.visitFilterBtn = mkEl('visitFilterBtn');
-  vm.runInContext('_visitFilter = { client: "", operator: "", status: "", from: "", to: "" }; _visitPage = 1;', sandbox);
+  vm.runInContext(
+    '_visitFilter = { client: "", operator: "", status: "", from: "", to: "" }; _visitPage = 1;',
+    sandbox
+  );
   vi.restoreAllMocks();
 });
 
@@ -100,7 +165,12 @@ describe('visitInitials', () => {
 
 describe('chips de status', () => {
   it('Todas + 3 status (sem select dedicado)', () => {
-    expect(T.VISIT_STATUS_CHIPS.map((c) => c.value)).toEqual(['', 'em_andamento', 'concluida', 'agendada']);
+    expect(T.VISIT_STATUS_CHIPS.map((c) => c.value)).toEqual([
+      '',
+      'em_andamento',
+      'concluida',
+      'agendada',
+    ]);
   });
 
   it('setVisitStatusFilter atualiza estado e salva', () => {
@@ -120,7 +190,10 @@ describe('getFilteredVisits com estado (sem ler selects do DOM)', () => {
     expect(T.getFilteredVisits().map((v) => v.id)).toEqual(['v2']);
     vm.runInContext('_visitFilter.status = ""; _visitFilter.operator = "Rafael";', sandbox);
     expect(T.getFilteredVisits().map((v) => v.id)).toEqual(['v3']);
-    vm.runInContext('_visitFilter.operator = ""; _visitFilter.from = "2026-09-16"; _visitFilter.to = "2026-09-23";', sandbox);
+    vm.runInContext(
+      '_visitFilter.operator = ""; _visitFilter.from = "2026-09-16"; _visitFilter.to = "2026-09-23";',
+      sandbox
+    );
     expect(T.getFilteredVisits().map((v) => v.id)).toEqual(['v1', 'v2']);
     _el.visitSearch.value = 'gmar';
     vm.runInContext('_visitFilter.from = ""; _visitFilter.to = "";', sandbox);
@@ -186,7 +259,14 @@ describe('contrato do template e do CSS', () => {
   const css = fs.readFileSync('css/styles.css', 'utf8').replace(/\s+/g, ' ');
 
   it('template: busca + funil + KPIs + chips + mês + FAB, sem tabela/selects', () => {
-    for (const id of ['visitSearch', 'visitFilterBtn', 'visitStats', 'visitChips', 'visitCount', 'visitViewArea']) {
+    for (const id of [
+      'visitSearch',
+      'visitFilterBtn',
+      'visitStats',
+      'visitChips',
+      'visitCount',
+      'visitViewArea',
+    ]) {
       expect(src).toContain(`id="${id}"`);
     }
     expect(src).toContain('openVisitMonthReportModal');
@@ -204,11 +284,20 @@ describe('contrato do template e do CSS', () => {
   });
 
   it('CSS do redesign presente + fonte única do app (sem Schibsted/Inter)', () => {
-    for (const sel of ['.vis-card', '.vis-chip[aria-pressed', '.vis-fab', '.vis-kpis', '.vis-fbtn.on', '.vis-st', '.vis-av']) {
+    for (const sel of [
+      '.vis-card',
+      '.vis-chip[aria-pressed',
+      '.vis-fab',
+      '.vis-kpis',
+      '.vis-fbtn.on',
+      '.vis-st',
+      '.vis-av',
+    ]) {
       expect(css).toContain(sel);
     }
     const html = fs.readFileSync('index.html', 'utf8');
-    expect(html).toContain('family=Manrope');
+    expect(html).toContain('css/fonts.css');
+    expect(fs.readFileSync('css/fonts.css', 'utf8')).toContain("font-family: 'Manrope'");
     expect(html).not.toContain('Schibsted+Grotesk');
     expect(html).not.toContain('family=Inter');
     expect(css).toContain('font-family: var(--font-sans)');
@@ -237,17 +326,20 @@ describe('lista agrupada por período', () => {
   });
 
   it('ordem dos grupos e das visitas dentro deles', () => {
-    const g = T.groupVisitsByPeriod([
-      v('ant1', '2026-10-10', 'concluida'),
-      v('ant2', '2026-10-15', 'concluida'),
-      v('am', '2026-10-22', 'agendada'),
-      v('h2', HOJE, 'agendada', { time: '14:00' }),
-      v('hdia', HOJE, 'agendada', { allDay: true }),
-      v('h1', HOJE, 'agendada', { time: '09:00' }),
-      v('atr', '2026-10-18', 'agendada'),
-      v('sem2', '2026-10-27', 'agendada'),
-      v('sem1', '2026-10-24', 'agendada'),
-    ], HOJE);
+    const g = T.groupVisitsByPeriod(
+      [
+        v('ant1', '2026-10-10', 'concluida'),
+        v('ant2', '2026-10-15', 'concluida'),
+        v('am', '2026-10-22', 'agendada'),
+        v('h2', HOJE, 'agendada', { time: '14:00' }),
+        v('hdia', HOJE, 'agendada', { allDay: true }),
+        v('h1', HOJE, 'agendada', { time: '09:00' }),
+        v('atr', '2026-10-18', 'agendada'),
+        v('sem2', '2026-10-27', 'agendada'),
+        v('sem1', '2026-10-24', 'agendada'),
+      ],
+      HOJE
+    );
     expect(g.map((x) => x.key)).toEqual(['atrasadas', 'hoje', 'amanha', 'semana', 'anteriores']);
     expect(g[1].visits.map((x) => x.id)).toEqual(['h1', 'h2', 'hdia']);
     expect(g[3].visits.map((x) => x.id)).toEqual(['sem1', 'sem2']);
@@ -267,13 +359,30 @@ describe('lista agrupada por período', () => {
 });
 
 describe('conflito de horário entre operadores', () => {
-  const nova = { id: 'nova', clientId: 'cli', operator: 'Ana', date: '2026-11-04', time: '10:00', timeEnd: '11:00' };
-  const outra = (over = {}) => ({ id: 'outra', clientId: 'cli', operator: 'Beto', date: '2026-11-04', time: '10:30', timeEnd: '11:30', ...over });
+  const nova = {
+    id: 'nova',
+    clientId: 'cli',
+    operator: 'Ana',
+    date: '2026-11-04',
+    time: '10:00',
+    timeEnd: '11:00',
+  };
+  const outra = (over = {}) => ({
+    id: 'outra',
+    clientId: 'cli',
+    operator: 'Beto',
+    date: '2026-11-04',
+    time: '10:30',
+    timeEnd: '11:30',
+    ...over,
+  });
 
   it('avisa sobreposição e dia inteiro, sem bloquear clientes ou horários diferentes', () => {
     expect(T.findVisitScheduleConflicts(nova, [outra()])).toHaveLength(1);
     expect(T.findVisitScheduleConflicts({ ...nova, allDay: true }, [outra()])).toHaveLength(1);
-    expect(T.findVisitScheduleConflicts(nova, [outra({ time: '11:00', timeEnd: '12:00' })])).toHaveLength(0);
+    expect(
+      T.findVisitScheduleConflicts(nova, [outra({ time: '11:00', timeEnd: '12:00' })])
+    ).toHaveLength(0);
     expect(T.findVisitScheduleConflicts(nova, [outra({ clientId: 'outro' })])).toHaveLength(0);
   });
 

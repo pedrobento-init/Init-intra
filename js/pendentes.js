@@ -13,19 +13,41 @@
 // realtime e pull do sync) e só é pendente o que for mais novo que isso.
 
 const PENDENTES_LABELS = {
-  pendencias: 'Pendência', visits: 'Visita', clients: 'Cliente', operators: 'Operador',
-  equipamentos: 'Equipamento', vencimentos: 'Vencimento', time_entries: 'Horas', procedures: 'Procedimento', procedure_templates: 'Modelo', reunioes: 'Reunião', visit_photos: 'Foto',
+  pendencias: 'Pendência',
+  visits: 'Visita',
+  clients: 'Cliente',
+  operators: 'Operador',
+  equipamentos: 'Equipamento',
+  vencimentos: 'Vencimento',
+  time_entries: 'Horas',
+  procedures: 'Procedimento',
+  procedure_templates: 'Modelo',
+  reunioes: 'Reunião',
+  visit_photos: 'Foto',
 };
 
 function _pendTitle(table, r) {
   if (!r) return '—';
-  if (table === 'pendencias') return (typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(r) : (r.assunto || r.descricao)) || r.id;
-  if (table === 'visits') return 'Visita · ' + (r.clientName || '—') + (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '');
+  if (table === 'pendencias')
+    return (
+      (typeof getPendenciaTitulo === 'function'
+        ? getPendenciaTitulo(r)
+        : r.assunto || r.descricao) || r.id
+    );
+  if (table === 'visits')
+    return (
+      'Visita · ' +
+      (r.clientName || '—') +
+      (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '')
+    );
   if (table === 'reunioes') return 'Reunião ' + (r.mesAno || r.id);
   return r.name || r.nome || r.title || r.assunto || r.id;
 }
 
-const _ms = (iso) => { const t = new Date(iso || 0).getTime(); return isNaN(t) ? 0 : t; };
+const _ms = (iso) => {
+  const t = new Date(iso || 0).getTime();
+  return isNaN(t) ? 0 : t;
+};
 
 /**
  * Lista pura (testável).
@@ -44,29 +66,60 @@ function buildPendingList(sources, outboxRows, tombstones, confirmed) {
   };
   const out = [];
   const seen = new Set();
-  const push = (item) => { const k = item.table + ':' + item.id; if (seen.has(k)) return; seen.add(k); out.push(item); };
-  for (const o of (outboxRows || [])) {
+  const push = (item) => {
+    const k = item.table + ':' + item.id;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(item);
+  };
+  for (const o of outboxRows || []) {
     if (!o || !o.targetId) continue;
     const at = (o.payload && o.payload.updatedAt) || o.createdAt;
     if (isConfirmed(o.entity, o.targetId, at)) continue; // já subiu por outro caminho
-    push({ table: o.entity, id: o.targetId, kind: 'save', title: _pendTitle(o.entity, o.payload), at, attempts: o.attempts || 0 });
+    push({
+      table: o.entity,
+      id: o.targetId,
+      kind: 'save',
+      title: _pendTitle(o.entity, o.payload),
+      at,
+      attempts: o.attempts || 0,
+      dead: !!o.dead,
+      deadReason: o.deadReason || '',
+    });
   }
-  for (const s of (sources || [])) {
-    for (const r of (s.records || [])) {
+  for (const s of sources || []) {
+    for (const r of s.records || []) {
       if (!r || !r.id) continue;
       const stamp = r.updatedAt || r.createdAt || '';
       const conf = up[s.table] && up[s.table][r.id];
       // Com confirmação do servidor: pendente só se o local for mais novo.
       // Sem confirmação (dados de antes desta versão): regra do último sync.
-      const pending = conf ? _ms(stamp) > _ms(conf) : (!s.lastSyncAt || (stamp && stamp > s.lastSyncAt));
+      const pending = conf
+        ? _ms(stamp) > _ms(conf)
+        : !s.lastSyncAt || (stamp && stamp > s.lastSyncAt);
       if (pending) {
-        push({ table: s.table, id: r.id, kind: !conf && stamp && r.createdAt && r.createdAt > (s.lastSyncAt || '') ? 'create' : 'save', title: _pendTitle(s.table, r), at: stamp, attempts: 0 });
+        push({
+          table: s.table,
+          id: r.id,
+          kind:
+            !conf && stamp && r.createdAt && r.createdAt > (s.lastSyncAt || '') ? 'create' : 'save',
+          title: _pendTitle(s.table, r),
+          at: stamp,
+          attempts: 0,
+        });
       }
     }
     const tomb = (tombstones && tombstones[s.dbKey]) || {};
     for (const id of Object.keys(tomb)) {
       if (del[s.table] && del[s.table][id]) continue; // servidor já apagou
-      push({ table: s.table, id, kind: 'delete', title: 'Exclusão de ' + (PENDENTES_LABELS[s.table] || s.table).toLowerCase(), at: tomb[id], attempts: 0 });
+      push({
+        table: s.table,
+        id,
+        kind: 'delete',
+        title: 'Exclusão de ' + (PENDENTES_LABELS[s.table] || s.table).toLowerCase(),
+        at: tomb[id],
+        attempts: 0,
+      });
     }
   }
   return out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
@@ -78,7 +131,13 @@ let _serverSeen = null;
 let _serverSeenTimer = null;
 function _loadServerSeen() {
   if (_serverSeen) return _serverSeen;
-  try { _serverSeen = JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(SERVER_SEEN_KEY)) || 'null'); } catch (_) { _serverSeen = null; }
+  try {
+    _serverSeen = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem(SERVER_SEEN_KEY)) || 'null'
+    );
+  } catch (_) {
+    _serverSeen = null;
+  }
   if (!_serverSeen || typeof _serverSeen !== 'object') _serverSeen = {};
   _serverSeen.up = _serverSeen.up || {};
   _serverSeen.del = _serverSeen.del || {};
@@ -87,7 +146,11 @@ function _loadServerSeen() {
 function _saveServerSeen() {
   clearTimeout(_serverSeenTimer);
   _serverSeenTimer = setTimeout(() => {
-    try { localStorage.setItem(SERVER_SEEN_KEY, JSON.stringify(_loadServerSeen())); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+    try {
+      localStorage.setItem(SERVER_SEEN_KEY, JSON.stringify(_loadServerSeen()));
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+    }
   }, 300);
 }
 /** Servidor confirmou estas linhas (id + updated_at). */
@@ -96,13 +159,19 @@ function markServerSeen(table, rows) {
   const s = _loadServerSeen();
   const t = s.up[table] || (s.up[table] = {});
   let changed = false;
-  for (const r of (Array.isArray(rows) ? rows : [rows])) {
+  for (const r of Array.isArray(rows) ? rows : [rows]) {
     if (!r || !r.id) continue;
     const at = r.updated_at || r.updatedAt;
     if (!at) continue;
-    if (!t[r.id] || _ms(at) > _ms(t[r.id])) { t[r.id] = at; changed = true; }
+    if (!t[r.id] || _ms(at) > _ms(t[r.id])) {
+      t[r.id] = at;
+      changed = true;
+    }
   }
-  if (changed) { _saveServerSeen(); refreshPendingStrip(); }
+  if (changed) {
+    _saveServerSeen();
+    refreshPendingStrip();
+  }
 }
 /** Servidor confirmou a exclusão. */
 function markServerDeleted(table, id) {
@@ -120,7 +189,18 @@ function _hookThen(builder, onOk) {
   if (!builder || typeof builder.then !== 'function' || builder.__seenHooked) return builder;
   const origThen = builder.then;
   builder.then = function (res, rej) {
-    return origThen.call(this, (r) => { try { if (r && !r.error) onOk(r); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); } return res ? res(r) : r; }, rej);
+    return origThen.call(
+      this,
+      (r) => {
+        try {
+          if (r && !r.error) onOk(r);
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+        }
+        return res ? res(r) : r;
+      },
+      rej
+    );
   };
   builder.__seenHooked = true;
   return builder;
@@ -140,7 +220,9 @@ function wrapSupabaseForSeen(client) {
           markServerSeen(table, rows);
           // Upsert confirmado: as edições locais desses registros foram entregues.
           if (typeof _clearDirtyFields === 'function') {
-            for (const r of rows) { if (r && r.id) _clearDirtyFields(table, r.id, r.updated_at || r.updatedAt); }
+            for (const r of rows) {
+              if (r && r.id) _clearDirtyFields(table, r.id, r.updated_at || r.updatedAt);
+            }
           }
         });
       };
@@ -164,32 +246,64 @@ function wrapSupabaseForSeen(client) {
   client.__seenWrapped = true;
   return client;
 }
-try { if (typeof supabaseClient !== 'undefined' && supabaseClient) wrapSupabaseForSeen(supabaseClient); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+try {
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) wrapSupabaseForSeen(supabaseClient);
+} catch (_e) {
+  if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+}
 
 async function getPendingChanges() {
   let rows = [];
   try {
-    if (typeof idb !== 'undefined' && idb && idb.outbox) rows = await idb.outbox.orderBy('seq').toArray();
-  } catch (_) { rows = []; }
+    if (typeof idb !== 'undefined' && idb && idb.outbox)
+      rows = await idb.outbox.orderBy('seq').toArray();
+  } catch (_) {
+    rows = [];
+  }
   const sources = [];
   try {
     (typeof SYNC_ENTITIES !== 'undefined' ? SYNC_ENTITIES : []).forEach((e) => {
       let records = [];
-      try { records = dbGet(e.dbKey) || []; } catch (_) { records = []; }
-      sources.push({ table: e.table, dbKey: e.dbKey, records: Array.isArray(records) ? records : [], lastSyncAt: typeof _getLastSyncAt === 'function' ? _getLastSyncAt(e.table) : null });
+      try {
+        records = dbGet(e.dbKey) || [];
+      } catch (_) {
+        records = [];
+      }
+      sources.push({
+        table: e.table,
+        dbKey: e.dbKey,
+        records: Array.isArray(records) ? records : [],
+        lastSyncAt: typeof _getLastSyncAt === 'function' ? _getLastSyncAt(e.table) : null,
+      });
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+  }
   let tombs = {};
-  try { tombs = typeof _loadTombstones === 'function' ? _loadTombstones() : {}; } catch (_) { tombs = {}; }
+  try {
+    tombs = typeof _loadTombstones === 'function' ? _loadTombstones() : {};
+  } catch (_) {
+    tombs = {};
+  }
   const list = buildPendingList(sources, rows, tombs, _loadServerSeen());
   // Fotos de visita tiradas offline (fila própria, ver visit-photos.js).
   try {
-    const q = (typeof getCacheKV === 'function' ? getCacheKV('intra_visit_photos_queue', []) : []) || [];
+    const q =
+      (typeof getCacheKV === 'function' ? getCacheKV('intra_visit_photos_queue', []) : []) || [];
     for (const ph of q) {
       const v = typeof getVisitById === 'function' ? getVisitById(ph.visitId) : null;
-      list.push({ table: 'visit_photos', id: ph.id, kind: 'create', title: 'Foto · Visita ' + ((v && v.clientName) || ''), at: ph.createdAt, attempts: 0 });
+      list.push({
+        table: 'visit_photos',
+        id: ph.id,
+        kind: 'create',
+        title: 'Foto · Visita ' + ((v && v.clientName) || ''),
+        at: ph.createdAt,
+        attempts: 0,
+      });
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+  }
   return list;
 }
 
@@ -204,35 +318,92 @@ async function _paintPendingStrip() {
   const el = document.getElementById('pendingStrip');
   if (!el) return;
   // Sem servidor configurado não há "pendente de envio": tudo é local mesmo.
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) { el.hidden = true; return; }
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
+    el.hidden = true;
+    return;
+  }
   let list = [];
-  try { list = await getPendingChanges(); } catch (_) { list = []; }
+  try {
+    list = await getPendingChanges();
+  } catch (_) {
+    list = [];
+  }
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (!list.length) { el.hidden = true; el.innerHTML = ''; return; }
+  if (!list.length) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
   const n = list.length;
   el.hidden = false;
   el.classList.toggle('is-offline', offline);
   el.innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>' +
-    '<span class="ps-text"><b>' + (typeof plural === 'function' ? plural(n, 'alteração', 'alterações') : n + ' alterações') + '</b> aguardando envio' + (offline ? ' — sem conexão, sobem quando a rede voltar' : '') + '</span>' +
+    '<span class="ps-text"><b>' +
+    (typeof plural === 'function' ? plural(n, 'alteração', 'alterações') : n + ' alterações') +
+    '</b> aguardando envio' +
+    (offline ? ' — sem conexão, sobem quando a rede voltar' : '') +
+    '</span>' +
     '<button type="button" class="btn btn-secondary btn-sm" data-action="openPendingChanges">Ver lista</button>' +
-    (offline ? '' : '<button type="button" class="btn btn-primary btn-sm" data-action="pendingSyncNow">Enviar agora</button>');
+    (offline
+      ? ''
+      : '<button type="button" class="btn btn-primary btn-sm" data-action="pendingSyncNow">Enviar agora</button>');
 }
 
 async function openPendingChanges() {
   const list = await getPendingChanges();
-  const fmt = (iso) => { try { return iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'; } catch (_) { return '—'; } };
+  const fmt = (iso) => {
+    try {
+      return iso
+        ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+        : '—';
+    } catch (_) {
+      return '—';
+    }
+  };
   const kindLbl = { create: 'Criado', save: 'Alterado', delete: 'Excluído' };
   const body = list.length
-    ? '<ul class="pend-list">' + list.map((it) =>
-        '<li><span class="pend-kind pend-kind--' + it.kind + '">' + kindLbl[it.kind] + '</span>' +
-        '<span class="pend-main"><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(PENDENTES_LABELS[it.table] || it.table) + ' · ' + escapeHtml(fmt(it.at)) +
-        (it.attempts ? ' · ' + plural(it.attempts, 'tentativa', 'tentativas') : '') + '</small></span></li>').join('') + '</ul>'
+    ? '<ul class="pend-list">' +
+      list
+        .map(
+          (it) =>
+            '<li><span class="pend-kind pend-kind--' +
+            it.kind +
+            '">' +
+            kindLbl[it.kind] +
+            '</span>' +
+            '<span class="pend-main"><b>' +
+            escapeHtml(it.title) +
+            '</b><small>' +
+            escapeHtml(PENDENTES_LABELS[it.table] || it.table) +
+            ' · ' +
+            escapeHtml(fmt(it.at)) +
+            (it.attempts ? ' · ' + plural(it.attempts, 'tentativa', 'tentativas') : '') +
+            (it.dead
+              ? ' · <b>não foi enviada</b> (' +
+                escapeHtml(it.deadReason || 'falha permanente') +
+                ')'
+              : '') +
+            '</small></span></li>'
+        )
+        .join('') +
+      '</ul>'
     : '<div class="empty-state"><p>Tudo enviado. Nada pendente neste aparelho.</p></div>';
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-  openModal('Aguardando envio', '<p class="pend-intro">Estas alterações estão salvas <b>neste aparelho</b> e sobem para o servidor no próximo sincronismo. Não feche a sessão (Sair) antes disso.</p>' + body +
-    '<div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>' +
-    (offline || !list.length ? '' : '<button type="button" class="btn btn-primary" data-action="pendCloseAndSync">Enviar agora</button>') + '</div>', 'sm');
+  openModal(
+    'Aguardando envio',
+    '<p class="pend-intro">Estas alterações estão salvas <b>neste aparelho</b> e sobem para o servidor no próximo sincronismo. Não feche a sessão (Sair) antes disso.</p>' +
+      body +
+      '<div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>' +
+      (list.some((it) => it.dead)
+        ? '<button type="button" class="btn btn-secondary" data-action="pendDiscardDead">Descartar as que falharam</button><button type="button" class="btn btn-secondary" data-action="pendRetryDead">Reenviar as que falharam</button>'
+        : '') +
+      (offline || !list.length
+        ? ''
+        : '<button type="button" class="btn btn-primary" data-action="pendCloseAndSync">Enviar agora</button>') +
+      '</div>',
+    'sm'
+  );
 }
 
 async function pendingSyncNow(btn) {
@@ -241,17 +412,36 @@ async function pendingSyncNow(btn) {
     if (typeof outboxDrain === 'function') await outboxDrain();
     if (typeof syncNow === 'function') await syncNow();
     else if (typeof syncSupabaseToLocal === 'function') await syncSupabaseToLocal();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+  }
   if (btn) btn.disabled = false;
   refreshPendingStrip();
 }
 
 if (typeof window !== 'undefined' && !window._pendStripBound) {
   window._pendStripBound = true;
-  ['online', 'offline', 'sync:update'].forEach((ev) => window.addEventListener(ev, refreshPendingStrip));
+  ['online', 'offline', 'sync:update'].forEach((ev) =>
+    window.addEventListener(ev, refreshPendingStrip)
+  );
   try {
-    if (typeof onDataChanged === 'function') ['pendencias', 'visitas', 'clientes', 'operadores', 'equipamentos', 'vencimentos', 'horas', 'reunioes', 'templates', 'procedimentos', 'sync-status'].forEach((n) => onDataChanged(n, refreshPendingStrip));
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); }
+    if (typeof onDataChanged === 'function')
+      [
+        'pendencias',
+        'visitas',
+        'clientes',
+        'operadores',
+        'equipamentos',
+        'vencimentos',
+        'horas',
+        'reunioes',
+        'templates',
+        'procedimentos',
+        'sync-status',
+      ].forEach((n) => onDataChanged(n, refreshPendingStrip));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+  }
 }
 
 if (typeof registerActions === 'function') {
@@ -259,8 +449,37 @@ if (typeof registerActions === 'function') {
     openPendingChanges: () => openPendingChanges(),
     pendingSyncNow: (el) => pendingSyncNow(el),
     closeModal: () => closeModal(),
-    pendCloseAndSync: () => { closeModal(); return pendingSyncNow(); },
+    pendCloseAndSync: () => {
+      closeModal();
+      return pendingSyncNow();
+    },
+    // Entradas mortas da outbox (SYNC-09): o usuário decide entre tentar de novo e descartar.
+    pendRetryDead: async () => {
+      try {
+        if (typeof outboxRetryDead === 'function') await outboxRetryDead();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+      }
+      closeModal();
+      refreshPendingStrip();
+    },
+    pendDiscardDead: async () => {
+      try {
+        if (typeof outboxDiscardDead === 'function') await outboxDiscardDead();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes');
+      }
+      closeModal();
+      refreshPendingStrip();
+    },
   });
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { buildPendingList, wrapSupabaseForSeen, markServerSeen, markServerDeleted, _loadServerSeen };
+if (typeof module !== 'undefined' && module.exports)
+  module.exports = {
+    buildPendingList,
+    wrapSupabaseForSeen,
+    markServerSeen,
+    markServerDeleted,
+    _loadServerSeen,
+  };

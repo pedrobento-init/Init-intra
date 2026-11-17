@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const { norm } = createRequire(import.meta.url)('./_fonte.cjs');
 import {
   TEXTO_MAX,
   assuntoDaMensagem,
@@ -74,7 +77,14 @@ describe('clienteDoTelefone', () => {
   });
 
   it('o mesmo cliente casando pelos dois telefones não é ambiguidade', () => {
-    const dobrado = [{ id: 'c4', name: 'Loja', owner_phone: '11 98765-4321', responsible_phone: '(11) 98765-4321' }];
+    const dobrado = [
+      {
+        id: 'c4',
+        name: 'Loja',
+        owner_phone: '11 98765-4321',
+        responsible_phone: '(11) 98765-4321',
+      },
+    ];
     expect(clienteDoTelefone(dobrado, '5511987654321')?.id).toBe('c4');
   });
 });
@@ -133,22 +143,35 @@ describe('pendenciaDoWhatsapp', () => {
   });
 
   it('cliente sem team cai na init, como o resto da triagem', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), { id: 'c', name: 'X' }, 'p1', agora).team).toBe('init');
+    expect(pendenciaDoWhatsapp(triagem(), msg(), { id: 'c', name: 'X' }, 'p1', agora).team).toBe(
+      'init'
+    );
   });
 
   it('não tem e-mail de solicitante, para a resposta não cair no pendencia-responder', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).solicitante_email).toBeNull();
+    expect(
+      pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).solicitante_email
+    ).toBeNull();
   });
 
   it('marca as tags da triagem e o fallback sem IA', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).tags)
-      .toEqual(['triagem-automatica', 'whatsapp']);
-    expect(pendenciaDoWhatsapp(triagem({ semIa: true }), msg(), cliente, 'p1', agora).tags)
-      .toContain('sem-classificacao-ia');
+    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).tags).toEqual([
+      'triagem-automatica',
+      'whatsapp',
+    ]);
+    expect(
+      pendenciaDoWhatsapp(triagem({ semIa: true }), msg(), cliente, 'p1', agora).tags
+    ).toContain('sem-classificacao-ia');
   });
 
   it('a chave gravada é a mesma que o webhook procura', () => {
-    const p = pendenciaDoWhatsapp(triagem(), msg({ telefone: '55 11 98765-4321' }), cliente, 'p1', agora);
+    const p = pendenciaDoWhatsapp(
+      triagem(),
+      msg({ telefone: '55 11 98765-4321' }),
+      cliente,
+      'p1',
+      agora
+    );
     expect(p.email_thread_id).toBe(conversaDoTelefone('5511987654321'));
   });
 });
@@ -196,15 +219,17 @@ describe('contrato do whatsapp-responder', () => {
   });
 
   it('o webhook procura o chamado aberto pela mesma chave', () => {
-    expect(webhook).toContain('.eq("email_thread_id", conversa)');
-    expect(webhook).toContain('conversaDoTelefone(m.telefone)');
+    const w = norm(webhook);
+    expect(w).toContain(norm('.eq("email_thread_id", conversa)'));
+    expect(w).toContain(norm('conversaDoTelefone(m.telefone)'));
   });
 
   // A 082 é do portal; banco que ainda não a rodou não pode perder mensagem
   // por causa de duas colunas que ele nem conhece.
   it('banco sem a 082 ainda recebe a mensagem: o insert repete sem direcao/media', () => {
-    expect(webhook).toContain('"42703"');
-    expect(webhook).toContain('"PGRST204"');
-    expect(webhook).toContain('const { direcao: _direcao, media: _media, ...semPortal } = linha;');
+    const w = norm(webhook);
+    expect(w).toContain(norm('"42703"'));
+    expect(w).toContain(norm('"PGRST204"'));
+    expect(w).toContain(norm('const { direcao: _direcao, media: _media, ...semPortal } = linha;'));
   });
 });

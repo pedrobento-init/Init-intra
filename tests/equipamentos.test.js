@@ -7,26 +7,47 @@ import vm from 'node:vm';
 // ── Equipamentos: helpers puros + camada de dados ──────────────────────────
 function mkEl(id) {
   const el = {
-    _id: id, innerHTML: '', textContent: '', value: '', disabled: false,
-    hidden: false, dataset: {}, checked: false,
-    style: {}, attrs: {}, toggled: {},
-    setAttribute(k, v) { el.attrs[k] = String(v); },
-    getAttribute(k) { return el.attrs[k]; },
+    _id: id,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    disabled: false,
+    hidden: false,
+    dataset: {},
+    checked: false,
+    style: {},
+    attrs: {},
+    toggled: {},
+    setAttribute(k, v) {
+      el.attrs[k] = String(v);
+    },
+    getAttribute(k) {
+      return el.attrs[k];
+    },
     classList: {
-      add() {}, remove() {},
-      toggle: (k, f) => { el.toggled[k] = !!f; },
+      add() {},
+      remove() {},
+      toggle: (k, f) => {
+        el.toggled[k] = !!f;
+      },
       contains: () => false,
     },
-    addEventListener() {}, appendChild() {}, remove() {}, click() {},
+    addEventListener() {},
+    appendChild() {},
+    remove() {},
+    click() {},
     contains: () => false,
-    querySelector: () => null, querySelectorAll: () => [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
     focus() {},
   };
   return el;
 }
 
 function loadEquip(sandbox) {
-  vm.runInContext(fs.readFileSync('js/equipamentos.js', 'utf8'), sandbox, { filename: 'equipamentos.js' });
+  vm.runInContext(fs.readFileSync('js/equipamentos.js', 'utf8'), sandbox, {
+    filename: 'equipamentos.js',
+  });
   vm.runInContext(
     'globalThis.__t = { EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS, normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS, formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine, equipStatusTag, equipOSCell, equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet, applyAcertoDesign };',
     sandbox
@@ -39,7 +60,13 @@ function baseSandbox(extra) {
   const sb = {
     console,
     Promise,
-    window: { addEventListener() {}, location: { hash: '#equipamentos' }, innerWidth: 1280, scrollY: 0, scrollX: 0 },
+    window: {
+      addEventListener() {},
+      location: { hash: '#equipamentos' },
+      innerWidth: 1280,
+      scrollY: 0,
+      scrollX: 0,
+    },
     navigator: { onLine: true },
     document: {
       addEventListener() {},
@@ -65,10 +92,62 @@ function baseSandbox(extra) {
 }
 
 const FAKE = [
-  { id: 'EQP-1', nome: 'Notebook Dell Latitude 5420', numeroSerie: 'DL5420-0091', tipo: 'notebook', clientId: 'c1', clientName: 'MAM', osVinculada: '010', pendenciaId: 'PEN-1', status: 'entregue', valor: 4200, dataAquisicao: '2026-01-10', updatedAt: '2026-09-27T00:00:00.000Z' },
-  { id: 'EQP-2', nome: 'Roteador Ubiquiti UDM Pro', numeroSerie: 'UDM-3391', tipo: 'roteador', clientId: 'c2', clientName: 'Lira', osVinculada: '006', pendenciaId: null, status: 'em_manutencao', valor: 3150, dataAquisicao: '2026-02-01', updatedAt: '2026-09-07T00:00:00.000Z' },
-  { id: 'EQP-3', nome: 'Notebook Lenovo T14', numeroSerie: 'TP-T14-0532', tipo: 'notebook', clientId: null, clientName: 'Estoque Initnet', osVinculada: null, pendenciaId: null, status: 'estoque', valor: 3600, dataAquisicao: '2026-03-01', updatedAt: '2026-09-10T00:00:00.000Z' },
-  { id: 'EQP-4', nome: 'Switch TP-Link 24p', numeroSerie: 'TPL-SW24-08', tipo: 'switch', clientId: 'c3', clientName: 'Podval', osVinculada: null, pendenciaId: null, status: 'baixado', valor: 480, dataAquisicao: '2025-05-01', updatedAt: '2026-08-02T00:00:00.000Z' },
+  {
+    id: 'EQP-1',
+    nome: 'Notebook Dell Latitude 5420',
+    numeroSerie: 'DL5420-0091',
+    tipo: 'notebook',
+    clientId: 'c1',
+    clientName: 'MAM',
+    osVinculada: '010',
+    pendenciaId: 'PEN-1',
+    status: 'entregue',
+    valor: 4200,
+    dataAquisicao: '2026-01-10',
+    updatedAt: '2026-09-27T00:00:00.000Z',
+  },
+  {
+    id: 'EQP-2',
+    nome: 'Roteador Ubiquiti UDM Pro',
+    numeroSerie: 'UDM-3391',
+    tipo: 'roteador',
+    clientId: 'c2',
+    clientName: 'Lira',
+    osVinculada: '006',
+    pendenciaId: null,
+    status: 'em_manutencao',
+    valor: 3150,
+    dataAquisicao: '2026-02-01',
+    updatedAt: '2026-09-07T00:00:00.000Z',
+  },
+  {
+    id: 'EQP-3',
+    nome: 'Notebook Lenovo T14',
+    numeroSerie: 'TP-T14-0532',
+    tipo: 'notebook',
+    clientId: null,
+    clientName: 'Estoque Initnet',
+    osVinculada: null,
+    pendenciaId: null,
+    status: 'estoque',
+    valor: 3600,
+    dataAquisicao: '2026-03-01',
+    updatedAt: '2026-09-10T00:00:00.000Z',
+  },
+  {
+    id: 'EQP-4',
+    nome: 'Switch TP-Link 24p',
+    numeroSerie: 'TPL-SW24-08',
+    tipo: 'switch',
+    clientId: 'c3',
+    clientName: 'Podval',
+    osVinculada: null,
+    pendenciaId: null,
+    status: 'baixado',
+    valor: 480,
+    dataAquisicao: '2025-05-01',
+    updatedAt: '2026-08-02T00:00:00.000Z',
+  },
 ];
 
 describe('equipamentos: status/valor/stats', () => {
@@ -117,7 +196,7 @@ describe('equipamentos: status/valor/stats', () => {
 describe('equipamentos: filtros', () => {
   it('filtra por aba de status', () => {
     const T = loadEquip(baseSandbox());
-    expect(T.filterEquipamentos(FAKE, { status: 'entregue' }).map(e => e.id)).toEqual(['EQP-1']);
+    expect(T.filterEquipamentos(FAKE, { status: 'entregue' }).map((e) => e.id)).toEqual(['EQP-1']);
     expect(T.filterEquipamentos(FAKE, { status: '' })).toHaveLength(4);
   });
 
@@ -125,15 +204,21 @@ describe('equipamentos: filtros', () => {
     const T = loadEquip(baseSandbox());
     expect(T.filterEquipamentos(FAKE, { search: 'dell latitude' })).toHaveLength(1);
     expect(T.filterEquipamentos(FAKE, { search: 'udm-3391' })).toHaveLength(1);
-    expect(T.filterEquipamentos(FAKE, { search: '010' })).toContainEqual(expect.objectContaining({ id: 'EQP-1' }));
-    expect(T.filterEquipamentos(FAKE, { search: 'pen-1' })).toContainEqual(expect.objectContaining({ id: 'EQP-1' }));
+    expect(T.filterEquipamentos(FAKE, { search: '010' })).toContainEqual(
+      expect.objectContaining({ id: 'EQP-1' })
+    );
+    expect(T.filterEquipamentos(FAKE, { search: 'pen-1' })).toContainEqual(
+      expect.objectContaining({ id: 'EQP-1' })
+    );
     expect(T.filterEquipamentos(FAKE, { search: 'podval' })).toHaveLength(1);
   });
 
   it('filtra por cliente, tipo e estoque interno', () => {
     const T = loadEquip(baseSandbox());
-    expect(T.filterEquipamentos(FAKE, { client: 'c1' }).map(e => e.id)).toEqual(['EQP-1']);
-    expect(T.filterEquipamentos(FAKE, { client: '__estoque__' }).map(e => e.id)).toEqual(['EQP-3']);
+    expect(T.filterEquipamentos(FAKE, { client: 'c1' }).map((e) => e.id)).toEqual(['EQP-1']);
+    expect(T.filterEquipamentos(FAKE, { client: '__estoque__' }).map((e) => e.id)).toEqual([
+      'EQP-3',
+    ]);
     expect(T.filterEquipamentos(FAKE, { tipo: 'notebook' })).toHaveLength(2);
     expect(T.filterEquipamentos(FAKE, { onlyWithOS: true })).toHaveLength(2);
   });
@@ -181,10 +266,22 @@ describe('equipamentos: planilha de acerto', () => {
     const T = loadEquip(sb);
     const sheet = T.buildEquipAcertoSheet(FAKE);
     expect(sheet.title).toContain('Acerto');
-    expect(sheet.header).toEqual(['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações']);
+    expect(sheet.header).toEqual([
+      'Ordem de Serviço',
+      'Cliente',
+      'Serviço a ser feito',
+      'Saída',
+      'Valor',
+      'Devolvido',
+      'Observações',
+    ]);
     // 4 equipamentos + linha de total
     expect(sheet.rows).toHaveLength(5);
-    expect(sheet.rows[0].slice(0, 3)).toEqual(['010', 'MAM', 'Notebook Dell Latitude 5420 (DL5420-0091)']);
+    expect(sheet.rows[0].slice(0, 3)).toEqual([
+      '010',
+      'MAM',
+      'Notebook Dell Latitude 5420 (DL5420-0091)',
+    ]);
     expect(sheet.rows[0][4]).toBe(4200);
     expect(sheet.rows[0][5]).toBe('☐');
     // OS digitada sem vínculo sai como texto puro
@@ -257,7 +354,13 @@ describe('equipamentos: schema/sync', () => {
     expect(dbSrc).toContain('equipamentos');
     expect(dbSrc).toContain('idb.version(7)');
     const stSrc = storageSource();
-    for (const fn of ['getEquipamentos', 'getMyEquipamentos', 'getEquipamentoById', 'saveEquipamento', 'deleteEquipamento']) {
+    for (const fn of [
+      'getEquipamentos',
+      'getMyEquipamentos',
+      'getEquipamentoById',
+      'saveEquipamento',
+      'deleteEquipamento',
+    ]) {
       expect(stSrc).toContain('function ' + fn);
     }
     expect(stSrc).toContain('pendencia_id');

@@ -1,6 +1,6 @@
 // visitas.js – Registro e acompanhamento de Visitas Técnicas
 
-const VISIT_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
+const VISIT_PAGE_SIZE = typeof UI_PAGE_SIZE !== 'undefined' ? UI_PAGE_SIZE : 30;
 let _visitPage = 1;
 let _filteredVisits = [];
 // Filtros estruturados vivem em estado (a sheet edita rascunho e aplica de
@@ -9,7 +9,10 @@ let _visitFilter = { client: '', operator: '', status: '', from: '', to: '' };
 
 function renderVisitas() {
   document.getElementById('pageTitle').textContent = 'Visitas Técnicas';
-  setTopbarAction('Nova Visita', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>');
+  setTopbarAction(
+    'Nova Visita',
+    '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>'
+  );
   window._topbarAction = () => openVisitForm();
 
   const _nowRpt = new Date();
@@ -17,11 +20,11 @@ function renderVisitas() {
 
   const saved = loadFilterState('visitas', {});
   _visitFilter = {
-    client:   saved.client || '',
+    client: saved.client || '',
     operator: saved.operator || '',
-    status:   saved.status || '',
-    from:     saved.from || '',
-    to:       saved.to || '',
+    status: saved.status || '',
+    from: saved.from || '',
+    to: saved.to || '',
   };
 
   document.getElementById('contentArea').innerHTML = `
@@ -54,17 +57,27 @@ window.debouncedRenderVisitView = debounce(() => renderVisitView(), 300);
 
 // Iniciais "Pedro Bento" → "PB" (avatar do operador / fallback de cliente).
 function visitInitials(name) {
-  return String(name || '').trim().split(/\s+/).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase() || '•';
+  return (
+    String(name || '')
+      .trim()
+      .split(/\s+/)
+      .map(function (w) {
+        return w[0];
+      })
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '•'
+  );
 }
 
 function saveVisitFilters() {
   const state = {
-    search:   document.getElementById('visitSearch')?.value || '',
-    client:   _visitFilter.client,
+    search: document.getElementById('visitSearch')?.value || '',
+    client: _visitFilter.client,
     operator: _visitFilter.operator,
-    status:   _visitFilter.status,
-    from:     _visitFilter.from,
-    to:       _visitFilter.to,
+    status: _visitFilter.status,
+    from: _visitFilter.from,
+    to: _visitFilter.to,
   };
   saveFilterState('visitas', state);
 }
@@ -85,7 +98,17 @@ function renderVisitChips() {
   const box = document.getElementById('visitChips');
   if (!box) return;
   box.innerHTML = VISIT_STATUS_CHIPS.map(function (c) {
-    return '<button type="button" class="vis-chip" data-s="' + c.value + '" aria-pressed="' + (_visitFilter.status === c.value) + '" data-action="setVisitStatusFilter" data-arg="' + escapeHtml(c.value) + '">' + escapeHtml(c.label) + '</button>';
+    return (
+      '<button type="button" class="vis-chip" data-s="' +
+      c.value +
+      '" aria-pressed="' +
+      (_visitFilter.status === c.value) +
+      '" data-action="setVisitStatusFilter" data-arg="' +
+      escapeHtml(c.value) +
+      '">' +
+      escapeHtml(c.label) +
+      '</button>'
+    );
   }).join('');
 }
 
@@ -95,28 +118,43 @@ function updateVisitFilterDot() {
   try {
     const btn = document.getElementById('visitFilterBtn');
     if (!btn) return;
-    const on = !!(_visitFilter.client || _visitFilter.operator || _visitFilter.from || _visitFilter.to);
+    const on = !!(
+      _visitFilter.client ||
+      _visitFilter.operator ||
+      _visitFilter.from ||
+      _visitFilter.to
+    );
     btn.classList.toggle('on', on);
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'visitas');
+  }
 }
 
 // Bottom-sheet de filtros (rascunho; aplica ao confirmar).
 function openVisitFiltersSheet() {
-  const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
-  const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
+  const team =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? _selectedTeam
+      : getCurrentTeam();
+  const clients =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getClientsByTeam(_selectedTeam)
+      : getMyClients();
   const opNames = getOperatorNames(team);
-  openModal('Filtros', `
+  openModal(
+    'Filtros',
+    `
     <div class="form-group"><label class="form-label" for="fVisitClient">Cliente</label>
       <select class="form-select" id="fVisitClient">
         <option value="">Todos os clientes</option>
-        ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${_visitFilter.client === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+        ${clients.map((c) => `<option value="${escapeHtml(c.id)}" ${_visitFilter.client === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label" for="fVisitOperator">Operador</label>
       <select class="form-select" id="fVisitOperator">
         <option value="">Todos os operadores</option>
-        ${opNames.map(n => `<option ${_visitFilter.operator === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+        ${opNames.map((n) => `<option ${_visitFilter.operator === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
       </select></div>
-    <div class="grid-2" style="grid-template-columns:1fr 1fr">
+    <div class="grid-2 u-33e95e">
       <div class="form-group"><label class="form-label" for="fVisitFrom">De</label>
         <input type="date" class="form-input" id="fVisitFrom" value="${escapeHtml(_visitFilter.from)}" /></div>
       <div class="form-group"><label class="form-label" for="fVisitTo">Até</label>
@@ -125,13 +163,14 @@ function openVisitFiltersSheet() {
     <div class="form-actions">
       <button type="button" class="btn btn-danger btn-sm" data-action="clearVisitFiltersSheet">Limpar</button>
       <button type="button" class="btn btn-primary" data-action="applyVisitFiltersSheet">Aplicar</button>
-    </div>`);
+    </div>`
+  );
 }
 function applyVisitFiltersSheet() {
-  _visitFilter.client   = document.getElementById('fVisitClient')?.value || '';
+  _visitFilter.client = document.getElementById('fVisitClient')?.value || '';
   _visitFilter.operator = document.getElementById('fVisitOperator')?.value || '';
-  _visitFilter.from     = document.getElementById('fVisitFrom')?.value || '';
-  _visitFilter.to       = document.getElementById('fVisitTo')?.value || '';
+  _visitFilter.from = document.getElementById('fVisitFrom')?.value || '';
+  _visitFilter.to = document.getElementById('fVisitTo')?.value || '';
   saveVisitFilters();
   closeModal();
   renderVisitView();
@@ -144,29 +183,39 @@ function clearVisitFiltersSheet() {
 }
 
 function getFilteredVisits() {
-  const base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
-    ? getVisitsByTeam(_selectedTeam)
-    : getMyVisits();
-  const q   = (document.getElementById('visitSearch')?.value || '').toLowerCase();
+  const base =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getVisitsByTeam(_selectedTeam)
+      : getMyVisits();
+  const q = (document.getElementById('visitSearch')?.value || '').toLowerCase();
   const cid = _visitFilter.client;
-  const op  = _visitFilter.operator;
-  const st  = _visitFilter.status;
-  const fr  = _visitFilter.from;
-  const to  = _visitFilter.to;
-  return base.filter(v => {
-    if (q && !(v.motivo || '').toLowerCase().includes(q)
-         && !(v.clientName || '').toLowerCase().includes(q)
-         && !(v.observacoes || '').toLowerCase().includes(q)
-         && !(v.relatorio || '').toLowerCase().includes(q)
-         && !(v.operator || '').toLowerCase().includes(q)
-         && !visitMatchesNumero(v, q)) return false;
-    if (cid && v.clientId !== cid) return false;
-    if (op  && v.operator !== op) return false;
-    if (st  && v.status   !== st)  return false;
-    if (fr  && (v.date || '') < fr) return false;
-    if (to  && (v.date || '') > to) return false;
-    return true;
-  }).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''));
+  const op = _visitFilter.operator;
+  const st = _visitFilter.status;
+  const fr = _visitFilter.from;
+  const to = _visitFilter.to;
+  return base
+    .filter((v) => {
+      if (
+        q &&
+        !(v.motivo || '').toLowerCase().includes(q) &&
+        !(v.clientName || '').toLowerCase().includes(q) &&
+        !(v.observacoes || '').toLowerCase().includes(q) &&
+        !(v.relatorio || '').toLowerCase().includes(q) &&
+        !(v.operator || '').toLowerCase().includes(q) &&
+        !visitMatchesNumero(v, q)
+      )
+        return false;
+      if (cid && v.clientId !== cid) return false;
+      if (op && v.operator !== op) return false;
+      if (st && v.status !== st) return false;
+      if (fr && (v.date || '') < fr) return false;
+      if (to && (v.date || '') > to) return false;
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || '')
+    );
 }
 
 function renderVisitView(resetPage) {
@@ -187,10 +236,10 @@ function renderVisitStats() {
   if (!wrap) return;
   const today = localDateISO();
   const base = isTeamAdmin() && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
-  const total    = base.length;
-  const todayN   = base.filter(v => v.date === today).length;
-  const upcoming = base.filter(v => v.date >= today && v.status === 'agendada').length;
-  const doneMonth = base.filter(v => {
+  const total = base.length;
+  const todayN = base.filter((v) => v.date === today).length;
+  const upcoming = base.filter((v) => v.date >= today && v.status === 'agendada').length;
+  const doneMonth = base.filter((v) => {
     if (!v.date || v.status !== 'concluida') return false;
     const d = parseDateOnly(v.date);
     const now = _brasiliaNow();
@@ -205,7 +254,7 @@ function renderVisitStats() {
 
 function visitStatusTag(st) {
   const m = VISIT_STATUS_MAP[st] || { label: st || '—', color: '#94a3b8' };
-  return `<span class="tag" style="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40;font-weight:600">${escapeHtml(m.label)}</span>`;
+  return `<span class="tag" data-sty="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40;font-weight:600">${escapeHtml(m.label)}</span>`;
 }
 
 // ── Número amigável ("Visita #0001") ─────────────────────────────────────
@@ -213,7 +262,7 @@ function visitStatusTag(st) {
 // Formato: #0001–#9999 com zeros; além disso cresce naturalmente (#10000…).
 function getVisitNumero(v) {
   const n = Number(v && v.numero);
-  return (Number.isInteger(n) && n > 0) ? n : null;
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 function formatVisitNumero(v) {
   const n = getVisitNumero(v);
@@ -227,7 +276,7 @@ function parseVisitNumeroQuery(q) {
   const digits = String(q || '').replace(/\D/g, '');
   if (!digits) return null;
   const n = Number(digits);
-  return (Number.isInteger(n) && n > 0) ? n : null;
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 function visitMatchesNumero(v, q) {
   const n = parseVisitNumeroQuery(q);
@@ -238,22 +287,50 @@ function visitMatchesNumero(v, q) {
 // Card da lista (mock Visitas): data + nº, pill de status, cliente com
 // avatar, operador + horário. Toque abre o detalhe (excluir fica lá dentro).
 function visitCardHtml(v) {
-  const c = (typeof getClientById === 'function') ? getClientById(v.clientId) : null;
-  const m = (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[v.status]) || { label: v.status || '—', color: '#94a3b8' };
+  const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
+  const m = (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[v.status]) || {
+    label: v.status || '—',
+    color: '#94a3b8',
+  };
   const avName = v.clientName || '—';
   const avatar = c
     ? clientAvatar(c, 32)
-    : '<span class="vis-av" style="--c:#555">' + escapeHtml(visitInitials(avName)) + '</span>';
-  const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : formatVisitTimeRange(v);
-  return '<button type="button" class="vis-card" style="--st:' + m.color + '" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">'
-    + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
-    + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
-    + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span>'
-    + (typeof milvusStatusChipHtml === 'function' ? milvusStatusChipHtml(v) : '') + '</div>'
-    + (v.motivo ? '<div class="vis-why">' + escapeHtml(v.motivo) + '</div>' : '')
-    + '<div class="vis-meta"><span class="vis-who"><i>' + escapeHtml(visitInitials(v.operator)) + '</i>' + escapeHtml(v.operator || '—') + '</span>'
-    + '<span>' + escapeHtml(timeLabel) + '</span></div>'
-    + '</button>';
+    : '<span class="vis-av u-76591b">' + escapeHtml(visitInitials(avName)) + '</span>';
+  const timeLabel = v.allDay || !v.time ? 'Dia inteiro' : formatVisitTimeRange(v);
+  return (
+    '<button type="button" class="vis-card" data-sty="--st:' +
+    m.color +
+    '" data-action="openVisit" data-arg="' +
+    escapeHtml(v.id) +
+    '">' +
+    '<div class="vis-row"><div class="vis-date">' +
+    escapeHtml(v.date ? formatDate(v.date) : '—') +
+    '<small>' +
+    escapeHtml(formatVisitNumero(v)) +
+    '</small></div>' +
+    '<span class="vis-st" data-sty="--st:' +
+    m.color +
+    '">' +
+    escapeHtml(m.label) +
+    '</span></div>' +
+    '<div class="vis-cli">' +
+    avatar +
+    '<span>' +
+    escapeHtml(avName) +
+    '</span>' +
+    (typeof milvusStatusChipHtml === 'function' ? milvusStatusChipHtml(v) : '') +
+    '</div>' +
+    (v.motivo ? '<div class="vis-why">' + escapeHtml(v.motivo) + '</div>' : '') +
+    '<div class="vis-meta"><span class="vis-who"><i>' +
+    escapeHtml(visitInitials(v.operator)) +
+    '</i>' +
+    escapeHtml(v.operator || '—') +
+    '</span>' +
+    '<span>' +
+    escapeHtml(timeLabel) +
+    '</span></div>' +
+    '</button>'
+  );
 }
 
 // ── Grupos da lista: o que pede ação primeiro, o passado no fim ───────────
@@ -276,7 +353,8 @@ function visitGroupKey(v, todayISO) {
   const d = (v && v.date) || '';
   if (!d) return 'depois';
   if (d === todayISO) return 'hoje';
-  if (d < todayISO) return (v.status === 'agendada' || v.status === 'em_andamento') ? 'atrasadas' : 'anteriores';
+  if (d < todayISO)
+    return v.status === 'agendada' || v.status === 'em_andamento' ? 'atrasadas' : 'anteriores';
   if (d === _visitIsoAddDays(todayISO, 1)) return 'amanha';
   if (d <= _visitIsoAddDays(todayISO, 7)) return 'semana';
   return 'depois';
@@ -289,9 +367,13 @@ function visitGroupKey(v, todayISO) {
  */
 function groupVisitsByPeriod(visits, todayISO) {
   const by = {};
-  for (const v of visits || []) { const k = visitGroupKey(v, todayISO); (by[k] = by[k] || []).push(v); }
+  for (const v of visits || []) {
+    const k = visitGroupKey(v, todayISO);
+    (by[k] = by[k] || []).push(v);
+  }
   const hora = (v) => (v.allDay || !v.time ? '99:99' : String(v.time));
-  const asc = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) || hora(a).localeCompare(hora(b));
+  const asc = (a, b) =>
+    String(a.date || '').localeCompare(String(b.date || '')) || hora(a).localeCompare(hora(b));
   return VISIT_GROUPS.filter((g) => by[g.key]).map((g) => ({
     ...g,
     visits: by[g.key].slice().sort(g.key === 'anteriores' ? (a, b) => asc(b, a) : asc),
@@ -306,8 +388,14 @@ function renderVisitTable(area) {
   if (countEl) countEl.textContent = visits.length + (visits.length === 1 ? ' visita' : ' visitas');
   if (!visits.length) {
     // "Ajuste os filtros" só faz sentido quando há busca/filtro ativo.
-    const hasFilter = !!((document.getElementById('visitSearch')?.value || '').trim()
-      || _visitFilter.client || _visitFilter.operator || _visitFilter.status || _visitFilter.from || _visitFilter.to);
+    const hasFilter = !!(
+      (document.getElementById('visitSearch')?.value || '').trim() ||
+      _visitFilter.client ||
+      _visitFilter.operator ||
+      _visitFilter.status ||
+      _visitFilter.from ||
+      _visitFilter.to
+    );
     wrap.innerHTML = hasFilter
       ? `<div class="vis-empty empty-state"><p>Nenhuma visita encontrada.<br>Ajuste os filtros ou limpe a busca.</p></div>`
       : `<div class="vis-empty empty-state"><p>Nenhuma visita registrada ainda.</p><button class="btn btn-primary btn-sm" data-action="newVisit">+ Nova Visita</button></div>`;
@@ -323,65 +411,95 @@ function renderVisitTable(area) {
   const rows = [];
   for (const g of groups) for (const v of g.visits) rows.push({ v, g });
   let lastGroup = null;
-  const pageHtml = rows.slice(startIdx, startIdx + VISIT_PAGE_SIZE).map(({ v, g }) => {
-    const head = g.key === lastGroup ? '' :
-      '<h3 class="vis-group vis-group--' + g.key + '">' + escapeHtml(g.label) + '<span>' + g.visits.length + '</span></h3>';
-    lastGroup = g.key;
-    return head + visitCardHtml(v);
-  }).join('');
+  const pageHtml = rows
+    .slice(startIdx, startIdx + VISIT_PAGE_SIZE)
+    .map(({ v, g }) => {
+      const head =
+        g.key === lastGroup
+          ? ''
+          : '<h3 class="vis-group vis-group--' +
+            g.key +
+            '">' +
+            escapeHtml(g.label) +
+            '<span>' +
+            g.visits.length +
+            '</span></h3>';
+      lastGroup = g.key;
+      return head + visitCardHtml(v);
+    })
+    .join('');
 
-  wrap.innerHTML = pageHtml
-  + (totalPages > 1 ? `
+  wrap.innerHTML =
+    pageHtml +
+    (totalPages > 1
+      ? `
     <div class="vis-pager">
-      <div>Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button class="btn btn-sm btn-secondary" ${_visitPage===1?'disabled':''} data-action="visitPrevPage">← Anterior</button>
+      <div>Mostrando ${startIdx + 1}–${Math.min(startIdx + VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
+      <div class="u-25b528">
+        <button class="btn btn-sm btn-secondary" ${_visitPage === 1 ? 'disabled' : ''} data-action="visitPrevPage">← Anterior</button>
         <span>${_visitPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} data-action="visitNextPage">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_visitPage === totalPages ? 'disabled' : ''} data-action="visitNextPage">Próxima →</button>
       </div>
-    </div>` : '');
+    </div>`
+      : '');
   // Status dos chamados no Milvus: consulta em segundo plano (TTL/throttle no módulo).
   if (typeof scheduleMilvusStatusRefresh === 'function') scheduleMilvusStatusRefresh();
 }
 
 function openVisitForm(id = null, preClientId = null, preDate = null, preTime = null) {
   const v = id ? getVisitById(id) : {};
-  const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
-  const team    = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
+  const clients =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getClientsByTeam(_selectedTeam)
+      : getMyClients();
+  const team =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? _selectedTeam
+      : getCurrentTeam();
   const opNames = getOperatorNames(team);
   const currentOp = v.operator || getUser().name;
   const allDay = v.allDay === true;
   // Hora clicada na Agenda (visão Semana) só vale para visita nova.
-  const timeStart = (v.time || (!id && /^\d{2}:\d{2}$/.test(preTime || '') ? preTime : '')).toString().slice(0, 5);
+  const timeStart = (v.time || (!id && /^\d{2}:\d{2}$/.test(preTime || '') ? preTime : ''))
+    .toString()
+    .slice(0, 5);
   const timeEnd = (v.timeEnd || '').toString().slice(0, 5);
 
-  openModal(id ? ('Editar ' + visitDisplayTitle(v)) : 'Nova Visita', `
-    <form data-submit="submitVisitForm" data-arg="${escapeHtml(id||'')}">
+  openModal(
+    id ? 'Editar ' + visitDisplayTitle(v) : 'Nova Visita',
+    `
+    <form data-submit="submitVisitForm" data-arg="${escapeHtml(id || '')}">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cliente *</label>
           <select class="form-select" name="clientId" required>
             <option value="">Selecione...</option>
-            ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${((v.clientId||preClientId)===c.id)?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+            ${clients.map((c) => `<option value="${escapeHtml(c.id)}" ${(v.clientId || preClientId) === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label class="form-label">Operador *</label>
           <select class="form-select" name="operator" required>
-            ${opNames.length
-              ? opNames.map(n => `<option value="${escapeHtml(n)}" ${currentOp===n?'selected':''}>${escapeHtml(n)}</option>`).join('')
-              : `<option value="${escapeHtml(currentOp)}">${escapeHtml(currentOp)}</option>`
+            ${
+              opNames.length
+                ? opNames
+                    .map(
+                      (n) =>
+                        `<option value="${escapeHtml(n)}" ${currentOp === n ? 'selected' : ''}>${escapeHtml(n)}</option>`
+                    )
+                    .join('')
+                : `<option value="${escapeHtml(currentOp)}">${escapeHtml(currentOp)}</option>`
             }
           </select></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Data *</label>
           <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || localDateISO())}" required /></div>
-        <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--bg-base)">
-            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} data-change="toggleVisitAllDayFields" style="width:16px;height:16px;accent-color:var(--accent)" />
+        <div class="form-group u-203914">
+          <label class="u-ead5fa">
+            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} data-change="toggleVisitAllDayFields" class="u-9cf325" />
             Dia inteiro
           </label>
         </div>
       </div>
-      <div class="form-row" id="visitTimeFields" style="${allDay ? 'opacity:.45;pointer-events:none' : ''}">
+      <div class="form-row" id="visitTimeFields" data-sty="${allDay ? 'opacity:.45;pointer-events:none' : ''}">
         <div class="form-group"><label class="form-label">Horário de início</label>
           <input type="time" class="form-input" id="visitTimeStart" name="time" value="${escapeHtml(timeStart)}" ${allDay ? 'disabled' : ''} /></div>
         <div class="form-group"><label class="form-label">Horário de fim</label>
@@ -393,29 +511,35 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
         <textarea class="form-textarea" name="observacoes" rows="2" placeholder="Orientações prévias, localização, contato local...">${escapeHtml(v.observacoes || '')}</textarea></div>
       ${typeof levarFormHtml === 'function' ? levarFormHtml(v) : ''}
 
-      <div class="form-group" style="margin-top:var(--space-5);padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
-        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);font-weight:700">
+      <div class="form-group u-64a97f">
+        <label class="form-label u-1d8672">
           <span>Relatório de Atendimento (O que foi feito na visita)</span>
-          <span style="font-size:11px;font-weight:400;color:var(--text-muted)">Preenchimento após/durante a visita</span>
+          <span class="u-d80dec">Preenchimento após/durante a visita</span>
         </label>
         <textarea class="form-textarea" name="relatorio" rows="4" placeholder="Descreva em detalhes o serviço realizado, equipamentos testados, soluções aplicadas ou observações de conclusão...">${escapeHtml(v.relatorio || '')}</textarea>
       </div>
 
-      <div class="form-row" style="margin-top:var(--space-5)">
+      <div class="form-row u-c45c36">
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" name="status">
-            ${Object.entries(VISIT_STATUS_MAP).map(([k,m]) => `<option value="${k}" ${(v.status||'agendada')===k?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
+            ${Object.entries(VISIT_STATUS_MAP)
+              .map(
+                ([k, m]) =>
+                  `<option value="${k}" ${(v.status || 'agendada') === k ? 'selected' : ''}>${escapeHtml(m.label)}</option>`
+              )
+              .join('')}
           </select></div>
         <div class="form-group"><label class="form-label">Recorrência</label>
           <select class="form-select" name="recurrence">
-            ${RECURRENCE_OPTIONS.map(o => `<option value="${o.value}" ${(v.recurrence||'')===o.value?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}
+            ${RECURRENCE_OPTIONS.map((o) => `<option value="${o.value}" ${(v.recurrence || '') === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
-    </form>`);
+    </form>`
+  );
 }
 
 function toggleVisitAllDayFields() {
@@ -432,11 +556,21 @@ function toggleVisitAllDayFields() {
 }
 
 function findVisitScheduleConflicts(data, visits) {
-  const minutes = (value, fallback) => /^\d{2}:\d{2}$/.test(value || '') ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3)) : fallback;
+  const minutes = (value, fallback) =>
+    /^\d{2}:\d{2}$/.test(value || '')
+      ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3))
+      : fallback;
   const start = data.allDay ? 0 : minutes(data.time, 0);
   const end = data.allDay ? 1440 : Math.max(start + 1, minutes(data.timeEnd, start + 1));
-  return (visits || []).filter(v => {
-    if (!v || v.id === data.id || v.clientId !== data.clientId || v.date !== data.date || v.status === 'cancelada') return false;
+  return (visits || []).filter((v) => {
+    if (
+      !v ||
+      v.id === data.id ||
+      v.clientId !== data.clientId ||
+      v.date !== data.date ||
+      v.status === 'cancelada'
+    )
+      return false;
     if (String(v.operator || '') === String(data.operator || '')) return false;
     const otherStart = v.allDay ? 0 : minutes(v.time, 0);
     const otherEnd = v.allDay ? 1440 : Math.max(otherStart + 1, minutes(v.timeEnd, otherStart + 1));
@@ -448,9 +582,9 @@ function submitVisitForm(e, id) {
   e.preventDefault();
   try {
     const fd = new FormData(e.target);
-    const g  = k => (fd.get(k) || '').toString();
+    const g = (k) => (fd.get(k) || '').toString();
     const clientId = g('clientId');
-    const client   = clientId ? getClientById(clientId) : null;
+    const client = clientId ? getClientById(clientId) : null;
     if (clientId && !client) {
       showToast('Cliente inválido.', 'error');
       return;
@@ -460,7 +594,10 @@ function submitVisitForm(e, id) {
       return;
     }
     const motivo = g('motivo').trim();
-    if (!motivo) { showToast('Informe o motivo da visita.', 'error'); return; }
+    if (!motivo) {
+      showToast('Informe o motivo da visita.', 'error');
+      return;
+    }
     const allDay = document.getElementById('visitAllDay')?.checked === true;
     let time = g('time').slice(0, 5);
     let timeEnd = g('timeEnd').slice(0, 5);
@@ -490,13 +627,21 @@ function submitVisitForm(e, id) {
     if (levar !== undefined) data.levar = levar;
     const conflicts = findVisitScheduleConflicts(data, getVisits());
     if (conflicts.length) {
-      const nomes = conflicts.map(v => v.operator || 'Outro operador').join(', ');
-      if (!window.confirm('Já existe visita deste cliente no mesmo horário com ' + nomes + '.\n\nDeseja salvar mesmo assim?')) return;
+      const nomes = conflicts.map((v) => v.operator || 'Outro operador').join(', ');
+      if (
+        !window.confirm(
+          'Já existe visita deste cliente no mesmo horário com ' +
+            nomes +
+            '.\n\nDeseja salvar mesmo assim?'
+        )
+      )
+        return;
     }
     saveVisit(data);
     closeModal();
     if (document.getElementById('visitViewArea')) renderVisitView();
-    if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+    if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+      refreshCalendar();
     if (typeof updateBadges === 'function') updateBadges();
     showToast(id ? 'Visita atualizada!' : 'Visita registrada!', 'success');
   } catch (err) {
@@ -510,10 +655,12 @@ function openVisitDetail(id) {
   const c = getClientById(v.clientId);
   const hasReport = !!(v.relatorio && v.relatorio.trim());
 
-  openModal(escapeHtml(visitDisplayTitle(v)), `
+  openModal(
+    escapeHtml(visitDisplayTitle(v)),
+    `
     <div class="ticket-info-grid">
-      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Operador</div><div class="ticket-info-value">${escapeHtml(v.operator)||'—'}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div class="u-b88d18">${clientAvatar(c, 22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName) || '—'}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Operador</div><div class="ticket-info-value">${escapeHtml(v.operator) || '—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Data</div><div class="ticket-info-value">${v.date ? formatDate(v.date) : '—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Horário</div><div class="ticket-info-value">${escapeHtml(formatVisitTimeRange(v))}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${visitStatusTag(v.status)}</div></div>
@@ -522,40 +669,52 @@ function openVisitDetail(id) {
       if (typeof resolveMilvusChamadoState !== 'function') return '';
       const ms = resolveMilvusChamadoState(v);
       if (ms.kind === 'nao_aplicavel') return '';
-      const box = (inner) => `<div class="form-group mchip-box"><label class="form-label">Chamado Milvus</label><div class="mchip-row">${inner}</div></div>`;
+      const box = (inner) =>
+        `<div class="form-group mchip-box"><label class="form-label">Chamado Milvus</label><div class="mchip-row">${inner}</div></div>`;
       if (ms.kind === 'criado') {
         let fin = '';
         if (typeof resolveMilvusFinalizarState === 'function') {
           const fs = resolveMilvusFinalizarState(v);
           if (fs.kind === 'finalizado') fin = ` <span class="mchip mchip--ok">✓ Finalizado</span>`;
-          else if (fs.kind === 'pendente') fin = ` <span class="mchip mchip--warn">⏳ Pendente de finalização</span>`;
-          else if (fs.kind === 'finalizando') fin = ` <span class="mchip mchip--info">🔄 Finalizando…</span>`;
-          else if (fs.kind === 'erro') fin = ` <span class="mchip mchip--bad">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`;
+          else if (fs.kind === 'pendente')
+            fin = ` <span class="mchip mchip--warn">⏳ Pendente de finalização</span>`;
+          else if (fs.kind === 'finalizando')
+            fin = ` <span class="mchip mchip--info">🔄 Finalizando…</span>`;
+          else if (fs.kind === 'erro')
+            fin = ` <span class="mchip mchip--bad">⚠️ Erro ao finalizar${fs.erro ? ': ' + escapeHtml(fs.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`;
           // Visita concluída antes da etapa 2 (ou sem transição nova): nunca
           // entrou sozinha (sem bulk-finalize). Ação manual explícita —
           // só aparece com chamado já criado (sem codigo, sem botão).
-          else if (fs.kind === null && v.status === 'concluida') fin = ` <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">✓ Finalizar chamado no Milvus</button>`;
+          else if (fs.kind === null && v.status === 'concluida')
+            fin = ` <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusFinalizar" data-arg="${escapeHtml(id)}">✓ Finalizar chamado no Milvus</button>`;
         }
         const back = typeof milvusStatusDetailHtml === 'function' ? milvusStatusDetailHtml(v) : '';
-        return box(`<span class="mchip mchip--ok">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`);
+        return box(
+          `<span class="mchip mchip--ok">🎫 Chamado Milvus: ${escapeHtml(String(ms.codigo))}</span>${fin}${back}`
+        );
       }
-      if (ms.kind === 'pendente') return box(`<span class="mchip mchip--warn">⏳ Aguardando criação do chamado</span>`);
-      if (ms.kind === 'criando') return box(`<span class="mchip mchip--info">🔄 Criando chamado no Milvus…</span>`);
-      if (ms.kind === 'sem_token') return box(`<span class="mchip">Cliente sem integração Milvus</span>`);
-      return box(`<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusChamado" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`);
+      if (ms.kind === 'pendente')
+        return box(`<span class="mchip mchip--warn">⏳ Aguardando criação do chamado</span>`);
+      if (ms.kind === 'criando')
+        return box(`<span class="mchip mchip--info">🔄 Criando chamado no Milvus…</span>`);
+      if (ms.kind === 'sem_token')
+        return box(`<span class="mchip">Cliente sem integração Milvus</span>`);
+      return box(
+        `<span class="mchip mchip--bad">⚠️ Erro ao criar chamado${ms.erro ? ': ' + escapeHtml(ms.erro) : ''}</span> <button class="btn btn-sm btn-secondary mchip-act" data-action="retryMilvusChamado" data-arg="${escapeHtml(id)}">↻ Tentar novamente</button>`
+      );
     })()}
     ${typeof visitaCampoHtml === 'function' ? visitaCampoHtml(v) : ''}
     <hr class="divider"/>
 
     <div class="form-group"><label class="form-label">Motivo</label>
-      <div class="timeline-text">${escapeHtml(v.motivo)||'—'}</div></div>
+      <div class="timeline-text">${escapeHtml(v.motivo) || '—'}</div></div>
     
     ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações prévias</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
     ${typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : ''}
 
-    <div class="form-group" style="margin-top:var(--space-5)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <label class="form-label" style="margin:0;font-weight:700;display:flex;align-items:center;gap:6px;font-size:13px;color:#16a34a">
+    <div class="form-group u-c45c36">
+      <div class="u-3daa03">
+        <label class="form-label u-381792">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Relatório de Atendimento (O que foi feito)
         </label>
@@ -563,10 +722,12 @@ function openVisitDetail(id) {
           ${hasReport ? '✎ Editar Relatório' : '+ Adicionar Relatório'}
         </button>
       </div>
-      <div class="timeline-text" style="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
-        ${hasReport
-          ? escapeHtml(v.relatorio).replace(/\n/g, '<br>')
-          : '<em style="color:var(--text-muted)">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'}
+      <div class="timeline-text" data-sty="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
+        ${
+          hasReport
+            ? escapeHtml(v.relatorio).replace(/\n/g, '<br>')
+            : '<em class="u-5872de">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'
+        }
       </div>
     </div>
 
@@ -575,38 +736,51 @@ function openVisitDetail(id) {
     ${typeof visitSignatureSectionHtml === 'function' ? visitSignatureSectionHtml(v) : ''}
 
     ${(() => {
-      const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
-      if (!linked.length) return `<div style="margin-top:var(--space-5);padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
-      return `<div style="margin-top:var(--space-5)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" data-action="openPendenciaFromVisit" data-arg="${escapeHtml(p.id)}">Abrir</button></div>`).join('')}</div></div>`;
+      const linked =
+        typeof getPendencias === 'function'
+          ? getPendencias().filter((p) => p.visitId === v.id)
+          : [];
+      if (!linked.length)
+        return `<div class="u-509c2d">Nenhuma pendência vinculada a esta visita.</div>`;
+      return `<div class="u-c45c36"><div class="u-da812b">Pendências geradas desta visita (${linked.length})</div><div class="u-14b4b5">${linked.map((p) => `<div class="u-d3f3d1"><div><div class="u-c4f362">${escapeHtml(getPendenciaTitulo(p))}</div><div class="u-749148">${escapeHtml(p.responsible || '—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" data-action="openPendenciaFromVisit" data-arg="${escapeHtml(p.id)}">Abrir</button></div>`).join('')}</div></div>`;
     })()}
-    <div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Alterar status</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="chgVisitStatus" style="width:180px">
-          ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
+    <div class="form-group u-c45c36"><label class="form-label">Alterar status</label>
+      <div class="u-58703f">
+        <select class="form-select u-54f91a" id="chgVisitStatus">
+          ${Object.entries(VISIT_STATUS_MAP)
+            .map(
+              ([k, mm]) =>
+                `<option value="${k}" ${v.status === k ? 'selected' : ''}>${escapeHtml(mm.label)}</option>`
+            )
+            .join('')}
         </select>
         <button class="btn btn-primary btn-sm" data-action="changeVisitStatus" data-arg="${escapeHtml(id)}">Atualizar Status</button>
-        ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" data-action="openConcludeVisitModal" data-arg="${escapeHtml(id)}">✅ Concluir com Relatório</button>` : ''}
+        ${v.status !== 'concluida' ? `<button class="btn btn-sm u-0968f6" data-action="openConcludeVisitModal" data-arg="${escapeHtml(id)}">✅ Concluir com Relatório</button>` : ''}
 ${typeof printVisitReport === 'function' ? `<button type="button" class="btn btn-secondary btn-sm" data-action="visitPrint" data-arg="${escapeHtml(id)}" title="Relatório da visita com a assinatura (imprimir ou salvar em PDF)">🖨 Relatório</button>` : ''}
                 <button class="btn btn-secondary btn-sm" data-action="visitEditAll" data-arg="${escapeHtml(id)}">✎ Editar Tudo</button>
         <button class="btn btn-sm btn-danger" data-action="visitDeleteFromDetail" data-arg="${escapeHtml(id)}" title="Excluir visita">Excluir</button>
       </div>
     </div>
-  `);
+  `
+  );
   if (typeof renderVisitPhotos === 'function') renderVisitPhotos(id);
   // Detalhe aberto: status do Milvus com mais de 2 min é consultado de novo.
   try {
     if (Number(v.milvusChamadoCodigo) > 0 && typeof scheduleMilvusStatusRefresh === 'function') {
       const e = typeof getMilvusStatusEntry === 'function' ? getMilvusStatusEntry(id) : null;
-      if (!e || Date.now() - new Date(e.checkedAt || 0).getTime() > 120000) scheduleMilvusStatusRefresh({ force: [id] });
+      if (!e || Date.now() - new Date(e.checkedAt || 0).getTime() > 120000)
+        scheduleMilvusStatusRefresh({ force: [id] });
     }
-  } catch (_) {}
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'visitas');
+  }
 }
 
 function changeVisitStatus(id) {
   const v = getVisitById(id);
   if (!v) return;
   const newStatus = document.getElementById('chgVisitStatus').value;
-  
+
   // Se estiver concluindo e não tiver relatório, direciona para o modal de conclusão com relatório
   if (newStatus === 'concluida' && (!v.relatorio || !v.relatorio.trim())) {
     openConcludeVisitModal(id);
@@ -620,7 +794,8 @@ function changeVisitStatus(id) {
   showToast('Status atualizado!', 'success');
   openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
-  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+    refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
 }
 
@@ -628,37 +803,44 @@ function openConcludeVisitModal(id) {
   const v = getVisitById(id);
   if (!v) return;
 
-  openModal('Concluir Visita — Relatório de Atendimento', `
+  openModal(
+    'Concluir Visita — Relatório de Atendimento',
+    `
     <form data-submit="submitConcludeVisit" data-arg="${escapeHtml(id)}">
-      <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;font-size:13px;border-left:3px solid #16a34a">
-        <strong>Cliente:</strong> ${escapeHtml(v.clientName||'—')}<br>
-        <strong>Motivo:</strong> ${escapeHtml(v.motivo||'—')}
+      <div class="u-2e0f03">
+        <strong>Cliente:</strong> ${escapeHtml(v.clientName || '—')}<br>
+        <strong>Motivo:</strong> ${escapeHtml(v.motivo || '—')}
       </div>
       <div class="form-group">
-        <label class="form-label" style="font-weight:700;color:#16a34a">
+        <label class="form-label u-f40695">
           O que foi feito no atendimento? *
         </label>
         <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('concludeRelatorio', v.id) : ''}
       </div>
-      ${typeof signaturePadHtml === 'function' ? `<div class="form-group">
+      ${
+        typeof signaturePadHtml === 'function'
+          ? `<div class="form-group">
         <label class="form-label">Assinatura do cliente (opcional)</label>
         ${signaturePadHtml('concludeSig', v.assinaturaNome || '')}
-      </div>` : ''}
+      </div>`
+          : ''
+      }
       <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)">
-          <input type="checkbox" id="concludeCreatePendencia" style="width:16px;height:16px;accent-color:var(--accent)" />
+        <label class="u-3bd1f7">
+          <input type="checkbox" id="concludeCreatePendencia" class="u-9cf325" />
           Criar pendência de acompanhamento vinculada a esta visita
         </label>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" data-action="openVisit" data-arg="${escapeHtml(id)}">Voltar</button>
-        <button type="submit" class="btn" style="background:#16a34a;color:#fff;border:none">
+        <button type="submit" class="btn u-0968f6">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Salvar Relatório e Concluir Visita
         </button>
       </div>
     </form>
-  `);
+  `
+  );
   setTimeout(() => {
     document.getElementById('concludeRelatorio')?.focus();
     if (typeof initSignaturePad === 'function') initSignaturePad('concludeSig');
@@ -674,8 +856,13 @@ function submitConcludeVisit(e, id) {
     showToast('Descreva o que foi feito para concluir a visita.', 'error');
     return;
   }
-  const sig = typeof readSignaturePad === 'function' ? signatureFields(readSignaturePad('concludeSig')) : {};
-  concludeVisit(id, { relatorio: rel, sig, criarPendencia: !!document.getElementById('concludeCreatePendencia')?.checked });
+  const sig =
+    typeof readSignaturePad === 'function' ? signatureFields(readSignaturePad('concludeSig')) : {};
+  concludeVisit(id, {
+    relatorio: rel,
+    sig,
+    criarPendencia: !!document.getElementById('concludeCreatePendencia')?.checked,
+  });
 
   closeModal();
   showToast('Visita concluída com relatório salvo!', 'success');
@@ -713,7 +900,8 @@ function concludeVisit(id, { relatorio, sig, criarPendencia } = {}) {
   }
 
   if (document.getElementById('visitViewArea')) renderVisitView(false);
-  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+    refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
   return true;
 }
@@ -722,10 +910,12 @@ function openEditVisitReportModal(id) {
   const v = getVisitById(id);
   if (!v) return;
 
-  openModal('Relatório de Atendimento', `
+  openModal(
+    'Relatório de Atendimento',
+    `
     <form data-submit="submitEditVisitReport" data-arg="${escapeHtml(id)}">
       <div class="form-group">
-        <label class="form-label" style="font-weight:700">Relatório (O que foi feito na visita)</label>
+        <label class="form-label u-e3ec02">Relatório (O que foi feito na visita)</label>
         <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('editVisitReportText', id) : ''}
       </div>
       <div class="form-actions">
@@ -733,7 +923,8 @@ function openEditVisitReportModal(id) {
         <button type="submit" class="btn btn-primary">Salvar Relatório</button>
       </div>
     </form>
-  `);
+  `
+  );
   setTimeout(() => document.getElementById('editVisitReportText')?.focus(), 100);
 }
 
@@ -748,23 +939,26 @@ function submitEditVisitReport(e, id) {
   showToast('Relatório salvo com sucesso!', 'success');
   openVisitDetail(id);
   if (document.getElementById('visitViewArea')) renderVisitView(false);
-  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+    refreshCalendar();
   if (typeof updateBadges === 'function') updateBadges();
 }
 
 function deleteVisitConfirm(id) {
   const v = getVisitById(id);
   if (!v) return;
-  confirmAction('Excluir esta visita?', function() {
+  confirmAction('Excluir esta visita?', function () {
     const snapshot = JSON.parse(JSON.stringify(v));
     deleteVisit(id);
     renderVisitView(false); // preserva a página (sem arg voltava para a 1)
-    if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+    if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+      refreshCalendar();
     if (typeof updateBadges === 'function') updateBadges();
-    showUndoToast('Visita removida.', function() {
+    showUndoToast('Visita removida.', function () {
       saveVisit(snapshot);
       renderVisitView(false);
-      if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) refreshCalendar();
+      if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+        refreshCalendar();
       if (typeof updateBadges === 'function') updateBadges();
       showToast('Visita restaurada.', 'success');
     });
@@ -773,10 +967,14 @@ function deleteVisitConfirm(id) {
 
 function openVisitMonthReportModal() {
   const now = new Date();
-  const def = window._visitReportDefaultMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  openModal('Relatório mensal de visitas', `
+  const def =
+    window._visitReportDefaultMonth ||
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  openModal(
+    'Relatório mensal de visitas',
+    `
     <form data-submit="visitMonthReportNoop">
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
+      <p class="u-25b390">
         Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong>, <strong>resumo por técnico</strong> e <strong>detalhe das visitas</strong>
         (horários previstos e reais de chegada/saída, observações, chamado, assinatura do cliente e o que foi feito em cada atendimento).
         O Excel sai formatado (pronto para enviar). O CSV serve para importar no Google Sheets.
@@ -786,19 +984,20 @@ function openVisitMonthReportModal() {
         <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
       </div>
       <div class="btn-pair-grid">
-        <button type="button" class="btn btn-primary" data-action="exportVisitMonthReport" data-arg="excel" style="justify-content:center">
+        <button type="button" class="btn btn-primary u-03c4bb" data-action="exportVisitMonthReport" data-arg="excel">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
           Excel (.xls)
         </button>
-        <button type="button" class="btn btn-secondary" data-action="exportVisitMonthReport" data-arg="csv" style="justify-content:center">
+        <button type="button" class="btn btn-secondary u-03c4bb" data-action="exportVisitMonthReport" data-arg="csv">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV (Sheets)
         </button>
       </div>
-      <div class="form-actions" style="margin-top:14px">
+      <div class="form-actions u-d6f2af">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>
       </div>
-    </form>`);
+    </form>`
+  );
 }
 
 function _visitReportCsvCell(val) {
@@ -817,7 +1016,20 @@ function _visitReportEscHtml(val) {
 }
 
 function _visitReportMonthLabel(yStr, mStr) {
-  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const months = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ];
   const m = Number(mStr) - 1;
   return (months[m] || mStr) + ' de ' + yStr;
 }
@@ -826,16 +1038,16 @@ function _visitReportMonthLabel(yStr, mStr) {
 function _visitReportClock(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Minutos → '2h30' / '45min' / '—' (mesmo padrão do tempo médio do cabeçalho). */
 function _visitReportFmtMin(min) {
   if (min == null || !isFinite(min) || min <= 0) return '—';
   const m = Math.round(min);
-  return m >= 60
-    ? Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'min' : '')
-    : m + 'min';
+  return m >= 60 ? Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'min' : '') : m + 'min';
 }
 
 /** Duração real (Cheguei → Saí) em minutos; null sem o par completo. */
@@ -852,7 +1064,7 @@ function _visitReportMinutes(v) {
   if (v && !v.allDay && v.time && v.timeEnd) {
     const [h1, m1] = String(v.time).slice(0, 5).split(':').map(Number);
     const [h2, m2] = String(v.timeEnd).slice(0, 5).split(':').map(Number);
-    const d = (h2 * 60 + m2) - (h1 * 60 + m1);
+    const d = h2 * 60 + m2 - (h1 * 60 + m1);
     return Number.isFinite(d) && d > 0 ? d : null;
   }
   return null;
@@ -861,21 +1073,32 @@ function _visitReportMinutes(v) {
 function _visitReportCollect(monthInput) {
   const [yStr, mStr] = monthInput.split('-');
   const prefix = monthInput;
-  const base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
-    ? getVisitsByTeam(_selectedTeam)
-    : getMyVisits();
+  const base =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getVisitsByTeam(_selectedTeam)
+      : getMyVisits();
 
   const visits = base
-    .filter(v => (v.date || '').startsWith(prefix))
-    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || (a.clientName || '').localeCompare(b.clientName || ''));
+    .filter((v) => (v.date || '').startsWith(prefix))
+    .sort(
+      (a, b) =>
+        (a.date || '').localeCompare(b.date || '') ||
+        (a.time || '').localeCompare(b.time || '') ||
+        (a.clientName || '').localeCompare(b.clientName || '')
+    );
 
   const byClient = {};
   const byStatus = {};
   const byOperator = {};
-  visits.forEach(v => {
+  visits.forEach((v) => {
     const key = v.clientId || v.clientName || '_sem_cliente';
     if (!byClient[key]) {
-      byClient[key] = { clientName: v.clientName || '—', count: 0, motivos: new Set(), operators: new Set() };
+      byClient[key] = {
+        clientName: v.clientName || '—',
+        count: 0,
+        motivos: new Set(),
+        operators: new Set(),
+      };
     }
     byClient[key].count += 1;
     if (v.motivo) byClient[key].motivos.add(v.motivo);
@@ -883,7 +1106,8 @@ function _visitReportCollect(monthInput) {
     const st = v.status || '—';
     byStatus[st] = (byStatus[st] || 0) + 1;
     const op = v.operator || '—';
-    if (!byOperator[op]) byOperator[op] = { operator: op, count: 0, concluidas: 0, minutes: 0, clients: new Set() };
+    if (!byOperator[op])
+      byOperator[op] = { operator: op, count: 0, concluidas: 0, minutes: 0, clients: new Set() };
     byOperator[op].count += 1;
     if (v.status === 'concluida') byOperator[op].concluidas += 1;
     const mins = _visitReportMinutes(v);
@@ -891,15 +1115,21 @@ function _visitReportCollect(monthInput) {
     if (v.clientName) byOperator[op].clients.add(v.clientName);
   });
 
-  const summary = Object.values(byClient)
-    .sort((a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName));
-  const operators = Object.values(byOperator)
-    .sort((a, b) => b.count - a.count || String(a.operator).localeCompare(String(b.operator)));
+  const summary = Object.values(byClient).sort(
+    (a, b) => b.count - a.count || a.clientName.localeCompare(b.clientName)
+  );
+  const operators = Object.values(byOperator).sort(
+    (a, b) => b.count - a.count || String(a.operator).localeCompare(String(b.operator))
+  );
 
-  const statusLabel = st => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
-  const team = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
-    ? _selectedTeam
-    : (typeof getCurrentTeam === 'function' ? getCurrentTeam() : '');
+  const statusLabel = (st) =>
+    (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[st]?.label) || st || '—';
+  const team =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? _selectedTeam
+      : typeof getCurrentTeam === 'function'
+        ? getCurrentTeam()
+        : '';
   const user = typeof getUser === 'function' ? getUser() : null;
 
   return { yStr, mStr, visits, summary, operators, byStatus, statusLabel, team, user };
@@ -938,49 +1168,91 @@ function exportVisitMonthReport(format) {
 function _exportVisitMonthCsv(data) {
   const { yStr, mStr, visits, summary, statusLabel } = data;
   const lines = [];
-  lines.push(['SEÇÃO', 'Cliente', 'Qtd visitas', 'Motivos', 'Operadores'].map(_visitReportCsvCell).join(';'));
-  summary.forEach(row => {
-    lines.push([
-      'RESUMO',
-      row.clientName,
-      String(row.count),
-      [...row.motivos].join(' | '),
-      [...row.operators].join(', '),
-    ].map(_visitReportCsvCell).join(';'));
+  lines.push(
+    ['SEÇÃO', 'Cliente', 'Qtd visitas', 'Motivos', 'Operadores'].map(_visitReportCsvCell).join(';')
+  );
+  summary.forEach((row) => {
+    lines.push(
+      [
+        'RESUMO',
+        row.clientName,
+        String(row.count),
+        [...row.motivos].join(' | '),
+        [...row.operators].join(', '),
+      ]
+        .map(_visitReportCsvCell)
+        .join(';')
+    );
   });
   lines.push('');
-  lines.push(['SEÇÃO', 'Data', 'Início', 'Fim', 'Duração', 'Chegada real', 'Saída real', 'Duração real', 'Cliente', 'Motivo', 'Observações prévias', 'O Que Foi Feito (Relatório)', 'Operador', 'Chamado', 'Assinatura', 'Status'].map(_visitReportCsvCell).join(';'));
-  visits.forEach(v => {
-    lines.push([
-      'DETALHE',
-      v.date || '',
-      v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5)),
-      v.allDay ? '' : ((v.timeEnd || '').toString().slice(0, 5)),
-      formatVisitTimeRange(v),
-      _visitReportClock(v.checkinAt),
-      _visitReportClock(v.checkoutAt),
-      _visitReportFmtMin(_visitReportRealMinutes(v)),
-      v.clientName || '',
-      v.motivo || '',
-      v.observacoes || '',
-      v.relatorio || '',
-      v.operator || '',
-      v.milvusChamadoCodigo ? String(v.milvusChamadoCodigo) : '',
-      v.assinaturaNome ? v.assinaturaNome + (v.assinaturaEm ? ' (' + _visitReportClock(v.assinaturaEm) + ')' : '') : '',
-      statusLabel(v.status),
-    ].map(_visitReportCsvCell).join(';'));
+  lines.push(
+    [
+      'SEÇÃO',
+      'Data',
+      'Início',
+      'Fim',
+      'Duração',
+      'Chegada real',
+      'Saída real',
+      'Duração real',
+      'Cliente',
+      'Motivo',
+      'Observações prévias',
+      'O Que Foi Feito (Relatório)',
+      'Operador',
+      'Chamado',
+      'Assinatura',
+      'Status',
+    ]
+      .map(_visitReportCsvCell)
+      .join(';')
+  );
+  visits.forEach((v) => {
+    lines.push(
+      [
+        'DETALHE',
+        v.date || '',
+        v.allDay ? 'Dia inteiro' : (v.time || '').toString().slice(0, 5),
+        v.allDay ? '' : (v.timeEnd || '').toString().slice(0, 5),
+        formatVisitTimeRange(v),
+        _visitReportClock(v.checkinAt),
+        _visitReportClock(v.checkoutAt),
+        _visitReportFmtMin(_visitReportRealMinutes(v)),
+        v.clientName || '',
+        v.motivo || '',
+        v.observacoes || '',
+        v.relatorio || '',
+        v.operator || '',
+        v.milvusChamadoCodigo ? String(v.milvusChamadoCodigo) : '',
+        v.assinaturaNome
+          ? v.assinaturaNome +
+            (v.assinaturaEm ? ' (' + _visitReportClock(v.assinaturaEm) + ')' : '')
+          : '',
+        statusLabel(v.status),
+      ]
+        .map(_visitReportCsvCell)
+        .join(';')
+    );
   });
   lines.push('');
-  lines.push(['SEÇÃO', 'Operador', 'Qtd visitas', 'Concluídas', 'Horas', 'Clientes'].map(_visitReportCsvCell).join(';'));
-  (data.operators || []).forEach(o => {
-    lines.push([
-      'OPERADOR',
-      o.operator,
-      String(o.count),
-      String(o.concluidas),
-      _visitReportFmtMin(o.minutes),
-      [...o.clients].join(', '),
-    ].map(_visitReportCsvCell).join(';'));
+  lines.push(
+    ['SEÇÃO', 'Operador', 'Qtd visitas', 'Concluídas', 'Horas', 'Clientes']
+      .map(_visitReportCsvCell)
+      .join(';')
+  );
+  (data.operators || []).forEach((o) => {
+    lines.push(
+      [
+        'OPERADOR',
+        o.operator,
+        String(o.count),
+        String(o.concluidas),
+        _visitReportFmtMin(o.minutes),
+        [...o.clients].join(', '),
+      ]
+        .map(_visitReportCsvCell)
+        .join(';')
+    );
   });
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   _visitReportDownload(`relatorio_visitas_${yStr}_${mStr}.csv`, blob);
@@ -1000,7 +1272,7 @@ function _exportVisitMonthExcel(data) {
   const cancelada = byStatus['cancelada'] || 0;
   const clientsN = summary.length;
 
-  const durations = visits.map(_visitReportMinutes).filter(m => m != null);
+  const durations = visits.map(_visitReportMinutes).filter((m) => m != null);
   const totalMinutes = durations.reduce((a, b) => a + b, 0);
   const avgMinutes = durations.length ? Math.round(totalMinutes / durations.length) : null;
   const avgDurationLabel = _visitReportFmtMin(avgMinutes);
@@ -1008,12 +1280,14 @@ function _exportVisitMonthExcel(data) {
 
   const kpiColor = (val, accent) => (val > 0 ? accent : '#cbd5e1');
 
-  const th = 'background:#1a56db;color:#ffffff;font-weight:700;font-size:11pt;padding:10px 12px;border:1px solid #1341a8;text-align:left;';
+  const th =
+    'background:#1a56db;color:#ffffff;font-weight:700;font-size:11pt;padding:10px 12px;border:1px solid #1341a8;text-align:left;';
   const td = 'padding:8px 12px;border:1px solid #d0d7de;font-size:10.5pt;vertical-align:top;';
   const tdAlt = td + 'background:#f3f6fb;';
   const kpiBox = 'border:1px solid #d0d7de;background:#f8fafc;padding:12px 14px;text-align:center;';
   const kpiVal = 'font-size:18pt;font-weight:800;color:#1a56db;';
-  const kpiLab = 'font-size:9pt;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.03em;';
+  const kpiLab =
+    'font-size:9pt;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.03em;';
 
   let summaryRows = '';
   summary.forEach((row, i) => {
@@ -1030,16 +1304,19 @@ function _exportVisitMonthExcel(data) {
   visits.forEach((v, i) => {
     const s = i % 2 ? tdAlt : td;
     const d = v.date ? (typeof formatDate === 'function' ? formatDate(v.date) : v.date) : '—';
-    const relatorioText = (v.relatorio && v.relatorio.trim())
-      ? v.relatorio
-      : (v.status === 'cancelada' ? 'Visita cancelada' : '—');
+    const relatorioText =
+      v.relatorio && v.relatorio.trim()
+        ? v.relatorio
+        : v.status === 'cancelada'
+          ? 'Visita cancelada'
+          : '—';
     const assinaturaText = v.assinaturaNome
       ? v.assinaturaNome + (v.assinaturaEm ? ' (' + _visitReportClock(v.assinaturaEm) + ')' : '')
       : '—';
     detailRows += `<tr>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(d)}</td>
-      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? 'Dia inteiro' : ((v.time || '').toString().slice(0, 5) || '—'))}</td>
-      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? '—' : ((v.timeEnd || '').toString().slice(0, 5) || '—'))}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? 'Dia inteiro' : (v.time || '').toString().slice(0, 5) || '—')}</td>
+      <td style="${s}white-space:nowrap;">${_visitReportEscHtml(v.allDay ? '—' : (v.timeEnd || '').toString().slice(0, 5) || '—')}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(formatVisitTimeRange(v))}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(_visitReportClock(v.checkinAt) || '—')}</td>
       <td style="${s}white-space:nowrap;">${_visitReportEscHtml(_visitReportClock(v.checkoutAt) || '—')}</td>
@@ -1201,20 +1478,33 @@ function _exportVisitMonthExcel(data) {
 // ── Auto-refresh global (lista + calendário; o bus 'visitas' não tinha
 // assinante — saves em background, ex: fila Milvus, só apareciam no eco
 // do realtime). Sem loop: renders aqui não salvam.
-(function(){
-  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
-  if(window._visAutoRefresh) return;
-  window._visAutoRefresh=true;
-  onDataChanged('visitas', function(){
-    var h=((typeof window!=='undefined' && window.location && window.location.hash) || '').replace('#','') || 'dashboard';
-    if(h!=='visitas' && h!=='calendario') return;
-    try{
-      var run=function(){
-        if(h==='visitas' && document.getElementById('visitViewArea') && typeof renderVisitView==='function') renderVisitView(false);
-        if(typeof refreshCalendar==='function' && document.getElementById('calendarContainer')) refreshCalendar();
+(function () {
+  if (typeof window === 'undefined' || typeof onDataChanged !== 'function') return;
+  if (window._visAutoRefresh) return;
+  window._visAutoRefresh = true;
+  onDataChanged('visitas', function () {
+    var h =
+      ((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace(
+        '#',
+        ''
+      ) || 'dashboard';
+    if (h !== 'visitas' && h !== 'calendario') return;
+    try {
+      var run = function () {
+        if (
+          h === 'visitas' &&
+          document.getElementById('visitViewArea') &&
+          typeof renderVisitView === 'function'
+        )
+          renderVisitView(false);
+        if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer'))
+          refreshCalendar();
       };
-      if(typeof preserveScrollAround==='function') preserveScrollAround(run); else run();
-    }catch(_){}
+      if (typeof preserveScrollAround === 'function') preserveScrollAround(run);
+      else run();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'visitas');
+    }
   });
 })();
 
@@ -1222,25 +1512,40 @@ function _exportVisitMonthExcel(data) {
 // Nome da ação = função global chamada; multi-instrução virou ação dedicada.
 if (typeof registerActions === 'function') {
   registerActions({
-    visitSearchInput: () => { saveVisitFilters(); if (typeof debouncedRenderVisitView === 'function') debouncedRenderVisitView(); },
+    visitSearchInput: () => {
+      saveVisitFilters();
+      if (typeof debouncedRenderVisitView === 'function') debouncedRenderVisitView();
+    },
     openVisitFiltersSheet: () => openVisitFiltersSheet(),
     applyVisitFiltersSheet: () => applyVisitFiltersSheet(),
     clearVisitFiltersSheet: () => clearVisitFiltersSheet(),
     setVisitStatusFilter: (_el, status) => setVisitStatusFilter(status),
     openVisitMonthReportModal: () => openVisitMonthReportModal(),
-    visitPrevPage: () => { _visitPage--; renderVisitView(false); },
-    visitNextPage: () => { _visitPage++; renderVisitView(false); },
+    visitPrevPage: () => {
+      _visitPage--;
+      renderVisitView(false);
+    },
+    visitNextPage: () => {
+      _visitPage++;
+      renderVisitView(false);
+    },
     submitVisitForm: (_el, id, ev) => submitVisitForm(ev, id),
     toggleVisitAllDayFields: () => toggleVisitAllDayFields(),
-    retryMilvusFinalizar: (_el, id) => { if (typeof retryMilvusFinalizar === 'function') retryMilvusFinalizar(id); },
-    retryMilvusChamado: (_el, id) => { if (typeof retryMilvusChamado === 'function') retryMilvusChamado(id); },
+    retryMilvusFinalizar: (_el, id) => {
+      if (typeof retryMilvusFinalizar === 'function') retryMilvusFinalizar(id);
+    },
+    retryMilvusChamado: (_el, id) => {
+      if (typeof retryMilvusChamado === 'function') retryMilvusChamado(id);
+    },
     openEditVisitReportModal: (_el, id) => openEditVisitReportModal(id),
     openConcludeVisitModal: (_el, id) => openConcludeVisitModal(id),
     changeVisitStatus: (_el, id) => changeVisitStatus(id),
     openPendenciaFromVisit: (_el, id) => {
       if (typeof closeModal === 'function') closeModal();
       if (typeof navigateTo === 'function') navigateTo('pendencias');
-      setTimeout(() => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); }, 100);
+      setTimeout(() => {
+        if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+      }, 100);
     },
     visitEditAll: (_el, id) => {
       if (typeof closeModal === 'function') closeModal();

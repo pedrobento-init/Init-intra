@@ -15,20 +15,47 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', name: 'name', cnpj: 'cnpj', segment: 'segment', color: 'color',
-      initials: 'initials', logo: 'logo', logo_shape: 'logoShape', owner: 'owner',
-      owner_phone: 'ownerPhone', responsible: 'responsible', responsible_phone: 'responsiblePhone',
-      technician: 'technician', server: 'server', hosting: 'hosting', backup: 'backup',
-      licenses: 'licenses', emails: 'emails', google_sheet_url: 'googleSheetUrl', drive_folder_url: 'driveFolderUrl', milvus_client_token: 'milvusClientToken', team: 'team',
-      notes: 'notes', attachments: 'attachments', documents: 'documents', created_at: 'createdAt', updated_by: 'updatedBy', updated_at: 'updatedAt',
-      address: 'address'
+      id: 'id',
+      name: 'name',
+      cnpj: 'cnpj',
+      segment: 'segment',
+      color: 'color',
+      initials: 'initials',
+      logo: 'logo',
+      logo_shape: 'logoShape',
+      owner: 'owner',
+      owner_phone: 'ownerPhone',
+      responsible: 'responsible',
+      responsible_phone: 'responsiblePhone',
+      technician: 'technician',
+      server: 'server',
+      hosting: 'hosting',
+      backup: 'backup',
+      licenses: 'licenses',
+      emails: 'emails',
+      google_sheet_url: 'googleSheetUrl',
+      drive_folder_url: 'driveFolderUrl',
+      milvus_client_token: 'milvusClientToken',
+      team: 'team',
+      notes: 'notes',
+      attachments: 'attachments',
+      documents: 'documents',
+      created_at: 'createdAt',
+      updated_by: 'updatedBy',
+      updated_at: 'updatedAt',
+      address: 'address',
     },
     // Colunas novas (migration 044+): só vão no upsert quando têm valor —
     // banco ainda sem a coluna não derruba o sync de todos os clientes.
     optionalFields: ['address', 'drive_folder_url'],
     onChange: () => {
-      if ((window.location.hash.replace('#', '') || '') === 'clientes' && document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
-    }
+      if (
+        (window.location.hash.replace('#', '') || '') === 'clientes' &&
+        document.getElementById('clientGrid') &&
+        typeof renderClientGrid === 'function'
+      )
+        renderClientGrid();
+    },
   },
   {
     table: 'pendencias',
@@ -38,19 +65,47 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo', assunto: 'assunto', descricao: 'descricao',
-      responsible: 'responsible', status: 'status', priority: 'priority', deadline: 'deadline',
-      notes: 'notes', link_util: 'linkUtil', team: 'team', attachments: 'attachments',
-      checklist: 'checklist', tags: 'tags', recurrence: 'recurrence', visit_id: 'visitId',
+      id: 'id',
+      client_id: 'clientId',
+      client_name: 'clientName',
+      tipo: 'tipo',
+      assunto: 'assunto',
+      descricao: 'descricao',
+      responsible: 'responsible',
+      status: 'status',
+      priority: 'priority',
+      deadline: 'deadline',
+      notes: 'notes',
+      link_util: 'linkUtil',
+      team: 'team',
+      attachments: 'attachments',
+      checklist: 'checklist',
+      tags: 'tags',
+      recurrence: 'recurrence',
+      visit_id: 'visitId',
       reviewed_in_meeting: 'reviewedInMeeting',
-      timer_running: 'timerRunning', timer_started_at: 'timerStartedAt', timer_total_seconds: 'timerTotalSeconds',
-      timer_operator: 'timerOperator', completed_at: 'completedAt', completed_by: 'completedBy', created_at: 'createdAt', updated_at: 'updatedAt',
-      responsible_id: 'responsibleId', timer_operator_id: 'timerOperatorId',
-      solicitante: 'solicitante', canal: 'canal', categoria: 'categoria',
-      first_response_due: 'firstResponseDue', first_response_at: 'firstResponseAt', first_response_by: 'firstResponseBy',
-      position: 'position', events: 'events',
-      solicitante_email: 'solicitanteEmail', email_message_id: 'emailMessageId',
-      email_thread_id: 'emailThreadId', email_corpo: 'emailCorpo'
+      timer_running: 'timerRunning',
+      timer_started_at: 'timerStartedAt',
+      timer_total_seconds: 'timerTotalSeconds',
+      timer_operator: 'timerOperator',
+      completed_at: 'completedAt',
+      completed_by: 'completedBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      responsible_id: 'responsibleId',
+      timer_operator_id: 'timerOperatorId',
+      solicitante: 'solicitante',
+      canal: 'canal',
+      categoria: 'categoria',
+      first_response_due: 'firstResponseDue',
+      first_response_at: 'firstResponseAt',
+      first_response_by: 'firstResponseBy',
+      position: 'position',
+      events: 'events',
+      solicitante_email: 'solicitanteEmail',
+      email_message_id: 'emailMessageId',
+      email_thread_id: 'emailThreadId',
+      email_corpo: 'emailCorpo',
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
     // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
@@ -64,29 +119,58 @@ const ENTITIES = [
     // aberto pela triagem, só não dá para responder ao cliente pela tela.
     // E-mail inteiro (066): idem — sem a coluna o chamado mostra só a
     // descrição de 600 caracteres, como antes.
-    optionalFields: ['responsible_id', 'timer_operator_id', 'solicitante', 'canal', 'categoria',
-      'first_response_due', 'first_response_at', 'first_response_by', 'position', 'events',
-      'solicitante_email', 'email_message_id', 'email_thread_id', 'email_corpo'],
+    optionalFields: [
+      'responsible_id',
+      'timer_operator_id',
+      'solicitante',
+      'canal',
+      'categoria',
+      'first_response_due',
+      'first_response_at',
+      'first_response_by',
+      'position',
+      'events',
+      'solicitante_email',
+      'email_message_id',
+      'email_thread_id',
+      'email_corpo',
+    ],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();
-      if ((window.location.hash.replace('#', '') || '') === 'pendencias' && document.getElementById('penViewArea') && typeof renderPenView === 'function') renderPenView(false);
+      if (
+        (window.location.hash.replace('#', '') || '') === 'pendencias' &&
+        document.getElementById('penViewArea') &&
+        typeof renderPenView === 'function'
+      )
+        renderPenView(false);
       // Cross-tela: realtime de pendência com dashboard aberto atualiza os
       // números ( throttle de bursts: no máximo 1 refresh a cada ~1.2s ).
       try {
-        if ((window.location.hash.replace('#', '') || '') === 'dashboard' && typeof renderDashboard === 'function' && document.getElementById('contentArea')) {
+        if (
+          (window.location.hash.replace('#', '') || '') === 'dashboard' &&
+          typeof renderDashboard === 'function' &&
+          document.getElementById('contentArea')
+        ) {
           if (!window._dashRTRefreshTimer) {
-            window._dashRTRefreshTimer = setTimeout(function() {
+            window._dashRTRefreshTimer = setTimeout(function () {
               window._dashRTRefreshTimer = null;
               try {
                 if ((window.location.hash.replace('#', '') || '') !== 'dashboard') return;
-                if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderDashboard(); });
+                if (typeof preserveScrollAround === 'function')
+                  preserveScrollAround(function () {
+                    renderDashboard();
+                  });
                 else renderDashboard();
-              } catch (_) {}
+              } catch (_e) {
+                if (typeof _logSilent === 'function') _logSilent(_e, 'schema');
+              }
             }, 1200);
           }
         }
-      } catch (_) {}
-    }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'schema');
+      }
+    },
   },
   {
     table: 'operators',
@@ -96,32 +180,73 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', name: 'name', initials: 'initials', color: 'color', role: 'role', phone: 'phone',
-      email: 'email', is_admin: 'isAdmin', is_gestao: 'isGestao', active: 'active', team: 'team', auth_user_id: 'auth_user_id',
+      id: 'id',
+      name: 'name',
+      initials: 'initials',
+      color: 'color',
+      role: 'role',
+      phone: 'phone',
+      email: 'email',
+      is_admin: 'isAdmin',
+      is_gestao: 'isGestao',
+      active: 'active',
+      team: 'team',
+      auth_user_id: 'auth_user_id',
       on_leave: 'onLeave',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
     // Hash de senha não existe mais no app (a senha é do Supabase Auth):
     // o merge apaga qualquer pinHash/pinSalt que tenha ficado no aparelho.
     onMerged: (merged) => {
-      for (const o of merged) { delete o.pinHash; delete o.pinSalt; }
+      for (const o of merged) {
+        delete o.pinHash;
+        delete o.pinSalt;
+      }
       return merged;
     },
-    buildUpsert: o => ({
-      id: o.id, name: o.name, initials: o.initials, color: o.color, role: o.role, phone: o.phone,
+    buildUpsert: (o) => ({
+      id: o.id,
+      name: o.name,
+      initials: o.initials,
+      color: o.color,
+      role: o.role,
+      phone: o.phone,
       email: o.email,
-      is_admin: o.isAdmin === true, is_gestao: o.isGestao === true, active: o.active !== false, team: o.team || 'init',
-      auth_user_id: o.auth_user_id || null, on_leave: o.onLeave === true,
-      created_at: o.createdAt || new Date().toISOString(), updated_at: o.updatedAt || new Date().toISOString()
+      is_admin: o.isAdmin === true,
+      is_gestao: o.isGestao === true,
+      active: o.active !== false,
+      team: o.team || 'init',
+      auth_user_id: o.auth_user_id || null,
+      on_leave: o.onLeave === true,
+      created_at: o.createdAt || new Date().toISOString(),
+      updated_at: o.updatedAt || new Date().toISOString(),
     }),
-    mapRow: r => ({
-      id: r.id, name: r.name, initials: r.initials, color: r.color, role: r.role, phone: r.phone,
-      email: r.email, isAdmin: r.is_admin === true, isGestao: r.is_gestao === true, active: r.active !== false, team: r.team || 'init',
-      auth_user_id: r.auth_user_id, onLeave: r.on_leave === true, createdAt: r.created_at, updatedAt: r.updated_at
+    mapRow: (r) => ({
+      id: r.id,
+      name: r.name,
+      initials: r.initials,
+      color: r.color,
+      role: r.role,
+      phone: r.phone,
+      email: r.email,
+      isAdmin: r.is_admin === true,
+      isGestao: r.is_gestao === true,
+      active: r.active !== false,
+      team: r.team || 'init',
+      auth_user_id: r.auth_user_id,
+      onLeave: r.on_leave === true,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }),
     onChange: () => {
-      if ((window.location.hash.replace('#', '') || '') === 'operadores' && document.getElementById('opGridWrap') && typeof filterOperadores === 'function') filterOperadores();
-    }
+      if (
+        (window.location.hash.replace('#', '') || '') === 'operadores' &&
+        document.getElementById('opGridWrap') &&
+        typeof filterOperadores === 'function'
+      )
+        filterOperadores();
+    },
   },
   {
     table: 'procedures',
@@ -131,12 +256,17 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', client_id: 'clientId', title: 'title', category: 'category', content: 'content',
-      created_at: 'createdAt', updated_at: 'updatedAt',
-      team: 'team' // artigos da base de conhecimento (sem cliente) — migration 042
+      id: 'id',
+      client_id: 'clientId',
+      title: 'title',
+      category: 'category',
+      content: 'content',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      team: 'team', // artigos da base de conhecimento (sem cliente) — migration 042
     },
     optionalFields: ['team'],
-    onChange: () => {}
+    onChange: () => {},
   },
   {
     table: 'visits',
@@ -146,27 +276,68 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     optional: true,
-    optionalFields: ['operator_id', 'assinatura', 'assinatura_nome', 'assinatura_em', 'levar', 'checkin_at', 'checkout_at'], // 049, 054, 058, 060
+    optionalFields: [
+      'operator_id',
+      'assinatura',
+      'assinatura_nome',
+      'assinatura_em',
+      'levar',
+      'checkin_at',
+      'checkout_at',
+    ], // 049, 054, 058, 060
     fields: {
-      id: 'id', client_id: 'clientId', client_name: 'clientName', operator: 'operator', date: 'date',
-      time: 'time', time_end: 'timeEnd', all_day: 'allDay', motivo: 'motivo', observacoes: 'observacoes',
-      relatorio: 'relatorio', status: 'status', recurrence: 'recurrence', team: 'team',
-      categories: 'categories', checklist: 'checklist', numero: 'numero',
-      milvus_chamado_codigo: 'milvusChamadoCodigo', milvus_chamado_status: 'milvusChamadoStatus',
-      milvus_chamado_erro: 'milvusChamadoErro', milvus_chamado_tentativas: 'milvusChamadoTentativas',
-      milvus_finalizar_status: 'milvusFinalizarStatus', milvus_finalizar_erro: 'milvusFinalizarErro',
+      id: 'id',
+      client_id: 'clientId',
+      client_name: 'clientName',
+      operator: 'operator',
+      date: 'date',
+      time: 'time',
+      time_end: 'timeEnd',
+      all_day: 'allDay',
+      motivo: 'motivo',
+      observacoes: 'observacoes',
+      relatorio: 'relatorio',
+      status: 'status',
+      recurrence: 'recurrence',
+      team: 'team',
+      categories: 'categories',
+      checklist: 'checklist',
+      numero: 'numero',
+      milvus_chamado_codigo: 'milvusChamadoCodigo',
+      milvus_chamado_status: 'milvusChamadoStatus',
+      milvus_chamado_erro: 'milvusChamadoErro',
+      milvus_chamado_tentativas: 'milvusChamadoTentativas',
+      milvus_finalizar_status: 'milvusFinalizarStatus',
+      milvus_finalizar_erro: 'milvusFinalizarErro',
       milvus_finalizar_tentativas: 'milvusFinalizarTentativas',
       operator_id: 'operatorId',
-      assinatura: 'assinatura', assinatura_nome: 'assinaturaNome', assinatura_em: 'assinaturaEm',
-      levar: 'levar', checkin_at: 'checkinAt', checkout_at: 'checkoutAt',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      assinatura: 'assinatura',
+      assinatura_nome: 'assinaturaNome',
+      assinatura_em: 'assinaturaEm',
+      levar: 'levar',
+      checkin_at: 'checkinAt',
+      checkout_at: 'checkoutAt',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
-    mapRow: r => ({
-      id: r.id, clientId: r.client_id, clientName: r.client_name, operator: r.operator, date: r.date,
-      time: r.time, motivo: r.motivo, observacoes: r.observacoes, relatorio: r.relatorio, status: r.status,
-      recurrence: r.recurrence, team: r.team, timeEnd: r.time_end, allDay: r.all_day === true,
-      categories: r.categories || [], checklist: r.checklist || [],
-      numero: (Number.isInteger(r.numero) && r.numero > 0) ? r.numero : null,
+    mapRow: (r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      clientName: r.client_name,
+      operator: r.operator,
+      date: r.date,
+      time: r.time,
+      motivo: r.motivo,
+      observacoes: r.observacoes,
+      relatorio: r.relatorio,
+      status: r.status,
+      recurrence: r.recurrence,
+      team: r.team,
+      timeEnd: r.time_end,
+      allDay: r.all_day === true,
+      categories: r.categories || [],
+      checklist: r.checklist || [],
+      numero: Number.isInteger(r.numero) && r.numero > 0 ? r.numero : null,
       milvusChamadoCodigo: r.milvus_chamado_codigo ?? null,
       milvusChamadoStatus: r.milvus_chamado_status ?? null,
       milvusChamadoErro: r.milvus_chamado_erro ?? null,
@@ -175,20 +346,25 @@ const ENTITIES = [
       milvusFinalizarErro: r.milvus_finalizar_erro ?? null,
       milvusFinalizarTentativas: r.milvus_finalizar_tentativas ?? 0,
       operatorId: r.operator_id ?? null,
-      assinatura: r.assinatura ?? null, assinaturaNome: r.assinatura_nome ?? null, assinaturaEm: r.assinatura_em ?? null,
+      assinatura: r.assinatura ?? null,
+      assinaturaNome: r.assinatura_nome ?? null,
+      assinaturaEm: r.assinatura_em ?? null,
       levar: Array.isArray(r.levar) ? r.levar : null,
-      checkinAt: r.checkin_at ?? null, checkoutAt: r.checkout_at ?? null,
+      checkinAt: r.checkin_at ?? null,
+      checkoutAt: r.checkout_at ?? null,
       // Só leitura: quem grava é o robô (fora de `fields`, o app nunca reenvia).
-      briefingIa: r.briefing_ia ?? null, briefingEm: r.briefing_em ?? null,
-      createdAt: r.created_at, updatedAt: r.updated_at
+      briefingIa: r.briefing_ia ?? null,
+      briefingEm: r.briefing_em ?? null,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }),
     // Estabilidade do número amigável: remoto SEM numero (coluna ainda sem
     // migration, cliente antigo, edição externa) nunca apaga o numero local.
     // Remoto COM número (reparo de outro aparelho, mais novo) entra pelo
     // merge normal — aqui só se restaura o local quando o merge zerou.
     onMerged: (merged, local) => {
-      const localById = new Map((local || []).map(o => [o.id, o]));
-      for (const m of (merged || [])) {
+      const localById = new Map((local || []).map((o) => [o.id, o]));
+      for (const m of merged || []) {
         if (!m || (m.numero !== null && m.numero !== undefined)) continue;
         const loc = m.id ? localById.get(m.id) : null;
         const n = loc ? Number(loc.numero) : NaN;
@@ -198,9 +374,14 @@ const ENTITIES = [
     },
     onChange: () => {
       const h = window.location.hash.replace('#', '') || '';
-      if (h === 'visitas' && document.getElementById('visitViewArea') && typeof renderVisitView === 'function') renderVisitView();
+      if (
+        h === 'visitas' &&
+        document.getElementById('visitViewArea') &&
+        typeof renderVisitView === 'function'
+      )
+        renderVisitView();
       if (h === 'calendario' && typeof refreshCalendar === 'function') refreshCalendar();
-    }
+    },
   },
   {
     table: 'reunioes',
@@ -211,19 +392,38 @@ const ENTITIES = [
     realtime: true,
     optional: true,
     fields: {
-      id: 'id', mes_ano: 'mesAno', status: 'status', started_at: 'startedAt', ended_at: 'endedAt',
-      team: 'team', relatorio: 'relatorio', participants: 'participants',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      id: 'id',
+      mes_ano: 'mesAno',
+      status: 'status',
+      started_at: 'startedAt',
+      ended_at: 'endedAt',
+      team: 'team',
+      relatorio: 'relatorio',
+      participants: 'participants',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
-    mapRow: r => ({
-      id: r.id, mesAno: r.mes_ano, status: r.status, startedAt: r.started_at, endedAt: r.ended_at,
-      team: r.team, relatorio: r.relatorio, participants: r.participants || [],
-      createdAt: r.created_at, updatedAt: r.updated_at
+    mapRow: (r) => ({
+      id: r.id,
+      mesAno: r.mes_ano,
+      status: r.status,
+      startedAt: r.started_at,
+      endedAt: r.ended_at,
+      team: r.team,
+      relatorio: r.relatorio,
+      participants: r.participants || [],
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }),
     onChange: () => {
       const h = window.location.hash.replace('#', '') || '';
-      if (h === 'reuniao' && document.getElementById('reuniaoViewArea') && typeof renderReuniaoView === 'function') renderReuniaoView();
-    }
+      if (
+        h === 'reuniao' &&
+        document.getElementById('reuniaoViewArea') &&
+        typeof renderReuniaoView === 'function'
+      )
+        renderReuniaoView();
+    },
   },
   {
     table: 'equipamentos',
@@ -234,18 +434,32 @@ const ENTITIES = [
     realtime: true,
     optional: true,
     fields: {
-      id: 'id', nome: 'nome', numero_serie: 'numeroSerie', tipo: 'tipo',
-      client_id: 'clientId', client_name: 'clientName', os_vinculada: 'osVinculada',
+      id: 'id',
+      nome: 'nome',
+      numero_serie: 'numeroSerie',
+      tipo: 'tipo',
+      client_id: 'clientId',
+      client_name: 'clientName',
+      os_vinculada: 'osVinculada',
       pendencia_id: 'pendenciaId',
-      status: 'status', valor: 'valor', data_aquisicao: 'dataAquisicao',
-      observacoes: 'observacoes', team: 'team',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      status: 'status',
+      valor: 'valor',
+      data_aquisicao: 'dataAquisicao',
+      observacoes: 'observacoes',
+      team: 'team',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
     onChange: () => {
       const h = window.location.hash.replace('#', '') || '';
-      if (h === 'equipamentos' && document.getElementById('equipViewArea') && typeof renderEquipView === 'function') renderEquipView(false);
+      if (
+        h === 'equipamentos' &&
+        document.getElementById('equipViewArea') &&
+        typeof renderEquipView === 'function'
+      )
+        renderEquipView(false);
       if (typeof updateBadges === 'function') updateBadges();
-    }
+    },
   },
   {
     table: 'vencimentos',
@@ -257,17 +471,33 @@ const ENTITIES = [
     optional: true, // migration 045: banco sem a tabela não quebra o sync
     optionalFields: ['responsavel_id'], // 049
     fields: {
-      id: 'id', client_id: 'clientId', client_name: 'clientName', tipo: 'tipo',
-      descricao: 'descricao', data_vencimento: 'dataVencimento', responsavel: 'responsavel',
-      renovacao_auto: 'renovacaoAuto', status: 'status', observacoes: 'observacoes',
-      avisos: 'avisos', historico: 'historico', team: 'team', responsavel_id: 'responsavelId',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      id: 'id',
+      client_id: 'clientId',
+      client_name: 'clientName',
+      tipo: 'tipo',
+      descricao: 'descricao',
+      data_vencimento: 'dataVencimento',
+      responsavel: 'responsavel',
+      renovacao_auto: 'renovacaoAuto',
+      status: 'status',
+      observacoes: 'observacoes',
+      avisos: 'avisos',
+      historico: 'historico',
+      team: 'team',
+      responsavel_id: 'responsavelId',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
     onChange: () => {
       const h = window.location.hash.replace('#', '') || '';
-      if (h === 'vencimentos' && typeof renderVencimentos === 'function' && document.getElementById('vencList')) renderVencimentos();
+      if (
+        h === 'vencimentos' &&
+        typeof renderVencimentos === 'function' &&
+        document.getElementById('vencList')
+      )
+        renderVencimentos();
       if (typeof updateBadges === 'function') updateBadges();
-    }
+    },
   },
   {
     table: 'time_entries',
@@ -278,11 +508,21 @@ const ENTITIES = [
     realtime: true,
     optional: true, // migration 048
     fields: {
-      id: 'id', pendencia_id: 'pendenciaId', client_id: 'clientId', operator_id: 'operatorId',
-      operator_name: 'operatorName', started_at: 'startedAt', ended_at: 'endedAt', seconds: 'seconds',
-      source: 'source', note: 'note', team: 'team', created_at: 'createdAt', updated_at: 'updatedAt'
+      id: 'id',
+      pendencia_id: 'pendenciaId',
+      client_id: 'clientId',
+      operator_id: 'operatorId',
+      operator_name: 'operatorName',
+      started_at: 'startedAt',
+      ended_at: 'endedAt',
+      seconds: 'seconds',
+      source: 'source',
+      note: 'note',
+      team: 'team',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
-    onChange: () => {}
+    onChange: () => {},
   },
   {
     table: 'procedure_templates',
@@ -292,12 +532,22 @@ const ENTITIES = [
     sync: true,
     realtime: true,
     fields: {
-      id: 'id', title: 'title', category: 'category', content: 'content', created_by: 'createdBy',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      id: 'id',
+      title: 'title',
+      category: 'category',
+      content: 'content',
+      created_by: 'createdBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
     onChange: () => {
-      if ((window.location.hash.replace('#', '') || '') === 'templates' && document.getElementById('templatesGridWrap') && typeof renderTemplatesGrid === 'function') renderTemplatesGrid();
-    }
+      if (
+        (window.location.hash.replace('#', '') || '') === 'templates' &&
+        document.getElementById('templatesGridWrap') &&
+        typeof renderTemplatesGrid === 'function'
+      )
+        renderTemplatesGrid();
+    },
   },
   {
     table: 'emails_triagem',
@@ -308,13 +558,30 @@ const ENTITIES = [
     realtime: true,
     optional: true, // migration 066: banco sem a tabela não quebra o sync
     fields: {
-      id: 'id', email_id: 'emailId', thread_id: 'threadId', message_id: 'messageId',
-      de: 'de', assunto: 'assunto', corpo: 'corpo', recebido_em: 'recebidoEm',
-      motivo: 'motivo', status: 'status', pendencia_id: 'pendenciaId', team: 'team',
-      tratado_por: 'tratadoPor', tratado_em: 'tratadoEm',
-      client_id: 'clientId', atribuido_a: 'atribuidoA', atribuido_em: 'atribuidoEm', atribuicao_nota: 'atribuicaoNota',
-      canal: 'canal', telefone: 'telefone', direcao: 'direcao', media: 'media',
-      created_at: 'createdAt', updated_at: 'updatedAt'
+      id: 'id',
+      email_id: 'emailId',
+      thread_id: 'threadId',
+      message_id: 'messageId',
+      de: 'de',
+      assunto: 'assunto',
+      corpo: 'corpo',
+      recebido_em: 'recebidoEm',
+      motivo: 'motivo',
+      status: 'status',
+      pendencia_id: 'pendenciaId',
+      team: 'team',
+      tratado_por: 'tratadoPor',
+      tratado_em: 'tratadoEm',
+      client_id: 'clientId',
+      atribuido_a: 'atribuidoA',
+      atribuido_em: 'atribuidoEm',
+      atribuicao_nota: 'atribuicaoNota',
+      canal: 'canal',
+      telefone: 'telefone',
+      direcao: 'direcao',
+      media: 'media',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
     },
     // 075/082: banco que ainda não rodou a migration não tem as colunas do
     // WhatsApp nem as do portal; a entrada sem canal continua sendo lida como
@@ -323,9 +590,13 @@ const ENTITIES = [
     onChange: () => {
       // A caixa mora na tela #caixa: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.
-      if ((window.location.hash.replace('#', '') || '') === 'caixa'
-        && document.getElementById('caixaLista') && typeof renderCaixaEntrada === 'function') renderCaixaEntrada();
-    }
+      if (
+        (window.location.hash.replace('#', '') || '') === 'caixa' &&
+        document.getElementById('caixaLista') &&
+        typeof renderCaixaEntrada === 'function'
+      )
+        renderCaixaEntrada();
+    },
   },
   {
     table: 'respostas_prontas',
@@ -336,9 +607,14 @@ const ENTITIES = [
     realtime: true,
     optional: true, // migration 074: banco sem a tabela não quebra o sync
     fields: {
-      id: 'id', titulo: 'titulo', conteudo: 'conteudo', team: 'team',
-      created_by: 'createdBy', created_at: 'createdAt', updated_at: 'updatedAt'
-    }
+      id: 'id',
+      titulo: 'titulo',
+      conteudo: 'conteudo',
+      team: 'team',
+      created_by: 'createdBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+    },
   },
   {
     table: 'audit_logs',
@@ -348,18 +624,27 @@ const ENTITIES = [
     sync: false,
     realtime: true,
     cacheTable: 'audit_logs',
-    mapRow: r => ({
-      id: r.id, operatorName: r.operator_name, action: r.action, type: r.type,
-      targetId: r.target_id, details: r.details, timestamp: r.timestamp
+    mapRow: (r) => ({
+      id: r.id,
+      operatorName: r.operator_name,
+      action: r.action,
+      type: r.type,
+      targetId: r.target_id,
+      details: r.details,
+      timestamp: r.timestamp,
     }),
     onChange: () => {
-      if ((window.location.hash.replace('#', '') || '') === 'historico' && typeof renderLogs === 'function') renderLogs();
-    }
-  }
+      if (
+        (window.location.hash.replace('#', '') || '') === 'historico' &&
+        typeof renderLogs === 'function'
+      )
+        renderLogs();
+    },
+  },
 ];
 
 // Entidades que participam do sync bidirecional (na ordem de processamento)
-const SYNC_ENTITIES = ENTITIES.filter(e => e.sync !== false);
+const SYNC_ENTITIES = ENTITIES.filter((e) => e.sync !== false);
 
 // Concorrência do sync entre entidades (tabelas distintas, independentes).
 // 3 = ~3× mais rápido no boot sem pressionar o pool do PostgREST.
@@ -403,8 +688,13 @@ function _mapToRemote(record, fieldMap, optionalFields) {
  */
 function _keepLocalEdits(merged, loc, nowIso) {
   const dirty = Array.isArray(loc && loc._dirtyFields) ? loc._dirtyFields : [];
-  if (!dirty.length) { delete merged._dirtyFields; return merged; }
-  for (const f of dirty) { if (Object.prototype.hasOwnProperty.call(loc, f)) merged[f] = loc[f]; }
+  if (!dirty.length) {
+    delete merged._dirtyFields;
+    return merged;
+  }
+  for (const f of dirty) {
+    if (Object.prototype.hasOwnProperty.call(loc, f)) merged[f] = loc[f];
+  }
   merged._dirtyFields = dirty.slice();
   merged.updatedAt = nowIso || new Date().toISOString();
   return merged;
@@ -414,16 +704,19 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
   const merged = [];
   let conflicts = 0;
   const conflictDetails = [];
-  const remoteById = new Map(remote.map(r => [r.id, r]));
+  const remoteById = new Map(remote.map((r) => [r.id, r]));
   for (const loc of local) {
     const rem = remoteById.get(loc.id);
     // Supabase is authoritative for records that no longer exist remotely.
     // Keeping these local orphans makes deleted records reappear on the next push.
-    if (!rem) { continue; }
+    if (!rem) {
+      continue;
+    }
     const localTime = new Date(loc.updatedAt || 0).getTime();
     const remoteTime = new Date(rem.updated_at || 0).getTime();
-    if (localTime > remoteTime) { merged.push(loc); }
-    else {
+    if (localTime > remoteTime) {
+      merged.push(loc);
+    } else {
       conflicts++;
       const mapped = {};
       const changedFields = [];
@@ -436,7 +729,12 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
       // Campos editados aqui e ainda não enviados não são perdidos (só os demais).
       const kept = new Set(Array.isArray(loc._dirtyFields) ? loc._dirtyFields : []);
       const lost = changedFields.filter((c) => !kept.has(c.field));
-      if (lost.length) conflictDetails.push({ id: loc.id, name: loc.name || loc.title || loc.assunto || loc.descricao || loc.id, fields: lost });
+      if (lost.length)
+        conflictDetails.push({
+          id: loc.id,
+          name: loc.name || loc.title || loc.assunto || loc.descricao || loc.id,
+          fields: lost,
+        });
       merged.push(_keepLocalEdits({ ...loc, ...mapped }, loc));
     }
     remoteById.delete(loc.id);
@@ -449,6 +747,38 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
   return { merged, conflicts, conflictDetails };
 }
 
+// SYNC-03: o sync lê o local, passa por awaits (push, rede) e só então grava a
+// lista inteira. Edição do usuário ou evento realtime (applyRemote) nesse meio
+// tempo era sobrescrita pelo dbSet do merge. Reconcilia o resultado do merge
+// com o que está no local AGORA: o que mudou desde o snapshot vence se for mais
+// novo (LWW por updatedAt); o que o usuário apagou nesse intervalo não volta.
+function _reconcileConcurrentEdits(final, snapshot, current) {
+  const stamp = (r) => {
+    const t = new Date((r && r.updatedAt) || 0).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const snapById = new Map((snapshot || []).filter((r) => r && r.id).map((r) => [r.id, r]));
+  const curById = new Map((current || []).filter((r) => r && r.id).map((r) => [r.id, r]));
+  const out = [];
+  const idxById = new Map();
+  for (const r of final || []) {
+    if (r && r.id && snapById.has(r.id) && !curById.has(r.id)) continue; // apagado durante o sync
+    if (r && r.id) idxById.set(r.id, out.length);
+    out.push(r);
+  }
+  for (const c of curById.values()) {
+    const s = snapById.get(c.id);
+    if (s && s.updatedAt === c.updatedAt) continue; // não mudou desde o snapshot
+    if (idxById.has(c.id)) {
+      const i = idxById.get(c.id);
+      if (stamp(c) >= stamp(out[i])) out[i] = c;
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
 // ── Sync parcial (P-9) — planejamento puro e testável ───────────────────────
 // Entrada: locais + "leves" do servidor ({id, updated_at}). Sai quais ids
 // precisam da linha completa (novos no servidor ou com updated_at diferente
@@ -457,10 +787,10 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
 // Não usa o relógio deste aparelho: carimbos de outros aparelhos adiantados
 // ou atrasados não fazem nada escapar.
 function _planDeltaPull(local, light) {
-  const localById = new Map((local || []).filter(r => r && r.id).map(r => [r.id, r]));
+  const localById = new Map((local || []).filter((r) => r && r.id).map((r) => [r.id, r]));
   const changedIds = [];
   const sameIds = [];
-  for (const r of (light || [])) {
+  for (const r of light || []) {
     if (!r || !r.id) continue;
     const loc = localById.get(r.id);
     const rt = new Date(r.updated_at || 0).getTime();
@@ -480,7 +810,7 @@ function _shouldFullSync(entity, lastFullAtIso, nowMs) {
   if (!lastFullAtIso) return true;
   const t = new Date(lastFullAtIso).getTime();
   if (isNaN(t)) return true;
-  return ((typeof nowMs === 'number' ? nowMs : Date.now()) - t) >= FULL_SYNC_EVERY_MS;
+  return (typeof nowMs === 'number' ? nowMs : Date.now()) - t >= FULL_SYNC_EVERY_MS;
 }
 
 function _needsPush(local, remote) {
@@ -503,8 +833,8 @@ function _needsPush(local, remote) {
 const TOMBSTONE_TTL_MS = 30 * 86400000;
 
 function _pruneTombstones(tombs, nowMs, ttlMs) {
-  const now = (typeof nowMs === 'number' && !isNaN(nowMs)) ? nowMs : Date.now();
-  const ttl = (typeof ttlMs === 'number' && ttlMs > 0) ? ttlMs : TOMBSTONE_TTL_MS;
+  const now = typeof nowMs === 'number' && !isNaN(nowMs) ? nowMs : Date.now();
+  const ttl = typeof ttlMs === 'number' && ttlMs > 0 ? ttlMs : TOMBSTONE_TTL_MS;
   const out = {};
   for (const [dbKey, ids] of Object.entries(tombs || {})) {
     const kept = {};
@@ -527,12 +857,18 @@ function _filterRemoteByTombstones(remote, tombsForKey, updatedAtKey) {
   const uk = updatedAtKey || 'updated_at';
   const kept = [];
   const revived = [];
-  for (const row of (remote || [])) {
+  for (const row of remote || []) {
     const tAt = tombs[row.id];
-    if (!tAt) { kept.push(row); continue; }
+    if (!tAt) {
+      kept.push(row);
+      continue;
+    }
     const remoteMs = new Date((row && row[uk]) || 0).getTime();
     const tombMs = new Date(tAt || 0).getTime();
-    if (remoteMs > tombMs) { kept.push(row); revived.push(row.id); }
+    if (remoteMs > tombMs) {
+      kept.push(row);
+      revived.push(row.id);
+    }
     // else: nossa deleção ainda não propagada (ou snapshot stale) → filtra.
   }
   return { remote: kept, revived };
@@ -544,7 +880,7 @@ function _filterRemoteByTombstones(remote, tombsForKey, updatedAtKey) {
 function _classifyLocalOnly(localOnly, lastSyncAt) {
   const toPush = [];
   const toDrop = [];
-  for (const loc of (localOnly || [])) {
+  for (const loc of localOnly || []) {
     const stamp = (loc && (loc.createdAt || loc.updatedAt)) || '';
     if (!lastSyncAt || (stamp && stamp >= lastSyncAt)) toPush.push(loc);
     else toDrop.push(loc);
@@ -557,9 +893,12 @@ function _classifyLocalOnly(localOnly, lastSyncAt) {
 // Retorna o mesmo array quando nada falta (sem cópia, sem duplicar).
 function _retainFailedPush(merged, failedRecs) {
   if (!failedRecs || !failedRecs.length) return merged;
-  const ids = new Set((merged || []).map(m => m && m.id));
+  const ids = new Set((merged || []).map((m) => m && m.id));
   for (const rec of failedRecs) {
-    if (rec && rec.id && !ids.has(rec.id)) { merged.push(rec); ids.add(rec.id); }
+    if (rec && rec.id && !ids.has(rec.id)) {
+      merged.push(rec);
+      ids.add(rec.id);
+    }
   }
   return merged;
 }
@@ -567,5 +906,23 @@ function _retainFailedPush(merged, failedRecs) {
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _keepLocalEdits, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
+  module.exports = {
+    ENTITIES,
+    SYNC_ENTITIES,
+    _valuesDiffer,
+    _mapFromRemote,
+    _mapToRemote,
+    _mergeRecords,
+    _reconcileConcurrentEdits,
+    _keepLocalEdits,
+    _needsPush,
+    TOMBSTONE_TTL_MS,
+    _pruneTombstones,
+    _filterRemoteByTombstones,
+    _classifyLocalOnly,
+    _retainFailedPush,
+    _planDeltaPull,
+    _shouldFullSync,
+    FULL_SYNC_EVERY_MS,
+  };
 }

@@ -55,7 +55,8 @@ _setGlobal(
       get: (_t, p) => {
         if (p === 'addEventListener') return () => {};
         if (p === 'querySelectorAll') return () => [];
-        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement') return (..._a) => _anyEl();
+        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement')
+          return (..._a) => _anyEl();
         if (p === 'head' || p === 'body') return _anyEl();
         if (p === 'visibilityState') return 'visible';
         return undefined;
@@ -156,10 +157,14 @@ describe('csvRow / exportCSV - estrutura das colunas', () => {
     };
     URL.revokeObjectURL = () => {};
     try {
-      exportCSV('arquivo_teste', ['Nome', 'Valor'], [
-        ['Cliente A', '=cmd|calc'],
-        ['Tem;ponto', 'texto simples'],
-      ]);
+      exportCSV(
+        'arquivo_teste',
+        ['Nome', 'Valor'],
+        [
+          ['Cliente A', '=cmd|calc'],
+          ['Tem;ponto', 'texto simples'],
+        ]
+      );
       expect(captured).toBeTruthy();
       const bytes = new Uint8Array(await captured.arrayBuffer());
       // BOM UTF-8 (EF BB BF) presente — Blob.text() descarta o BOM, por isso
@@ -168,7 +173,16 @@ describe('csvRow / exportCSV - estrutura das colunas', () => {
       const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
       expect(text.charCodeAt(0)).toBe(0xfeff);
       expect(text.slice(1)).toBe(
-        'Nome;Valor' + NL + 'Cliente A;' + Q + '=cmd|calc' + NL + D + 'Tem;ponto' + D + ';texto simples'
+        'Nome;Valor' +
+          NL +
+          'Cliente A;' +
+          Q +
+          '=cmd|calc' +
+          NL +
+          D +
+          'Tem;ponto' +
+          D +
+          ';texto simples'
       );
     } finally {
       URL.createObjectURL = _create;

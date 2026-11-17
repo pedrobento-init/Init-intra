@@ -30,7 +30,14 @@ const diasAtras = (n) => new Date(Date.now() - n * 86400000).toISOString().slice
 // maybeSingle). Filtros valem para a operação pendente, como no supabase-js.
 function fakeDb(tabelas) {
   const store = tabelas;
-  for (const t of ['operators', 'visits', 'google_agenda_queue', 'google_agenda_calendars', 'google_agenda_runner', 'google_agenda_shared']) {
+  for (const t of [
+    'operators',
+    'visits',
+    'google_agenda_queue',
+    'google_agenda_calendars',
+    'google_agenda_runner',
+    'google_agenda_shared',
+  ]) {
     if (!store[t]) store[t] = [];
   }
   return {
@@ -48,7 +55,10 @@ function builder(rows) {
   const preds = [];
   const match = () => {
     let out = rows.filter((r) => preds.every((p) => p(r)));
-    if (orderKey) out = out.slice().sort((a, b) => (a[orderKey] > b[orderKey] ? 1 : a[orderKey] < b[orderKey] ? -1 : 0));
+    if (orderKey)
+      out = out
+        .slice()
+        .sort((a, b) => (a[orderKey] > b[orderKey] ? 1 : a[orderKey] < b[orderKey] ? -1 : 0));
     return out.slice(0, limitN);
   };
   const exec = () => {
@@ -69,7 +79,8 @@ function builder(rows) {
       for (const r of novas) {
         const chave = 'id' in r ? 'id' : 'operator_id';
         const ex = rows.find((x) => x[chave] === r[chave]);
-        if (ex) Object.assign(ex, r); else rows.push({ ...r });
+        if (ex) Object.assign(ex, r);
+        else rows.push({ ...r });
       }
       return { data: null, error: null };
     }
@@ -77,18 +88,57 @@ function builder(rows) {
   };
   const api = {
     select: () => api,
-    eq: (c, v) => { preds.push((r) => r[c] === v); return api; },
-    neq: (c, v) => { preds.push((r) => r[c] !== v); return api; },
-    in: (c, vs) => { preds.push((r) => vs.includes(r[c])); return api; },
-    is: (c, v) => { preds.push((r) => r[c] === v); return api; },
-    gte: (c, v) => { preds.push((r) => r[c] >= v); return api; },
-    lte: (c, v) => { preds.push((r) => r[c] <= v); return api; },
-    order: (c) => { orderKey = c; return api; },
-    limit: (n) => { limitN = n; return api; },
-    update: (p) => { op = 'update'; patch = p; return api; },
-    delete: () => { op = 'delete'; return api; },
-    insert: (rs) => { op = 'insert'; novas = rs; return api; },
-    upsert: (r) => { op = 'upsert'; novas = [r]; return api; },
+    eq: (c, v) => {
+      preds.push((r) => r[c] === v);
+      return api;
+    },
+    neq: (c, v) => {
+      preds.push((r) => r[c] !== v);
+      return api;
+    },
+    in: (c, vs) => {
+      preds.push((r) => vs.includes(r[c]));
+      return api;
+    },
+    is: (c, v) => {
+      preds.push((r) => r[c] === v);
+      return api;
+    },
+    gte: (c, v) => {
+      preds.push((r) => r[c] >= v);
+      return api;
+    },
+    lte: (c, v) => {
+      preds.push((r) => r[c] <= v);
+      return api;
+    },
+    order: (c) => {
+      orderKey = c;
+      return api;
+    },
+    limit: (n) => {
+      limitN = n;
+      return api;
+    },
+    update: (p) => {
+      op = 'update';
+      patch = p;
+      return api;
+    },
+    delete: () => {
+      op = 'delete';
+      return api;
+    },
+    insert: (rs) => {
+      op = 'insert';
+      novas = rs;
+      return api;
+    },
+    upsert: (r) => {
+      op = 'upsert';
+      novas = [r];
+      return api;
+    },
     maybeSingle: async () => ({ data: match()[0] ?? null, error: null }),
     then: (res, rej) => Promise.resolve(exec()).then(res, rej),
   };
@@ -96,13 +146,18 @@ function builder(rows) {
 }
 
 async function handlerCom(db, env = ENV) {
-  const { handler } = await loadHandler('google-agenda', { env, createClient: () => ({ from: db.from }) });
+  const { handler } = await loadHandler('google-agenda', {
+    env,
+    createClient: () => ({ from: db.from }),
+  });
   return async (body) => {
-    const res = await handler(new Request('https://fn.local/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...AUTH },
-      body: JSON.stringify(body),
-    }));
+    const res = await handler(
+      new Request('https://fn.local/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...AUTH },
+        body: JSON.stringify(body),
+      })
+    );
     expect(res.status).toBe(200);
     return res.json();
   };
@@ -130,14 +185,21 @@ const visita = (over = {}) => ({
 
 describe('google-agenda compartilhada — begin', () => {
   it('visita na fila sai para a agenda pessoal E para a compartilhada', async () => {
-    const db = fakeDb({ operators: [ana], visits: [visita()], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [visita()],
+      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }],
+    });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin', runner_email: 'agenda@empresa.com' });
 
     expect(res.calendars).toContainEqual({ op: 'OP-1', cal: 'ana@empresa.com' });
     expect(res.calendars).toContainEqual({ op: 'shared', cal: SHARED });
     const dests = res.push.map((p) => [p.dest, p.cal]).sort();
-    expect(dests).toEqual([['personal', 'ana@empresa.com'], ['shared', SHARED]]);
+    expect(dests).toEqual([
+      ['personal', 'ana@empresa.com'],
+      ['shared', SHARED],
+    ]);
     for (const p of res.push) {
       expect(p.event_id).toBe(eventIdFor('VIS-1'));
       expect(p.event.summary).toContain('Padaria Central');
@@ -146,7 +208,11 @@ describe('google-agenda compartilhada — begin', () => {
   });
 
   it('o título na compartilhada traz o técnico; na pessoal, não', async () => {
-    const db = fakeDb({ operators: [ana], visits: [visita()], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [visita()],
+      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }],
+    });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
 
@@ -165,7 +231,11 @@ describe('google-agenda compartilhada — begin', () => {
     v.google_hash = await visitHash(v);
     v.google_hash_shared = await visitHash(visita(), 'Ana');
     const beto = { id: 'OP-2', name: 'Beto', email: null, active: true };
-    const db = fakeDb({ operators: [ana, beto], visits: [v], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [ana, beto],
+      visits: [v],
+      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }],
+    });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
 
@@ -175,7 +245,11 @@ describe('google-agenda compartilhada — begin', () => {
 
   it('visita de técnico sem e-mail vai só para a compartilhada', async () => {
     const beto = { id: 'OP-2', name: 'Beto', email: null, active: true };
-    const db = fakeDb({ operators: [beto], visits: [visita({ operator: 'Beto', operator_id: 'OP-2' })], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [beto],
+      visits: [visita({ operator: 'Beto', operator_id: 'OP-2' })],
+      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }],
+    });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
 
@@ -187,7 +261,11 @@ describe('google-agenda compartilhada — begin', () => {
     const v = visita();
     v.google_hash = await visitHash(v);
     v.google_hash_shared = await visitHash(v, 'Ana');
-    const db = fakeDb({ operators: [ana], visits: [v], google_agenda_queue: [{ seq: 7, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [v],
+      google_agenda_queue: [{ seq: 7, visit_id: 'VIS-1' }],
+    });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
 
@@ -202,14 +280,22 @@ describe('google-agenda compartilhada — begin', () => {
         visita({ id: 'VIS-1', status: 'cancelada', google_hash: 'h1', google_hash_shared: 'h1' }),
         visita({ id: 'VIS-2', status: 'cancelada', google_hash: null, google_hash_shared: null }),
       ],
-      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }, { seq: 2, visit_id: 'VIS-2' }],
+      google_agenda_queue: [
+        { seq: 1, visit_id: 'VIS-1' },
+        { seq: 2, visit_id: 'VIS-2' },
+      ],
     });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin' });
 
     const remocoes = res.push.filter((p) => p.dest === 'shared');
     expect(remocoes).toHaveLength(1);
-    expect(remocoes[0]).toMatchObject({ visit_id: 'VIS-1', cal: null, remove_from: [SHARED], hash: null });
+    expect(remocoes[0]).toMatchObject({
+      visit_id: 'VIS-1',
+      cal: null,
+      remove_from: [SHARED],
+      hash: null,
+    });
   });
 
   it('linha na fila de visita apagada do banco não derruba o begin', async () => {
@@ -219,18 +305,34 @@ describe('google-agenda compartilhada — begin', () => {
     const db = fakeDb({
       operators: [ana],
       visits: [],
-      google_agenda_queue: [{ seq: 5, visit_id: 'VIS-APAGADA', old_operator_id: 'OP-1', old_operator: 'Ana' }],
+      google_agenda_queue: [
+        { seq: 5, visit_id: 'VIS-APAGADA', old_operator_id: 'OP-1', old_operator: 'Ana' },
+      ],
     });
     const call = await handlerCom(db);
     const res = await call({ action: 'begin', runner_email: 'agenda@empresa.com' });
 
     const porDest = Object.fromEntries(res.push.map((p) => [p.dest, p]));
-    expect(porDest.personal).toMatchObject({ visit_id: 'VIS-APAGADA', cal: null, remove_from: ['ana@empresa.com'], event: null });
-    expect(porDest.shared).toMatchObject({ visit_id: 'VIS-APAGADA', cal: null, remove_from: [SHARED], event: null });
+    expect(porDest.personal).toMatchObject({
+      visit_id: 'VIS-APAGADA',
+      cal: null,
+      remove_from: ['ana@empresa.com'],
+      event: null,
+    });
+    expect(porDest.shared).toMatchObject({
+      visit_id: 'VIS-APAGADA',
+      cal: null,
+      remove_from: [SHARED],
+      event: null,
+    });
   });
 
   it('sem AGENDA_SHARED_CAL, o comportamento é o de antes da 081', async () => {
-    const db = fakeDb({ operators: [ana], visits: [visita()], google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [visita()],
+      google_agenda_queue: [{ seq: 1, visit_id: 'VIS-1' }],
+    });
     const env = { ...ENV };
     delete env.AGENDA_SHARED_CAL;
     const call = await handlerCom(db, env);
@@ -248,20 +350,26 @@ describe('google-agenda compartilhada — finish', () => {
     v.google_hash = h;
     v.google_hash_shared = await visitHash(v, 'Ana');
     // Agenda já liberada antes (sem backfill nesta rodada, que zera o hash).
-    const db = fakeDb({ operators: [ana], visits: [v], google_agenda_shared: [{ id: 1, calendar_id: SHARED, ok: true }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [v],
+      google_agenda_shared: [{ id: 1, calendar_id: SHARED, ok: true }],
+    });
     const call = await handlerCom(db);
     const res = await call({
       action: 'finish',
       calendars: [{ op: 'shared', ok: true }],
-      changes: [{
-        op: 'shared',
-        event: {
-          id: eventIdFor('VIS-1'),
-          status: 'confirmed',
-          start: { dateTime: `${hoje()}T14:00:00-03:00`, timeZone: 'America/Sao_Paulo' },
-          end: { dateTime: `${hoje()}T15:00:00-03:00`, timeZone: 'America/Sao_Paulo' },
+      changes: [
+        {
+          op: 'shared',
+          event: {
+            id: eventIdFor('VIS-1'),
+            status: 'confirmed',
+            start: { dateTime: `${hoje()}T14:00:00-03:00`, timeZone: 'America/Sao_Paulo' },
+            end: { dateTime: `${hoje()}T15:00:00-03:00`, timeZone: 'America/Sao_Paulo' },
+          },
         },
-      }],
+      ],
       pushed: [],
     });
 
@@ -281,7 +389,16 @@ describe('google-agenda compartilhada — finish', () => {
     const res = await call({
       action: 'finish',
       calendars: [],
-      changes: [{ op: 'shared', event: { id: eventIdFor('VIS-1'), status: 'confirmed', start: { dateTime: `${hoje()}T14:00:00-03:00` } } }],
+      changes: [
+        {
+          op: 'shared',
+          event: {
+            id: eventIdFor('VIS-1'),
+            status: 'confirmed',
+            start: { dateTime: `${hoje()}T14:00:00-03:00` },
+          },
+        },
+      ],
       pushed: [],
     });
 
@@ -332,7 +449,11 @@ describe('google-agenda compartilhada — finish', () => {
     const v = visita();
     const h = await visitHash(v);
     const hComp = await visitHash(v, 'Ana');
-    const db = fakeDb({ operators: [ana], visits: [v], google_agenda_queue: [{ seq: 3, visit_id: 'VIS-1', attempts: 0 }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [v],
+      google_agenda_queue: [{ seq: 3, visit_id: 'VIS-1', attempts: 0 }],
+    });
     const call = await handlerCom(db);
     await call({
       action: 'finish',
@@ -352,9 +473,18 @@ describe('google-agenda compartilhada — finish', () => {
   it('robô de antes da 081 (sem dest no retorno) confirma a agenda pessoal', async () => {
     const v = visita();
     const h = await visitHash(v);
-    const db = fakeDb({ operators: [ana], visits: [v], google_agenda_queue: [{ seq: 3, visit_id: 'VIS-1', attempts: 0 }] });
+    const db = fakeDb({
+      operators: [ana],
+      visits: [v],
+      google_agenda_queue: [{ seq: 3, visit_id: 'VIS-1', attempts: 0 }],
+    });
     const call = await handlerCom(db);
-    await call({ action: 'finish', calendars: [], changes: [], pushed: [{ seq: 3, visit_id: 'VIS-1', ok: true, hash: h }] });
+    await call({
+      action: 'finish',
+      calendars: [],
+      changes: [],
+      pushed: [{ seq: 3, visit_id: 'VIS-1', ok: true, hash: h }],
+    });
 
     expect(db.store.visits[0].google_hash).toBe(h);
     expect(db.store.visits[0].google_hash_shared).toBeNull();
@@ -370,7 +500,12 @@ describe('google-agenda compartilhada — finish', () => {
       ],
     });
     const call = await handlerCom(db);
-    await call({ action: 'finish', calendars: [{ op: 'shared', ok: true }], changes: [], pushed: [] });
+    await call({
+      action: 'finish',
+      calendars: [{ op: 'shared', ok: true }],
+      changes: [],
+      pushed: [],
+    });
 
     expect(db.store.google_agenda_shared[0]).toMatchObject({ calendar_id: SHARED, ok: true });
     expect(db.store.google_agenda_queue.map((q) => q.visit_id)).toEqual(['VIS-1']);
@@ -386,6 +521,9 @@ describe('google-agenda compartilhada — finish', () => {
       pushed: [],
     });
 
-    expect(db.store.google_agenda_shared[0]).toMatchObject({ ok: false, last_error: 'Agenda não compartilhada' });
+    expect(db.store.google_agenda_shared[0]).toMatchObject({
+      ok: false,
+      last_error: 'Agenda não compartilhada',
+    });
   });
 });

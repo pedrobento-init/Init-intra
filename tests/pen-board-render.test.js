@@ -29,7 +29,11 @@ const _el = () => ({
 
 const sandbox = {
   console,
-  window: { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: false }) },
+  window: {
+    addEventListener() {},
+    removeEventListener() {},
+    matchMedia: () => ({ matches: false }),
+  },
   navigator: { onLine: true },
   document: {
     addEventListener() {},
@@ -68,9 +72,42 @@ try {
 const T = sandbox.__t;
 const area = _el();
 const PENS = [
-  { id: 'PEN-1', status: 'aberto', clientId: 1, clientName: 'Acme', priority: 'alta', responsible: 'Ana', deadline: '2020-01-01', assunto: 'Chamado aberto', createdAt: '2026-01-01T10:00:00Z', timerRunning: false },
-  { id: 'PEN-2', status: 'em_andamento', clientId: 2, clientName: 'Beta', priority: 'critica', responsible: 'Bia', deadline: '2099-01-01', assunto: 'Chamado em andamento', createdAt: '2026-01-02T10:00:00Z', timerRunning: true },
-  { id: 'PEN-3', status: 'pausado', clientId: 3, clientName: 'Gama', priority: 'baixa', responsible: 'Caio', deadline: null, assunto: 'Chamado pausado', createdAt: '2026-01-03T10:00:00Z', timerRunning: false },
+  {
+    id: 'PEN-1',
+    status: 'aberto',
+    clientId: 1,
+    clientName: 'Acme',
+    priority: 'alta',
+    responsible: 'Ana',
+    deadline: '2020-01-01',
+    assunto: 'Chamado aberto',
+    createdAt: '2026-01-01T10:00:00Z',
+    timerRunning: false,
+  },
+  {
+    id: 'PEN-2',
+    status: 'em_andamento',
+    clientId: 2,
+    clientName: 'Beta',
+    priority: 'critica',
+    responsible: 'Bia',
+    deadline: '2099-01-01',
+    assunto: 'Chamado em andamento',
+    createdAt: '2026-01-02T10:00:00Z',
+    timerRunning: true,
+  },
+  {
+    id: 'PEN-3',
+    status: 'pausado',
+    clientId: 3,
+    clientName: 'Gama',
+    priority: 'baixa',
+    responsible: 'Caio',
+    deadline: null,
+    assunto: 'Chamado pausado',
+    createdAt: '2026-01-03T10:00:00Z',
+    timerRunning: false,
+  },
 ];
 
 function render(pens) {
@@ -99,13 +136,15 @@ describe('renderPenKanban (modo local)', () => {
   });
 
   it('renderiza a região do quadro com as 5 colunas e contadores', () => {
-    expect(html).toContain('<section class="kanban-board" role="region" aria-label="Quadro de pendências">');
-    expect(html).toContain('class="kanban-col" style="--c:var(--kb-accent)"');
-    expect(html).toContain('class="kanban-col" style="--c:var(--kb-cyan)"');
-    expect(html).toContain('class="kanban-col" style="--c:var(--kb-amber)"');
+    expect(html).toContain(
+      '<section class="kanban-board" role="region" aria-label="Quadro de pendências">'
+    );
+    expect(html).toContain('class="kanban-col" data-sty="--c:var(--kb-accent)"');
+    expect(html).toContain('class="kanban-col" data-sty="--c:var(--kb-cyan)"');
+    expect(html).toContain('class="kanban-col" data-sty="--c:var(--kb-amber)"');
     // Sem cards: coluna estreita (is-empty), sem botão de ordenar.
-    expect(html).toContain('class="kanban-col is-empty" style="--c:var(--kb-violet)"');
-    expect(html).toContain('class="kanban-col is-empty" style="--c:var(--kb-green)"');
+    expect(html).toContain('class="kanban-col is-empty" data-sty="--c:var(--kb-violet)"');
+    expect(html).toContain('class="kanban-col is-empty" data-sty="--c:var(--kb-green)"');
     expect(html).not.toContain("cyclePenColSort('aguardando')");
     expect(html).toContain('aria-label="Coluna Em Andamento, 1 pendência"');
     expect(html).toContain('class="kanban-col-count"');
@@ -122,11 +161,13 @@ describe('renderPenKanban (modo local)', () => {
     // Ordenação padrão (criação) = relógio, só dentro do botão (sem relógio solto)
     const firstHeader = html.slice(aside, html.indexOf('</div>', aside));
     expect((firstHeader.match(/<circle cx="12" cy="12" r="9"\/>/g) || []).length).toBe(1);
-    expect(firstHeader.indexOf('<circle cx="12" cy="12" r="9"/>')).toBeGreaterThan(firstHeader.indexOf('kanban-col-sort'));
+    expect(firstHeader.indexOf('<circle cx="12" cy="12" r="9"/>')).toBeGreaterThan(
+      firstHeader.indexOf('kanban-col-sort')
+    );
   });
 
   it('um card por pendência, com drag-and-drop mantido', () => {
-    expect(html).toContain('<article class="kanban-card" style="border-left:4px');
+    expect(html).toContain('<article class="kanban-card" data-sty="border-left:4px');
     expect((html.match(/<article class="kanban-card"/g) || []).length).toBe(3);
     // Drag via delegação (data-pen-id + data-col-id na coluna; _bindPenBoardDrag)
     expect(html).toContain('data-pen-id=');
@@ -146,11 +187,20 @@ describe('renderPenKanban (modo local)', () => {
   // número sem palavra nenhuma, com o sentido preso no title, e que nem era o
   // SLA configurado. Quem fala agora são os selos de resposta e resolução.
   it('o card não traz mais contagem solta de SLA', () => {
-    const fresh = render([{
-      id: 'PEN-9', status: 'aberto', clientId: 1, clientName: 'Acme', priority: 'alta',
-      responsible: 'Ana', deadline: null, assunto: 'Nova pendência',
-      createdAt: new Date().toISOString(), timerRunning: false,
-    }]);
+    const fresh = render([
+      {
+        id: 'PEN-9',
+        status: 'aberto',
+        clientId: 1,
+        clientName: 'Acme',
+        priority: 'alta',
+        responsible: 'Ana',
+        deadline: null,
+        assunto: 'Nova pendência',
+        createdAt: new Date().toISOString(),
+        timerRunning: false,
+      },
+    ]);
     expect(fresh).not.toContain('kc-sla');
     expect(fresh).not.toMatch(/>[0-9]+h</);
   });
@@ -180,8 +230,12 @@ describe('rolagem independente por coluna', () => {
   it('limita o quadro à viewport e mantém a rolagem vertical na lista de cards', () => {
     const css = read('css/styles.css').replace(/\s+/g, ' ');
     expect(css).toContain('.content-area:has(> #penViewArea > .pen-board)');
-    expect(css).toMatch(/\.pen-board \.kanban-board \{[^}]*flex: 1;[^}]*min-height: 0;[^}]*overflow-y: hidden;[^}]*align-items: stretch;/);
-    expect(css).toMatch(/\.pen-board \.kanban-cards \{[^}]*min-height: 0;[^}]*overscroll-behavior: contain;/);
+    expect(css).toMatch(
+      /\.pen-board \.kanban-board \{[^}]*flex: 1;[^}]*min-height: 0;[^}]*overflow-y: hidden;[^}]*align-items: stretch;/
+    );
+    expect(css).toMatch(
+      /\.pen-board \.kanban-cards \{[^}]*min-height: 0;[^}]*overscroll-behavior: contain;/
+    );
   });
 });
 
@@ -203,6 +257,8 @@ describe('cabeçalho da coluna: a ordem só ganha nome quando sai do padrão', (
       expect(html).toContain('<span class="kcs-word">prazo</span>');
       // Só a coluna mexida fala; as outras seguem caladas.
       expect((html.match(/kcs-word/g) || []).length).toBe(1);
-    } finally { T.setPenColSort('aberto', 'criacao'); }
+    } finally {
+      T.setPenColSort('aberto', 'criacao');
+    }
   });
 });

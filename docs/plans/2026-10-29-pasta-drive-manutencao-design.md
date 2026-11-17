@@ -82,13 +82,13 @@ de clientes, que só a função tem. O robô recebe `nome` pronto em `buscar` e 
 
 ### 2. Plano (`planoPastas`)
 
-| Cliente | Lista |
-| --- | --- |
-| Link de pasta válido | `vigiar: {client_id, folder_id, nome, compartilhada}` |
-| Link de pasta inválido | `invalidos` (como hoje) |
-| Sem pasta, planilha válida | `candidatos` (como hoje) |
-| Sem pasta, sem planilha válida, nome não vazio | `buscar: {client_id, nome}` |
-| Sem pasta, nome vazio | fora |
+| Cliente                                        | Lista                                                 |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Link de pasta válido                           | `vigiar: {client_id, folder_id, nome, compartilhada}` |
+| Link de pasta inválido                         | `invalidos` (como hoje)                               |
+| Sem pasta, planilha válida                     | `candidatos` (como hoje)                              |
+| Sem pasta, sem planilha válida, nome não vazio | `buscar: {client_id, nome}`                           |
+| Sem pasta, nome vazio                          | fora                                                  |
 
 - `compartilhada = true` quando o mesmo `folder_id` aparece em mais de um
   cliente. O robô não move nem renomeia essas.
@@ -110,7 +110,7 @@ movimentação e as órfãs; `candidatos` e o teste de `vigiar` seguem.
 - **vigiar** — testa como hoje. Se acessível e `!compartilhada`:
   - `getName() !== nome` → `setName(nome)`, `renomeadas++`;
   - nenhum pai é a raiz → `moveTo(root)`, `movidas++`.
-  Falha de rename ou move vira `erros`, sem mudar o status `ok`.
+    Falha de rename ou move vira `erros`, sem mudar o status `ok`.
 - **órfãs** — `root.getFolders()`, não lixeira, cujo id não está em `vigiar` nem
   nos `achados` desta noite → `orfas` (nomes).
 - O log ganha `| renomeadas | movidas | ambíguas | órfãs`, e as listas de
@@ -122,21 +122,21 @@ movimentação e as órfãs; `candidatos` e o teste de `vigiar` seguem.
 
 ### 4. Compatibilidade entre deploys
 
-| Função | Robô | O que acontece |
-| --- | --- | --- |
-| nova | antigo | Robô lê `r.criar || []` → vazio: nada é criado até colar o `Robo.gs` novo. `vigiar` com campos a mais é ignorado. Seguro. |
-| antiga | novo | Robô lê `r.buscar || []` → vazio; `v.nome` ausente → não renomeia; sem `compartilhada` → não move (exige `nome` presente para mexer). Seguro. |
+| Função | Robô   | O que acontece    |
+| ------ | ------ | ----------------- |
+| nova   | antigo | Robô lê `r.criar  |     | []`→ vazio: nada é criado até colar o`Robo.gs`novo.`vigiar` com campos a mais é ignorado. Seguro.                  |
+| antiga | novo   | Robô lê `r.buscar |     | []`→ vazio;`v.nome`ausente → não renomeia; sem`compartilhada`→ não move (exige`nome` presente para mexer). Seguro. |
 
 ### 5. Erros e degradação
 
-| Falha | O que acontece |
-| --- | --- |
-| Raiz vazia ou inacessível | Um erro; nada criado, movido nem listado. |
-| `createFolder`, `setName` ou `moveTo` falha | Erro por cliente; tenta na noite seguinte. |
-| Pasta criada, resultado não gravado | Reaproveitada pelo nome na noite seguinte. |
-| Pasta no Meu Drive de alguém, sem permissão de mover | Erro por cliente; continua vinculada. |
-| Pessoa renomeia a pasta no Drive | Volta ao nome do Intra na noite seguinte (o Intra manda). |
-| Cliente muda de nome e vira homônimo | Pasta ganha o sufixo no rename. |
+| Falha                                                | O que acontece                                            |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| Raiz vazia ou inacessível                            | Um erro; nada criado, movido nem listado.                 |
+| `createFolder`, `setName` ou `moveTo` falha          | Erro por cliente; tenta na noite seguinte.                |
+| Pasta criada, resultado não gravado                  | Reaproveitada pelo nome na noite seguinte.                |
+| Pasta no Meu Drive de alguém, sem permissão de mover | Erro por cliente; continua vinculada.                     |
+| Pessoa renomeia a pasta no Drive                     | Volta ao nome do Intra na noite seguinte (o Intra manda). |
+| Cliente muda de nome e vira homônimo                 | Pasta ganha o sufixo no rename.                           |
 
 ### 6. Testes
 
@@ -164,36 +164,36 @@ movimentação e as órfãs; `candidatos` e o teste de `vigiar` seguem.
 
 ### Inputs
 
-| Input | Tipo | Restrições |
-| --- | --- | --- |
-| `clients.name` | text | saneado; vazio não entra em `buscar` |
-| `clients.cnpj` | text | sufixo só em homônimo; vazio usa id curto |
-| `clients.google_sheet_url` | text | inválido equivale a vazio para `buscar` |
-| `clients.drive_folder_url` | text | nulo para `buscar`; válido para `vigiar` |
-| `CLIENTES_ROOT_ID` | Script Property | obrigatório para buscar, mover e órfãs |
+| Input                      | Tipo            | Restrições                                |
+| -------------------------- | --------------- | ----------------------------------------- |
+| `clients.name`             | text            | saneado; vazio não entra em `buscar`      |
+| `clients.cnpj`             | text            | sufixo só em homônimo; vazio usa id curto |
+| `clients.google_sheet_url` | text            | inválido equivale a vazio para `buscar`   |
+| `clients.drive_folder_url` | text            | nulo para `buscar`; válido para `vigiar`  |
+| `CLIENTES_ROOT_ID`         | Script Property | obrigatório para buscar, mover e órfãs    |
 
 ### Outputs
 
-| Caso | Resultado |
-| --- | --- |
-| `pastas` | `{ candidatos, vigiar: [{client_id, folder_id, nome, compartilhada}], buscar: [{client_id, nome}] }` |
-| Uma pasta ou pasta criada | `drive_folder_url` gravado, status `ok` |
-| Várias pastas | Nada gravado; nome em `ambiguas` |
-| Rename ou move | Nada muda no banco (o id da pasta é o mesmo) |
-| Órfã | Nome no log; nada muda |
+| Caso                      | Resultado                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `pastas`                  | `{ candidatos, vigiar: [{client_id, folder_id, nome, compartilhada}], buscar: [{client_id, nome}] }` |
+| Uma pasta ou pasta criada | `drive_folder_url` gravado, status `ok`                                                              |
+| Várias pastas             | Nada gravado; nome em `ambiguas`                                                                     |
+| Rename ou move            | Nada muda no banco (o id da pasta é o mesmo)                                                         |
+| Órfã                      | Nome no log; nada muda                                                                               |
 
 ### Edge cases
 
-| Caso | Comportamento |
-| --- | --- |
-| Nome `A/B  C` | Pasta `A-B C` |
-| Nome com 300 caracteres e homônimo | Base cortada em 100, sufixo inteiro |
-| Dois clientes `Padaria Sol` e `padaria sol` | Ambos com sufixo |
-| Homônimo sem CNPJ | Sufixo com 8 caracteres do id |
-| Pasta antiga sem sufixo, cliente vira homônimo | Renomeada com sufixo |
-| Pasta linkada por dois clientes | Testada, nunca renomeada nem movida |
-| Planilha direto na raiz | Não vincula a raiz; vai para `ambiguas` |
-| Pasta de mesmo nome só na lixeira | Ignorada; cria outra |
+| Caso                                           | Comportamento                           |
+| ---------------------------------------------- | --------------------------------------- |
+| Nome `A/B  C`                                  | Pasta `A-B C`                           |
+| Nome com 300 caracteres e homônimo             | Base cortada em 100, sufixo inteiro     |
+| Dois clientes `Padaria Sol` e `padaria sol`    | Ambos com sufixo                        |
+| Homônimo sem CNPJ                              | Sufixo com 8 caracteres do id           |
+| Pasta antiga sem sufixo, cliente vira homônimo | Renomeada com sufixo                    |
+| Pasta linkada por dois clientes                | Testada, nunca renomeada nem movida     |
+| Planilha direto na raiz                        | Não vincula a raiz; vai para `ambiguas` |
+| Pasta de mesmo nome só na lixeira              | Ignorada; cria outra                    |
 
 ### Acceptance criteria
 

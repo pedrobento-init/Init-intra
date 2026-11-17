@@ -13,19 +13,23 @@ import { fileURLToPath } from 'node:url';
 
 const src = fs.readFileSync(
   fileURLToPath(new URL('../supabase/functions/pendencia-responder/index.ts', import.meta.url)),
-  'utf8',
+  'utf8'
 );
 
 describe('pendencia-responder: o destinatário nunca vem do app', () => {
   it('o corpo da requisição só traz pendencia_id e text', () => {
     const destruct = /const\s*\{([^}]*)\}\s*=\s*await\s+req\.json\(\)/.exec(src);
     expect(destruct, 'não achei a leitura do corpo da requisição').not.toBeNull();
-    const campos = destruct[1].split(',').map((s) => s.trim()).filter(Boolean).sort();
+    const campos = destruct[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .sort();
     expect(campos).toEqual(['pendencia_id', 'text']);
   });
 
   it('o endereço sai do chamado, lido com a chave de serviço', () => {
-    expect(src).toMatch(/supabaseAdmin[\s\S]*?from\("pendencias"\)/);
+    expect(src).toMatch(/supabaseAdmin[\s\S]*?from\(["']pendencias["']\)/);
     expect(src).toMatch(/solicitante_email/);
     expect(src).toMatch(/const\s+destino\s*=\s*String\(pen\.solicitante_email/);
     expect(src).toMatch(/to:\s*destino\b/);
@@ -38,8 +42,8 @@ describe('pendencia-responder: o destinatário nunca vem do app', () => {
 
 describe('pendencia-responder: quem pode chamar', () => {
   it('exige operador ativo logado, como a send-email', () => {
-    expect(src).toMatch(/withSupabase\(\s*\{\s*auth:\s*"user"\s*\}/);
-    expect(src).toMatch(/from\("operators"\)/);
+    expect(src).toMatch(/withSupabase\(\s*\{\s*auth:\s*["']user["']\s*\}/);
+    expect(src).toMatch(/from\(["']operators["']\)/);
     expect(src).toContain('unauthorized');
   });
 });

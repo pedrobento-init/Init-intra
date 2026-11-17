@@ -41,7 +41,11 @@ describe('cronômetro esquecido', () => {
     expect(T.isTimerForgotten({ timerRunning: false, timerTotalSeconds: 999999 })).toBe(false);
   });
   it('conta só a sessão atual, não o total acumulado', () => {
-    const s = T.getSessionSeconds({ timerRunning: true, timerStartedAt: hoursAgo(1), timerTotalSeconds: 100000 });
+    const s = T.getSessionSeconds({
+      timerRunning: true,
+      timerStartedAt: hoursAgo(1),
+      timerTotalSeconds: 100000,
+    });
     expect(s).toBeGreaterThanOrEqual(3599);
     expect(s).toBeLessThan(3700);
   });

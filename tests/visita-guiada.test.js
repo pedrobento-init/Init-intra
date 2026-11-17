@@ -11,7 +11,13 @@ beforeAll(() => {
 
 describe('Atendimento guiado — etapa inicial', () => {
   it('cinco etapas na ordem do atendimento', () => {
-    expect(CW_PASSOS.map((p) => p.k)).toEqual(['chegada', 'fotos', 'relatorio', 'assinatura', 'concluir']);
+    expect(CW_PASSOS.map((p) => p.k)).toEqual([
+      'chegada',
+      'fotos',
+      'relatorio',
+      'assinatura',
+      'concluir',
+    ]);
   });
 
   it('sem chegada registrada começa na Chegada (mesmo com etapa salva)', () => {
@@ -46,7 +52,15 @@ describe('Atendimento guiado — resumo antes de concluir', () => {
   });
 
   it('tudo feito', () => {
-    const r = cwResumo({ checkinAt: '2026-10-21T12:05:00Z', relatorio: 'ok', assinatura: SIG, assinaturaNome: 'Ana' }, 3);
+    const r = cwResumo(
+      {
+        checkinAt: '2026-10-21T12:05:00Z',
+        relatorio: 'ok',
+        assinatura: SIG,
+        assinaturaNome: 'Ana',
+      },
+      3
+    );
     expect(r.every((x) => x.ok)).toBe(true);
     expect(r[1].texto).toBe('3 fotos');
     expect(r[3].texto).toBe('Assinado por Ana');
@@ -60,12 +74,21 @@ describe('Atendimento guiado — resumo antes de concluir', () => {
 describe('Atendimento guiado — linha de sincronização', () => {
   // O estado vira data-estado no HTML e decide a cor do ponto: pendência não pode passar por "ok".
   it('alteração pendente vence o online, no singular e no plural', () => {
-    expect(cwSyncEstado(1, true)).toEqual({ estado: 'pendente', texto: '1 alteração aguardando sincronização' });
-    expect(cwSyncEstado(3, false)).toEqual({ estado: 'pendente', texto: '3 alterações aguardando sincronização' });
+    expect(cwSyncEstado(1, true)).toEqual({
+      estado: 'pendente',
+      texto: '1 alteração aguardando sincronização',
+    });
+    expect(cwSyncEstado(3, false)).toEqual({
+      estado: 'pendente',
+      texto: '3 alterações aguardando sincronização',
+    });
   });
 
   it('sem pendência: ok online, offline sem rede', () => {
     expect(cwSyncEstado(0, true).estado).toBe('ok');
-    expect(cwSyncEstado(0, false)).toEqual({ estado: 'offline', texto: 'Offline — as alterações ficam neste aparelho' });
+    expect(cwSyncEstado(0, false)).toEqual({
+      estado: 'offline',
+      texto: 'Offline — as alterações ficam neste aparelho',
+    });
   });
 });

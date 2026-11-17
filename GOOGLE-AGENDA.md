@@ -6,20 +6,20 @@ própria agenda com o robô, e o robô mantém visitas e eventos iguais.
 
 Não precisa do Google Cloud Console, de OAuth nem de administrador do Workspace.
 
-| No site | Na agenda Google do técnico (até 1 min) |
-| --- | --- |
-| Cria visita | Evento criado na agenda principal |
+| No site                                                    | Na agenda Google do técnico (até 1 min)         |
+| ---------------------------------------------------------- | ----------------------------------------------- |
+| Cria visita                                                | Evento criado na agenda principal               |
 | Muda data, horário, cliente, motivo, observações ou status | Evento atualizado (concluída ganha ✓ no título) |
-| Cancela ou exclui a visita | Evento apagado |
-| Passa a visita para outro técnico | Sai da agenda de um e entra na do outro |
+| Cancela ou exclui a visita                                 | Evento apagado                                  |
+| Passa a visita para outro técnico                          | Sai da agenda de um e entra na do outro         |
 
-| Na agenda Google | No site (até 1 min) |
-| --- | --- |
-| Arrasta o evento / muda data ou horário | Visita muda de data/horário |
-| Marca ou desmarca "dia inteiro" | Visita muda igual |
-| Apaga o evento | Visita **agendada** vira **cancelada** (concluída não muda) |
-| Muda título ou descrição | Nada (na próxima edição no site o evento volta ao padrão) |
-| Cria um evento novo direto no Google | Nada (visita precisa de cliente; crie pelo site) |
+| Na agenda Google                        | No site (até 1 min)                                         |
+| --------------------------------------- | ----------------------------------------------------------- |
+| Arrasta o evento / muda data ou horário | Visita muda de data/horário                                 |
+| Marca ou desmarca "dia inteiro"         | Visita muda igual                                           |
+| Apaga o evento                          | Visita **agendada** vira **cancelada** (concluída não muda) |
+| Muda título ou descrição                | Nada (na próxima edição no site o evento volta ao padrão)   |
+| Cria um evento novo direto no Google    | Nada (visita precisa de cliente; crie pelo site)            |
 
 Se a visita foi editada no site e ainda não chegou ao Google, o site vence.
 
@@ -118,21 +118,23 @@ SELECT count(*), max(attempts) FROM public.google_agenda_queue;  -- perto de 0
 
 O mesmo projeto do Apps Script também cuida destas tarefas. A regra de cada uma fica na Edge Function `robo`.
 
-| Quando | O quê |
-| --- | --- |
-| De hora em hora | Agenda **"Vencimentos Init"**: cada vencimento ativo vira um evento de dia inteiro, que não ocupa a agenda de ninguém. A equipe ativa recebe acesso só de leitura. Vencimento encerrado ou excluído sai da agenda. |
+| Quando           | O quê                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| De hora em hora  | Agenda **"Vencimentos Init"**: cada vencimento ativo vira um evento de dia inteiro, que não ocupa a agenda de ninguém. A equipe ativa recebe acesso só de leitura. Vencimento encerrado ou excluído sai da agenda.                                                                                                                                                      |
 | Por volta das 8h | E-mail **"Seu dia"** para cada pessoa: visitas de hoje (com o "O que levar"), pendências vencidas ou que vencem hoje e vencimentos dos próximos 7 dias. Admin vê os vencimentos da equipe e os domínios com data diferente do registro. Dia sem nada não gera e-mail; no fim de semana, só recebe quem tem visita. Opcional: texto da equipe num espaço do Google Chat. |
-| De madrugada | **Domínios:** para vencimentos do tipo "Domínio", consulta a expiração no registro público (RDAP; `.br` vai ao registro.br). **Planilha "Init Intra — Indicadores"**, reescrita toda noite, com as abas Resumo mensal, Visitas, Pendências e Horas. **Backup** em JSON na pasta "Init Intra — Backups" do Drive, guardado por 30 dias. |
-| De 30 em 30 min | **Backups dos clientes:** e-mails do rótulo "Backups" do Gmail viram o status de cada rotina monitorada; falha ou silêncio além do limite abre pendência. |
-| De 5 em 5 min | **Triagem de e-mail:** e-mail de cliente no rótulo "Pendências" vira pendência já preenchida (assunto, descrição, tipo, prioridade, categoria). |
+| De madrugada     | **Domínios:** para vencimentos do tipo "Domínio", consulta a expiração no registro público (RDAP; `.br` vai ao registro.br). **Planilha "Init Intra — Indicadores"**, reescrita toda noite, com as abas Resumo mensal, Visitas, Pendências e Horas. **Backup** em JSON na pasta "Init Intra — Backups" do Drive, guardado por 30 dias.                                  |
+| De 30 em 30 min  | **Backups dos clientes:** e-mails do rótulo "Backups" do Gmail viram o status de cada rotina monitorada; falha ou silêncio além do limite abre pendência.                                                                                                                                                                                                               |
+| De 5 em 5 min    | **Triagem de e-mail:** e-mail de cliente no rótulo "Pendências" vira pendência já preenchida (assunto, descrição, tipo, prioridade, categoria).                                                                                                                                                                                                                         |
 
 Detalhes:
+
 - **Lembretes da agenda:** no Google, lembrete de evento é pessoal. Os avisos de 30 e 7 dias e do dia continuam saindo por e-mail (`avisos-prazo`). Quem quiser também pode ligar as notificações da agenda "Vencimentos Init" nas próprias configurações do Google Agenda.
 - **Domínio:** escreva o domínio na descrição ou nas observações do vencimento, por exemplo "Domínio cliente.com.br". Se não houver domínio, o erro fica registrado e nada é avisado.
 - **Planilha:** dá para ligar no Looker Studio (Adicionar dados → Planilhas Google) e montar o painel da diretoria. Não edite a planilha à mão, porque ela é reescrita.
 - **Backup:** não leva o token Milvus dos clientes nem o PIN dos operadores, e também não inclui as tabelas de credenciais e de sincronização. Os arquivos ficam no Drive da conta do robô: mesmo assim são dados de clientes, então compartilhe a pasta só com quem precisa.
 
 ### Instalar
+
 1. Supabase (uma vez): rode a migration `059_vencimento_dominios.sql` e faça
    `supabase functions deploy robo --no-verify-jwt`. Ela usa os secrets que já existem.
 2. No projeto do Apps Script: **+ → Script**, dê o nome `Robo` e cole
@@ -174,7 +176,7 @@ supabase functions deploy ia-levar
 
 Cada rota está descrita na seção da função que a usa: briefing abaixo, [triagem](#triagem-de-e-mail-make), [relatório](#relatório-da-visita-com-ia-make) e [o que levar](#o-que-levar-com-ia-make).
 
-**Por que um cenário só:** o plano Free da Make deixa **2 cenários ativos** e **1.000 operações por mês**. Um cenário com Router gasta um slot só, e o Router não consome operação — cada chamada custa 3 (webhook + IA + resposta), ou seja, cerca de **330 chamadas por mês** somando as quatro rotas. Se o limite apertar, o plano Core sobe para 10.000 operações. O consumo aparece em *Organization → Usage*.
+**Por que um cenário só:** o plano Free da Make deixa **2 cenários ativos** e **1.000 operações por mês**. Um cenário com Router gasta um slot só, e o Router não consome operação — cada chamada custa 3 (webhook + IA + resposta), ou seja, cerca de **330 chamadas por mês** somando as quatro rotas. Se o limite apertar, o plano Core sobe para 10.000 operações. O consumo aparece em _Organization → Usage_.
 
 **Modelo:** no provedor da Make, os modelos GPT-4o, GPT-4o mini e GPT-4.1 mini **não são liberados** (erro "Model not allowed"); use **GPT-5 mini**. Trocar o modelo é no módulo de IA de cada rota.
 
@@ -187,6 +189,7 @@ O e-mail "Seu dia" já traz, em cada visita, os fatos do cliente: últimas visit
 A rota `briefing` recebe `{ "tarefa", "visita_id", "contexto" }` — `contexto` é o texto pronto — e responde com o parágrafo em texto puro. A IA é chamada uma vez por visita por dia, no e-mail de cerca de 8h. Se o Make demorar mais de 25 s ou falhar, o e-mail sai sem o parágrafo.
 
 ### Prompt
+
 ```text
 Você ajuda técnicos de suporte de TI de uma empresa que atende pequenas e médias empresas.
 Antes de uma visita técnica, leia os fatos do cliente abaixo e escreva um briefing curto para o técnico.
@@ -209,9 +212,10 @@ Fatos:
 E-mail de cliente marcado com o rótulo **"Pendências"** no Gmail do robô vira pendência no Intra, já com assunto, descrição, tipo, prioridade e categoria preenchidos.
 
 ### Como funciona
+
 1. No Gmail da conta do robô, marque o e-mail com o rótulo **Pendências** — na mão ou por um filtro (por exemplo, tudo que chega no endereço de suporte). O robô cria o rótulo sozinho na primeira execução.
 2. De 5 em 5 minutos o robô (`roboPendenciasEmail`) manda ao Intra os e-mails novos do rótulo.
-3. O Intra acha o cliente pelo **domínio do remetente** (campo *Domínio* da aba E-mail da ficha do cliente) e, se não achar, pelo **nome do cliente no remetente ou no assunto**. Domínio de e-mail grátis (gmail, hotmail, uol…) nunca casa cliente.
+3. O Intra acha o cliente pelo **domínio do remetente** (campo _Domínio_ da aba E-mail da ficha do cliente) e, se não achar, pelo **nome do cliente no remetente ou no assunto**. Domínio de e-mail grátis (gmail, hotmail, uol…) nunca casa cliente.
 4. Com o cliente na mão, os fatos vão ao cenário do Make, que devolve a classificação. A pendência abre com canal **E-mail**, etiqueta `triagem-automatica`, o técnico do cliente como responsável, o solicitante do e-mail e o prazo de 1ª resposta pela prioridade (mesma regra do `js/sla.js`: 8h–18h, seg–sex).
 5. O e-mail original (remetente, data e assunto) fica no fim da descrição, e o texto do corpo é o que a IA resumiu — vale conferir antes de responder ao cliente.
 
@@ -270,8 +274,7 @@ domínio de casa sai da caixa que o robô já usa. Sem `GMAIL_USER`, ninguém é
 barrado e o comportamento é o de antes. O log do Apps Script passa a contar
 esses e-mails (`N da própria Init`).
 
-A resposta do *cliente* na mesma conversa é tratada logo abaixo.
-
+A resposta do _cliente_ na mesma conversa é tratada logo abaixo.
 
 ### Resposta do cliente cai no chamado que a conversa já abriu
 
@@ -305,11 +308,11 @@ nota em vez de ser ignorada.
 > falha em silêncio (fica no log da function) e a triagem volta a abrir um
 > chamado por mensagem.
 
-
 ### A rota `triagem` no Make
+
 Recebe `{ "tarefa", "email_id", "de", "assunto", "data", "trecho", "cliente" }` e responde um JSON com `assunto`, `descricao`, `categoria`, `prioridade`, `tipo`, `solicitante` e `ignorar`.
 
-É o módulo **Extract information from text**: sete campos, os seis primeiros do tipo *Text* e `ignorar` como *Boolean*. A **descrição de cada campo é o que diz à IA as opções válidas** (as listas da migration 056) — é ali que se ajusta o critério, sem tocar no código. Depois vem **Transform to JSON** e o **Webhook response** com `Content-Type: application/json`.
+É o módulo **Extract information from text**: sete campos, os seis primeiros do tipo _Text_ e `ignorar` como _Boolean_. A **descrição de cada campo é o que diz à IA as opções válidas** (as listas da migration 056) — é ali que se ajusta o critério, sem tocar no código. Depois vem **Transform to JSON** e o **Webhook response** com `Content-Type: application/json`.
 
 O Intra confere tudo o que volta: categoria, prioridade e tipo fora das listas caem no padrão (Outro / Média / Suporte), então um ajuste malfeito no prompt não suja o banco.
 
@@ -321,10 +324,10 @@ No Apps Script, rode **`instalarRobo`** de novo depois de atualizar o `Robo.gs` 
 
 Dois caminhos da triagem não abrem chamado, e antes os dois sumiam em silêncio:
 
-| Motivo | O que aconteceu | O que fazer |
-| --- | --- | --- |
-| **Sem cliente** | O remetente não casou com ficha nenhuma: domínio fora do cadastro, ou Gmail/Hotmail pessoal — domínio público **nunca** casa, de propósito, porque o remetente pode ser qualquer um. | Cadastrar o cliente, ou pôr o domínio em `emails.domain` na ficha. |
-| **A IA ignorou** | O Make devolveu `ignorar: true` — propaganda, aviso automático, agradecimento. | Conferir. Quando o Make erra, é aqui que o pedido real aparece. |
+| Motivo           | O que aconteceu                                                                                                                                                                      | O que fazer                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| **Sem cliente**  | O remetente não casou com ficha nenhuma: domínio fora do cadastro, ou Gmail/Hotmail pessoal — domínio público **nunca** casa, de propósito, porque o remetente pode ser qualquer um. | Cadastrar o cliente, ou pôr o domínio em `emails.domain` na ficha. |
+| **A IA ignorou** | O Make devolveu `ignorar: true` — propaganda, aviso automático, agradecimento.                                                                                                       | Conferir. Quando o Make erra, é aqui que o pedido real aparece.    |
 
 Agora os dois viram linha em `emails_triagem` (migration 066) e aparecem **no
 topo da tela de Pendências**, numa caixa que some sozinha quando não há nada
@@ -360,7 +363,7 @@ mexer em dado nenhum.
 
 ## Relatório da visita com IA (Make)
 
-No relatório da visita, o botão **✨ Escrever com IA** manda as anotações soltas do técnico (com o cliente, o motivo e os itens concluídos do checklist) e devolve o texto organizado para o cliente final: *Resumo*, *O que foi feito* e *Pendências e recomendações*. O técnico revisa e pode **Desfazer** — a IA nunca salva nada sozinha, e o botão só aparece para operador logado e online.
+No relatório da visita, o botão **✨ Escrever com IA** manda as anotações soltas do técnico (com o cliente, o motivo e os itens concluídos do checklist) e devolve o texto organizado para o cliente final: _Resumo_, _O que foi feito_ e _Pendências e recomendações_. O técnico revisa e pode **Desfazer** — a IA nunca salva nada sozinha, e o botão só aparece para operador logado e online.
 
 A rota `relatorio` recebe `{ "tarefa", "contexto" }` e responde o relatório em texto puro. O prompt está no módulo de IA do cenário; as regras que valem a pena manter: só o que está nas anotações (nada inventado), texto simples sem Markdown, termo técnico explicado entre parênteses na primeira vez, e **senha ou token que apareça nas anotações sai como `[credencial omitida]`**.
 
@@ -393,13 +396,16 @@ O botão só aparece com operador logado e conexão (mesma regra do relatório).
 - **Etiquetas QR:** no cliente → Inventário → **🏷️ Etiquetas QR** (folha A4 3 × 7, como a Pimaco A4356/6180; imprima em 100%), ou no menu ⋯ de um equipamento em conserto. O QR abre o Intra no equipamento (depois do login), com atalho para abrir uma pendência.
 
 ### Instalar (Supabase + robô)
+
 1. Rode a migration `060_campo_backups_briefing.sql` e faça `supabase functions deploy robo --no-verify-jwt`.
 2. No Apps Script, cole o `Robo.gs` novo (que agora inclui `roboBackupsEmail`), cole também o `appsscript.json` se você o usa (ele agora pede acesso ao Gmail), rode **`instalarRobo`** de novo e autorize.
 
 ### Instalar a pasta do Drive automática (robô da noite)
+
 Toda noite o robô preenche o link da pasta de quem tem planilha e não tem pasta (a pasta onde a planilha está) e confere as pastas vinculadas. A ficha mostra um selo discreto: ✅ verificada, ⚠️ sem acesso ou ⚠️ link inválido. Um link colocado por alguém nunca é trocado.
 
 Quem não tem pasta nem planilha válida (cliente novo ou antigo, inclusive com link de planilha inválido) passa por uma busca pelo nome na raiz antes de qualquer criação:
+
 - **uma** pasta com o nome: o robô vincula essa pasta;
 - **nenhuma**: cria a pasta na raiz e vincula;
 - **várias**: não vincula nem cria, só registra no log ("Nome: N pastas") para alguém decidir.

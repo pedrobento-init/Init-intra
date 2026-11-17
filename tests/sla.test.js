@@ -39,7 +39,13 @@ describe('horário comercial', () => {
 });
 
 describe('1ª resposta ao gravar', () => {
-  const criada = () => ({ id: 'P1', status: 'aberto', priority: 'alta', createdAt: iso(2026, 10, 21, 9, 0), notes: [] });
+  const criada = () => ({
+    id: 'P1',
+    status: 'aberto',
+    priority: 'alta',
+    createdAt: iso(2026, 10, 21, 9, 0),
+    notes: [],
+  });
 
   it('criação define o prazo da resposta pela prioridade', () => {
     const p = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
@@ -48,21 +54,49 @@ describe('1ª resposta ao gravar', () => {
   });
 
   it('criar já em andamento conta como respondida na hora', () => {
-    const p = sla.slaOnSave(null, { ...criada(), status: 'em_andamento' }, iso(2026, 10, 21, 9, 0), 'Ana');
+    const p = sla.slaOnSave(
+      null,
+      { ...criada(), status: 'em_andamento' },
+      iso(2026, 10, 21, 9, 0),
+      'Ana'
+    );
     expect(p.firstResponseAt).toBe(iso(2026, 10, 21, 9, 0));
     expect(p.firstResponseBy).toBe('Ana');
   });
 
   it('responde com nota, cronômetro ou status saindo de Aberto — só a primeira vez', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const nota = sla.slaOnSave(base, { ...base, notes: [{ text: 'vi', visibility: 'resposta' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
-    expect([nota.firstResponseAt, nota.firstResponseBy]).toEqual([iso(2026, 10, 21, 10, 0), 'Beto']);
-    const depois = sla.slaOnSave(nota, { ...nota, status: 'em_andamento' }, iso(2026, 10, 21, 11, 0), 'Gil');
+    const nota = sla.slaOnSave(
+      base,
+      { ...base, notes: [{ text: 'vi', visibility: 'resposta' }] },
+      iso(2026, 10, 21, 10, 0),
+      'Beto'
+    );
+    expect([nota.firstResponseAt, nota.firstResponseBy]).toEqual([
+      iso(2026, 10, 21, 10, 0),
+      'Beto',
+    ]);
+    const depois = sla.slaOnSave(
+      nota,
+      { ...nota, status: 'em_andamento' },
+      iso(2026, 10, 21, 11, 0),
+      'Gil'
+    );
     expect(depois.firstResponseBy).toBe('Beto');
 
-    const timer = sla.slaOnSave(base, { ...base, timerRunning: true }, iso(2026, 10, 21, 9, 30), 'Gil');
+    const timer = sla.slaOnSave(
+      base,
+      { ...base, timerRunning: true },
+      iso(2026, 10, 21, 9, 30),
+      'Gil'
+    );
     expect(timer.firstResponseAt).toBe(iso(2026, 10, 21, 9, 30));
-    const status = sla.slaOnSave(base, { ...base, status: 'aguardando_cliente' }, iso(2026, 10, 21, 9, 45), 'Gil');
+    const status = sla.slaOnSave(
+      base,
+      { ...base, status: 'aguardando_cliente' },
+      iso(2026, 10, 21, 9, 45),
+      'Gil'
+    );
     expect(status.firstResponseAt).toBe(iso(2026, 10, 21, 9, 45));
   });
 
@@ -71,11 +105,24 @@ describe('1ª resposta ao gravar', () => {
   // contasse, o número deixaria de significar isso.
   it('anotação interna NÃO conta como 1ª resposta', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const interna = sla.slaOnSave(base, { ...base, notes: [{ text: 'cliente é chato', visibility: 'interna' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    const interna = sla.slaOnSave(
+      base,
+      { ...base, notes: [{ text: 'cliente é chato', visibility: 'interna' }] },
+      iso(2026, 10, 21, 10, 0),
+      'Beto'
+    );
     expect(interna.firstResponseAt).toBeUndefined();
     // e a resposta seguinte conta normalmente
-    const resp = sla.slaOnSave(interna, { ...interna, notes: [...interna.notes, { text: 'bom dia', visibility: 'resposta' }] }, iso(2026, 10, 21, 11, 0), 'Beto');
-    expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 11, 0), 'Beto']);
+    const resp = sla.slaOnSave(
+      interna,
+      { ...interna, notes: [...interna.notes, { text: 'bom dia', visibility: 'resposta' }] },
+      iso(2026, 10, 21, 11, 0),
+      'Beto'
+    );
+    expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([
+      iso(2026, 10, 21, 11, 0),
+      'Beto',
+    ]);
   });
 
   // Em chamado (canal externo), "a equipe tocou" não é "o cliente foi
@@ -97,36 +144,74 @@ describe('1ª resposta ao gravar', () => {
     it('status saindo de Aberto NÃO conta como resposta em chamado', () => {
       const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
       expect(base.firstResponseAt).toBeUndefined();
-      const andamento = sla.slaOnSave(base, { ...base, status: 'em_andamento' }, iso(2026, 10, 21, 10, 0), 'Ana');
+      const andamento = sla.slaOnSave(
+        base,
+        { ...base, status: 'em_andamento' },
+        iso(2026, 10, 21, 10, 0),
+        'Ana'
+      );
       expect(andamento.firstResponseAt).toBeUndefined();
     });
 
     it('cronômetro ligado NÃO conta como resposta em chamado', () => {
       const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
-      const timer = sla.slaOnSave(base, { ...base, timerRunning: true }, iso(2026, 10, 21, 9, 30), 'Ana');
+      const timer = sla.slaOnSave(
+        base,
+        { ...base, timerRunning: true },
+        iso(2026, 10, 21, 9, 30),
+        'Ana'
+      );
       expect(timer.firstResponseAt).toBeUndefined();
     });
 
     it('a nota-resposta queima o SLA normalmente, inclusive na criação', () => {
       const base = sla.slaOnSave(null, chamado(), iso(2026, 10, 21, 9, 0), 'Ana');
-      const resp = sla.slaOnSave(base, { ...base, notes: [{ text: 'bom dia, estamos vendo', visibility: 'resposta' }] }, iso(2026, 10, 21, 10, 0), 'Ana');
-      expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([iso(2026, 10, 21, 10, 0), 'Ana']);
-      const naCriacao = sla.slaOnSave(null, { ...chamado(), notes: [{ text: 'oi', visibility: 'resposta' }] }, iso(2026, 10, 21, 9, 0), 'Ana');
+      const resp = sla.slaOnSave(
+        base,
+        { ...base, notes: [{ text: 'bom dia, estamos vendo', visibility: 'resposta' }] },
+        iso(2026, 10, 21, 10, 0),
+        'Ana'
+      );
+      expect([resp.firstResponseAt, resp.firstResponseBy]).toEqual([
+        iso(2026, 10, 21, 10, 0),
+        'Ana',
+      ]);
+      const naCriacao = sla.slaOnSave(
+        null,
+        { ...chamado(), notes: [{ text: 'oi', visibility: 'resposta' }] },
+        iso(2026, 10, 21, 9, 0),
+        'Ana'
+      );
       expect(naCriacao.firstResponseAt).toBe(iso(2026, 10, 21, 9, 0));
     });
 
     it('tarefa interna segue medindo o 1º toque da equipe (status e cronômetro)', () => {
       const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana'); // sem canal
-      const timer = sla.slaOnSave(base, { ...base, timerRunning: true }, iso(2026, 10, 21, 9, 30), 'Ana');
+      const timer = sla.slaOnSave(
+        base,
+        { ...base, timerRunning: true },
+        iso(2026, 10, 21, 9, 30),
+        'Ana'
+      );
       expect(timer.firstResponseAt).toBe(iso(2026, 10, 21, 9, 30));
-      const status = sla.slaOnSave(base, { ...base, status: 'em_andamento' }, iso(2026, 10, 21, 9, 45), 'Ana');
+      const status = sla.slaOnSave(
+        base,
+        { ...base, status: 'em_andamento' },
+        iso(2026, 10, 21, 9, 45),
+        'Ana'
+      );
       expect(status.firstResponseAt).toBe(iso(2026, 10, 21, 9, 45));
     });
   });
 
   it('nota antiga, sem o campo visibility, não conta (fail-closed)', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const velha = sla.slaOnSave(base, { ...base, notes: [{ text: 'sem campo' }] }, iso(2026, 10, 21, 10, 0), 'Beto');
+    const velha = sla.slaOnSave(
+      base,
+      { ...base, notes: [{ text: 'sem campo' }] },
+      iso(2026, 10, 21, 10, 0),
+      'Beto'
+    );
     expect(velha.firstResponseAt).toBeUndefined();
   });
 
@@ -135,29 +220,64 @@ describe('1ª resposta ao gravar', () => {
     // Se ela contasse, o chamado apareceria respondido sem ninguém ter
     // respondido — e o SLA ficaria verde por engano.
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const doCliente = sla.slaOnSave(base, { ...base, notes: [{ text: 'e aí?', visibility: 'solicitante' }] },
-      iso(2026, 10, 21, 10, 0), 'Beatriz');
+    const doCliente = sla.slaOnSave(
+      base,
+      { ...base, notes: [{ text: 'e aí?', visibility: 'solicitante' }] },
+      iso(2026, 10, 21, 10, 0),
+      'Beatriz'
+    );
     expect(doCliente.firstResponseAt).toBeUndefined();
   });
 
   it('editar o texto ou o prazo não conta como resposta', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const ed = sla.slaOnSave(base, { ...base, assunto: 'novo', deadline: '2026-10-30' }, iso(2026, 10, 21, 10, 0), 'Ana');
+    const ed = sla.slaOnSave(
+      base,
+      { ...base, assunto: 'novo', deadline: '2026-10-30' },
+      iso(2026, 10, 21, 10, 0),
+      'Ana'
+    );
     expect(ed.firstResponseAt).toBeUndefined();
   });
 
   it('trocar a prioridade antes de responder recalcula o prazo; depois, não', () => {
     const base = sla.slaOnSave(null, criada(), iso(2026, 10, 21, 9, 0), 'Ana');
-    const crit = sla.slaOnSave(base, { ...base, priority: 'critica' }, iso(2026, 10, 21, 9, 5), 'Ana');
+    const crit = sla.slaOnSave(
+      base,
+      { ...base, priority: 'critica' },
+      iso(2026, 10, 21, 9, 5),
+      'Ana'
+    );
     expect(crit.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
-    const resp = sla.slaOnSave(crit, { ...crit, notes: [{ text: 'ok', visibility: 'resposta' }] }, iso(2026, 10, 21, 9, 30), 'Ana');
-    const baixa = sla.slaOnSave(resp, { ...resp, priority: 'baixa' }, iso(2026, 10, 21, 9, 40), 'Ana');
+    const resp = sla.slaOnSave(
+      crit,
+      { ...crit, notes: [{ text: 'ok', visibility: 'resposta' }] },
+      iso(2026, 10, 21, 9, 30),
+      'Ana'
+    );
+    const baixa = sla.slaOnSave(
+      resp,
+      { ...resp, priority: 'baixa' },
+      iso(2026, 10, 21, 9, 40),
+      'Ana'
+    );
     expect(baixa.firstResponseDue).toBe(iso(2026, 10, 21, 10, 0));
   });
 
   it('pendência antiga (sem prazo de resposta) não ganha SLA ao ser editada', () => {
-    const antiga = { id: 'P0', status: 'aberto', priority: 'alta', createdAt: iso(2026, 1, 5, 9, 0), notes: [] };
-    const ed = sla.slaOnSave(antiga, { ...antiga, notes: [{ text: 'x' }] }, iso(2026, 10, 21, 9, 0), 'Ana');
+    const antiga = {
+      id: 'P0',
+      status: 'aberto',
+      priority: 'alta',
+      createdAt: iso(2026, 1, 5, 9, 0),
+      notes: [],
+    };
+    const ed = sla.slaOnSave(
+      antiga,
+      { ...antiga, notes: [{ text: 'x' }] },
+      iso(2026, 10, 21, 9, 0),
+      'Ana'
+    );
     expect(ed.firstResponseDue).toBeUndefined();
     expect(ed.firstResponseAt).toBeUndefined();
   });
@@ -168,42 +288,92 @@ describe('situação e números da 1ª resposta', () => {
   const pen = (o) => ({ status: 'aberto', createdAt: iso(2026, 10, 21, 9, 0), ...o });
 
   it('classifica: atrasada, vence logo, no prazo, respondida, sem SLA', () => {
-    expect(sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }), now)).toEqual({ estado: 'atrasada', minutos: 60 });
-    expect(sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 12, 30) }), now).estado).toBe('vence_logo');
-    expect(sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }), now).estado).toBe('no_prazo');
-    expect(sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 13, 0), firstResponseAt: iso(2026, 10, 21, 9, 20) }), now))
-      .toEqual({ estado: 'respondida', noPrazo: true, minutos: 20 });
+    expect(sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }), now)).toEqual(
+      { estado: 'atrasada', minutos: 60 }
+    );
+    expect(
+      sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 12, 30) }), now).estado
+    ).toBe('vence_logo');
+    expect(
+      sla.slaRespostaEstado(pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }), now).estado
+    ).toBe('no_prazo');
+    expect(
+      sla.slaRespostaEstado(
+        pen({
+          firstResponseDue: iso(2026, 10, 21, 13, 0),
+          firstResponseAt: iso(2026, 10, 21, 9, 20),
+        }),
+        now
+      )
+    ).toEqual({ estado: 'respondida', noPrazo: true, minutos: 20 });
     expect(sla.slaRespostaEstado(pen({}), now).estado).toBe('sem_sla');
     // Resolvida sem resposta registrada não fica "atrasada" para sempre.
-    expect(sla.slaRespostaEstado(pen({ status: 'resolvido', firstResponseDue: iso(2026, 10, 21, 10, 0) }), now).estado).toBe('sem_sla');
+    expect(
+      sla.slaRespostaEstado(
+        pen({ status: 'resolvido', firstResponseDue: iso(2026, 10, 21, 10, 0) }),
+        now
+      ).estado
+    ).toBe('sem_sla');
   });
 
   it('KPIs: aguardando, atrasadas, % no prazo e mediana', () => {
-    const k = sla.buildRespostaKpis([
-      pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }),
-      pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }),
-      pen({ firstResponseDue: iso(2026, 10, 21, 13, 0), firstResponseAt: iso(2026, 10, 21, 9, 10) }),
-      pen({ firstResponseDue: iso(2026, 10, 21, 10, 0), firstResponseAt: iso(2026, 10, 21, 11, 0) }),
-      pen({}),
-    ], now, 30);
-    expect(k).toEqual({ aguardando: 2, atrasadas: 1, respondidas: 2, pctNoPrazo: 50, medianaMin: 10 });
+    const k = sla.buildRespostaKpis(
+      [
+        pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }),
+        pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }),
+        pen({
+          firstResponseDue: iso(2026, 10, 21, 13, 0),
+          firstResponseAt: iso(2026, 10, 21, 9, 10),
+        }),
+        pen({
+          firstResponseDue: iso(2026, 10, 21, 10, 0),
+          firstResponseAt: iso(2026, 10, 21, 11, 0),
+        }),
+        pen({}),
+      ],
+      now,
+      30
+    );
+    expect(k).toEqual({
+      aguardando: 2,
+      atrasadas: 1,
+      respondidas: 2,
+      pctNoPrazo: 50,
+      medianaMin: 10,
+    });
   });
 
   it('selo do card só aparece com atraso ou perto de vencer', () => {
     expect(sla.penRespostaBadge(pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }), now)).toBe('');
-    expect(sla.penRespostaBadge(pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }), now)).toContain('Sem resposta · 1h atrasada');
-    expect(sla.penRespostaBadge(pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }), now, { full: true })).toContain('Responder em 5h');
+    expect(
+      sla.penRespostaBadge(pen({ firstResponseDue: iso(2026, 10, 21, 11, 0) }), now)
+    ).toContain('Sem resposta · 1h atrasada');
+    expect(
+      sla.penRespostaBadge(pen({ firstResponseDue: iso(2026, 10, 21, 17, 0) }), now, { full: true })
+    ).toContain('Responder em 5h');
     expect(sla.slaDuracaoCurta(90)).toBe('1h30');
     expect(sla.slaDuracaoCurta(3000)).toBe('2 dias');
   });
 });
 
 describe('problemas recorrentes', () => {
-  const p = (id, clientId, categoria, dia, o) => ({ id, clientId, clientName: clientId === 'c1' ? 'Acme' : 'Zeta', categoria, assunto: 'a' + id,
-    status: 'resolvido', createdAt: '2026-' + dia + 'T12:00:00.000Z', ...o });
+  const p = (id, clientId, categoria, dia, o) => ({
+    id,
+    clientId,
+    clientName: clientId === 'c1' ? 'Acme' : 'Zeta',
+    categoria,
+    assunto: 'a' + id,
+    status: 'resolvido',
+    createdAt: '2026-' + dia + 'T12:00:00.000Z',
+    ...o,
+  });
   const pens = [
-    p('1', 'c1', 'impressora', '10-01'), p('2', 'c1', 'impressora', '10-05'), p('3', 'c1', 'impressora', '10-15', { status: 'aberto' }),
-    p('4', 'c1', 'rede', '10-02'), p('5', 'c2', 'impressora', '10-03'), p('6', 'c2', 'impressora', '10-04'),
+    p('1', 'c1', 'impressora', '10-01'),
+    p('2', 'c1', 'impressora', '10-05'),
+    p('3', 'c1', 'impressora', '10-15', { status: 'aberto' }),
+    p('4', 'c1', 'rede', '10-02'),
+    p('5', 'c2', 'impressora', '10-03'),
+    p('6', 'c2', 'impressora', '10-04'),
     p('7', 'c1', 'impressora', '06-01'), // fora dos 90 dias
     p('8', 'c1', 'impressora', '10-06', { status: 'cancelado' }), // cancelada não conta
     p('9', 'c2', '', '10-07', { canal: 'whatsapp', solicitante: 'Maria' }),
@@ -213,7 +383,9 @@ describe('problemas recorrentes', () => {
 
   it('acha cliente × categoria com 3+ ocorrências, mais recentes primeiro', () => {
     const m = sla.buildRecorrentesModel(pens, '2026-10-20');
-    expect(m.recorrentes.map((g) => [g.clientId, g.categoria, g.total, g.abertas])).toEqual([['c1', 'impressora', 3, 1]]);
+    expect(m.recorrentes.map((g) => [g.clientId, g.categoria, g.total, g.abertas])).toEqual([
+      ['c1', 'impressora', 3, 1],
+    ]);
     expect(m.recorrentes[0].itens.map((i) => i.id)).toEqual(['3', '2', '1']);
   });
 
@@ -221,8 +393,14 @@ describe('problemas recorrentes', () => {
     const m = sla.buildRecorrentesModel(pens, '2026-10-20');
     expect(m.total).toBe(9);
     expect(m.semCategoria).toBe(1);
-    expect(m.porCategoria).toEqual([{ value: 'impressora', total: 5 }, { value: 'rede', total: 3 }]);
-    expect(m.porCanal).toEqual([{ value: 'whatsapp', total: 2 }, { value: 'telefone', total: 1 }]);
+    expect(m.porCategoria).toEqual([
+      { value: 'impressora', total: 5 },
+      { value: 'rede', total: 3 },
+    ]);
+    expect(m.porCanal).toEqual([
+      { value: 'whatsapp', total: 2 },
+      { value: 'telefone', total: 1 },
+    ]);
     expect(m.solicitantes.map((s) => [s.nome, s.total])).toEqual([['Maria', 2]]);
   });
 
@@ -235,10 +413,31 @@ describe('problemas recorrentes', () => {
 
 describe('abertura rápida', () => {
   it('monta pendência de suporte aberta, com prazo pelo SLA e descrição = assunto', () => {
-    const d = penRapidaData({ assunto: '  Impressora parou ', priority: 'alta', clientId: 'c1', clientName: 'Acme',
-      responsible: 'Ana', categoria: 'impressora', canal: 'whatsapp', solicitante: ' Maria ' }, '2026-10-23');
-    expect(d).toMatchObject({ tipo: 'Suporte', status: 'aberto', assunto: 'Impressora parou', descricao: 'Impressora parou',
-      priority: 'alta', deadline: '2026-10-26', solicitante: 'Maria', canal: 'whatsapp', categoria: 'impressora', responsible: 'Ana' });
+    const d = penRapidaData(
+      {
+        assunto: '  Impressora parou ',
+        priority: 'alta',
+        clientId: 'c1',
+        clientName: 'Acme',
+        responsible: 'Ana',
+        categoria: 'impressora',
+        canal: 'whatsapp',
+        solicitante: ' Maria ',
+      },
+      '2026-10-23'
+    );
+    expect(d).toMatchObject({
+      tipo: 'Suporte',
+      status: 'aberto',
+      assunto: 'Impressora parou',
+      descricao: 'Impressora parou',
+      priority: 'alta',
+      deadline: '2026-10-26',
+      solicitante: 'Maria',
+      canal: 'whatsapp',
+      categoria: 'impressora',
+      responsible: 'Ana',
+    });
   });
   it('prioridade inválida vira média e detalhes digitados ficam na descrição', () => {
     const d = penRapidaData({ assunto: 'x', priority: '???', descricao: 'erro 0x1' }, '2026-10-21');
@@ -251,13 +450,19 @@ describe('abertura rápida', () => {
 // Nenhuma coluna nova; é o par do SLA de 1ª resposta.
 describe('situação da resolução', () => {
   const aberta = (over = {}) => ({
-    id: 'P1', status: 'em_andamento', priority: 'alta',
-    createdAt: iso(2026, 10, 20, 9, 0), deadline: '2026-10-23', ...over,
+    id: 'P1',
+    status: 'em_andamento',
+    priority: 'alta',
+    createdAt: iso(2026, 10, 20, 9, 0),
+    deadline: '2026-10-23',
+    ...over,
   });
   const agora = (y, m, d, h, min) => local(y, m, d, h, min).getTime();
 
   it('sem prazo não há SLA de resolução', () => {
-    expect(sla.slaResolucaoEstado(aberta({ deadline: null }), agora(2026, 10, 21, 9, 0)).estado).toBe('sem_sla');
+    expect(
+      sla.slaResolucaoEstado(aberta({ deadline: null }), agora(2026, 10, 21, 9, 0)).estado
+    ).toBe('sem_sla');
   });
 
   it('faltando mais de um dia: no prazo', () => {
@@ -285,7 +490,10 @@ describe('situação da resolução', () => {
 
   it('resolver depois do prazo marca fora do prazo', () => {
     const p = aberta({ status: 'resolvido', completedAt: iso(2026, 10, 24, 10, 0) });
-    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0))).toMatchObject({ estado: 'resolvida', noPrazo: false });
+    expect(sla.slaResolucaoEstado(p, agora(2026, 10, 25, 9, 0))).toMatchObject({
+      estado: 'resolvida',
+      noPrazo: false,
+    });
   });
 
   it('fechada sem completedAt (legado) não é julgada', () => {
@@ -296,7 +504,9 @@ describe('situação da resolução', () => {
   it('o selo só fala sozinho quando exige ação', () => {
     expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0))).toBe('');
     expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 24, 9, 0))).toContain('Vencida');
-    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0), { full: true })).toContain('Resolver em');
+    expect(sla.penResolucaoBadge(aberta(), agora(2026, 10, 21, 9, 0), { full: true })).toContain(
+      'Resolver em'
+    );
   });
 });
 
@@ -307,30 +517,63 @@ describe('de quem foi o tempo', () => {
   });
   it('chamado sem eventos é todo tempo da equipe', () => {
     const p = { status: 'aberto', createdAt: iso(2026, 10, 21, 9, 0) };
-    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 11))).toEqual({ equipe: 120, solicitante: 0 });
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 11))).toEqual({
+      equipe: 120,
+      solicitante: 0,
+    });
   });
   it('aguardando_cliente conta para quem pediu', () => {
     const p = {
-      status: 'em_andamento', createdAt: iso(2026, 10, 21, 9, 0),
+      status: 'em_andamento',
+      createdAt: iso(2026, 10, 21, 9, 0),
       events: [
         { type: 'status', at: iso(2026, 10, 21, 10, 0), de: 'aberto', para: 'aguardando_cliente' },
-        { type: 'status', at: iso(2026, 10, 21, 13, 0), de: 'aguardando_cliente', para: 'em_andamento' },
+        {
+          type: 'status',
+          at: iso(2026, 10, 21, 13, 0),
+          de: 'aguardando_cliente',
+          para: 'em_andamento',
+        },
       ],
     };
-    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 14))).toEqual({ equipe: 120, solicitante: 180 });
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 14))).toEqual({
+      equipe: 120,
+      solicitante: 180,
+    });
   });
   it('chamado resolvido para de contar em completedAt', () => {
-    const p = { status: 'resolvido', createdAt: iso(2026, 10, 21, 9, 0), completedAt: iso(2026, 10, 21, 10, 0) };
-    expect(sla.slaTempoPorLado(p, +local(2026, 10, 22, 17))).toEqual({ equipe: 60, solicitante: 0 });
+    const p = {
+      status: 'resolvido',
+      createdAt: iso(2026, 10, 21, 9, 0),
+      completedAt: iso(2026, 10, 21, 10, 0),
+    };
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 22, 17))).toEqual({
+      equipe: 60,
+      solicitante: 0,
+    });
   });
   it('aceita createdAt no evento no lugar de at', () => {
     const p = {
-      status: 'aguardando_cliente', createdAt: iso(2026, 10, 21, 9, 0),
-      events: [{ type: 'status', createdAt: iso(2026, 10, 21, 10, 0), de: 'aberto', para: 'aguardando_cliente' }],
+      status: 'aguardando_cliente',
+      createdAt: iso(2026, 10, 21, 9, 0),
+      events: [
+        {
+          type: 'status',
+          createdAt: iso(2026, 10, 21, 10, 0),
+          de: 'aberto',
+          para: 'aguardando_cliente',
+        },
+      ],
     };
-    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 12))).toEqual({ equipe: 60, solicitante: 120 });
+    expect(sla.slaTempoPorLado(p, +local(2026, 10, 21, 12))).toEqual({
+      equipe: 60,
+      solicitante: 120,
+    });
   });
   it('sem createdAt devolve zero sem quebrar', () => {
-    expect(sla.slaTempoPorLado({ status: 'aberto' }, Date.now())).toEqual({ equipe: 0, solicitante: 0 });
+    expect(sla.slaTempoPorLado({ status: 'aberto' }, Date.now())).toEqual({
+      equipe: 0,
+      solicitante: 0,
+    });
   });
 });

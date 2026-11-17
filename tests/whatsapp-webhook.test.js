@@ -52,11 +52,13 @@ async function chamar(payload, { falharInsert = false, fetch } = {}) {
     return cliente;
   };
   const { handler } = await loadHandler('whatsapp', { env: ENV, createClient, fetch });
-  const res = await handler(new Request('https://fn.local/?token=segredo-do-webhook', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  }));
+  const res = await handler(
+    new Request('https://fn.local/?token=segredo-do-webhook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  );
   return { res, dados: await res.json(), queries };
 }
 
@@ -73,16 +75,23 @@ describe('whatsapp: mídia e reentrega', () => {
   // X-Api-Key no cabeçalho.
   it('anexo com host embutido no caminho não manda a chave para fora da WAHA', async () => {
     const buscadas = [];
-    const { res } = await chamar(evento({
-      body: '',
-      hasMedia: true,
-      media: { url: 'https://x//evil.example.com/roubar', filename: 'a.png', mimetype: 'image/png' },
-    }), {
-      fetch: async (url) => {
-        buscadas.push(String(url));
-        return new Response('não é imagem', { status: 404 });
-      },
-    });
+    const { res } = await chamar(
+      evento({
+        body: '',
+        hasMedia: true,
+        media: {
+          url: 'https://x//evil.example.com/roubar',
+          filename: 'a.png',
+          mimetype: 'image/png',
+        },
+      }),
+      {
+        fetch: async (url) => {
+          buscadas.push(String(url));
+          return new Response('não é imagem', { status: 404 });
+        },
+      }
+    );
     expect(res.status).toBe(200);
     expect(buscadas).toHaveLength(1);
     expect(new URL(buscadas[0]).origin).toBe('https://waha.interno');
@@ -95,8 +104,12 @@ describe('whatsapp: mídia e reentrega', () => {
     const { res, dados, queries } = await chamar(evento(), { falharInsert: true });
     expect(res.status).toBe(500);
     expect(dados.ok).toBe(false);
-    const devolveu = queries.find((q) =>
-      q.tabela === 'avisos_enviados' && !q.insert && q.filtros.some(([col, val]) => col === 'key' && val === 'whatsapp:MSG1'));
+    const devolveu = queries.find(
+      (q) =>
+        q.tabela === 'avisos_enviados' &&
+        !q.insert &&
+        q.filtros.some(([col, val]) => col === 'key' && val === 'whatsapp:MSG1')
+    );
     expect(devolveu).toBeDefined();
   });
 
@@ -104,8 +117,9 @@ describe('whatsapp: mídia e reentrega', () => {
     const { res, dados, queries } = await chamar(evento());
     expect(res.status).toBe(200);
     expect(dados).toMatchObject({ ok: true, caixa: 1 });
-    const devolveu = queries.find((q) =>
-      q.tabela === 'avisos_enviados' && !q.insert && q.filtros.some(([col]) => col === 'key'));
+    const devolveu = queries.find(
+      (q) => q.tabela === 'avisos_enviados' && !q.insert && q.filtros.some(([col]) => col === 'key')
+    );
     expect(devolveu).toBeUndefined();
   });
 });

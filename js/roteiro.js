@@ -19,12 +19,18 @@ function mapsLinks(address) {
  * @returns {string|null}
  */
 function buildRouteUrl(addresses) {
-  const list = (addresses || []).map((a) => String(a || '').trim()).filter(Boolean).slice(0, ROTEIRO_MAX_WAYPOINTS + 1);
+  const list = (addresses || [])
+    .map((a) => String(a || '').trim())
+    .filter(Boolean)
+    .slice(0, ROTEIRO_MAX_WAYPOINTS + 1);
   if (!list.length) return null;
   const dest = list[list.length - 1];
   const way = list.slice(0, -1);
-  return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(dest) +
-    (way.length ? '&waypoints=' + encodeURIComponent(way.join('|')) : '');
+  return (
+    'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' +
+    encodeURIComponent(dest) +
+    (way.length ? '&waypoints=' + encodeURIComponent(way.join('|')) : '')
+  );
 }
 
 /**
@@ -34,14 +40,29 @@ function buildRouteUrl(addresses) {
  */
 function buildRoteiro(visits, getClient, todayISO, userName, userId) {
   const stops = (visits || [])
-    .filter((v) => v && v.date === todayISO && v.status !== 'cancelada' &&
-      ((v.operatorId && userId) ? v.operatorId === userId : (v.operator || '') === (userName || '')))
+    .filter(
+      (v) =>
+        v &&
+        v.date === todayISO &&
+        v.status !== 'cancelada' &&
+        (v.operatorId && userId ? v.operatorId === userId : (v.operator || '') === (userName || ''))
+    )
     .map((v) => {
       const c = typeof getClient === 'function' ? getClient(v.clientId) : null;
       const address = String((c && c.address) || '').trim();
-      return { v, client: c, address, done: v.status === 'concluida', timed: !v.allDay && !!v.time };
+      return {
+        v,
+        client: c,
+        address,
+        done: v.status === 'concluida',
+        timed: !v.allDay && !!v.time,
+      };
     })
-    .sort((a, b) => (Number(b.timed) - Number(a.timed)) || String(a.v.time || '').localeCompare(String(b.v.time || '')));
+    .sort(
+      (a, b) =>
+        Number(b.timed) - Number(a.timed) ||
+        String(a.v.time || '').localeCompare(String(b.v.time || ''))
+    );
   const pending = stops.filter((s) => !s.done);
   return {
     stops,
@@ -53,50 +74,113 @@ function buildRoteiro(visits, getClient, todayISO, userName, userId) {
 }
 
 function roteiroPanelHtml(visits, todayISO, userName, userId) {
-  const r = buildRoteiro(visits, typeof getClientById === 'function' ? getClientById : null, todayISO, userName, userId);
-  const head = '<div class="ov-ph"><h2 class="ov-h2">Roteiro do dia</h2>' +
+  const r = buildRoteiro(
+    visits,
+    typeof getClientById === 'function' ? getClientById : null,
+    todayISO,
+    userName,
+    userId
+  );
+  const head =
+    '<div class="ov-ph"><h2 class="ov-h2">Roteiro do dia</h2>' +
     '<div class="rt-head-acts">' +
-      (r.routeUrl && r.routable > 1 ? '<a class="btn btn-primary btn-sm" href="' + escapeHtml(r.routeUrl) + '" target="_blank" rel="noopener">Rota completa</a>' : '') +
-      '<button class="btn btn-secondary btn-sm" data-action="newVisit">+ Visita</button>' +
+    (r.routeUrl && r.routable > 1
+      ? '<a class="btn btn-primary btn-sm" href="' +
+        escapeHtml(r.routeUrl) +
+        '" target="_blank" rel="noopener">Rota completa</a>'
+      : '') +
+    '<button class="btn btn-secondary btn-sm" data-action="newVisit">+ Visita</button>' +
     '</div></div>';
-  if (!r.stops.length) return '<section class="ov-panel">' + head + '<p class="fila-none">Nenhuma visita sua hoje.</p></section>';
+  if (!r.stops.length)
+    return (
+      '<section class="ov-panel">' +
+      head +
+      '<p class="fila-none">Nenhuma visita sua hoje.</p></section>'
+    );
 
   let n = 0;
-  const rows = r.stops.map((s) => {
-    const v = s.v;
-    const id = escapeHtml(v.id);
-    const when = s.timed ? (typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : v.time) : 'Dia inteiro';
-    const num = s.done ? '✓' : String(++n);
-    let place;
-    if (s.address) {
-      const ml = mapsLinks(s.address);
-      place = '<span class="rt-addr">' + escapeHtml(s.address) + '</span>' +
-        (s.done ? '' : '<span class="rt-nav"><a href="' + escapeHtml(ml.google) + '" target="_blank" rel="noopener" data-rt-link="1">Maps</a>' +
-          '<a href="' + escapeHtml(ml.waze) + '" target="_blank" rel="noopener" data-rt-link="1">Waze</a></span>');
-    } else {
-      place = '<button type="button" class="link-btn rt-noaddr" data-action="openClient" data-stop="1" data-arg="' + escapeHtml(v.clientId || '') + '">Sem endereço — adicionar</button>';
-    }
-    return '<li class="rt-stop' + (s.done ? ' is-done' : '') + '" tabindex="0" data-action="rtOpenVisit" data-arg="' + id + '">' +
-      '<span class="rt-num" aria-hidden="true">' + num + '</span>' +
-      '<span class="rt-main"><span class="rt-top"><b>' + escapeHtml(v.clientName || '—') + '</b><span class="rt-when">' + escapeHtml(when) + '</span></span>' +
-      (v.motivo ? '<span class="rt-why">' + escapeHtml(v.motivo) + '</span>' : '') +
-      '<span class="rt-place">' + place + '</span></span></li>';
-  }).join('');
-  const note = r.missingAddress && r.pending > 1
-    ? '<p class="rt-note">' + r.missingAddress + (r.missingAddress === 1 ? ' parada sem endereço fica' : ' paradas sem endereço ficam') + ' fora da rota.</p>'
-    : '';
-  return '<section class="ov-panel rt">' + head + '<ol class="rt-list">' + rows + '</ol>' + note + '</section>';
+  const rows = r.stops
+    .map((s) => {
+      const v = s.v;
+      const id = escapeHtml(v.id);
+      const when = s.timed
+        ? typeof formatVisitTimeRange === 'function'
+          ? formatVisitTimeRange(v)
+          : v.time
+        : 'Dia inteiro';
+      const num = s.done ? '✓' : String(++n);
+      let place;
+      if (s.address) {
+        const ml = mapsLinks(s.address);
+        place =
+          '<span class="rt-addr">' +
+          escapeHtml(s.address) +
+          '</span>' +
+          (s.done
+            ? ''
+            : '<span class="rt-nav"><a href="' +
+              escapeHtml(ml.google) +
+              '" target="_blank" rel="noopener" data-rt-link="1">Maps</a>' +
+              '<a href="' +
+              escapeHtml(ml.waze) +
+              '" target="_blank" rel="noopener" data-rt-link="1">Waze</a></span>');
+      } else {
+        place =
+          '<button type="button" class="link-btn rt-noaddr" data-action="openClient" data-stop="1" data-arg="' +
+          escapeHtml(v.clientId || '') +
+          '">Sem endereço — adicionar</button>';
+      }
+      return (
+        '<li class="rt-stop' +
+        (s.done ? ' is-done' : '') +
+        '" tabindex="0" data-action="rtOpenVisit" data-arg="' +
+        id +
+        '">' +
+        '<span class="rt-num" aria-hidden="true">' +
+        num +
+        '</span>' +
+        '<span class="rt-main"><span class="rt-top"><b>' +
+        escapeHtml(v.clientName || '—') +
+        '</b><span class="rt-when">' +
+        escapeHtml(when) +
+        '</span></span>' +
+        (v.motivo ? '<span class="rt-why">' + escapeHtml(v.motivo) + '</span>' : '') +
+        '<span class="rt-place">' +
+        place +
+        '</span></span></li>'
+      );
+    })
+    .join('');
+  const note =
+    r.missingAddress && r.pending > 1
+      ? '<p class="rt-note">' +
+        r.missingAddress +
+        (r.missingAddress === 1 ? ' parada sem endereço fica' : ' paradas sem endereço ficam') +
+        ' fora da rota.</p>'
+      : '';
+  return (
+    '<section class="ov-panel rt">' +
+    head +
+    '<ol class="rt-list">' +
+    rows +
+    '</ol>' +
+    note +
+    '</section>'
+  );
 }
 
 if (typeof registerActions === 'function') {
   // Clique no link de Maps/Waze (dentro da parada) não abre a visita.
   // Parada em aberto abre o atendimento guiado (visita-guiada.js); concluída, o detalhe.
-  registerActions({ rtOpenVisit: (_el, id, ev) => {
-    if (ev && ev.target && ev.target.closest && ev.target.closest('[data-rt-link]')) return;
-    const v = typeof getVisitById === 'function' ? getVisitById(id) : null;
-    if (v && v.status !== 'concluida' && typeof openVisitaGuiada === 'function') openVisitaGuiada(id);
-    else openVisitDetail(id);
-  } });
+  registerActions({
+    rtOpenVisit: (_el, id, ev) => {
+      if (ev && ev.target && ev.target.closest && ev.target.closest('[data-rt-link]')) return;
+      const v = typeof getVisitById === 'function' ? getVisitById(id) : null;
+      if (v && v.status !== 'concluida' && typeof openVisitaGuiada === 'function')
+        openVisitaGuiada(id);
+      else openVisitDetail(id);
+    },
+  });
 }
 
 if (typeof module !== 'undefined' && module.exports) {
