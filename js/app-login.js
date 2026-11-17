@@ -11,6 +11,13 @@ function _startApp() {
   initTeamSelector();
   updateUserUI();
   updateBadges();
+  if (typeof iniciarPresenca === 'function') {
+    try {
+      iniciarPresenca();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'presenca');
+    }
+  }
 
   if (typeof initSupabaseRealtime === 'function') {
     try {
@@ -293,6 +300,8 @@ async function doLogout() {
   } catch (_e) {
     if (typeof _logSilent === 'function') _logSilent(_e, 'app');
   }
+  // Sai do canal antes do signOut: depois dele o socket já não tem token.
+  if (typeof pararPresenca === 'function') pararPresenca();
   try {
     await authSignOut();
   } catch (err) {

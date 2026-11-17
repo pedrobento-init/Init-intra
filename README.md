@@ -5,7 +5,8 @@ SPA em JavaScript puro, offline-first (IndexedDB), sincronizada com o Supabase e
 
 ## Funcionalidades
 
-- **Dashboard**: visão geral por perfil (prioridade, carga, evolução, ranking).
+- **Dashboard**: abre como portal — saudação, atalhos para os módulos e quem da equipe está online — e segue com a visão geral por perfil (prioridade, carga, evolução, ranking).
+- **Equipe online**: presença em tempo real (Supabase Realtime Presence, canal por equipe, sem tabela). Verde = online, âmbar = ausente (aba escondida ou 5 min sem interação). Aparece no topo, no cartão do usuário e nos cards de Operadores.
 - **Pendências**: quadro kanban e tabela, assunto/descrição, checklist, notas, anexos, timer e horas trabalhadas; pendências de Gestão visíveis só para quem é Gestão.
 - **Visitas**: agenda com recorrência, número da visita, checklist, fotos, relatório e roteiro; feed iCalendar por técnico (Google Agenda, Outlook, iPhone).
 - **Clientes**: ficha completa, abas de inventário, acessos cifrados, equipamentos e relatório do cliente.

@@ -49,6 +49,7 @@ const STATIC_ASSETS = [
   'js/sla.js',
   'js/pendencias-rapida.js',
   'js/operadores.js',
+  'js/presenca.js',
   'js/notifications.js',
   'js/calendar.js',
   'js/visita-levar.js',
