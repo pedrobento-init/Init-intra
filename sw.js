@@ -1,4 +1,4 @@
-const CACHE_NAME = 'init-intra-v59';
+const CACHE_NAME = 'init-intra-v60';
 const CDN_CACHE_NAME = 'init-intra-cdn-v52';
 const MAX_CDN_ENTRIES = 40;
 
@@ -85,6 +85,7 @@ const STATIC_ASSETS = [
   'js/milvus-tickets.js',
   'js/milvus-token-backfill.js',
   'js/push.js',
+  'js/dashboard.js',
   'js/app.js',
   'js/sw-register.js',
   'manifest.json',

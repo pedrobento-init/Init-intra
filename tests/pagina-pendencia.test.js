@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const { requireParts } = createRequire(import.meta.url)('./_parts.cjs');
+const { requireParts, partsSource } = createRequire(import.meta.url)('./_parts.cjs');
 
 const STATUS_FALSO = {
   backlog: { label: 'Backlog' },
@@ -329,7 +329,7 @@ describe('páginas de pendência', () => {
       };
       sb.globalThis = sb;
       vm.createContext(sb);
-      vm.runInContext(fs.readFileSync('js/app.js', 'utf8'), sb, { filename: 'js/app.js' });
+      vm.runInContext(partsSource('app'), sb, { filename: 'js/app.js' });
       // app.js declara updateBadges e ele depende de sessão/cache; o caminho testado não precisa.
       sb.updateBadges = () => {};
       return { sb, chamadas };
