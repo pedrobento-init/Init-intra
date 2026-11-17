@@ -143,6 +143,34 @@ function outboxQueueIfTransient(entity, op, record, err, thrown) {
   return op === 'delete' ? outboxQueueDelete(entity, record && record.id) : outboxQueueUpsert(entity, record);
 }
 
+// Atalhos usados pelos saves de storage-pendencias/storage-visitas. Ficam aqui
+// (e não em cada storage) para haver UM ponto que engole falha da fila: enfileirar
+// é melhor-esforço e nunca pode derrubar o save/delete que já deu certo local.
+// `_outboxOffline`: sem conexão no momento da escrita. `_outboxFail`: o envio
+// falhou (só enfileira se a causa for conectividade). `_outboxDropTarget`: o
+// delete foi direto ao servidor, então uma entrada pendente do mesmo id não pode
+// recriar o registro no próximo drain (SYNC-10).
+function _outboxOffline(entity, op, record) {
+  try {
+    var p = op === 'delete' ? outboxQueueDelete(entity, record && record.id) : outboxQueueUpsert(entity, record);
+    if (p && typeof p.catch === 'function') p.catch(function (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); });
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+
+function _outboxFail(entity, op, record, err, thrown) {
+  try {
+    var p = outboxQueueIfTransient(entity, op, record, err, thrown);
+    if (p && typeof p.catch === 'function') p.catch(function (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); });
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+
+function _outboxDropTarget(id) {
+  try {
+    var p = outboxRemoveTarget(id);
+    if (p && typeof p.catch === 'function') p.catch(function (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); });
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+
 // Reenvia as entradas mortas (zera tentativas) ou as descarta. O descarte é
 // decisão explícita do usuário: o registro local permanece, só deixa de ser
 // reenviado por esta fila (o sync normal ainda o reconcilia).
@@ -289,5 +317,5 @@ if (typeof window !== 'undefined') {
   }
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { outboxQueueUpsert, outboxQueueDelete, outboxQueueIfTransient, outboxRetryDead, outboxDiscardDead, buildOutboxEntry, outboxEnqueue, outboxRemoveTarget, outboxHas, outboxCount, outboxDrain, Outbox, OUTBOX_MAX_ATTEMPTS };
+  module.exports = { _outboxOffline, _outboxFail, _outboxDropTarget, outboxQueueUpsert, outboxQueueDelete, outboxQueueIfTransient, outboxRetryDead, outboxDiscardDead, buildOutboxEntry, outboxEnqueue, outboxRemoveTarget, outboxHas, outboxCount, outboxDrain, Outbox, OUTBOX_MAX_ATTEMPTS };
 }

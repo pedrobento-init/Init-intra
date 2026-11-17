@@ -134,3 +134,31 @@ describe('Outbox — falha permanente visível e resolvível (SYNC-09)', () => {
     expect(globalThis.supabaseClient.ops[0][0]).toBe('upsert');
   });
 });
+
+describe('Atalhos de enfileiramento dos saves (_outboxOffline/_outboxFail/_outboxDropTarget)', () => {
+  it('_outboxOffline enfileira upsert e delete sem lançar', async () => {
+    outbox._outboxOffline('visits', 'upsert', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
+    outbox._outboxOffline('visits', 'delete', { id: 'V2' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(table.all().map((r) => [r.entity, r.op, r.targetId])).toEqual([['visits', 'upsert', 'V1'], ['visits', 'delete', 'V2']]);
+  });
+  it('_outboxFail só enfileira falha de conectividade, não 4xx/RLS', async () => {
+    outbox._outboxFail('visits', 'upsert', { id: 'V1' }, { status: 403, message: 'rls' });
+    outbox._outboxFail('visits', 'upsert', { id: 'V2' }, null, true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(table.all().map((r) => r.targetId)).toEqual(['V2']);
+  });
+  it('_outboxDropTarget remove a entrada pendente do id (delete direto não é desfeito pelo drain)', async () => {
+    await outbox.outboxQueueUpsert('visits', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
+    outbox._outboxDropTarget('V1');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(table.all()).toHaveLength(0);
+  });
+  it('sem backend configurado, nenhum atalho lança nem enfileira', async () => {
+    globalThis.isSupabaseConnected = () => false;
+    expect(() => outbox._outboxOffline('visits', 'upsert', { id: 'V1' })).not.toThrow();
+    expect(() => outbox._outboxFail('visits', 'delete', { id: 'V1' }, null, true)).not.toThrow();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(table.all()).toHaveLength(0);
+  });
+});
