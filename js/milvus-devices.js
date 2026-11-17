@@ -557,11 +557,11 @@ async function readMilvusExportFile(file) {
           if (!hasFantasia) { reject(new Error('Coluna "Nome fantasia do cliente" não encontrada.')); return; }
           if (rows.length > 5000) { reject(new Error('Planilha com linhas demais (máx. 5000).')); return; }
           resolve(rows);
-        } catch (e) { reject(new Error('Não foi possível ler a planilha.')); }
+        } catch (_e) { reject(new Error('Não foi possível ler a planilha.')); }
       };
       reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
       reader.readAsArrayBuffer(file);
-    } catch (e) { reject(new Error('Não foi possível ler o arquivo.')); }
+    } catch (_e) { reject(new Error('Não foi possível ler o arquivo.')); }
   });
 }
 

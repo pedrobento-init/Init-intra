@@ -195,7 +195,7 @@ function renderAlertStrip() {
     text = buildAlertStripText(counts);
   } catch (_) { text = ''; }
   let dismissed = false;
-  try { dismissed = !!sessionStorage.getItem(_alertStripKey(text)); } catch (_) {}
+  try { dismissed = !!sessionStorage.getItem(_alertStripKey(text)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'fila'); }
   // Só nas telas de visão do dia (Minha fila, Dashboard): nas demais a faixa
   // repetia o mesmo aviso em toda página; o selo do menu continua mostrando.
   if (!ALERT_STRIP_PAGES.includes(_alertStripPage())) dismissed = true;
@@ -214,7 +214,7 @@ function renderAlertStrip() {
 function dismissAlertStrip() {
   const el = document.getElementById('alertStrip');
   if (!el) return;
-  try { sessionStorage.setItem(_alertStripKey(el.dataset.text || ''), '1'); } catch (_) {}
+  try { sessionStorage.setItem(_alertStripKey(el.dataset.text || ''), '1'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'fila'); }
   el.hidden = true;
 }
 
@@ -224,8 +224,8 @@ function dismissAlertStrip() {
   if (typeof window === 'undefined' || typeof onDataChanged !== 'function' || window._filaAutoRefresh) return;
   window._filaAutoRefresh = true;
   const refresh = function () {
-    try { renderAlertStrip(); } catch (_) {}
-    try { if ((window.location.hash || '').replace('#', '') === 'fila') renderFila(); } catch (_) {}
+    try { renderAlertStrip(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'fila'); }
+    try { if ((window.location.hash || '').replace('#', '') === 'fila') renderFila(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'fila'); }
   };
   onDataChanged('pendencias', refresh);
   onDataChanged('visitas', refresh);

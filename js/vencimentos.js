@@ -244,8 +244,8 @@ function updateVencimentosBadge() {
 if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !window._vencAutoRefresh) {
   window._vencAutoRefresh = true;
   onDataChanged('vencimentos', function () {
-    try { updateVencimentosBadge(); } catch (_) {}
-    try { if (typeof renderAlertStrip === 'function') renderAlertStrip(); } catch (_) {}
+    try { updateVencimentosBadge(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'vencimentos'); }
+    try { if (typeof renderAlertStrip === 'function') renderAlertStrip(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'vencimentos'); }
   });
 }
 

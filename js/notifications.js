@@ -95,7 +95,7 @@ async function _emailErrorDetail(error) {
       if (body && (body.error || body.message)) out.message = body.error || body.message;
       if (body && body.code) out.code = body.code;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'notifications'); }
   if (!out.status && error && error.name === 'FunctionsFetchError') out.code = out.code || 'network';
   return out;
 }
@@ -271,12 +271,12 @@ function collectPendenciaRecipients(pendencia) {
         try {
           var _isGop = (typeof isGestaoOperator === 'function') ? isGestaoOperator : (typeof globalThis !== 'undefined' ? globalThis.isGestaoOperator : null);
           isRopG = _isGop ? !!_isGop(rop) : false;
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'notifications'); }
         if (rop && isRopG && !gestaoMails.includes(rop.email)) gestaoMails.push(rop.email);
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'notifications'); }
       return gestaoMails;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'notifications'); }
   return collectRecipients(pendencia.responsible);
 }
 
@@ -431,7 +431,7 @@ function _notaLink(pendencia) {
   try {
     const h = typeof penPaginaHash === 'function' ? penPaginaHash(pendencia) : '';
     if (h) return '#' + h;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'notifications'); }
   return '#pendencias';
 }
 

@@ -59,12 +59,12 @@ function _getPendingSyncText() {
 function _refreshSyncBannerSafe() {
   try {
     if (typeof _refreshSyncBanner === 'function') { _refreshSyncBanner(); return; }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
   try {
     if (typeof _updateConnectionStatus === 'function') {
       _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
 }
 // Dispara o sync tolerando retorno não-Promise e sempre refresca o banner.
 function _triggerBackgroundSync(logLabel) {
@@ -114,7 +114,7 @@ function getSearchActions() {
         ? { id: 'timer-adjust', label: 'Parar e ajustar meu cronômetro', kw: 'cronometro timer parar ajustar esquecido', run: () => openTimerAdjust(mine.id) }
         : { id: 'timer-pause', label: 'Pausar meu cronômetro', kw: 'cronometro timer pausar parar', run: () => toggleTimer('pendencia', mine.id) });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
   return list;
 }
 /** Filtra ações pelo texto (todas as palavras precisam aparecer); vazio → todas. */
@@ -205,7 +205,7 @@ function _renderSearchResults(query) {
   }).slice(0, 5);
 
   const matchPens = pendencias.filter(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
     if (statusFilter && String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
     if (clienteFilter && !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
     if (!q) return true;
@@ -404,7 +404,7 @@ function _openSearchDetailWhenReady(kind, id) {
         var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
         if (p && document.getElementById('penViewArea') && typeof openPendenciaDetail === 'function') { openPendenciaDetail(id); return; }
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
     if (tries < 25) { setTimeout(tick, 120); return; }
     if (typeof showToast === 'function') showToast('Registro não encontrado (pode ter sido excluído ou ainda estar sincronizando).', 'warning');
   };
@@ -524,7 +524,7 @@ function syncNow() {
     _refreshSyncBannerSafe();
     // O sync pode ter trazido dados novos — re-renderiza a tela atual para
     // a lista não continuar velha (refreshPage preserva scroll da página).
-    try { if (res && res.ok && typeof refreshPage === 'function') refreshPage(); } catch (_) {}
+    try { if (res && res.ok && typeof refreshPage === 'function') refreshPage(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
     if (syncBtn) {
       syncBtn.textContent = '↻ Sincronizar';
       syncBtn.disabled = false;

@@ -70,7 +70,7 @@ async function openMilvusClientsImportModal() {
       </tr>`).join('')}</tbody></table></div>
       <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" data-action="confirmMilvusClientsImport">Importar selecionados</button></div>
       <div id="milvusImportMsg" style="font-size:13px;margin-top:8px"></div>`;
-  } catch (e) {
+  } catch (_e) {
     const body = document.getElementById('milvusImportBody');
     if (body) body.innerHTML = '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
   }
@@ -98,7 +98,7 @@ async function confirmMilvusClientsImport() {
       if (typeof _refreshClientsInPlace === 'function') _refreshClientsInPlace();
       if (typeof updateBadges === 'function') updateBadges();
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
-  } catch (e) {
+  } catch (_e) {
     setMsg('<span style="color:var(--danger,#dc2626)">Falha na importação. Tente novamente.</span>');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Importar selecionados'; }
@@ -211,7 +211,7 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
       if (last && lastEl) lastEl.textContent = _fmtTicketDate(last);
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
     await loadClientMilvusTicketsUI(clientId);
-  } catch (e) {
+  } catch (_e) {
     // Erro discreto; mantém os já sincronizados (não apaga nada).
     if (!silent) setMsg('<span style="color:var(--danger,#dc2626)">Não foi possível atualizar os chamados do Milvus.</span>');
   } finally {
@@ -309,7 +309,7 @@ async function syncClientInventoryUI(clientId) {
       if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
     await loadClientInventoryUI(clientId);
-  } catch (e) {
+  } catch (_e) {
     // Mensagem amigável; sem token ou detalhe sensível.
     if (msg) msg.innerHTML = '<span style="color:var(--danger,#dc2626)">Não foi possível sincronizar o inventário. Tente novamente.</span>';
   } finally {

@@ -345,7 +345,7 @@ async function loadClientReport(clientId) {
 function printClientReport() {
   if (!_rptLast) return;
   printHtmlDocument(_rptLast.html, _rptLast.title);
-  if (typeof addLog === 'function') { try { addLog('Gerou relatório mensal', 'Cliente', _rptLast.title.replace(/^Relatório /, ''), ''); } catch (_) {} }
+  if (typeof addLog === 'function') { try { addLog('Gerou relatório mensal', 'Cliente', _rptLast.title.replace(/^Relatório /, ''), ''); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'relatorio-cliente'); } }
 }
 
 if (typeof registerActions === 'function') {

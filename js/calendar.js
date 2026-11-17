@@ -127,15 +127,15 @@ function agFcView(logical) {
 function agSetView(v) {
   if (['month', 'week', 'list'].indexOf(v) === -1) return;
   _agView = v;
-  try { if (_fcInstance) _fcInstance.changeView(agFcView(v)); } catch (_) {}
+  try { if (_fcInstance) _fcInstance.changeView(agFcView(v)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
   _paintAgNav();
   renderAgendaSide();
 }
 function agNav(dir) {
-  try { if (_fcInstance) _fcInstance[dir === 'prev' ? 'prev' : 'next'](); } catch (_) {}
+  try { if (_fcInstance) _fcInstance[dir === 'prev' ? 'prev' : 'next'](); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
 }
 function agToday() {
-  try { if (_fcInstance) _fcInstance.today(); } catch (_) {}
+  try { if (_fcInstance) _fcInstance.today(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
 }
 // Período visível ("Outubro de 2026") ao lado das setas de navegação.
 function agPaintPeriod(title) {
@@ -144,7 +144,7 @@ function agPaintPeriod(title) {
     if (!el) return;
     var t = String(title || '');
     el.textContent = t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
 }
 function _paintAgNav() {
   try {
@@ -152,7 +152,7 @@ function _paintAgNav() {
     document.querySelectorAll('.ag-nav [data-view]').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-view') === cur);
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
 }
 
 // Baixa o FullCalendar com timeout: sem isso, uma CDN lenta/travada no 1º
@@ -182,7 +182,7 @@ function closeCalFilters() {
     if (!box || box.dataset.open !== '1') return;
     box.dataset.open = '0';
     if (btn) btn.setAttribute('aria-expanded', 'false');
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
 }
 if (typeof window !== 'undefined' && !window._calFiltersBound && typeof document !== 'undefined' && document.addEventListener) {
   window._calFiltersBound = true;
@@ -193,12 +193,12 @@ if (typeof window !== 'undefined' && !window._calFiltersBound && typeof document
       if (!box || box.dataset.open !== '1') return;
       if (box.contains(e.target) || (btn && btn.contains(e.target))) return;
       closeCalFilters();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
   });
   document.addEventListener('keydown', function (e) {
     try {
       if (e && e.key === 'Escape') closeCalFilters();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
   });
 }
 
@@ -323,7 +323,7 @@ function getFilteredCalendarPendencias() {
     : (typeof getMyPendencias === 'function' ? getMyPendencias()
       : (typeof getPendencias === 'function' ? getPendencias() : []));
   return scoped.filter(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
     if (!p.deadline) return false;
     if (!st && isPendenciaClosed(p.status)) return false;
     if (cid  && p.clientId   !== cid)   return false;
@@ -484,7 +484,7 @@ function openPendenciaQuickCard(id) {
       if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
   const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
   const ev = penEventColors(p);
   const num = (typeof penDisplayNumber === 'function') ? penDisplayNumber(p) : '';
@@ -673,7 +673,7 @@ function renderAgendaSide() {
   try { pens = getFilteredCalendarPendencias(); } catch (_) { pens = []; }
   try { visits = getFilteredCalendarVisits(); } catch (_) { visits = []; }
   var monthKey = todayStr.slice(0, 7);
-  try { if (_fcInstance && typeof _fcInstance.getDate === 'function') monthKey = _agMonthKey(_fcInstance.getDate()); } catch (_) {}
+  try { if (_fcInstance && typeof _fcInstance.getDate === 'function') monthKey = _agMonthKey(_fcInstance.getDate()); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
   var isClosed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed : function () { return false; };
   var openPens = pens.filter(function (p) { return !isClosed(p.status); });
 
