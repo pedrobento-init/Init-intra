@@ -49,7 +49,7 @@ function buildPendingList(sources, outboxRows, tombstones, confirmed) {
     if (!o || !o.targetId) continue;
     const at = (o.payload && o.payload.updatedAt) || o.createdAt;
     if (isConfirmed(o.entity, o.targetId, at)) continue; // já subiu por outro caminho
-    push({ table: o.entity, id: o.targetId, kind: 'save', title: _pendTitle(o.entity, o.payload), at, attempts: o.attempts || 0 });
+    push({ table: o.entity, id: o.targetId, kind: 'save', title: _pendTitle(o.entity, o.payload), at, attempts: o.attempts || 0, dead: !!o.dead, deadReason: o.deadReason || '' });
   }
   for (const s of (sources || [])) {
     for (const r of (s.records || [])) {
@@ -227,11 +227,12 @@ async function openPendingChanges() {
     ? '<ul class="pend-list">' + list.map((it) =>
         '<li><span class="pend-kind pend-kind--' + it.kind + '">' + kindLbl[it.kind] + '</span>' +
         '<span class="pend-main"><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(PENDENTES_LABELS[it.table] || it.table) + ' · ' + escapeHtml(fmt(it.at)) +
-        (it.attempts ? ' · ' + plural(it.attempts, 'tentativa', 'tentativas') : '') + '</small></span></li>').join('') + '</ul>'
+        (it.attempts ? ' · ' + plural(it.attempts, 'tentativa', 'tentativas') : '') + (it.dead ? ' · <b>não foi enviada</b> (' + escapeHtml(it.deadReason || 'falha permanente') + ')' : '') + '</small></span></li>').join('') + '</ul>'
     : '<div class="empty-state"><p>Tudo enviado. Nada pendente neste aparelho.</p></div>';
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   openModal('Aguardando envio', '<p class="pend-intro">Estas alterações estão salvas <b>neste aparelho</b> e sobem para o servidor no próximo sincronismo. Não feche a sessão (Sair) antes disso.</p>' + body +
     '<div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>' +
+    (list.some((it) => it.dead) ? '<button type="button" class="btn btn-secondary" data-action="pendDiscardDead">Descartar as que falharam</button><button type="button" class="btn btn-secondary" data-action="pendRetryDead">Reenviar as que falharam</button>' : '') +
     (offline || !list.length ? '' : '<button type="button" class="btn btn-primary" data-action="pendCloseAndSync">Enviar agora</button>') + '</div>', 'sm');
 }
 
@@ -260,6 +261,9 @@ if (typeof registerActions === 'function') {
     pendingSyncNow: (el) => pendingSyncNow(el),
     closeModal: () => closeModal(),
     pendCloseAndSync: () => { closeModal(); return pendingSyncNow(); },
+    // Entradas mortas da outbox (SYNC-09): o usuário decide entre tentar de novo e descartar.
+    pendRetryDead: async () => { try { if (typeof outboxRetryDead === 'function') await outboxRetryDead(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); } closeModal(); refreshPendingStrip(); },
+    pendDiscardDead: async () => { try { if (typeof outboxDiscardDead === 'function') await outboxDiscardDead(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendentes'); } closeModal(); refreshPendingStrip(); },
   });
 }
 

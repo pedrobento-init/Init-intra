@@ -95,7 +95,8 @@ function saveClient(data) {
   dbSet(DB.CLIENTS, clients);
   addLog(isEdit ? 'Editou' : 'Criou', 'Cliente', data.id, data.name);
 
-  // Sync Supabase
+  // Sync Supabase. A fila offline leva o registro MESCLADO (o `data` pode ser parcial).
+  const _fullC = clients.find(c => c.id === data.id) || data;
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
     supabaseClient.from('clients').upsert({
       id: data.id,
@@ -134,11 +135,14 @@ function saveClient(data) {
       // único caminho que apaga o valor no servidor.
       ...('driveFolderUrl' in data ? { drive_folder_url: data.driveFolderUrl || null } : {})
     }).then(res => {
-      if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); }
+      if (res.error) { console.error('❌ Supabase cliente:', String(res.error.message || res.error)); markSyncPushFailed(); _outboxFail('clients', 'upsert', _fullC, res.error); }
     }).catch(err => {
       console.error('❌ Erro de rede Supabase cliente:', String(err.message));
       markSyncPushFailed();
+      _outboxFail('clients', 'upsert', _fullC, null, true);
     });
+  } else {
+    _outboxOffline('clients', 'upsert', _fullC);
   }
 
   return data;
@@ -155,7 +159,10 @@ function deleteClient(id) {
   addLog('Excluiu', 'Cliente', id, name);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    _outboxDropTarget(id);
+    supabaseClient.from('clients').delete().eq('id', id).then(res => { if(res.error) { console.error('❌ Supabase excluir cliente:', String(res.error.message || res.error)); markSyncPushFailed(); _outboxFail('clients', 'delete', { id }, res.error); } }).catch(() => { markSyncPushFailed(); _outboxFail('clients', 'delete', { id }, null, true); });
+  } else {
+    _outboxOffline('clients', 'delete', { id });
   }
 }
 
