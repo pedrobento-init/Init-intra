@@ -1,0 +1,31 @@
+-- ============================================================
+-- Migration 083: monitor de backup que só avisa quando dá erro
+-- ============================================================
+-- PROBLEMA: o monitor (060) alerta por silêncio depois de max_horas sem
+-- e-mail. Rotina que só manda e-mail quando FALHA (ex.: Iperius semanal)
+-- fica calada quando está tudo certo, então o robô abria "Backup sem
+-- notícia há 97 h" para um backup saudável.
+--
+-- O QUE MUDA: coluna so_erro (padrão false = comportamento de antes). Com
+-- so_erro = true o robô e o app não alertam por silêncio; só a falha vale, e
+-- uma pendência por e-mail de falha (o status não limpa sozinho, pois a
+-- rotina nunca manda "OK").
+--
+-- Aplicar no SQL Editor. Idempotente. O app e o robô funcionam sem ela
+-- (tratam a coluna ausente como false); só não dá para ligar a opção.
+--
+-- DEPOIS DE APLICAR, marque a rotina (ajuste o nome) e feche a pendência
+-- "Backup sem notícia" que já estiver aberta:
+--   update public.backup_monitores set so_erro = true where nome ilike 'Iperius%';
+--
+-- VERIFICAR:
+--   select column_name, data_type, column_default
+--     from information_schema.columns
+--    where table_name = 'backup_monitores' and column_name = 'so_erro';
+--   -- esperado: 1 linha (boolean, default false)
+-- REVERTER:
+--   alter table public.backup_monitores drop column if exists so_erro;
+-- ============================================================
+
+alter table public.backup_monitores
+  add column if not exists so_erro boolean not null default false;

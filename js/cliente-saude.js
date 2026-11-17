@@ -20,12 +20,29 @@ function _saudeDias(deISO, ateISO) {
   return Math.round((b - a) / 86400000);
 }
 
+/**
+ * Falha de monitor `so_erro` cuja pendência já foi fechada: a rotina não manda
+ * e-mail "OK" para limpar o status, então sem isto a nota do cliente ficaria
+ * descontada para sempre. Só olha a pendência local; sem ela, a falha vale.
+ */
+function _bkFalhaTratada(m) {
+  if (!m.so_erro || !m.pendencia_id || typeof getPendenciaById !== 'function') return false;
+  const p = getPendenciaById(m.pendencia_id);
+  if (!p) return false;
+  if (typeof isPendenciaClosed === 'function') return isPendenciaClosed(p.status);
+  return ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(String(p.status));
+}
+
 /** Alerta do monitor de backup: 'falha' | 'silencio' | 'aviso' | null. */
 function backupMonitorAlerta(m, agora) {
   if (!m || m.ativo === false) return null;
-  if (m.ultimo_status === 'falha') return 'falha';
+  if (m.ultimo_status === 'falha') return _bkFalhaTratada(m) ? null : 'falha';
   const desde = Date.parse(m.ultimo_em || m.created_at || '');
-  if (!isNaN(desde) && ((agora || Date.now()) - desde) / 3600000 > (Number(m.max_horas) || 48))
+  if (
+    !m.so_erro &&
+    !isNaN(desde) &&
+    ((agora || Date.now()) - desde) / 3600000 > (Number(m.max_horas) || 48)
+  )
     return 'silencio';
   return m.ultimo_status === 'aviso' ? 'aviso' : null;
 }
@@ -218,9 +235,9 @@ function _bkStatusTag(m) {
   if (a === 'falha') return '<span class="tag tag-red">Falha</span>';
   if (a === 'silencio') return '<span class="tag tag-red">Sem notícia</span>';
   if (a === 'aviso') return '<span class="tag tag-yellow">Aviso</span>';
-  return m.ultimo_status === 'ok'
-    ? '<span class="tag tag-green">OK</span>'
-    : '<span class="tag">Aguardando 1º e-mail</span>';
+  if (m.ultimo_status === 'ok' || (m.so_erro && !m.ultimo_status))
+    return `<span class="tag tag-green">${m.so_erro && !m.ultimo_status ? 'Sem erros' : 'OK'}</span>`;
+  return '<span class="tag">Aguardando 1º e-mail</span>';
 }
 
 async function renderClientBackupsTab(clientId) {
@@ -249,7 +266,7 @@ async function renderClientBackupsTab(clientId) {
       <div class="bk-card">
         <div class="bk-head"><b>${escapeHtml(m.nome)}</b> ${_bkStatusTag(m)}
           <span class="bk-acts"><button type="button" class="btn btn-secondary btn-sm" data-bk-editar="${escapeHtml(m.id)}">Editar</button></span></div>
-        <div class="bk-meta">Identificador: <code>${escapeHtml(m.identificador)}</code> · limite ${Number(m.max_horas) || 48} h${m.responsavel ? ' · ' + escapeHtml(m.responsavel) : ''}</div>
+        <div class="bk-meta">Identificador: <code>${escapeHtml(m.identificador)}</code> · ${m.so_erro ? 'só avisa quando dá erro' : 'limite ' + (Number(m.max_horas) || 48) + ' h'}${m.responsavel ? ' · ' + escapeHtml(m.responsavel) : ''}</div>
         <div class="bk-meta">Último e-mail: ${escapeHtml(quando(m.ultimo_em))}${m.ultimo_assunto ? ' — ' + escapeHtml(m.ultimo_assunto) : ''}</div>
         ${
           (m.historico || []).length
@@ -284,6 +301,8 @@ function _bkForm(m) {
         <div class="form-group"><label class="form-label">Alertar sem e-mail após (horas)</label><input class="form-input" type="number" name="max_horas" min="1" max="2160" value="${Number(m.max_horas) || 48}" /></div>
         <div class="form-group"><label class="form-label">Responsável pela pendência</label><select class="form-select" name="responsavel"><option value="">— ninguém (admins veem) —</option>${ops.map((n) => `<option ${n === m.responsavel ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></div>
       </div>
+      <label class="u-ae752a"><input type="checkbox" name="so_erro" ${m.so_erro ? 'checked' : ''} /> Essa rotina só manda e-mail quando dá erro (não alertar por falta de e-mail)</label>
+      <div class="bk-meta">Sem essa marca, o limite acima vale: rotina semanal pede cerca de 192 h (7 dias + 1 de folga), mensal cerca de 744 h.</div>
       <label class="u-ae752a"><input type="checkbox" name="ativo" ${m.ativo !== false ? 'checked' : ''} /> Monitorando</label>
       <div class="form-actions">
         ${m.id && typeof isCurrentAdmin === 'function' && isCurrentAdmin() ? `<button type="button" class="btn btn-danger btn-sm" data-bk-apagar="${escapeHtml(m.id)}">Apagar</button>` : ''}
@@ -315,13 +334,23 @@ async function _bkSalvar(form) {
     ativo: fd.get('ativo') === 'on',
     updated_at: new Date().toISOString(),
   };
+  // A coluna é da migration 083: só vai no upsert se for ligada ou se o registro
+  // já a tem, para salvar monitor continuar funcionando antes de a 083 rodar.
+  const soErro = fd.get('so_erro') === 'on';
+  const atual = (_saudeLer().monitores || []).find((x) => x.id === id);
+  if (soErro || (atual && 'so_erro' in atual)) row.so_erro = soErro;
   if (!row.nome || row.identificador.length < 3) {
     showToast('Preencha o nome e um identificador com 3+ letras.', 'error');
     return;
   }
   const { error } = await supabaseClient.from('backup_monitores').upsert(row);
   if (error) {
-    showToast('Não foi possível salvar o monitor.', 'error');
+    showToast(
+      soErro && /so_erro|PGRST204/.test(`${error.code || ''} ${error.message || ''}`)
+        ? 'Falta aplicar a migration 083 no banco para usar "só avisa quando dá erro".'
+        : 'Não foi possível salvar o monitor.',
+      'error'
+    );
     return;
   }
   showToast('Monitor salvo.', 'success');

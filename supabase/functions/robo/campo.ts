@@ -32,6 +32,8 @@ export type Monitor = {
   nome: string;
   identificador: string;
   max_horas: number;
+  /** Rotina que só manda e-mail quando dá erro (ex.: Iperius): silêncio é o normal, não alerta. */
+  so_erro?: boolean | null;
   responsavel?: string | null;
   ativo?: boolean | null;
   ultimo_status?: string | null;
@@ -142,7 +144,7 @@ export function briefingDados(
     .filter((m) => m.ativo !== false)
     .map((m) => ({
       nome: m.nome,
-      status: m.ultimo_status || 'sem notícia',
+      status: m.ultimo_status || (m.so_erro ? 'sem erros' : 'sem notícia'),
       ultimo: m.ultimo_em ? String(m.ultimo_em) : '',
     }));
   return {
@@ -334,17 +336,41 @@ export function aplicarEmail(
     : { ...m, historico: hist };
 }
 
-/** Precisa de atenção? Falha no último e-mail, ou silêncio além de max_horas. */
+/**
+ * Precisa de atenção? Falha no último e-mail, ou silêncio além de max_horas.
+ * Monitor `so_erro` nunca alerta por silêncio: a rotina só escreve quando
+ * falha, então ficar calado é o estado saudável.
+ */
 export function backupAlerta(
   m: Monitor,
   agora: Date = new Date()
 ): { tipo: 'falha' | 'silencio'; horas?: number } | null {
   if (m.ativo === false) return null;
   if (m.ultimo_status === 'falha') return { tipo: 'falha' };
+  if (m.so_erro) return null;
   const desde = Date.parse(m.ultimo_em || m.created_at || '');
   if (isNaN(desde)) return null;
   const horas = Math.floor((agora.getTime() - desde) / 3600000);
   return horas > m.max_horas ? { tipo: 'silencio', horas } : null;
+}
+
+/**
+ * A falha de um monitor `so_erro` já virou pendência? Esse tipo de rotina não
+ * manda e-mail "OK" para limpar o `ultimo_status`, então ele fica em 'falha'
+ * para sempre; sem esta checagem, fechar a pendência fazia o robô abrir outra
+ * a cada execução. Vale uma pendência por e-mail de falha: só uma falha MAIS
+ * NOVA que a pendência (aberta, fechada ou apagada) abre outra.
+ */
+export function falhaJaTratada(
+  m: Monitor,
+  pen: { created_at?: string | null } | null | undefined
+): boolean {
+  if (!m.so_erro || m.ultimo_status !== 'falha' || !m.pendencia_id) return false;
+  if (!pen) return true;
+  const falhou = Date.parse(m.ultimo_em || '');
+  const aberta = Date.parse(pen.created_at || '');
+  if (isNaN(falhou) || isNaN(aberta)) return true;
+  return falhou <= aberta;
 }
 
 /** Pendência automática do alerta. */

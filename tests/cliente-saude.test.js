@@ -86,6 +86,44 @@ describe('saúde do cliente (0–100)', () => {
   });
 });
 
+describe('monitor de backup que só avisa quando dá erro (so_erro)', () => {
+  const iperius = { nome: 'Iperius - Semanal', so_erro: true, max_horas: 48 };
+  it('silêncio de 97 h não é alerta nem desconta a nota do cliente', () => {
+    const m = { ...iperius, ultimo_status: 'ok', ultimo_em: '2026-10-17T11:00:00Z' };
+    expect(backupMonitorAlerta(m, agora)).toBeNull();
+    expect(calcularSaude({ base: verde, today, agora, monitores: [m] }).nota).toBe(100);
+  });
+  it('falha continua alertando e desconta a nota', () => {
+    const m = { ...iperius, ultimo_status: 'falha', ultimo_em: '2026-10-21T08:00:00Z' };
+    expect(backupMonitorAlerta(m, agora)).toBe('falha');
+    expect(calcularSaude({ base: verde, today, agora, monitores: [m] }).nota).toBe(75);
+  });
+  it('falha cuja pendência já foi fechada deixa de pesar (a rotina nunca manda "OK")', () => {
+    globalThis.getPendenciaById = (id) => (id === 'PEN-1' ? { id, status: 'concluido' } : null);
+    try {
+      const m = { ...iperius, ultimo_status: 'falha', pendencia_id: 'PEN-1' };
+      expect(backupMonitorAlerta(m, agora)).toBeNull();
+      // pendência ainda aberta: a falha segue valendo
+      globalThis.getPendenciaById = () => ({ id: 'PEN-1', status: 'aberto' });
+      expect(backupMonitorAlerta(m, agora)).toBe('falha');
+      // sem so_erro, fechar a pendência não apaga a falha (só um e-mail "OK" faz isso)
+      globalThis.getPendenciaById = () => ({ id: 'PEN-1', status: 'concluido' });
+      expect(backupMonitorAlerta({ ...m, so_erro: false }, agora)).toBe('falha');
+    } finally {
+      delete globalThis.getPendenciaById;
+    }
+  });
+  it('sem a marca, o silêncio continua alertando como antes', () => {
+    const m = {
+      ...iperius,
+      so_erro: false,
+      ultimo_status: 'ok',
+      ultimo_em: '2026-10-17T11:00:00Z',
+    };
+    expect(backupMonitorAlerta(m, agora)).toBe('silencio');
+  });
+});
+
 describe('rota do dia (Google Maps)', () => {
   it('última parada é o destino; as outras viram waypoints; sem visitas, nada', () => {
     const url = rotaMapsUrl(['Rua A, 1', '', 'Acme Ltda']);
