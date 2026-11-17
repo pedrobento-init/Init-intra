@@ -72,6 +72,114 @@ function addLog(action, type, targetId, details) {
 const ATTACHMENT_MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ATTACHMENT_MAX_COUNT = 5;
 
+// ── SEC-10: allowlist de anexos (extensão + MIME, coerentes entre si) ───────
+// Por que: só checar tamanho deixava subir .html/.svg/.exe — e svg/html abertos
+// numa aba rodam script no nosso domínio (XSS). `file.type` vem do navegador/SO
+// e é falsificável, então ele sozinho não decide: a extensão manda, e o MIME
+// declarado, se existir, tem que ser um dos aceitos para ela. É defesa de
+// cliente; o bucket privado + links assinados (022) continuam sendo a barreira
+// real. Conteúdo (magic bytes) não é inspecionado aqui.
+const ATTACHMENT_ALLOWED_TYPES = {
+  png:  ['image/png'],
+  jpg:  ['image/jpeg', 'image/pjpeg'],
+  jpeg: ['image/jpeg', 'image/pjpeg'],
+  webp: ['image/webp'],
+  gif:  ['image/gif'],
+  pdf:  ['application/pdf'],
+  txt:  ['text/plain'],
+  csv:  ['text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel'], // Windows reporta csv como ms-excel
+  doc:  ['application/msword'],
+  docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  xls:  ['application/vnd.ms-excel'],
+  xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  ppt:  ['application/vnd.ms-powerpoint'],
+  pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  odt:  ['application/vnd.oasis.opendocument.text'],
+  ods:  ['application/vnd.oasis.opendocument.spreadsheet'],
+  odp:  ['application/vnd.oasis.opendocument.presentation'],
+  rtf:  ['application/rtf', 'text/rtf'],
+  zip:  ['application/zip', 'application/x-zip-compressed'],
+};
+// Imagens que o app mostra inline (svg fica de fora de propósito: executa script).
+const ATTACHMENT_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+// Extensão perigosa em QUALQUER posição do nome barra o arquivo (a.exe.pdf).
+const ATTACHMENT_DANGEROUS_EXTS = [
+  'html', 'htm', 'xhtml', 'shtml', 'svg', 'svgz', 'xml', 'xsl', 'js', 'mjs', 'cjs', 'jsx', 'ts',
+  'exe', 'dll', 'msi', 'bat', 'cmd', 'com', 'scr', 'pif', 'cpl', 'lnk', 'ps1', 'psm1', 'vbs', 'vbe', 'wsf', 'wsh',
+  'jar', 'apk', 'app', 'dmg', 'sh', 'bash', 'php', 'asp', 'aspx', 'jsp', 'py', 'rb', 'pl', 'hta', 'swf',
+  'docm', 'xlsm', 'pptm', 'reg', 'iso', 'msc', 'crx',
+];
+
+/** Nome seguro: sem caminho, sem controle/caracteres especiais, sem ponto inicial, tamanho limitado. */
+function sanitizeAttachmentName(name) {
+  let n = String(name == null ? '' : name);
+  n = n.split(/[\\/]/).pop();                       // só o último segmento
+  // controle, zero-width e bidi (RLO faz "fdp.exe" parecer "exe.pdf"), por código para não depender de regex com controle
+  n = Array.from(n).filter((ch) => {
+    const c = ch.charCodeAt(0);
+    return !(c <= 0x1f || c === 0x7f || (c >= 0x200b && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || (c >= 0x2066 && c <= 0x2069) || c === 0xfeff);
+  }).join('');
+  n = n.replace(/[<>:"|?*`'$%&;=#{}[\]^~!@+,]/g, '_').replace(/\s+/g, ' ').trim();
+  n = n.replace(/^\.+/, '');                        // sem arquivo oculto / "..": o ponto inicial cai fora
+  if (n.length > 100) {
+    const i = n.lastIndexOf('.');
+    const ext = i > 0 && n.length - i <= 10 ? n.slice(i) : '';
+    n = n.slice(0, 100 - ext.length) + ext;
+  }
+  return n;
+}
+
+/**
+ * Valida um arquivo antes de aceitar/enviar. Entrada: { name, type|mimeType, size }.
+ * Saída: { ok:true, name, ext, mime } ou { ok:false, error } (mensagem em pt-BR).
+ */
+function validateAttachmentFile(file) {
+  if (!file || typeof file !== 'object') return { ok: false, error: 'Arquivo inválido.' };
+  const name = sanitizeAttachmentName(file.name);
+  if (!name) return { ok: false, error: 'Nome de arquivo inválido.' };
+  const size = Number(file.size);
+  if (!Number.isFinite(size) || size < 0) return { ok: false, error: 'Tamanho de arquivo inválido.' };
+  if (size > ATTACHMENT_MAX_SIZE) return { ok: false, error: 'Arquivo excede o limite de 2MB.' };
+  const parts = name.toLowerCase().split('.');
+  if (parts.length < 2 || !parts[parts.length - 1]) {
+    return { ok: false, error: 'O arquivo precisa ter extensão (ex.: .pdf, .png).' };
+  }
+  const exts = parts.slice(1);
+  const bad = exts.find((e) => ATTACHMENT_DANGEROUS_EXTS.indexOf(e) !== -1);
+  if (bad) return { ok: false, error: 'Tipo de arquivo não permitido (.' + bad + ').' };
+  const ext = exts[exts.length - 1];
+  const allowed = Object.prototype.hasOwnProperty.call(ATTACHMENT_ALLOWED_TYPES, ext) ? ATTACHMENT_ALLOWED_TYPES[ext] : null;
+  if (!allowed) {
+    return { ok: false, error: 'Tipo de arquivo não permitido (.' + ext + '). Use imagem, PDF, texto, CSV ou documento do Office.' };
+  }
+  const declared = String(file.mimeType || file.type || '').split(';')[0].trim().toLowerCase();
+  // Vazio/genérico é comum (csv, docx no Windows): cai para o MIME canônico da extensão.
+  if (declared && declared !== 'application/octet-stream' && allowed.indexOf(declared) === -1) {
+    return { ok: false, error: 'O conteúdo declarado (' + declared + ') não confere com a extensão .' + ext + '.' };
+  }
+  return { ok: true, name, ext, mime: (declared && declared !== 'application/octet-stream') ? declared : allowed[0] };
+}
+
+/** Registro já gravado (inclusive legado): pode ser mostrado/baixado? */
+function attachmentRecordAllowed(a) {
+  if (!a || !a.name) return false;
+  return validateAttachmentFile({ name: a.name, mimeType: a.mimeType, size: 0 }).ok;
+}
+
+/** Só raster conhecido vira <img>; svg/html nunca. */
+function attachmentIsRasterImage(a) {
+  if (!attachmentRecordAllowed(a)) return false;
+  const v = validateAttachmentFile({ name: a.name, mimeType: a.mimeType, size: 0 });
+  return ATTACHMENT_IMAGE_EXTS.indexOf(v.ext) !== -1 && v.mime.indexOf('image/') === 0;
+}
+
+/** URL que pode ir para window.open: https ou data: de imagem raster (nunca svg/html). */
+function isSafeAttachmentOpenUrl(u) {
+  if (typeof u !== 'string') return false;
+  if (/^https:\/\//i.test(u)) return true;
+  return /^data:image\/(png|jpe?g|webp|gif)[;,]/i.test(u);
+}
+
 function getAttachments(type, itemId) {
   // type = 'clients' | 'pendencias'
   const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
@@ -82,8 +190,10 @@ function getAttachments(type, itemId) {
 
 async function _uploadAttachmentToStorage(type, itemId, attId, file) {
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || !window._supabaseAuthActive) return null;
+  const v = validateAttachmentFile(file);
+  if (!v.ok) return null; // nunca sobe tipo fora da allowlist
   try {
-    const path = `${type}/${itemId}/${attId}-${file.name}`;
+    const path = `${type}/${itemId}/${attId}-${v.name}`;
     const { error } = await supabaseClient.storage.from('attachments').upload(path, file, { upsert: true });
     if (error) { console.warn('Storage upload error:', error.message); return null; }
     const { data } = supabaseClient.storage.from('attachments').getPublicUrl(path);
@@ -225,9 +335,8 @@ async function migrateAttachmentDataToStorage(type, itemId) {
 
 function addAttachment(type, itemId, fileObj) {
   // fileObj = {name, mimeType/type, size, data (base64) | url, path}
-  if (fileObj.size > ATTACHMENT_MAX_SIZE) {
-    return { error: 'Arquivo excede o limite de 2MB.' };
-  }
+  const v = validateAttachmentFile(fileObj);
+  if (!v.ok) return { error: v.error };
   const keyMap = { clients: DB.CLIENTS, pendencias: DB.PENDENCIAS };
   const key = keyMap[type];
   if (!key) return { error: 'Tipo inválido.' };
@@ -240,8 +349,8 @@ function addAttachment(type, itemId, fileObj) {
   }
   const att = {
     id: fileObj.id || ('ATT-' + Date.now() + '-' + _secureRandStr(4)),
-    name: fileObj.name,
-    mimeType: fileObj.mimeType || fileObj.type,
+    name: v.name,
+    mimeType: v.mime,
     size: fileObj.size,
     data: fileObj.data || null,
     url: fileObj.url || null,
@@ -252,7 +361,7 @@ function addAttachment(type, itemId, fileObj) {
   list[idx].attachments.push(att);
   list[idx].updatedAt = new Date().toISOString();
   dbSet(key, list);
-  addLog('Anexou arquivo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, fileObj.name);
+  addLog('Anexou arquivo', type === 'clients' ? 'Cliente' : type === 'pendencias' ? 'Pendência' : 'Chamado', itemId, v.name);
   return { success: true, attachment: att };
 }
 
@@ -283,8 +392,9 @@ function removeAttachment(type, itemId, attachmentId) {
 function handleFileUpload(type, itemId, inputElement, callback) {
   const file = inputElement.files[0];
   if (!file) return;
-  if (file.size > ATTACHMENT_MAX_SIZE) {
-    if (typeof showToast === 'function') showToast('Arquivo excede o limite de 2MB.', 'error');
+  const check = validateAttachmentFile(file);
+  if (!check.ok) {
+    if (typeof showToast === 'function') showToast(check.error, 'error');
     inputElement.value = '';
     return;
   }
@@ -307,7 +417,7 @@ function handleFileUpload(type, itemId, inputElement, callback) {
       } catch (e) { data = null; }
     }
     const result = addAttachment(type, itemId, {
-      id: attId, name: file.name, mimeType: file.type, size: file.size, data, url, path
+      id: attId, name: check.name, mimeType: check.mime, size: file.size, data, url, path
     });
     if (result && result.error) {
       if (typeof showToast === 'function') showToast(result.error, 'error');
@@ -336,11 +446,12 @@ function renderAttachmentList(type, itemId, containerId) {
     }).catch(() => {});
   }
   container.innerHTML = atts.map(a => {
-    const isImage = a.mimeType && a.mimeType.startsWith('image/');
+    const blocked = !attachmentRecordAllowed(a); // legado fora da allowlist: sem miniatura nem link
+    const isImage = attachmentIsRasterImage(a);
     const sizeKB = (a.size / 1024).toFixed(1);
-    const icon = isImage ? '🖼️' : a.mimeType?.includes('pdf') ? '📄' : '📎';
-    const l = _attachmentLinkAttrs(a);
-    const href = l.signed ? `aria-disabled="true" title="Carregando…"` : `href="${escapeHtml(l.src)}" title="Baixar"`;
+    const icon = blocked ? '🚫' : isImage ? '🖼️' : a.mimeType?.includes('pdf') ? '📄' : '📎';
+    const l = blocked ? { src: '', signed: '' } : _attachmentLinkAttrs(a);
+    const href = blocked ? `aria-disabled="true" title="Tipo de arquivo bloqueado"` : l.signed ? `aria-disabled="true" title="Carregando…"` : `href="${escapeHtml(l.src)}" title="Baixar"`;
     return `<div class="attachment-item">
       ${isImage ? `<img src="${escapeHtml(l.src)}"${l.signed} class="attachment-thumb" alt="${escapeHtml(a.name)}" data-action="attOpenFull" />` : `<div class="attachment-icon">${icon}</div>`}
       <div class="attachment-info">
@@ -376,7 +487,8 @@ function getClientDocuments(clientId) {
 }
 
 function addClientDocument(clientId, fileObj) {
-  if (fileObj.size > ATTACHMENT_MAX_SIZE) return { error: 'Arquivo excede o limite de 2MB.' };
+  const v = validateAttachmentFile(fileObj);
+  if (!v.ok) return { error: v.error };
   const list = dbGet(DB.CLIENTS);
   const idx = list.findIndex(function(c){ return c.id === clientId; });
   if (idx === -1) return { error: 'Cliente não encontrado.' };
@@ -384,8 +496,8 @@ function addClientDocument(clientId, fileObj) {
   if (list[idx].documents.length >= ATTACHMENT_MAX_COUNT) return { error: 'Máximo de ' + ATTACHMENT_MAX_COUNT + ' documentos por cliente.' };
   var doc = {
     id: fileObj.id || ('DOC-' + Date.now() + '-' + _secureRandStr(4)),
-    name: fileObj.name,
-    mimeType: fileObj.mimeType || fileObj.type,
+    name: v.name,
+    mimeType: v.mime,
     size: fileObj.size,
     data: fileObj.data || null,
     url: fileObj.url || null,
@@ -396,7 +508,7 @@ function addClientDocument(clientId, fileObj) {
   list[idx].documents.push(doc);
   list[idx].updatedAt = new Date().toISOString();
   dbSet(DB.CLIENTS, list);
-  addLog('Anexou documento', 'Cliente', clientId, fileObj.name);
+  addLog('Anexou documento', 'Cliente', clientId, v.name);
   return { success: true, document: doc };
 }
 
@@ -427,11 +539,12 @@ function renderClientDocumentsList(clientId, containerId) {
   if (!container) return;
   if (!docs.length) { container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Nenhum documento permanente.</p>'; return; }
   container.innerHTML = docs.map(function(a){
-    var isImage = a.mimeType && a.mimeType.startsWith('image/');
+    var blocked = !attachmentRecordAllowed(a);
+    var isImage = attachmentIsRasterImage(a);
     var sizeKB = (a.size / 1024).toFixed(1);
-    var icon = isImage ? '🖼️' : a.mimeType && a.mimeType.includes('pdf') ? '📄' : '📎';
-    var l = _attachmentLinkAttrs(a);
-    var href = l.signed ? 'aria-disabled="true" title="Carregando…"' : 'href="' + escapeHtml(l.src) + '" title="Baixar"';
+    var icon = blocked ? '🚫' : isImage ? '🖼️' : a.mimeType && a.mimeType.includes('pdf') ? '📄' : '📎';
+    var l = blocked ? { src: '', signed: '' } : _attachmentLinkAttrs(a);
+    var href = blocked ? 'aria-disabled="true" title="Tipo de arquivo bloqueado"' : l.signed ? 'aria-disabled="true" title="Carregando…"' : 'href="' + escapeHtml(l.src) + '" title="Baixar"';
     return '<div class="attachment-item">' +
       (isImage ? '<img src="' + escapeHtml(l.src) + '"' + l.signed + ' class="attachment-thumb" alt="' + escapeHtml(a.name) + '" data-action="attOpenFull" />' : '<div class="attachment-icon">' + icon + '</div>') +
       '<div class="attachment-info"><div class="attachment-name">' + escapeHtml(a.name) + '</div><div class="attachment-meta">' + sizeKB + ' KB · ' + escapeHtml(a.uploadedBy) + ' · ' + formatDateTime(a.uploadedAt) + '</div></div>' +
@@ -450,7 +563,8 @@ function removeClientDocumentUI(clientId, docId, containerId) {
 function handleClientDocumentUpload(clientId, inputElement, callback) {
   var file = inputElement.files[0];
   if (!file) return;
-  if (file.size > ATTACHMENT_MAX_SIZE) { if (typeof showToast === 'function') showToast('Arquivo excede o limite de 2MB.', 'error'); inputElement.value=''; return; }
+  var check = validateAttachmentFile(file);
+  if (!check.ok) { if (typeof showToast === 'function') showToast(check.error, 'error'); inputElement.value=''; return; }
   inputElement.value='';
   (async function(){
     var docId = 'DOC-' + Date.now() + '-' + _secureRandStr(4);
@@ -459,7 +573,7 @@ function handleClientDocumentUpload(clientId, inputElement, callback) {
     if (!url) {
       try { data = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(r.result); }; r.onerror=reject; r.readAsDataURL(file); }); } catch(e){ data=null; }
     }
-    var result = addClientDocument(clientId, { id:docId, name:file.name, mimeType:file.type, size:file.size, data:data, url:url, path:path });
+    var result = addClientDocument(clientId, { id:docId, name:check.name, mimeType:check.mime, size:file.size, data:data, url:url, path:path });
     if (result && result.error) { if (typeof showToast==='function') showToast(result.error,'error'); }
     else { if (typeof showToast==='function') showToast('Documento anexado!', 'success'); if (callback) callback(result.document); renderClientDocumentsList(clientId, 'cliDocumentsList'); }
   })();
@@ -467,7 +581,7 @@ function handleClientDocumentUpload(clientId, inputElement, callback) {
 
 if (typeof registerActions === 'function') {
   registerActions({
-    attOpenFull: (el) => { if (el.src) window.open(el.src, '_blank', 'noopener'); },
+    attOpenFull: (el) => { if (isSafeAttachmentOpenUrl(el.src)) window.open(el.src, '_blank', 'noopener'); },
     removeAttachmentUI: (el) => removeAttachmentUI(el.dataset.arg, el.dataset.itemId, el.dataset.attId, el.dataset.containerId),
     removeClientDocumentUI: (el) => removeClientDocumentUI(el.dataset.arg, el.dataset.attId, el.dataset.containerId),
   });
