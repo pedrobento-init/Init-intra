@@ -1124,7 +1124,7 @@ async function _runSupabaseSync(reason, opts) {
     // Pulado direto se a sessão expirou (evita mais um 401).
     try {
       if (authFailed) throw { status: 401, message: 'skipped: sessão expirada neste ciclo' };
-      const logsRes = await timed(supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500), 'pull:audit_logs');
+      const logsRes = await timed(supabaseClient.from('audit_logs').select('id,operator_name,action,type,target_id,details,timestamp').order('timestamp', { ascending: false }).limit(500), 'pull:audit_logs');
       const { data: remoteLogs, error: logErr } = logsRes || {};
       if (logErr && _isAuthError(logErr)) throw logErr;
       if (logErr) console.warn('Supabase logs error:', logErr);

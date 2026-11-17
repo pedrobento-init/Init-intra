@@ -337,6 +337,12 @@ function getChecklistItensAll(tipo) {
   return [];
 }
 
+// PERF-01: colunas que a tela usa (created_at/updated_at não são lidos aqui).
+// Se uma migration futura acrescentar coluna lida pela UI, inclua-a abaixo.
+const CK_COLS_MODELO = 'id,tipo,categoria,texto,ordem,ativo';
+const CK_COLS_CHECKLISTS = 'id,nome,ativo,ordem';
+const CK_COLS_MARCACOES = 'id,client_id,item_id,team,marcado_por,marcado_em';
+
 // Pull do modelo (1× por sessão).
 let _ckModeloLoaded = false;
 async function loadChecklistModelo() {
@@ -345,7 +351,7 @@ async function loadChecklistModelo() {
     if (_ckSupabaseReady()) {
       const res = await supabaseClient
         .from('checklist_modelo_itens')
-        .select('*')
+        .select(CK_COLS_MODELO)
         .order('ordem', { ascending: true });
       if (res && !res.error && Array.isArray(res.data)) {
         _ckSetCache(CHECKLIST_STORE_MODELO, res.data);
@@ -363,7 +369,7 @@ async function loadChecklists(force) {
   if (_ckChecklistsLoaded && !force) return true;
   try {
     if (_ckSupabaseReady()) {
-      const res = await supabaseClient.from('checklists').select('*').order('ordem', { ascending: true });
+      const res = await supabaseClient.from('checklists').select(CK_COLS_CHECKLISTS).order('ordem', { ascending: true });
       if (res && !res.error && Array.isArray(res.data)) {
         _ckSetCache(CHECKLIST_STORE, res.data);
         _ckChecklistsLoaded = true;
@@ -402,7 +408,7 @@ async function loadChecklistMarcacoes(clientId) {
     if (_ckSupabaseReady()) {
       const res = await supabaseClient
         .from('checklist_marcacoes')
-        .select('*')
+        .select(CK_COLS_MARCACOES)
         .eq('client_id', clientId);
       if (res && !res.error && Array.isArray(res.data)) {
         if (_ckSaving > 0) { _ckPendingReload = true; _ckReloadFor = clientId; return false; }
