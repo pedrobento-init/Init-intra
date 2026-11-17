@@ -1575,6 +1575,30 @@ function showLoginScreen() {
   });
 
   setTimeout(() => document.getElementById('loginEmail')?.focus(), 100);
+  _loginLockCountdown();
+}
+
+// Mostra o tempo restante da trava e segura o botão até liberar (a trava em si
+// vive em auth.js e sobrevive ao reload; ver o aviso sobre defesa server-side).
+let _loginLockTimer = null;
+function _loginLockCountdown() {
+  if (_loginLockTimer) { clearInterval(_loginLockTimer); _loginLockTimer = null; }
+  if (typeof loginLockRemainingMs !== 'function' || loginLockRemainingMs() <= 0) return;
+  const tick = () => {
+    const errEl = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+    const left = loginLockRemainingMs();
+    if (left <= 0) {
+      clearInterval(_loginLockTimer); _loginLockTimer = null;
+      if (errEl) errEl.textContent = '';
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (errEl) { errEl.textContent = 'Muitas tentativas. Aguarde ' + formatLoginLockWait(left) + ' e tente novamente.'; errEl.style.color = '#f87171'; }
+    if (btn) btn.disabled = true;
+  };
+  tick();
+  _loginLockTimer = setInterval(tick, 1000);
 }
 
 async function doLogin() {
@@ -1639,6 +1663,7 @@ async function doLogin() {
       btn.disabled = false;
       btn.innerHTML = 'Entrar →';
     }
+    _loginLockCountdown();
   }
 }
 

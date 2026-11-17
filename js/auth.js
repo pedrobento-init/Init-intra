@@ -3,27 +3,88 @@
 
 const OP_SAFE_COLS = 'id,name,initials,color,role,phone,email,is_admin,is_gestao,active,team,auth_user_id,created_at,updated_at';
 
-const _loginGuard = { fails: 0, lockUntil: 0 };
+// Trava de tentativas de login — ATENÇÃO: é só conforto/atrito no CLIENTE.
+// Quem quer burlar limpa o storage, abre outra aba anônima ou fala direto com a
+// API; a defesa real contra força bruta é server-side (rate limit e proteção
+// do Supabase Auth, mais senhas fortes). Aqui só persistimos o estado para o
+// reload não zerar a contagem e damos feedback claro (tempo restante).
+// Backoff exponencial: a cada 5 falhas a trava dobra (30 s, 1, 2, 4… até 30 min);
+// sucesso zera tudo, e 1 h sem falhar também zera o nível.
+const LOGIN_GUARD_KEY = 'initintra:login-guard';
+const LOGIN_GUARD_MAX_FAILS = 5;
+const LOGIN_GUARD_BASE_MS = 30 * 1000;
+const LOGIN_GUARD_MAX_MS = 30 * 60 * 1000;
+const LOGIN_GUARD_DECAY_MS = 60 * 60 * 1000;
+
+// Espelho em memória: vale quando o storage falha (modo privado, bloqueado).
+const _loginGuard = { fails: 0, lockUntil: 0, level: 0, lastFail: 0 };
+
+function _loginGuardNum(v, max) {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0;
+}
+
+function _loginGuardLoad(now) {
+  try {
+    const raw = localStorage.getItem(LOGIN_GUARD_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        _loginGuard.fails = Math.floor(_loginGuardNum(o.fails, 1000));
+        _loginGuard.level = Math.floor(_loginGuardNum(o.level, 30));
+        _loginGuard.lastFail = _loginGuardNum(o.lastFail, now);
+        // relógio voltado para trás não pode render uma trava maior que o teto
+        _loginGuard.lockUntil = _loginGuardNum(o.lockUntil, now + LOGIN_GUARD_MAX_MS);
+      }
+    }
+  } catch (_) { /* storage indisponível ou JSON corrompido: segue com a memória */ }
+  if (_loginGuard.level > 0 && now >= _loginGuard.lockUntil && now - _loginGuard.lastFail > LOGIN_GUARD_DECAY_MS) {
+    _loginGuard.fails = 0; _loginGuard.level = 0; _loginGuard.lastFail = 0; _loginGuard.lockUntil = 0;
+  }
+  return _loginGuard;
+}
+
+function _loginGuardSave() {
+  try { localStorage.setItem(LOGIN_GUARD_KEY, JSON.stringify(_loginGuard)); } catch (_) { /* fica só em memória */ }
+}
+
+/** Milissegundos que faltam para liberar o login (0 = liberado). */
+function loginLockRemainingMs(now) {
+  const t = now == null ? Date.now() : now;
+  return Math.max(0, _loginGuardLoad(t).lockUntil - t);
+}
+
+/** "45 s" ou "2 min 10 s". */
+function formatLoginLockWait(ms) {
+  const total = Math.max(1, Math.ceil(ms / 1000));
+  if (total < 60) return total + ' s';
+  const m = Math.floor(total / 60), sec = total % 60;
+  return m + ' min' + (sec ? ' ' + sec + ' s' : '');
+}
 
 function _assertLoginAllowed() {
-  const now = Date.now();
-  if (now < _loginGuard.lockUntil) {
-    const mins = Math.ceil((_loginGuard.lockUntil - now) / 60000);
-    throw new Error(`Muitas tentativas. Aguarde ${mins} min e tente novamente.`);
+  const left = loginLockRemainingMs();
+  if (left > 0) {
+    throw new Error(`Muitas tentativas. Aguarde ${formatLoginLockWait(left)} e tente novamente.`);
   }
 }
 
 function _recordLoginFailure() {
-  _loginGuard.fails += 1;
-  if (_loginGuard.fails >= 5) {
-    _loginGuard.lockUntil = Date.now() + 15 * 60 * 1000;
-    _loginGuard.fails = 0;
+  const now = Date.now();
+  const g = _loginGuardLoad(now);
+  g.fails += 1;
+  g.lastFail = now;
+  if (g.fails >= LOGIN_GUARD_MAX_FAILS) {
+    g.lockUntil = now + Math.min(LOGIN_GUARD_BASE_MS * Math.pow(2, g.level), LOGIN_GUARD_MAX_MS);
+    g.level += 1;
+    g.fails = 0;
   }
+  _loginGuardSave();
 }
 
 function _recordLoginSuccess() {
-  _loginGuard.fails = 0;
-  _loginGuard.lockUntil = 0;
+  _loginGuard.fails = 0; _loginGuard.level = 0; _loginGuard.lastFail = 0; _loginGuard.lockUntil = 0;
+  try { localStorage.removeItem(LOGIN_GUARD_KEY); } catch (_) { /* nada a limpar */ }
 }
 
 /**
