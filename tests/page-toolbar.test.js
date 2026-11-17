@@ -25,7 +25,12 @@ describe('cabeçalho de página único', () => {
   }
 
   it('ações secundárias ficam em .pt-actions (export/import)', () => {
-    for (const f of ['js/clients.js', 'js/equipamentos.js', 'js/ui.js', 'js/milvus-atendimentos.js']) {
+    for (const f of [
+      'js/clients.js',
+      'js/equipamentos.js',
+      'js/ui.js',
+      'js/milvus-atendimentos.js',
+    ]) {
       expect(fs.readFileSync(f, 'utf8')).toContain('pt-actions');
     }
   });
@@ -34,6 +39,8 @@ describe('cabeçalho de página único', () => {
     const css = fs.readFileSync('css/styles.css', 'utf8');
     expect(css).toContain('.page-toolbar > .pt-search');
     expect(css).toContain('.page-toolbar > .pt-actions');
-    expect(css).toMatch(/@media \(max-width:768px\)[^]*\.page-toolbar > \.pt-filter \{ flex: 1 1 calc\(50% - 4px\)/);
+    expect(css).toMatch(
+      /@media \(max-width:768px\)[^]*\.page-toolbar > \.pt-filter \{ flex: 1 1 calc\(50% - 4px\)/
+    );
   });
 });

@@ -7,15 +7,22 @@ import { fileURLToPath } from 'node:url';
 // que dá para travar aqui são os invariantes que impedem a tela de mentir.
 
 const robo = fs.readFileSync(
-  fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)),
+  'utf8'
+);
 const detalhe = fs.readFileSync(
-  fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)),
+  'utf8'
+);
 const migration = fs.readFileSync(
-  fileURLToPath(new URL('../supabase/migrations/065_pendencias_email_thread.sql', import.meta.url)), 'utf8');
-const schema = fs.readFileSync(
-  fileURLToPath(new URL('../js/schema.js', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../supabase/migrations/065_pendencias_email_thread.sql', import.meta.url)),
+  'utf8'
+);
+const schema = fs.readFileSync(fileURLToPath(new URL('../js/schema.js', import.meta.url)), 'utf8');
 const robogs = fs.readFileSync(
-  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)), 'utf8');
+  fileURLToPath(new URL('../tools/google-agenda-apps-script/Robo.gs', import.meta.url)),
+  'utf8'
+);
 
 describe('chamado fechado não recebe a resposta', () => {
   // Resposta depois de concluir é pedido NOVO. Ressuscitar o chamado antigo
@@ -27,7 +34,11 @@ describe('chamado fechado não recebe a resposta', () => {
   it('a lista de fechados é a mesma do resto do app', () => {
     const m = /const PEN_FECHADOS = \[(.+?)\]/s.exec(robo);
     expect(m).toBeTruthy();
-    const lista = m[1].split(',').map((s) => s.trim().replace(/"/g, '')).filter(Boolean).sort();
+    const lista = m[1]
+      .split(',')
+      .map((s) => s.trim().replace(/"/g, ''))
+      .filter(Boolean)
+      .sort();
     expect(lista).toEqual(['cancelado', 'concluido', 'fechado', 'resolvido']);
   });
 });

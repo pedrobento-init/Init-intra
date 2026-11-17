@@ -3,22 +3,30 @@
 // UI segue Pendências: search-bar, abas de status, tabela, modal, tags.
 
 const EQUIP_STATUS_MAP = {
-  entregue:      { label: 'Entregue',      cls: 'tag-green',  dot: '#16a34a' },
+  entregue: { label: 'Entregue', cls: 'tag-green', dot: '#16a34a' },
   em_manutencao: { label: 'Em manutenção', cls: 'tag-yellow', dot: '#d97706' },
-  estoque:       { label: 'Estoque',       cls: 'tag-blue',   dot: '#1a56db' },
-  baixado:       { label: 'Baixado',       cls: 'tag-red',    dot: '#dc2626' },
+  estoque: { label: 'Estoque', cls: 'tag-blue', dot: '#1a56db' },
+  baixado: { label: 'Baixado', cls: 'tag-red', dot: '#dc2626' },
 };
 
 // Alias legado: antes o status "entregue" se chamava "em_uso". Registros
 // antigos (locais ou remotos) ainda podem trazer 'em_uso' — normaliza para
 // o valor atual sem perder o registro.
 function normEquipStatus(status) {
-  return status === 'em_uso' ? 'entregue' : (status || '');
+  return status === 'em_uso' ? 'entregue' : status || '';
 }
 
 const EQUIP_TIPO_OPTIONS = [
-  'notebook', 'desktop', 'monitor', 'celular', 'roteador',
-  'switch', 'impressora', 'servidor', 'nobreak', 'outro',
+  'notebook',
+  'desktop',
+  'monitor',
+  'celular',
+  'roteador',
+  'switch',
+  'impressora',
+  'servidor',
+  'nobreak',
+  'outro',
 ];
 
 const EQUIP_TABS = [
@@ -29,7 +37,7 @@ const EQUIP_TABS = [
   { value: 'baixado', label: 'Baixados' },
 ];
 
-const EQUIP_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
+const EQUIP_PAGE_SIZE = typeof UI_PAGE_SIZE !== 'undefined' ? UI_PAGE_SIZE : 30;
 
 let _equipTab = '';
 let _equipPage = 1;
@@ -51,7 +59,9 @@ function getEquipPendenciaId(e) {
   if (!os) return null;
   try {
     if (typeof getPendenciaById === 'function' && getPendenciaById(os)) return os;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   return null;
 }
 
@@ -65,7 +75,11 @@ function formatEquipValor(v) {
   const n = Number(v);
   if (v === '' || v == null || isNaN(n)) return '—';
   try {
-    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+    return n.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0,
+    });
   } catch (_) {
     return 'R$ ' + String(Math.round(n));
   }
@@ -88,8 +102,10 @@ function calcEquipStats(list) {
 
 function filterEquipamentos(list, f) {
   const o = f || {};
-  const q = String(o.search || '').trim().toLowerCase();
-  return (list || []).filter(e => {
+  const q = String(o.search || '')
+    .trim()
+    .toLowerCase();
+  return (list || []).filter((e) => {
     if (!e) return false;
     if (o.status && normEquipStatus(e.status) !== normEquipStatus(o.status)) return false;
     if (o.client) {
@@ -103,8 +119,17 @@ function filterEquipamentos(list, f) {
     if (o.to && (e.dataAquisicao || '') > o.to) return false;
     if (q) {
       const hay = [
-        e.nome, e.numeroSerie, e.clientName, e.osVinculada, e.pendenciaId, e.tipo, e.observacoes,
-      ].filter(Boolean).join(' ').toLowerCase();
+        e.nome,
+        e.numeroSerie,
+        e.clientName,
+        e.osVinculada,
+        e.pendenciaId,
+        e.tipo,
+        e.observacoes,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -113,41 +138,65 @@ function filterEquipamentos(list, f) {
 
 function equipSummaryLine(stats) {
   const b = (stats && stats.byStatus) || {};
-  return `${stats ? stats.total : 0} equipamentos · ` +
+  return (
+    `${stats ? stats.total : 0} equipamentos · ` +
     `<b>${b.entregue || b.em_uso || 0}</b> entregues · ` +
     `<b>${b.em_manutencao || 0}</b> em manutenção · ` +
     `<b>${b.estoque || 0}</b> em estoque · ` +
-    `<b>${b.baixado || 0}</b> baixados`;
+    `<b>${b.baixado || 0}</b> baixados`
+  );
 }
 
 // ── Acesso respeitando equipe ─────────────────────────────────────────────
 function _equipBaseList() {
   try {
-    if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) {
+    if (
+      typeof isTeamAdmin === 'function' &&
+      isTeamAdmin() &&
+      typeof _selectedTeam !== 'undefined' &&
+      _selectedTeam
+    ) {
       return getEquipamentosByTeam(_selectedTeam);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   try {
     if (typeof getMyEquipamentos === 'function') return getMyEquipamentos();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   try {
     if (typeof getEquipamentos === 'function') return getEquipamentos();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   return [];
 }
 
 function _equipClients() {
   try {
-    if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) {
+    if (
+      typeof isTeamAdmin === 'function' &&
+      isTeamAdmin() &&
+      typeof _selectedTeam !== 'undefined' &&
+      _selectedTeam
+    ) {
       return getClientsByTeam(_selectedTeam);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   try {
     if (typeof getMyClients === 'function') return getMyClients();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   try {
     if (typeof getClients === 'function') return getClients();
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   return [];
 }
 
@@ -157,8 +206,10 @@ function _equipClients() {
 function _migrateEquipLocalAliases() {
   let list = [];
   try {
-    list = (typeof getEquipamentos === 'function') ? getEquipamentos() : [];
-  } catch (_) { return; }
+    list = typeof getEquipamentos === 'function' ? getEquipamentos() : [];
+  } catch (_) {
+    return;
+  }
   if (!Array.isArray(list) || !list.length) return;
   let changed = false;
   const now = new Date().toISOString();
@@ -166,21 +217,32 @@ function _migrateEquipLocalAliases() {
     if (!e) continue;
     // updatedAt acompanha a troca: sem o bump o remoto (antigo) venceria o
     // merge e o status legado voltaria (mesmo padrão da migração de visitas).
-    if (e.status === 'em_uso') { e.status = 'entregue'; e.updatedAt = now; changed = true; }
+    if (e.status === 'em_uso') {
+      e.status = 'entregue';
+      e.updatedAt = now;
+      changed = true;
+    }
     if (!e.pendenciaId && e.osVinculada) {
       try {
-        if (typeof getPendenciaById === 'function' && getPendenciaById(String(e.osVinculada).trim())) {
+        if (
+          typeof getPendenciaById === 'function' &&
+          getPendenciaById(String(e.osVinculada).trim())
+        ) {
           e.pendenciaId = String(e.osVinculada).trim();
           e.updatedAt = e.updatedAt || now;
           changed = true;
         }
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+      }
     }
   }
   if (changed) {
     try {
       if (typeof dbSet !== 'undefined' && typeof DB !== 'undefined') dbSet(DB.EQUIPAMENTOS, list);
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
   }
 }
 
@@ -189,17 +251,28 @@ function renderEquipamentos() {
   if (typeof document === 'undefined') return;
   document.getElementById('pageTitle').textContent = 'Equipamentos';
   if (typeof setTopbarAction === 'function') {
-    setTopbarAction('Novo Equipamento', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+    setTopbarAction(
+      'Novo Equipamento',
+      '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    );
   }
   if (typeof window !== 'undefined') window._topbarAction = () => openEquipForm();
 
   let saved = {};
-  try { saved = loadFilterState('equipamentos', {}); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    saved = loadFilterState('equipamentos', {});
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   _equipTab = normEquipStatus(saved.status || '');
 
   // Migração local one-shot: 'em_uso' → 'entregue' + resgata vínculo legado
   // (id de pendência guardado em osVinculada) para o campo pendenciaId.
-  try { _migrateEquipLocalAliases(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    _migrateEquipLocalAliases();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   _equipFilter = {
     client: saved.client || '',
     tipo: saved.tipo || '',
@@ -219,11 +292,11 @@ function renderEquipamentos() {
       <select class="form-select filter-select-md pt-filter" id="equipClient" data-change="eqFiltersChange" aria-label="Filtrar por cliente">
         <option value="">Todos os clientes</option>
         <option value="__estoque__">Estoque Initnet</option>
-        ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+        ${clients.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
       <select class="form-select filter-select pt-filter" id="equipTipo" data-change="eqFiltersChange" aria-label="Filtrar por tipo">
         <option value="">Todos os tipos</option>
-        ${EQUIP_TIPO_OPTIONS.map(t => `<option value="${t}">${escapeHtml(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
+        ${EQUIP_TIPO_OPTIONS.map((t) => `<option value="${t}">${escapeHtml(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
       </select>
       <button class="btn btn-secondary pt-filter pt-full" id="equipMoreFiltersBtn" data-action="eqToggleMoreFilters" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
@@ -252,7 +325,7 @@ function renderEquipamentos() {
     </div>
     <div class="page-action-row pen-scope-row">
       <div class="view-toggles pen-scope-tabs" role="tablist" aria-label="Filtrar por status">
-        ${EQUIP_TABS.map(t => `<button role="tab" aria-selected="${_equipTab === t.value}" class="pen-scope-tab ${_equipTab === t.value ? 'is-active' : ''}" data-action="setEquipTab" data-arg="${escapeHtml(t.value)}">${escapeHtml(t.label)}</button>`).join('')}
+        ${EQUIP_TABS.map((t) => `<button role="tab" aria-selected="${_equipTab === t.value}" class="pen-scope-tab ${_equipTab === t.value ? 'is-active' : ''}" data-action="setEquipTab" data-arg="${escapeHtml(t.value)}">${escapeHtml(t.label)}</button>`).join('')}
       </div>
       <span class="pen-scope-count" id="equipScopeCount" aria-live="polite"></span>
     </div>
@@ -261,14 +334,21 @@ function renderEquipamentos() {
   if (saved.search) document.getElementById('equipSearch').value = saved.search;
   if (_equipFilter.client) document.getElementById('equipClient').value = _equipFilter.client;
   if (_equipFilter.tipo) document.getElementById('equipTipo').value = _equipFilter.tipo;
-  if (_equipFilter.from && document.getElementById('equipFrom')) document.getElementById('equipFrom').value = _equipFilter.from;
-  if (_equipFilter.to && document.getElementById('equipTo')) document.getElementById('equipTo').value = _equipFilter.to;
-  if (_equipFilter.onlyWithOS && document.getElementById('equipOnlyOS')) document.getElementById('equipOnlyOS').checked = true;
+  if (_equipFilter.from && document.getElementById('equipFrom'))
+    document.getElementById('equipFrom').value = _equipFilter.from;
+  if (_equipFilter.to && document.getElementById('equipTo'))
+    document.getElementById('equipTo').value = _equipFilter.to;
+  if (_equipFilter.onlyWithOS && document.getElementById('equipOnlyOS'))
+    document.getElementById('equipOnlyOS').checked = true;
   if (typeof showSkeleton === 'function') showSkeleton('equipViewArea', 6);
   renderEquipView();
 }
 
-if (typeof window !== 'undefined' && typeof debounce === 'function' && !window.debouncedRenderEquipView) {
+if (
+  typeof window !== 'undefined' &&
+  typeof debounce === 'function' &&
+  !window.debouncedRenderEquipView
+) {
   window.debouncedRenderEquipView = debounce(() => renderEquipView(false), 300);
 } else if (typeof window !== 'undefined' && !window.debouncedRenderEquipView) {
   window.debouncedRenderEquipView = () => renderEquipView(false);
@@ -295,12 +375,18 @@ function saveEquipFilters() {
       to: _equipFilter.to || '',
       onlyWithOS: !!_equipFilter.onlyWithOS,
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
 }
 
 function setEquipTab(status) {
   _equipTab = status || '';
-  try { saveEquipFilters(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    saveEquipFilters();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   renderEquipView();
 }
 
@@ -329,7 +415,12 @@ function _equipUpdateMoreFiltersBadge() {
   badge.textContent = n ? String(n) : '';
   badge.style.display = n ? 'inline-flex' : 'none';
 }
-if (typeof window !== 'undefined' && !window._equipMoreFiltersBound && typeof document !== 'undefined' && document.addEventListener) {
+if (
+  typeof window !== 'undefined' &&
+  !window._equipMoreFiltersBound &&
+  typeof document !== 'undefined' &&
+  document.addEventListener
+) {
   window._equipMoreFiltersBound = true;
   document.addEventListener('click', function (e) {
     try {
@@ -340,13 +431,16 @@ if (typeof window !== 'undefined' && !window._equipMoreFiltersBound && typeof do
       panel.dataset.open = '0';
       panel.style.display = 'none';
       btn.setAttribute('aria-expanded', 'false');
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
   });
 }
 
 function getFilteredEquipamentos() {
   const base = _equipBaseList();
-  const q = (typeof document !== 'undefined' && document.getElementById('equipSearch')?.value) || '';
+  const q =
+    (typeof document !== 'undefined' && document.getElementById('equipSearch')?.value) || '';
   return filterEquipamentos(base, {
     search: q,
     status: _equipTab,
@@ -355,7 +449,9 @@ function getFilteredEquipamentos() {
     from: _equipFilter.from,
     to: _equipFilter.to,
     onlyWithOS: _equipFilter.onlyWithOS,
-  }).sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+  }).sort(
+    (a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0)
+  );
 }
 
 function renderEquipView(resetPage) {
@@ -373,7 +469,9 @@ function renderEquipView(resetPage) {
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
     renderEquipTable(area);
     _equipUpdateMoreFiltersBadge();
   };
@@ -429,25 +527,27 @@ function renderEquipStats() {
 
 function equipStatusTag(status) {
   const m = getEquipStatusMeta(status);
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
   return `<span class="tag ${m.cls}"><span class="priority-dot" data-sty="background:${m.dot}"></span>${esc(m.label)}</span>`;
 }
 
 function equipClientCell(e) {
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
   if (!e.clientId) {
     return `<span class="client-tag"><span class="client-dot u-3ada6f"></span>${esc(e.clientName || 'Estoque Initnet')}</span>`;
   }
   let color = '#1a56db';
   try {
-    const c = (typeof getClientById === 'function') ? getClientById(e.clientId) : null;
+    const c = typeof getClientById === 'function' ? getClientById(e.clientId) : null;
     if (c && c.color) color = c.color;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   return `<span class="client-tag"><span class="client-dot" data-sty="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
 }
 
 function equipOSCell(e) {
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
   const osText = e && e.osVinculada ? String(e.osVinculada).trim() : '';
   const penId = getEquipPendenciaId(e);
   if (!osText && !penId) return '<span class="u-5872de">—</span>';
@@ -459,9 +559,14 @@ function equipOSCell(e) {
         const p = getPendenciaById(penId);
         if (p && typeof penDisplayNumber === 'function') penLabel = penDisplayNumber(p);
       }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
     const shown = osText || penLabel || penId;
-    const title = penLabel && osText && penLabel !== osText ? `Pendência ${penLabel}` : 'Abrir pendência vinculada';
+    const title =
+      penLabel && osText && penLabel !== osText
+        ? `Pendência ${penLabel}`
+        : 'Abrir pendência vinculada';
     return `<a href="#" class="os-link" title="${esc(title)}" data-action="goToEquipOS" data-arg="${esc(penId)}">${esc(shown)} 🔗</a>`;
   }
   return esc(osText);
@@ -470,25 +575,42 @@ function equipOSCell(e) {
 // Rótulo amigável da pendência vinculada (para o form/menu).
 function _equipPenLabel(p) {
   let num = p.id;
-  try { if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   const title = (p.assunto || p.descricao || '').toString().slice(0, 40);
   return `${num} · ${p.clientName || ''} · ${title}`;
 }
 
 function _equipActivePens() {
   try {
-    const all = (typeof getMyPendencias === 'function' ? getMyPendencias() : (typeof getPendencias === 'function' ? getPendencias() : []));
+    const all =
+      typeof getMyPendencias === 'function'
+        ? getMyPendencias()
+        : typeof getPendencias === 'function'
+          ? getPendencias()
+          : [];
     return all
-      .filter(p => { try { return typeof isPendenciaClosed === 'function' ? !isPendenciaClosed(p.status) : true; } catch (_) { return true; } })
+      .filter((p) => {
+        try {
+          return typeof isPendenciaClosed === 'function' ? !isPendenciaClosed(p.status) : true;
+        } catch (_) {
+          return true;
+        }
+      })
       .slice(0, 200);
-  } catch (_) { return []; }
+  } catch (_) {
+    return [];
+  }
 }
 
 function renderEquipTable(area) {
   const wrap = area || document.getElementById('equipViewArea');
   if (!wrap) return;
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-  const fmtDate = (typeof formatDate === 'function') ? formatDate : (v => String(v || '—'));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
+  const fmtDate = typeof formatDate === 'function' ? formatDate : (v) => String(v || '—');
   const list = _filteredEquips || [];
   if (!list.length) {
     wrap.innerHTML = `<div class="empty-state u-553466">
@@ -509,7 +631,9 @@ function renderEquipTable(area) {
         <th class="u-54c2af">Valor</th><th>Última atualização</th><th class="u-d6db40"></th>
       </tr></thead>
       <tbody>
-        ${page.map(e => `
+        ${page
+          .map(
+            (e) => `
           <tr>
             <td><div class="eq-name">${esc(e.nome || '—')}</div>
               <div class="eq-sub">Nº série: ${esc(e.numeroSerie || '—')}${e.tipo ? ` · ${esc(e.tipo)}` : ''}</div></td>
@@ -519,10 +643,14 @@ function renderEquipTable(area) {
             <td class="value u-f3535d">${esc(formatEquipValor(e.valor))}</td>
             <td class="u-86abda">${esc(e.updatedAt ? fmtDate(e.updatedAt) : '—')}</td>
             <td class="row-menu"><button class="btn-icon" title="Ações" aria-label="Ações do equipamento" data-action="toggleEquipMenu" data-stop="1" data-arg="${esc(e.id)}">⋮</button></td>
-          </tr>`).join('')}
+          </tr>`
+          )
+          .join('')}
       </tbody>
     </table></div>
-    ${totalPages > 1 ? `
+    ${
+      totalPages > 1
+        ? `
     <div class="vis-pager u-8453e0">
       <div>Mostrando ${startIdx + 1}–${Math.min(startIdx + EQUIP_PAGE_SIZE, list.length)} de ${list.length}</div>
       <div class="u-25b528">
@@ -530,15 +658,22 @@ function renderEquipTable(area) {
         <span>${_equipPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_equipPage === totalPages ? 'disabled' : ''} data-action="eqNextPage">Próxima →</button>
       </div>
-    </div>` : ''}`;
+    </div>`
+        : ''
+    }`;
 }
 
 // ── Menu ⋮ ──────────────────────────────────────────────────────────────────
 function toggleEquipMenu(e, id) {
   if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-  try { closeEquipMenu(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    closeEquipMenu();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   const btn = e && e.currentTarget ? e.currentTarget : null;
-  const rect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { bottom: 0, right: 0 };
+  const rect =
+    btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { bottom: 0, right: 0 };
   const menu = document.createElement('div');
   menu.id = 'equipRowMenu';
   menu.className = 'equip-row-menu';
@@ -546,10 +681,20 @@ function toggleEquipMenu(e, id) {
     <button data-action="eqMenuOpenForm" data-arg="${escapeHtml(id)}">✏️ Editar</button>
     <button data-action="eqMenuLink" data-arg="${escapeHtml(id)}">🔗 Vincular pendência</button>
     <button type="button" data-qr-equip="${escapeHtml(id)}">🏷️ Etiqueta QR</button>
-    ${(() => { try { const eq = getEquipamentoById(id); const penId = getEquipPendenciaId(eq); return penId ? `<button data-action="eqMenuViewPen" data-arg="${escapeHtml(penId)}">↗ Ver pendência</button>` : ''; } catch (_) { return ''; } })()}
+    ${(() => {
+      try {
+        const eq = getEquipamentoById(id);
+        const penId = getEquipPendenciaId(eq);
+        return penId
+          ? `<button data-action="eqMenuViewPen" data-arg="${escapeHtml(penId)}">↗ Ver pendência</button>`
+          : '';
+      } catch (_) {
+        return '';
+      }
+    })()}
     <button class="danger" data-action="eqMenuDelete" data-arg="${escapeHtml(id)}">🗑️ Excluir</button>`;
-  menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-  menu.style.left = Math.max(8, (rect.right + window.scrollX - 170)) + 'px';
+  menu.style.top = rect.bottom + window.scrollY + 4 + 'px';
+  menu.style.left = Math.max(8, rect.right + window.scrollX - 170) + 'px';
   document.body.appendChild(menu);
   setTimeout(() => {
     document.addEventListener('click', closeEquipMenu, { once: true });
@@ -565,58 +710,72 @@ function goToEquipOS(osId) {
   if (!osId) return;
   try {
     if (typeof navigateTo === 'function') navigateTo('pendencias');
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   let tries = 0;
   const tick = () => {
     tries++;
     try {
-      const p = (typeof getPendenciaById === 'function') ? getPendenciaById(osId) : null;
-      if (p && document.getElementById('penViewArea') && typeof openPendenciaDetail === 'function') {
+      const p = typeof getPendenciaById === 'function' ? getPendenciaById(osId) : null;
+      if (
+        p &&
+        document.getElementById('penViewArea') &&
+        typeof openPendenciaDetail === 'function'
+      ) {
         openPendenciaDetail(osId);
         return;
       }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
     if (tries < 25) setTimeout(tick, 120);
-    else if (typeof showToast === 'function') showToast('OS não encontrada (pode ter sido excluída).', 'warning');
+    else if (typeof showToast === 'function')
+      showToast('OS não encontrada (pode ter sido excluída).', 'warning');
   };
   tick();
 }
 
 // ── Menu separado: vincular/desvincular pendência ───────────────────────────
 function openEquipLinkModal(id) {
-  const eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null;
+  const eq = typeof getEquipamentoById === 'function' ? getEquipamentoById(id) : null;
   if (!eq) return;
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
   const pens = _equipActivePens();
   const cur = getEquipPendenciaId(eq);
-  openModal('Vincular pendência', `
+  openModal(
+    'Vincular pendência',
+    `
     <form data-submit="submitEquipLink" data-arg="${esc(eq.id)}">
       <p class="u-fa39c2">Equipamento: <strong class="u-3c6f5e">${esc(eq.nome || '—')}</strong>${eq.osVinculada ? ` · OS <strong class="u-3c6f5e">${esc(eq.osVinculada)}</strong>` : ''}</p>
       <div class="form-group"><label class="form-label" for="eqLinkPen">Pendência</label>
         <select class="form-select" id="eqLinkPen">
           <option value="">— Nenhuma (desvincular) —</option>
-          ${pens.map(p => `<option value="${esc(p.id)}" ${cur === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
+          ${pens.map((p) => `<option value="${esc(p.id)}" ${cur === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
         </select></div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Vincular</button>
       </div>
-    </form>`);
+    </form>`
+  );
 }
 
 function submitEquipLink(e, id) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
-  const eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null;
+  const eq = typeof getEquipamentoById === 'function' ? getEquipamentoById(id) : null;
   if (!eq) return;
   const penId = document.getElementById('eqLinkPen')?.value || null;
   try {
     if (typeof saveEquipamento === 'function') saveEquipamento({ ...eq, pendenciaId: penId });
   } catch (err) {
-    if (typeof showToast === 'function') showToast('Erro ao vincular: ' + (err && err.message ? err.message : err), 'error');
+    if (typeof showToast === 'function')
+      showToast('Erro ao vincular: ' + (err && err.message ? err.message : err), 'error');
     return;
   }
   if (typeof closeModal === 'function') closeModal();
-  if (typeof showToast === 'function') showToast(penId ? 'Pendência vinculada!' : 'Pendência desvinculada.', 'success');
+  if (typeof showToast === 'function')
+    showToast(penId ? 'Pendência vinculada!' : 'Pendência desvinculada.', 'success');
   renderEquipView(false);
 }
 
@@ -625,9 +784,11 @@ function openEquipForm(id) {
   const eq = id && typeof getEquipamentoById === 'function' ? getEquipamentoById(id) : null;
   const clients = _equipClients();
   const pens = _equipActivePens();
-  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
   const curPen = getEquipPendenciaId(eq);
-  openModal(eq ? 'Editar Equipamento' : 'Novo Equipamento', `
+  openModal(
+    eq ? 'Editar Equipamento' : 'Novo Equipamento',
+    `
     <form data-submit="submitEquipForm" data-arg="${esc(eq?.id || '')}">
       <div class="form-group"><label class="form-label" for="eqNome">Nome *</label>
         <input class="form-input" id="eqNome" required maxlength="120" placeholder='Ex: Notebook Dell Latitude 5420' value="${esc(eq?.nome || '')}" /></div>
@@ -636,14 +797,14 @@ function openEquipForm(id) {
           <input class="form-input" id="eqSerie" maxlength="80" value="${esc(eq?.numeroSerie || '')}" /></div>
         <div class="form-group"><label class="form-label" for="eqTipo">Tipo</label>
           <select class="form-select" id="eqTipo">
-            ${EQUIP_TIPO_OPTIONS.map(t => `<option value="${t}" ${(eq?.tipo || 'outro') === t ? 'selected' : ''}>${esc(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
+            ${EQUIP_TIPO_OPTIONS.map((t) => `<option value="${t}" ${(eq?.tipo || 'outro') === t ? 'selected' : ''}>${esc(t[0].toUpperCase() + t.slice(1))}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="eqCliente">Cliente</label>
           <select class="form-select" id="eqCliente">
             <option value="__estoque__" ${!eq?.clientId ? 'selected' : ''}>Estoque Initnet</option>
-            ${clients.map(c => `<option value="${esc(c.id)}" ${eq?.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+            ${clients.map((c) => `<option value="${esc(c.id)}" ${eq?.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label class="form-label" for="eqOS">OS vinculada</label>
           <input class="form-input" id="eqOS" maxlength="60" placeholder="Ex: 010, OS-123..." value="${esc(eq?.osVinculada || '')}" /></div>
@@ -651,12 +812,17 @@ function openEquipForm(id) {
       <div class="form-group"><label class="form-label" for="eqPendencia">Vincular pendência <span class="u-6947ee">(menu separado — opcional)</span></label>
         <select class="form-select" id="eqPendencia">
           <option value="">— Nenhuma —</option>
-          ${pens.map(p => `<option value="${esc(p.id)}" ${curPen === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
+          ${pens.map((p) => `<option value="${esc(p.id)}" ${curPen === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
         </select></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="eqStatus">Status *</label>
           <select class="form-select" id="eqStatus" required>
-            ${Object.entries(EQUIP_STATUS_MAP).map(([k, m]) => `<option value="${k}" ${(eq?.status || 'estoque') === k ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
+            ${Object.entries(EQUIP_STATUS_MAP)
+              .map(
+                ([k, m]) =>
+                  `<option value="${k}" ${(eq?.status || 'estoque') === k ? 'selected' : ''}>${esc(m.label)}</option>`
+              )
+              .join('')}
           </select></div>
         <div class="form-group"><label class="form-label" for="eqValor">Valor (R$)</label>
           <input class="form-input" id="eqValor" type="number" min="0" step="0.01" value="${eq?.valor ?? ''}" placeholder="0" /></div>
@@ -669,7 +835,8 @@ function openEquipForm(id) {
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">${eq ? 'Salvar' : 'Cadastrar'}</button>
       </div>
-    </form>`);
+    </form>`
+  );
 }
 
 function submitEquipForm(e, id) {
@@ -684,23 +851,26 @@ function submitEquipForm(e, id) {
   let clientName = 'Estoque Initnet';
   if (clientSel && clientSel !== '__estoque__') {
     try {
-      const c = (typeof getClientById === 'function') ? getClientById(clientSel) : null;
+      const c = typeof getClientById === 'function' ? getClientById(clientSel) : null;
       if (c) clientName = c.name;
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
   }
   const rawValor = document.getElementById('eqValor')?.value;
-  const rawStatus = normEquipStatus(document.getElementById('eqStatus')?.value || 'estoque') || 'estoque';
+  const rawStatus =
+    normEquipStatus(document.getElementById('eqStatus')?.value || 'estoque') || 'estoque';
   const data = {
     id: id || undefined,
     nome,
     numeroSerie: val('eqSerie'),
     tipo: document.getElementById('eqTipo')?.value || 'outro',
-    clientId: clientSel === '__estoque__' ? null : (clientSel || null),
+    clientId: clientSel === '__estoque__' ? null : clientSel || null,
     clientName,
     osVinculada: val('eqOS') || null,
     pendenciaId: document.getElementById('eqPendencia')?.value || null,
     status: rawStatus,
-    valor: (rawValor === '' || rawValor == null) ? '' : Number(rawValor),
+    valor: rawValor === '' || rawValor == null ? '' : Number(rawValor),
     dataAquisicao: document.getElementById('eqDataAq')?.value || '',
     observacoes: document.getElementById('eqObs')?.value || '',
   };
@@ -708,53 +878,86 @@ function submitEquipForm(e, id) {
     if (typeof saveEquipamento === 'function') saveEquipamento(data);
     else return;
   } catch (err) {
-    if (typeof showToast === 'function') showToast('Erro ao salvar: ' + (err && err.message ? err.message : err), 'error');
+    if (typeof showToast === 'function')
+      showToast('Erro ao salvar: ' + (err && err.message ? err.message : err), 'error');
     return;
   }
   if (typeof closeModal === 'function') closeModal();
-  if (typeof showToast === 'function') showToast(id ? 'Equipamento atualizado!' : 'Equipamento cadastrado!', 'success');
+  if (typeof showToast === 'function')
+    showToast(id ? 'Equipamento atualizado!' : 'Equipamento cadastrado!', 'success');
   renderEquipView(false);
-  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); } }
+  if (typeof updateBadges === 'function') {
+    try {
+      updateBadges();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
+  }
 }
 
 function deleteEquipFlow(id) {
   let eq = null;
-  try { eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    eq = typeof getEquipamentoById === 'function' ? getEquipamentoById(id) : null;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   const name = (eq && eq.nome) || 'este equipamento';
   const doDelete = () => {
     let snapshot = null;
-    try { snapshot = eq ? { ...eq } : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    try {
+      snapshot = eq ? { ...eq } : null;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
     try {
       if (typeof deleteEquipamento === 'function') deleteEquipamento(id);
     } catch (err) {
-      if (typeof showToast === 'function') showToast('Erro ao excluir: ' + (err && err.message ? err.message : err), 'error');
+      if (typeof showToast === 'function')
+        showToast('Erro ao excluir: ' + (err && err.message ? err.message : err), 'error');
       return;
     }
     renderEquipView(false);
-    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); } }
+    if (typeof updateBadges === 'function') {
+      try {
+        updateBadges();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+      }
+    }
     if (snapshot && typeof showUndoToast === 'function') {
       showUndoToast(`"${snapshot.nome}" excluído.`, () => {
         try {
-          if (typeof saveEquipamento === 'function') saveEquipamento({ ...snapshot, id: undefined });
+          if (typeof saveEquipamento === 'function')
+            saveEquipamento({ ...snapshot, id: undefined });
           // Reinsere com o mesmo id para não quebrar vínculos (undo fiel).
-          const list = (typeof getEquipamentos === 'function') ? getEquipamentos() : [];
+          const list = typeof getEquipamentos === 'function' ? getEquipamentos() : [];
           const last = list[list.length - 1];
           if (last && snapshot.id && last.id !== snapshot.id) {
-            const idx = list.findIndex(x => x.id === last.id);
+            const idx = list.findIndex((x) => x.id === last.id);
             if (idx !== -1) {
               list[idx] = { ...snapshot };
-              if (typeof dbSet !== 'undefined' && typeof DB !== 'undefined') dbSet(DB.EQUIPAMENTOS, list);
+              if (typeof dbSet !== 'undefined' && typeof DB !== 'undefined')
+                dbSet(DB.EQUIPAMENTOS, list);
             }
           }
           renderEquipView(false);
-        } catch (_e) { console.error('[equipamentos] desfazer exclusão falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); if (typeof showToast === 'function') showToast('Não foi possível desfazer a exclusão.', 'error'); }
+        } catch (_e) {
+          console.error('[equipamentos] desfazer exclusão falhou', _e);
+          if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+          if (typeof showToast === 'function')
+            showToast('Não foi possível desfazer a exclusão.', 'error');
+        }
       });
     } else if (typeof showToast === 'function') {
       showToast('Equipamento excluído.', 'success');
     }
   };
   if (typeof confirmAction === 'function') {
-    confirmAction(`Excluir <strong>"${(typeof escapeHtml === 'function' ? escapeHtml(name) : name)}"</strong>? Esta ação pode ser desfeita em 5s.`, doDelete);
+    confirmAction(
+      `Excluir <strong>"${typeof escapeHtml === 'function' ? escapeHtml(name) : name}"</strong>? Esta ação pode ser desfeita em 5s.`,
+      doDelete
+    );
   } else {
     doDelete();
   }
@@ -767,7 +970,7 @@ function deleteEquipFlow(id) {
 // - Saída/Devolvido: controle manual na planilha (sem campo no sistema).
 // - Total a Acertar: soma dos valores dos NÃO baixados (igual ao card de ativos).
 function equipOSExportLabel(e) {
-  const typed = (e && e.osVinculada) ? String(e.osVinculada).trim() : '';
+  const typed = e && e.osVinculada ? String(e.osVinculada).trim() : '';
   if (typed) return typed;
   const penId = getEquipPendenciaId(e);
   if (penId) {
@@ -776,30 +979,45 @@ function equipOSExportLabel(e) {
         const p = getPendenciaById(penId);
         if (p) return penDisplayNumber(p);
       }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+    }
     return penId;
   }
   return '';
 }
 
 function equipServicoExportLabel(e) {
-  const nome = (e && e.nome) ? String(e.nome).trim() : '—';
-  const serie = (e && e.numeroSerie) ? String(e.numeroSerie).trim() : '';
+  const nome = e && e.nome ? String(e.nome).trim() : '—';
+  const serie = e && e.numeroSerie ? String(e.numeroSerie).trim() : '';
   return serie ? `${nome} (${serie})` : nome;
 }
 
 // Pura e testável: monta título + cabeçalho + linhas + total (valores
 // numéricos; cada escritor — xlsx ou CSV — formata à sua maneira).
 function buildEquipAcertoSheet(list, dateLabel) {
-  const stamp = dateLabel || (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  const stamp =
+    dateLabel ||
+    (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
   let titleDate = stamp;
   try {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(stamp) && typeof formatDate === 'function') titleDate = formatDate(stamp);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(stamp) && typeof formatDate === 'function')
+      titleDate = formatDate(stamp);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
   const title = `Equipamentos — Acerto (${titleDate})`;
-  const header = ['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações'];
+  const header = [
+    'Ordem de Serviço',
+    'Cliente',
+    'Serviço a ser feito',
+    'Saída',
+    'Valor',
+    'Devolvido',
+    'Observações',
+  ];
   const arr = list || [];
-  const rows = arr.map(e => ([
+  const rows = arr.map((e) => [
     equipOSExportLabel(e),
     (e && e.clientName) || '—',
     equipServicoExportLabel(e),
@@ -807,7 +1025,7 @@ function buildEquipAcertoSheet(list, dateLabel) {
     Number((e && e.valor) === '' || (e && e.valor) == null ? 0 : e.valor) || 0,
     '☐',
     (e && e.observacoes) || '',
-  ]));
+  ]);
   let total = 0;
   for (const e of arr) {
     if (normEquipStatus(e && e.status) === 'baixado') continue;
@@ -823,7 +1041,10 @@ const ACERTO_NCOLS = 7;
 function _acertoAddr(r, c) {
   let s = '';
   let n = c;
-  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
   return s + (r + 1);
 }
 function _acertoCell(ws, r, c) {
@@ -840,14 +1061,30 @@ function _acertoBorder(color) {
 // Layout: linha 1 título mesclado, linha 2 cabeçalho, dados, linha de total.
 function applyAcertoDesign(ws, meta) {
   const n = Math.max(0, (meta && meta.dataCount) || 0);
-  const TITLE = 0, HEADER = 1, FIRST = 2, LAST = FIRST + n - 1, TOTAL = FIRST + n;
+  const TITLE = 0,
+    HEADER = 1,
+    FIRST = 2,
+    LAST = FIRST + n - 1,
+    TOTAL = FIRST + n;
   const GRID = 'D9D9D9';
 
   ws['!merges'] = [{ s: { r: TITLE, c: 0 }, e: { r: TITLE, c: ACERTO_NCOLS - 1 } }];
-  ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }];
+  ws['!cols'] = [
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 50 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 40 },
+  ];
   ws['!rows'] = [{ hpt: 26 }, { hpt: 20 }];
   ws['!autofilter'] = { ref: `A${HEADER + 1}:G${LAST + 1}` };
-  try { ws['!views'] = [{ state: 'frozen', ySplit: HEADER + 1 }]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
+  try {
+    ws['!views'] = [{ state: 'frozen', ySplit: HEADER + 1 }];
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
 
   // Título
   const t = _acertoCell(ws, TITLE, 0);
@@ -869,14 +1106,25 @@ function applyAcertoDesign(ws, meta) {
     const isTotal = r === TOTAL;
     for (let c = 0; c < ACERTO_NCOLS; c++) {
       const cell = _acertoCell(ws, r, c);
-      cell.s.font = { name: 'Calibri', sz: 11, bold: isTotal, color: { rgb: isTotal ? '1F4E79' : '262626' } };
-      cell.s.fill = { patternType: 'solid', fgColor: { rgb: isTotal ? 'FFF2CC' : ((r - FIRST) % 2 ? 'F2F2F2' : 'FFFFFF') } };
+      cell.s.font = {
+        name: 'Calibri',
+        sz: 11,
+        bold: isTotal,
+        color: { rgb: isTotal ? '1F4E79' : '262626' },
+      };
+      cell.s.fill = {
+        patternType: 'solid',
+        fgColor: { rgb: isTotal ? 'FFF2CC' : (r - FIRST) % 2 ? 'F2F2F2' : 'FFFFFF' },
+      };
       cell.s.border = _acertoBorder(GRID);
       cell.s.alignment = { vertical: 'center' };
       if (c === 4) cell.s.alignment.horizontal = 'right';
       else if (c === 0 || c === 3 || c === 5) cell.s.alignment.horizontal = 'center';
       if (c === 2 || c === 6) cell.s.alignment.wrapText = true;
-      if (c === 4 && typeof cell.v === 'number') { cell.t = 'n'; cell.z = '"R$" #,##0.00'; }
+      if (c === 4 && typeof cell.v === 'number') {
+        cell.t = 'n';
+        cell.z = '"R$" #,##0.00';
+      }
     }
   }
   return ws;
@@ -885,17 +1133,23 @@ function applyAcertoDesign(ws, meta) {
 async function exportEquipamentosPlanilha() {
   try {
     if (typeof canExport === 'function' && !canExport()) {
-      if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+      if (typeof showToast === 'function')
+        showToast('Exportação restrita a administradores/supervisores.', 'error');
       return;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
-  const list = (_filteredEquips && _filteredEquips.length) ? _filteredEquips : getFilteredEquipamentos();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
+  const list =
+    _filteredEquips && _filteredEquips.length ? _filteredEquips : getFilteredEquipamentos();
   if (!list.length) {
-    if (typeof showToast === 'function') showToast('Nada para exportar com os filtros atuais.', 'warning');
+    if (typeof showToast === 'function')
+      showToast('Nada para exportar com os filtros atuais.', 'warning');
     return;
   }
   const sheet = buildEquipAcertoSheet(list);
-  const stamp = (typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10));
+  const stamp =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
   // .xlsx real com o SheetJS (carregado agora, sob demanda); offline cai no CSV.
   try {
     const XLSX = await loadLib('xlsx').catch(() => null);
@@ -908,8 +1162,11 @@ async function exportEquipamentosPlanilha() {
       if (typeof showToast === 'function') showToast('Planilha exportada com sucesso!', 'success');
       return;
     }
-  } catch (_) { /* cai para o CSV abaixo */ }
-  const fmtNum = n => (n == null || isNaN(Number(n))) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
+  } catch (_) {
+    /* cai para o CSV abaixo */
+  }
+  const fmtNum = (n) =>
+    n == null || isNaN(Number(n)) ? '' : String(Number(n).toFixed(2)).replace('.', ',');
   const cell = (v) => {
     if (typeof csvCell === 'function') return csvCell(v);
     let s = String(v == null ? '' : v);
@@ -919,36 +1176,56 @@ async function exportEquipamentosPlanilha() {
   const lines = [
     cell(sheet.title),
     sheet.header.join(';'),
-    ...sheet.rows.map(r => [cell(r[0]), cell(r[1]), cell(r[2]), cell(r[3]), fmtNum(r[4]), cell(r[5]), cell(r[6])].join(';')),
+    ...sheet.rows.map((r) =>
+      [cell(r[0]), cell(r[1]), cell(r[2]), cell(r[3]), fmtNum(r[4]), cell(r[5]), cell(r[6])].join(
+        ';'
+      )
+    ),
   ];
-  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `equipamentos_acerto_${stamp}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  if (typeof showToast === 'function') showToast('Planilha (CSV) exportada com sucesso!', 'success');
+  if (typeof showToast === 'function')
+    showToast('Planilha (CSV) exportada com sucesso!', 'success');
 }
 
 function exportEquipamentosCSV() {
   try {
     if (typeof canExport === 'function' && !canExport()) {
-      if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+      if (typeof showToast === 'function')
+        showToast('Exportação restrita a administradores/supervisores.', 'error');
       return;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
-  const list = _filteredEquips && _filteredEquips.length ? _filteredEquips : getFilteredEquipamentos();
-  const headers = ['Nome', 'Nº Série', 'Tipo', 'Cliente', 'OS', 'Pendência vinculada', 'Status', 'Valor', 'Aquisição', 'Atualizado em'];
-  const rows = list.map(eq => [
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos');
+  }
+  const list =
+    _filteredEquips && _filteredEquips.length ? _filteredEquips : getFilteredEquipamentos();
+  const headers = [
+    'Nome',
+    'Nº Série',
+    'Tipo',
+    'Cliente',
+    'OS',
+    'Pendência vinculada',
+    'Status',
+    'Valor',
+    'Aquisição',
+    'Atualizado em',
+  ];
+  const rows = list.map((eq) => [
     (eq.nome || '').replace(/;/g, ','),
     (eq.numeroSerie || '').replace(/;/g, ','),
     eq.tipo || '',
     (eq.clientName || '').replace(/;/g, ','),
     (eq.osVinculada || '').replace(/;/g, ','),
     getEquipPendenciaId(eq) || '',
-    (getEquipStatusMeta(eq.status).label || eq.status || ''),
-    (eq.valor === '' || eq.valor == null) ? '' : String(eq.valor).replace('.', ','),
+    getEquipStatusMeta(eq.status).label || eq.status || '',
+    eq.valor === '' || eq.valor == null ? '' : String(eq.valor).replace('.', ','),
     eq.dataAquisicao || '',
     eq.updatedAt || eq.createdAt || '',
   ]);
@@ -958,9 +1235,20 @@ function exportEquipamentosCSV() {
 // Ações do arquivo — delegação via js/actions.js (data-action/data-change/data-input/data-submit).
 if (typeof registerActions === 'function') {
   registerActions({
-    eqSearchInput: () => { saveEquipFilters(); if (typeof debouncedRenderEquipView === 'function') debouncedRenderEquipView(); else renderEquipView(false); },
-    eqFiltersChange: () => { saveEquipFilters(); renderEquipView(); },
-    eqFiltersChangeBadge: () => { saveEquipFilters(); renderEquipView(); _equipUpdateMoreFiltersBadge(); },
+    eqSearchInput: () => {
+      saveEquipFilters();
+      if (typeof debouncedRenderEquipView === 'function') debouncedRenderEquipView();
+      else renderEquipView(false);
+    },
+    eqFiltersChange: () => {
+      saveEquipFilters();
+      renderEquipView();
+    },
+    eqFiltersChangeBadge: () => {
+      saveEquipFilters();
+      renderEquipView();
+      _equipUpdateMoreFiltersBadge();
+    },
     eqToggleMoreFilters: (_el, _arg, ev) => toggleEquipMoreFilters(ev),
     exportEquipamentosPlanilha: () => exportEquipamentosPlanilha(),
     setEquipTab: (_el, arg) => setEquipTab(arg),
@@ -968,12 +1256,30 @@ if (typeof registerActions === 'function') {
     openEquipForm: (_el, arg) => openEquipForm(arg),
     // data-stop="1" no botão já impede a propagação; aqui só repassamos o botão como currentTarget.
     toggleEquipMenu: (el, arg) => toggleEquipMenu({ currentTarget: el }, arg),
-    eqPrevPage: () => { _equipPage--; renderEquipView(false); },
-    eqNextPage: () => { _equipPage++; renderEquipView(false); },
-    eqMenuOpenForm: (_el, arg) => { closeEquipMenu(); openEquipForm(arg); },
-    eqMenuLink: (_el, arg) => { closeEquipMenu(); openEquipLinkModal(arg); },
-    eqMenuViewPen: (_el, arg) => { closeEquipMenu(); goToEquipOS(arg); },
-    eqMenuDelete: (_el, arg) => { closeEquipMenu(); deleteEquipFlow(arg); },
+    eqPrevPage: () => {
+      _equipPage--;
+      renderEquipView(false);
+    },
+    eqNextPage: () => {
+      _equipPage++;
+      renderEquipView(false);
+    },
+    eqMenuOpenForm: (_el, arg) => {
+      closeEquipMenu();
+      openEquipForm(arg);
+    },
+    eqMenuLink: (_el, arg) => {
+      closeEquipMenu();
+      openEquipLinkModal(arg);
+    },
+    eqMenuViewPen: (_el, arg) => {
+      closeEquipMenu();
+      goToEquipOS(arg);
+    },
+    eqMenuDelete: (_el, arg) => {
+      closeEquipMenu();
+      deleteEquipFlow(arg);
+    },
     submitEquipLink: (_el, arg, ev) => submitEquipLink(ev, arg),
     submitEquipForm: (_el, arg, ev) => submitEquipForm(ev, arg),
   });
@@ -983,9 +1289,20 @@ if (typeof registerActions === 'function') {
 // funções acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    EQUIP_STATUS_MAP, EQUIP_TIPO_OPTIONS, EQUIP_TABS,
-    normEquipStatus, getEquipStatusMeta, getEquipPendenciaId, hasEquipOS,
-    formatEquipValor, calcEquipStats, filterEquipamentos, equipSummaryLine,
-    equipOSExportLabel, equipServicoExportLabel, buildEquipAcertoSheet, applyAcertoDesign,
+    EQUIP_STATUS_MAP,
+    EQUIP_TIPO_OPTIONS,
+    EQUIP_TABS,
+    normEquipStatus,
+    getEquipStatusMeta,
+    getEquipPendenciaId,
+    hasEquipOS,
+    formatEquipValor,
+    calcEquipStats,
+    filterEquipamentos,
+    equipSummaryLine,
+    equipOSExportLabel,
+    equipServicoExportLabel,
+    buildEquipAcertoSheet,
+    applyAcertoDesign,
   };
 }

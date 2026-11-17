@@ -8,18 +8,34 @@ const require = createRequire(import.meta.url);
 function setGlobal(name, value) {
   try {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
-  } catch (_) { globalThis[name] = value; }
+  } catch (_) {
+    globalThis[name] = value;
+  }
 }
 
 const _stores = { clients: [], pendencias: [], operators: [], visits: [] };
 const _tables = {};
 let _session = null;
 
-setGlobal('window', { _pendingSyncCount: 0, _syncPending: 0, _supabaseAuthActive: false, _suppressPendingSync: true, addEventListener() {}, location: { hash: '' } });
-setGlobal('document', { addEventListener() {}, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] });
+setGlobal('window', {
+  _pendingSyncCount: 0,
+  _syncPending: 0,
+  _supabaseAuthActive: false,
+  _suppressPendingSync: true,
+  addEventListener() {},
+  location: { hash: '' },
+});
+setGlobal('document', {
+  addEventListener() {},
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+});
 setGlobal('navigator', { onLine: true });
 setGlobal('getCacheStore', (name) => _stores[name] || []);
-setGlobal('setCacheStore', (name, items) => { _stores[name] = Array.isArray(items) ? [...items] : items; });
+setGlobal('setCacheStore', (name, items) => {
+  _stores[name] = Array.isArray(items) ? [...items] : items;
+});
 setGlobal('getCacheKV', (k, d) => d);
 setGlobal('setCacheKV', () => {});
 setGlobal('getCacheTable', (t) => {
@@ -27,7 +43,9 @@ setGlobal('getCacheTable', (t) => {
   if (t === 'audit_logs' && _tables.audit_logs) return _tables.audit_logs;
   return {};
 });
-setGlobal('setCacheTable', (t, v) => { _tables[t] = v; });
+setGlobal('setCacheTable', (t, v) => {
+  _tables[t] = v;
+});
 setGlobal('getOperatorNames', () => []);
 setGlobal('escapeHtml', (s) => String(s ?? ''));
 
@@ -44,10 +62,18 @@ function mockOps() {
 
 function mockPen(over = {}) {
   return {
-    id: 'PEN-1', clientId: 'CLI-1', clientName: 'BT', tipo: 'Projeto',
-    assunto: 'Bitlocker', descricao: 'Ativar bitlocker', responsible: 'Ana',
-    status: 'aberto', priority: 'media', team: 'init',
-    createdAt: '2026-01-01T10:00:00Z', updatedAt: '2026-01-02T10:00:00Z',
+    id: 'PEN-1',
+    clientId: 'CLI-1',
+    clientName: 'BT',
+    tipo: 'Projeto',
+    assunto: 'Bitlocker',
+    descricao: 'Ativar bitlocker',
+    responsible: 'Ana',
+    status: 'aberto',
+    priority: 'media',
+    team: 'init',
+    createdAt: '2026-01-01T10:00:00Z',
+    updatedAt: '2026-01-02T10:00:00Z',
     ...over,
   };
 }
@@ -61,7 +87,7 @@ describe('updatePendenciaAssignee (regras 404/400/403)', () => {
     delete _tables.audit_logs;
     mockOps();
     _session = { opId: 'OP-9', name: 'Ana', team: 'init', isAdmin: false };
-        storage = requireStorage();
+    storage = requireStorage();
   });
 
   it('reatribui, mantém completedBy e registra auditoria', () => {
@@ -69,7 +95,15 @@ describe('updatePendenciaAssignee (regras 404/400/403)', () => {
     expect(r.changed).toEqual({ responsible: true, completedBy: false });
     expect(storage.getPendenciaById('PEN-1').responsible).toBe('Beto');
     const logs = _tables.audit_logs || [];
-    expect(logs.some((l) => l.action === 'Reatribuiu' && l.targetId === 'PEN-1' && l.details === 'Ana → Beto' && l.operatorName === 'Ana')).toBe(true);
+    expect(
+      logs.some(
+        (l) =>
+          l.action === 'Reatribuiu' &&
+          l.targetId === 'PEN-1' &&
+          l.details === 'Ana → Beto' &&
+          l.operatorName === 'Ana'
+      )
+    ).toBe(true);
   });
 
   it('permite remover o responsável ("")', () => {
@@ -86,19 +120,29 @@ describe('updatePendenciaAssignee (regras 404/400/403)', () => {
   });
 
   it('404 em pendência inexistente', () => {
-    expect(() => storage.updatePendenciaAssignee('PEN-X', { responsible: 'Beto' })).toThrow(/não encontrada/i);
+    expect(() => storage.updatePendenciaAssignee('PEN-X', { responsible: 'Beto' })).toThrow(
+      /não encontrada/i
+    );
   });
 
   it('400 em operador inexistente, inativo ou afastado (responsible)', () => {
-    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Zé' })).toThrow(/não encontrado/i);
-    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Paulo' })).toThrow(/inativo/i);
-    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Lia' })).toThrow(/afastado/i);
+    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Zé' })).toThrow(
+      /não encontrado/i
+    );
+    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Paulo' })).toThrow(
+      /inativo/i
+    );
+    expect(() => storage.updatePendenciaAssignee('PEN-1', { responsible: 'Lia' })).toThrow(
+      /afastado/i
+    );
   });
 
   it('403 em pendência Gestão para não-Gestão', () => {
     _stores.pendencias = [mockPen({ id: 'PEN-G', tipo: 'Gestão' })];
     _session = { opId: 'OP-9', name: 'Ana', team: 'init', isAdmin: false };
-    expect(() => storage.updatePendenciaAssignee('PEN-G', { responsible: 'Beto' })).toThrow(/negado/i);
+    expect(() => storage.updatePendenciaAssignee('PEN-G', { responsible: 'Beto' })).toThrow(
+      /negado/i
+    );
     _session = { opId: 'OP-5', name: 'Felipe', team: 'init', isAdmin: true };
     expect(() => storage.updatePendenciaAssignee('PEN-G', { responsible: 'Beto' })).not.toThrow();
   });
@@ -108,12 +152,20 @@ describe('completedBy (quem concluiu)', () => {
   let storage;
   beforeEach(() => {
     _stores.clients = [];
-    _stores.pendencias = [mockPen({ id: 'PEN-2', status: 'resolvido', responsible: 'Ana', completedAt: '2026-02-01T10:00:00Z', completedBy: 'Ana' })];
+    _stores.pendencias = [
+      mockPen({
+        id: 'PEN-2',
+        status: 'resolvido',
+        responsible: 'Ana',
+        completedAt: '2026-02-01T10:00:00Z',
+        completedBy: 'Ana',
+      }),
+    ];
     _stores.visits = [];
     delete _tables.audit_logs;
     mockOps();
     _session = { opId: 'OP-9', name: 'Ana', team: 'init', isAdmin: false };
-        storage = requireStorage();
+    storage = requireStorage();
   });
 
   it('corrige quem concluiu e registra auditoria (completedAt intacto)', () => {
@@ -123,7 +175,9 @@ describe('completedBy (quem concluiu)', () => {
     expect(p.completedBy).toBe('Beto');
     expect(p.completedAt).toBe('2026-02-01T10:00:00Z');
     const logs = _tables.audit_logs || [];
-    expect(logs.some((l) => l.action === 'Corrigiu conclusão' && l.details === 'Ana → Beto')).toBe(true);
+    expect(logs.some((l) => l.action === 'Corrigiu conclusão' && l.details === 'Ana → Beto')).toBe(
+      true
+    );
   });
 
   it('aceita afastado como fato passado e permite limpar', () => {
@@ -135,8 +189,12 @@ describe('completedBy (quem concluiu)', () => {
 
   it('barra completedBy em pendência aberta e operador inexistente', () => {
     _stores.pendencias.push(mockPen({ id: 'PEN-3', status: 'aberto' }));
-    expect(() => storage.updatePendenciaAssignee('PEN-3', { completedBy: 'Beto' })).toThrow(/concluída/i);
-    expect(() => storage.updatePendenciaAssignee('PEN-2', { completedBy: 'Zé' })).toThrow(/não encontrado/i);
+    expect(() => storage.updatePendenciaAssignee('PEN-3', { completedBy: 'Beto' })).toThrow(
+      /concluída/i
+    );
+    expect(() => storage.updatePendenciaAssignee('PEN-2', { completedBy: 'Zé' })).toThrow(
+      /não encontrado/i
+    );
   });
 
   it('concluir carimba completedBy = responsável e completedAt', () => {
@@ -166,7 +224,7 @@ describe('contrato: migração, mapa e card', () => {
     expect(pen.fields.completed_by).toBe('completedBy');
     const src = fs.readFileSync('js/reunioes.js', 'utf8');
     expect(src).toContain('meeting-done-${escapeHtml(p.id)}');
-    expect(src).toContain("data-action=\"openCorrectCompletion\" data-arg=\"${escapeHtml(p.id)}\"");
+    expect(src).toContain('data-action="openCorrectCompletion" data-arg="${escapeHtml(p.id)}"');
     expect(src).toContain('_meetingPenHistoryHtml(p.id)');
     expect(src).toContain('Corrigiu conclusão');
   });

@@ -38,9 +38,11 @@ function resolveMilvusChamadoState(visit) {
   const st = v.milvusChamadoStatus || null;
   if (!st) return { kind: 'nao_aplicavel', codigo: null, erro: null };
   if (st === 'criado') return { kind: 'criado', codigo: null, erro: null };
-  if (st === 'pendente') return { kind: 'pendente', codigo: null, erro: v.milvusChamadoErro || null };
+  if (st === 'pendente')
+    return { kind: 'pendente', codigo: null, erro: v.milvusChamadoErro || null };
   if (st === 'criando') return { kind: 'criando', codigo: null, erro: v.milvusChamadoErro || null };
-  if (st === 'sem_token') return { kind: 'sem_token', codigo: null, erro: v.milvusChamadoErro || null };
+  if (st === 'sem_token')
+    return { kind: 'sem_token', codigo: null, erro: v.milvusChamadoErro || null };
   return { kind: 'erro', codigo: null, erro: v.milvusChamadoErro || null };
 }
 
@@ -52,10 +54,10 @@ function shouldRetryMilvusChamado(visit, nowMs) {
   if (tentativas >= MILVUS_CHAMADO_MAX_TENTATIVAS) return false;
   if (v.milvusChamadoStatus === 'pendente') return true;
   if (v.milvusChamadoStatus === 'criando') {
-    const now = (typeof nowMs === 'number') ? nowMs : Date.now();
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
     const upd = new Date(v.updatedAt || 0).getTime();
     if (isNaN(upd)) return true;
-    return (now - upd) > MILVUS_CHAMADO_STALE_MS;
+    return now - upd > MILVUS_CHAMADO_STALE_MS;
   }
   return false;
 }
@@ -70,7 +72,11 @@ function extractMilvusCodigo(body) {
     if (!s) return null;
     const direct = Number(s);
     if (Number.isFinite(direct) && direct > 0) return Math.trunc(direct);
-    try { return extractMilvusCodigo(JSON.parse(s)); } catch (_) { return null; }
+    try {
+      return extractMilvusCodigo(JSON.parse(s));
+    } catch (_) {
+      return null;
+    }
   }
   if (typeof body === 'object') {
     const c = body.codigo ?? body.code ?? body.id;
@@ -116,10 +122,10 @@ function shouldRetryMilvusFinalizar(visit, nowMs) {
   if (tentativas >= MILVUS_FINALIZAR_MAX_TENTATIVAS) return false;
   if (v.milvusFinalizarStatus === 'pendente') return true;
   if (v.milvusFinalizarStatus === 'finalizando') {
-    const now = (typeof nowMs === 'number') ? nowMs : Date.now();
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
     const upd = new Date(v.updatedAt || 0).getTime();
     if (isNaN(upd)) return true;
-    return (now - upd) > MILVUS_FINALIZAR_STALE_MS;
+    return now - upd > MILVUS_FINALIZAR_STALE_MS;
   }
   return false;
 }
@@ -127,18 +133,39 @@ function shouldRetryMilvusFinalizar(visit, nowMs) {
 // Classifica o resultado do invoke de finalização (puro, testável).
 // outcome: finalized | permanent | transient
 function classifyMilvusFinalizarResult(res, invokeError) {
-  if (invokeError) return { outcome: 'transient', detail: String((invokeError && invokeError.message) || invokeError) };
+  if (invokeError)
+    return {
+      outcome: 'transient',
+      detail: String((invokeError && invokeError.message) || invokeError),
+    };
   const data = (res && res.data) || res || {};
   if (data.success === true) {
-    return { outcome: 'finalized', codigo: extractMilvusCodigo(data.codigo ?? data) || null, recovered: data.already === true };
+    return {
+      outcome: 'finalized',
+      codigo: extractMilvusCodigo(data.codigo ?? data) || null,
+      recovered: data.already === true,
+    };
   }
   const code = String(data.code || '');
   if (code === 'MILVUS_CHAMADO_NOT_IN_PROGRESS') {
-    return { outcome: 'permanent', detail: String(data.message || 'Chamado ainda não está em atendimento no Milvus — dê play e tente novamente') };
+    return {
+      outcome: 'permanent',
+      detail: String(
+        data.message ||
+          'Chamado ainda não está em atendimento no Milvus — dê play e tente novamente'
+      ),
+    };
   }
-  if (code === 'MILVUS_VISIT_WITHOUT_CODIGO' || code === 'MILVUS_VISIT_WITHOUT_CLIENT' ||
-      code === 'MILVUS_VALIDATION_ERROR' || code === 'MILVUS_INVALID_TOKEN') {
-    return { outcome: 'permanent', detail: (data.detail ? code + ': ' + data.detail : code) || 'erro permanente' };
+  if (
+    code === 'MILVUS_VISIT_WITHOUT_CODIGO' ||
+    code === 'MILVUS_VISIT_WITHOUT_CLIENT' ||
+    code === 'MILVUS_VALIDATION_ERROR' ||
+    code === 'MILVUS_INVALID_TOKEN'
+  ) {
+    return {
+      outcome: 'permanent',
+      detail: (data.detail ? code + ': ' + data.detail : code) || 'erro permanente',
+    };
   }
   if (data.error) return { outcome: 'transient', detail: String(data.error.message || data.error) };
   return { outcome: 'transient', detail: code || 'resposta inesperada da integração' };
@@ -147,15 +174,30 @@ function classifyMilvusFinalizarResult(res, invokeError) {
 // Classifica o resultado do invoke da Edge (puro, testável).
 // outcome: created | no-token | permanent | transient
 function classifyMilvusChamadoResult(res, invokeError) {
-  if (invokeError) return { outcome: 'transient', detail: String((invokeError && invokeError.message) || invokeError) };
+  if (invokeError)
+    return {
+      outcome: 'transient',
+      detail: String((invokeError && invokeError.message) || invokeError),
+    };
   const data = (res && res.data) || res || {};
   if (data.success === true && extractMilvusCodigo(data.codigo ?? data) !== null) {
-    return { outcome: 'created', codigo: extractMilvusCodigo(data.codigo ?? data), recovered: data.recovered === true || data.already === true };
+    return {
+      outcome: 'created',
+      codigo: extractMilvusCodigo(data.codigo ?? data),
+      recovered: data.recovered === true || data.already === true,
+    };
   }
   const code = String(data.code || '');
   if (code === 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED') return { outcome: 'no-token', detail: code };
-  if (code === 'MILVUS_VISIT_WITHOUT_CLIENT' || code === 'MILVUS_VALIDATION_ERROR' || code === 'MILVUS_INVALID_TOKEN') {
-    return { outcome: 'permanent', detail: (data.detail ? code + ': ' + data.detail : code) || 'erro permanente' };
+  if (
+    code === 'MILVUS_VISIT_WITHOUT_CLIENT' ||
+    code === 'MILVUS_VALIDATION_ERROR' ||
+    code === 'MILVUS_INVALID_TOKEN'
+  ) {
+    return {
+      outcome: 'permanent',
+      detail: (data.detail ? code + ': ' + data.detail : code) || 'erro permanente',
+    };
   }
   if (data.error) return { outcome: 'transient', detail: String(data.error.message || data.error) };
   return { outcome: 'transient', detail: code || 'resposta inesperada da integração' };
@@ -171,7 +213,9 @@ function _milvusChamadoCanRun() {
     if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return false;
     if (typeof window !== 'undefined' && !window._supabaseAuthActive) return false;
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
   return true;
 }
 
@@ -181,7 +225,9 @@ function enqueueMilvusChamado(visitId) {
   try {
     if (!_milvusChamadoCanRun()) return;
     processPendingMilvusChamados('visit:' + (visitId || ''));
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+  }
 }
 
 // Pós-varredura: a lista/calendário já acompanham via bus 'visitas'
@@ -196,12 +242,20 @@ function _notifyMilvusVisitUI(changedIds) {
     var overlay = document.getElementById('modalOverlay');
     if (!overlay || overlay.style.display === 'none') return;
     var body = document.getElementById('modalBody');
-    var html = body ? (body.innerHTML || '') : '';
+    var html = body ? body.innerHTML || '' : '';
     if (!html) return;
-    changedIds.forEach(function(id) {
-      if (id && html.indexOf("'" + id + "'") !== -1) { try { openVisitDetail(id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); } }
+    changedIds.forEach(function (id) {
+      if (id && html.indexOf("'" + id + "'") !== -1) {
+        try {
+          openVisitDetail(id);
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+        }
+      }
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+  }
 }
 
 // Varredura idempotente dos pendentes. Nunca lança; nunca apaga visita;
@@ -232,7 +286,10 @@ async function processPendingMilvusChamados(_reason) {
       // Trava persistida ANTES da rede (crash-safe; stale retoma depois).
       try {
         saveVisit({ ...v, milvusChamadoStatus: 'criando' });
-      } catch (_e) { console.error('[milvus-chamado] trava de criação não gravada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      } catch (_e) {
+        console.error('[milvus-chamado] trava de criação não gravada', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
 
       let res = null;
       let invokeError = null;
@@ -242,7 +299,9 @@ async function processPendingMilvusChamados(_reason) {
         });
         res = r && r.data !== undefined ? r : { data: r };
         if (r && r.error) invokeError = r.error;
-      } catch (e) { invokeError = e; }
+      } catch (e) {
+        invokeError = e;
+      }
 
       const cls = classifyMilvusChamadoResult(res, invokeError);
       // Releitura final: visita excluída no meio do voo → pula (sem ressuscitar).
@@ -250,7 +309,12 @@ async function processPendingMilvusChamados(_reason) {
       if (!cur) continue;
       try {
         if (cls.outcome === 'created') {
-          const patch = { ...cur, milvusChamadoCodigo: cls.codigo, milvusChamadoStatus: 'criado', milvusChamadoErro: null };
+          const patch = {
+            ...cur,
+            milvusChamadoCodigo: cls.codigo,
+            milvusChamadoStatus: 'criado',
+            milvusChamadoErro: null,
+          };
           // Código chegou numa visita JÁ concluída (concluiu offline antes):
           // engata a etapa 2 (finalização pendente) — sem isso ela nunca
           // finalizaria, pois a transição de conclusão já passou.
@@ -261,16 +325,32 @@ async function processPendingMilvusChamados(_reason) {
           saveVisit(patch);
           summary.created++;
         } else if (cls.outcome === 'no-token') {
-          saveVisit({ ...cur, milvusChamadoStatus: 'sem_token', milvusChamadoErro: 'Cliente sem identificação Milvus (token/mapa).' });
+          saveVisit({
+            ...cur,
+            milvusChamadoStatus: 'sem_token',
+            milvusChamadoErro: 'Cliente sem identificação Milvus (token/mapa).',
+          });
           summary.failed++;
         } else if (cls.outcome === 'permanent') {
-          saveVisit({ ...cur, milvusChamadoStatus: 'erro', milvusChamadoErro: String(cls.detail || 'erro').slice(0, 300) });
+          saveVisit({
+            ...cur,
+            milvusChamadoStatus: 'erro',
+            milvusChamadoErro: String(cls.detail || 'erro').slice(0, 300),
+          });
           summary.failed++;
         } else {
-          saveVisit({ ...cur, milvusChamadoStatus: 'pendente', milvusChamadoErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusChamadoTentativas: (Number(cur.milvusChamadoTentativas) || 0) + 1 });
+          saveVisit({
+            ...cur,
+            milvusChamadoStatus: 'pendente',
+            milvusChamadoErro: String(cls.detail || 'falha temporária').slice(0, 300),
+            milvusChamadoTentativas: (Number(cur.milvusChamadoTentativas) || 0) + 1,
+          });
           summary.failed++;
         }
-      } catch (_e) { console.error('[milvus-chamado] processamento do chamado falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      } catch (_e) {
+        console.error('[milvus-chamado] processamento do chamado falhou', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
     }
   } catch (_) {
     // varredura nunca derruba o chamador
@@ -289,12 +369,22 @@ function retryMilvusChamado(visitId) {
     if (!v) return;
     if (v.milvusChamadoCodigo && Number(v.milvusChamadoCodigo) > 0) return;
     saveVisit({ ...v, milvusChamadoStatus: 'pendente', milvusChamadoErro: null });
-    if (typeof showToast === 'function') showToast('Nova tentativa de criação do chamado enfileirada.', 'info');
+    if (typeof showToast === 'function')
+      showToast('Nova tentativa de criação do chamado enfileirada.', 'info');
     enqueueMilvusChamado(visitId);
     if (typeof openVisitDetail === 'function') {
-      try { openVisitDetail(visitId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      try {
+        openVisitDetail(visitId);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
     }
-  } catch (_e) { console.error('[milvus-chamado] nova tentativa do chamado falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); if (typeof showToast === 'function') showToast('Não foi possível enfileirar nova tentativa do chamado.', 'error'); }
+  } catch (_e) {
+    console.error('[milvus-chamado] nova tentativa do chamado falhou', _e);
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+    if (typeof showToast === 'function')
+      showToast('Não foi possível enfileirar nova tentativa do chamado.', 'error');
+  }
 }
 
 // ── ETAPA 2: finalização (relatório concluído → PUT finalizar) ───────────
@@ -311,7 +401,9 @@ function enqueueMilvusFinalizar(visitId) {
   try {
     if (!_milvusChamadoCanRun()) return;
     processPendingMilvusFinalizar('visit:' + (visitId || ''));
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+  }
 }
 
 // Varredura idempotente das finalizações pendentes. PUT repetir é seguro
@@ -342,7 +434,10 @@ async function processPendingMilvusFinalizar(_reason) {
 
       try {
         saveVisit({ ...vv, milvusFinalizarStatus: 'finalizando' });
-      } catch (_e) { console.error('[milvus-chamado] trava de finalização não gravada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      } catch (_e) {
+        console.error('[milvus-chamado] trava de finalização não gravada', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
 
       let res = null;
       let invokeError = null;
@@ -352,7 +447,9 @@ async function processPendingMilvusFinalizar(_reason) {
         });
         res = r && r.data !== undefined ? r : { data: r };
         if (r && r.error) invokeError = r.error;
-      } catch (e) { invokeError = e; }
+      } catch (e) {
+        invokeError = e;
+      }
 
       const cls = classifyMilvusFinalizarResult(res, invokeError);
       // Releitura final: visita excluída no meio do voo → pula (sem ressuscitar).
@@ -363,13 +460,25 @@ async function processPendingMilvusFinalizar(_reason) {
           saveVisit({ ...cur, milvusFinalizarStatus: 'finalizado', milvusFinalizarErro: null });
           summary.finalized++;
         } else if (cls.outcome === 'permanent') {
-          saveVisit({ ...cur, milvusFinalizarStatus: 'erro', milvusFinalizarErro: String(cls.detail || 'erro').slice(0, 300) });
+          saveVisit({
+            ...cur,
+            milvusFinalizarStatus: 'erro',
+            milvusFinalizarErro: String(cls.detail || 'erro').slice(0, 300),
+          });
           summary.failed++;
         } else {
-          saveVisit({ ...cur, milvusFinalizarStatus: 'pendente', milvusFinalizarErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusFinalizarTentativas: (Number(cur.milvusFinalizarTentativas) || 0) + 1 });
+          saveVisit({
+            ...cur,
+            milvusFinalizarStatus: 'pendente',
+            milvusFinalizarErro: String(cls.detail || 'falha temporária').slice(0, 300),
+            milvusFinalizarTentativas: (Number(cur.milvusFinalizarTentativas) || 0) + 1,
+          });
           summary.failed++;
         }
-      } catch (_e) { console.error('[milvus-chamado] processamento da finalização falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      } catch (_e) {
+        console.error('[milvus-chamado] processamento da finalização falhou', _e);
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
     }
   } catch (_) {
     // varredura nunca derruba o chamador
@@ -390,30 +499,49 @@ function retryMilvusFinalizar(visitId) {
     if (vv.milvusFinalizarStatus === 'finalizado') return;
     if (!vv.milvusChamadoCodigo || Number(vv.milvusChamadoCodigo) <= 0) return;
     saveVisit({ ...vv, milvusFinalizarStatus: 'pendente', milvusFinalizarErro: null });
-    if (typeof showToast === 'function') showToast('Nova tentativa de finalização enfileirada.', 'info');
+    if (typeof showToast === 'function')
+      showToast('Nova tentativa de finalização enfileirada.', 'info');
     enqueueMilvusFinalizar(visitId);
     if (typeof openVisitDetail === 'function') {
-      try { openVisitDetail(visitId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+      try {
+        openVisitDetail(visitId);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+      }
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+  }
 }
 
 // Gatilhos de reconexão/retorno (a verificação real ocorre no processador).
 // Ambas as etapas (criação e finalização) retomam juntas.
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    try { processPendingMilvusChamados('online'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
-    try { processPendingMilvusFinalizar('online'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+    try {
+      processPendingMilvusChamados('online');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+    }
+    try {
+      processPendingMilvusFinalizar('online');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+    }
   });
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('visibilitychange', () => {
     try {
       if (document.visibilityState === 'visible') processPendingMilvusChamados('visibility');
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+    }
     try {
       if (document.visibilityState === 'visible') processPendingMilvusFinalizar('visibility');
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado');
+    }
   });
 }
 

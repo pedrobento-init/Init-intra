@@ -3,9 +3,9 @@
 let _fcInstance = null;
 
 const PRIORITY_COLORS = {
-  baixa:   { bg: '#16a34a', text: '#fff' },
-  media:   { bg: '#d97706', text: '#fff' },
-  alta:    { bg: '#dc2626', text: '#fff' },
+  baixa: { bg: '#16a34a', text: '#fff' },
+  media: { bg: '#d97706', text: '#fff' },
+  alta: { bg: '#dc2626', text: '#fff' },
   critica: { bg: '#991b1b', text: '#fff' },
 };
 
@@ -26,10 +26,10 @@ function penEventColors(p) {
 }
 
 const VISIT_COLORS = {
-  agendada:     { bg: '#0ea5e9', border: '#0284c7' },
+  agendada: { bg: '#0ea5e9', border: '#0284c7' },
   em_andamento: { bg: '#f59e0b', border: '#d97706' },
-  concluida:    { bg: '#16a34a', border: '#15803d' },
-  cancelada:    { bg: '#94a3b8', border: '#64748b' },
+  concluida: { bg: '#16a34a', border: '#15803d' },
+  cancelada: { bg: '#94a3b8', border: '#64748b' },
 };
 
 // ── Agenda: cor do ponto por tipo/prioridade (mesma legenda da grade) ────────
@@ -40,15 +40,40 @@ function agDotFor(kind, priority) {
 // Escape local da Agenda (usa o global quando existe).
 function _agEsc(s) {
   if (typeof escapeHtml === 'function') return escapeHtml(s);
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 // Chip de evento da grade (mock Agenda): ponto + título; vencida ganha selo.
 function agChipHtml(kind, title, dot, overdue) {
-  return '<div class="ag-chip' + (overdue ? ' overdue' : '') + '" data-sty="--dot:' + dot + '"><span>' + _agEsc(title) + '</span></div>';
+  return (
+    '<div class="ag-chip' +
+    (overdue ? ' overdue' : '') +
+    '" data-sty="--dot:' +
+    dot +
+    '"><span>' +
+    _agEsc(title) +
+    '</span></div>'
+  );
 }
 
 // ── Agenda: view-models puros da sidebar (testáveis, sem DOM/storage) ───────
-var _AG_MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+var _AG_MONTHS_SHORT = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+];
 function _agParseDay(dateStr) {
   var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ''));
   if (!m) return null;
@@ -60,7 +85,8 @@ function agDayMonth(dateStr) {
   return p.d + ' ' + (_AG_MONTHS_SHORT[p.m - 1] || '');
 }
 function _agDiffDays(aStr, bStr) {
-  var a = _agParseDay(aStr), b = _agParseDay(bStr);
+  var a = _agParseDay(aStr),
+    b = _agParseDay(bStr);
   if (!a || !b) return null;
   var ms = Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d);
   return Math.round(ms / 86400000);
@@ -68,10 +94,22 @@ function _agDiffDays(aStr, bStr) {
 // Pendências vencidas (abertas, deadline < hoje), mais antigas primeiro.
 function agOverdueItems(pens, todayStr) {
   return (pens || [])
-    .filter(function (p) { return p && p.deadline && String(p.deadline) < String(todayStr); })
-    .sort(function (a, b) { return String(a.deadline).localeCompare(String(b.deadline)); })
+    .filter(function (p) {
+      return p && p.deadline && String(p.deadline) < String(todayStr);
+    })
+    .sort(function (a, b) {
+      return String(a.deadline).localeCompare(String(b.deadline));
+    })
     .map(function (p) {
-      return { id: p.id, title: p.title || p.assunto || p.descricao || 'Sem título', date: p.deadline, meta: 'Venceu em ' + agDayMonth(p.deadline), dot: agDotFor('pendencia', p.priority), priority: p.priority || 'media', kind: 'pendencia' };
+      return {
+        id: p.id,
+        title: p.title || p.assunto || p.descricao || 'Sem título',
+        date: p.deadline,
+        meta: 'Venceu em ' + agDayMonth(p.deadline),
+        dot: agDotFor('pendencia', p.priority),
+        priority: p.priority || 'media',
+        kind: 'pendencia',
+      };
     });
 }
 // Itens dos próximos 7 dias (pendências por deadline + visitas por data).
@@ -81,15 +119,35 @@ function agNext7Items(pens, visits, todayStr) {
     if (!p || !p.deadline) return;
     var diff = _agDiffDays(todayStr, String(p.deadline).slice(0, 10));
     if (diff == null || diff < 0 || diff > 7) return;
-    out.push({ id: p.id, title: p.title || p.assunto || p.descricao || 'Sem título', date: String(p.deadline).slice(0, 10), diff: diff, dot: agDotFor('pendencia', p.priority), priority: p.priority || 'media', kind: 'pendencia', meta: agDayMonth(p.deadline) + (diff === 0 ? ' · hoje' : '') });
+    out.push({
+      id: p.id,
+      title: p.title || p.assunto || p.descricao || 'Sem título',
+      date: String(p.deadline).slice(0, 10),
+      diff: diff,
+      dot: agDotFor('pendencia', p.priority),
+      priority: p.priority || 'media',
+      kind: 'pendencia',
+      meta: agDayMonth(p.deadline) + (diff === 0 ? ' · hoje' : ''),
+    });
   });
   (visits || []).forEach(function (v) {
     if (!v || !v.date) return;
     var diff = _agDiffDays(todayStr, String(v.date).slice(0, 10));
     if (diff == null || diff < 0 || diff > 7) return;
-    out.push({ id: v.id, title: 'Visita — ' + (v.clientName || '—'), date: String(v.date).slice(0, 10), diff: diff, dot: agDotFor('visit'), priority: '', kind: 'visit', meta: agDayMonth(v.date) + (diff === 0 ? ' · hoje' : '') });
+    out.push({
+      id: v.id,
+      title: 'Visita — ' + (v.clientName || '—'),
+      date: String(v.date).slice(0, 10),
+      diff: diff,
+      dot: agDotFor('visit'),
+      priority: '',
+      kind: 'visit',
+      meta: agDayMonth(v.date) + (diff === 0 ? ' · hoje' : ''),
+    });
   });
-  out.sort(function (a, b) { return a.diff - b.diff || String(a.title).localeCompare(String(b.title)); });
+  out.sort(function (a, b) {
+    return a.diff - b.diff || String(a.title).localeCompare(String(b.title));
+  });
   return out;
 }
 // Visitas recorrentes agrupadas por cliente: frequência + ocorrências no mês.
@@ -98,27 +156,56 @@ function agRecurringGroups(visits, monthKey) {
   (visits || []).forEach(function (v) {
     if (!v || !v.recurrence) return;
     var key = v.clientId || v.clientName || '?';
-    if (!groups[key]) groups[key] = { clientId: v.clientId, clientName: v.clientName || '—', recurrence: v.recurrence, count: 0, visitId: v.id };
+    if (!groups[key])
+      groups[key] = {
+        clientId: v.clientId,
+        clientName: v.clientName || '—',
+        recurrence: v.recurrence,
+        count: 0,
+        visitId: v.id,
+      };
     if (monthKey && String(v.date || '').slice(0, 7) === monthKey) groups[key].count++;
     groups[key].visitId = v.id;
   });
-  var labels = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', quarterly: 'Trimestral', yearly: 'Anual' };
-  return Object.values(groups).sort(function (a, b) { return String(a.clientName).localeCompare(String(b.clientName)); }).map(function (g) {
-    return { clientId: g.clientId, clientName: g.clientName, visitId: g.visitId, meta: (labels[g.recurrence] || 'Recorrente') + ' · ' + g.count + ' no mês' };
-  });
+  var labels = {
+    weekly: 'Semanal',
+    biweekly: 'Quinzenal',
+    monthly: 'Mensal',
+    quarterly: 'Trimestral',
+    yearly: 'Anual',
+  };
+  return Object.values(groups)
+    .sort(function (a, b) {
+      return String(a.clientName).localeCompare(String(b.clientName));
+    })
+    .map(function (g) {
+      return {
+        clientId: g.clientId,
+        clientName: g.clientName,
+        visitId: g.visitId,
+        meta: (labels[g.recurrence] || 'Recorrente') + ' · ' + g.count + ' no mês',
+      };
+    });
 }
 
 // Título da página (topbar + cabeçalho interno).
-function calendarPageTitle() { return 'Agenda'; }
+function calendarPageTitle() {
+  return 'Agenda';
+}
 
 // Views lógicas da Agenda: month | week | list. O switcher próprio chama
 // agSetView; o FullCalendar é só o motor (sem toolbar nativa).
 let _agView = null;
 function agIsMobileWidth() {
-  try { return (typeof window !== 'undefined' ? window.innerWidth : 1024) <= 768; }
-  catch (_) { return false; }
+  try {
+    return (typeof window !== 'undefined' ? window.innerWidth : 1024) <= 768;
+  } catch (_) {
+    return false;
+  }
 }
-function agDefaultView() { return agIsMobileWidth() ? 'list' : 'month'; }
+function agDefaultView() {
+  return agIsMobileWidth() ? 'list' : 'month';
+}
 function agFcView(logical) {
   if (logical === 'week') return 'timeGridWeek';
   if (logical === 'list') return agIsMobileWidth() ? 'listMonth' : 'listWeek';
@@ -127,15 +214,27 @@ function agFcView(logical) {
 function agSetView(v) {
   if (['month', 'week', 'list'].indexOf(v) === -1) return;
   _agView = v;
-  try { if (_fcInstance) _fcInstance.changeView(agFcView(v)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  try {
+    if (_fcInstance) _fcInstance.changeView(agFcView(v));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
   _paintAgNav();
   renderAgendaSide();
 }
 function agNav(dir) {
-  try { if (_fcInstance) _fcInstance[dir === 'prev' ? 'prev' : 'next'](); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  try {
+    if (_fcInstance) _fcInstance[dir === 'prev' ? 'prev' : 'next']();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
 }
 function agToday() {
-  try { if (_fcInstance) _fcInstance.today(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  try {
+    if (_fcInstance) _fcInstance.today();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
 }
 // Período visível ("Outubro de 2026") ao lado das setas de navegação.
 function agPaintPeriod(title) {
@@ -144,7 +243,9 @@ function agPaintPeriod(title) {
     if (!el) return;
     var t = String(title || '');
     el.textContent = t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
 }
 function _paintAgNav() {
   try {
@@ -152,7 +253,9 @@ function _paintAgNav() {
     document.querySelectorAll('.ag-nav [data-view]').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-view') === cur);
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
 }
 
 // Baixa o FullCalendar com timeout: sem isso, uma CDN lenta/travada no 1º
@@ -161,7 +264,9 @@ function _loadFullCalendarWithTimeout(ms) {
   return Promise.race([
     loadFullCalendar(),
     new Promise(function (_, reject) {
-      setTimeout(function () { reject(new Error('timeout FullCalendar')); }, ms || 15000);
+      setTimeout(function () {
+        reject(new Error('timeout FullCalendar'));
+      }, ms || 15000);
     }),
   ]);
 }
@@ -182,9 +287,16 @@ function closeCalFilters() {
     if (!box || box.dataset.open !== '1') return;
     box.dataset.open = '0';
     if (btn) btn.setAttribute('aria-expanded', 'false');
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
 }
-if (typeof window !== 'undefined' && !window._calFiltersBound && typeof document !== 'undefined' && document.addEventListener) {
+if (
+  typeof window !== 'undefined' &&
+  !window._calFiltersBound &&
+  typeof document !== 'undefined' &&
+  document.addEventListener
+) {
   window._calFiltersBound = true;
   document.addEventListener('click', function (e) {
     try {
@@ -193,23 +305,36 @@ if (typeof window !== 'undefined' && !window._calFiltersBound && typeof document
       if (!box || box.dataset.open !== '1') return;
       if (box.contains(e.target) || (btn && btn.contains(e.target))) return;
       closeCalFilters();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+    }
   });
   document.addEventListener('keydown', function (e) {
     try {
       if (e && e.key === 'Escape') closeCalFilters();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+    }
   });
 }
 
 function renderCalendar() {
   document.getElementById('pageTitle').textContent = calendarPageTitle();
-  setTopbarAction('Nova Pendência', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+  setTopbarAction(
+    'Nova Pendência',
+    '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+  );
   window._topbarAction = () => openPendenciaForm();
   if (typeof updateBadges === 'function') updateBadges();
 
-  const clients = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
-  const team    = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam();
+  const clients =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getClientsByTeam(_selectedTeam)
+      : getMyClients();
+  const team =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? _selectedTeam
+      : getCurrentTeam();
   const opNames = getOperatorNames(team);
 
   document.getElementById('contentArea').innerHTML = `
@@ -242,15 +367,17 @@ function renderCalendar() {
             </select>
             <select class="form-select" id="calClient" data-change="refreshCalendar">
               <option value="">Todos os clientes</option>
-              ${clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+              ${clients.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
             </select>
             <select class="form-select" id="calResponsible" data-change="refreshCalendar">
               <option value="">Todos os responsáveis</option>
-              ${opNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
+              ${opNames.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
             </select>
             <select class="form-select" id="calStatus" data-change="refreshCalendar">
               <option value="">Todos os status</option>
-              ${Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('')}
+              ${Object.entries(STATUS_PEN_MAP)
+                .map(([k, v]) => `<option value="${k}">${escapeHtml(v.label)}</option>`)
+                .join('')}
             </select>
             <select class="form-select" id="calPriority" data-change="refreshCalendar">
               <option value="">Prioridade</option>
@@ -302,7 +429,8 @@ function renderCalendar() {
   const savedFilters = loadFilterState('calendar', {});
   if (savedFilters.type) document.getElementById('calType').value = savedFilters.type;
   if (savedFilters.client) document.getElementById('calClient').value = savedFilters.client;
-  if (savedFilters.responsible) document.getElementById('calResponsible').value = savedFilters.responsible;
+  if (savedFilters.responsible)
+    document.getElementById('calResponsible').value = savedFilters.responsible;
   if (savedFilters.status) document.getElementById('calStatus').value = savedFilters.status;
   if (savedFilters.priority) document.getElementById('calPriority').value = savedFilters.priority;
 
@@ -310,44 +438,59 @@ function renderCalendar() {
 }
 
 function getFilteredCalendarPendencias() {
-  const cid  = document.getElementById('calClient')?.value || '';
+  const cid = document.getElementById('calClient')?.value || '';
   const resp = document.getElementById('calResponsible')?.value || '';
-  const st   = document.getElementById('calStatus')?.value || '';
-  const pr   = document.getElementById('calPriority')?.value || '';
+  const st = document.getElementById('calStatus')?.value || '';
+  const pr = document.getElementById('calPriority')?.value || '';
   // Escopo por equipe: mesma base da listagem (pendencias.js) e das visitas
   // acima — getMyPendencias() = filterByTeam; admin com time selecionado usa
   // getPendenciasByTeam. Sem isso o calendário lia getPendencias() global.
   // (Segurança real continua no RLS/banco; aqui só se apresenta o permitido.)
-  const scoped = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam && typeof getPendenciasByTeam === 'function')
-    ? getPendenciasByTeam(_selectedTeam)
-    : (typeof getMyPendencias === 'function' ? getMyPendencias()
-      : (typeof getPendencias === 'function' ? getPendencias() : []));
-  return scoped.filter(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  const scoped =
+    typeof isTeamAdmin === 'function' &&
+    isTeamAdmin() &&
+    typeof _selectedTeam !== 'undefined' &&
+    _selectedTeam &&
+    typeof getPendenciasByTeam === 'function'
+      ? getPendenciasByTeam(_selectedTeam)
+      : typeof getMyPendencias === 'function'
+        ? getMyPendencias()
+        : typeof getPendencias === 'function'
+          ? getPendencias()
+          : [];
+  return scoped.filter((p) => {
+    try {
+      if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+    }
     if (!p.deadline) return false;
     if (!st && isPendenciaClosed(p.status)) return false;
-    if (cid  && p.clientId   !== cid)   return false;
+    if (cid && p.clientId !== cid) return false;
     if (resp && p.responsible !== resp) return false;
-    if (st   && p.status     !== st)    return false;
-    if (pr   && p.priority   !== pr)    return false;
+    if (st && p.status !== st) return false;
+    if (pr && p.priority !== pr) return false;
     return true;
   });
 }
 
 function getFilteredCalendarVisits() {
-  const cid  = document.getElementById('calClient')?.value || '';
+  const cid = document.getElementById('calClient')?.value || '';
   const resp = document.getElementById('calResponsible')?.value || '';
-  const base = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getVisitsByTeam(_selectedTeam) : getMyVisits();
-  return base.filter(v => {
+  const base =
+    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
+      ? getVisitsByTeam(_selectedTeam)
+      : getMyVisits();
+  return base.filter((v) => {
     if (!v.date) return false;
-    if (cid  && v.clientId !== cid) return false;
+    if (cid && v.clientId !== cid) return false;
     if (resp && v.operator !== resp) return false;
     return true;
   });
 }
 
 function mapPendenciasToEvents(pendencias) {
-  return pendencias.map(p => {
+  return pendencias.map((p) => {
     const ev = penEventColors(p);
 
     return {
@@ -378,7 +521,7 @@ function mapPendenciasToEvents(pendencias) {
 }
 
 function mapVisitsToEvents(visits) {
-  return visits.map(v => {
+  return visits.map((v) => {
     const c = VISIT_COLORS[v.status] || VISIT_COLORS.agendada;
     const allDay = v.allDay === true || !v.time;
     let start = v.date;
@@ -391,7 +534,7 @@ function mapVisitsToEvents(visits) {
         end = v.date + 'T' + tEnd + ':00';
       }
     }
-    const visitNum = (typeof formatVisitNumero === 'function') ? formatVisitNumero(v) + ' · ' : '';
+    const visitNum = typeof formatVisitNumero === 'function' ? formatVisitNumero(v) + ' · ' : '';
     return {
       id: 'VIS-' + v.id,
       title: '🚗 ' + visitNum + (v.clientName || '—'),
@@ -425,7 +568,10 @@ function calendarDayTitle(dateStr) {
   const date = new Date(dateStr + 'T12:00:00Z');
   if (isNaN(date.getTime())) return formatDate(dateStr);
   const label = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
   }).format(date);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
@@ -433,8 +579,10 @@ function calendarDayTitle(dateStr) {
 function openCalendarDaySheet(dateStr, hora = '') {
   if (!/^\d{2}:\d{2}$/.test(hora)) hora = '';
   const type = document.getElementById('calType')?.value || 'all';
-  const allPens = type === 'visitas' ? [] : getFilteredCalendarPendencias().filter(p => p.deadline === dateStr);
-  const allVisits = type === 'pendencias' ? [] : getFilteredCalendarVisits().filter(v => v.date === dateStr);
+  const allPens =
+    type === 'visitas' ? [] : getFilteredCalendarPendencias().filter((p) => p.deadline === dateStr);
+  const allVisits =
+    type === 'pendencias' ? [] : getFilteredCalendarVisits().filter((v) => v.date === dateStr);
   const total = allPens.length + allVisits.length;
 
   let html = `<div class="cal-day-summary"><span>${total ? `${total} ${total === 1 ? 'compromisso' : 'compromissos'}` : 'Agenda livre'}</span><span>${escapeHtml(formatDate(dateStr))}</span></div>`;
@@ -444,19 +592,23 @@ function openCalendarDaySheet(dateStr, hora = '') {
   } else {
     if (allVisits.length) {
       html += `<div class="cal-day-section">Visitas <span>${allVisits.length}</span></div>`;
-      html += allVisits.map(v => {
-        const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
-        return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayVisit" data-arg="${escapeHtml(v.id)}">
-          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(v.clientName||'—')}</div><div class="cal-day-card-meta">${escapeHtml(v.motivo||'—')} · ${escapeHtml(v.operator||'—')} ${formatVisitTimeRange(v)!=='—'?'· '+escapeHtml(formatVisitTimeRange(v)):''}</div></div>${visitStatusTag(v.status)}</div>`;
-      }).join('');
+      html += allVisits
+        .map((v) => {
+          const c = typeof getClientById === 'function' ? getClientById(v.clientId) : null;
+          return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayVisit" data-arg="${escapeHtml(v.id)}">
+          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(v.clientName || '—')}</div><div class="cal-day-card-meta">${escapeHtml(v.motivo || '—')} · ${escapeHtml(v.operator || '—')} ${formatVisitTimeRange(v) !== '—' ? '· ' + escapeHtml(formatVisitTimeRange(v)) : ''}</div></div>${visitStatusTag(v.status)}</div>`;
+        })
+        .join('');
     }
     if (allPens.length) {
       html += `<div class="cal-day-section">Pendências <span>${allPens.length}</span></div>`;
-      html += allPens.map(p => {
-        const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
-        return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayPendencia" data-arg="${escapeHtml(p.id)}">
-          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(getPendenciaTitulo(p))}</div><div class="cal-day-card-meta">${escapeHtml(p.clientName||'—')} · ${escapeHtml(p.responsible||'—')}</div></div><div class="cal-day-card-tags">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
-      }).join('');
+      html += allPens
+        .map((p) => {
+          const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
+          return `<div class="cal-day-card" role="button" tabindex="0" data-action="agDayPendencia" data-arg="${escapeHtml(p.id)}">
+          ${c ? clientAvatar(c, 32) : ''}<div class="cal-day-card-main"><div class="cal-day-card-title">${escapeHtml(getPendenciaTitulo(p))}</div><div class="cal-day-card-meta">${escapeHtml(p.clientName || '—')} · ${escapeHtml(p.responsible || '—')}</div></div><div class="cal-day-card-tags">${priorityTag(p.priority)} ${statusTag(p.status)}</div></div>`;
+        })
+        .join('');
     }
   }
   html += `</div>`;
@@ -477,20 +629,24 @@ function openCalendarDaySheet(dateStr, hora = '') {
 // inteira — assimétrico no mesmo calendário. O card mostra o essencial e deixa
 // "Abrir chamado" para quem precisa da tela cheia.
 function openPendenciaQuickCard(id) {
-  const p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
+  const p = typeof getPendenciaById === 'function' ? getPendenciaById(id) : null;
   if (!p) return;
   try {
     if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) {
       if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
       return;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
   const c = typeof getClientById === 'function' ? getClientById(p.clientId) : null;
   const ev = penEventColors(p);
-  const num = (typeof penDisplayNumber === 'function') ? penDisplayNumber(p) : '';
+  const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
   const desc = String(p.descricao || '').trim();
   const descCurta = desc.length > 280 ? desc.slice(0, 280) + '…' : desc;
-  openModal(`${num ? num + ' – ' : ''}${escapeHtml(getPendenciaTitulo(p))}`, `
+  openModal(
+    `${num ? num + ' – ' : ''}${escapeHtml(getPendenciaTitulo(p))}`,
+    `
     <div class="ticket-info-grid">
       <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div class="u-b88d18">${clientAvatar(c, 22)}<span>${escapeHtml(p.clientName)}</span></div>` : escapeHtml(p.clientName || '—')}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Responsável</div><div class="ticket-info-value">${escapeHtml(p.responsible || '—')}</div></div>
@@ -504,30 +660,60 @@ function openPendenciaQuickCard(id) {
       <button class="btn btn-primary btn-sm" data-action="penQuickOpen" data-arg="${escapeHtml(id)}">Abrir chamado</button>
       <button class="btn btn-secondary btn-sm" data-action="closeModal">Fechar</button>
     </div></div>
-  `, 'sm');
+  `,
+    'sm'
+  );
 }
 
 if (typeof registerActions === 'function') {
   registerActions({
     // O card é um resumo; a tela cheia do chamado abre com o modal fechado.
-    penQuickOpen: (_el, id) => { closeModal(); if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
+    penQuickOpen: (_el, id) => {
+      closeModal();
+      if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+    },
     agNav: (_el, dir) => agNav(dir),
     agToday: () => agToday(),
     agSetView: (_el, view) => agSetView(view),
     // data-stop="1" no botão já faz stopPropagation; a função repete por segurança.
     toggleCalFilters: (_el, _arg, ev) => toggleCalFilters(ev),
-    openCalendarFeed: () => { if (typeof openCalendarFeed === 'function') openCalendarFeed(); },
+    openCalendarFeed: () => {
+      if (typeof openCalendarFeed === 'function') openCalendarFeed();
+    },
     refreshCalendar: () => refreshCalendar(),
-    calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); },
-    calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); },
-    calExportICS: () => { closeCalFilters(); exportCalendarICS(); },
-    agDayVisit: (_el, id) => { closeModal(); if (typeof openVisitDetail === 'function') openVisitDetail(id); },
-    agDayPendencia: (_el, id) => { closeModal(); openPendenciaQuickCard(id); },
-    agDayPendenciaForm: (_el, dateStr) => { closeModal(); openPendenciaForm(null, null, dateStr); },
-    agDayVisitForm: (el, dateStr) => { closeModal(); openVisitForm(null, null, dateStr, el.dataset.hora || ''); },
+    calOpenPendenciaForm: () => {
+      closeCalFilters();
+      openPendenciaForm();
+    },
+    calOpenVisitForm: () => {
+      closeCalFilters();
+      openVisitForm();
+    },
+    calExportICS: () => {
+      closeCalFilters();
+      exportCalendarICS();
+    },
+    agDayVisit: (_el, id) => {
+      closeModal();
+      if (typeof openVisitDetail === 'function') openVisitDetail(id);
+    },
+    agDayPendencia: (_el, id) => {
+      closeModal();
+      openPendenciaQuickCard(id);
+    },
+    agDayPendenciaForm: (_el, dateStr) => {
+      closeModal();
+      openPendenciaForm(null, null, dateStr);
+    },
+    agDayVisitForm: (el, dateStr) => {
+      closeModal();
+      openVisitForm(null, null, dateStr, el.dataset.hora || '');
+    },
     initFullCalendar: () => initFullCalendar(),
     openPendenciaQuickCard: (_el, id) => openPendenciaQuickCard(id),
-    openVisitDetail: (_el, id) => { if (typeof openVisitDetail === 'function') openVisitDetail(id); },
+    openVisitDetail: (_el, id) => {
+      if (typeof openVisitDetail === 'function') openVisitDetail(id);
+    },
   });
 }
 
@@ -544,18 +730,21 @@ async function initFullCalendar() {
   // Feedback imediato: no 1º acesso o FullCalendar vem do CDN e a grade
   // ficava vazia sem explicação enquanto baixava (ou para sempre, se
   // a rede falhava — sem try/catch o erro era silencioso).
-  container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Carregando calendário…</p></div>';
+  container.innerHTML =
+    '<div class="loading-spinner"><div class="spinner"></div><p>Carregando calendário…</p></div>';
   try {
     await _loadFullCalendarWithTimeout(15000);
   } catch (_) {
     if (seq !== _fcInitSeq) return;
-    container.innerHTML = '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
+    container.innerHTML =
+      '<div class="empty-state"><p>Não foi possível carregar o calendário. Verifique sua conexão.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
     return;
   }
   if (seq !== _fcInitSeq || container.isConnected === false) return;
 
   if (typeof FullCalendar === 'undefined') {
-    container.innerHTML = '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
+    container.innerHTML =
+      '<div class="empty-state"><p>Erro ao carregar FullCalendar.</p><button class="btn btn-secondary btn-sm" data-action="initFullCalendar">Tentar novamente</button></div>';
     return;
   }
 
@@ -579,21 +768,25 @@ async function initFullCalendar() {
     events: events,
     eventDisplay: 'block',
     dayMaxEvents: 3,
-    moreLinkContent: function(args){ return '+' + args.num + ' mais'; },
+    moreLinkContent: function (args) {
+      return '+' + args.num + ' mais';
+    },
     nowIndicator: true,
     height: 'auto',
     fixedWeekCount: false,
     showNonCurrentDates: true,
-    eventContent: function(arg) {
+    eventContent: function (arg) {
       const props = arg.event.extendedProps;
       if (props.kind === 'visit') {
-        return { html: agChipHtml('visit', props.clientName || 'Visita', agDotFor('visit'), false) };
+        return {
+          html: agChipHtml('visit', props.clientName || 'Visita', agDotFor('visit'), false),
+        };
       }
       // Mesma regra central (penEventColors), lida das props calculadas no mapa.
       const fill = props.evFill || (PRIORITY_COLORS[props.priority] || PRIORITY_COLORS.media).bg;
       return { html: agChipHtml('pendencia', arg.event.title, fill, !!props.isOverdue) };
     },
-    eventClick: function(info) {
+    eventClick: function (info) {
       info.jsEvent.preventDefault();
       info.jsEvent.stopPropagation();
       const props = info.event.extendedProps;
@@ -603,18 +796,18 @@ async function initFullCalendar() {
         if (typeof openPendenciaQuickCard === 'function') openPendenciaQuickCard(props.penId);
       }
     },
-    dateClick: function(info) {
+    dateClick: function (info) {
       // Na Semana o clique vem com hora ("2026-10-21T10:00:00-03:00"): o dia
       // vai para o sheet e a hora vira o início da visita nova.
       const hora = !info.allDay && info.dateStr.length > 10 ? info.dateStr.slice(11, 16) : '';
       openCalendarDaySheet(info.dateStr.slice(0, 10), hora);
     },
-    moreLinkClick: function(info){
+    moreLinkClick: function (info) {
       info.jsEvent.preventDefault();
       openCalendarDaySheet(localDateISO(info.date));
       return 'none';
     },
-    dayCellDidMount: function(info){
+    dayCellDidMount: function (info) {
       const d = info.date;
       // Fim de semana com fundo suave (visual da Agenda)
       const day = d.getDay();
@@ -622,12 +815,17 @@ async function initFullCalendar() {
         info.el.classList.add('fc-day-weekend');
       }
     },
-    eventDidMount: function(info) {
+    eventDidMount: function (info) {
       const props = info.event.extendedProps;
       let title = info.event.title;
       if (props.kind === 'visit') {
-        const statusLabel = (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[props.status]?.label) || props.status;
-        const range = typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(props) : (props.time || '');
+        const statusLabel =
+          (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[props.status]?.label) ||
+          props.status;
+        const range =
+          typeof formatVisitTimeRange === 'function'
+            ? formatVisitTimeRange(props)
+            : props.time || '';
         title = `🚗 Visita: ${props.motivo || '—'}\nCliente: ${props.clientName || '—'}\nOperador: ${props.operator || '—'}\nStatus: ${statusLabel}${range && range !== '—' ? '\nHorário: ' + range : ''}`;
       } else {
         const statusLabel = STATUS_PEN_MAP[props.status]?.label || props.status;
@@ -637,10 +835,10 @@ async function initFullCalendar() {
       }
       info.el.title = title;
     },
-    viewDidMount: function() {
+    viewDidMount: function () {
       applyCalendarDarkMode(isDark);
     },
-    datesSet: function(info) {
+    datesSet: function (info) {
       // Sem a toolbar nativa, o período visível só aparecia aqui.
       agPaintPeriod(info && info.view ? info.view.title : '');
       renderAgendaSide();
@@ -656,54 +854,132 @@ async function initFullCalendar() {
 function _agMonthKey(d) {
   try {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  } catch (_) { return ''; }
+  } catch (_) {
+    return '';
+  }
 }
 function _agPriBadge(priority) {
-  var label = (typeof PRIORITY_MAP !== 'undefined' && PRIORITY_MAP[priority]) ? PRIORITY_MAP[priority].label : (priority || '');
+  var label =
+    typeof PRIORITY_MAP !== 'undefined' && PRIORITY_MAP[priority]
+      ? PRIORITY_MAP[priority].label
+      : priority || '';
   if (!label) return '';
-  return '<span class="badge ' + String(priority || '') + '">' + ((typeof escapeHtml === 'function') ? escapeHtml(label.toLowerCase()) : label) + '</span>';
+  return (
+    '<span class="badge ' +
+    String(priority || '') +
+    '">' +
+    (typeof escapeHtml === 'function' ? escapeHtml(label.toLowerCase()) : label) +
+    '</span>'
+  );
 }
 // Sidebar da Agenda: Vencidas + Próximos 7 dias + Visitas recorrentes.
 function renderAgendaSide() {
   var box = document.getElementById('agendaSide');
   if (!box) return;
   var esc = _agEsc;
-  var todayStr = (typeof localDateISO === 'function') ? localDateISO() : new Date().toISOString().slice(0, 10);
-  var pens = [], visits = [];
-  try { pens = getFilteredCalendarPendencias(); } catch (_) { pens = []; }
-  try { visits = getFilteredCalendarVisits(); } catch (_) { visits = []; }
+  var todayStr =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
+  var pens = [],
+    visits = [];
+  try {
+    pens = getFilteredCalendarPendencias();
+  } catch (_) {
+    pens = [];
+  }
+  try {
+    visits = getFilteredCalendarVisits();
+  } catch (_) {
+    visits = [];
+  }
   var monthKey = todayStr.slice(0, 7);
-  try { if (_fcInstance && typeof _fcInstance.getDate === 'function') monthKey = _agMonthKey(_fcInstance.getDate()); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'calendar'); }
-  var isClosed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed : function () { return false; };
-  var openPens = pens.filter(function (p) { return !isClosed(p.status); });
+  try {
+    if (_fcInstance && typeof _fcInstance.getDate === 'function')
+      monthKey = _agMonthKey(_fcInstance.getDate());
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'calendar');
+  }
+  var isClosed =
+    typeof isPendenciaClosed === 'function'
+      ? isPendenciaClosed
+      : function () {
+          return false;
+        };
+  var openPens = pens.filter(function (p) {
+    return !isClosed(p.status);
+  });
 
   var html = '';
   var overdue = agOverdueItems(openPens, todayStr).slice(0, 5);
   if (overdue.length) {
-    html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
-      overdue.map(function (o) {
-        return '<li role="button" tabindex="0" data-action="openPendenciaQuickCard" data-arg="' + esc(o.id) + '"><div class="pbar u-6386bc"></div>' +
-          '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
-      }).join('') + '</ul></div>';
+    html +=
+      '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
+      overdue
+        .map(function (o) {
+          return (
+            '<li role="button" tabindex="0" data-action="openPendenciaQuickCard" data-arg="' +
+            esc(o.id) +
+            '"><div class="pbar u-6386bc"></div>' +
+            '<div class="ptext"><div class="ttitle">' +
+            esc(o.title) +
+            '</div><div class="tmeta">' +
+            esc(o.meta) +
+            '</div></div></li>'
+          );
+        })
+        .join('') +
+      '</ul></div>';
   }
   var next7 = agNext7Items(openPens, visits, todayStr).slice(0, 6);
-  html += '<div class="card ag-card"><h2>Próximos 7 dias <span class="count">' + next7.length + (next7.length === 1 ? ' item' : ' itens') + '</span></h2>' +
+  html +=
+    '<div class="card ag-card"><h2>Próximos 7 dias <span class="count">' +
+    next7.length +
+    (next7.length === 1 ? ' item' : ' itens') +
+    '</span></h2>' +
     (next7.length
-      ? '<ul class="plist">' + next7.map(function (o) {
-        var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaQuickCard';
-        var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
-        return '<li role="button" tabindex="0" data-action="' + fn + '" data-arg="' + esc(o.id) + '"><div class="pbar" data-sty="background:' + o.dot + '"></div>' +
-          '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
-      }).join('') + '</ul>'
+      ? '<ul class="plist">' +
+        next7
+          .map(function (o) {
+            var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaQuickCard';
+            var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
+            return (
+              '<li role="button" tabindex="0" data-action="' +
+              fn +
+              '" data-arg="' +
+              esc(o.id) +
+              '"><div class="pbar" data-sty="background:' +
+              o.dot +
+              '"></div>' +
+              '<div class="ptext"><div class="ttitle">' +
+              esc(o.title) +
+              badge +
+              '</div><div class="tmeta">' +
+              esc(o.meta) +
+              '</div></div></li>'
+            );
+          })
+          .join('') +
+        '</ul>'
       : '<div class="empty-state u-a95dc7"><p>Nada nos próximos 7 dias 🎉</p></div>') +
     '</div>';
   var rec = agRecurringGroups(visits, monthKey);
   if (rec.length) {
-    html += '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
-      rec.map(function (g) {
-        return '<li role="button" tabindex="0" data-action="openVisitDetail" data-arg="' + esc(g.visitId) + '"><div class="pbar u-f7eaa9"></div>' +
-          '<div class="ptext"><div class="ttitle">' + esc(g.clientName) + '</div><div class="tmeta">' + esc(g.meta) + '</div></div></li>';
-      }).join('') + '</ul></div>';
+    html +=
+      '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
+      rec
+        .map(function (g) {
+          return (
+            '<li role="button" tabindex="0" data-action="openVisitDetail" data-arg="' +
+            esc(g.visitId) +
+            '"><div class="pbar u-f7eaa9"></div>' +
+            '<div class="ptext"><div class="ttitle">' +
+            esc(g.clientName) +
+            '</div><div class="tmeta">' +
+            esc(g.meta) +
+            '</div></div></li>'
+          );
+        })
+        .join('') +
+      '</ul></div>';
   }
   box.innerHTML = html;
 }
@@ -722,12 +998,12 @@ function getCalendarEvents() {
 
 function refreshCalendar() {
   if (!_fcInstance) return;
-  const type        = document.getElementById('calType')?.value || 'all';
-  const client      = document.getElementById('calClient')?.value || '';
+  const type = document.getElementById('calType')?.value || 'all';
+  const client = document.getElementById('calClient')?.value || '';
   const responsible = document.getElementById('calResponsible')?.value || '';
-  const status      = document.getElementById('calStatus')?.value || '';
-  const priority    = document.getElementById('calPriority')?.value || '';
-  saveFilterState('calendar', {type, client, responsible, status, priority});
+  const status = document.getElementById('calStatus')?.value || '';
+  const priority = document.getElementById('calPriority')?.value || '';
+  saveFilterState('calendar', { type, client, responsible, status, priority });
   const events = getCalendarEvents();
   _fcInstance.removeAllEvents();
   _fcInstance.addEventSource(events);
@@ -788,7 +1064,7 @@ function exportCalendarICS() {
   const pens = getFilteredCalendarPendencias();
   const visits = getFilteredCalendarVisits();
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Init Intra//PT'];
-  pens.forEach(p => {
+  pens.forEach((p) => {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:pen-${p.id}`);
     lines.push(`DTSTART;VALUE=DATE:${_icsDate(p.deadline)}`);
@@ -796,7 +1072,7 @@ function exportCalendarICS() {
     lines.push(`DESCRIPTION:${_icsEscape((p.clientName || '') + ' — ' + (p.responsible || ''))}`);
     lines.push('END:VEVENT');
   });
-  visits.forEach(v => {
+  visits.forEach((v) => {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:vis-${v.id}`);
     const allDay = v.allDay === true || !v.time;

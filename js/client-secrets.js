@@ -11,15 +11,24 @@
 const CLIENT_SECRET_TTL_MS = 60 * 1000;
 const _clientSecretMem = new Map(); // "cliente|tipo|kid" → { v, timer }
 
-function _secretKey(clientId, kind, kid) { return clientId + '|' + kind + '|' + (kid || ''); }
+function _secretKey(clientId, kind, kid) {
+  return clientId + '|' + kind + '|' + (kid || '');
+}
 
 function clientSecretsOnline() {
   try {
-    return typeof isSupabaseConnected === 'function' && isSupabaseConnected() &&
-      typeof window !== 'undefined' && window._supabaseAuthActive === true &&
-      typeof supabaseClient !== 'undefined' && !!supabaseClient &&
-      (typeof navigator === 'undefined' || navigator.onLine !== false);
-  } catch (_) { return false; }
+    return (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive === true &&
+      typeof supabaseClient !== 'undefined' &&
+      !!supabaseClient &&
+      (typeof navigator === 'undefined' || navigator.onLine !== false)
+    );
+  } catch (_) {
+    return false;
+  }
 }
 
 /** O ID está guardado no cofre (marca presente e sem valor no registro)? */
@@ -47,7 +56,9 @@ function forgetClientSecret(clientId, kind, kid) {
 }
 
 function forgetAllClientSecrets() {
-  _clientSecretMem.forEach((e) => { if (e.timer) clearTimeout(e.timer); });
+  _clientSecretMem.forEach((e) => {
+    if (e.timer) clearTimeout(e.timer);
+  });
   _clientSecretMem.clear();
 }
 
@@ -60,13 +71,28 @@ async function revealClientSecret(clientId, kind, kid, onExpire) {
   const cached = getRevealedSecret(clientId, kind, kid);
   if (cached !== null) return cached;
   if (!clientSecretsOnline()) throw new Error('Os acessos ficam no servidor: conecte-se para ver.');
-  const { data, error } = await supabaseClient.rpc('reveal_client_secret', { p_client_id: clientId, p_kind: kind, p_kid: kid || null });
-  if (error) throw new Error(/negado/i.test(error.message || '') ? 'Sem acesso a este cliente.' : 'Não foi possível buscar o acesso.');
+  const { data, error } = await supabaseClient.rpc('reveal_client_secret', {
+    p_client_id: clientId,
+    p_kind: kind,
+    p_kid: kid || null,
+  });
+  if (error)
+    throw new Error(
+      /negado/i.test(error.message || '')
+        ? 'Sem acesso a este cliente.'
+        : 'Não foi possível buscar o acesso.'
+    );
   const v = data == null ? '' : String(data);
   const k = _secretKey(clientId, kind, kid);
   const timer = setTimeout(() => {
     _clientSecretMem.delete(k);
-    if (typeof onExpire === 'function') { try { onExpire(clientId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'client-secrets'); } }
+    if (typeof onExpire === 'function') {
+      try {
+        onExpire(clientId);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'client-secrets');
+      }
+    }
   }, CLIENT_SECRET_TTL_MS);
   _clientSecretMem.set(k, { v, timer });
   return v;
@@ -75,7 +101,10 @@ async function revealClientSecret(clientId, kind, kid, onExpire) {
 /** Troca (ou remove, com '') o ID de acesso remoto direto no cofre. */
 async function setClientRemoteId(clientId, value) {
   if (!clientSecretsOnline()) throw new Error('Sem conexão: tente de novo online.');
-  const { error } = await supabaseClient.rpc('set_client_remote_id', { p_client_id: clientId, p_value: value || '' });
+  const { error } = await supabaseClient.rpc('set_client_remote_id', {
+    p_client_id: clientId,
+    p_value: value || '',
+  });
   if (error) throw new Error('Não foi possível salvar o acesso.');
   forgetClientSecret(clientId, 'remote_id');
   return true;
@@ -87,5 +116,12 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { isRemoteIdVaulted, isLicenseKeyVaulted, getRevealedSecret, revealClientSecret, forgetAllClientSecrets, CLIENT_SECRET_TTL_MS };
+  module.exports = {
+    isRemoteIdVaulted,
+    isLicenseKeyVaulted,
+    getRevealedSecret,
+    revealClientSecret,
+    forgetAllClientSecrets,
+    CLIENT_SECRET_TTL_MS,
+  };
 }

@@ -11,12 +11,27 @@ function fakeOutboxTable() {
   return {
     rows,
     all: sorted,
-    async add(entry) { const seq = next++; rows.set(seq, { ...entry, seq }); return seq; },
-    async delete(seq) { rows.delete(seq); },
-    async update(seq, patch) { const r = rows.get(seq); if (r) rows.set(seq, { ...r, ...patch }); },
-    orderBy() { return { toArray: async () => sorted() }; },
+    async add(entry) {
+      const seq = next++;
+      rows.set(seq, { ...entry, seq });
+      return seq;
+    },
+    async delete(seq) {
+      rows.delete(seq);
+    },
+    async update(seq, patch) {
+      const r = rows.get(seq);
+      if (r) rows.set(seq, { ...r, ...patch });
+    },
+    orderBy() {
+      return { toArray: async () => sorted() };
+    },
     where(field) {
-      return { equals(val) { return { toArray: async () => sorted().filter((r) => r[field] === val) }; } };
+      return {
+        equals(val) {
+          return { toArray: async () => sorted().filter((r) => r[field] === val) };
+        },
+      };
     },
   };
 }
@@ -28,20 +43,50 @@ function fakeSupabase({ serverUpdatedAt = {}, failUpsert = false } = {}) {
     ops,
     from(table) {
       return {
-        upsert(row) { ops.push(['upsert', table, row]); return Promise.resolve({ error: failUpsert ? { message: 'boom' } : null }); },
-        delete() { return { eq(col, val) { ops.push(['delete', table, val]); return Promise.resolve({ error: null }); } }; },
+        upsert(row) {
+          ops.push(['upsert', table, row]);
+          return Promise.resolve({ error: failUpsert ? { message: 'boom' } : null });
+        },
+        delete() {
+          return {
+            eq(col, val) {
+              ops.push(['delete', table, val]);
+              return Promise.resolve({ error: null });
+            },
+          };
+        },
         select() {
-          return { eq(col, val) { return { maybeSingle: async () => ({ data: serverUpdatedAt[val] ? { updated_at: serverUpdatedAt[val] } : null, error: null }) }; } };
+          return {
+            eq(col, val) {
+              return {
+                maybeSingle: async () => ({
+                  data: serverUpdatedAt[val] ? { updated_at: serverUpdatedAt[val] } : null,
+                  error: null,
+                }),
+              };
+            },
+          };
         },
       };
     },
   };
 }
 
-let table; let outbox; let sb;
+let table;
+let outbox;
+let sb;
 const ENTS = [
-  { table: 'visits', dbKey: 'intra_visits', fields: { id: 'id', client_name: 'clientName', updated_at: 'updatedAt' } },
-  { table: 'operators', dbKey: 'intra_operators', fields: { id: 'id' }, buildUpsert: (o) => ({ id: o.id, built: true }) },
+  {
+    table: 'visits',
+    dbKey: 'intra_visits',
+    fields: { id: 'id', client_name: 'clientName', updated_at: 'updatedAt' },
+  },
+  {
+    table: 'operators',
+    dbKey: 'intra_operators',
+    fields: { id: 'id' },
+    buildUpsert: (o) => ({ id: o.id, built: true }),
+  },
 ];
 
 beforeEach(() => {
@@ -50,10 +95,19 @@ beforeEach(() => {
   globalThis.idb = { outbox: table };
   globalThis.supabaseClient = sb;
   globalThis.ENTITIES = ENTS;
-  globalThis._mapToRemote = (obj, fields) => { const o = {}; for (const [rk, lk] of Object.entries(fields)) o[rk] = obj[lk]; return o; };
+  globalThis._mapToRemote = (obj, fields) => {
+    const o = {};
+    for (const [rk, lk] of Object.entries(fields)) o[rk] = obj[lk];
+    return o;
+  };
   globalThis.isSupabaseConnected = () => true;
   globalThis.window = { _supabaseAuthActive: true, addEventListener() {}, dispatchEvent() {} };
-  globalThis.CustomEvent = class { constructor(t, o) { this.type = t; this.detail = o && o.detail; } };
+  globalThis.CustomEvent = class {
+    constructor(t, o) {
+      this.type = t;
+      this.detail = o && o.detail;
+    }
+  };
   delete globalThis.showToast;
   delete require.cache[require.resolve('../js/outbox.js')];
   outbox = require('../js/outbox.js');
@@ -61,10 +115,20 @@ beforeEach(() => {
 
 describe('Outbox — entidades além de pendencias (SYNC-02)', () => {
   it('upsert de visita enfileirado sobe mapeado pelo schema da entidade', async () => {
-    await outbox.outboxQueueUpsert('visits', { id: 'V1', clientName: 'ACME', updatedAt: '2026-01-01T10:00:00.000Z' });
+    await outbox.outboxQueueUpsert('visits', {
+      id: 'V1',
+      clientName: 'ACME',
+      updatedAt: '2026-01-01T10:00:00.000Z',
+    });
     const r = await outbox.outboxDrain();
     expect(r.sent).toBe(1);
-    expect(sb.ops).toEqual([['upsert', 'visits', { id: 'V1', client_name: 'ACME', updated_at: '2026-01-01T10:00:00.000Z' }]]);
+    expect(sb.ops).toEqual([
+      [
+        'upsert',
+        'visits',
+        { id: 'V1', client_name: 'ACME', updated_at: '2026-01-01T10:00:00.000Z' },
+      ],
+    ]);
     expect(table.all()).toHaveLength(0);
   });
   it('entidade com buildUpsert usa o builder, não o mapa genérico', async () => {
@@ -79,7 +143,14 @@ describe('Outbox — entidades além de pendencias (SYNC-02)', () => {
     expect(table.all()).toHaveLength(0);
   });
   it('erro de dado (4xx/RLS) não enfileira; queda de rede enfileira', async () => {
-    expect(outbox.outboxQueueIfTransient('visits', 'upsert', { id: 'V1' }, { status: 403, message: 'rls' })).toBeNull();
+    expect(
+      outbox.outboxQueueIfTransient(
+        'visits',
+        'upsert',
+        { id: 'V1' },
+        { status: 403, message: 'rls' }
+      )
+    ).toBeNull();
     await outbox.outboxQueueIfTransient('visits', 'upsert', { id: 'V2' }, null, true);
     expect(table.all().map((r) => r.targetId)).toEqual(['V2']);
   });
@@ -91,7 +162,11 @@ describe('Outbox — entidades além de pendencias (SYNC-02)', () => {
   it('LWW: servidor mais novo que a entrada vence e a entrada é descartada sem upsert', async () => {
     sb = fakeSupabase({ serverUpdatedAt: { V1: '2026-02-01T00:00:00.000Z' } });
     globalThis.supabaseClient = sb;
-    await outbox.outboxQueueUpsert('visits', { id: 'V1', clientName: 'velho', updatedAt: '2026-01-01T00:00:00.000Z' });
+    await outbox.outboxQueueUpsert('visits', {
+      id: 'V1',
+      clientName: 'velho',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const r = await outbox.outboxDrain();
     expect(sb.ops.filter((o) => o[0] === 'upsert')).toHaveLength(0);
     expect(r.sent).toBe(0);
@@ -139,7 +214,13 @@ describe('Atalhos de enfileiramento dos saves (_outboxOffline/_outboxFail/_outbo
   // Os atalhos moram em storage.js e enxergam o outbox como globais, igual ao navegador.
   let shims;
   beforeEach(() => {
-    for (const k of ['outboxQueueUpsert', 'outboxQueueDelete', 'outboxQueueIfTransient', 'outboxRemoveTarget']) globalThis[k] = outbox[k];
+    for (const k of [
+      'outboxQueueUpsert',
+      'outboxQueueDelete',
+      'outboxQueueIfTransient',
+      'outboxRemoveTarget',
+    ])
+      globalThis[k] = outbox[k];
     globalThis._isConnectivityError = (e) => !!e && e.status === 0;
     shims = require('./_storage.cjs').requireStorage();
   });
@@ -149,7 +230,10 @@ describe('Atalhos de enfileiramento dos saves (_outboxOffline/_outboxFail/_outbo
     shims._outboxOffline('visits', 'upsert', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
     shims._outboxOffline('visits', 'delete', { id: 'V2' });
     await tick();
-    expect(table.all().map((r) => [r.entity, r.op, r.targetId])).toEqual([['visits', 'upsert', 'V1'], ['visits', 'delete', 'V2']]);
+    expect(table.all().map((r) => [r.entity, r.op, r.targetId])).toEqual([
+      ['visits', 'upsert', 'V1'],
+      ['visits', 'delete', 'V2'],
+    ]);
   });
   it('_outboxFail só enfileira falha de conectividade, não 4xx/RLS', async () => {
     shims._outboxFail('visits', 'upsert', { id: 'V1' }, { status: 403, message: 'rls' });
@@ -171,7 +255,13 @@ describe('Atalhos de enfileiramento dos saves (_outboxOffline/_outboxFail/_outbo
     expect(table.all()).toHaveLength(0);
   });
   it('sem outbox.js carregado os atalhos são no-op (o save local não quebra)', () => {
-    for (const k of ['outboxQueueUpsert', 'outboxQueueDelete', 'outboxQueueIfTransient', 'outboxRemoveTarget']) delete globalThis[k];
+    for (const k of [
+      'outboxQueueUpsert',
+      'outboxQueueDelete',
+      'outboxQueueIfTransient',
+      'outboxRemoveTarget',
+    ])
+      delete globalThis[k];
     expect(() => shims._outboxOffline('visits', 'upsert', { id: 'V1' })).not.toThrow();
     expect(() => shims._outboxFail('visits', 'upsert', { id: 'V1' }, null, true)).not.toThrow();
     expect(() => shims._outboxDropTarget('V1')).not.toThrow();

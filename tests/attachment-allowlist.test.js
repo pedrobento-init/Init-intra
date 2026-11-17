@@ -7,8 +7,18 @@ describe('allowlist de anexos (SEC-10)', () => {
   let s;
   beforeEach(() => {
     globalThis.getOperatorNames = () => [];
-    globalThis.escapeHtml = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    globalThis.window = { addEventListener() {}, ...(globalThis.window || {}), _supabaseAuthActive: false };
+    globalThis.escapeHtml = (v) =>
+      String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    globalThis.window = {
+      addEventListener() {},
+      ...(globalThis.window || {}),
+      _supabaseAuthActive: false,
+    };
     globalThis.getSession = () => ({ name: 'Teste' });
     globalThis.addLog = () => {};
     s = requireStorage();
@@ -20,7 +30,11 @@ describe('allowlist de anexos (SEC-10)', () => {
     expect(s.validateAttachmentFile(f('foto.png', 'image/png')).ok).toBe(true);
     expect(s.validateAttachmentFile(f('foto.jpg', 'image/jpeg')).ok).toBe(true);
     expect(s.validateAttachmentFile(f('laudo.pdf', 'application/pdf')).ok).toBe(true);
-    expect(s.validateAttachmentFile(f('p.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).ok).toBe(true);
+    expect(
+      s.validateAttachmentFile(
+        f('p.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      ).ok
+    ).toBe(true);
     expect(s.validateAttachmentFile(f('n.txt', 'text/plain')).ok).toBe(true);
   });
 
@@ -29,7 +43,9 @@ describe('allowlist de anexos (SEC-10)', () => {
     const r = s.validateAttachmentFile(f('d.docx', ''));
     expect(r.ok).toBe(true);
     expect(r.mime).toContain('wordprocessingml');
-    expect(s.validateAttachmentFile(f('x.pdf', 'application/octet-stream')).mime).toBe('application/pdf');
+    expect(s.validateAttachmentFile(f('x.pdf', 'application/octet-stream')).mime).toBe(
+      'application/pdf'
+    );
   });
 
   it('extensão em maiúsculas vale como minúscula', () => {
@@ -77,7 +93,9 @@ describe('allowlist de anexos (SEC-10)', () => {
   });
 
   it('mantém o limite de 2MB e rejeita tamanho inválido', () => {
-    expect(s.validateAttachmentFile(f('a.pdf', 'application/pdf', 2 * 1024 * 1024 + 1)).error).toBe('Arquivo excede o limite de 2MB.');
+    expect(s.validateAttachmentFile(f('a.pdf', 'application/pdf', 2 * 1024 * 1024 + 1)).error).toBe(
+      'Arquivo excede o limite de 2MB.'
+    );
     expect(s.validateAttachmentFile(f('a.pdf', 'application/pdf', NaN)).ok).toBe(false);
     expect(s.validateAttachmentFile(null).ok).toBe(false);
   });
@@ -103,8 +121,15 @@ describe('allowlist de anexos (SEC-10)', () => {
   it('addAttachment recusa svg e não grava nada no item', () => {
     const store = { clients: [{ id: 'C1', attachments: [] }] };
     globalThis.getCacheStore = () => store.clients;
-    globalThis.setCacheStore = (_t, v) => { store.clients = v; };
-    const r = s.addAttachment('clients', 'C1', { name: 'x.svg', mimeType: 'image/svg+xml', size: 10, data: 'data:image/svg+xml;base64,AAAA' });
+    globalThis.setCacheStore = (_t, v) => {
+      store.clients = v;
+    };
+    const r = s.addAttachment('clients', 'C1', {
+      name: 'x.svg',
+      mimeType: 'image/svg+xml',
+      size: 10,
+      data: 'data:image/svg+xml;base64,AAAA',
+    });
     expect(r.error).toMatch(/não permitido/);
     expect(store.clients[0].attachments).toHaveLength(0);
   });
@@ -112,9 +137,17 @@ describe('allowlist de anexos (SEC-10)', () => {
   it('addClientDocument também recusa html e aceita pdf com nome sanitizado', () => {
     const store = { clients: [{ id: 'C1', documents: [] }] };
     globalThis.getCacheStore = () => store.clients;
-    globalThis.setCacheStore = (_t, v) => { store.clients = v; };
-    expect(s.addClientDocument('C1', { name: 'x.html', mimeType: 'text/html', size: 10 }).error).toMatch(/não permitido/);
-    const ok = s.addClientDocument('C1', { name: '../c.pdf', mimeType: 'application/pdf', size: 10 });
+    globalThis.setCacheStore = (_t, v) => {
+      store.clients = v;
+    };
+    expect(
+      s.addClientDocument('C1', { name: 'x.html', mimeType: 'text/html', size: 10 }).error
+    ).toMatch(/não permitido/);
+    const ok = s.addClientDocument('C1', {
+      name: '../c.pdf',
+      mimeType: 'application/pdf',
+      size: 10,
+    });
     expect(ok.success).toBe(true);
     expect(ok.document.name).toBe('c.pdf');
   });
@@ -123,10 +156,27 @@ describe('allowlist de anexos (SEC-10)', () => {
     let uploaded = false;
     globalThis.window._supabaseAuthActive = true;
     globalThis.isSupabaseConnected = () => true;
-    globalThis.supabaseClient = { storage: { from: () => ({ upload: async () => { uploaded = true; return { error: null }; }, getPublicUrl: () => ({ data: {} }) }) } };
-    expect(await s._uploadAttachmentToStorage('clients', 'C1', 'A1', f('x.svg', 'image/svg+xml'))).toBeNull();
+    globalThis.supabaseClient = {
+      storage: {
+        from: () => ({
+          upload: async () => {
+            uploaded = true;
+            return { error: null };
+          },
+          getPublicUrl: () => ({ data: {} }),
+        }),
+      },
+    };
+    expect(
+      await s._uploadAttachmentToStorage('clients', 'C1', 'A1', f('x.svg', 'image/svg+xml'))
+    ).toBeNull();
     expect(uploaded).toBe(false);
-    const ok = await s._uploadAttachmentToStorage('clients', 'C1', 'A1', f('../a b.pdf', 'application/pdf'));
+    const ok = await s._uploadAttachmentToStorage(
+      'clients',
+      'C1',
+      'A1',
+      f('../a b.pdf', 'application/pdf')
+    );
     expect(ok.path).toBe('clients/C1/A1-a b.pdf');
     expect(uploaded).toBe(true);
   });
@@ -137,9 +187,24 @@ describe('allowlist de anexos (SEC-10)', () => {
     expect(s.attachmentIsRasterImage({ name: 'a.png', mimeType: 'image/png' })).toBe(true);
     expect(s.attachmentIsRasterImage({ name: 'a.pdf', mimeType: 'application/pdf' })).toBe(false);
 
-    const store = { clients: [{ id: 'C1', attachments: [
-      { id: 'A1', name: 'evil.svg', mimeType: 'image/svg+xml', size: 1, data: 'data:image/svg+xml;base64,AAAA', uploadedBy: 'x', uploadedAt: '2020-01-01' },
-    ] }] };
+    const store = {
+      clients: [
+        {
+          id: 'C1',
+          attachments: [
+            {
+              id: 'A1',
+              name: 'evil.svg',
+              mimeType: 'image/svg+xml',
+              size: 1,
+              data: 'data:image/svg+xml;base64,AAAA',
+              uploadedBy: 'x',
+              uploadedAt: '2020-01-01',
+            },
+          ],
+        },
+      ],
+    };
     globalThis.getCacheStore = () => store.clients;
     globalThis.formatDateTime = () => '';
     const box = { innerHTML: '', isConnected: true };

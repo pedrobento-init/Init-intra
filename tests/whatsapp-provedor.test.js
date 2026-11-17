@@ -150,12 +150,23 @@ describe('enviarTexto', () => {
   });
 });
 
-
 describe('mídia do WAHA', () => {
   it('aceita imagem sem texto e normaliza os metadados', () => {
-    const p = recebida({ body: '', hasMedia: true, media: { url: 'http://localhost:3000/api/files/foto.jpg', mimetype: 'image/jpeg', filename: 'foto.jpg' } });
+    const p = recebida({
+      body: '',
+      hasMedia: true,
+      media: {
+        url: 'http://localhost:3000/api/files/foto.jpg',
+        mimetype: 'image/jpeg',
+        filename: 'foto.jpg',
+      },
+    });
     const [m] = mensagensDoWebhook(p);
-    expect(m.media).toEqual({ nome: 'foto.jpg', tipo: 'image/jpeg', url: 'http://localhost:3000/api/files/foto.jpg' });
+    expect(m.media).toEqual({
+      nome: 'foto.jpg',
+      tipo: 'image/jpeg',
+      url: 'http://localhost:3000/api/files/foto.jpg',
+    });
   });
 
   it('não aceita URL de mídia fora de HTTP', () => {

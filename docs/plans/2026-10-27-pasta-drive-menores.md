@@ -90,12 +90,12 @@ cada uma fica presa à tarefa que tem o código.
 
 ## Mapa de arquivos
 
-| Arquivo | Ação | Responsabilidade |
-| --- | --- | --- |
-| `js/clients-form.js:585-597` | modificar | parser flexível (normalização + `open?id=`) |
-| `tests/drive-folder-url.test.js` | modificar | testes do parser, higiene de globais, guarda do emoji |
-| `js/clients-ficha.js:780` | modificar | `🗂️` no título da seção da pasta |
-| `docs/plans/2026-10-27-pasta-drive-cliente.md` | modificar | caixas marcadas, contagem real 101→102 |
+| Arquivo                                        | Ação      | Responsabilidade                                      |
+| ---------------------------------------------- | --------- | ----------------------------------------------------- |
+| `js/clients-form.js:585-597`                   | modificar | parser flexível (normalização + `open?id=`)           |
+| `tests/drive-folder-url.test.js`               | modificar | testes do parser, higiene de globais, guarda do emoji |
+| `js/clients-ficha.js:780`                      | modificar | `🗂️` no título da seção da pasta                      |
+| `docs/plans/2026-10-27-pasta-drive-cliente.md` | modificar | caixas marcadas, contagem real 101→102                |
 
 ---
 
@@ -124,11 +124,15 @@ Adicionar ao `tests/drive-folder-url.test.js`, depois do describe
 ```js
 describe('parseDriveFolderId — normalização flexível', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('aceita host sem esquema, host em maiúsculas e a forma legada open?id=', () => {
     expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID)).toBe(ID);
-    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')).toBe(ID);
+    expect(
+      mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')
+    ).toBe(ID);
     expect(mod.parseDriveFolderId('https://drive.google.com/open?id=' + ID)).toBe(ID);
     expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID + '&usp=sharing')).toBe(ID);
   });
@@ -137,7 +141,9 @@ describe('parseDriveFolderId — normalização flexível', () => {
     expect(mod.driveFolderUrl('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID)).toBe(BASE + ID);
     expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/file/d/' + ID + '/view')).toBeNull();
     expect(mod.parseDriveFolderId('docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
-    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')).toBeNull();
+    expect(
+      mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')
+    ).toBeNull();
     expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID.slice(0, 14))).toBeNull();
   });
 });
@@ -146,9 +152,9 @@ describe('parseDriveFolderId — normalização flexível', () => {
 E no describe `aceita o ID colado cru` (linha 19), acrescentar a fixação do piso:
 
 ```js
-  it('recusa ID cru de 14 caracteres — o piso é 15', () => {
-    expect(mod.parseDriveFolderId(ID.slice(0, 14))).toBeNull();
-  });
+it('recusa ID cru de 14 caracteres — o piso é 15', () => {
+  expect(mod.parseDriveFolderId(ID.slice(0, 14))).toBeNull();
+});
 ```
 
 - [x] **Passo 2: rodar e ver falhar**
@@ -183,7 +189,9 @@ function parseDriveFolderId(v) {
   let s = String(v === null || v === undefined ? '' : v).trim();
   if (!s) return null;
   if (/^drive\.google\.com\//i.test(s)) s = 'https://' + s;
-  const m = s.match(/^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i);
+  const m = s.match(
+    /^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i
+  );
   if (m) return m[1] || m[2];
   if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
   return null;
@@ -242,11 +250,11 @@ cliente')` (linha ~185), virar `async` e acrescentar o `await` **antes** da
 asserção:
 
 ```js
-  it('salvar leva de volta para a ficha do cliente', async () => {
-    // ...corpo existente até mod.submitDriveFolderLink('cli-1')...
-    await new Promise((r) => setTimeout(r, 30));
-    expect(titulo).toBe('ACME');
-  });
+it('salvar leva de volta para a ficha do cliente', async () => {
+  // ...corpo existente até mod.submitDriveFolderLink('cli-1')...
+  await new Promise((r) => setTimeout(r, 30));
+  expect(titulo).toBe('ACME');
+});
 ```
 
 Comentário no teste (pt-BR, por quê): o `viewClient` agenda o `setTimeout` de
@@ -268,10 +276,10 @@ baseline (2 em 5), agora garantida a cada execução.
 No corpo do mesmo `it`, antes de `mod.submitDriveFolderLink('cli-1')`:
 
 ```js
-    // Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
-    // fora do grupo 'clients' que o teste compila: sem o stub, ReferenceError.
-    global.renderClientDocumentsList = () => {};
-    global.renderAttachmentList = () => {};
+// Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
+// fora do grupo 'clients' que o teste compila: sem o stub, ReferenceError.
+global.renderClientDocumentsList = () => {};
+global.renderAttachmentList = () => {};
 ```
 
 - [x] **Passo 4: rodar e ver passar**
@@ -322,9 +330,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 // Snapshot antes de qualquer teste: o que é devolvido é exatamente o que
 // existia. Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
 const _globalKeys = [
-  'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
-  'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
-  'renderClientDocumentsList', 'renderAttachmentList',
+  'getClientById',
+  'isCurrentAdmin',
+  'saveClient',
+  'showToast',
+  'closeModal',
+  'openModal',
+  'getVisitsByClient',
+  'getPendenciasByClient',
+  'document',
+  'escapeHtml',
+  'renderClientDocumentsList',
+  'renderAttachmentList',
 ];
 const _keep = {};
 for (const k of _globalKeys) _keep[k] = globalThis[k];

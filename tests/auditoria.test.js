@@ -6,14 +6,37 @@ const src = fs.readFileSync('js/ui.js', 'utf8');
 const pick = (name) => src.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n\\}'))[0];
 const T = new Function(
   'const localDateISO = (d) => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); };\n' +
-  ['_auditNorm', 'auditFacets', 'filterAuditLogs', 'groupAuditLogsByDay'].map(pick).join('\n') +
-  '\nreturn { auditFacets, filterAuditLogs, groupAuditLogsByDay };'
+    ['_auditNorm', 'auditFacets', 'filterAuditLogs', 'groupAuditLogsByDay'].map(pick).join('\n') +
+    '\nreturn { auditFacets, filterAuditLogs, groupAuditLogsByDay };'
 )();
 
 const L = [
-  { id: '1', action: 'Criou', type: 'Pendência', operatorName: 'Ana', details: 'Backup mensal', targetId: 'PEN-1', timestamp: '2026-10-15T15:00:00.000Z' },
-  { id: '2', action: 'Editou', type: 'Visita', operatorName: 'Beto', details: 'Relatório', targetId: 'VIS-9', timestamp: '2026-10-14T15:00:00.000Z' },
-  { id: '3', action: 'Login', type: 'Sessão', operatorName: null, details: '', timestamp: '2026-10-01T15:00:00.000Z' },
+  {
+    id: '1',
+    action: 'Criou',
+    type: 'Pendência',
+    operatorName: 'Ana',
+    details: 'Backup mensal',
+    targetId: 'PEN-1',
+    timestamp: '2026-10-15T15:00:00.000Z',
+  },
+  {
+    id: '2',
+    action: 'Editou',
+    type: 'Visita',
+    operatorName: 'Beto',
+    details: 'Relatório',
+    targetId: 'VIS-9',
+    timestamp: '2026-10-14T15:00:00.000Z',
+  },
+  {
+    id: '3',
+    action: 'Login',
+    type: 'Sessão',
+    operatorName: null,
+    details: '',
+    timestamp: '2026-10-01T15:00:00.000Z',
+  },
 ];
 
 describe('auditoria', () => {

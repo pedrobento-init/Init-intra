@@ -7,11 +7,15 @@ const { getPendenciaAssunto, getPendenciaTitulo } = metrics;
 
 describe('assunto x descrição da pendência', () => {
   it('assunto preenchido é o título', () => {
-    expect(getPendenciaTitulo({ assunto: 'Trocar HD', descricao: 'Detalhes longos' })).toBe('Trocar HD');
+    expect(getPendenciaTitulo({ assunto: 'Trocar HD', descricao: 'Detalhes longos' })).toBe(
+      'Trocar HD'
+    );
   });
 
   it('registro antigo sem assunto usa descricao como fallback de leitura', () => {
-    expect(getPendenciaTitulo({ assunto: '', descricao: 'Cabeamento andar 2' })).toBe('Cabeamento andar 2');
+    expect(getPendenciaTitulo({ assunto: '', descricao: 'Cabeamento andar 2' })).toBe(
+      'Cabeamento andar 2'
+    );
     expect(getPendenciaTitulo({ descricao: 'Só descricao' })).toBe('Só descricao');
   });
 

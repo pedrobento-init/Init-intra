@@ -4,13 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 const require = createRequire(import.meta.url);
-const { buildAssets, shortHash, parseLocalScripts, minifyCss } = require('../tools/build-assets.js');
+const {
+  buildAssets,
+  shortHash,
+  parseLocalScripts,
+  minifyCss,
+} = require('../tools/build-assets.js');
 
-const INDEX = '<html><head><link rel="stylesheet" href="css/styles.css" /></head><body>\n' +
+const INDEX =
+  '<html><head><link rel="stylesheet" href="css/styles.css" /></head><body>\n' +
   '<script src="https://cdn.jsdelivr.net/npm/x@1/x.min.js"></script>\n' +
   '<script defer src="js/a.js"></script>\n' +
   '<script defer src="js/b.js"></script>\n</body></html>';
-const SW = "const CACHE_NAME = 'init-intra-vX';\nconst CDN_CACHE_NAME = 'init-intra-cdn-vX';\nconst STATIC_ASSETS = [\n  '/',\n  'index.html'\n];\n";
+const SW =
+  "const CACHE_NAME = 'init-intra-vX';\nconst CDN_CACHE_NAME = 'init-intra-cdn-vX';\nconst STATIC_ASSETS = [\n  '/',\n  'index.html'\n];\n";
 
 function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'intra-build-'));
@@ -28,8 +35,11 @@ function fixture() {
 
 describe('build-assets', () => {
   it('parseia só scripts locais (ignora CDN)', () => {
-    expect(parseLocalScripts('<script src="https://x/y.js"></script><script defer src="js/a.js"></script>'))
-      .toEqual(['js/a.js']);
+    expect(
+      parseLocalScripts(
+        '<script src="https://x/y.js"></script><script defer src="js/a.js"></script>'
+      )
+    ).toEqual(['js/a.js']);
   });
 
   it('modo check: monta o resultado sem escrever nada', async () => {
@@ -97,7 +107,9 @@ describe('build-assets', () => {
     const b = fixture();
     fs.writeFileSync(path.join(b, 'sw.js'), SW.replace(/\n/g, '\r\n'));
     fs.writeFileSync(path.join(b, 'index.html'), INDEX.replace(/\n/g, '\r\n'));
-    expect((await buildAssets(b, { check: true })).buildTag).toBe((await buildAssets(a, { check: true })).buildTag);
+    expect((await buildAssets(b, { check: true })).buildTag).toBe(
+      (await buildAssets(a, { check: true })).buildTag
+    );
   });
 
   it('o sw.js do build leva a tag nos dois caches e o sw.js da raiz não é tocado', async () => {
@@ -114,8 +126,17 @@ describe('build-assets', () => {
     fs.mkdirSync(path.join(dir, 'fonts'));
     fs.writeFileSync(path.join(dir, 'fonts', 'f-latin.woff2'), 'woff2-bytes');
     fs.writeFileSync(path.join(dir, 'fonts', 'OFL.txt'), 'licenca');
-    fs.writeFileSync(path.join(dir, 'css', 'styles.css'), "@font-face { font-family: 'F'; src: url('../fonts/f-latin.woff2') format('woff2'); }\n");
-    fs.writeFileSync(path.join(dir, 'index.html'), INDEX.replace('<link rel="stylesheet"', '<link rel="preload" href="fonts/f-latin.woff2" as="font" crossorigin /><link rel="stylesheet"'));
+    fs.writeFileSync(
+      path.join(dir, 'css', 'styles.css'),
+      "@font-face { font-family: 'F'; src: url('../fonts/f-latin.woff2') format('woff2'); }\n"
+    );
+    fs.writeFileSync(
+      path.join(dir, 'index.html'),
+      INDEX.replace(
+        '<link rel="stylesheet"',
+        '<link rel="preload" href="fonts/f-latin.woff2" as="font" crossorigin /><link rel="stylesheet"'
+      )
+    );
     const r = await buildAssets(dir, {});
     const hashed = r.manifest.fonts['fonts/f-latin.woff2'];
     expect(hashed).toMatch(/^assets\/fonts\/f-latin\.[0-9a-f]{8}\.woff2$/);
@@ -144,19 +165,30 @@ describe('minifyCss', () => {
   .c > .d { padding: 4px 8px; }
 }
 `;
-    expect(minifyCss(src)).toBe('.a,.b{color :red;margin:0 auto}@media (max-width:768px){.c > .d{padding:4px 8px}}');
+    expect(minifyCss(src)).toBe(
+      '.a,.b{color :red;margin:0 auto}@media (max-width:768px){.c > .d{padding:4px 8px}}'
+    );
   });
 
   it('preserva o espaço antes de ":" (seletor descendente), calc e textos entre aspas', () => {
-    expect(minifyCss('.x :hover { width: calc(100% - 10px); }')).toBe('.x :hover{width:calc(100% - 10px)}');
-    expect(minifyCss('.q::after { content: "a ; b  { c }  /* d */"; font-family: "Open Sans", sans-serif; }'))
-      .toBe('.q::after{content:"a ; b  { c }  /* d */";font-family:"Open Sans",sans-serif}');
-    expect(minifyCss("a[title='x  y'] { grid-template-areas: 'a b' 'c d'; }")).toBe("a[title='x  y']{grid-template-areas:'a b' 'c d'}");
+    expect(minifyCss('.x :hover { width: calc(100% - 10px); }')).toBe(
+      '.x :hover{width:calc(100% - 10px)}'
+    );
+    expect(
+      minifyCss(
+        '.q::after { content: "a ; b  { c }  /* d */"; font-family: "Open Sans", sans-serif; }'
+      )
+    ).toBe('.q::after{content:"a ; b  { c }  /* d */";font-family:"Open Sans",sans-serif}');
+    expect(minifyCss("a[title='x  y'] { grid-template-areas: 'a b' 'c d'; }")).toBe(
+      "a[title='x  y']{grid-template-areas:'a b' 'c d'}"
+    );
   });
 
   it('o build publica o CSS minificado', async () => {
     const dir = fixture();
     const r = await buildAssets(dir, { check: true });
-    expect(r.manifest.css['css/styles.css']).toMatch(/^assets\/css\/styles\.[0-9a-f]{8}\.min\.css$/);
+    expect(r.manifest.css['css/styles.css']).toMatch(
+      /^assets\/css\/styles\.[0-9a-f]{8}\.min\.css$/
+    );
   });
 });

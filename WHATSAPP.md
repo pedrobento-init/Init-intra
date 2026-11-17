@@ -190,14 +190,14 @@ aparecem com `docker compose logs waha`.
 | Log com 401                             | O `token=` da URL não bate com `WHATSAPP_WEBHOOK_TOKEN`.                               |
 | 200 com `caixa: 0` em mensagem de texto | O payload não é um evento `message` com `payload.body`, `payload.from` e `payload.id`. |
 | Erro `column "canal" does not exist`    | A migration 075 não foi aplicada.                                                      |
-| Erro `column "direcao" does not exist`  | A migration 082 não foi aplicada; a mensagem ainda entra, mas o portal não responde.  |
+| Erro `column "direcao" does not exist`  | A migration 082 não foi aplicada; a mensagem ainda entra, mas o portal não responde.   |
 | Mensagem cai como "sem cliente"         | O telefone não está cadastrado ou está em dois clientes diferentes.                    |
 | Envio: `missing_credentials` (500)      | Faltou `WAHA_BASE_URL` ou `WAHA_API_KEY` nos secrets.                                  |
 | Envio: `provider_error` (502)           | Chave errada, sessão desconectada ou WAHA recusou o envio.                             |
 | Envio: `provider_unreachable` (502)     | `WAHA_BASE_URL` está inacessível; `localhost` não funciona para a Edge Function.       |
 | Envio: `not_whatsapp_contact` (422)     | A 076 não foi aplicada, ou esse número nunca escreveu para a empresa.                  |
 | Portal: `thread_not_found` (404)        | Linha antiga sem `thread_id` ou conversa de outra equipe; a RLS esconde a mensagem.    |
-| Portal: `missing_credentials` (500)      | Faltou `WAHA_*` (WhatsApp) ou `GMAIL_*` (e-mail) nos secrets.                          |
+| Portal: `missing_credentials` (500)     | Faltou `WAHA_*` (WhatsApp) ou `GMAIL_*` (e-mail) nos secrets.                          |
 | Log "migration 077 não aplicada"        | Funciona assim, mas rode a 077 para evitar leitura de todos os clientes.               |
 | Log "passou de 30 mensagens por minuto" | O excesso foi descartado pelo limite do canal.                                         |
 | Envio: `pendencia_closed` (409)         | O chamado está encerrado. Reabra antes de responder.                                   |

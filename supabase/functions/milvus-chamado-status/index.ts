@@ -23,13 +23,12 @@
 // - Token só em Deno.env: nunca retornado, logado ou em erro.
 // - Não devolve contato, e-mails, telefone, CPF/CNPJ nem HTML.
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
-const LIST_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/chamado/listagem`;
+const LIST_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/listagem`;
 const MAX_VISITS = 25;
 const CONCURRENCY = 4;
 
@@ -38,24 +37,28 @@ const CONCURRENCY = 4;
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-const _txt = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
+const _txt = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
 
 // "2026-09-10 13:51:41" (sem TZ na origem) → ISO. Inválido → null.
 const _iso = (v: unknown): string | null => {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).trim().replace(" ", "T");
+  if (v === null || v === undefined || v === '') return null;
+  const s = String(v).trim().replace(' ', 'T');
   const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
 
 // Texto de log do Milvus pode vir com HTML: devolve texto puro e curto.
 const _plain = (v: unknown, max = 280): string => {
-  const s = _txt(v).replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  const s = _txt(v)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s.length > max ? s.slice(0, max - 1) + '…' : s;
 };
 
 type Status = {
@@ -76,31 +79,48 @@ async function fetchStatus(visitId: string, codigo: number): Promise<Status | nu
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
     const res = await fetch(LIST_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": MILVUS_API_TOKEN },
-      body: JSON.stringify({ is_paginate: true, pagina: 1, total_registros: 50, filtro_body: { codigo } }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: MILVUS_API_TOKEN },
+      body: JSON.stringify({
+        is_paginate: true,
+        pagina: 1,
+        total_registros: 50,
+        filtro_body: { codigo },
+      }),
       signal: ctrl.signal,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
-    const lista = (data["lista"] ?? data["data"] ?? []) as unknown;
+    const lista = (data['lista'] ?? data['data'] ?? []) as unknown;
     if (!Array.isArray(lista)) return null;
-    const row = (lista as Record<string, unknown>[]).find((r) => Number(r["codigo"]) === codigo);
+    const row = (lista as Record<string, unknown>[]).find((r) => Number(r['codigo']) === codigo);
     if (!row) {
-      return { visitId, codigo, found: false, status: "", tecnico: "", data_modificacao: null, data_solucao: null, ultima_log: null };
+      return {
+        visitId,
+        codigo,
+        found: false,
+        status: '',
+        tecnico: '',
+        data_modificacao: null,
+        data_solucao: null,
+        ultima_log: null,
+      };
     }
-    const log = (row["ultima_log"] && typeof row["ultima_log"] === "object")
-      ? (row["ultima_log"] as Record<string, unknown>)
-      : null;
+    const log =
+      row['ultima_log'] && typeof row['ultima_log'] === 'object'
+        ? (row['ultima_log'] as Record<string, unknown>)
+        : null;
     return {
       visitId,
       codigo,
       found: true,
-      status: _txt(row["status"]),
-      tecnico: _txt(row["tecnico"]),
-      data_modificacao: _iso(row["data_modificacao"]),
-      data_solucao: _iso(row["data_solucao"]),
-      ultima_log: log ? { texto: _plain(log["texto"]), data: _iso(log["data"]), tecnico: _txt(log["tecnico"]) } : null,
+      status: _txt(row['status']),
+      tecnico: _txt(row['tecnico']),
+      data_modificacao: _iso(row['data_modificacao']),
+      data_solucao: _iso(row['data_solucao']),
+      ultima_log: log
+        ? { texto: _plain(log['texto']), data: _iso(log['data']), tecnico: _txt(log['tecnico']) }
+        : null,
     };
   } catch {
     return null;
@@ -110,48 +130,53 @@ async function fetchStatus(visitId: string, codigo: number): Promise<Status | nu
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-chamado-status: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-chamado-status: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
   // pronto no contexto.
   const admin = ctx.supabaseAdmin;
   const callerUid = ctx.userClaims?.id ?? null;
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, team, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, team, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
-  if (!callerOp || callerOp.active === false) return json({ error: "Operador sem acesso" }, 403);
+  if (!callerOp || callerOp.active === false) return json({ error: 'Operador sem acesso' }, 403);
 
   let ids: string[] = [];
   try {
     const body = await req.json();
-    ids = Array.isArray(body?.visitIds) ? body.visitIds.map((x: unknown) => String(x ?? "").trim()).filter(Boolean) : [];
+    ids = Array.isArray(body?.visitIds)
+      ? body.visitIds.map((x: unknown) => String(x ?? '').trim()).filter(Boolean)
+      : [];
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
   ids = [...new Set(ids)].slice(0, MAX_VISITS);
   if (!ids.length) return json({ success: true, statuses: [] });
 
   const { data: visits, error } = await admin
-    .from("visits")
-    .select("id, team, milvus_chamado_codigo")
-    .in("id", ids);
+    .from('visits')
+    .select('id, team, milvus_chamado_codigo')
+    .in('id', ids);
   if (error) {
     console.error(`milvus-chamado-status: leitura de visitas falhou: ${error.message}`);
-    return json({ error: "Não foi possível ler as visitas." }, 500);
+    return json({ error: 'Não foi possível ler as visitas.' }, 500);
   }
 
   const isAdmin = callerOp.is_admin === true;
-  const opTeam = callerOp.team || "init";
+  const opTeam = callerOp.team || 'init';
   const jobs = (visits || [])
-    .filter((v: { team: string | null }) => isAdmin || (v.team || "init") === opTeam)
-    .map((v: { id: string; milvus_chamado_codigo: number | null }) => ({ visitId: v.id, codigo: Number(v.milvus_chamado_codigo) }))
+    .filter((v: { team: string | null }) => isAdmin || (v.team || 'init') === opTeam)
+    .map((v: { id: string; milvus_chamado_codigo: number | null }) => ({
+      visitId: v.id,
+      codigo: Number(v.milvus_chamado_codigo),
+    }))
     .filter((j: { codigo: number }) => Number.isFinite(j.codigo) && j.codigo > 0);
 
   // Poucas consultas em paralelo (não estoura o rate limit do Milvus).
@@ -166,8 +191,10 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
 
-  console.log(`milvus-chamado-status: pedidos=${ids.length} consultados=${jobs.length} ok=${statuses.length}`);
+  console.log(
+    `milvus-chamado-status: pedidos=${ids.length} consultados=${jobs.length} ok=${statuses.length}`
+  );
   return json({ success: true, statuses, checkedAt: new Date().toISOString() });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

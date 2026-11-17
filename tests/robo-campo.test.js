@@ -1,22 +1,60 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  aplicarEmail, assuntoLimpo, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, classificarBackup,
-  clienteDoEmail, diasSemComunicar, monitorDoEmail, nomeDoRemetente, pendenciaDaTriagem, pendenciaDoAlerta,
-  itensDaIa, primeiraRespostaDue, textoDaIa, triagemDaIa, corpoLimpo, remetenteInterno, dominiosInternos, notaDoSolicitante,
-  parseDriveFolderId, planoPastas, marcarPastasInvalidas, gravarResultadoPastas, AVISO_069, nomeDaPasta, NOME_PASTA_MAX,
+  aplicarEmail,
+  assuntoLimpo,
+  backupAlerta,
+  briefingDados,
+  briefingHtml,
+  briefingTemConteudo,
+  classificarBackup,
+  clienteDoEmail,
+  diasSemComunicar,
+  monitorDoEmail,
+  nomeDoRemetente,
+  pendenciaDaTriagem,
+  pendenciaDoAlerta,
+  itensDaIa,
+  primeiraRespostaDue,
+  textoDaIa,
+  triagemDaIa,
+  corpoLimpo,
+  remetenteInterno,
+  dominiosInternos,
+  notaDoSolicitante,
+  parseDriveFolderId,
+  planoPastas,
+  marcarPastasInvalidas,
+  gravarResultadoPastas,
+  AVISO_069,
+  nomeDaPasta,
+  NOME_PASTA_MAX,
   resumoDaRodada,
 } from '../supabase/functions/robo/campo.ts';
 
 const today = '2026-10-21';
 
 describe('briefing antes da visita', () => {
-  const visita = { id: 'V0', client_name: 'Acme', date: today, time: '14:00:00', motivo: 'Formatação', status: 'agendada',
-    observacoes: 'Falar com a Ana', levar: [{ t: 'Pendrive', ok: false }] };
+  const visita = {
+    id: 'V0',
+    client_name: 'Acme',
+    date: today,
+    time: '14:00:00',
+    motivo: 'Formatação',
+    status: 'agendada',
+    observacoes: 'Falar com a Ana',
+    levar: [{ t: 'Pendrive', ok: false }],
+  };
   const ctx = {
     today,
     visitas: [
-      { id: 'V1', date: '2026-09-01', motivo: 'Rede', status: 'concluida', relatorio: 'Troquei o switch.' },
+      {
+        id: 'V1',
+        date: '2026-09-01',
+        motivo: 'Rede',
+        status: 'concluida',
+        relatorio: 'Troquei o switch.',
+      },
       { id: 'V2', date: '2026-10-01', motivo: 'Impressora', status: 'concluida', relatorio: '' },
       { id: 'V3', date: '2026-08-01', motivo: 'Antiga', status: 'concluida' },
       { id: 'V4', date: '2026-07-01', motivo: 'Mais antiga', status: 'concluida' },
@@ -27,15 +65,51 @@ describe('briefing antes da visita', () => {
       { id: 'P2', assunto: 'Fechada', status: 'resolvido' },
     ],
     vencimentos: [
-      { id: 'X1', tipo: 'ssl', descricao: 'SSL acme.com', data_vencimento: '2026-11-01', status: 'ativo' },
-      { id: 'X2', tipo: 'licenca', descricao: 'Longe', data_vencimento: '2027-06-01', status: 'ativo' },
+      {
+        id: 'X1',
+        tipo: 'ssl',
+        descricao: 'SSL acme.com',
+        data_vencimento: '2026-11-01',
+        status: 'ativo',
+      },
+      {
+        id: 'X2',
+        tipo: 'licenca',
+        descricao: 'Longe',
+        data_vencimento: '2027-06-01',
+        status: 'ativo',
+      },
     ],
     devices: [
-      { hostname: 'PC-01', is_ativo: true, data_ultima_atualizacao: '2026-10-01T10:00:00Z', updated_at: '2026-10-20T10:00:00Z' },
-      { hostname: 'PC-02', is_ativo: true, data_ultima_atualizacao: '2026-10-19T10:00:00Z', updated_at: '2026-10-20T10:00:00Z' },
-      { hostname: 'PC-03', is_ativo: false, data_ultima_atualizacao: '2026-01-01T10:00:00Z', updated_at: '2026-10-20T10:00:00Z' },
+      {
+        hostname: 'PC-01',
+        is_ativo: true,
+        data_ultima_atualizacao: '2026-10-01T10:00:00Z',
+        updated_at: '2026-10-20T10:00:00Z',
+      },
+      {
+        hostname: 'PC-02',
+        is_ativo: true,
+        data_ultima_atualizacao: '2026-10-19T10:00:00Z',
+        updated_at: '2026-10-20T10:00:00Z',
+      },
+      {
+        hostname: 'PC-03',
+        is_ativo: false,
+        data_ultima_atualizacao: '2026-01-01T10:00:00Z',
+        updated_at: '2026-10-20T10:00:00Z',
+      },
     ],
-    monitores: [{ id: 'M1', client_id: 'C', nome: 'Veeam', identificador: 'veeam', max_horas: 48, ultimo_status: 'falha' }],
+    monitores: [
+      {
+        id: 'M1',
+        client_id: 'C',
+        nome: 'Veeam',
+        identificador: 'veeam',
+        max_horas: 48,
+        ultimo_status: 'falha',
+      },
+    ],
   };
   const b = briefingDados(visita, ctx);
 
@@ -43,7 +117,15 @@ describe('briefing antes da visita', () => {
     expect(b.ultimas_visitas.map((x) => x.motivo)).toEqual(['Impressora', 'Rede', 'Antiga']);
   });
   it('pendências abertas (atrasada marcada), vencimentos em até 45 dias, dispositivo parado há >7 dias, backup com falha', () => {
-    expect(b.pendencias_abertas).toEqual([{ assunto: 'Toner', status: 'aberto', prioridade: 'alta', prazo: '2026-10-15', atrasada: true }]);
+    expect(b.pendencias_abertas).toEqual([
+      {
+        assunto: 'Toner',
+        status: 'aberto',
+        prioridade: 'alta',
+        prazo: '2026-10-15',
+        atrasada: true,
+      },
+    ]);
     expect(b.vencimentos_proximos.map((x) => x.descricao)).toEqual(['SSL acme.com']);
     expect(b.dispositivos_sem_comunicar).toEqual([{ nome: 'PC-01', dias: 19 }]);
     expect(b.backups).toEqual([{ nome: 'Veeam', status: 'falha', ultimo: '' }]);
@@ -68,7 +150,14 @@ describe('briefing antes da visita', () => {
     expect(t).toContain('- Veeam: falha');
   });
   it('cliente sem histórico nenhum não gera briefing', () => {
-    const vazio = briefingDados(visita, { today, visitas: [], pendencias: [], vencimentos: [], devices: [], monitores: [] });
+    const vazio = briefingDados(visita, {
+      today,
+      visitas: [],
+      pendencias: [],
+      vencimentos: [],
+      devices: [],
+      monitores: [],
+    });
     expect(briefingTemConteudo(vazio)).toBe(false);
   });
   it('resposta do Make: JSON {texto}, texto puro, ou "Accepted" (sem resposta configurada)', () => {
@@ -81,8 +170,20 @@ describe('briefing antes da visita', () => {
     expect(textoDaIa('x'.repeat(2000), 8000)).toHaveLength(2000);
   });
   it('dispositivo: dias sem comunicar medidos na última sincronização', () => {
-    expect(diasSemComunicar({ is_ativo: true, data_ultima_atualizacao: '2026-10-19T00:00:00Z', updated_at: '2026-10-20T00:00:00Z' })).toBeNull();
-    expect(diasSemComunicar({ is_ativo: true, data_ultima_atualizacao: '2026-10-01T00:00:00Z', updated_at: '2026-10-20T00:00:00Z' })).toBe(19);
+    expect(
+      diasSemComunicar({
+        is_ativo: true,
+        data_ultima_atualizacao: '2026-10-19T00:00:00Z',
+        updated_at: '2026-10-20T00:00:00Z',
+      })
+    ).toBeNull();
+    expect(
+      diasSemComunicar({
+        is_ativo: true,
+        data_ultima_atualizacao: '2026-10-01T00:00:00Z',
+        updated_at: '2026-10-20T00:00:00Z',
+      })
+    ).toBe(19);
   });
 });
 
@@ -97,79 +198,178 @@ describe('backup por e-mail', () => {
     expect(classificarBackup('Relatório diário', 'Nada a dizer')).toBeNull();
   });
   const mons = [
-    { id: 'M1', client_id: 'C1', nome: 'Veeam', identificador: 'veeam', max_horas: 48, ativo: true },
-    { id: 'M2', client_id: 'C2', nome: 'Veeam Acme', identificador: 'Job Acme', max_horas: 48, ativo: true },
+    {
+      id: 'M1',
+      client_id: 'C1',
+      nome: 'Veeam',
+      identificador: 'veeam',
+      max_horas: 48,
+      ativo: true,
+    },
+    {
+      id: 'M2',
+      client_id: 'C2',
+      nome: 'Veeam Acme',
+      identificador: 'Job Acme',
+      max_horas: 48,
+      ativo: true,
+    },
     { id: 'M3', client_id: 'C3', nome: 'Off', identificador: 'nas', max_horas: 48, ativo: false },
   ];
   it('acha o monitor pelo identificador (o mais específico vence; inativo não)', () => {
-    expect(monitorDoEmail(mons, { id: 'e', de: 'veeam@x.com', assunto: '[Success] Job ACME', data: '' }).id).toBe('M2');
-    expect(monitorDoEmail(mons, { id: 'e', de: 'veeam@x.com', assunto: '[Success] Outro', data: '' }).id).toBe('M1');
+    expect(
+      monitorDoEmail(mons, { id: 'e', de: 'veeam@x.com', assunto: '[Success] Job ACME', data: '' })
+        .id
+    ).toBe('M2');
+    expect(
+      monitorDoEmail(mons, { id: 'e', de: 'veeam@x.com', assunto: '[Success] Outro', data: '' }).id
+    ).toBe('M1');
     expect(monitorDoEmail(mons, { id: 'e', de: 'nas@x.com', assunto: 'ok', data: '' })).toBeNull();
   });
   it('e-mail mais antigo não sobrescreve o último status, mas entra no histórico', () => {
     const m = { ...mons[0], ultimo_status: 'ok', ultimo_em: '2026-10-21T08:00:00Z', historico: [] };
-    const r = aplicarEmail(m, { id: 'e', de: '', assunto: '[Failed] velho', data: '2026-10-20T08:00:00Z' }, 'falha');
+    const r = aplicarEmail(
+      m,
+      { id: 'e', de: '', assunto: '[Failed] velho', data: '2026-10-20T08:00:00Z' },
+      'falha'
+    );
     expect(r.ultimo_status).toBe('ok');
     expect(r.historico).toHaveLength(1);
-    expect(aplicarEmail(m, { id: 'e', de: '', assunto: '[Failed] novo', data: '2026-10-21T09:00:00Z' }, 'falha').ultimo_status).toBe('falha');
+    expect(
+      aplicarEmail(
+        m,
+        { id: 'e', de: '', assunto: '[Failed] novo', data: '2026-10-21T09:00:00Z' },
+        'falha'
+      ).ultimo_status
+    ).toBe('falha');
   });
   it('alerta: falha no último e-mail, ou silêncio além do limite (desde a criação se nunca chegou)', () => {
     const agora = new Date('2026-10-21T12:00:00Z');
-    expect(backupAlerta({ ...mons[0], ultimo_status: 'falha', ultimo_em: '2026-10-21T08:00:00Z' }, agora)).toEqual({ tipo: 'falha' });
-    expect(backupAlerta({ ...mons[0], ultimo_status: 'ok', ultimo_em: '2026-10-20T12:00:00Z' }, agora)).toBeNull();
-    expect(backupAlerta({ ...mons[0], ultimo_status: 'ok', ultimo_em: '2026-10-18T12:00:00Z' }, agora)).toEqual({ tipo: 'silencio', horas: 72 });
+    expect(
+      backupAlerta({ ...mons[0], ultimo_status: 'falha', ultimo_em: '2026-10-21T08:00:00Z' }, agora)
+    ).toEqual({ tipo: 'falha' });
+    expect(
+      backupAlerta({ ...mons[0], ultimo_status: 'ok', ultimo_em: '2026-10-20T12:00:00Z' }, agora)
+    ).toBeNull();
+    expect(
+      backupAlerta({ ...mons[0], ultimo_status: 'ok', ultimo_em: '2026-10-18T12:00:00Z' }, agora)
+    ).toEqual({ tipo: 'silencio', horas: 72 });
     expect(backupAlerta({ ...mons[0], created_at: '2026-10-21T00:00:00Z' }, agora)).toBeNull();
     expect(backupAlerta({ ...mons[2], ultimo_status: 'falha' }, agora)).toBeNull();
   });
   it('pendência automática com os valores válidos da 056', () => {
-    const p = pendenciaDoAlerta({ ...mons[0], client_name: 'Acme', team: 'mam', responsavel: 'Beto' }, { tipo: 'silencio', horas: 72 }, 'PEN-1');
-    expect(p).toMatchObject({ id: 'PEN-1', client_id: 'C1', team: 'mam', responsible: 'Beto', status: 'aberto', priority: 'alta',
-      canal: 'proativo', categoria: 'backup', tipo: 'Manutenção', assunto: 'Backup sem notícia há 72 h: Veeam' });
+    const p = pendenciaDoAlerta(
+      { ...mons[0], client_name: 'Acme', team: 'mam', responsavel: 'Beto' },
+      { tipo: 'silencio', horas: 72 },
+      'PEN-1'
+    );
+    expect(p).toMatchObject({
+      id: 'PEN-1',
+      client_id: 'C1',
+      team: 'mam',
+      responsible: 'Beto',
+      status: 'aberto',
+      priority: 'alta',
+      canal: 'proativo',
+      categoria: 'backup',
+      tipo: 'Manutenção',
+      assunto: 'Backup sem notícia há 72 h: Veeam',
+    });
   });
 });
 
 describe('triagem de e-mail', () => {
   const clientes = [
-    { id: 'C1', name: 'Padaria Pão Quente', team: 'init', technician: 'Pedro', emails: { domain: 'paoquente.com.br' } },
+    {
+      id: 'C1',
+      name: 'Padaria Pão Quente',
+      team: 'init',
+      technician: 'Pedro',
+      emails: { domain: 'paoquente.com.br' },
+    },
     { id: 'C2', name: 'Acme', team: 'mam', technician: 'Beto', emails: {} },
-    { id: 'C3', name: 'Mercado do Zé', team: 'init', technician: '', emails: { domain: 'gmail.com' } },
+    {
+      id: 'C3',
+      name: 'Mercado do Zé',
+      team: 'init',
+      technician: '',
+      emails: { domain: 'gmail.com' },
+    },
   ];
-  const email = { id: 'm1', de: 'Márcia Souza <marcia@filial.paoquente.com.br>', assunto: 'Re: Enc: impressora parada',
-    data: '2026-10-21T13:20:00Z', trecho: 'A impressora do faturamento parou.' };
+  const email = {
+    id: 'm1',
+    de: 'Márcia Souza <marcia@filial.paoquente.com.br>',
+    assunto: 'Re: Enc: impressora parada',
+    data: '2026-10-21T13:20:00Z',
+    trecho: 'A impressora do faturamento parou.',
+  };
 
   it('casa o cliente pelo domínio da ficha, inclusive em subdomínio', () => {
     expect(clienteDoEmail(clientes, email).id).toBe('C1');
   });
   it('sem domínio na ficha, casa pelo nome do cliente no assunto', () => {
-    expect(clienteDoEmail(clientes, { ...email, de: 'joao@provedor.net', assunto: 'Chamado Acme: sem rede' }).id).toBe('C2');
+    expect(
+      clienteDoEmail(clientes, {
+        ...email,
+        de: 'joao@provedor.net',
+        assunto: 'Chamado Acme: sem rede',
+      }).id
+    ).toBe('C2');
   });
   it('domínio de e-mail grátis não casa cliente nenhum', () => {
-    expect(clienteDoEmail(clientes, { ...email, de: 'alguem@gmail.com', assunto: 'oi' })).toBeNull();
+    expect(
+      clienteDoEmail(clientes, { ...email, de: 'alguem@gmail.com', assunto: 'oi' })
+    ).toBeNull();
   });
   it('endereço aprendido na caixa casa mesmo vindo de Gmail', () => {
     const aprendidos = [{ remetente: 'alguem@gmail.com', tipo: 'endereco', client_id: 'C2' }];
-    expect(clienteDoEmail(clientes, { ...email, de: 'Alguém <Alguem@Gmail.com>', assunto: 'oi' }, aprendidos).id).toBe('C2');
+    expect(
+      clienteDoEmail(
+        clientes,
+        { ...email, de: 'Alguém <Alguem@Gmail.com>', assunto: 'oi' },
+        aprendidos
+      ).id
+    ).toBe('C2');
   });
   it('endereço aprendido não vaza para outro remetente do mesmo provedor', () => {
     const aprendidos = [{ remetente: 'alguem@gmail.com', tipo: 'endereco', client_id: 'C2' }];
-    expect(clienteDoEmail(clientes, { ...email, de: 'outro@gmail.com', assunto: 'oi' }, aprendidos)).toBeNull();
+    expect(
+      clienteDoEmail(clientes, { ...email, de: 'outro@gmail.com', assunto: 'oi' }, aprendidos)
+    ).toBeNull();
   });
   it('domínio aprendido casa também em subdomínio', () => {
     const aprendidos = [{ remetente: 'acme.ind.br', tipo: 'dominio', client_id: 'C2' }];
-    expect(clienteDoEmail(clientes, { ...email, de: 'ti@filial.acme.ind.br', assunto: 'oi' }, aprendidos).id).toBe('C2');
+    expect(
+      clienteDoEmail(clientes, { ...email, de: 'ti@filial.acme.ind.br', assunto: 'oi' }, aprendidos)
+        .id
+    ).toBe('C2');
   });
   it('linha de domínio público nunca casa: gmail.com como domínio seria todo mundo', () => {
     const aprendidos = [{ remetente: 'gmail.com', tipo: 'dominio', client_id: 'C2' }];
-    expect(clienteDoEmail(clientes, { ...email, de: 'qualquer@gmail.com', assunto: 'oi' }, aprendidos)).toBeNull();
+    expect(
+      clienteDoEmail(clientes, { ...email, de: 'qualquer@gmail.com', assunto: 'oi' }, aprendidos)
+    ).toBeNull();
   });
   it('aprendido vence o domínio da ficha', () => {
-    const aprendidos = [{ remetente: 'marcia@filial.paoquente.com.br', tipo: 'endereco', client_id: 'C2' }];
+    const aprendidos = [
+      { remetente: 'marcia@filial.paoquente.com.br', tipo: 'endereco', client_id: 'C2' },
+    ];
     expect(clienteDoEmail(clientes, email, aprendidos).id).toBe('C2');
   });
   it('dois vínculos para o mesmo remetente: vale o mais recente', () => {
     const aprendidos = [
-      { remetente: 'paoquente.com.br', tipo: 'dominio', client_id: 'C2', updated_at: '2026-10-01T00:00:00Z' },
-      { remetente: 'paoquente.com.br', tipo: 'dominio', client_id: 'C3', updated_at: '2026-10-20T00:00:00Z' },
+      {
+        remetente: 'paoquente.com.br',
+        tipo: 'dominio',
+        client_id: 'C2',
+        updated_at: '2026-10-01T00:00:00Z',
+      },
+      {
+        remetente: 'paoquente.com.br',
+        tipo: 'dominio',
+        client_id: 'C3',
+        updated_at: '2026-10-20T00:00:00Z',
+      },
     ];
     expect(clienteDoEmail(clientes, email, aprendidos).id).toBe('C3');
   });
@@ -183,38 +383,95 @@ describe('triagem de e-mail', () => {
     expect(nomeDoRemetente('marcia@paoquente.com.br')).toBe('marcia');
   });
   it('resposta do Make validada contra as listas fechadas', () => {
-    const t = triagemDaIa(JSON.stringify({ assunto: 'Impressora do faturamento não imprime', descricao: 'Parou ontem.',
-      categoria: 'impressora', prioridade: 'alta', tipo: 'Suporte', solicitante: 'Márcia', ignorar: false }), email);
-    expect(t).toMatchObject({ ignorar: false, categoria: 'impressora', prioridade: 'alta', tipo: 'Suporte', semIa: false });
+    const t = triagemDaIa(
+      JSON.stringify({
+        assunto: 'Impressora do faturamento não imprime',
+        descricao: 'Parou ontem.',
+        categoria: 'impressora',
+        prioridade: 'alta',
+        tipo: 'Suporte',
+        solicitante: 'Márcia',
+        ignorar: false,
+      }),
+      email
+    );
+    expect(t).toMatchObject({
+      ignorar: false,
+      categoria: 'impressora',
+      prioridade: 'alta',
+      tipo: 'Suporte',
+      semIa: false,
+    });
   });
   it('categoria e tipo inventados caem no padrão, e crítica para em alta', () => {
-    const t = triagemDaIa(JSON.stringify({ categoria: 'nuvem', tipo: 'Urgência', prioridade: 'critica' }), email);
+    const t = triagemDaIa(
+      JSON.stringify({ categoria: 'nuvem', tipo: 'Urgência', prioridade: 'critica' }),
+      email
+    );
     expect(t).toMatchObject({ categoria: 'outro', tipo: 'Suporte', prioridade: 'alta' });
   });
   it('propaganda vem marcada para ignorar', () => {
-    expect(triagemDaIa(JSON.stringify({ assunto: '50% OFF', ignorar: true }), email).ignorar).toBe(true);
+    expect(triagemDaIa(JSON.stringify({ assunto: '50% OFF', ignorar: true }), email).ignorar).toBe(
+      true
+    );
   });
   it('Make fora do ar: vale o texto do próprio e-mail, com marca de sem-IA', () => {
     const t = triagemDaIa('Accepted', email);
-    expect(t).toMatchObject({ assunto: 'impressora parada', descricao: 'A impressora do faturamento parou.',
-      categoria: 'outro', prioridade: 'media', tipo: 'Suporte', solicitante: 'Márcia Souza', semIa: true, ignorar: false });
-    expect(pendenciaDaTriagem(t, email, clientes[1], 'PEN-2').tags).toEqual(['triagem-automatica', 'sem-classificacao-ia']);
+    expect(t).toMatchObject({
+      assunto: 'impressora parada',
+      descricao: 'A impressora do faturamento parou.',
+      categoria: 'outro',
+      prioridade: 'media',
+      tipo: 'Suporte',
+      solicitante: 'Márcia Souza',
+      semIa: true,
+      ignorar: false,
+    });
+    expect(pendenciaDaTriagem(t, email, clientes[1], 'PEN-2').tags).toEqual([
+      'triagem-automatica',
+      'sem-classificacao-ia',
+    ]);
   });
   it('prazo de 1ª resposta em horas úteis, igual ao js/sla.js', () => {
     // Sexta 17:00 de Brasília + 4 h úteis → segunda 11:00 (14:00 UTC).
-    expect(primeiraRespostaDue('alta', new Date('2026-10-16T20:00:00Z'))).toBe('2026-10-19T14:00:00.000Z');
+    expect(primeiraRespostaDue('alta', new Date('2026-10-16T20:00:00Z'))).toBe(
+      '2026-10-19T14:00:00.000Z'
+    );
     // Sábado: começa na abertura do próximo dia útil.
-    expect(primeiraRespostaDue('critica', new Date('2026-10-17T23:00:00Z'))).toBe('2026-10-19T12:00:00.000Z');
+    expect(primeiraRespostaDue('critica', new Date('2026-10-17T23:00:00Z'))).toBe(
+      '2026-10-19T12:00:00.000Z'
+    );
   });
   it('pendência da triagem com os valores válidos da 056', () => {
-    const t = triagemDaIa(JSON.stringify({ assunto: 'Impressora não imprime', descricao: 'Parou ontem.',
-      categoria: 'impressora', prioridade: 'alta', tipo: 'Suporte', solicitante: 'Márcia' }), email);
+    const t = triagemDaIa(
+      JSON.stringify({
+        assunto: 'Impressora não imprime',
+        descricao: 'Parou ontem.',
+        categoria: 'impressora',
+        prioridade: 'alta',
+        tipo: 'Suporte',
+        solicitante: 'Márcia',
+      }),
+      email
+    );
     const p = pendenciaDaTriagem(t, email, clientes[0], 'PEN-1', new Date('2026-10-21T13:30:00Z'));
-    expect(p).toMatchObject({ id: 'PEN-1', client_id: 'C1', client_name: 'Padaria Pão Quente', team: 'init',
-      responsible: 'Pedro', solicitante: 'Márcia', status: 'aberto', priority: 'alta', canal: 'email',
-      categoria: 'impressora', tipo: 'Suporte', assunto: 'Impressora não imprime', tags: ['triagem-automatica'] });
+    expect(p).toMatchObject({
+      id: 'PEN-1',
+      client_id: 'C1',
+      client_name: 'Padaria Pão Quente',
+      team: 'init',
+      responsible: 'Pedro',
+      solicitante: 'Márcia',
+      status: 'aberto',
+      priority: 'alta',
+      canal: 'email',
+      categoria: 'impressora',
+      tipo: 'Suporte',
+      assunto: 'Impressora não imprime',
+      tags: ['triagem-automatica'],
+    });
     expect(p.descricao).toContain('Assunto original: Re: Enc: impressora parada');
-    expect(p.first_response_due).toBe('2026-10-21T17:30:00.000Z');  // 10:30 + 4 h úteis = 14:30 de Brasília
+    expect(p.first_response_due).toBe('2026-10-21T17:30:00.000Z'); // 10:30 + 4 h úteis = 14:30 de Brasília
   });
 
   // Caminho de volta (064): sem estes dois a resposta pela tela não existe.
@@ -235,9 +492,13 @@ describe('triagem de e-mail', () => {
 
 describe('o que levar sugerido pela IA', () => {
   it('uma linha por item, sem numeração, hífen, repetido nem o que já está na lista', () => {
-    const resposta = '- Cabo de rede\n1) Alicate de crimpar\n* Cabo de rede\nConectores RJ45.\n\n  Testador de cabo  ';
-    expect(itensDaIa(resposta, ['alicate de crimpar']))
-      .toEqual(['Cabo de rede', 'Conectores RJ45', 'Testador de cabo']);
+    const resposta =
+      '- Cabo de rede\n1) Alicate de crimpar\n* Cabo de rede\nConectores RJ45.\n\n  Testador de cabo  ';
+    expect(itensDaIa(resposta, ['alicate de crimpar'])).toEqual([
+      'Cabo de rede',
+      'Conectores RJ45',
+      'Testador de cabo',
+    ]);
   });
   it('resposta vazia, "Accepted" ou "nada a levar" não sugere nada', () => {
     expect(itensDaIa('Accepted')).toEqual([]);
@@ -294,7 +555,8 @@ describe('corpoLimpo: só o que a pessoa escreveu agora', () => {
   });
 
   it('despedida abreviada corta a assinatura com imagens e contatos', () => {
-    const e = 'Boa tarde.\nPeço verificar se há algo ocorrendo no SharePoint pois temos relatos internos que alguns arquivos não estão sendo salvos.\nObg\n\n[cid:image001.png@01DD7050.B4901920]\nJorge Babazono\nBusiness Partner\n+55 11 99774-4427\njorgeb@pxcs.com.br\nwww.pxcs.com.br';
+    const e =
+      'Boa tarde.\nPeço verificar se há algo ocorrendo no SharePoint pois temos relatos internos que alguns arquivos não estão sendo salvos.\nObg\n\n[cid:image001.png@01DD7050.B4901920]\nJorge Babazono\nBusiness Partner\n+55 11 99774-4427\njorgeb@pxcs.com.br\nwww.pxcs.com.br';
     const limpo = corpoLimpo(e);
     expect(limpo).toContain('Peço verificar');
     expect(limpo.endsWith('Obg')).toBe(true);
@@ -308,8 +570,9 @@ describe('corpoLimpo: só o que a pessoa escreveu agora', () => {
   });
 
   it('cabeçalho de encaminhamento do Outlook também é citação', () => {
-    const e = 'Segue abaixo o chamado que abrimos ontem, sem retorno.\n\n'
-      + 'De: Suporte <suporte@x.com.br>\nEnviada em: quarta-feira, 21 de outubro\nPara: Ana\nAssunto: Chamado';
+    const e =
+      'Segue abaixo o chamado que abrimos ontem, sem retorno.\n\n' +
+      'De: Suporte <suporte@x.com.br>\nEnviada em: quarta-feira, 21 de outubro\nPara: Ana\nAssunto: Chamado';
     expect(corpoLimpo(e)).toBe('Segue abaixo o chamado que abrimos ontem, sem retorno.');
   });
 
@@ -341,7 +604,8 @@ describe('corpoLimpo: só o que a pessoa escreveu agora', () => {
   });
 
   it('CRLF do Outlook não atrapalha o corte', () => {
-    const e = 'O notebook não liga mais.\r\n\r\nEm qui., 22 de out. de 2026, Ana <a@x.com> escreveu:\r\n> teste';
+    const e =
+      'O notebook não liga mais.\r\n\r\nEm qui., 22 de out. de 2026, Ana <a@x.com> escreveu:\r\n> teste';
     expect(corpoLimpo(e)).toBe('O notebook não liga mais.');
   });
 });
@@ -381,10 +645,15 @@ describe('triagem: e-mail da própria Init não vira chamado', () => {
 });
 
 describe('a descrição do chamado já nasce limpa', () => {
-  const email = { id: 'M9', de: 'Beatriz <beatriz@diasrizzo.com.br>', assunto: 'Re: Notebook',
+  const email = {
+    id: 'M9',
+    de: 'Beatriz <beatriz@diasrizzo.com.br>',
+    assunto: 'Re: Notebook',
     data: '2026-10-24T13:05:00Z',
-    trecho: 'O notebook não liga desde ontem.\n\nAtenciosamente,\nBeatriz\n(11) 99999-0000\n\n'
-      + 'Em qua., 21 de out. de 2026, Suporte <suporte@initnet.com.br> escreveu:\n> Bom dia' };
+    trecho:
+      'O notebook não liga desde ontem.\n\nAtenciosamente,\nBeatriz\n(11) 99999-0000\n\n' +
+      'Em qua., 21 de out. de 2026, Suporte <suporte@initnet.com.br> escreveu:\n> Bom dia',
+  };
 
   it('sem IA, o fallback é o corpo limpo e não o e-mail cru', () => {
     const t = triagemDaIa('Accepted', email);
@@ -400,9 +669,16 @@ describe('a descrição do chamado já nasce limpa', () => {
 });
 
 describe('resposta na conversa vira nota no chamado aberto', () => {
-  const email = { id: 'M20', de: 'Beatriz Rangel <beatriz@diasrizzo.com.br>', assunto: 'Re: Notebook',
-    data: '2026-10-24T13:05:36.000Z', message_id: '<abc@mail>', thread_id: 'THREAD-7',
-    trecho: 'Consigo na segunda de manhã sim, obrigada!\n\nEm qua., 23 de out., Suporte escreveu:\n> Podemos agendar?' };
+  const email = {
+    id: 'M20',
+    de: 'Beatriz Rangel <beatriz@diasrizzo.com.br>',
+    assunto: 'Re: Notebook',
+    data: '2026-10-24T13:05:36.000Z',
+    message_id: '<abc@mail>',
+    thread_id: 'THREAD-7',
+    trecho:
+      'Consigo na segunda de manhã sim, obrigada!\n\nEm qua., 23 de out., Suporte escreveu:\n> Podemos agendar?',
+  };
 
   it('a nota traz só o que a pessoa escreveu agora', () => {
     const n = notaDoSolicitante(email);
@@ -432,16 +708,35 @@ describe('resposta na conversa vira nota no chamado aberto', () => {
   });
 
   it('a nota tem o mesmo formato das que o app grava', () => {
-    expect(Object.keys(notaDoSolicitante(email)).sort())
-      .toEqual(['author', 'createdAt', 'mentionedOperators', 'text', 'visibility']);
+    expect(Object.keys(notaDoSolicitante(email)).sort()).toEqual([
+      'author',
+      'createdAt',
+      'mentionedOperators',
+      'text',
+      'visibility',
+    ]);
   });
 });
 
 describe('o chamado guarda a conversa que o abriu', () => {
-  const clientes = [{ id: 'C1', name: 'Dias Rizzo', team: 'init', technician: 'Ana',
-    emails: { domain: 'diasrizzo.com.br' } }];
-  const email = { id: 'M21', de: 'Beatriz <beatriz@diasrizzo.com.br>', assunto: 'Notebook',
-    data: '2026-10-24T13:05:00Z', message_id: '<abc@mail>', thread_id: 'THREAD-7', trecho: 'O notebook não liga.' };
+  const clientes = [
+    {
+      id: 'C1',
+      name: 'Dias Rizzo',
+      team: 'init',
+      technician: 'Ana',
+      emails: { domain: 'diasrizzo.com.br' },
+    },
+  ];
+  const email = {
+    id: 'M21',
+    de: 'Beatriz <beatriz@diasrizzo.com.br>',
+    assunto: 'Notebook',
+    data: '2026-10-24T13:05:00Z',
+    message_id: '<abc@mail>',
+    thread_id: 'THREAD-7',
+    trecho: 'O notebook não liga.',
+  };
 
   it('email_thread_id vai junto, para a próxima mensagem achar o chamado', () => {
     const p = pendenciaDaTriagem(triagemDaIa('Accepted', email), email, clientes[0], 'PEN-20');
@@ -449,20 +744,26 @@ describe('o chamado guarda a conversa que o abriu', () => {
   });
 
   it('e-mail sem thread_id (Robo.gs antigo) grava null, não string vazia', () => {
-    const p = pendenciaDaTriagem(triagemDaIa('Accepted', { ...email, thread_id: '' }), { ...email, thread_id: '' }, clientes[0], 'PEN-21');
+    const p = pendenciaDaTriagem(
+      triagemDaIa('Accepted', { ...email, thread_id: '' }),
+      { ...email, thread_id: '' },
+      clientes[0],
+      'PEN-21'
+    );
     expect(p.email_thread_id).toBe(null);
   });
 });
 
 describe('pasta do Drive do cliente (069)', () => {
-  const F = '1AbCdEfGhIjKlMnOpQr';  // 19 chars
+  const F = '1AbCdEfGhIjKlMnOpQr'; // 19 chars
   const S = '1ZyXwVuTsRqPoNmLkJiHgFeDcBa';
 
   // Banco de mentira: aplica eq/in/is sobre as linhas e guarda cada update.
   function fakeDb(rows, { semColuna = false } = {}) {
     const updates = [];
     return {
-      rows, updates,
+      rows,
+      updates,
       from: () => ({
         update(vals) {
           const filtros = [];
@@ -473,7 +774,13 @@ describe('pasta do Drive do cliente (069)', () => {
             select: () => q,
             then(ok) {
               if (semColuna && 'drive_folder_status' in vals) {
-                return ok({ data: null, error: { code: '42703', message: 'column clients.drive_folder_status does not exist' } });
+                return ok({
+                  data: null,
+                  error: {
+                    code: '42703',
+                    message: 'column clients.drive_folder_status does not exist',
+                  },
+                });
               }
               const hit = rows.filter((r) => filtros.every((f) => f(r)));
               hit.forEach((r) => Object.assign(r, vals));
@@ -488,22 +795,47 @@ describe('pasta do Drive do cliente (069)', () => {
   }
 
   it('parser aceita as formas do app e recusa o resto', () => {
-    for (const ok of [`https://drive.google.com/drive/folders/${F}`, `https://drive.google.com/drive/folders/${F}?usp=sharing`,
-      `https://drive.google.com/drive/u/0/folders/${F}`, `https://drive.google.com/open?id=${F}`, `drive.google.com/drive/folders/${F}`, F]) {
+    for (const ok of [
+      `https://drive.google.com/drive/folders/${F}`,
+      `https://drive.google.com/drive/folders/${F}?usp=sharing`,
+      `https://drive.google.com/drive/u/0/folders/${F}`,
+      `https://drive.google.com/open?id=${F}`,
+      `drive.google.com/drive/folders/${F}`,
+      F,
+    ]) {
       expect(parseDriveFolderId(ok)).toBe(F);
     }
-    for (const no of [`https://drive.google.com/drive/folders/${F}"onmouseover`, `https://drive.google.com/drive/folders/${F} x`,
-      `https://drive.google.com/file/d/${F}/view`, `https://evil.com/drive/folders/${F}`, 'A'.repeat(14), '', null]) {
+    for (const no of [
+      `https://drive.google.com/drive/folders/${F}"onmouseover`,
+      `https://drive.google.com/drive/folders/${F} x`,
+      `https://drive.google.com/file/d/${F}/view`,
+      `https://evil.com/drive/folders/${F}`,
+      'A'.repeat(14),
+      '',
+      null,
+    ]) {
       expect(parseDriveFolderId(no)).toBe(null);
     }
   });
 
   it('plano: candidato só com planilha e sem pasta; vigia quem tem pasta; link ruim vira inválido', () => {
     const p = planoPastas([
-      { id: 'a', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`, drive_folder_url: null },
-      { id: 'b', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`, drive_folder_url: `https://drive.google.com/drive/folders/${F}` },
+      {
+        id: 'a',
+        google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`,
+        drive_folder_url: null,
+      },
+      {
+        id: 'b',
+        google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`,
+        drive_folder_url: `https://drive.google.com/drive/folders/${F}`,
+      },
       { id: 'c', google_sheet_url: null, drive_folder_url: null },
-      { id: 'd', google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml', drive_folder_url: '' },
+      {
+        id: 'd',
+        google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml',
+        drive_folder_url: '',
+      },
       { id: 'e', drive_folder_url: 'https://exemplo.com/pasta' },
     ]);
     expect(p.candidatos).toEqual([{ client_id: 'a', sheet_id: S }]);
@@ -514,30 +846,79 @@ describe('pasta do Drive do cliente (069)', () => {
   it('marca inválidos com checked_at sem ir ao Google', async () => {
     const db = fakeDb([{ id: 'e', drive_folder_url: 'x' }]);
     expect(await marcarPastasInvalidas(db, ['e'], 'T')).toBe(null);
-    expect(db.rows[0]).toMatchObject({ drive_folder_status: 'invalido', drive_folder_checked_at: 'T' });
+    expect(db.rows[0]).toMatchObject({
+      drive_folder_status: 'invalido',
+      drive_folder_checked_at: 'T',
+    });
     expect(await marcarPastasInvalidas(db, [], 'T')).toBe(null);
     expect(db.updates).toHaveLength(1);
   });
 
   it('grava achado com status ok, não sobrescreve vínculo humano e ignora quem não estava no plano', async () => {
-    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }, { client_id: 'h', sheet_id: S }], vigiar: [], buscar: [], invalidos: [] };
+    const plano = {
+      candidatos: [
+        { client_id: 'a', sheet_id: S },
+        { client_id: 'h', sheet_id: S },
+      ],
+      vigiar: [],
+      buscar: [],
+      invalidos: [],
+    };
     // 'h' ganhou pasta à mão entre as duas chamadas do robô.
-    const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'h', drive_folder_url: 'https://drive.google.com/drive/folders/HUMANO123456789' }, { id: 'z', drive_folder_url: null }]);
-    const r = await gravarResultadoPastas(db, plano, { achados: [
-      { client_id: 'a', folder_url: F }, { client_id: 'h', folder_url: F }, { client_id: 'z', folder_url: F }, { client_id: 'a', folder_url: 'lixo' },
-    ] }, 'T');
+    const db = fakeDb([
+      { id: 'a', drive_folder_url: null },
+      { id: 'h', drive_folder_url: 'https://drive.google.com/drive/folders/HUMANO123456789' },
+      { id: 'z', drive_folder_url: null },
+    ]);
+    const r = await gravarResultadoPastas(
+      db,
+      plano,
+      {
+        achados: [
+          { client_id: 'a', folder_url: F },
+          { client_id: 'h', folder_url: F },
+          { client_id: 'z', folder_url: F },
+          { client_id: 'a', folder_url: 'lixo' },
+        ],
+      },
+      'T'
+    );
     expect(r).toMatchObject({ gravados: 1, ignorados: 2, log: null });
-    expect(db.rows[0]).toMatchObject({ drive_folder_url: `https://drive.google.com/drive/folders/${F}`, drive_folder_status: 'ok', drive_folder_checked_at: 'T' });
-    expect(db.rows[1].drive_folder_url).toBe('https://drive.google.com/drive/folders/HUMANO123456789');
+    expect(db.rows[0]).toMatchObject({
+      drive_folder_url: `https://drive.google.com/drive/folders/${F}`,
+      drive_folder_status: 'ok',
+      drive_folder_checked_at: 'T',
+    });
+    expect(db.rows[1].drive_folder_url).toBe(
+      'https://drive.google.com/drive/folders/HUMANO123456789'
+    );
     expect(db.rows[2].drive_folder_url).toBe(null);
   });
 
   it('testes viram ok / inacessivel com checked_at; status desconhecido é ignorado', async () => {
-    const plano = { candidatos: [], vigiar: [{ client_id: 'b', folder_id: F }, { client_id: 'c', folder_id: F }], buscar: [], invalidos: [] };
+    const plano = {
+      candidatos: [],
+      vigiar: [
+        { client_id: 'b', folder_id: F },
+        { client_id: 'c', folder_id: F },
+      ],
+      buscar: [],
+      invalidos: [],
+    };
     const db = fakeDb([{ id: 'b' }, { id: 'c' }]);
-    const r = await gravarResultadoPastas(db, plano, { testes: [
-      { client_id: 'b', status: 'ok' }, { client_id: 'c', status: 'inacessivel' }, { client_id: 'c', status: 'invalido' }, { client_id: 'x', status: 'ok' },
-    ] }, 'T');
+    const r = await gravarResultadoPastas(
+      db,
+      plano,
+      {
+        testes: [
+          { client_id: 'b', status: 'ok' },
+          { client_id: 'c', status: 'inacessivel' },
+          { client_id: 'c', status: 'invalido' },
+          { client_id: 'x', status: 'ok' },
+        ],
+      },
+      'T'
+    );
     expect(r).toMatchObject({ atualizados: 2, ignorados: 2 });
     expect(db.rows).toEqual([
       { id: 'b', drive_folder_status: 'ok', drive_folder_checked_at: 'T' },
@@ -546,16 +927,32 @@ describe('pasta do Drive do cliente (069)', () => {
   });
 
   it('sem a 069: não lança, ainda vincula a pasta e devolve a instrução', async () => {
-    const plano = { candidatos: [{ client_id: 'a', sheet_id: S }], vigiar: [{ client_id: 'b', folder_id: F }], buscar: [], invalidos: ['e'] };
+    const plano = {
+      candidatos: [{ client_id: 'a', sheet_id: S }],
+      vigiar: [{ client_id: 'b', folder_id: F }],
+      buscar: [],
+      invalidos: ['e'],
+    };
     const db = fakeDb([{ id: 'a', drive_folder_url: null }, { id: 'b' }], { semColuna: true });
     expect(await marcarPastasInvalidas(db, ['e'], 'T')).toBe(AVISO_069);
-    const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'a', folder_url: F }], testes: [{ client_id: 'b', status: 'ok' }] }, 'T');
+    const r = await gravarResultadoPastas(
+      db,
+      plano,
+      { achados: [{ client_id: 'a', folder_url: F }], testes: [{ client_id: 'b', status: 'ok' }] },
+      'T'
+    );
     expect(r).toMatchObject({ gravados: 1, atualizados: 0, log: AVISO_069 });
     expect(db.rows[0].drive_folder_url).toBe(`https://drive.google.com/drive/folders/${F}`);
   });
 
   it('outro erro do banco não é mascarado', async () => {
-    const db = { from: () => ({ update: () => ({ in: async () => ({ error: { code: '42501', message: 'permission denied' } }) }) }) };
+    const db = {
+      from: () => ({
+        update: () => ({
+          in: async () => ({ error: { code: '42501', message: 'permission denied' } }),
+        }),
+      }),
+    };
     await expect(marcarPastasInvalidas(db, ['e'], 'T')).rejects.toThrow('permission denied');
   });
 
@@ -565,18 +962,31 @@ describe('pasta do Drive do cliente (069)', () => {
         { id: 'n', name: '  Acme Ltda  ', google_sheet_url: null, drive_folder_url: null },
         { id: 'branco', name: 'Beta', google_sheet_url: '   ', drive_folder_url: '' },
       ]);
-      expect(p.buscar).toEqual([{ client_id: 'n', nome: 'Acme Ltda' }, { client_id: 'branco', nome: 'Beta' }]);
+      expect(p.buscar).toEqual([
+        { client_id: 'n', nome: 'Acme Ltda' },
+        { client_id: 'branco', nome: 'Beta' },
+      ]);
     });
 
     it('link de planilha inválido também vai a buscar: o nome evita duplicar a pasta que exista', () => {
-      const p = planoPastas([{ id: 'inv', name: 'Gama', google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml' }]);
+      const p = planoPastas([
+        {
+          id: 'inv',
+          name: 'Gama',
+          google_sheet_url: 'https://docs.google.com/spreadsheets/d/e/2PACX-publicada/pubhtml',
+        },
+      ]);
       expect(p.buscar).toEqual([{ client_id: 'inv', nome: 'Gama' }]);
       expect(p.candidatos).toEqual([]);
     });
 
     it('fica de fora de buscar: planilha válida (vai a candidatos), nome vazio, já tem pasta', () => {
       const p = planoPastas([
-        { id: 'pl', name: 'A', google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit` },
+        {
+          id: 'pl',
+          name: 'A',
+          google_sheet_url: `https://docs.google.com/spreadsheets/d/${S}/edit`,
+        },
         { id: 'vazio', name: '' },
         { id: 'esp', name: '   ' },
         { id: 'semnome' },
@@ -592,7 +1002,9 @@ describe('pasta do Drive do cliente (069)', () => {
       expect(nomeDaPasta(null)).toBe('');
       expect(nomeDaPasta('x'.repeat(NOME_PASTA_MAX + 20))).toHaveLength(NOME_PASTA_MAX);
       // O corte não pode deixar espaço no fim, que o Drive mostraria como outro nome.
-      expect(nomeDaPasta('x'.repeat(NOME_PASTA_MAX - 1) + ' y')).toBe('x'.repeat(NOME_PASTA_MAX - 1));
+      expect(nomeDaPasta('x'.repeat(NOME_PASTA_MAX - 1) + ' y')).toBe(
+        'x'.repeat(NOME_PASTA_MAX - 1)
+      );
     });
 
     it('nome repetido ganha o CNPJ; sem CNPJ, o começo do id; nome único fica limpo', () => {
@@ -623,11 +1035,24 @@ describe('pasta do Drive do cliente (069)', () => {
     });
 
     it('grava a pasta achada ou criada para quem estava em buscar, com status ok', async () => {
-      const plano = { candidatos: [], vigiar: [], invalidos: [], buscar: [{ client_id: 'n', nome: 'X' }] };
+      const plano = {
+        candidatos: [],
+        vigiar: [],
+        invalidos: [],
+        buscar: [{ client_id: 'n', nome: 'X' }],
+      };
       const db = fakeDb([{ id: 'n', drive_folder_url: null }]);
-      const r = await gravarResultadoPastas(db, plano, { achados: [{ client_id: 'n', folder_url: F }] }, 'T');
+      const r = await gravarResultadoPastas(
+        db,
+        plano,
+        { achados: [{ client_id: 'n', folder_url: F }] },
+        'T'
+      );
       expect(r).toMatchObject({ gravados: 1, ignorados: 0 });
-      expect(db.rows[0]).toMatchObject({ drive_folder_url: `https://drive.google.com/drive/folders/${F}`, drive_folder_status: 'ok' });
+      expect(db.rows[0]).toMatchObject({
+        drive_folder_url: `https://drive.google.com/drive/folders/${F}`,
+        drive_folder_status: 'ok',
+      });
     });
 
     const ler = (f) => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
@@ -640,19 +1065,31 @@ describe('pasta do Drive do cliente (069)', () => {
 
     it('Robo.gs trabalha na raiz configurada, ignora a lixeira e lê buscar', () => {
       const src = ler('tools/google-agenda-apps-script/Robo.gs');
-      for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.buscar || []']) expect(src).toContain(s);
+      for (const s of ['CLIENTES_ROOT_ID', 'isTrashed()', 'r.buscar || []'])
+        expect(src).toContain(s);
     });
   });
 });
 
 describe('resumo da rodada do robô (071)', () => {
   it('guarda as contagens que a triagem devolve', () => {
-    const r = resumoDaRodada({ success: true, mensagens: 7, abertas: 2, notas: 1, ignorados: 3, sem_cliente: ['a@x.com', 'b@y.com'] });
+    const r = resumoDaRodada({
+      success: true,
+      mensagens: 7,
+      abertas: 2,
+      notas: 1,
+      ignorados: 3,
+      sem_cliente: ['a@x.com', 'b@y.com'],
+    });
     expect(r).toEqual({ mensagens: 7, abertas: 2, notas: 1, ignorados: 3, sem_cliente: 2 });
   });
 
   it('nunca grava o conteúdo do backup, só quantas tabelas vieram', () => {
-    const r = resumoDaRodada({ gerado_em: '2026-10-29T03:00:00Z', tabelas: { clients: [{ nome: 'X' }], pendencias: [] }, erros: [] });
+    const r = resumoDaRodada({
+      gerado_em: '2026-10-29T03:00:00Z',
+      tabelas: { clients: [{ nome: 'X' }], pendencias: [] },
+      erros: [],
+    });
     expect(r).toEqual({ tabelas: 2, erros: 0 });
     expect(JSON.stringify(r)).not.toContain('X');
   });
@@ -673,21 +1110,42 @@ import { conversaDoEmail } from '../supabase/functions/robo/campo.ts';
 
 describe('conversaDoEmail', () => {
   it('usa o número do ticket quando o remetente é o Octadesk', () => {
-    expect(conversaDoEmail({ de: 'suporte@init.octadesk.com', assunto: 'Atualização no Ticket #4821', thread_id: 't1' }))
-      .toBe('octadesk:4821');
+    expect(
+      conversaDoEmail({
+        de: 'suporte@init.octadesk.com',
+        assunto: 'Atualização no Ticket #4821',
+        thread_id: 't1',
+      })
+    ).toBe('octadesk:4821');
   });
 
   it('casa a mesma chave em threads diferentes do mesmo ticket', () => {
-    const a = conversaDoEmail({ de: 'noreply@octadesk.com', assunto: '[#4821] Novo comentário', thread_id: 't1' });
-    const b = conversaDoEmail({ de: 'noreply@octadesk.com', assunto: 'Re: Ticket 4821 resolvido', thread_id: 't2' });
+    const a = conversaDoEmail({
+      de: 'noreply@octadesk.com',
+      assunto: '[#4821] Novo comentário',
+      thread_id: 't1',
+    });
+    const b = conversaDoEmail({
+      de: 'noreply@octadesk.com',
+      assunto: 'Re: Ticket 4821 resolvido',
+      thread_id: 't2',
+    });
     expect(a).toBe(b);
   });
 
   it('cai na thread do Gmail quando o remetente não é o Octadesk', () => {
-    expect(conversaDoEmail({ de: 'cliente@empresa.com', assunto: 'Ticket #4821', thread_id: 't9' })).toBe('t9');
+    expect(
+      conversaDoEmail({ de: 'cliente@empresa.com', assunto: 'Ticket #4821', thread_id: 't9' })
+    ).toBe('t9');
   });
 
   it('cai na thread do Gmail quando o assunto não traz número de ticket', () => {
-    expect(conversaDoEmail({ de: 'noreply@octadesk.com', assunto: 'Pesquisa de satisfação', thread_id: 't3' })).toBe('t3');
+    expect(
+      conversaDoEmail({
+        de: 'noreply@octadesk.com',
+        assunto: 'Pesquisa de satisfação',
+        thread_id: 't3',
+      })
+    ).toBe('t3');
   });
 });

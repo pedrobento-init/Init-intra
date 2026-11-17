@@ -26,18 +26,24 @@ describe('textos sem "(s)"', () => {
     const files = fs.readdirSync('js').filter((f) => f.endsWith('.js'));
     const offenders = [];
     for (const f of files) {
-      fs.readFileSync('js/' + f, 'utf8').split('\n').forEach((line, i) => {
-        if (/console\.|^\s*\*|^\s*\/\//.test(line)) return; // logs e comentários
-        // Só conta "(s)" dentro de string (aspas/crase abertas antes dele),
-        // para não pegar chamadas como escapeHtml(s).
-        const re = /(?:^|[^\wà-ú])[a-zà-ú]+\(s\)/g; // palavra minúscula inteira (não String(s))
-        let m;
-        while ((m = re.exec(line))) {
-          const before = line.slice(0, m.index);
-          const inStr = (before.split('`').length - 1) % 2 === 1 || (before.split("'").length - 1) % 2 === 1;
-          if (inStr) { offenders.push(`${f}:${i + 1}`); break; }
-        }
-      });
+      fs.readFileSync('js/' + f, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (/console\.|^\s*\*|^\s*\/\//.test(line)) return; // logs e comentários
+          // Só conta "(s)" dentro de string (aspas/crase abertas antes dele),
+          // para não pegar chamadas como escapeHtml(s).
+          const re = /(?:^|[^\wà-ú])[a-zà-ú]+\(s\)/g; // palavra minúscula inteira (não String(s))
+          let m;
+          while ((m = re.exec(line))) {
+            const before = line.slice(0, m.index);
+            const inStr =
+              (before.split('`').length - 1) % 2 === 1 || (before.split("'").length - 1) % 2 === 1;
+            if (inStr) {
+              offenders.push(`${f}:${i + 1}`);
+              break;
+            }
+          }
+        });
     }
     expect(offenders).toEqual([]);
   });

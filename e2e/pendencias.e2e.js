@@ -9,9 +9,12 @@ test.describe('Pendências', () => {
 
   test('coluna longa rola os cards sem mover o cabeçalho ou a página', async ({ page }) => {
     const column = penColumn(page, 'Aberto');
-    await column.locator('.kanban-card').first().evaluate((card) => {
-      for (let i = 0; i < 30; i++) card.parentElement.append(card.cloneNode(true));
-    });
+    await column
+      .locator('.kanban-card')
+      .first()
+      .evaluate((card) => {
+        for (let i = 0; i < 30; i++) card.parentElement.append(card.cloneNode(true));
+      });
 
     const result = await column.evaluate((col) => {
       const header = col.querySelector('.kanban-col-header');
@@ -26,7 +29,12 @@ test.describe('Pendências', () => {
         pageFixed: window.scrollY === pageScroll,
       };
     });
-    expect(result).toEqual({ scrollable: true, scrolled: true, headerFixed: true, pageFixed: true });
+    expect(result).toEqual({
+      scrollable: true,
+      scrolled: true,
+      headerFixed: true,
+      pageFixed: true,
+    });
   });
 
   test('criar pendência pelo formulário aparece em "Aberto"', async ({ page }) => {
@@ -41,7 +49,9 @@ test.describe('Pendências', () => {
     await modal.getByRole('button', { name: 'Salvar' }).click();
 
     await expect(page.locator('#modalOverlay')).toBeHidden();
-    await expect(penColumn(page, 'Aberto').locator('.kanban-card', { hasText: 'E2E — trocar nobreak' })).toBeVisible();
+    await expect(
+      penColumn(page, 'Aberto').locator('.kanban-card', { hasText: 'E2E — trocar nobreak' })
+    ).toBeVisible();
   });
 
   test('iniciar e pausar o cronômetro move entre colunas', async ({ page }) => {
@@ -50,7 +60,9 @@ test.describe('Pendências', () => {
 
     // Iniciar → vai para Em Andamento com o tempo correndo
     await card.getByRole('button', { name: /Iniciar cronômetro/ }).click();
-    const running = penColumn(page, 'Em Andamento').locator('.kanban-card', { hasText: 'Verificação mensal de backup' });
+    const running = penColumn(page, 'Em Andamento').locator('.kanban-card', {
+      hasText: 'Verificação mensal de backup',
+    });
     await expect(running).toBeVisible();
     await expect(running.locator('.kb-timer[data-running="true"]')).toBeVisible();
 
@@ -75,14 +87,19 @@ test.describe('Pendências', () => {
     await moved.hover();
     await moved.getByRole('button', { name: /Ações rápidas/ }).click();
     await page.getByRole('menu').getByRole('menuitemradio', { name: 'Giovane' }).click();
-    await expect(penCard(page, 'Atualização do antivírus').locator('.kc-resp')).toHaveText('Giovane');
+    await expect(penCard(page, 'Atualização do antivírus').locator('.kc-resp')).toHaveText(
+      'Giovane'
+    );
   });
 
   test('nova pendência a partir de modelo já nasce com checklist', async ({ page }) => {
     await page.locator('#topbarActionBtn').click();
     const modal = page.locator('#modal');
     await modal.getByRole('button', { name: 'Formulário completo' }).click();
-    const tplValue = await modal.locator('#penTemplateSel option', { hasText: 'Onboarding' }).first().getAttribute('value');
+    const tplValue = await modal
+      .locator('#penTemplateSel option', { hasText: 'Onboarding' })
+      .first()
+      .getAttribute('value');
     await modal.locator('#penTemplateSel').selectOption(tplValue);
     await expect(modal.locator('#penTemplateHint')).toContainText('checklist');
     await expect(modal.locator('[name="assunto"]')).not.toHaveValue('');

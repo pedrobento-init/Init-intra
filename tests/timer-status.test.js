@@ -10,9 +10,12 @@ import vm from 'node:vm';
 // fantasma na coluna nova. A regra agora é única, em timer.js.
 
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const FECHADOS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
@@ -60,21 +63,33 @@ try {
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
 const runningPen = (over = {}) => ({
-  id: 'PEN-1', status: 'em_andamento', responsible: 'Ana', notes: [],
-  timerRunning: true, timerOperator: 'Ana', timerStartedAt: hoursAgo(2), timerTotalSeconds: 3600,
+  id: 'PEN-1',
+  status: 'em_andamento',
+  responsible: 'Ana',
+  notes: [],
+  timerRunning: true,
+  timerOperator: 'Ana',
+  timerStartedAt: hoursAgo(2),
+  timerTotalSeconds: 3600,
   ...over,
 });
 
 // Toasts/saves registrados em memória, mesmo padrão do chamado-desfazer.
 let salvos, sessoes, atual;
 function instrumentar(pen) {
-  salvos = []; sessoes = [];
+  salvos = [];
+  sessoes = [];
   atual = { ...pen };
   sandbox.showToast = () => {};
   sandbox.showUndoToast = () => {};
   sandbox.getPendenciaById = () => ({ ...atual });
-  sandbox.savePendencia = (next) => { salvos.push(next); Object.assign(atual, next); };
-  sandbox.recordTimeSession = (p, secs, opts) => { sessoes.push({ secs, opts }); };
+  sandbox.savePendencia = (next) => {
+    salvos.push(next);
+    Object.assign(atual, next);
+  };
+  sandbox.recordTimeSession = (p, secs, opts) => {
+    sessoes.push({ secs, opts });
+  };
 }
 
 describe('timerSessionStopForStatus', () => {

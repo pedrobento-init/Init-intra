@@ -22,13 +22,17 @@ const sandbox = {
   document: { getElementById: () => null },
   DB: { EMAILS_TRIAGEM: 'intra_emails_triagem' },
   dbGet: () => lista,
-  dbSet: (_k, v) => { lista = v; },
+  dbSet: (_k, v) => {
+    lista = v;
+  },
   getUser: () => ({ name: 'Ana' }),
   isSupabaseConnected: () => false,
   filterByTeam: (l) => l,
   showToast: (m, k) => toasts.push({ m, k }),
   openPendenciaForm: (...args) => aberturas.push(args),
-  showUndoToast: (_m, cb) => { undoCb = cb; },
+  showUndoToast: (_m, cb) => {
+    undoCb = cb;
+  },
   escapeHtml: (s) => String(s == null ? '' : s),
   formatDateTime: (s) => s,
   getClientById: (id) => clientes.find((c) => c.id === id) || null,
@@ -39,29 +43,41 @@ vm.createContext(sandbox);
 const _err = console.error;
 console.error = () => {};
 try {
-  vm.runInContext(fs.readFileSync('js/emails-triagem.js', 'utf8'), sandbox, { filename: 'emails-triagem.js' });
+  vm.runInContext(fs.readFileSync('js/emails-triagem.js', 'utf8'), sandbox, {
+    filename: 'emails-triagem.js',
+  });
 } finally {
   console.error = _err;
 }
 
-const entrada = (over = {}) => Object.assign({
-  id: 'ETR-1',
-  de: 'Márcia Prado <marcia@acme.com.br>',
-  assunto: 'Impressora não imprime',
-  corpo: 'A impressora da recepção parou.',
-  motivo: 'sem_cliente',
-  status: 'pendente',
-  pendenciaId: null,
-  threadId: 'thread-9',
-  messageId: '<CAF=abc@mail.gmail.com>',
-  team: 'init',
-  recebidoEm: '2026-10-26T12:00:00.000Z',
-  tratadoPor: null,
-  tratadoEm: null,
-  updatedAt: '2026-10-26T12:00:00.000Z',
-}, over);
+const entrada = (over = {}) =>
+  Object.assign(
+    {
+      id: 'ETR-1',
+      de: 'Márcia Prado <marcia@acme.com.br>',
+      assunto: 'Impressora não imprime',
+      corpo: 'A impressora da recepção parou.',
+      motivo: 'sem_cliente',
+      status: 'pendente',
+      pendenciaId: null,
+      threadId: 'thread-9',
+      messageId: '<CAF=abc@mail.gmail.com>',
+      team: 'init',
+      recebidoEm: '2026-10-26T12:00:00.000Z',
+      tratadoPor: null,
+      tratadoEm: null,
+      updatedAt: '2026-10-26T12:00:00.000Z',
+    },
+    over
+  );
 
-beforeEach(() => { lista = []; toasts = []; aberturas = []; undoCb = null; clientes = []; });
+beforeEach(() => {
+  lista = [];
+  toasts = [];
+  aberturas = [];
+  undoCb = null;
+  clientes = [];
+});
 
 describe('abrir o formulário a partir da caixa', () => {
   it('entrada já tratada não abre nada: card velho não vira segundo chamado', () => {
@@ -138,22 +154,37 @@ describe('desfazer não deixa responsável fantasma', () => {
 });
 
 describe('o formulário carrega e persiste o que veio do e-mail', () => {
-  const detalhe = fs.readFileSync(fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)), 'utf8');
+  const detalhe = fs.readFileSync(
+    fileURLToPath(new URL('../js/pendencias-detalhe.js', import.meta.url)),
+    'utf8'
+  );
 
   it('os quatro campos entram como hidden: o submit só grava o que é input', () => {
     expect(detalhe).toContain('<input type="hidden" name="\' + f[0] + \'"');
-    expect(detalhe).toContain("['solicitanteEmail', 'emailThreadId', 'emailMessageId', 'emailCorpo']");
+    expect(detalhe).toContain(
+      "['solicitanteEmail', 'emailThreadId', 'emailMessageId', 'emailCorpo']"
+    );
   });
 
   it('o id da entrada viaja no formulário e chega ao marcar', () => {
     expect(detalhe).toContain("['etrEntrada', p.etrEntrada]");
-    expect(detalhe).toContain("emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || ''), data.clientId)");
+    expect(detalhe).toContain(
+      "emailTriagemMarcarAberta(data.id, String(fd.get('etrEntrada') || ''), data.clientId)"
+    );
   });
 });
 
 describe('a caixa acompanha o app em tempo real', () => {
-  const migr = fs.readFileSync(fileURLToPath(new URL('../supabase/migrations/067_emails_triagem_realtime.sql', import.meta.url)), 'utf8');
-  const schema = fs.readFileSync(fileURLToPath(new URL('../js/schema.js', import.meta.url)), 'utf8');
+  const migr = fs.readFileSync(
+    fileURLToPath(
+      new URL('../supabase/migrations/067_emails_triagem_realtime.sql', import.meta.url)
+    ),
+    'utf8'
+  );
+  const schema = fs.readFileSync(
+    fileURLToPath(new URL('../js/schema.js', import.meta.url)),
+    'utf8'
+  );
 
   it('a tabela entra na publicação supabase_realtime — assinar sozinho não entrega evento', () => {
     expect(migr).toContain('ALTER PUBLICATION supabase_realtime ADD TABLE public.emails_triagem');
@@ -169,7 +200,10 @@ describe('a caixa acompanha o app em tempo real', () => {
 });
 
 describe('o robô grava a entrada sem reprocessar para sempre', () => {
-  const robo = fs.readFileSync(fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)), 'utf8');
+  const robo = fs.readFileSync(
+    fileURLToPath(new URL('../supabase/functions/robo/index.ts', import.meta.url)),
+    'utf8'
+  );
 
   it('ignorado_ia herda a equipe do cliente — senão a caixa da mam/bt fica vazia', () => {
     expect(robo).toContain('naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team })');
@@ -177,7 +211,10 @@ describe('o robô grava a entrada sem reprocessar para sempre', () => {
   });
 
   it('a chave de dedupe não volta no erro da caixa: era reprocessamento para sempre', () => {
-    const trecho = robo.slice(robo.indexOf('async function guardarEntrada'), robo.indexOf('async function triagem'));
+    const trecho = robo.slice(
+      robo.indexOf('async function guardarEntrada'),
+      robo.indexOf('async function triagem')
+    );
     expect(trecho).not.toContain('avisos_enviados');
     expect(trecho).toContain('console.error');
   });

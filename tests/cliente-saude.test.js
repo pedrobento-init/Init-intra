@@ -19,7 +19,9 @@ describe('saúde do cliente (0–100)', () => {
   });
   it('backup com falha e vencimento estourado derrubam um cliente sem pendências', () => {
     const s = calcularSaude({
-      base: verde, today, agora,
+      base: verde,
+      today,
+      agora,
       monitores: [{ nome: 'Veeam', ultimo_status: 'falha', max_horas: 48 }],
       vencimentos: [{ status: 'ativo', dataVencimento: '2026-10-10' }],
     });
@@ -29,10 +31,20 @@ describe('saúde do cliente (0–100)', () => {
   });
   it('soma tudo e chega a crítico', () => {
     const s = calcularSaude({
-      base: { level: 'yellow', totalAbertas: 8, vencidas: 4, avgHours: 100 }, today, agora,
-      vencimentos: [{ status: 'ativo', dataVencimento: '2026-10-25' }, { status: 'ativo', dataVencimento: '2026-11-10' }],
-      monitores: [{ nome: 'NAS', ultimo_status: 'ok', ultimo_em: '2026-10-15T00:00:00Z', max_horas: 48 }],
-      dispositivosParados: [{ nome: 'PC-1', dias: 20 }, { nome: 'PC-2', dias: 9 }],
+      base: { level: 'yellow', totalAbertas: 8, vencidas: 4, avgHours: 100 },
+      today,
+      agora,
+      vencimentos: [
+        { status: 'ativo', dataVencimento: '2026-10-25' },
+        { status: 'ativo', dataVencimento: '2026-11-10' },
+      ],
+      monitores: [
+        { nome: 'NAS', ultimo_status: 'ok', ultimo_em: '2026-10-15T00:00:00Z', max_horas: 48 },
+      ],
+      dispositivosParados: [
+        { nome: 'PC-1', dias: 20 },
+        { nome: 'PC-2', dias: 9 },
+      ],
       visitas: [{ date: '2026-03-01', status: 'concluida' }],
     });
     expect(s.level).toBe('red');
@@ -45,23 +57,41 @@ describe('saúde do cliente (0–100)', () => {
     expect(calcularSaude({ base: { ...verde, level: 'red' }, today, agora }).level).toBe('red');
   });
   it('vencimento encerrado e monitor pausado não contam', () => {
-    const s = calcularSaude({ base: verde, today, agora,
+    const s = calcularSaude({
+      base: verde,
+      today,
+      agora,
       vencimentos: [{ status: 'encerrado', dataVencimento: '2026-01-01' }],
-      monitores: [{ nome: 'X', ultimo_status: 'falha', ativo: false, max_horas: 48 }] });
+      monitores: [{ nome: 'X', ultimo_status: 'falha', ativo: false, max_horas: 48 }],
+    });
     expect(s.nota).toBe(100);
   });
   it('alerta do monitor: falha, silêncio (desde a criação se nunca chegou), aviso', () => {
     expect(backupMonitorAlerta({ ultimo_status: 'falha' }, agora)).toBe('falha');
-    expect(backupMonitorAlerta({ ultimo_status: 'ok', ultimo_em: '2026-10-21T00:00:00Z', max_horas: 48 }, agora)).toBeNull();
-    expect(backupMonitorAlerta({ created_at: '2026-10-10T00:00:00Z', max_horas: 48 }, agora)).toBe('silencio');
-    expect(backupMonitorAlerta({ ultimo_status: 'aviso', ultimo_em: '2026-10-21T00:00:00Z', max_horas: 48 }, agora)).toBe('aviso');
+    expect(
+      backupMonitorAlerta(
+        { ultimo_status: 'ok', ultimo_em: '2026-10-21T00:00:00Z', max_horas: 48 },
+        agora
+      )
+    ).toBeNull();
+    expect(backupMonitorAlerta({ created_at: '2026-10-10T00:00:00Z', max_horas: 48 }, agora)).toBe(
+      'silencio'
+    );
+    expect(
+      backupMonitorAlerta(
+        { ultimo_status: 'aviso', ultimo_em: '2026-10-21T00:00:00Z', max_horas: 48 },
+        agora
+      )
+    ).toBe('aviso');
   });
 });
 
 describe('rota do dia (Google Maps)', () => {
   it('última parada é o destino; as outras viram waypoints; sem visitas, nada', () => {
     const url = rotaMapsUrl(['Rua A, 1', '', 'Acme Ltda']);
-    expect(url).toBe('https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=Acme%20Ltda&waypoints=Rua%20A%2C%201');
+    expect(url).toBe(
+      'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=Acme%20Ltda&waypoints=Rua%20A%2C%201'
+    );
     expect(rotaMapsUrl([])).toBeNull();
   });
   it('no máximo 10 paradas; site e e-mail montam a mesma URL', () => {

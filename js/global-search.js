@@ -11,7 +11,12 @@ let _searchResults = [];
 function _snippetEscapeHtml(str) {
   if (typeof escapeHtml === 'function') return escapeHtml(str);
   if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function getNoteSnippet(text, query, radius) {
   if (!text || !query) return null;
@@ -25,7 +30,12 @@ function getNoteSnippet(text, query, radius) {
   const before = text.slice(start, idx);
   const match = text.slice(idx, idx + query.length);
   const after = text.slice(idx + query.length, end);
-  let snippet = _snippetEscapeHtml(before) + '<mark>' + _snippetEscapeHtml(match) + '</mark>' + _snippetEscapeHtml(after);
+  let snippet =
+    _snippetEscapeHtml(before) +
+    '<mark>' +
+    _snippetEscapeHtml(match) +
+    '</mark>' +
+    _snippetEscapeHtml(after);
   if (start > 0) snippet = '…' + snippet;
   if (end < text.length) snippet = snippet + '…';
   return snippet;
@@ -58,13 +68,20 @@ function _getPendingSyncText() {
 // aqui é a garantia para syncs disparados em background).
 function _refreshSyncBannerSafe() {
   try {
-    if (typeof _refreshSyncBanner === 'function') { _refreshSyncBanner(); return; }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
+    if (typeof _refreshSyncBanner === 'function') {
+      _refreshSyncBanner();
+      return;
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+  }
   try {
     if (typeof _updateConnectionStatus === 'function') {
       _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+  }
 }
 // Dispara o sync tolerando retorno não-Promise e sempre refresca o banner.
 function _triggerBackgroundSync(logLabel) {
@@ -74,35 +91,89 @@ function _triggerBackgroundSync(logLabel) {
     if (p && typeof p.then === 'function') {
       p.then(
         () => _refreshSyncBannerSafe(),
-        (err) => { console.warn(logLabel, err); _refreshSyncBannerSafe(); }
+        (err) => {
+          console.warn(logLabel, err);
+          _refreshSyncBannerSafe();
+        }
       );
     } else {
       _refreshSyncBannerSafe();
     }
-  } catch (err) { console.warn(logLabel, err); }
+  } catch (err) {
+    console.warn(logLabel, err);
+  }
 }
 
 // ── Ações rápidas (Ctrl+K como paleta de comandos) ─────────────────────────
 // Lista montada na hora (depende de quem está logado / cronômetro ligado).
 function _normSearch(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
 }
 function getSearchActions() {
-  const go = (page, label, kw) => ({ id: 'go-' + page, label: 'Ir para ' + label, kw: 'ir abrir tela ' + kw, run: () => navigateTo(page) });
+  const go = (page, label, kw) => ({
+    id: 'go-' + page,
+    label: 'Ir para ' + label,
+    kw: 'ir abrir tela ' + kw,
+    run: () => navigateTo(page),
+  });
   const list = [
-    { id: 'new-pen', label: 'Nova pendência', kw: 'nova criar adicionar pendencia chamado tarefa', run: () => { if (typeof openPendenciaRapida === 'function') openPendenciaRapida(); else if (typeof openPendenciaForm === 'function') openPendenciaForm(); } },
-    { id: 'new-visit', label: 'Nova visita', kw: 'nova criar agendar visita tecnica', run: () => { if (typeof openVisitForm === 'function') openVisitForm(); } },
+    {
+      id: 'new-pen',
+      label: 'Nova pendência',
+      kw: 'nova criar adicionar pendencia chamado tarefa',
+      run: () => {
+        if (typeof openPendenciaRapida === 'function') openPendenciaRapida();
+        else if (typeof openPendenciaForm === 'function') openPendenciaForm();
+      },
+    },
+    {
+      id: 'new-visit',
+      label: 'Nova visita',
+      kw: 'nova criar agendar visita tecnica',
+      run: () => {
+        if (typeof openVisitForm === 'function') openVisitForm();
+      },
+    },
     go('fila', 'Minha fila', 'fila minha hoje urgente'),
     go('pendencias', 'Pendências', 'pendencias quadro kanban'),
     go('calendario', 'Agenda', 'agenda calendario'),
     go('prazos', 'Prazos e SLA', 'prazos sla vencidas atrasadas cumprimento'),
-    go('vencimentos', 'Vencimentos', 'vencimentos licenca ssl certificado dominio garantia renovacao'),
-    { id: 'new-venc', label: 'Novo vencimento', kw: 'novo cadastrar vencimento licenca ssl dominio garantia', run: () => { if (typeof openVencimentoForm === 'function') openVencimentoForm(); } },
+    go(
+      'vencimentos',
+      'Vencimentos',
+      'vencimentos licenca ssl certificado dominio garantia renovacao'
+    ),
+    {
+      id: 'new-venc',
+      label: 'Novo vencimento',
+      kw: 'novo cadastrar vencimento licenca ssl dominio garantia',
+      run: () => {
+        if (typeof openVencimentoForm === 'function') openVencimentoForm();
+      },
+    },
     go('visitas', 'Visitas', 'visitas'),
-    { id: 'cal-feed', label: 'Agenda no celular (Google/Outlook)', kw: 'agenda celular google outlook iphone ics calendario assinar', run: () => { if (typeof openCalendarFeed === 'function') openCalendarFeed(); } },
+    {
+      id: 'cal-feed',
+      label: 'Agenda no celular (Google/Outlook)',
+      kw: 'agenda celular google outlook iphone ics calendario assinar',
+      run: () => {
+        if (typeof openCalendarFeed === 'function') openCalendarFeed();
+      },
+    },
     go('clientes', 'Clientes', 'clientes'),
     go('equipamentos', 'Equipamentos', 'equipamentos estoque'),
-    { id: 'theme', label: 'Alternar tema claro/escuro', kw: 'tema escuro claro dark light', run: () => { const b = document.getElementById('themeToggleBtn'); if (b) b.click(); } },
+    {
+      id: 'theme',
+      label: 'Alternar tema claro/escuro',
+      kw: 'tema escuro claro dark light',
+      run: () => {
+        const b = document.getElementById('themeToggleBtn');
+        if (b) b.click();
+      },
+    },
   ];
   try {
     const me = (typeof getUser === 'function' && getUser()) || {};
@@ -110,11 +181,25 @@ function getSearchActions() {
     const mine = pens.find((p) => p && p.timerRunning && p.timerOperator === me.name);
     if (mine) {
       const forgot = typeof isTimerForgotten === 'function' && isTimerForgotten(mine);
-      list.unshift(forgot
-        ? { id: 'timer-adjust', label: 'Parar e ajustar meu cronômetro', kw: 'cronometro timer parar ajustar esquecido', run: () => openTimerAdjust(mine.id) }
-        : { id: 'timer-pause', label: 'Pausar meu cronômetro', kw: 'cronometro timer pausar parar', run: () => toggleTimer('pendencia', mine.id) });
+      list.unshift(
+        forgot
+          ? {
+              id: 'timer-adjust',
+              label: 'Parar e ajustar meu cronômetro',
+              kw: 'cronometro timer parar ajustar esquecido',
+              run: () => openTimerAdjust(mine.id),
+            }
+          : {
+              id: 'timer-pause',
+              label: 'Pausar meu cronômetro',
+              kw: 'cronometro timer pausar parar',
+              run: () => toggleTimer('pendencia', mine.id),
+            }
+      );
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+  }
   return list;
 }
 /** Filtra ações pelo texto (todas as palavras precisam aparecer); vazio → todas. */
@@ -122,7 +207,10 @@ function matchSearchActions(query, actions, max) {
   const words = _normSearch(query).split(/\s+/).filter(Boolean);
   const list = actions || [];
   const hits = words.length
-    ? list.filter((a) => { const hay = _normSearch(a.label + ' ' + (a.kw || '')); return words.every((w) => hay.includes(w)); })
+    ? list.filter((a) => {
+        const hay = _normSearch(a.label + ' ' + (a.kw || ''));
+        return words.every((w) => hay.includes(w));
+      })
     : list;
   return hits.slice(0, max || 6);
 }
@@ -170,91 +258,158 @@ function _renderSearchResults(query) {
   const hasFilters = Object.keys(filters).length > 0;
 
   // Sem filtros de atalho, a busca também procura ações ("nova visita"...).
-  const matchActions = hasFilters ? [] : matchSearchActions(remainingText, getSearchActions(), q ? 3 : 6);
+  const matchActions = hasFilters
+    ? []
+    : matchSearchActions(remainingText, getSearchActions(), q ? 3 : 6);
   if (!q && !hasFilters) {
-    _searchResults = matchActions.map(a => ({ type: 'action', data: a }));
-    container.innerHTML = '<div class="search-group-label">Ações rápidas</div>' +
+    _searchResults = matchActions.map((a) => ({ type: 'action', data: a }));
+    container.innerHTML =
+      '<div class="search-group-label">Ações rápidas</div>' +
       matchActions.map((a, i) => _searchActionHtml(a, i)).join('') +
       '<div class="search-empty u-02ec7e">Ou digite para buscar clientes, pendências e equipamentos.</div>';
     return;
   }
 
   // Collect data (respeita filtro de time)
-  const clients   = (typeof getMyClients === 'function')   ? getMyClients()
-                  : (typeof getClients === 'function')     ? getClients()   : [];
-  const pendencias = (typeof getMyPendencias === 'function') ? getMyPendencias()
-                   : (typeof getPendencias === 'function')   ? getPendencias() : [];
-  const equipamentos = (typeof getMyEquipamentos === 'function') ? getMyEquipamentos()
-                   : (typeof getEquipamentos === 'function')     ? getEquipamentos() : [];
+  const clients =
+    typeof getMyClients === 'function'
+      ? getMyClients()
+      : typeof getClients === 'function'
+        ? getClients()
+        : [];
+  const pendencias =
+    typeof getMyPendencias === 'function'
+      ? getMyPendencias()
+      : typeof getPendencias === 'function'
+        ? getPendencias()
+        : [];
+  const equipamentos =
+    typeof getMyEquipamentos === 'function'
+      ? getMyEquipamentos()
+      : typeof getEquipamentos === 'function'
+        ? getEquipamentos()
+        : [];
 
   const clienteFilter = filters.cliente || filters.clientes || filters.client || null;
   const statusFilter = filters.status || null;
 
-  const matchClients = clients.filter(c => {
-    if (clienteFilter) {
-      const cf = String(clienteFilter).toLowerCase();
-      const inName = (c.name || '').toLowerCase().includes(cf);
-      const inSeg = (c.segment || '').toLowerCase().includes(cf);
-      if (!inName && !inSeg) return false;
+  const matchClients = clients
+    .filter((c) => {
+      if (clienteFilter) {
+        const cf = String(clienteFilter).toLowerCase();
+        const inName = (c.name || '').toLowerCase().includes(cf);
+        const inSeg = (c.segment || '').toLowerCase().includes(cf);
+        if (!inName && !inSeg) return false;
+        if (!q) return true;
+      } else if (!q) return false;
       if (!q) return true;
-    } else if (!q) return false;
-    if (!q) return true;
-    return (c.name || '').toLowerCase().includes(q) ||
-           (c.cnpj || '').toLowerCase().includes(q) ||
-           (c.segment || '').toLowerCase().includes(q);
-  }).slice(0, 5);
+      return (
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.cnpj || '').toLowerCase().includes(q) ||
+        (c.segment || '').toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 5);
 
-  const matchPens = pendencias.filter(p => {
-    try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
-    if (statusFilter && String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
-    if (clienteFilter && !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
-    if (!q) return true;
-    const inAssunto = (p.assunto || '').toLowerCase().includes(q);
-    const inDescricao = (p.descricao || '').toLowerCase().includes(q);
-    const inClient = (p.clientName || '').toLowerCase().includes(q);
-    const inResp = (p.responsible || '').toLowerCase().includes(q);
-    const inNotes = Array.isArray(p.notes) && p.notes.some(n => String(n.text || '').toLowerCase().includes(q));
-    return inAssunto || inDescricao || inClient || inResp || inNotes;
-  }).slice(0, 5);
+  const matchPens = pendencias
+    .filter((p) => {
+      try {
+        if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false;
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+      }
+      if (
+        statusFilter &&
+        String(p.status || '').toLowerCase() !== String(statusFilter).toLowerCase()
+      )
+        return false;
+      if (
+        clienteFilter &&
+        !(p.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())
+      )
+        return false;
+      if (!q) return true;
+      const inAssunto = (p.assunto || '').toLowerCase().includes(q);
+      const inDescricao = (p.descricao || '').toLowerCase().includes(q);
+      const inClient = (p.clientName || '').toLowerCase().includes(q);
+      const inResp = (p.responsible || '').toLowerCase().includes(q);
+      const inNotes =
+        Array.isArray(p.notes) &&
+        p.notes.some((n) =>
+          String(n.text || '')
+            .toLowerCase()
+            .includes(q)
+        );
+      return inAssunto || inDescricao || inClient || inResp || inNotes;
+    })
+    .slice(0, 5);
 
-  const matchEquips = equipamentos.filter(eq => {
-    // (CONS-09) havia um `if (!q) return false` aqui que tornava o
-    // `if (!q) return true` abaixo inalcançável: status:/cliente: nunca
-    // retornavam equipamentos.
-    if (statusFilter) {
-      const meta = (typeof getEquipStatusMeta === 'function') ? getEquipStatusMeta(eq.status).label : eq.status;
-      if (String(eq.status || '').toLowerCase() !== String(statusFilter).toLowerCase()
-        && String(meta || '').toLowerCase() !== String(statusFilter).toLowerCase()) return false;
-    }
-    if (clienteFilter && !(eq.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())) return false;
-    if (!q) return true;
-    return (eq.nome || '').toLowerCase().includes(q) ||
-           (eq.numeroSerie || '').toLowerCase().includes(q) ||
-           (eq.clientName || '').toLowerCase().includes(q) ||
-           (eq.osVinculada || '').toLowerCase().includes(q) ||
-           (eq.tipo || '').toLowerCase().includes(q);
-  }).slice(0, 5);
+  const matchEquips = equipamentos
+    .filter((eq) => {
+      // (CONS-09) havia um `if (!q) return false` aqui que tornava o
+      // `if (!q) return true` abaixo inalcançável: status:/cliente: nunca
+      // retornavam equipamentos.
+      if (statusFilter) {
+        const meta =
+          typeof getEquipStatusMeta === 'function'
+            ? getEquipStatusMeta(eq.status).label
+            : eq.status;
+        if (
+          String(eq.status || '').toLowerCase() !== String(statusFilter).toLowerCase() &&
+          String(meta || '').toLowerCase() !== String(statusFilter).toLowerCase()
+        )
+          return false;
+      }
+      if (
+        clienteFilter &&
+        !(eq.clientName || '').toLowerCase().includes(String(clienteFilter).toLowerCase())
+      )
+        return false;
+      if (!q) return true;
+      return (
+        (eq.nome || '').toLowerCase().includes(q) ||
+        (eq.numeroSerie || '').toLowerCase().includes(q) ||
+        (eq.clientName || '').toLowerCase().includes(q) ||
+        (eq.osVinculada || '').toLowerCase().includes(q) ||
+        (eq.tipo || '').toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 5);
 
   // Base de conhecimento (artigos, procedimentos, modelos, casos resolvidos).
   let matchKb = [];
   if (q && !hasFilters && typeof kbSearch === 'function' && typeof kbDocs === 'function') {
-    try { matchKb = kbSearch(kbDocs(), remainingText, { limit: 4 }).filter((d) => d.kind !== 'caso' || !matchPens.some((p) => p.id === d.id)); } catch (_) { matchKb = []; }
+    try {
+      matchKb = kbSearch(kbDocs(), remainingText, { limit: 4 }).filter(
+        (d) => d.kind !== 'caso' || !matchPens.some((p) => p.id === d.id)
+      );
+    } catch (_) {
+      matchKb = [];
+    }
   }
 
   _searchResults = [
-    ...matchActions.map(a => ({ type: 'action', data: a })),
-    ...matchClients.map(c => ({ type: 'client', data: c })),
-    ...matchPens.map(p => ({ type: 'pendencia', data: p })),
-    ...matchEquips.map(eq => ({ type: 'equipamento', data: eq })),
-    ...matchKb.map(d => ({ type: 'kb', data: d }))
+    ...matchActions.map((a) => ({ type: 'action', data: a })),
+    ...matchClients.map((c) => ({ type: 'client', data: c })),
+    ...matchPens.map((p) => ({ type: 'pendencia', data: p })),
+    ...matchEquips.map((eq) => ({ type: 'equipamento', data: eq })),
+    ...matchKb.map((d) => ({ type: 'kb', data: d })),
   ];
 
   if (_searchResults.length === 0) {
     const esc = typeof escapeHtml === 'function' ? escapeHtml(raw) : raw;
     let emptyHtml = `<div class="search-empty">Nenhum resultado para "<strong>${esc}</strong>"</div>`;
     if (hasFilters) {
-      const badges = Object.entries(filters).map(function(entry){ const k=entry[0], v=entry[1]; const ek = typeof escapeHtml==='function'?escapeHtml(k):k; const ev=typeof escapeHtml==='function'?escapeHtml(v):v; return '<span class="tag tag-blue u-11a508">'+ek+':'+ev+'</span>'; }).join(' ');
-      emptyHtml = '<div class="u-54dc9a">'+badges+'</div>' + emptyHtml;
+      const badges = Object.entries(filters)
+        .map(function (entry) {
+          const k = entry[0],
+            v = entry[1];
+          const ek = typeof escapeHtml === 'function' ? escapeHtml(k) : k;
+          const ev = typeof escapeHtml === 'function' ? escapeHtml(v) : v;
+          return '<span class="tag tag-blue u-11a508">' + ek + ':' + ev + '</span>';
+        })
+        .join(' ');
+      emptyHtml = '<div class="u-54dc9a">' + badges + '</div>' + emptyHtml;
     }
     container.innerHTML = emptyHtml;
     return;
@@ -264,11 +419,12 @@ function _renderSearchResults(query) {
 
   if (hasFilters) {
     html += '<div class="u-54dc9a">';
-    Object.entries(filters).forEach(function(entry){
-      const k=entry[0], v=entry[1];
-      const ek = typeof escapeHtml==='function'?escapeHtml(k):k;
-      const ev = typeof escapeHtml==='function'?escapeHtml(v):v;
-      html += '<span class="tag tag-blue u-11a508">'+ek+':'+ev+'</span>';
+    Object.entries(filters).forEach(function (entry) {
+      const k = entry[0],
+        v = entry[1];
+      const ek = typeof escapeHtml === 'function' ? escapeHtml(k) : k;
+      const ev = typeof escapeHtml === 'function' ? escapeHtml(v) : v;
+      html += '<span class="tag tag-blue u-11a508">' + ek + ':' + ev + '</span>';
     });
     html += '</div>';
   }
@@ -281,7 +437,9 @@ function _renderSearchResults(query) {
 
   if (matchClients.length) {
     html += `<div class="search-group-label">Clientes</div>`;
-    html += matchClients.map((c, i) => `
+    html += matchClients
+      .map(
+        (c, i) => `
       <div class="search-result-item" data-idx="${actionOffset + i}" data-action="selectSearchResult" data-arg="${actionOffset + i}" role="button" tabindex="0">
         <div class="search-result-icon u-4ff1ea">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -291,25 +449,33 @@ function _renderSearchResults(query) {
           <div class="search-result-sub">${escapeHtml(c.segment || '—')} · ${escapeHtml(c.cnpj || '—')}</div>
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`).join('');
+      </div>`
+      )
+      .join('');
   }
 
   const clientOffset = actionOffset + matchClients.length;
   const penOffset = clientOffset + matchPens.length;
   if (matchPens.length) {
     html += `<div class="search-group-label">Pendências</div>`;
-    html += matchPens.map((p, i) => {
-      const idx = clientOffset + i;
-      const color = (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.dot) || '#9ca3af';
-      let preview = '';
-      if (q && Array.isArray(p.notes)) {
-        const hit = p.notes.find(n => String(n.text||'').toLowerCase().includes(q));
-        if (hit) {
-          const snippet = getNoteSnippet(hit.text, remainingText, 60);
-          if (snippet) preview = '<div class="search-result-sub u-27d2d0">'+snippet+'</div>';
+    html += matchPens
+      .map((p, i) => {
+        const idx = clientOffset + i;
+        const color =
+          (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[p.status]?.dot) || '#9ca3af';
+        let preview = '';
+        if (q && Array.isArray(p.notes)) {
+          const hit = p.notes.find((n) =>
+            String(n.text || '')
+              .toLowerCase()
+              .includes(q)
+          );
+          if (hit) {
+            const snippet = getNoteSnippet(hit.text, remainingText, 60);
+            if (snippet) preview = '<div class="search-result-sub u-27d2d0">' + snippet + '</div>';
+          }
         }
-      }
-      return `
+        return `
       <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
         <div class="search-result-icon u-514bb9">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -321,14 +487,16 @@ function _renderSearchResults(query) {
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>`;
-    }).join('');
+      })
+      .join('');
   }
 
   if (matchEquips.length) {
     html += `<div class="search-group-label">Equipamentos</div>`;
-    html += matchEquips.map((eq, i) => {
-      const idx = penOffset + i;
-      return `
+    html += matchEquips
+      .map((eq, i) => {
+        const idx = penOffset + i;
+        return `
       <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
         <div class="search-result-icon u-c7183d">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -339,13 +507,16 @@ function _renderSearchResults(query) {
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>`;
-    }).join('');
+      })
+      .join('');
   }
 
   if (matchKb.length) {
     const kbOffset = penOffset + matchEquips.length;
     html += `<div class="search-group-label">Conhecimento</div>`;
-    html += matchKb.map((d, i) => `
+    html += matchKb
+      .map(
+        (d, i) => `
       <div class="search-result-item" data-idx="${kbOffset + i}" data-action="selectSearchResult" data-arg="${kbOffset + i}" role="button" tabindex="0">
         <div class="search-result-icon u-6104c8">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -355,7 +526,9 @@ function _renderSearchResults(query) {
           <div class="search-result-sub">${escapeHtml([typeof KB_KINDS !== 'undefined' ? KB_KINDS[d.kind] : d.kind, d.clientName].filter(Boolean).join(' · '))}</div>
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`).join('');
+      </div>`
+      )
+      .join('');
   }
 
   container.innerHTML = html;
@@ -370,7 +543,11 @@ function selectSearchResult(idx) {
 
   switch (result.type) {
     case 'action':
-      try { result.data.run(); } catch (err) { console.warn('[busca] ação falhou:', err); }
+      try {
+        result.data.run();
+      } catch (err) {
+        console.warn('[busca] ação falhou:', err);
+      }
       break;
     case 'client':
       navigateTo('clientes');
@@ -394,26 +571,45 @@ function selectSearchResult(idx) {
 // Se o registro sumiu (excluído após a busca), avisa em vez de abrir vazio.
 function _openSearchDetailWhenReady(kind, id) {
   var tries = 0;
-  var tick = function() {
+  var tick = function () {
     tries++;
     try {
       if (kind === 'client') {
-        var c = (typeof getClientById === 'function') ? getClientById(id) : null;
-        if (c && document.getElementById('clientGrid') && typeof viewClient === 'function') { viewClient(id); return; }
+        var c = typeof getClientById === 'function' ? getClientById(id) : null;
+        if (c && document.getElementById('clientGrid') && typeof viewClient === 'function') {
+          viewClient(id);
+          return;
+        }
       } else {
-        var p = (typeof getPendenciaById === 'function') ? getPendenciaById(id) : null;
-        if (p && document.getElementById('penViewArea') && typeof openPendenciaDetail === 'function') { openPendenciaDetail(id); return; }
+        var p = typeof getPendenciaById === 'function' ? getPendenciaById(id) : null;
+        if (
+          p &&
+          document.getElementById('penViewArea') &&
+          typeof openPendenciaDetail === 'function'
+        ) {
+          openPendenciaDetail(id);
+          return;
+        }
       }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
-    if (tries < 25) { setTimeout(tick, 120); return; }
-    if (typeof showToast === 'function') showToast('Registro não encontrado (pode ter sido excluído ou ainda estar sincronizando).', 'warning');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+    }
+    if (tries < 25) {
+      setTimeout(tick, 120);
+      return;
+    }
+    if (typeof showToast === 'function')
+      showToast(
+        'Registro não encontrado (pode ter sido excluído ou ainda estar sincronizando).',
+        'warning'
+      );
   };
   tick();
 }
 
 function _highlightSearchItem(idx) {
   const items = document.querySelectorAll('.search-result-item');
-  items.forEach(el => el.classList.remove('active'));
+  items.forEach((el) => el.classList.remove('active'));
   if (idx >= 0 && idx < items.length) {
     items[idx].classList.add('active');
     items[idx].scrollIntoView({ block: 'nearest' });
@@ -421,56 +617,63 @@ function _highlightSearchItem(idx) {
 }
 
 // Keyboard navigation
-if (typeof document !== 'undefined') document.addEventListener('keydown', (e) => {
-  // Ctrl+K or Cmd+K to open search
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault();
-    const modal = document.getElementById('globalSearchModal');
-    if (modal && modal.style.display === 'none') {
-      openGlobalSearch();
-    } else {
-      closeGlobalSearch({ target: modal });
+if (typeof document !== 'undefined')
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+K or Cmd+K to open search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const modal = document.getElementById('globalSearchModal');
+      if (modal && modal.style.display === 'none') {
+        openGlobalSearch();
+      } else {
+        closeGlobalSearch({ target: modal });
+      }
+      return;
     }
-    return;
-  }
 
-  const modal = document.getElementById('globalSearchModal');
-  if (!modal || modal.style.display === 'none') return;
+    const modal = document.getElementById('globalSearchModal');
+    if (!modal || modal.style.display === 'none') return;
 
-  if (e.key === 'Escape') {
-    closeGlobalSearch({ target: modal });
-    return;
-  }
+    if (e.key === 'Escape') {
+      closeGlobalSearch({ target: modal });
+      return;
+    }
 
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    _searchActive = Math.min(_searchActive + 1, _searchResults.length - 1);
-    _highlightSearchItem(_searchActive);
-    return;
-  }
-  if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    _searchActive = Math.max(_searchActive - 1, 0);
-    _highlightSearchItem(_searchActive);
-    return;
-  }
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    if (_searchActive >= 0) selectSearchResult(_searchActive);
-    return;
-  }
-});
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _searchActive = Math.min(_searchActive + 1, _searchResults.length - 1);
+      _highlightSearchItem(_searchActive);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _searchActive = Math.max(_searchActive - 1, 0);
+      _highlightSearchItem(_searchActive);
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_searchActive >= 0) selectSearchResult(_searchActive);
+      return;
+    }
+  });
 
 // Live search input (debounced a 300ms como nas demais telas)
 if (typeof document !== 'undefined') {
-  const _debouncedGlobalSearch = (typeof debounce === 'function') ? debounce((value) => {
-    _searchActive = -1;
-    _renderSearchResults(value);
-  }, 300) : null;
+  const _debouncedGlobalSearch =
+    typeof debounce === 'function'
+      ? debounce((value) => {
+          _searchActive = -1;
+          _renderSearchResults(value);
+        }, 300)
+      : null;
   document.addEventListener('input', (e) => {
     if (e.target && e.target.id === 'globalSearchInput') {
       if (_debouncedGlobalSearch) _debouncedGlobalSearch(e.target.value);
-      else { _searchActive = -1; _renderSearchResults(e.target.value); }
+      else {
+        _searchActive = -1;
+        _renderSearchResults(e.target.value);
+      }
     }
   });
 }
@@ -504,56 +707,76 @@ function syncNow() {
     syncBtn.disabled = true;
   }
   // Trigger Supabase sync if available
-  const _raw = typeof syncSupabaseToLocal === 'function'
-    ? syncSupabaseToLocal()
-    : null;
-  const syncFn = (_raw && typeof _raw.then === 'function') ? _raw : Promise.resolve();
+  const _raw = typeof syncSupabaseToLocal === 'function' ? syncSupabaseToLocal() : null;
+  const syncFn = _raw && typeof _raw.then === 'function' ? _raw : Promise.resolve();
 
-  syncFn.then((res) => {
-    if (res && res.ok) {
-      showToast('Sincronizado com sucesso!', 'success');
-    } else if (res && (res.reason === 'offline' || res.reason === 'connectivity' || res.reason === 'timeout')) {
-      showToast('Sem conexão com o servidor. Dados locais preservados — tenta de novo depois.', 'warning', 5000);
-    } else if (res && res.reason === 'partial') {
-      showToast('Sincronização parcial: alguns itens seguem pendentes.', 'warning', 5000);
-    } else if (res && (res.reason === 'not-configured' || res.reason === 'not-authenticated')) {
-      showToast('Sincronização indisponível no momento.', 'warning');
-    } else {
-      showToast('Sincronização concluída com ressalvas. Confira o console ([sync]).', 'warning');
-    }
-    _refreshSyncBannerSafe();
-    // O sync pode ter trazido dados novos — re-renderiza a tela atual para
-    // a lista não continuar velha (refreshPage preserva scroll da página).
-    try { if (res && res.ok && typeof refreshPage === 'function') refreshPage(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'global-search'); }
-    if (syncBtn) {
-      syncBtn.textContent = '↻ Sincronizar';
-      syncBtn.disabled = false;
-    }
-  }).catch(() => {
-    showToast('Erro ao sincronizar. Tente novamente.', 'error');
-    _refreshSyncBannerSafe();
-    if (syncBtn) {
-      syncBtn.textContent = '↻ Sincronizar';
-      syncBtn.disabled = false;
-    }
-  });
+  syncFn
+    .then((res) => {
+      if (res && res.ok) {
+        showToast('Sincronizado com sucesso!', 'success');
+      } else if (
+        res &&
+        (res.reason === 'offline' || res.reason === 'connectivity' || res.reason === 'timeout')
+      ) {
+        showToast(
+          'Sem conexão com o servidor. Dados locais preservados — tenta de novo depois.',
+          'warning',
+          5000
+        );
+      } else if (res && res.reason === 'partial') {
+        showToast('Sincronização parcial: alguns itens seguem pendentes.', 'warning', 5000);
+      } else if (res && (res.reason === 'not-configured' || res.reason === 'not-authenticated')) {
+        showToast('Sincronização indisponível no momento.', 'warning');
+      } else {
+        showToast('Sincronização concluída com ressalvas. Confira o console ([sync]).', 'warning');
+      }
+      _refreshSyncBannerSafe();
+      // O sync pode ter trazido dados novos — re-renderiza a tela atual para
+      // a lista não continuar velha (refreshPage preserva scroll da página).
+      try {
+        if (res && res.ok && typeof refreshPage === 'function') refreshPage();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'global-search');
+      }
+      if (syncBtn) {
+        syncBtn.textContent = '↻ Sincronizar';
+        syncBtn.disabled = false;
+      }
+    })
+    .catch(() => {
+      showToast('Erro ao sincronizar. Tente novamente.', 'error');
+      _refreshSyncBannerSafe();
+      if (syncBtn) {
+        syncBtn.textContent = '↻ Sincronizar';
+        syncBtn.disabled = false;
+      }
+    });
 }
 
 // Listen to browser online/offline events
 if (typeof window !== 'undefined') {
-  window.addEventListener('online',  () => _updateConnectionStatus(true));
+  window.addEventListener('online', () => _updateConnectionStatus(true));
   window.addEventListener('offline', () => _updateConnectionStatus(false));
 }
-if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && typeof navigator !== 'undefined' && navigator.onLine && typeof window !== 'undefined' && window._supabaseAuthActive && typeof syncSupabaseToLocal === 'function') {
-    _triggerBackgroundSync('Sincronização ao retornar à aba:');
-  }
-});
+if (typeof document !== 'undefined')
+  document.addEventListener('visibilitychange', () => {
+    if (
+      document.visibilityState === 'visible' &&
+      typeof navigator !== 'undefined' &&
+      navigator.onLine &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive &&
+      typeof syncSupabaseToLocal === 'function'
+    ) {
+      _triggerBackgroundSync('Sincronização ao retornar à aba:');
+    }
+  });
 
 // Initial check
-if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', () => {
-  _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
-});
+if (typeof window !== 'undefined')
+  window.addEventListener('DOMContentLoaded', () => {
+    _updateConnectionStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  });
 
 // Ação dos itens de resultado (clique/Enter por delegação em js/actions.js).
 if (typeof registerActions === 'function') {
@@ -563,5 +786,13 @@ if (typeof registerActions === 'function') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseSearchShortcuts, getNoteSnippet, matchSearchActions, _getPendingSyncCountSafe, _getPendingSyncText, _refreshSyncBannerSafe, _triggerBackgroundSync };
+  module.exports = {
+    parseSearchShortcuts,
+    getNoteSnippet,
+    matchSearchActions,
+    _getPendingSyncCountSafe,
+    _getPendingSyncText,
+    _refreshSyncBannerSafe,
+    _triggerBackgroundSync,
+  };
 }

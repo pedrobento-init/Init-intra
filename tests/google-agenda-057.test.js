@@ -5,10 +5,18 @@ import { PGlite } from '@electric-sql/pglite';
 // Migration 057 em Postgres de verdade (PGlite): o trigger de visits põe na
 // fila do robô só o que aparece na agenda, nunca o que a própria sincronização
 // grava (google_hash), e nunca impede a visita de ser salva.
-const M057 = fs.readFileSync(new URL('../supabase/migrations/057_google_agenda.sql', import.meta.url), 'utf8');
+const M057 = fs.readFileSync(
+  new URL('../supabase/migrations/057_google_agenda.sql', import.meta.url),
+  'utf8'
+);
 
 let db;
-const fila = async () => (await db.query('SELECT visit_id, old_operator_id, old_operator FROM google_agenda_queue ORDER BY seq')).rows;
+const fila = async () =>
+  (
+    await db.query(
+      'SELECT visit_id, old_operator_id, old_operator FROM google_agenda_queue ORDER BY seq'
+    )
+  ).rows;
 
 beforeAll(async () => {
   db = new PGlite();
@@ -37,8 +45,12 @@ beforeEach(async () => {
 
 describe('057: fila do robô da agenda Google', () => {
   it('criar, mudar horário/técnico e excluir entram na fila com o técnico antigo', async () => {
-    await db.exec(`INSERT INTO visits (id, operator, operator_id, date, "time", status) VALUES ('VIS-1', 'Ana', 'OP-1', '2026-10-20', '09:00', 'agendada')`);
-    await db.exec(`UPDATE visits SET "time" = '10:00', operator = 'Beto', operator_id = 'OP-2' WHERE id = 'VIS-1'`);
+    await db.exec(
+      `INSERT INTO visits (id, operator, operator_id, date, "time", status) VALUES ('VIS-1', 'Ana', 'OP-1', '2026-10-20', '09:00', 'agendada')`
+    );
+    await db.exec(
+      `UPDATE visits SET "time" = '10:00', operator = 'Beto', operator_id = 'OP-2' WHERE id = 'VIS-1'`
+    );
     await db.exec(`DELETE FROM visits WHERE id = 'VIS-1'`);
     expect(await fila()).toEqual([
       { visit_id: 'VIS-1', old_operator_id: null, old_operator: null },
@@ -48,9 +60,13 @@ describe('057: fila do robô da agenda Google', () => {
   });
 
   it('gravar só google_hash, updated_at ou relatório não entra (sem loop)', async () => {
-    await db.exec(`INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-2', 'OP-1', '2026-10-20', 'agendada')`);
+    await db.exec(
+      `INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-2', 'OP-1', '2026-10-20', 'agendada')`
+    );
     await db.exec('DELETE FROM google_agenda_queue');
-    await db.exec(`UPDATE visits SET google_hash = 'abc', updated_at = now(), relatorio = 'ok' WHERE id = 'VIS-2'`);
+    await db.exec(
+      `UPDATE visits SET google_hash = 'abc', updated_at = now(), relatorio = 'ok' WHERE id = 'VIS-2'`
+    );
     await db.exec(`UPDATE visits SET "time" = NULL WHERE id = 'VIS-2'`); // NULL → NULL
     expect(await fila()).toEqual([]);
   });
@@ -64,13 +80,22 @@ describe('057: fila do robô da agenda Google', () => {
 
   it('app não lê as tabelas do robô; só o próprio estado pela RPC', async () => {
     for (const t of ['google_agenda_queue', 'google_agenda_calendars', 'google_agenda_runner']) {
-      const g = await db.query(`SELECT has_table_privilege('authenticated', '${t}', 'SELECT') AS ok`);
+      const g = await db.query(
+        `SELECT has_table_privilege('authenticated', '${t}', 'SELECT') AS ok`
+      );
       expect(g.rows[0].ok).toBe(false);
     }
-    await db.exec(`INSERT INTO google_agenda_calendars (operator_id, calendar_id, ok, last_error) VALUES ('OP-1', 'ana@empresa.com', false, 'Agenda não compartilhada')`);
+    await db.exec(
+      `INSERT INTO google_agenda_calendars (operator_id, calendar_id, ok, last_error) VALUES ('OP-1', 'ana@empresa.com', false, 'Agenda não compartilhada')`
+    );
     await db.exec(`SET request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000a1'`);
     const ana = (await db.query('SELECT my_google_agenda_status() AS s')).rows[0].s;
-    expect(ana).toMatchObject({ runner_email: 'agenda@empresa.com', my_email: 'ana@empresa.com', ok: false, error: 'Agenda não compartilhada' });
+    expect(ana).toMatchObject({
+      runner_email: 'agenda@empresa.com',
+      my_email: 'ana@empresa.com',
+      ok: false,
+      error: 'Agenda não compartilhada',
+    });
     await db.exec(`SET request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000b1'`);
     const beto = (await db.query('SELECT my_google_agenda_status() AS s')).rows[0].s;
     expect(beto).toMatchObject({ my_email: null, ok: false, error: null });

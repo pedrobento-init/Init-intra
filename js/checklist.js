@@ -33,7 +33,15 @@ const CHECKLIST_STORE_MARCACOES = 'checklist_marcacoes';
 const CHECKLIST_SEM_PROC = 'Geral';
 
 // Seletor de categoria do modo Gerenciar (mesmas da aba Procedimentos).
-const CHECKLIST_CATEGORIAS = ['Estações', 'Servidor(es)', 'E-mails', 'Impressora', 'Sistemas', 'Firewall', 'Geral'];
+const CHECKLIST_CATEGORIAS = [
+  'Estações',
+  'Servidor(es)',
+  'E-mails',
+  'Impressora',
+  'Sistemas',
+  'Firewall',
+  'Geral',
+];
 
 // Fallback offline / migração ainda não aplicada (espelha o seed da 041).
 const CHECKLISTS_DEFAULT = [
@@ -44,45 +52,304 @@ const CHECKLISTS_DEFAULT = [
 
 const CHECKLIST_MODELO_DEFAULT = [
   // Instalação (14)
-  { id: 'inst-01', tipo: 'instalacao', categoria: 'Estações', texto: 'Instalar atualizações do Windows', ordem: 1, ativo: true },
-  { id: 'inst-02', tipo: 'instalacao', categoria: 'Estações', texto: 'Definir nome padrão da máquina', ordem: 2, ativo: true },
-  { id: 'inst-03', tipo: 'instalacao', categoria: 'Estações', texto: 'Instalar e ativar antivírus', ordem: 3, ativo: true },
-  { id: 'inst-04', tipo: 'instalacao', categoria: 'Estações', texto: 'Configurar AnyDesk e anotar ID na Ficha TI', ordem: 4, ativo: true },
-  { id: 'inst-05', tipo: 'instalacao', categoria: 'Estações', texto: 'Ativar backup', ordem: 5, ativo: true },
-  { id: 'inst-06', tipo: 'instalacao', categoria: 'Servidor(es)', texto: 'Ingressar na rede/domínio', ordem: 6, ativo: true },
-  { id: 'inst-07', tipo: 'instalacao', categoria: 'Servidor(es)', texto: 'Criar usuário', ordem: 7, ativo: true },
-  { id: 'inst-08', tipo: 'instalacao', categoria: 'Servidor(es)', texto: 'Mapear pastas de rede', ordem: 8, ativo: true },
-  { id: 'inst-09', tipo: 'instalacao', categoria: 'E-mails', texto: 'Configurar e-mail', ordem: 9, ativo: true },
-  { id: 'inst-10', tipo: 'instalacao', categoria: 'Impressora', texto: 'Configurar impressoras', ordem: 10, ativo: true },
-  { id: 'inst-11', tipo: 'instalacao', categoria: 'Sistemas', texto: 'Instalar sistemas do cliente', ordem: 11, ativo: true },
-  { id: 'inst-12', tipo: 'instalacao', categoria: 'Sistemas', texto: 'Testar acesso aos sistemas', ordem: 12, ativo: true },
-  { id: 'inst-13', tipo: 'instalacao', categoria: 'Geral', texto: 'Atualizar inventário', ordem: 13, ativo: true },
-  { id: 'inst-14', tipo: 'instalacao', categoria: 'Geral', texto: 'Testar com o usuário', ordem: 14, ativo: true },
+  {
+    id: 'inst-01',
+    tipo: 'instalacao',
+    categoria: 'Estações',
+    texto: 'Instalar atualizações do Windows',
+    ordem: 1,
+    ativo: true,
+  },
+  {
+    id: 'inst-02',
+    tipo: 'instalacao',
+    categoria: 'Estações',
+    texto: 'Definir nome padrão da máquina',
+    ordem: 2,
+    ativo: true,
+  },
+  {
+    id: 'inst-03',
+    tipo: 'instalacao',
+    categoria: 'Estações',
+    texto: 'Instalar e ativar antivírus',
+    ordem: 3,
+    ativo: true,
+  },
+  {
+    id: 'inst-04',
+    tipo: 'instalacao',
+    categoria: 'Estações',
+    texto: 'Configurar AnyDesk e anotar ID na Ficha TI',
+    ordem: 4,
+    ativo: true,
+  },
+  {
+    id: 'inst-05',
+    tipo: 'instalacao',
+    categoria: 'Estações',
+    texto: 'Ativar backup',
+    ordem: 5,
+    ativo: true,
+  },
+  {
+    id: 'inst-06',
+    tipo: 'instalacao',
+    categoria: 'Servidor(es)',
+    texto: 'Ingressar na rede/domínio',
+    ordem: 6,
+    ativo: true,
+  },
+  {
+    id: 'inst-07',
+    tipo: 'instalacao',
+    categoria: 'Servidor(es)',
+    texto: 'Criar usuário',
+    ordem: 7,
+    ativo: true,
+  },
+  {
+    id: 'inst-08',
+    tipo: 'instalacao',
+    categoria: 'Servidor(es)',
+    texto: 'Mapear pastas de rede',
+    ordem: 8,
+    ativo: true,
+  },
+  {
+    id: 'inst-09',
+    tipo: 'instalacao',
+    categoria: 'E-mails',
+    texto: 'Configurar e-mail',
+    ordem: 9,
+    ativo: true,
+  },
+  {
+    id: 'inst-10',
+    tipo: 'instalacao',
+    categoria: 'Impressora',
+    texto: 'Configurar impressoras',
+    ordem: 10,
+    ativo: true,
+  },
+  {
+    id: 'inst-11',
+    tipo: 'instalacao',
+    categoria: 'Sistemas',
+    texto: 'Instalar sistemas do cliente',
+    ordem: 11,
+    ativo: true,
+  },
+  {
+    id: 'inst-12',
+    tipo: 'instalacao',
+    categoria: 'Sistemas',
+    texto: 'Testar acesso aos sistemas',
+    ordem: 12,
+    ativo: true,
+  },
+  {
+    id: 'inst-13',
+    tipo: 'instalacao',
+    categoria: 'Geral',
+    texto: 'Atualizar inventário',
+    ordem: 13,
+    ativo: true,
+  },
+  {
+    id: 'inst-14',
+    tipo: 'instalacao',
+    categoria: 'Geral',
+    texto: 'Testar com o usuário',
+    ordem: 14,
+    ativo: true,
+  },
   // Troca de usuário (9)
-  { id: 'troca-01', tipo: 'troca', categoria: 'Servidor(es)', texto: 'Criar usuário e definir permissões', ordem: 1, ativo: true },
-  { id: 'troca-02', tipo: 'troca', categoria: 'Servidor(es)', texto: 'Redefinir senhas e acessos', ordem: 2, ativo: true },
-  { id: 'troca-03', tipo: 'troca', categoria: 'Servidor(es)', texto: 'Revisar permissões de pastas', ordem: 3, ativo: true },
-  { id: 'troca-04', tipo: 'troca', categoria: 'Servidor(es)', texto: 'Migrar ou arquivar arquivos do usuário anterior', ordem: 4, ativo: true },
-  { id: 'troca-05', tipo: 'troca', categoria: 'E-mails', texto: 'Atualizar e-mail e assinatura', ordem: 5, ativo: true },
-  { id: 'troca-06', tipo: 'troca', categoria: 'Sistemas', texto: 'Transferir licenças e acessos dos sistemas', ordem: 6, ativo: true },
-  { id: 'troca-07', tipo: 'troca', categoria: 'Geral', texto: 'Identificar quem sai e quem entra', ordem: 7, ativo: true },
-  { id: 'troca-08', tipo: 'troca', categoria: 'Geral', texto: 'Atualizar inventário', ordem: 8, ativo: true },
-  { id: 'troca-09', tipo: 'troca', categoria: 'Geral', texto: 'Validar com o gestor', ordem: 9, ativo: true },
+  {
+    id: 'troca-01',
+    tipo: 'troca',
+    categoria: 'Servidor(es)',
+    texto: 'Criar usuário e definir permissões',
+    ordem: 1,
+    ativo: true,
+  },
+  {
+    id: 'troca-02',
+    tipo: 'troca',
+    categoria: 'Servidor(es)',
+    texto: 'Redefinir senhas e acessos',
+    ordem: 2,
+    ativo: true,
+  },
+  {
+    id: 'troca-03',
+    tipo: 'troca',
+    categoria: 'Servidor(es)',
+    texto: 'Revisar permissões de pastas',
+    ordem: 3,
+    ativo: true,
+  },
+  {
+    id: 'troca-04',
+    tipo: 'troca',
+    categoria: 'Servidor(es)',
+    texto: 'Migrar ou arquivar arquivos do usuário anterior',
+    ordem: 4,
+    ativo: true,
+  },
+  {
+    id: 'troca-05',
+    tipo: 'troca',
+    categoria: 'E-mails',
+    texto: 'Atualizar e-mail e assinatura',
+    ordem: 5,
+    ativo: true,
+  },
+  {
+    id: 'troca-06',
+    tipo: 'troca',
+    categoria: 'Sistemas',
+    texto: 'Transferir licenças e acessos dos sistemas',
+    ordem: 6,
+    ativo: true,
+  },
+  {
+    id: 'troca-07',
+    tipo: 'troca',
+    categoria: 'Geral',
+    texto: 'Identificar quem sai e quem entra',
+    ordem: 7,
+    ativo: true,
+  },
+  {
+    id: 'troca-08',
+    tipo: 'troca',
+    categoria: 'Geral',
+    texto: 'Atualizar inventário',
+    ordem: 8,
+    ativo: true,
+  },
+  {
+    id: 'troca-09',
+    tipo: 'troca',
+    categoria: 'Geral',
+    texto: 'Validar com o gestor',
+    ordem: 9,
+    ativo: true,
+  },
   // Saída de colaborador (14)
-  { id: 'saida-01', tipo: 'saida', categoria: 'Servidor(es)', texto: 'Desativar usuário e senha', ordem: 1, ativo: true },
-  { id: 'saida-02', tipo: 'saida', categoria: 'Servidor(es)', texto: 'Encerrar sessões abertas', ordem: 2, ativo: true },
-  { id: 'saida-03', tipo: 'saida', categoria: 'Servidor(es)', texto: 'Fazer backup do perfil', ordem: 3, ativo: true },
-  { id: 'saida-04', tipo: 'saida', categoria: 'Servidor(es)', texto: 'Definir quem herda arquivos e pastas', ordem: 4, ativo: true },
-  { id: 'saida-05', tipo: 'saida', categoria: 'E-mails', texto: 'Remover do e-mail e WhatsApp corporativo', ordem: 5, ativo: true },
-  { id: 'saida-06', tipo: 'saida', categoria: 'E-mails', texto: 'Fazer backup do e-mail', ordem: 6, ativo: true },
-  { id: 'saida-07', tipo: 'saida', categoria: 'E-mails', texto: 'Redirecionar e-mail para o gestor', ordem: 7, ativo: true },
-  { id: 'saida-08', tipo: 'saida', categoria: 'Firewall', texto: 'Revogar acesso remoto (VPN, AnyDesk, painéis)', ordem: 8, ativo: true },
-  { id: 'saida-09', tipo: 'saida', categoria: 'Sistemas', texto: 'Remover de sistemas e licenças', ordem: 9, ativo: true },
-  { id: 'saida-10', tipo: 'saida', categoria: 'Sistemas', texto: 'Trocar senhas compartilhadas que ele conhecia', ordem: 10, ativo: true },
-  { id: 'saida-11', tipo: 'saida', categoria: 'Estações', texto: 'Receber o equipamento', ordem: 11, ativo: true },
-  { id: 'saida-12', tipo: 'saida', categoria: 'Estações', texto: 'Formatar ou reatribuir', ordem: 12, ativo: true },
-  { id: 'saida-13', tipo: 'saida', categoria: 'Geral', texto: 'Atualizar inventário', ordem: 13, ativo: true },
-  { id: 'saida-14', tipo: 'saida', categoria: 'Geral', texto: 'Gestor confirmou a conclusão', ordem: 14, ativo: true },
+  {
+    id: 'saida-01',
+    tipo: 'saida',
+    categoria: 'Servidor(es)',
+    texto: 'Desativar usuário e senha',
+    ordem: 1,
+    ativo: true,
+  },
+  {
+    id: 'saida-02',
+    tipo: 'saida',
+    categoria: 'Servidor(es)',
+    texto: 'Encerrar sessões abertas',
+    ordem: 2,
+    ativo: true,
+  },
+  {
+    id: 'saida-03',
+    tipo: 'saida',
+    categoria: 'Servidor(es)',
+    texto: 'Fazer backup do perfil',
+    ordem: 3,
+    ativo: true,
+  },
+  {
+    id: 'saida-04',
+    tipo: 'saida',
+    categoria: 'Servidor(es)',
+    texto: 'Definir quem herda arquivos e pastas',
+    ordem: 4,
+    ativo: true,
+  },
+  {
+    id: 'saida-05',
+    tipo: 'saida',
+    categoria: 'E-mails',
+    texto: 'Remover do e-mail e WhatsApp corporativo',
+    ordem: 5,
+    ativo: true,
+  },
+  {
+    id: 'saida-06',
+    tipo: 'saida',
+    categoria: 'E-mails',
+    texto: 'Fazer backup do e-mail',
+    ordem: 6,
+    ativo: true,
+  },
+  {
+    id: 'saida-07',
+    tipo: 'saida',
+    categoria: 'E-mails',
+    texto: 'Redirecionar e-mail para o gestor',
+    ordem: 7,
+    ativo: true,
+  },
+  {
+    id: 'saida-08',
+    tipo: 'saida',
+    categoria: 'Firewall',
+    texto: 'Revogar acesso remoto (VPN, AnyDesk, painéis)',
+    ordem: 8,
+    ativo: true,
+  },
+  {
+    id: 'saida-09',
+    tipo: 'saida',
+    categoria: 'Sistemas',
+    texto: 'Remover de sistemas e licenças',
+    ordem: 9,
+    ativo: true,
+  },
+  {
+    id: 'saida-10',
+    tipo: 'saida',
+    categoria: 'Sistemas',
+    texto: 'Trocar senhas compartilhadas que ele conhecia',
+    ordem: 10,
+    ativo: true,
+  },
+  {
+    id: 'saida-11',
+    tipo: 'saida',
+    categoria: 'Estações',
+    texto: 'Receber o equipamento',
+    ordem: 11,
+    ativo: true,
+  },
+  {
+    id: 'saida-12',
+    tipo: 'saida',
+    categoria: 'Estações',
+    texto: 'Formatar ou reatribuir',
+    ordem: 12,
+    ativo: true,
+  },
+  {
+    id: 'saida-13',
+    tipo: 'saida',
+    categoria: 'Geral',
+    texto: 'Atualizar inventário',
+    ordem: 13,
+    ativo: true,
+  },
+  {
+    id: 'saida-14',
+    tipo: 'saida',
+    categoria: 'Geral',
+    texto: 'Gestor confirmou a conclusão',
+    ordem: 14,
+    ativo: true,
+  },
 ];
 
 // ── Funções puras (testadas em tests/checklist.test.js) ──────────────────────
@@ -90,7 +357,9 @@ const CHECKLIST_MODELO_DEFAULT = [
 // Comparação de categoria ignora caixa/espaços (a aba Procedimentos guarda a
 // categoria como texto livre).
 function checklistNormCat(v) {
-  return String(v == null ? '' : v).trim().toLowerCase();
+  return String(v == null ? '' : v)
+    .trim()
+    .toLowerCase();
 }
 
 // Itens ativos agrupados por categoria, NA ORDEM do modelo (a categoria do
@@ -105,7 +374,11 @@ function groupChecklistItens(itens) {
       if (!it || it.ativo === false) return;
       const key = String(it.categoria || 'Geral');
       let g = byCat.get(key);
-      if (!g) { g = { categoria: key, itens: [] }; byCat.set(key, g); groups.push(g); }
+      if (!g) {
+        g = { categoria: key, itens: [] };
+        byCat.set(key, g);
+        groups.push(g);
+      }
       g.itens.push(it);
     });
   return groups;
@@ -114,11 +387,14 @@ function groupChecklistItens(itens) {
 // Progresso do checklist: itens desmarcados não entram; item inativo some.
 function checklistProgress(grupos, marcadoSet) {
   const set = marcadoSet instanceof Set ? marcadoSet : new Set(marcadoSet || []);
-  let done = 0, total = 0;
-  (grupos || []).forEach(g => (g.itens || []).forEach(it => {
-    total++;
-    if (set.has(it.id)) done++;
-  }));
+  let done = 0,
+    total = 0;
+  (grupos || []).forEach((g) =>
+    (g.itens || []).forEach((it) => {
+      total++;
+      if (set.has(it.id)) done++;
+    })
+  );
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
@@ -126,17 +402,21 @@ function checklistProgress(grupos, marcadoSet) {
 function findProceduresByCategoria(procedures, categoria) {
   const alvo = checklistNormCat(categoria);
   if (!alvo) return [];
-  return (Array.isArray(procedures) ? procedures : [])
-    .filter(p => p && checklistNormCat(p.category) === alvo);
+  return (Array.isArray(procedures) ? procedures : []).filter(
+    (p) => p && checklistNormCat(p.category) === alvo
+  );
 }
 
 // Lista de checklists na ordem de exibição (ordem, depois nome).
 function orderChecklists(list) {
   return (Array.isArray(list) ? list : [])
-    .filter(c => c && c.id)
+    .filter((c) => c && c.id)
     .slice()
-    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0)
-      || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+    .sort(
+      (a, b) =>
+        (a.ordem || 0) - (b.ordem || 0) ||
+        String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR')
+    );
 }
 
 // Concatena os grupos na ordem de exibição.
@@ -147,12 +427,14 @@ function groupsToFlat(groups) {
 // Atribui `ordem` 1..n seguindo a ordem de exibição dos grupos.
 function renumberGroups(groups) {
   let n = 0;
-  return groupsToFlat(groups).map(it => ({ ...it, ordem: ++n }));
+  return groupsToFlat(groups).map((it) => ({ ...it, ordem: ++n }));
 }
 
 function _cloneGroups(groups) {
-  return (Array.isArray(groups) ? groups : [])
-    .map(g => ({ categoria: g.categoria, itens: (g.itens || []).map(i => ({ ...i })) }));
+  return (Array.isArray(groups) ? groups : []).map((g) => ({
+    categoria: g.categoria,
+    itens: (g.itens || []).map((i) => ({ ...i })),
+  }));
 }
 
 // Sobe/desce um item DENTRO da própria categoria (null quando não dá).
@@ -160,7 +442,7 @@ function moveItemDir(groups, id, dir) {
   const g = _cloneGroups(groups);
   const step = Number(dir) < 0 ? -1 : 1;
   for (const grp of g) {
-    const i = grp.itens.findIndex(x => x.id === id);
+    const i = grp.itens.findIndex((x) => x.id === id);
     if (i < 0) continue;
     const j = i + step;
     if (j < 0 || j >= grp.itens.length) return null;
@@ -180,30 +462,38 @@ function moveItemBefore(groups, fromId, toCategoria, beforeId) {
   const g = _cloneGroups(groups);
   let moved = null;
   for (const grp of g) {
-    const i = grp.itens.findIndex(x => x.id === fromId);
-    if (i >= 0) { moved = grp.itens.splice(i, 1)[0]; break; }
+    const i = grp.itens.findIndex((x) => x.id === fromId);
+    if (i >= 0) {
+      moved = grp.itens.splice(i, 1)[0];
+      break;
+    }
   }
   if (!moved) return null;
 
-  let alvo = g.find(x => checklistNormCat(x.categoria) === checklistNormCat(toCategoria));
+  let alvo = g.find((x) => checklistNormCat(x.categoria) === checklistNormCat(toCategoria));
   const catNome = alvo ? alvo.categoria : String(toCategoria || CHECKLIST_SEM_PROC);
-  if (!alvo) { alvo = { categoria: catNome, itens: [] }; g.push(alvo); }
+  if (!alvo) {
+    alvo = { categoria: catNome, itens: [] };
+    g.push(alvo);
+  }
 
-  const pos = beforeId ? alvo.itens.findIndex(x => x.id === beforeId) : -1;
+  const pos = beforeId ? alvo.itens.findIndex((x) => x.id === beforeId) : -1;
   if (pos >= 0) alvo.itens.splice(pos, 0, moved);
   else alvo.itens.push(moved);
   moved.categoria = catNome;
 
   // grupos que ficaram vazios não devem aparecer
-  return g.filter(x => x.itens.length > 0);
+  return g.filter((x) => x.itens.length > 0);
 }
 
 // Quantidade de itens ativos/inativos de um checklist.
 function countItemsByChecklist(items, checklistId) {
-  let ativos = 0, inativos = 0;
-  (Array.isArray(items) ? items : []).forEach(i => {
+  let ativos = 0,
+    inativos = 0;
+  (Array.isArray(items) ? items : []).forEach((i) => {
     if (!i || i.tipo !== checklistId) return;
-    if (i.ativo === false) inativos++; else ativos++;
+    if (i.ativo === false) inativos++;
+    else ativos++;
   });
   return { ativos, inativos };
 }
@@ -211,7 +501,7 @@ function countItemsByChecklist(items, checklistId) {
 function checklistCategoriaOptions(atual) {
   const cats = CHECKLIST_CATEGORIAS.slice();
   const cur = String(atual == null ? '' : atual);
-  if (cur && !cats.some(c => checklistNormCat(c) === checklistNormCat(cur))) cats.unshift(cur);
+  if (cur && !cats.some((c) => checklistNormCat(c) === checklistNormCat(cur))) cats.unshift(cur);
   return cats;
 }
 
@@ -220,40 +510,66 @@ function checklistCategoriaOptions(atual) {
 function _ckCache(store) {
   try {
     if (typeof getCacheStore === 'function') return getCacheStore(store) || [];
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return [];
 }
 
 function _ckSetCache(store, rows) {
   try {
-    if (typeof setCacheStore === 'function') { setCacheStore(store, rows); return true; }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+    if (typeof setCacheStore === 'function') {
+      setCacheStore(store, rows);
+      return true;
+    }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return false;
 }
 
 function _ckSnapshot(store) {
-  return _ckCache(store).map(x => ({ ...x }));
+  return _ckCache(store).map((x) => ({ ...x }));
 }
 
 function _ckSupabaseReady() {
   try {
-    return typeof isSupabaseConnected === 'function' && isSupabaseConnected()
-      && typeof supabaseClient !== 'undefined' && supabaseClient
-      && typeof window !== 'undefined' && window._supabaseAuthActive === true;
-  } catch (_) { return false; }
+    return (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof supabaseClient !== 'undefined' &&
+      supabaseClient &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive === true
+    );
+  } catch (_) {
+    return false;
+  }
 }
 
 function _ckToast(msg, type) {
-  try { if (typeof showToast === 'function') showToast(msg, type || 'error'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  try {
+    if (typeof showToast === 'function') showToast(msg, type || 'error');
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
 }
 
 function _ckNewId(prefix) {
-  try { if (typeof nextId === 'function') return nextId(prefix); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  try {
+    if (typeof nextId === 'function') return nextId(prefix);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
 function ckIsAdmin() {
-  try { return typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true; } catch (_) { return false; }
+  try {
+    return typeof isCurrentAdmin === 'function' && isCurrentAdmin() === true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // Escreve local -> servidor; servidor falhou/offline -> desfaz + toast.
@@ -272,7 +588,9 @@ async function _ckPersist(apply, revert, remote, failMsg) {
     return true;
   } catch (err) {
     revert();
-    _ckToast((failMsg || 'Não foi possível salvar') + ': ' + (err && err.message ? err.message : err));
+    _ckToast(
+      (failMsg || 'Não foi possível salvar') + ': ' + (err && err.message ? err.message : err)
+    );
     return false;
   } finally {
     _ckSaving--;
@@ -280,7 +598,13 @@ async function _ckPersist(apply, revert, remote, failMsg) {
       _ckPendingReload = false;
       const alvo = _ckReloadFor;
       _ckReloadFor = null;
-      if (alvo) { try { await loadChecklistMarcacoes(alvo); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); } }
+      if (alvo) {
+        try {
+          await loadChecklistMarcacoes(alvo);
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+        }
+      }
     }
   }
 }
@@ -300,11 +624,11 @@ function getChecklists() {
 }
 
 function getActiveChecklists() {
-  return getChecklists().filter(c => c.ativo !== false);
+  return getChecklists().filter((c) => c.ativo !== false);
 }
 
 function getChecklistById(id) {
-  return getChecklists().find(c => c.id === id) || null;
+  return getChecklists().find((c) => c.id === id) || null;
 }
 
 function getChecklistNome(id) {
@@ -314,25 +638,29 @@ function getChecklistNome(id) {
 
 // Itens ATIVOS de um checklist, na ordem do modelo.
 function getChecklistItens(tipo) {
-  const cached = _ckCache(CHECKLIST_STORE_MODELO).filter(i => i && i.tipo === tipo);
+  const cached = _ckCache(CHECKLIST_STORE_MODELO).filter((i) => i && i.tipo === tipo);
   if (cached.length) {
-    return cached.filter(i => i.ativo !== false)
-      .slice().sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    return cached
+      .filter((i) => i.ativo !== false)
+      .slice()
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
   }
   if (_ckUsingDefaults()) {
-    return CHECKLIST_MODELO_DEFAULT.filter(i => i.tipo === tipo && i.ativo !== false)
-      .slice().sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    return CHECKLIST_MODELO_DEFAULT.filter((i) => i.tipo === tipo && i.ativo !== false)
+      .slice()
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
   }
   return [];
 }
 
 // Todos os itens (inclusive inativos) — usado pelo modo Gerenciar.
 function getChecklistItensAll(tipo) {
-  const cached = _ckCache(CHECKLIST_STORE_MODELO).filter(i => i && i.tipo === tipo);
+  const cached = _ckCache(CHECKLIST_STORE_MODELO).filter((i) => i && i.tipo === tipo);
   if (cached.length) return cached.slice().sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
   if (_ckUsingDefaults()) {
-    return CHECKLIST_MODELO_DEFAULT.filter(i => i.tipo === tipo)
-      .slice().sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    return CHECKLIST_MODELO_DEFAULT.filter((i) => i.tipo === tipo)
+      .slice()
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
   }
   return [];
 }
@@ -360,7 +688,9 @@ async function loadChecklistModelo() {
       }
       if (res && res.error) console.warn('⚠️ Checklist itens:', res.error.message);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return false;
 }
 
@@ -369,7 +699,10 @@ async function loadChecklists(force) {
   if (_ckChecklistsLoaded && !force) return true;
   try {
     if (_ckSupabaseReady()) {
-      const res = await supabaseClient.from('checklists').select(CK_COLS_CHECKLISTS).order('ordem', { ascending: true });
+      const res = await supabaseClient
+        .from('checklists')
+        .select(CK_COLS_CHECKLISTS)
+        .order('ordem', { ascending: true });
       if (res && !res.error && Array.isArray(res.data)) {
         _ckSetCache(CHECKLIST_STORE, res.data);
         _ckChecklistsLoaded = true;
@@ -377,22 +710,24 @@ async function loadChecklists(force) {
       }
       if (res && res.error) console.warn('⚠️ Checklists:', res.error.message);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return false;
 }
 let _ckChecklistsLoaded = false;
 
 // Marcações locais de um cliente (linhas = itens marcados).
 function getChecklistMarcacoes(clientId) {
-  return _ckCache(CHECKLIST_STORE_MARCACOES).filter(m => m && m.clientId === clientId);
+  return _ckCache(CHECKLIST_STORE_MARCACOES).filter((m) => m && m.clientId === clientId);
 }
 
 function checklistMarcadoSet(clientId) {
-  return new Set(getChecklistMarcacoes(clientId).map(m => m.itemId));
+  return new Set(getChecklistMarcacoes(clientId).map((m) => m.itemId));
 }
 
 function _ckSetMarcacoesLocal(clientId, rows) {
-  const others = _ckCache(CHECKLIST_STORE_MARCACOES).filter(m => m && m.clientId !== clientId);
+  const others = _ckCache(CHECKLIST_STORE_MARCACOES).filter((m) => m && m.clientId !== clientId);
   _ckSetCache(CHECKLIST_STORE_MARCACOES, others.concat(rows));
 }
 
@@ -403,7 +738,11 @@ let _ckReloadFor = null;
 // Pull das marcações do cliente (troca de aba/dispositivo pega o estado novo).
 async function loadChecklistMarcacoes(clientId) {
   if (!clientId) return false;
-  if (_ckSaving > 0) { _ckPendingReload = true; _ckReloadFor = clientId; return false; }
+  if (_ckSaving > 0) {
+    _ckPendingReload = true;
+    _ckReloadFor = clientId;
+    return false;
+  }
   try {
     if (_ckSupabaseReady()) {
       const res = await supabaseClient
@@ -411,13 +750,19 @@ async function loadChecklistMarcacoes(clientId) {
         .select(CK_COLS_MARCACOES)
         .eq('client_id', clientId);
       if (res && !res.error && Array.isArray(res.data)) {
-        if (_ckSaving > 0) { _ckPendingReload = true; _ckReloadFor = clientId; return false; }
+        if (_ckSaving > 0) {
+          _ckPendingReload = true;
+          _ckReloadFor = clientId;
+          return false;
+        }
         _ckSetMarcacoesLocal(clientId, res.data);
         return true;
       }
       if (res && res.error) console.warn('⚠️ Checklist marcações:', res.error.message);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return false;
 }
 
@@ -429,24 +774,26 @@ async function loadAllChecklistMarcacoes() {
     if (!_ckSupabaseReady()) return false;
     const res = await supabaseClient.from('checklist_marcacoes').select('item_id, client_id');
     if (res && !res.error && Array.isArray(res.data)) {
-      _ckAllMarks = res.data.map(r => ({ itemId: r.item_id, clientId: r.client_id }));
+      _ckAllMarks = res.data.map((r) => ({ itemId: r.item_id, clientId: r.client_id }));
       return true;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
   return false;
 }
 
 // Clientes distintos que marcaram um item (null = desconhecido).
 function ckMarcacoesDoItem(itemId) {
   if (!_ckAllMarks) return null;
-  return new Set(_ckAllMarks.filter(m => m.itemId === itemId).map(m => m.clientId)).size;
+  return new Set(_ckAllMarks.filter((m) => m.itemId === itemId).map((m) => m.clientId)).size;
 }
 
 // Clientes distintos que marcaram QUALQUER item do checklist (null = desconhecido).
 function ckMarcacoesDoChecklist(checklistId) {
   if (!_ckAllMarks) return null;
-  const ids = new Set(getChecklistItensAll(checklistId).map(i => i.id));
-  return new Set(_ckAllMarks.filter(m => ids.has(m.itemId)).map(m => m.clientId)).size;
+  const ids = new Set(getChecklistItensAll(checklistId).map((i) => i.id));
+  return new Set(_ckAllMarks.filter((m) => ids.has(m.itemId)).map((m) => m.clientId)).size;
 }
 
 // ── Escritas ─────────────────────────────────────────────────────────────────
@@ -454,8 +801,8 @@ function ckMarcacoesDoChecklist(checklistId) {
 // Marca/desmarca um item. Linha existe = marcado.
 async function saveChecklistMarcacao(clientId, itemId, marcado) {
   if (!clientId || !itemId) return false;
-  const snap = getChecklistMarcacoes(clientId).map(m => ({ ...m }));
-  const local = snap.filter(m => m.itemId !== itemId);
+  const snap = getChecklistMarcacoes(clientId).map((m) => ({ ...m }));
+  const local = snap.filter((m) => m.itemId !== itemId);
   if (marcado) {
     const cliente = typeof getClientById === 'function' ? getClientById(clientId) : null;
     const sess = typeof getSession === 'function' ? getSession() : null;
@@ -473,7 +820,7 @@ async function saveChecklistMarcacao(clientId, itemId, marcado) {
     () => _ckSetMarcacoesLocal(clientId, snap),
     async () => {
       if (marcado) {
-        const row = local.find(m => m.itemId === itemId);
+        const row = local.find((m) => m.itemId === itemId);
         return supabaseClient.from('checklist_marcacoes').upsert({
           id: row.id,
           client_id: clientId,
@@ -483,8 +830,11 @@ async function saveChecklistMarcacao(clientId, itemId, marcado) {
           marcado_em: row.marcadoEm,
         });
       }
-      return supabaseClient.from('checklist_marcacoes').delete()
-        .eq('client_id', clientId).eq('item_id', itemId);
+      return supabaseClient
+        .from('checklist_marcacoes')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('item_id', itemId);
     },
     'Não foi possível salvar'
   );
@@ -494,20 +844,32 @@ async function saveChecklistMarcacao(clientId, itemId, marcado) {
 async function limparChecklist(clientId, checklistId) {
   if (!clientId || !checklistId) return false;
   const snap = _ckSnapshot(CHECKLIST_STORE_MARCACOES);
-  const ids = new Set(getChecklistItensAll(checklistId).map(i => i.id));
+  const ids = new Set(getChecklistItensAll(checklistId).map((i) => i.id));
   if (!_ckUsingDefaults()) {
-    _ckCache(CHECKLIST_STORE_MODELO).forEach(i => { if (i && i.tipo === checklistId) ids.add(i.id); });
+    _ckCache(CHECKLIST_STORE_MODELO).forEach((i) => {
+      if (i && i.tipo === checklistId) ids.add(i.id);
+    });
   } else {
-    CHECKLIST_MODELO_DEFAULT.forEach(i => { if (i.tipo === checklistId) ids.add(i.id); });
+    CHECKLIST_MODELO_DEFAULT.forEach((i) => {
+      if (i.tipo === checklistId) ids.add(i.id);
+    });
   }
-  const alvo = snap.filter(m => m.clientId === clientId && ids.has(m.itemId));
+  const alvo = snap.filter((m) => m.clientId === clientId && ids.has(m.itemId));
   if (!alvo.length) return true;
 
   return _ckPersist(
-    () => _ckSetMarcacoesLocal(clientId, snap.filter(m => !(m.clientId === clientId && ids.has(m.itemId)))),
+    () =>
+      _ckSetMarcacoesLocal(
+        clientId,
+        snap.filter((m) => !(m.clientId === clientId && ids.has(m.itemId)))
+      ),
     () => _ckSetCache(CHECKLIST_STORE_MARCACOES, snap),
-    () => supabaseClient.from('checklist_marcacoes').delete()
-      .eq('client_id', clientId).in('item_id', Array.from(ids)),
+    () =>
+      supabaseClient
+        .from('checklist_marcacoes')
+        .delete()
+        .eq('client_id', clientId)
+        .in('item_id', Array.from(ids)),
     'Não foi possível limpar'
   );
 }
@@ -516,13 +878,14 @@ async function limparChecklist(clientId, checklistId) {
 async function saveChecklistRow(row, failMsg) {
   if (!row || !row.id) return false;
   const snap = _ckSnapshot(CHECKLIST_STORE);
-  const prox = snap.some(x => x.id === row.id)
-    ? snap.map(x => (x.id === row.id ? { ...x, ...row } : x))
+  const prox = snap.some((x) => x.id === row.id)
+    ? snap.map((x) => (x.id === row.id ? { ...x, ...row } : x))
     : snap.concat([row]);
   return _ckPersist(
     () => _ckSetCache(CHECKLIST_STORE, prox),
     () => _ckSetCache(CHECKLIST_STORE, snap),
-    () => supabaseClient.from('checklists').upsert({ ...row, updated_at: new Date().toISOString() }),
+    () =>
+      supabaseClient.from('checklists').upsert({ ...row, updated_at: new Date().toISOString() }),
     failMsg || 'Não foi possível salvar'
   );
 }
@@ -540,7 +903,7 @@ async function createChecklist({ nome, duplicarDe }) {
     ordem: (lista.reduce((mx, c) => Math.max(mx, c.ordem || 0), 0) || 0) + 1,
   };
   const origem = duplicarDe ? getChecklistItensAll(duplicarDe) : [];
-  const novos = origem.map(it => ({ ...it, id: _ckNewId('CKI'), tipo: id }));
+  const novos = origem.map((it) => ({ ...it, id: _ckNewId('CKI'), tipo: id }));
 
   const snapCk = _ckSnapshot(CHECKLIST_STORE);
   const snapIt = _ckSnapshot(CHECKLIST_STORE_MODELO);
@@ -549,9 +912,14 @@ async function createChecklist({ nome, duplicarDe }) {
       _ckSetCache(CHECKLIST_STORE, snapCk.concat([row]));
       if (novos.length) _ckSetCache(CHECKLIST_STORE_MODELO, snapIt.concat(novos));
     },
-    () => { _ckSetCache(CHECKLIST_STORE, snapCk); _ckSetCache(CHECKLIST_STORE_MODELO, snapIt); },
+    () => {
+      _ckSetCache(CHECKLIST_STORE, snapCk);
+      _ckSetCache(CHECKLIST_STORE_MODELO, snapIt);
+    },
     async () => {
-      const r1 = await supabaseClient.from('checklists').upsert({ ...row, updated_at: new Date().toISOString() });
+      const r1 = await supabaseClient
+        .from('checklists')
+        .upsert({ ...row, updated_at: new Date().toISOString() });
       if (r1 && r1.error) return r1;
       if (novos.length) return supabaseClient.from('checklist_modelo_itens').upsert(novos);
       return null;
@@ -568,10 +936,19 @@ async function deleteChecklist(id) {
   const snapIt = _ckSnapshot(CHECKLIST_STORE_MODELO);
   return _ckPersist(
     () => {
-      _ckSetCache(CHECKLIST_STORE, snapCk.filter(c => c.id !== id));
-      _ckSetCache(CHECKLIST_STORE_MODELO, snapIt.filter(i => i.tipo !== id));
+      _ckSetCache(
+        CHECKLIST_STORE,
+        snapCk.filter((c) => c.id !== id)
+      );
+      _ckSetCache(
+        CHECKLIST_STORE_MODELO,
+        snapIt.filter((i) => i.tipo !== id)
+      );
     },
-    () => { _ckSetCache(CHECKLIST_STORE, snapCk); _ckSetCache(CHECKLIST_STORE_MODELO, snapIt); },
+    () => {
+      _ckSetCache(CHECKLIST_STORE, snapCk);
+      _ckSetCache(CHECKLIST_STORE_MODELO, snapIt);
+    },
     // itens e marcações caem em cascata (FKs ON DELETE CASCADE)
     () => supabaseClient.from('checklists').delete().eq('id', id),
     'Não foi possível excluir'
@@ -596,7 +973,10 @@ async function addChecklistItem(checklistId, { texto, categoria }) {
   const ok = await _ckPersist(
     () => _ckSetCache(CHECKLIST_STORE_MODELO, snap.concat([item])),
     () => _ckSetCache(CHECKLIST_STORE_MODELO, snap),
-    () => supabaseClient.from('checklist_modelo_itens').upsert({ ...item, updated_at: new Date().toISOString() }),
+    () =>
+      supabaseClient
+        .from('checklist_modelo_itens')
+        .upsert({ ...item, updated_at: new Date().toISOString() }),
     'Não foi possível adicionar'
   );
   return { ok, id: ok ? item.id : null };
@@ -606,12 +986,14 @@ async function addChecklistItem(checklistId, { texto, categoria }) {
 async function saveChecklistItem(patch, failMsg) {
   if (!patch || !patch.id) return false;
   const snap = _ckSnapshot(CHECKLIST_STORE_MODELO);
-  const prox = snap.map(x => (x.id === patch.id ? { ...x, ...patch } : x));
+  const prox = snap.map((x) => (x.id === patch.id ? { ...x, ...patch } : x));
   return _ckPersist(
     () => _ckSetCache(CHECKLIST_STORE_MODELO, prox),
     () => _ckSetCache(CHECKLIST_STORE_MODELO, snap),
-    () => supabaseClient.from('checklist_modelo_itens')
-      .upsert({ ...patch, updated_at: new Date().toISOString() }),
+    () =>
+      supabaseClient
+        .from('checklist_modelo_itens')
+        .upsert({ ...patch, updated_at: new Date().toISOString() }),
     failMsg || 'Não foi possível salvar'
   );
 }
@@ -625,42 +1007,46 @@ async function softRemoveChecklistItem(itemId) {
 async function reorderChecklistItems(checklistId, novosGrupos) {
   const flat = renumberGroups(novosGrupos);
   const snap = _ckSnapshot(CHECKLIST_STORE_MODELO);
-  const atual = new Map(snap.filter(i => i.tipo === checklistId).map(i => [i.id, i.ordem]));
-  const mudou = flat.filter(i => atual.get(i.id) !== i.ordem);
+  const atual = new Map(snap.filter((i) => i.tipo === checklistId).map((i) => [i.id, i.ordem]));
+  const mudou = flat.filter((i) => atual.get(i.id) !== i.ordem);
   if (!mudou.length) return true;
-  const prox = snap.map(i => {
-    const n = mudou.find(x => x.id === i.id);
+  const prox = snap.map((i) => {
+    const n = mudou.find((x) => x.id === i.id);
     return n ? { ...i, ordem: n.ordem } : i;
   });
   return _ckPersist(
     () => _ckSetCache(CHECKLIST_STORE_MODELO, prox),
     () => _ckSetCache(CHECKLIST_STORE_MODELO, snap),
-    () => supabaseClient.from('checklist_modelo_itens')
-      .upsert(mudou.map(i => ({ id: i.id, ordem: i.ordem, updated_at: new Date().toISOString() }))),
+    () =>
+      supabaseClient
+        .from('checklist_modelo_itens')
+        .upsert(
+          mudou.map((i) => ({ id: i.id, ordem: i.ordem, updated_at: new Date().toISOString() }))
+        ),
     'Não foi possível salvar a ordem'
   );
 }
 
 // ── Estado da aba (em sessão) ────────────────────────────────────────────────
 
-const _ckSelByClient = {};   // checklist escolhido na tela de uso
-const _ckModeByClient = {};  // 'uso' | 'gerir'
-const _ckAdmSel = {};        // checklist selecionado no modo Gerenciar
-let _ckNovoAberto = false;   // formulário "+ Novo checklist" visível
-let _ckRefocus = '';         // 'add' → devolve foco ao campo de novo item
-let _ckDragId = null;        // item em arraste (drag & drop)
+const _ckSelByClient = {}; // checklist escolhido na tela de uso
+const _ckModeByClient = {}; // 'uso' | 'gerir'
+const _ckAdmSel = {}; // checklist selecionado no modo Gerenciar
+let _ckNovoAberto = false; // formulário "+ Novo checklist" visível
+let _ckRefocus = ''; // 'add' → devolve foco ao campo de novo item
+let _ckDragId = null; // item em arraste (drag & drop)
 
 function checklistSelAtual(clientId) {
   const ativos = getActiveChecklists();
   if (!ativos.length) return null;
   const atual = _ckSelByClient[clientId];
-  if (atual && ativos.some(c => c.id === atual)) return atual;
+  if (atual && ativos.some((c) => c.id === atual)) return atual;
   _ckSelByClient[clientId] = ativos[0].id;
   return ativos[0].id;
 }
 
 function setChecklistSel(clientId, id) {
-  if (!getActiveChecklists().some(c => c.id === id)) return;
+  if (!getActiveChecklists().some((c) => c.id === id)) return;
   _ckSelByClient[clientId] = id;
   renderClientChecklistTab(clientId);
 }
@@ -700,9 +1086,13 @@ function ckRefreshStats(clientId, checklistId) {
   if (!root) return;
   const { grupos, marcado, done, total, pct } = _ckCompute(clientId, checklistId);
 
-  grupos.forEach(g => {
-    const elCount = root.querySelector('[data-ck-count="' + String(g.categoria).replace(/"/g, '') + '"]');
-    if (elCount) elCount.textContent = g.itens.filter(it => marcado.has(it.id)).length + '/' + g.itens.length;
+  grupos.forEach((g) => {
+    const elCount = root.querySelector(
+      '[data-ck-count="' + String(g.categoria).replace(/"/g, '') + '"]'
+    );
+    if (elCount)
+      elCount.textContent =
+        g.itens.filter((it) => marcado.has(it.id)).length + '/' + g.itens.length;
   });
 
   const txt = root.querySelector('#ckProgText');
@@ -710,7 +1100,10 @@ function ckRefreshStats(clientId, checklistId) {
   const pctEl = root.querySelector('#ckProgPct');
   if (pctEl) pctEl.textContent = pct + '%';
   const fill = root.querySelector('#ckProgFill');
-  if (fill) { fill.style.width = pct + '%'; fill.classList.toggle('is-done', pct === 100); }
+  if (fill) {
+    fill.style.width = pct + '%';
+    fill.classList.toggle('is-done', pct === 100);
+  }
   const ok = root.querySelector('#ckOk');
   if (ok) ok.classList.toggle('is-on', total > 0 && pct === 100);
 }
@@ -724,15 +1117,21 @@ function _ckIsChecklistTabActive() {
     const oc = active.getAttribute('onclick') || '';
     if (/switchClientTab\('checklist'/.test(oc)) return true;
     if (active.getAttribute('data-client-tab') === 'checklist') return true;
-    if (active.getAttribute('data-action') === 'switchClientTab' && (active.getAttribute('data-arg') || '').split(',')[0] === 'checklist') return true;
+    if (
+      active.getAttribute('data-action') === 'switchClientTab' &&
+      (active.getAttribute('data-arg') || '').split(',')[0] === 'checklist'
+    )
+      return true;
     return false;
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 
 function _ckSignature(clientId, checklistId) {
   const { grupos, marcado } = _ckCompute(clientId, checklistId);
   return JSON.stringify([
-    grupos.map(g => [g.categoria, g.itens.map(i => i.id)]),
+    grupos.map((g) => [g.categoria, g.itens.map((i) => i.id)]),
     Array.from(marcado).sort(),
   ]);
 }
@@ -748,7 +1147,9 @@ async function _ckBackgroundLoad(clientId, checklistId) {
     if (checklistModo(clientId) !== 'uso') return;
     if (!_ckIsChecklistTabActive()) return;
     if (_ckSignature(clientId, checklistId) !== before) renderClientChecklistTab(clientId);
-  } catch (_) { /* pull é best-effort: a aba já mostra o estado local */ }
+  } catch (_) {
+    /* pull é best-effort: a aba já mostra o estado local */
+  }
 }
 
 // ── Render: entrada da aba ───────────────────────────────────────────────────
@@ -757,7 +1158,10 @@ function renderClientChecklistTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   _ckEnsureLocal();
-  if (checklistModo(clientId) === 'gerir') { _ckRenderGerir(clientId, el); return; }
+  if (checklistModo(clientId) === 'gerir') {
+    _ckRenderGerir(clientId, el);
+    return;
+  }
   _ckRenderUso(clientId, el);
 }
 
@@ -767,8 +1171,14 @@ function renderClientChecklistTab(clientId) {
 // acusa o erro se as tabelas não existirem.
 function _ckEnsureLocal() {
   if (_ckCache(CHECKLIST_STORE).length) return;
-  _ckSetCache(CHECKLIST_STORE, CHECKLISTS_DEFAULT.map(c => ({ ...c })));
-  _ckSetCache(CHECKLIST_STORE_MODELO, CHECKLIST_MODELO_DEFAULT.map(i => ({ ...i })));
+  _ckSetCache(
+    CHECKLIST_STORE,
+    CHECKLISTS_DEFAULT.map((c) => ({ ...c }))
+  );
+  _ckSetCache(
+    CHECKLIST_STORE_MODELO,
+    CHECKLIST_MODELO_DEFAULT.map((i) => ({ ...i }))
+  );
 }
 
 // ── Modo de USO ──────────────────────────────────────────────────────────────
@@ -791,23 +1201,31 @@ function _ckRenderUso(clientId, el) {
   const { grupos, marcado, done, total, pct } = _ckCompute(clientId, sel);
   const procs = typeof getProcedures === 'function' ? getProcedures(clientId) : [];
 
-  const segBtns = ativos.map(c => `
+  const segBtns = ativos
+    .map(
+      (c) => `
     <button type="button" class="ck-seg-btn${c.id === sel ? ' is-on' : ''}" data-ck-tipo="${_ckEsc(c.id)}"
-      aria-pressed="${c.id === sel}" data-action="ckSelectChecklist" data-client="${cid}" data-arg="${escapeHtml(c.id)}">${escapeHtml(c.nome)}</button>`).join('');
+      aria-pressed="${c.id === sel}" data-action="ckSelectChecklist" data-client="${cid}" data-arg="${escapeHtml(c.id)}">${escapeHtml(c.nome)}</button>`
+    )
+    .join('');
 
-  const groupsHtml = grupos.map(g => {
-    const d = g.itens.filter(it => marcado.has(it.id)).length;
-    const temProc = g.categoria !== CHECKLIST_SEM_PROC
-      && findProceduresByCategoria(procs, g.categoria).length > 0;
-    const rows = g.itens.map(it => {
-      const on = marcado.has(it.id);
-      return `<label class="ck-item${on ? ' is-done' : ''}" data-ck-row="${_ckEsc(it.id)}">
+  const groupsHtml = grupos
+    .map((g) => {
+      const d = g.itens.filter((it) => marcado.has(it.id)).length;
+      const temProc =
+        g.categoria !== CHECKLIST_SEM_PROC &&
+        findProceduresByCategoria(procs, g.categoria).length > 0;
+      const rows = g.itens
+        .map((it) => {
+          const on = marcado.has(it.id);
+          return `<label class="ck-item${on ? ' is-done' : ''}" data-ck-row="${_ckEsc(it.id)}">
         <input type="checkbox" class="ck-box" data-ck-item="${_ckEsc(it.id)}"${on ? ' checked' : ''}
           aria-label="${escapeHtml(it.texto)}" />
         <span class="ck-text">${escapeHtml(it.texto)}</span>
       </label>`;
-    }).join('');
-    return `<section class="ck-group">
+        })
+        .join('');
+      return `<section class="ck-group">
       <header class="ck-group-head">
         <h3 class="ck-group-title">${escapeHtml(g.categoria)}</h3>
         <span class="ck-count" data-ck-count="${escapeHtml(g.categoria)}">${d}/${g.itens.length}</span>
@@ -816,7 +1234,8 @@ function _ckRenderUso(clientId, el) {
       </header>
       <div class="ck-list">${rows}</div>
     </section>`;
-  }).join('');
+    })
+    .join('');
 
   el.innerHTML = `
     <div class="ck-bar">
@@ -834,7 +1253,7 @@ function _ckRenderUso(clientId, el) {
     <div class="ck-groups">${groupsHtml || '<div class="empty-state"><p>Nenhum item neste checklist.</p></div>'}</div>
     <p class="ck-hint">O estado fica salvo por cliente e por checklist — marque conforme for concluindo.</p>`;
 
-  el.querySelectorAll('[data-ck-item]').forEach(cb => {
+  el.querySelectorAll('[data-ck-item]').forEach((cb) => {
     cb.addEventListener('change', () => _ckOnToggle(clientId, sel, cb));
   });
 
@@ -849,18 +1268,20 @@ function _ckOnToggle(clientId, checklistId, cb) {
   ckRefreshStats(clientId, checklistId);
 
   cb.disabled = true;
-  Promise.resolve(saveChecklistMarcacao(clientId, itemId, marcado)).then(ok => {
-    cb.disabled = false;
-    if (ok) return;
-    cb.checked = !marcado; // rollback visual (cache já revertido pela escrita)
-    if (row) row.classList.toggle('is-done', !marcado);
-    ckRefreshStats(clientId, checklistId);
-  }).catch(() => {
-    cb.disabled = false;
-    cb.checked = !marcado;
-    if (row) row.classList.toggle('is-done', !marcado);
-    ckRefreshStats(clientId, checklistId);
-  });
+  Promise.resolve(saveChecklistMarcacao(clientId, itemId, marcado))
+    .then((ok) => {
+      cb.disabled = false;
+      if (ok) return;
+      cb.checked = !marcado; // rollback visual (cache já revertido pela escrita)
+      if (row) row.classList.toggle('is-done', !marcado);
+      ckRefreshStats(clientId, checklistId);
+    })
+    .catch(() => {
+      cb.disabled = false;
+      cb.checked = !marcado;
+      if (row) row.classList.toggle('is-done', !marcado);
+      ckRefreshStats(clientId, checklistId);
+    });
 }
 
 // "Desmarcar tudo": confirmação simples e volta para o modo de uso.
@@ -869,11 +1290,17 @@ function clearChecklistConfirm(clientId) {
   if (!sel) return;
   const n = getChecklistItens(sel).length;
   if (!n) return;
-  confirmAction('Desmarcar todos os itens de <strong>' + escapeHtml(getChecklistNome(sel))
-    + '</strong>? Os ' + n + ' itens voltam a ficar pendentes.', async () => {
+  confirmAction(
+    'Desmarcar todos os itens de <strong>' +
+      escapeHtml(getChecklistNome(sel)) +
+      '</strong>? Os ' +
+      n +
+      ' itens voltam a ficar pendentes.',
+    async () => {
       await limparChecklist(clientId, sel);
       _ckReopen(clientId);
-    });
+    }
+  );
 }
 
 // Reabre o modal do cliente no MESMO modo (confirmAction fecha o modal).
@@ -881,7 +1308,9 @@ function _ckReopen(clientId) {
   try {
     if (typeof viewClient === 'function') viewClient(clientId);
     if (typeof switchClientTab === 'function') switchClientTab('checklist', clientId);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+  }
 }
 
 // ── Modo GERENCIAR ───────────────────────────────────────────────────────────
@@ -891,50 +1320,62 @@ function _ckRenderGerir(clientId, el) {
   const admin = ckIsAdmin();
   const lista = getChecklists();
 
-  if (!lista.some(c => c.id === _ckAdmSel[clientId])) {
+  if (!lista.some((c) => c.id === _ckAdmSel[clientId])) {
     _ckAdmSel[clientId] = lista.length ? lista[0].id : null;
   }
   const sel = _ckAdmSel[clientId];
 
-  const novoForm = _ckNovoAberto && admin ? `
+  const novoForm =
+    _ckNovoAberto && admin
+      ? `
     <form class="ck-adm-new" data-submit="ckAdmCreate" data-arg="${cid}">
       <input type="text" class="ck-adm-input" id="ckAdmNewName" maxlength="60"
         placeholder="Nome do checklist" aria-label="Nome do checklist" />
       <select class="ck-adm-select" id="ckAdmNewFrom" aria-label="A partir de">
         <option value="">Começar em branco</option>
-        ${lista.map(c => `<option value="${_ckEsc(c.id)}">Duplicar: ${escapeHtml(c.nome)}</option>`).join('')}
+        ${lista.map((c) => `<option value="${_ckEsc(c.id)}">Duplicar: ${escapeHtml(c.nome)}</option>`).join('')}
       </select>
       <button type="submit" class="btn btn-primary btn-sm">Criar</button>
       <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmCloseNew" data-arg="${cid}">Cancelar</button>
-    </form>` : '';
+    </form>`
+      : '';
 
-  const rows = lista.map(c => {
-    const n = countItemsByChecklist(_ckCache(CHECKLIST_STORE_MODELO), c.id);
-    const contas = _ckUsingDefaults()
-      ? countItemsByChecklist(CHECKLIST_MODELO_DEFAULT, c.id) : n;
-    const marcados = ckMarcacoesDoChecklist(c.id);
-    const nome = admin
-      ? `<input type="text" class="ck-adm-name" value="${escapeHtml(c.nome)}" maxlength="60"
+  const rows = lista
+    .map((c) => {
+      const n = countItemsByChecklist(_ckCache(CHECKLIST_STORE_MODELO), c.id);
+      const contas = _ckUsingDefaults() ? countItemsByChecklist(CHECKLIST_MODELO_DEFAULT, c.id) : n;
+      const marcados = ckMarcacoesDoChecklist(c.id);
+      const nome = admin
+        ? `<input type="text" class="ck-adm-name" value="${escapeHtml(c.nome)}" maxlength="60"
            aria-label="Nome do checklist"
            data-change="ckAdmRename" data-client="${cid}" data-arg="${escapeHtml(c.id)}"
            data-enter-blur="1" />`
-      : `<span class="ck-adm-name-txt">${escapeHtml(c.nome)}</span>`;
-    const badge = c.ativo === false
-      ? '<span class="ck-badge ck-badge--off">inativo</span>'
-      : '<span class="ck-badge">ativo</span>';
-    const contagem = `${contas.ativos} ${contas.ativos === 1 ? 'item' : 'itens'}`
-      + (contas.inativos ? ` <span class="ck-adm-off">(+${contas.inativos} desativados)</span>` : '')
-      + (marcados ? ` <span class="ck-adm-marks">${marcados} ${marcados === 1 ? 'cliente' : 'clientes'}</span>` : '');
-    const acoes = admin ? `
+        : `<span class="ck-adm-name-txt">${escapeHtml(c.nome)}</span>`;
+      const badge =
+        c.ativo === false
+          ? '<span class="ck-badge ck-badge--off">inativo</span>'
+          : '<span class="ck-badge">ativo</span>';
+      const contagem =
+        `${contas.ativos} ${contas.ativos === 1 ? 'item' : 'itens'}` +
+        (contas.inativos
+          ? ` <span class="ck-adm-off">(+${contas.inativos} desativados)</span>`
+          : '') +
+        (marcados
+          ? ` <span class="ck-adm-marks">${marcados} ${marcados === 1 ? 'cliente' : 'clientes'}</span>`
+          : '');
+      const acoes = admin
+        ? `
       <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmPick" data-client="${cid}" data-arg="${escapeHtml(c.id)}">Itens</button>
       <button type="button" class="btn btn-secondary btn-sm" data-action="ckAdmToggle" data-client="${cid}" data-arg="${escapeHtml(c.id)}">${c.ativo === false ? 'Reativar' : 'Desativar'}</button>
-      <button type="button" class="btn btn-danger btn-sm" data-action="ckAdmDelete" data-client="${cid}" data-arg="${escapeHtml(c.id)}">Excluir</button>` : '';
-    return `<div class="ck-adm-row${c.id === sel ? ' is-on' : ''}">
+      <button type="button" class="btn btn-danger btn-sm" data-action="ckAdmDelete" data-client="${cid}" data-arg="${escapeHtml(c.id)}">Excluir</button>`
+        : '';
+      return `<div class="ck-adm-row${c.id === sel ? ' is-on' : ''}">
       <div class="ck-adm-id">${nome}${badge}</div>
       <div class="ck-adm-meta">${contagem}</div>
       <div class="ck-adm-acts">${acoes}</div>
     </div>`;
-  }).join('');
+    })
+    .join('');
 
   el.innerHTML = `
     <div class="ck-adm">
@@ -959,7 +1400,7 @@ function _ckRenderGerir(clientId, el) {
     </div>`;
 
   if (admin) {
-    el.querySelectorAll('.ck-adm-item').forEach(row => _ckBindDrag(clientId, row));
+    el.querySelectorAll('.ck-adm-item').forEach((row) => _ckBindDrag(clientId, row));
     if (_ckRefocus === 'add') {
       _ckRefocus = '';
       const inp = el.querySelector('#ckAdmAddText');
@@ -974,12 +1415,19 @@ function _ckRenderGerir(clientId, el) {
 
 function _ckRenderItensSec(cid, checklistId) {
   const grupos = groupChecklistItens(getChecklistItensAll(checklistId));
-  const selOpts = (atual) => checklistCategoriaOptions(atual)
-    .map(c => `<option value="${escapeHtml(c)}"${checklistNormCat(c) === checklistNormCat(atual) ? ' selected' : ''}>${escapeHtml(c)}</option>`)
-    .join('');
+  const selOpts = (atual) =>
+    checklistCategoriaOptions(atual)
+      .map(
+        (c) =>
+          `<option value="${escapeHtml(c)}"${checklistNormCat(c) === checklistNormCat(atual) ? ' selected' : ''}>${escapeHtml(c)}</option>`
+      )
+      .join('');
 
-  const cards = grupos.map(g => {
-    const rows = g.itens.map((it, i) => `
+  const cards = grupos
+    .map((g) => {
+      const rows = g.itens
+        .map(
+          (it, i) => `
       <div class="ck-adm-item" draggable="true" data-item="${_ckEsc(it.id)}" data-cat="${escapeHtml(g.categoria)}">
         <span class="ck-adm-handle" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
@@ -995,8 +1443,10 @@ function _ckRenderItensSec(cid, checklistId) {
           data-action="ckAdmMoveDown" data-client="${cid}" data-arg="${escapeHtml(it.id)}"${i === g.itens.length - 1 ? ' disabled' : ''}>↓</button>
         <button type="button" class="ck-adm-btn ck-adm-btn--rm" title="Remover item" aria-label="Remover item"
           data-action="ckAdmRemoveItem" data-client="${cid}" data-arg="${escapeHtml(it.id)}">×</button>
-      </div>`).join('');
-    return `<section class="ck-group">
+      </div>`
+        )
+        .join('');
+      return `<section class="ck-group">
       <header class="ck-group-head">
         <h3 class="ck-group-title">${escapeHtml(g.categoria)}</h3>
         <span class="ck-count">${g.itens.length}</span>
@@ -1005,7 +1455,8 @@ function _ckRenderItensSec(cid, checklistId) {
       </header>
       <div class="ck-list">${rows}</div>
     </section>`;
-  }).join('');
+    })
+    .join('');
 
   return `<section class="ck-adm-sec">
     <div class="ck-adm-sec-head">
@@ -1018,7 +1469,9 @@ function _ckRenderItensSec(cid, checklistId) {
         aria-label="Novo item"
         data-ck-add="${cid}" />
       <select class="ck-adm-select" id="ckAdmAddCat" aria-label="Categoria do novo item">
-        ${checklistCategoriaOptions('Estações').map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+        ${checklistCategoriaOptions('Estações')
+          .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+          .join('')}
       </select>
       <button type="button" class="btn btn-primary btn-sm" data-action="ckAdmAdd" data-arg="${cid}">Adicionar</button>
     </div>
@@ -1029,13 +1482,20 @@ function _ckRenderItensSec(cid, checklistId) {
 // INPUT (lá Enter é digitação), então a aba tem o próprio ouvinte.
 //   [data-enter-blur] → Enter sai do campo (o change salva, como o onblur)
 //   [data-ck-add]     → Enter adiciona o item (equivale a ckAdmAddKey)
-if (typeof document !== 'undefined' && document.addEventListener && !(typeof window !== 'undefined' && window._ckEnterBound)) {
+if (
+  typeof document !== 'undefined' &&
+  document.addEventListener &&
+  !(typeof window !== 'undefined' && window._ckEnterBound)
+) {
   if (typeof window !== 'undefined') window._ckEnterBound = true;
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
     const t = ev.target;
     if (!t || !t.getAttribute) return;
-    if (t.hasAttribute('data-enter-blur')) { t.blur(); return; }
+    if (t.hasAttribute('data-enter-blur')) {
+      t.blur();
+      return;
+    }
     const addFor = t.getAttribute('data-ck-add');
     if (addFor != null && typeof ckAdmAddKey === 'function') ckAdmAddKey(ev, addFor);
   });
@@ -1076,7 +1536,10 @@ async function ckAdmCreate(ev, clientId) {
   const nome = (root.querySelector('#ckAdmNewName') || {}).value || '';
   const de = (root.querySelector('#ckAdmNewFrom') || {}).value || '';
   const r = await createChecklist({ nome, duplicarDe: de || null });
-  if (!r.ok) { _ckToast(r.motivo || 'Não foi possível criar.', 'error'); return false; }
+  if (!r.ok) {
+    _ckToast(r.motivo || 'Não foi possível criar.', 'error');
+    return false;
+  }
   _ckNovoAberto = false;
   _ckAdmSel[clientId] = r.id;
   _ckGerirAfter(clientId, true, 'Checklist criado.');
@@ -1086,8 +1549,14 @@ async function ckAdmCreate(ev, clientId) {
 async function ckAdmRename(clientId, id, valor) {
   const nm = String(valor || '').trim();
   const atual = getChecklistById(id);
-  if (!nm) { _ckRerenderGerir(clientId); return; }
-  if (atual && nm === atual.nome) { _ckRerenderGerir(clientId); return; }
+  if (!nm) {
+    _ckRerenderGerir(clientId);
+    return;
+  }
+  if (atual && nm === atual.nome) {
+    _ckRerenderGerir(clientId);
+    return;
+  }
   const ok = await saveChecklistRow({ id, nome: nm }, 'Não foi possível renomear');
   _ckGerirAfter(clientId, ok, 'Nome salvo.');
 }
@@ -1117,17 +1586,26 @@ async function ckAdmDelete(clientId, id) {
   }
   const n = ckMarcacoesDoChecklist(id);
   if (n > 0) {
-    _ckToast('Não é possível excluir: ' + n + (n === 1 ? ' cliente já marcou' : ' clientes já marcaram')
-      + ' itens dele. Desative em vez de excluir.', 'error');
+    _ckToast(
+      'Não é possível excluir: ' +
+        n +
+        (n === 1 ? ' cliente já marcou' : ' clientes já marcaram') +
+        ' itens dele. Desative em vez de excluir.',
+      'error'
+    );
     return;
   }
-  confirmAction('Excluir <strong>' + escapeHtml(c.nome) + '</strong> e seus itens? Esta ação não pode ser desfeita.',
+  confirmAction(
+    'Excluir <strong>' +
+      escapeHtml(c.nome) +
+      '</strong> e seus itens? Esta ação não pode ser desfeita.',
     async () => {
       const ok = await deleteChecklist(id);
       if (_ckAdmSel[clientId] === id) _ckAdmSel[clientId] = null;
       _ckReopen(clientId);
       if (ok) _ckToast('Checklist excluído.', 'success');
-    });
+    }
+  );
 }
 
 async function ckAdmAddKey(ev, clientId) {
@@ -1144,22 +1622,31 @@ async function ckAdmAdd(clientId) {
   const cat = (root.querySelector('#ckAdmAddCat') || {}).value || CHECKLIST_SEM_PROC;
   if (!inp) return;
   const r = await addChecklistItem(sel, { texto: inp.value, categoria: cat });
-  if (!r.ok) { _ckToast(r.motivo || 'Não foi possível adicionar.', 'error'); return; }
+  if (!r.ok) {
+    _ckToast(r.motivo || 'Não foi possível adicionar.', 'error');
+    return;
+  }
   _ckRefocus = 'add'; // Enter mantém o foco no próximo item
   _ckGerirAfter(clientId, true, 'Item adicionado.');
 }
 
 async function ckAdmItemText(clientId, itemId, valor) {
   const txt = String(valor || '').trim();
-  const atual = (_ckCache(CHECKLIST_STORE_MODELO).find(i => i.id === itemId) || {}).texto;
-  if (!txt) { _ckRerenderGerir(clientId); return; }
+  const atual = (_ckCache(CHECKLIST_STORE_MODELO).find((i) => i.id === itemId) || {}).texto;
+  if (!txt) {
+    _ckRerenderGerir(clientId);
+    return;
+  }
   if (txt === atual) return;
   const ok = await saveChecklistItem({ id: itemId, texto: txt }, 'Não foi possível salvar');
   _ckGerirAfter(clientId, ok, 'Salvo.');
 }
 
 async function ckAdmItemCat(clientId, itemId, categoria) {
-  const ok = await saveChecklistItem({ id: itemId, categoria: String(categoria || CHECKLIST_SEM_PROC) }, 'Não foi possível salvar');
+  const ok = await saveChecklistItem(
+    { id: itemId, categoria: String(categoria || CHECKLIST_SEM_PROC) },
+    'Não foi possível salvar'
+  );
   _ckGerirAfter(clientId, ok, 'Salvo.');
 }
 
@@ -1175,19 +1662,27 @@ async function ckAdmMove(clientId, itemId, dir) {
 // Drag & drop (complementa ↑↓, que é o caminho por teclado/celular).
 function _ckBindDrag(clientId, row) {
   const id = row.getAttribute('data-item');
-  row.addEventListener('dragstart', e => {
+  row.addEventListener('dragstart', (e) => {
     _ckDragId = id;
     row.classList.add('is-drag');
-    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+    try {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+    }
   });
   row.addEventListener('dragend', () => {
     row.classList.remove('is-drag');
     _ckDragId = null;
-    document.querySelectorAll('.ck-adm-item.is-over').forEach(x => x.classList.remove('is-over'));
+    document.querySelectorAll('.ck-adm-item.is-over').forEach((x) => x.classList.remove('is-over'));
   });
-  row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('is-over'); });
+  row.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    row.classList.add('is-over');
+  });
   row.addEventListener('dragleave', () => row.classList.remove('is-over'));
-  row.addEventListener('drop', e => {
+  row.addEventListener('drop', (e) => {
     e.preventDefault();
     row.classList.remove('is-over');
     ckAdmDrop(clientId, row.getAttribute('data-item'), row.getAttribute('data-cat'));
@@ -1216,8 +1711,11 @@ async function ckAdmRemoveItem(clientId, itemId) {
   if (n === null) {
     msg = 'Remover este item do checklist? (não foi possível contar as marcações)';
   } else if (n > 0) {
-    msg = 'Remover este item? ' + n + (n === 1 ? ' cliente já marcou' : ' clientes já marcaram')
-      + ' ele — o histórico é preservado (só some da tela).';
+    msg =
+      'Remover este item? ' +
+      n +
+      (n === 1 ? ' cliente já marcou' : ' clientes já marcaram') +
+      ' ele — o histórico é preservado (só some da tela).';
   } else {
     msg = 'Remover este item do checklist? Ninguém ainda marcou ele.';
   }
@@ -1232,15 +1730,21 @@ async function ckAdmRemoveItem(clientId, itemId) {
 //    outro destruiria o modal do cliente) ─────────────────────────────────────
 
 function _ckProcOverlay() {
-  try { return document.getElementById('ckProcOverlay'); } catch (_) { return null; }
+  try {
+    return document.getElementById('ckProcOverlay');
+  } catch (_) {
+    return null;
+  }
 }
 
 function openChecklistProc(clientId, categoria) {
   const ov = _ckProcOverlay();
   if (!ov) return;
-  const procs = typeof getProcedures === 'function'
-    ? findProceduresByCategoria(getProcedures(clientId), categoria) : [];
-  const comTexto = procs.filter(p => String(p.content || '').trim());
+  const procs =
+    typeof getProcedures === 'function'
+      ? findProceduresByCategoria(getProcedures(clientId), categoria)
+      : [];
+  const comTexto = procs.filter((p) => String(p.content || '').trim());
   const title = document.getElementById('ckProcTitle');
   const body = document.getElementById('ckProcBody');
   if (title) title.textContent = categoria;
@@ -1249,11 +1753,17 @@ function openChecklistProc(clientId, categoria) {
   if (!comTexto.length) {
     html = `<p class="ck-proc-empty">Nenhuma instrução cadastrada para ${escapeHtml(categoria)} neste cliente. Cadastre na aba Procedimentos.</p>`;
   } else {
-    html = comTexto.map(p => {
-      const head = comTexto.length > 1
-        ? `<div class="ck-proc-name">${escapeHtml(p.title || 'Procedimento')}</div>` : '';
-      return head + `<pre class="ck-proc-text">${escapeHtml(String(p.content || '').trim())}</pre>`;
-    }).join('');
+    html = comTexto
+      .map((p) => {
+        const head =
+          comTexto.length > 1
+            ? `<div class="ck-proc-name">${escapeHtml(p.title || 'Procedimento')}</div>`
+            : '';
+        return (
+          head + `<pre class="ck-proc-text">${escapeHtml(String(p.content || '').trim())}</pre>`
+        );
+      })
+      .join('');
   }
   if (body) body.innerHTML = html;
 
@@ -1271,10 +1781,15 @@ if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     try {
       const ov = document.getElementById('ckProcOverlay');
-      if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeChecklistProc(); });
+      if (ov)
+        ov.addEventListener('click', (e) => {
+          if (e.target === ov) closeChecklistProc();
+        });
       const btn = document.getElementById('ckProcClose');
       if (btn) btn.addEventListener('click', closeChecklistProc);
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'checklist');
+    }
   });
 }
 

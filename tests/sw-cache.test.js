@@ -22,23 +22,39 @@ function loadSW() {
       skipWaiting() {},
       clients: { claim() {} },
       location: { origin: APP_ORIGIN },
-      addEventListener(type, fn) { listeners[type] = fn; },
+      addEventListener(type, fn) {
+        listeners[type] = fn;
+      },
     },
     caches: {
       async open(name) {
         if (!cacheStore.has(name)) cacheStore.set(name, new Map());
         const store = cacheStore.get(name);
         return {
-          put: async (req, res) => { store.set(typeof req === 'string' ? req : req.url, res); },
+          put: async (req, res) => {
+            store.set(typeof req === 'string' ? req : req.url, res);
+          },
           keys: async () => [...store.keys()],
           delete: async (k) => store.delete(typeof k === 'string' ? k : k.url),
         };
       },
-      async keys() { return [...cacheStore.keys()]; },
-      async delete(name) { return cacheStore.delete(name); },
-      async match() { return undefined; },
+      async keys() {
+        return [...cacheStore.keys()];
+      },
+      async delete(name) {
+        return cacheStore.delete(name);
+      },
+      async match() {
+        return undefined;
+      },
     },
-    fetch: async () => ({ ok: true, status: 200, clone() { return this; } }),
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      clone() {
+        return this;
+      },
+    }),
   };
   vm.createContext(sandbox);
   vm.runInContext(swSource, sandbox);
@@ -49,7 +65,9 @@ function dispatchFetch(listeners, req) {
   let responded = null;
   const event = {
     request: req,
-    respondWith(p) { responded = p; },
+    respondWith(p) {
+      responded = p;
+    },
     waitUntil() {},
   };
   listeners.fetch(event);
@@ -68,17 +86,25 @@ function makeRequest(url, headers = {}) {
 
 describe('sw.js e respostas autenticadas', () => {
   let listeners;
-  beforeEach(() => { ({ listeners } = loadSW()); });
+  beforeEach(() => {
+    ({ listeners } = loadSW());
+  });
 
   it('registra o handler de fetch', () => {
     expect(typeof listeners.fetch).toBe('function');
   });
 
   it('NÃƒO intercepta GET do Supabase (apikey/authorization)', () => {
-    const withApikey = dispatchFetch(listeners,
-      makeRequest('https://proj.supabase.co/rest/v1/pendencias?select=*', { apikey: 'anon-key' }));
-    const withBearer = dispatchFetch(listeners,
-      makeRequest('https://proj.supabase.co/storage/v1/object/attachments/x.png', { authorization: 'Bearer x' }));
+    const withApikey = dispatchFetch(
+      listeners,
+      makeRequest('https://proj.supabase.co/rest/v1/pendencias?select=*', { apikey: 'anon-key' })
+    );
+    const withBearer = dispatchFetch(
+      listeners,
+      makeRequest('https://proj.supabase.co/storage/v1/object/attachments/x.png', {
+        authorization: 'Bearer x',
+      })
+    );
     expect(withApikey).toBeNull();
     expect(withBearer).toBeNull();
   });
@@ -90,8 +116,10 @@ describe('sw.js e respostas autenticadas', () => {
   });
 
   it('intercepta e cacheia CDN sem credenciais', async () => {
-    const p = dispatchFetch(listeners,
-      makeRequest('https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js'));
+    const p = dispatchFetch(
+      listeners,
+      makeRequest('https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js')
+    );
     expect(p).not.toBeNull();
     await expect(p).resolves.toBeTruthy();
   });

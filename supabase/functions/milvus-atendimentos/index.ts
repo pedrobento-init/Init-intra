@@ -20,38 +20,46 @@
 // clients a partir das variaveis que a plataforma injeta -- por isso nao ha
 // mais createClient/SERVICE_ROLE_KEY aqui. verify_jwt = true no config.toml
 // continua valendo (auth: "user"). O team/admin-check segue sendo nosso.
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
-const LISTAGEM_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/relatorio-atendimento/listagem`;
-const EXPORTA_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/relatorio-atendimento/exporta`;
+const LISTAGEM_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/relatorio-atendimento/listagem`;
+const EXPORTA_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/relatorio-atendimento/exporta`;
 
 // CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
 // ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 function sanitizeIlike(s: unknown): string {
-  return String(s ?? "").replace(/[%_\\]/g, "").replace(/[,()]/g, " ").trim().slice(0, 80);
+  return String(s ?? '')
+    .replace(/[%_\\]/g, '')
+    .replace(/[,()]/g, ' ')
+    .trim()
+    .slice(0, 80);
 }
 function sanitizeDate(s: unknown): string {
-  const v = String(s ?? "").trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+  const v = String(s ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
 }
 function sanitizeCodigo(v: unknown): string {
-  const s = String(v ?? "").trim().slice(0, 20);
+  const s = String(v ?? '')
+    .trim()
+    .slice(0, 20);
   // Milvus aceita codigo string ou int; mantém como string sanitizada
-  return s.replace(/[^0-9a-zA-Z-_]/g, "").slice(0, 20);
+  return s.replace(/[^0-9a-zA-Z-_]/g, '').slice(0, 20);
 }
 function sanitizeToken(v: unknown): string {
-  return String(v ?? "").trim().slice(0, 40).replace(/[^a-zA-Z0-9]/g, "");
+  return String(v ?? '')
+    .trim()
+    .slice(0, 40)
+    .replace(/[^a-zA-Z0-9]/g, '');
 }
 function clampTotalRegistros(v: unknown): number {
   const n = Number(v);
@@ -65,19 +73,19 @@ function clampTotalRegistros(v: unknown): number {
   return Math.min(1000, Math.max(50, Math.trunc(n)));
 }
 function normalizeTeam(t: string | null | undefined): string {
-  if (!t) return "init";
+  if (!t) return 'init';
   const s = String(t).toLowerCase().trim();
-  if (s.indexOf("poiesis_") === 0) return "poiesis";
+  if (s.indexOf('poiesis_') === 0) return 'poiesis';
   return s;
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-atendimentos: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-atendimentos: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
@@ -85,28 +93,28 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   const admin = ctx.supabaseAdmin;
 
   const callerUid = ctx.userClaims?.id ?? null;
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
 
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, team, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, team, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
   if (!callerOp || callerOp.active === false) {
-    return json({ error: "Operador sem acesso" }, 403);
+    return json({ error: 'Operador sem acesso' }, 403);
   }
   const isAdmin = callerOp.is_admin === true;
-  const opTeam = callerOp.team || "init";
+  const opTeam = callerOp.team || 'init';
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
-  const action = String(body?.action ?? "list").toLowerCase();
-  if (!["list", "export"].includes(action)) {
-    return json({ error: "action deve ser list ou export" }, 400);
+  const action = String(body?.action ?? 'list').toLowerCase();
+  if (!['list', 'export'].includes(action)) {
+    return json({ error: 'action deve ser list ou export' }, 400);
   }
 
   const filtroBodyRaw = (body?.filtro_body ?? body?.filtroBody ?? {}) as Record<string, unknown>;
@@ -116,166 +124,181 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // Novo contrato (frontend não envia mais o token): client_id top-level; a
   // Edge resolve o token no servidor. Legado: filtro_body.token continua
   // aceito durante a transição de deploy.
-  const clientIdRaw = String(body?.client_id ?? body?.clientId ?? "").trim().slice(0, 80);
+  const clientIdRaw = String(body?.client_id ?? body?.clientId ?? '')
+    .trim()
+    .slice(0, 80);
 
   // Sanitização filtros
   const filtro: Record<string, unknown> = {};
-  const dataInicial = sanitizeDate(filtroBodyRaw["data_inicial"] ?? filtroBodyRaw["dataInicial"]);
-  const dataFinal = sanitizeDate(filtroBodyRaw["data_final"] ?? filtroBodyRaw["dataFinal"]);
-  if (dataInicial) filtro["data_inicial"] = dataInicial;
-  if (dataFinal) filtro["data_final"] = dataFinal;
+  const dataInicial = sanitizeDate(filtroBodyRaw['data_inicial'] ?? filtroBodyRaw['dataInicial']);
+  const dataFinal = sanitizeDate(filtroBodyRaw['data_final'] ?? filtroBodyRaw['dataFinal']);
+  if (dataInicial) filtro['data_inicial'] = dataInicial;
+  if (dataFinal) filtro['data_final'] = dataFinal;
 
-  const codigoSan = sanitizeCodigo(filtroBodyRaw["codigo"]);
-  if (codigoSan) filtro["codigo"] = codigoSan;
+  const codigoSan = sanitizeCodigo(filtroBodyRaw['codigo']);
+  if (codigoSan) filtro['codigo'] = codigoSan;
 
   // Token: resolvido no bloco de validação abaixo (client_id novo contrato,
   // filtro_body.token legado) — nunca confia cegamente no que o frontend manda.
 
-  const nomeTec = sanitizeIlike(filtroBodyRaw["nome_tecnico"] ?? filtroBodyRaw["nomeTecnico"]);
-  if (nomeTec) filtro["nome_tecnico"] = nomeTec;
+  const nomeTec = sanitizeIlike(filtroBodyRaw['nome_tecnico'] ?? filtroBodyRaw['nomeTecnico']);
+  if (nomeTec) filtro['nome_tecnico'] = nomeTec;
 
-  const nomeMesa = sanitizeIlike(filtroBodyRaw["nome_mesa"] ?? filtroBodyRaw["nomeMesa"]);
-  if (nomeMesa) filtro["nome_mesa"] = nomeMesa;
+  const nomeMesa = sanitizeIlike(filtroBodyRaw['nome_mesa'] ?? filtroBodyRaw['nomeMesa']);
+  if (nomeMesa) filtro['nome_mesa'] = nomeMesa;
 
-  if (filtroBodyRaw["is_externo"] !== undefined) filtro["is_externo"] = !!filtroBodyRaw["is_externo"];
-  if (filtroBodyRaw["is_comercial"] !== undefined) filtro["is_comercial"] = !!filtroBodyRaw["is_comercial"];
-  if (filtroBodyRaw["motivo_pausa"] !== undefined) {
-    const mp = sanitizeIlike(filtroBodyRaw["motivo_pausa"]);
-    if (mp) filtro["motivo_pausa"] = mp;
+  if (filtroBodyRaw['is_externo'] !== undefined)
+    filtro['is_externo'] = !!filtroBodyRaw['is_externo'];
+  if (filtroBodyRaw['is_comercial'] !== undefined)
+    filtro['is_comercial'] = !!filtroBodyRaw['is_comercial'];
+  if (filtroBodyRaw['motivo_pausa'] !== undefined) {
+    const mp = sanitizeIlike(filtroBodyRaw['motivo_pausa']);
+    if (mp) filtro['motivo_pausa'] = mp;
   }
 
   // export: tipo_arquivo
-  if (action === "export") {
-    const tipo = String(filtroBodyRaw["tipo_arquivo"] ?? filtroBodyRaw["tipoArquivo"] ?? "csv").toLowerCase();
-    if (!["csv", "xls", "xlsx"].includes(tipo)) {
-      return json({ error: "tipo_arquivo deve ser csv ou xls" }, 400);
+  if (action === 'export') {
+    const tipo = String(
+      filtroBodyRaw['tipo_arquivo'] ?? filtroBodyRaw['tipoArquivo'] ?? 'csv'
+    ).toLowerCase();
+    if (!['csv', 'xls', 'xlsx'].includes(tipo)) {
+      return json({ error: 'tipo_arquivo deve ser csv ou xls' }, 400);
     }
-    filtro["tipo_arquivo"] = tipo === "xlsx" ? "xls" : tipo;
+    filtro['tipo_arquivo'] = tipo === 'xlsx' ? 'xls' : tipo;
   }
 
   // Validação cross-team por cliente (novo contrato) ou por token (legado).
   // O token do cliente NUNCA precisa sair do servidor: com client_id, a Edge
   // resolve clients.milvus_client_token e valida a equipe antes de repassar.
   let clientIdForLog: string | null = null;
-  let tokenSan = sanitizeToken(filtroBodyRaw["token"]);
-  let via = "none";
+  let tokenSan = sanitizeToken(filtroBodyRaw['token']);
+  let via = 'none';
   if (clientIdRaw) {
     const { data: client } = await admin
-      .from("clients")
-      .select("id, team, milvus_client_token")
-      .eq("id", clientIdRaw)
+      .from('clients')
+      .select('id, team, milvus_client_token')
+      .eq('id', clientIdRaw)
       .maybeSingle();
     if (!client) {
-      return json({ error: "Cliente não encontrado" }, 404);
+      return json({ error: 'Cliente não encontrado' }, 404);
     }
-    const cliTeam = (client as { team: string | null }).team || "init";
+    const cliTeam = (client as { team: string | null }).team || 'init';
     if (!isAdmin && normalizeTeam(cliTeam) !== normalizeTeam(opTeam)) {
-      return json({ error: "Acesso negado a este cliente" }, 403);
+      return json({ error: 'Acesso negado a este cliente' }, 403);
     }
     clientIdForLog = (client as { id: string }).id;
-    const serverToken = sanitizeToken((client as { milvus_client_token: string | null }).milvus_client_token);
+    const serverToken = sanitizeToken(
+      (client as { milvus_client_token: string | null }).milvus_client_token
+    );
     if (!serverToken) {
       // HTTP 200 + {error}: o frontend exibe data.error sem quebrar o
       // contrato {lista,resumo} do caminho feliz.
-      return json({ error: "Cliente sem token Milvus configurado.", code: "MILVUS_CLIENT_TOKEN_NOT_CONFIGURED" });
+      return json({
+        error: 'Cliente sem token Milvus configurado.',
+        code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED',
+      });
     }
     tokenSan = serverToken;
-    via = "client-id";
+    via = 'client-id';
   } else if (tokenSan) {
     const { data: client } = await admin
-      .from("clients")
-      .select("id, team, milvus_client_token")
-      .eq("milvus_client_token", tokenSan)
+      .from('clients')
+      .select('id, team, milvus_client_token')
+      .eq('milvus_client_token', tokenSan)
       .maybeSingle();
     if (!client) {
-      return json({ error: "Token de cliente inválido" }, 403);
+      return json({ error: 'Token de cliente inválido' }, 403);
     }
-    const cliTeam = (client as { team: string | null }).team || "init";
+    const cliTeam = (client as { team: string | null }).team || 'init';
     if (!isAdmin && normalizeTeam(cliTeam) !== normalizeTeam(opTeam)) {
-      return json({ error: "Token de cliente não pertence à sua equipe" }, 403);
+      return json({ error: 'Token de cliente não pertence à sua equipe' }, 403);
     }
     clientIdForLog = (client as { id: string }).id;
-    via = "token-legado";
+    via = 'token-legado';
   }
-  if (tokenSan) filtro["token"] = tokenSan;
-  else delete filtro["token"];
+  if (tokenSan) filtro['token'] = tokenSan;
+  else delete filtro['token'];
 
-  console.log(`milvus-atendimentos: action=${action} team=${opTeam} clientId=${clientIdForLog ?? "-"} via=${via} isAdmin=${isAdmin}`);
+  console.log(
+    `milvus-atendimentos: action=${action} team=${opTeam} clientId=${clientIdForLog ?? '-'} via=${via} isAdmin=${isAdmin}`
+  );
 
   // Monta payload para Milvus
   const milvusBody: Record<string, unknown> = {
     filtro_body: filtro,
   };
   // list: paginacao top-level
-  if (action === "list") {
+  if (action === 'list') {
     const pagina = paginaRaw !== undefined ? Math.max(1, Math.trunc(Number(paginaRaw) || 1)) : 1;
     const total = clampTotalRegistros(totalRegistrosRaw);
     const isDesc = isDescendingRaw !== undefined ? !!isDescendingRaw : true;
-    milvusBody["pagina"] = pagina;
-    milvusBody["total_registros"] = total;
-    milvusBody["is_descending"] = isDesc;
+    milvusBody['pagina'] = pagina;
+    milvusBody['total_registros'] = total;
+    milvusBody['is_descending'] = isDesc;
     // também envia dentro de filtro_body? não, só top-level conforme spec
   }
 
-  const targetUrl = action === "export" ? EXPORTA_URL : LISTAGEM_URL;
+  const targetUrl = action === 'export' ? EXPORTA_URL : LISTAGEM_URL;
 
   let milvusRes: Response;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 25000);
     milvusRes = await fetch(targetUrl, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": MILVUS_API_TOKEN,
+        'Content-Type': 'application/json',
+        Authorization: MILVUS_API_TOKEN,
       },
       body: JSON.stringify(milvusBody),
       signal: ctrl.signal,
     });
     clearTimeout(timer);
   } catch (e) {
-    const isAbort = (e as Error)?.name === "AbortError";
-    console.error(`milvus-atendimentos: fetch erro ${isAbort ? "timeout" : "rede"}`);
-    return json({ error: "Falha de conexão com o Milvus" }, 502);
+    const isAbort = (e as Error)?.name === 'AbortError';
+    console.error(`milvus-atendimentos: fetch erro ${isAbort ? 'timeout' : 'rede'}`);
+    return json({ error: 'Falha de conexão com o Milvus' }, 502);
   }
 
   if (milvusRes.status === 401 || milvusRes.status === 403) {
-    console.error("milvus-atendimentos: auth falhou no Milvus");
-    return json({ error: "Falha de autenticação com o Milvus" }, 502);
+    console.error('milvus-atendimentos: auth falhou no Milvus');
+    return json({ error: 'Falha de autenticação com o Milvus' }, 502);
   }
   if (!milvusRes.ok) {
-    const txt = await milvusRes.text().catch(() => "");
+    const txt = await milvusRes.text().catch(() => '');
     console.error(`milvus-atendimentos: Milvus HTTP ${milvusRes.status} ${txt.slice(0, 200)}`);
     return json({ error: `Milvus retornou HTTP ${milvusRes.status}` }, 502);
   }
 
-  if (action === "list") {
+  if (action === 'list') {
     let data: unknown;
     try {
       data = await milvusRes.json();
     } catch {
-      return json({ error: "Resposta inválida do Milvus" }, 502);
+      return json({ error: 'Resposta inválida do Milvus' }, 502);
     }
     // repassa sem alterar formato {meta, lista, resumo}
     return json(data as Record<string, unknown>);
   } else {
     // export: retorna binário como base64
-    const contentType = milvusRes.headers.get("content-type") || (String(filtro["tipo_arquivo"]) === "xls" ? "application/vnd.ms-excel" : "text/csv");
+    const contentType =
+      milvusRes.headers.get('content-type') ||
+      (String(filtro['tipo_arquivo']) === 'xls' ? 'application/vnd.ms-excel' : 'text/csv');
     const buf = await milvusRes.arrayBuffer();
     // cap de segurança: 10MB
     if (buf.byteLength > 10 * 1024 * 1024) {
-      return json({ error: "Arquivo muito grande" }, 502);
+      return json({ error: 'Arquivo muito grande' }, 502);
     }
-    let base64 = "";
+    let base64 = '';
     try {
       const bytes = new Uint8Array(buf);
-      let binary = "";
+      let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       base64 = btoa(binary);
     } catch {
-      return json({ error: "Falha ao codificar arquivo" }, 500);
+      return json({ error: 'Falha ao codificar arquivo' }, 500);
     }
-    const tipo = String(filtro["tipo_arquivo"] ?? "csv");
+    const tipo = String(filtro['tipo_arquivo'] ?? 'csv');
     return json({
       success: true,
       tipo_arquivo: tipo,
@@ -286,4 +309,4 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   }
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

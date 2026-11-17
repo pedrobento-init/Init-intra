@@ -47,7 +47,8 @@ _setGlobal(
       get: (_t, p) => {
         if (p === 'addEventListener') return () => {};
         if (p === 'querySelectorAll') return () => [];
-        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement') return (..._a) => _anyEl();
+        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement')
+          return (..._a) => _anyEl();
         if (p === 'head' || p === 'body') return _anyEl();
         if (p === 'visibilityState') return 'visible';
         return undefined;
@@ -84,7 +85,9 @@ _setGlobal('setCacheKV', (key, value) => {
   _kv[key] = value;
 });
 _setGlobal('getCacheTable', (table) =>
-  table === 'sessions' ? { key: 'intra_session', value: { opId: 'OP-1', name: 'Teste', team: 'init', role: 'membro' } } : {}
+  table === 'sessions'
+    ? { key: 'intra_session', value: { opId: 'OP-1', name: 'Teste', team: 'init', role: 'membro' } }
+    : {}
 );
 _setGlobal('setCacheTable', () => {});
 _setGlobal('isSupabaseConnected', () => true);
@@ -373,7 +376,13 @@ describe('P-19 — payload remoto da visita (SYNC-07)', () => {
   it('assinatura do cliente sobe junto com a visita (054)', () => {
     const png = 'data:image/png;base64,iVBORw0KGgo=';
     const v = getVisits().find((x) => x.id === 'VIS-1');
-    saveVisit({ ...v, status: 'concluida', assinatura: png, assinaturaNome: 'João', assinaturaEm: '2026-02-10T12:00:00.000Z' });
+    saveVisit({
+      ...v,
+      status: 'concluida',
+      assinatura: png,
+      assinaturaNome: 'João',
+      assinaturaEm: '2026-02-10T12:00:00.000Z',
+    });
 
     const push = _pushOf('visits');
     expect(push.payload.assinatura).toBe(png);
@@ -413,4 +422,3 @@ describe('P-19 — payload remoto da visita (SYNC-07)', () => {
     expect(push.payload.milvus_chamado_codigo).toBe(null);
   });
 });
-

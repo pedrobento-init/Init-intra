@@ -25,11 +25,21 @@ function scriptsDoIndex() {
 function nomesDoPadrao(p, acc) {
   if (!p) return;
   switch (p.type) {
-    case 'Identifier': acc.push(p.name); break;
-    case 'ObjectPattern': p.properties.forEach((x) => nomesDoPadrao(x.value || x.argument, acc)); break;
-    case 'ArrayPattern': p.elements.forEach((x) => nomesDoPadrao(x, acc)); break;
-    case 'AssignmentPattern': nomesDoPadrao(p.left, acc); break;
-    case 'RestElement': nomesDoPadrao(p.argument, acc); break;
+    case 'Identifier':
+      acc.push(p.name);
+      break;
+    case 'ObjectPattern':
+      p.properties.forEach((x) => nomesDoPadrao(x.value || x.argument, acc));
+      break;
+    case 'ArrayPattern':
+      p.elements.forEach((x) => nomesDoPadrao(x, acc));
+      break;
+    case 'AssignmentPattern':
+      nomesDoPadrao(p.left, acc);
+      break;
+    case 'RestElement':
+      nomesDoPadrao(p.argument, acc);
+      break;
   }
 }
 
@@ -48,11 +58,20 @@ function coletarVarEmBlocos(node, acc) {
 }
 
 function declaracoesDeTopo(src, arquivo) {
-  const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script', allowReturnOutsideFunction: true });
+  const ast = acorn.parse(src, {
+    ecmaVersion: 2022,
+    sourceType: 'script',
+    allowReturnOutsideFunction: true,
+  });
   const out = [];
   for (const n of ast.body) {
     if (n.type === 'FunctionDeclaration' || n.type === 'ClassDeclaration') {
-      out.push({ nome: n.id.name, tipo: n.type === 'ClassDeclaration' ? 'class' : 'function', arquivo, corpo: src.slice(n.start, n.end) });
+      out.push({
+        nome: n.id.name,
+        tipo: n.type === 'ClassDeclaration' ? 'class' : 'function',
+        arquivo,
+        corpo: src.slice(n.start, n.end),
+      });
     } else if (n.type === 'VariableDeclaration') {
       const nomes = [];
       n.declarations.forEach((d) => nomesDoPadrao(d.id, nomes));

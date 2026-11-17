@@ -26,10 +26,9 @@
 // cliente_id só é usado como chave de busca DENTRO de nome já
 // mapeado manualmente pelo administrador.
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-const MILVUS_API_URL =
-  Deno.env.get("MILVUS_API_URL") ?? "https://apiintegracao.milvus.com.br";
-const MILVUS_API_TOKEN = Deno.env.get("MILVUS_API_TOKEN") ?? "";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+const MILVUS_API_URL = Deno.env.get('MILVUS_API_URL') ?? 'https://apiintegracao.milvus.com.br';
+const MILVUS_API_TOKEN = Deno.env.get('MILVUS_API_TOKEN') ?? '';
 
 const MAX_PAGES = 60;
 const PAGE_SIZE = 1000;
@@ -40,23 +39,23 @@ const UPSERT_BATCH = 200;
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 const _toText = (v: unknown): string => {
-  if (v === null || v === undefined) return "";
+  if (v === null || v === undefined) return '';
   return String(v);
 };
 
 const _toIntOrNull = (v: unknown): number | null => {
-  if (v === null || v === undefined || v === "") return null;
+  if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
 const _toIsoOrNull = (v: unknown): string | null => {
-  if (v === null || v === undefined || v === "") return null;
+  if (v === null || v === undefined || v === '') return null;
   const d = new Date(String(v));
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
@@ -70,7 +69,7 @@ const _toDateOrNull = (v: unknown): string | null => {
 // NOTA: `sistema_operacional_licenca` é ignorado de propósito
 // (pode conter chave — sem necessidade funcional, não persistimos).
 function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: string) {
-  const milvusId = _toIntOrNull(raw["id"]);
+  const milvusId = _toIntOrNull(raw['id']);
   if (milvusId === null) return null;
   const now = new Date().toISOString();
   return {
@@ -78,44 +77,45 @@ function normalizeDevice(raw: Record<string, unknown>, clientId: string, team: s
     client_id: clientId,
     team,
     milvus_device_id: milvusId,
-    hostname: _toText(raw["hostname"]),
-    apelido: _toText(raw["apelido"]),
-    ip_interno: _toText(raw["ip_interno"]),
-    ip_externo: _toText(raw["ip_externo"]),
-    mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
+    hostname: _toText(raw['hostname']),
+    apelido: _toText(raw['apelido']),
+    ip_interno: _toText(raw['ip_interno']),
+    ip_externo: _toText(raw['ip_externo']),
+    mac_address: _toText(raw['macaddres'] ?? raw['mac_address']),
     // `fabricante` não é puxado (decisão de produto): gravamos '' para
     // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
-    marca: _toText(raw["marca"]),
-    fabricante: "",
-    is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
-      ? true
-      : raw["is_ativo"] === true || raw["is_ativo"] === 1 || raw["is_ativo"] === "1",
-    data_criacao: _toIsoOrNull(raw["data_criacao"]),
-    data_ultima_atualizacao: _toIsoOrNull(raw["data_ultima_atualizacao"]),
-    dominio: _toText(raw["dominio"]),
-    sistema_operacional: _toText(raw["sistema_operacional"]),
-    placa_mae: _toText(raw["placa_mae"]),
-    placa_mae_serial: _toText(raw["placa_mae_serial"]),
-    processador: _toText(raw["processador"]),
-    versao_client: _toText(raw["versao_client"]),
-    observacao: _toText(raw["observacao"]),
-    usuario_logado: _toText(raw["usuario_logado"]),
-    total_processadores: _toIntOrNull(raw["total_processadores"]),
-    numero_serial: _toText(raw["numero_serial"]),
-    placa_mae_modelo: _toText(raw["placa_mae_modelo"]),
-    data_compra: _toDateOrNull(raw["data_compra"]),
-    data_garantia: _toDateOrNull(raw["data_garantia"]),
-    modelo_notebook: _toText(raw["modelo_notebook"]),
-    nome_fantasia: _toText(raw["nome_fantasia"]),
-    tipo_dispositivo_id: _toIntOrNull(raw["tipo_dispositivo_id"]),
-    tipo_dispositivo_text: _toText(raw["tipo_dispositivo_text"]),
+    marca: _toText(raw['marca']),
+    fabricante: '',
+    is_ativo:
+      raw['is_ativo'] === undefined || raw['is_ativo'] === null
+        ? true
+        : raw['is_ativo'] === true || raw['is_ativo'] === 1 || raw['is_ativo'] === '1',
+    data_criacao: _toIsoOrNull(raw['data_criacao']),
+    data_ultima_atualizacao: _toIsoOrNull(raw['data_ultima_atualizacao']),
+    dominio: _toText(raw['dominio']),
+    sistema_operacional: _toText(raw['sistema_operacional']),
+    placa_mae: _toText(raw['placa_mae']),
+    placa_mae_serial: _toText(raw['placa_mae_serial']),
+    processador: _toText(raw['processador']),
+    versao_client: _toText(raw['versao_client']),
+    observacao: _toText(raw['observacao']),
+    usuario_logado: _toText(raw['usuario_logado']),
+    total_processadores: _toIntOrNull(raw['total_processadores']),
+    numero_serial: _toText(raw['numero_serial']),
+    placa_mae_modelo: _toText(raw['placa_mae_modelo']),
+    data_compra: _toDateOrNull(raw['data_compra']),
+    data_garantia: _toDateOrNull(raw['data_garantia']),
+    modelo_notebook: _toText(raw['modelo_notebook']),
+    nome_fantasia: _toText(raw['nome_fantasia']),
+    tipo_dispositivo_id: _toIntOrNull(raw['tipo_dispositivo_id']),
+    tipo_dispositivo_text: _toText(raw['tipo_dispositivo_text']),
     updated_at: now,
   };
 }
 
-const BUSCAR_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/buscar`;
-const TYPES_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/lista/tipo-dispositivo`;
-const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, "")}/api/cliente/busca`;
+const BUSCAR_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/dispositivos/buscar`;
+const TYPES_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/dispositivos/lista/tipo-dispositivo`;
+const CLIENTS_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/cliente/busca`;
 
 // GET genérico ao Milvus (buscar/tipos): status antes do corpo,
 // 1 retry para 429/5xx/conexão, nunca para 401/403.
@@ -129,7 +129,7 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { "Authorization": MILVUS_API_TOKEN },
+        headers: { Authorization: MILVUS_API_TOKEN },
         signal: ctrl.signal,
       });
     } catch (e) {
@@ -138,11 +138,13 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+      throw new Error(
+        `Falha de conexão com o Milvus: ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'rede'}`
+      );
     }
     if (res.status === 401 || res.status === 403) {
       clearTimeout(timer);
-      throw new Error("Falha de autenticação com o Milvus");
+      throw new Error('Falha de autenticação com o Milvus');
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
       clearTimeout(timer);
@@ -162,14 +164,14 @@ async function milvusGet(path: string, params: Record<string, string>): Promise<
       return data;
     } catch {
       clearTimeout(timer);
-      throw new Error("Resposta inválida do Milvus");
+      throw new Error('Resposta inválida do Milvus');
     }
   }
-  throw new Error("Falha inesperada ao consultar o Milvus");
+  throw new Error('Falha inesperada ao consultar o Milvus');
 }
 
 function _buscarList(data: unknown): Record<string, unknown>[] {
-  const lista = (data as Record<string, unknown> | null)?.["lista"] as unknown;
+  const lista = (data as Record<string, unknown> | null)?.['lista'] as unknown;
   if (Array.isArray(lista)) return lista as Record<string, unknown>[];
   if (Array.isArray(data)) return data as Record<string, unknown>[];
   return [];
@@ -180,15 +182,17 @@ function _buscarList(data: unknown): Record<string, unknown>[] {
 async function fetchMilvusClientIndex(): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   try {
-    const data = await milvusGet(CLIENTS_URL, { status: "3" });
+    const data = await milvusGet(CLIENTS_URL, { status: '3' });
     for (const c of _buscarList(data)) {
-      const key = String(c["nome_fantasia"] ?? "").trim().toLowerCase();
-      const id = Number(c["id"]);
+      const key = String(c['nome_fantasia'] ?? '')
+        .trim()
+        .toLowerCase();
+      const id = Number(c['id']);
       if (key && Number.isFinite(id) && !out.has(key)) out.set(key, id);
     }
     console.log(`milvus-devices: índice de clientes size=${out.size}`);
   } catch (e) {
-    console.log(`milvus-devices: índice indisponível (${(e as Error)?.message ?? "erro"})`);
+    console.log(`milvus-devices: índice indisponível (${(e as Error)?.message ?? 'erro'})`);
   }
   return out;
 }
@@ -199,11 +203,12 @@ async function fetchTipoMap(): Promise<Map<number, string>> {
   try {
     const data = await milvusGet(TYPES_URL, {});
     for (const t of _buscarList(data)) {
-      const id = Number((t as Record<string, unknown>)["id"]);
-      if (Number.isFinite(id)) out.set(id, String((t as Record<string, unknown>)["descricao"] ?? ""));
+      const id = Number((t as Record<string, unknown>)['id']);
+      if (Number.isFinite(id))
+        out.set(id, String((t as Record<string, unknown>)['descricao'] ?? ''));
     }
   } catch (e) {
-    console.log(`milvus-devices: tipos indisponíveis (${(e as Error)?.message ?? "erro"})`);
+    console.log(`milvus-devices: tipos indisponíveis (${(e as Error)?.message ?? 'erro'})`);
   }
   return out;
 }
@@ -211,49 +216,54 @@ async function fetchTipoMap(): Promise<Map<number, string>> {
 // Normaliza UM item do /buscar (registro completo, sem nome_fantasia —
 // o vínculo vem do nome mapeado que originou a busca). Licença ignorada.
 function normalizeBuscarDevice(
-  raw: Record<string, unknown>, clientId: string, team: string,
-  fantasia: string, tipoMap: Map<number, string>,
+  raw: Record<string, unknown>,
+  clientId: string,
+  team: string,
+  fantasia: string,
+  tipoMap: Map<number, string>
 ) {
-  const milvusId = _toIntOrNull(raw["id"]);
+  const milvusId = _toIntOrNull(raw['id']);
   if (milvusId === null) return null;
   const now = new Date().toISOString();
-  const tipoId = _toIntOrNull(raw["tipo_dispositivo_id"]);
+  const tipoId = _toIntOrNull(raw['tipo_dispositivo_id']);
   return {
     id: `${clientId}:milvus-${milvusId}`,
     client_id: clientId,
     team,
     milvus_device_id: milvusId,
-    hostname: _toText(raw["hostname"]),
-    apelido: _toText(raw["apelido"]),
-    ip_interno: _toText(raw["ip_interno"]),
-    ip_externo: _toText(raw["ip_externo"]),
-    mac_address: _toText(raw["macaddres"] ?? raw["mac_address"]),
+    hostname: _toText(raw['hostname']),
+    apelido: _toText(raw['apelido']),
+    ip_interno: _toText(raw['ip_interno']),
+    ip_externo: _toText(raw['ip_externo']),
+    mac_address: _toText(raw['macaddres'] ?? raw['mac_address']),
     // `fabricante` não é puxado (decisão de produto): gravamos '' para
     // limpar valores antigos no re-sync; `marca` usa só o campo próprio.
-    marca: _toText(raw["marca"]),
-    fabricante: "",
-    is_ativo: raw["is_ativo"] === undefined || raw["is_ativo"] === null
-      ? true
-      : raw["is_ativo"] === true || raw["is_ativo"] === 1 || raw["is_ativo"] === "1",
-    data_criacao: _toIsoOrNull(raw["data_criacao"]),
-    data_ultima_atualizacao: _toIsoOrNull(raw["data_ultima_atualizacao"]),
-    dominio: _toText(raw["dominio"]),
-    sistema_operacional: _toText(raw["sistema_operacional"]),
-    placa_mae: _toText(raw["placa_mae"]),
-    placa_mae_serial: _toText(raw["placa_mae_serial"]),
-    processador: _toText(raw["processador"]),
-    versao_client: _toText(raw["versao_client"]),
-    observacao: _toText(raw["observacao"]),
-    usuario_logado: _toText(raw["usuario_logado"]),
-    total_processadores: _toIntOrNull(raw["total_processadores"]),
-    numero_serial: _toText(raw["numero_serial"]),
-    placa_mae_modelo: _toText(raw["placa_mae_modelo"]),
-    data_compra: _toDateOrNull(raw["data_compra"]),
-    data_garantia: _toDateOrNull(raw["data_garantia"]),
-    modelo_notebook: _toText(raw["modelo_notebook"] ?? raw["modelo"]),
+    marca: _toText(raw['marca']),
+    fabricante: '',
+    is_ativo:
+      raw['is_ativo'] === undefined || raw['is_ativo'] === null
+        ? true
+        : raw['is_ativo'] === true || raw['is_ativo'] === 1 || raw['is_ativo'] === '1',
+    data_criacao: _toIsoOrNull(raw['data_criacao']),
+    data_ultima_atualizacao: _toIsoOrNull(raw['data_ultima_atualizacao']),
+    dominio: _toText(raw['dominio']),
+    sistema_operacional: _toText(raw['sistema_operacional']),
+    placa_mae: _toText(raw['placa_mae']),
+    placa_mae_serial: _toText(raw['placa_mae_serial']),
+    processador: _toText(raw['processador']),
+    versao_client: _toText(raw['versao_client']),
+    observacao: _toText(raw['observacao']),
+    usuario_logado: _toText(raw['usuario_logado']),
+    total_processadores: _toIntOrNull(raw['total_processadores']),
+    numero_serial: _toText(raw['numero_serial']),
+    placa_mae_modelo: _toText(raw['placa_mae_modelo']),
+    data_compra: _toDateOrNull(raw['data_compra']),
+    data_garantia: _toDateOrNull(raw['data_garantia']),
+    modelo_notebook: _toText(raw['modelo_notebook'] ?? raw['modelo']),
     nome_fantasia: fantasia,
     tipo_dispositivo_id: tipoId,
-    tipo_dispositivo_text: (tipoId !== null && tipoMap.get(tipoId)) || _toText(raw["tipo_dispositivo_text"]),
+    tipo_dispositivo_text:
+      (tipoId !== null && tipoMap.get(tipoId)) || _toText(raw['tipo_dispositivo_text']),
     updated_at: now,
   };
 }
@@ -261,18 +271,21 @@ function normalizeBuscarDevice(
 // Descobre o cliente_id do Milvus a partir de dispositivos conhecidos
 // (id ou serial). Nunca joga erro pra cima: retorna null se não achar.
 async function resolveClienteId(
-  known: { milvus_device_id: number | null; numero_serial: string }[],
+  known: { milvus_device_id: number | null; numero_serial: string }[]
 ): Promise<number | null> {
   for (const k of known) {
     try {
       let data: unknown = null;
-      if (k.milvus_device_id) data = await milvusGet(BUSCAR_URL, { id: String(k.milvus_device_id) });
+      if (k.milvus_device_id)
+        data = await milvusGet(BUSCAR_URL, { id: String(k.milvus_device_id) });
       else if (k.numero_serial) data = await milvusGet(BUSCAR_URL, { serial: k.numero_serial });
       else continue;
       const item = _buscarList(data)[0];
-      const cid = item ? Number(item["cliente_id"]) : NaN;
+      const cid = item ? Number(item['cliente_id']) : NaN;
       if (Number.isFinite(cid)) return cid;
-    } catch (_) { /* tenta o próximo conhecido */ }
+    } catch (_) {
+      /* tenta o próximo conhecido */
+    }
   }
   return null;
 }
@@ -291,23 +304,28 @@ async function fetchListagemSample(): Promise<{ id: number; nome: string }[]> {
     }
     let fresh = 0;
     for (const raw of r.list) {
-      const id = Number((raw as Record<string, unknown>)?.["id"]);
+      const id = Number((raw as Record<string, unknown>)?.['id']);
       if (!Number.isFinite(id) || seen.has(id)) continue;
       seen.add(id);
       fresh++;
-      out.push({ id, nome: String((raw as Record<string, unknown>)?.["nome_fantasia"] ?? "").trim() });
+      out.push({
+        id,
+        nome: String((raw as Record<string, unknown>)?.['nome_fantasia'] ?? '').trim(),
+      });
     }
     if (fresh === 0 || r.list.length === 0) break;
   }
   return out;
 }
 
-async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current: number; last: number }> {
-  const url = `${MILVUS_API_URL.replace(/\/$/, "")}/api/dispositivos/listagem`;
+async function fetchMilvusPage(
+  page: number
+): Promise<{ list: unknown[]; current: number; last: number }> {
+  const url = `${MILVUS_API_URL.replace(/\/$/, '')}/api/dispositivos/listagem`;
   const body = {
     is_paginate: true,
     is_descending: false,
-    order_by: "id",
+    order_by: 'id',
     total_registros: PAGE_SIZE,
     pagina: page,
   };
@@ -323,11 +341,11 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
     let res: Response;
     try {
       res = await fetch(url, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           // A API do Milvus espera o token puro neste header.
-          "Authorization": MILVUS_API_TOKEN,
+          Authorization: MILVUS_API_TOKEN,
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
@@ -339,7 +357,9 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error(`Falha de conexão com o Milvus: ${(e as Error)?.name === "AbortError" ? "timeout" : "rede"}`);
+      throw new Error(
+        `Falha de conexão com o Milvus: ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'rede'}`
+      );
     }
     let data: unknown;
     // Status ANTES do corpo: 429/5xx com corpo vazio precisam do retry
@@ -347,7 +367,7 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
     if (res.status === 401 || res.status === 403) {
       clearTimeout(timer);
       // Erro de autenticação: NUNCA repetir automaticamente.
-      throw new Error("Falha de autenticação com o Milvus");
+      throw new Error('Falha de autenticação com o Milvus');
     }
     if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
       clearTimeout(timer);
@@ -371,28 +391,31 @@ async function fetchMilvusPage(page: number): Promise<{ list: unknown[]; current
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      throw new Error("Resposta inválida do Milvus");
+      throw new Error('Resposta inválida do Milvus');
     }
     clearTimeout(timer);
 
     const d = data as Record<string, unknown>;
-    const lista = (d["lista"] ?? d["data"] ?? d["devices"] ?? null) as unknown;
-    if (!Array.isArray(lista)) throw new Error("Resposta do Milvus sem lista de dispositivos");
-    const pag = (((d["meta"] as Record<string, unknown> | undefined)?.["paginate"]) ?? {}) as Record<string, unknown>;
-    const current = Number(pag["current_page"] ?? page) || page;
-    const last = Number(pag["last_page"] ?? page) || page;
+    const lista = (d['lista'] ?? d['data'] ?? d['devices'] ?? null) as unknown;
+    if (!Array.isArray(lista)) throw new Error('Resposta do Milvus sem lista de dispositivos');
+    const pag = ((d['meta'] as Record<string, unknown> | undefined)?.['paginate'] ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const current = Number(pag['current_page'] ?? page) || page;
+    const last = Number(pag['last_page'] ?? page) || page;
     return { list: lista as unknown[], current, last };
   }
-  throw new Error("Falha inesperada ao consultar o Milvus");
+  throw new Error('Falha inesperada ao consultar o Milvus');
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (!MILVUS_API_TOKEN) {
-    console.error("milvus-devices: MILVUS_API_TOKEN não configurado");
-    return json({ error: "Integração Milvus não configurada" }, 500);
+    console.error('milvus-devices: MILVUS_API_TOKEN não configurado');
+    return json({ error: 'Integração Milvus não configurada' }, 500);
   }
 
   const startedAt = Date.now();
@@ -400,75 +423,91 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // pronto no contexto.
   const admin = ctx.supabaseAdmin;
   const callerUid = ctx.userClaims?.id ?? null;
-  if (!callerUid) return json({ error: "Não autenticado" }, 401);
+  if (!callerUid) return json({ error: 'Não autenticado' }, 401);
 
   const { data: callerOp } = await admin
-    .from("operators")
-    .select("id, team, is_admin, active")
-    .eq("auth_user_id", callerUid)
+    .from('operators')
+    .select('id, team, is_admin, active')
+    .eq('auth_user_id', callerUid)
     .maybeSingle();
   if (!callerOp || callerOp.active === false) {
-    return json({ error: "Operador sem acesso" }, 403);
+    return json({ error: 'Operador sem acesso' }, 403);
   }
 
   // 2) Qual cliente.
-  let clientId = "";
+  let clientId = '';
   try {
     const body = await req.json();
-    clientId = String(body?.clientId ?? "").trim();
+    clientId = String(body?.clientId ?? '').trim();
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
-  if (!clientId) return json({ error: "clientId é obrigatório" }, 400);
+  if (!clientId) return json({ error: 'clientId é obrigatório' }, 400);
 
   const { data: client } = await admin
-    .from("clients")
-    .select("id, name, team")
-    .eq("id", clientId)
+    .from('clients')
+    .select('id, name, team')
+    .eq('id', clientId)
     .maybeSingle();
-  if (!client) return json({ error: "Cliente não encontrado" }, 404);
+  if (!client) return json({ error: 'Cliente não encontrado' }, 404);
 
   // 3) Autorização: mesma regra das policies clients_* (sem bypass).
   const isAdmin = callerOp.is_admin === true;
-  const opTeam = callerOp.team || "init";
-  const cliTeam = client.team || "init";
+  const opTeam = callerOp.team || 'init';
+  const cliTeam = client.team || 'init';
   if (!isAdmin && opTeam !== cliTeam) {
-    return json({ error: "Acesso negado a este cliente" }, 403);
+    return json({ error: 'Acesso negado a este cliente' }, 403);
   }
 
   console.log(`milvus-devices: início client_id=${clientId} team=${cliTeam}`);
 
   // 4) Mapa explícito nome_fantasia → este cliente (+ cache cliente_id).
   const { data: mapRows } = await admin
-    .from("milvus_client_map")
-    .select("milvus_nome,milvus_cliente_id")
-    .eq("client_id", clientId);
-  const mapList = (mapRows || []).map((r: { milvus_nome: string; milvus_cliente_id: number | null }) => ({
-    nome: String(r.milvus_nome || "").trim(),
-    clienteId: (typeof r.milvus_cliente_id === "number") ? r.milvus_cliente_id : null as number | null,
-  })).filter((m) => m.nome);
+    .from('milvus_client_map')
+    .select('milvus_nome,milvus_cliente_id')
+    .eq('client_id', clientId);
+  const mapList = (mapRows || [])
+    .map((r: { milvus_nome: string; milvus_cliente_id: number | null }) => ({
+      nome: String(r.milvus_nome || '').trim(),
+      clienteId:
+        typeof r.milvus_cliente_id === 'number' ? r.milvus_cliente_id : (null as number | null),
+    }))
+    .filter((m) => m.nome);
   if (!mapList.length) {
     return json({
-      success: true, clientId, synced: 0, created: 0, updated: 0,
-      resolved: 0, unresolvedNames: [], received: 0, lastSyncAt: new Date().toISOString(),
+      success: true,
+      clientId,
+      synced: 0,
+      created: 0,
+      updated: 0,
+      resolved: 0,
+      unresolvedNames: [],
+      received: 0,
+      lastSyncAt: new Date().toISOString(),
     });
   }
 
   // Dispositivos conhecidos: resolvem o cliente_id (via id ou serial) e
   // evitam duplicar linhas vindas da planilha no merge.
   const { data: knownRows } = await admin
-    .from("client_devices")
-    .select("id,milvus_device_id,numero_serial,hostname,nome_fantasia")
-    .eq("client_id", clientId)
+    .from('client_devices')
+    .select('id,milvus_device_id,numero_serial,hostname,nome_fantasia')
+    .eq('client_id', clientId)
     .limit(3000);
-  const knownByName = new Map<string, { milvus_device_id: number | null; numero_serial: string }[]>();
+  const knownByName = new Map<
+    string,
+    { milvus_device_id: number | null; numero_serial: string }[]
+  >();
   for (const k of (knownRows || []) as Record<string, unknown>[]) {
-    const key = String(k["nome_fantasia"] ?? "").trim().toLowerCase();
+    const key = String(k['nome_fantasia'] ?? '')
+      .trim()
+      .toLowerCase();
     if (!key) continue;
     const arr = knownByName.get(key) || [];
     arr.push({
-      milvus_device_id: (typeof k["milvus_device_id"] === "number") ? k["milvus_device_id"] as number : null,
-      numero_serial: String(k["numero_serial"] ?? ""),
+      milvus_device_id:
+        typeof k['milvus_device_id'] === 'number' ? (k['milvus_device_id'] as number) : null,
+      numero_serial: String(k['numero_serial'] ?? ''),
     });
     knownByName.set(key, arr);
   }
@@ -501,14 +540,20 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
           try {
             const data = await milvusGet(BUSCAR_URL, { id: String(hit.id) });
             const item = _buscarList(data)[0];
-            const n = item ? Number(item["cliente_id"]) : NaN;
+            const n = item ? Number(item['cliente_id']) : NaN;
             if (Number.isFinite(n)) cid = n;
           } catch (_) {}
         }
       }
-      if (cid === null) { unresolvedNames.push(m.nome); continue; }
+      if (cid === null) {
+        unresolvedNames.push(m.nome);
+        continue;
+      }
       if (cid !== m.clienteId) {
-        await admin.from("milvus_client_map").update({ milvus_cliente_id: cid }).eq("milvus_nome", m.nome);
+        await admin
+          .from('milvus_client_map')
+          .update({ milvus_cliente_id: cid })
+          .eq('milvus_nome', m.nome);
       }
       const data = await milvusGet(BUSCAR_URL, { cliente: String(cid) });
       const items = _buscarList(data);
@@ -519,17 +564,21 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
         // Mesmo dispositivo via 2 nomes (mesmo cliente Milvus): 1ª ocorrência
         // vence — duplicata no batch quebra o upsert (ON CONFLICT).
         const mid = (row as { milvus_device_id: unknown }).milvus_device_id;
-        if (typeof mid === "number") {
+        if (typeof mid === 'number') {
           if (seenMids.has(mid)) continue;
           seenMids.add(mid);
         }
         collected.push(row as unknown as { [k: string]: unknown });
       }
       resolvedNames.push(m.nome);
-      console.log(`milvus-devices: nome client_id=${clientId} nome="${m.nome}" milvus_cliente=${cid} items=${items.length}`);
+      console.log(
+        `milvus-devices: nome client_id=${clientId} nome="${m.nome}" milvus_cliente=${cid} items=${items.length}`
+      );
     } catch (e) {
       // Mensagem amigável no retorno; detalhe só no log seguro (sem token).
-      console.error(`milvus-devices: nome falhou client_id=${clientId} nome="${m.nome}": ${(e as Error)?.message ?? "erro"}`);
+      console.error(
+        `milvus-devices: nome falhou client_id=${clientId} nome="${m.nome}": ${(e as Error)?.message ?? 'erro'}`
+      );
       unresolvedNames.push(m.nome);
     }
   }
@@ -538,18 +587,18 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // Dispositivo que sumiu NÃO é excluído (histórico). Linhas da planilha
   // (id imp-*) casadas por serial/hostname ganham o milvus id aqui.
   const { data: existing } = await admin
-    .from("client_devices")
-    .select("*")
-    .eq("client_id", clientId)
+    .from('client_devices')
+    .select('*')
+    .eq('client_id', clientId)
     .limit(3000);
   const byMid = new Map<number, Record<string, unknown>>();
   const bySerial = new Map<string, Record<string, unknown>>();
   const byHost = new Map<string, Record<string, unknown>>();
   for (const e of (existing || []) as Record<string, unknown>[]) {
-    if (typeof e["milvus_device_id"] === "number") byMid.set(e["milvus_device_id"] as number, e);
-    const s = String(e["numero_serial"] ?? "").toLowerCase();
+    if (typeof e['milvus_device_id'] === 'number') byMid.set(e['milvus_device_id'] as number, e);
+    const s = String(e['numero_serial'] ?? '').toLowerCase();
     if (s && !bySerial.has(s)) bySerial.set(s, e);
-    const h = String(e["hostname"] ?? "").toLowerCase();
+    const h = String(e['hostname'] ?? '').toLowerCase();
     if (h && !byHost.has(h)) byHost.set(h, e);
   }
   const rows: { [k: string]: unknown }[] = [];
@@ -557,21 +606,24 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   let created = 0;
   let updated = 0;
   for (const row of collected) {
-    const mid = row["milvus_device_id"];
-    const prev = (typeof mid === "number" && byMid.get(mid)) ||
-      bySerial.get(String(row["numero_serial"] ?? "").toLowerCase()) ||
-      byHost.get(String(row["hostname"] ?? "").toLowerCase()) || null;
+    const mid = row['milvus_device_id'];
+    const prev =
+      (typeof mid === 'number' && byMid.get(mid)) ||
+      bySerial.get(String(row['numero_serial'] ?? '').toLowerCase()) ||
+      byHost.get(String(row['hostname'] ?? '').toLowerCase()) ||
+      null;
     const final = prev
       ? {
-        ...prev, ...row,
-        id: prev["id"],
-        created_at: prev["created_at"],
-        observacao: String(row["observacao"] ?? "") || String(prev["observacao"] ?? ""),
-      }
+          ...prev,
+          ...row,
+          id: prev['id'],
+          created_at: prev['created_at'],
+          observacao: String(row['observacao'] ?? '') || String(prev['observacao'] ?? ''),
+        }
       : row;
     // Mesma linha alcançada por dois caminhos: 1ª vence — duplicata no
     // batch quebra o upsert (ON CONFLICT).
-    const rid = String(final["id"] ?? "");
+    const rid = String(final['id'] ?? '');
     if (!rid || seenRowIds.has(rid)) continue;
     seenRowIds.add(rid);
     rows.push(final);
@@ -584,12 +636,10 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     // Alvo = PK `id` (determinístico e único por dispositivo). Mirar
     // (client_id, milvus_device_id) quebrava quando a linha mesclada
     // reaproveitava um id existente com mid de outra linha (409/23505).
-    const { error } = await admin
-      .from("client_devices")
-      .upsert(batch);
+    const { error } = await admin.from('client_devices').upsert(batch);
     if (error) {
       console.error(`milvus-devices: upsert falhou client_id=${clientId}: ${error.message}`);
-      return json({ error: "Falha ao gravar inventário" }, 500);
+      return json({ error: 'Falha ao gravar inventário' }, 500);
     }
   }
 
@@ -597,9 +647,9 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   const lastSyncAt = new Date().toISOString();
   console.log(
     `milvus-devices: fim client_id=${clientId} received=${received} ` +
-    `matched=${rows.length} created=${created} updated=${updated} ` +
-    `resolved=${resolvedNames.length} unresolved=${unresolvedNames.length} ` +
-    `duration_ms=${durationMs} ok`,
+      `matched=${rows.length} created=${created} updated=${updated} ` +
+      `resolved=${resolvedNames.length} unresolved=${unresolvedNames.length} ` +
+      `duration_ms=${durationMs} ok`
   );
   return json({
     success: true,
@@ -614,4 +664,4 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

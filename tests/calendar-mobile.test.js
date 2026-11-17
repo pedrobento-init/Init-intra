@@ -6,14 +6,28 @@ import vm from 'node:vm';
 // grade mensal vira lista ────────────────────────────────────────────────────
 function mkEl(id) {
   const el = {
-    _id: id, innerHTML: '', textContent: '', value: '', disabled: false,
-    hidden: false, dataset: { open: '0' },
-    style: {}, attrs: {},
-    setAttribute(k, v) { el.attrs[k] = String(v); },
-    getAttribute(k) { return el.attrs[k]; },
-    addEventListener() {}, appendChild() {}, remove() {}, click() {},
+    _id: id,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    disabled: false,
+    hidden: false,
+    dataset: { open: '0' },
+    style: {},
+    attrs: {},
+    setAttribute(k, v) {
+      el.attrs[k] = String(v);
+    },
+    getAttribute(k) {
+      return el.attrs[k];
+    },
+    addEventListener() {},
+    appendChild() {},
+    remove() {},
+    click() {},
     contains: () => false,
-    querySelector: () => null, querySelectorAll: () => [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
     focus() {},
   };
   return el;
@@ -26,7 +40,9 @@ const sandbox = {
   window: { addEventListener() {}, location: { hash: '#calendario' }, innerWidth: 360 },
   navigator: { onLine: true },
   document: {
-    addEventListener(type, fn) { (_listeners[type] = _listeners[type] || []).push(fn); },
+    addEventListener(type, fn) {
+      (_listeners[type] = _listeners[type] || []).push(fn);
+    },
     getElementById: (id) => _el[id] || (_el[id] = mkEl(id)),
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -85,7 +101,10 @@ describe('views lógicas da Agenda', () => {
   });
 
   it('agSetView troca a view do motor e ignora inválidas', () => {
-    vm.runInContext('_fcInstance = { v: null, changeView: function(v){ this.v = v; }, getDate: function(){ return new Date(2026, 8, 23); } };', sandbox);
+    vm.runInContext(
+      '_fcInstance = { v: null, changeView: function(v){ this.v = v; }, getDate: function(){ return new Date(2026, 8, 23); } };',
+      sandbox
+    );
     try {
       vm.runInContext("agSetView('week')", sandbox);
       expect(vm.runInContext('_fcInstance.v', sandbox)).toBe('timeGridWeek');
@@ -101,7 +120,10 @@ describe('primeiro acesso: loading imediato + erro com retry se o CDN falhar', (
   it('mostra "Carregando" na hora e "Tentar novamente" ao falhar', async () => {
     _el.calendarContainer = mkEl('calendarContainer');
     // CDN falha de forma assíncrona (como na rede real)
-    vm.runInContext('loadFullCalendar = function(){ return Promise.reject(new Error("cdn")); }', sandbox);
+    vm.runInContext(
+      'loadFullCalendar = function(){ return Promise.reject(new Error("cdn")); }',
+      sandbox
+    );
     const p = vm.runInContext('initFullCalendar()', sandbox);
     expect(_el.calendarContainer.innerHTML).toContain('Carregando calendário');
     await p;
@@ -150,8 +172,20 @@ describe('view-models puros da sidebar', () => {
 
   it('agRecurringGroups: agrupa por cliente com frequência e conta do mês', () => {
     const visits = [
-      { id: 'v1', clientId: 'c1', clientName: 'Panobianco', date: '2026-09-02', recurrence: 'weekly' },
-      { id: 'v2', clientId: 'c1', clientName: 'Panobianco', date: '2026-09-09', recurrence: 'weekly' },
+      {
+        id: 'v1',
+        clientId: 'c1',
+        clientName: 'Panobianco',
+        date: '2026-09-02',
+        recurrence: 'weekly',
+      },
+      {
+        id: 'v2',
+        clientId: 'c1',
+        clientName: 'Panobianco',
+        date: '2026-09-09',
+        recurrence: 'weekly',
+      },
       { id: 'v3', clientId: 'c2', clientName: 'Outro', date: '2026-09-05', recurrence: '' },
     ];
     const out = T.agRecurringGroups(visits, '2026-09');
@@ -217,9 +251,9 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
 
   it('usa toolbar própria (sem headerToolbar nativa)', () => {
     expect(src).toContain('headerToolbar: false');
-    expect(src).toContain("data-action=\"agSetView\" data-arg=\"month\"");
-    expect(src).toContain("data-action=\"agSetView\" data-arg=\"week\"");
-    expect(src).toContain("data-action=\"agSetView\" data-arg=\"list\"");
+    expect(src).toContain('data-action="agSetView" data-arg="month"');
+    expect(src).toContain('data-action="agSetView" data-arg="week"');
+    expect(src).toContain('data-action="agSetView" data-arg="list"');
   });
 
   it('header da Agenda: título só na topbar (sem h1 duplicado) + legenda + layout grade/sidebar', () => {
@@ -232,12 +266,14 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
 
   it('ações do menu fecham o dropdown', () => {
     // Migrado para delegação: as ações calOpen* e calExportICS chamam closeCalFilters + a ação.
-    expect(src).toContain("data-action=\"calOpenPendenciaForm\"");
-    expect(src).toContain("data-action=\"calOpenVisitForm\"");
-    expect(src).toContain("data-action=\"calExportICS\"");
-    expect(src).toContain("calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); }");
-    expect(src).toContain("calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); }");
-    expect(src).toContain("calExportICS: () => { closeCalFilters(); exportCalendarICS(); }");
+    expect(src).toContain('data-action="calOpenPendenciaForm"');
+    expect(src).toContain('data-action="calOpenVisitForm"');
+    expect(src).toContain('data-action="calExportICS"');
+    expect(src).toContain(
+      'calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); }'
+    );
+    expect(src).toContain('calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); }');
+    expect(src).toContain('calExportICS: () => { closeCalFilters(); exportCalendarICS(); }');
   });
 });
 
@@ -254,7 +290,9 @@ describe('contrato mobile no CSS', () => {
   });
 
   it('título do mês centralizado e com inicial maiúscula', () => {
-    expect(mobile).toMatch(/\.fc-header-toolbar \.fc-toolbar-chunk:nth-child\(2\)\s*\{[^}]*text-align:\s*center/);
+    expect(mobile).toMatch(
+      /\.fc-header-toolbar \.fc-toolbar-chunk:nth-child\(2\)\s*\{[^}]*text-align:\s*center/
+    );
     expect(mobile).toMatch(/\.fc-toolbar-title::first-letter\s*\{\s*text-transform:\s*uppercase/);
   });
 
@@ -269,7 +307,9 @@ describe('contrato mobile no CSS', () => {
   it('visual da mock: chips, grade 2 colunas e sidebar', () => {
     expect(norm).toContain('.ag-chip');
     expect(norm).toContain('.ag-chip.overdue');
-    expect(norm).toMatch(/\.ag-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*320px/);
+    expect(norm).toMatch(
+      /\.ag-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*320px/
+    );
     expect(norm).toContain('.ag-side');
     expect(norm).toContain('.plist');
     expect(norm).toContain('.ag-card .badge.vencida');
@@ -277,8 +317,12 @@ describe('contrato mobile no CSS', () => {
 
   it('eventos da semana respeitam a altura e não vazam sobre os vizinhos', () => {
     expect(norm).toMatch(/\.fc-timegrid-event\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/);
-    expect(norm).toMatch(/\.fc-timegrid-event \.ag-chip\s*\{[^}]*height:\s*100%[^}]*margin:\s*0[^}]*overflow:\s*hidden/);
-    expect(norm).toMatch(/\.fc-timegrid-event \.ag-chip span\s*\{[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*anywhere/);
+    expect(norm).toMatch(
+      /\.fc-timegrid-event \.ag-chip\s*\{[^}]*height:\s*100%[^}]*margin:\s*0[^}]*overflow:\s*hidden/
+    );
+    expect(norm).toMatch(
+      /\.fc-timegrid-event \.ag-chip span\s*\{[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*anywhere/
+    );
     expect(norm).toMatch(/\.fc-timegrid-event-short \.ag-chip span\s*\{[^}]*white-space:\s*nowrap/);
   });
 
@@ -287,5 +331,4 @@ describe('contrato mobile no CSS', () => {
     expect(html).toContain('css/fonts.css');
     expect(fs.readFileSync('css/fonts.css', 'utf8')).toContain("font-family: 'Manrope'");
   });
-
 });

@@ -6,7 +6,18 @@ const { buildPrazosModel, classifyDeadline, prazosDaysBetween } = require('../js
 
 const TODAY = '2026-10-15';
 let n = 0;
-const pen = (over) => Object.assign({ id: 'P' + (++n), status: 'aberto', responsible: 'Ana', clientId: 'C1', clientName: 'Acme', priority: 'media' }, over);
+const pen = (over) =>
+  Object.assign(
+    {
+      id: 'P' + ++n,
+      status: 'aberto',
+      responsible: 'Ana',
+      clientId: 'C1',
+      clientName: 'Acme',
+      priority: 'media',
+    },
+    over
+  );
 
 describe('classifyDeadline', () => {
   it('separa vencida, hoje, em breve (até 3 dias), semana, futuro e sem prazo', () => {
@@ -25,22 +36,31 @@ describe('classifyDeadline', () => {
 
 describe('buildPrazosModel', () => {
   const pens = [
-    pen({ deadline: '2026-10-05' }),                       // Ana vencida há 10 dias
-    pen({ deadline: '2026-10-13' }),                       // Ana vencida há 2
+    pen({ deadline: '2026-10-05' }), // Ana vencida há 10 dias
+    pen({ deadline: '2026-10-13' }), // Ana vencida há 2
     pen({ deadline: TODAY, responsible: 'Beto' }),
     pen({ deadline: '2026-10-17', responsible: 'Beto' }),
-    pen({ responsible: 'Beto' }),                          // sem prazo
+    pen({ responsible: 'Beto' }), // sem prazo
     pen({ responsible: '', clientId: 'C2', clientName: 'Zeta' }),
     // Entregues nos últimos 30 dias (cumprimento)
     pen({ status: 'concluido', deadline: '2026-10-10', completedAt: '2026-10-09T15:00:00Z' }), // no prazo
     pen({ status: 'resolvido', deadline: '2026-10-10', completedAt: '2026-10-12T15:00:00Z' }), // atrasada
     pen({ status: 'concluido', deadline: '2026-08-01', completedAt: '2026-08-01T12:00:00Z' }), // fora da janela
-    pen({ status: 'cancelado', deadline: '2026-10-01' }),                                      // não conta
+    pen({ status: 'cancelado', deadline: '2026-10-01' }), // não conta
   ];
 
   it('KPIs de risco e cumprimento', () => {
     const m = buildPrazosModel(pens, TODAY);
-    expect(m.kpis).toMatchObject({ abertas: 6, vencidas: 2, hoje: 1, breve: 1, semPrazo: 2, entregues: 2, noPrazo: 1, pct: 50 });
+    expect(m.kpis).toMatchObject({
+      abertas: 6,
+      vencidas: 2,
+      hoje: 1,
+      breve: 1,
+      semPrazo: 2,
+      entregues: 2,
+      noPrazo: 1,
+      pct: 50,
+    });
   });
 
   it('agrupa por responsável com pior atraso, e quem tem mais vencidas vem primeiro', () => {
@@ -54,7 +74,10 @@ describe('buildPrazosModel', () => {
   it('agrupa por cliente', () => {
     const m = buildPrazosModel(pens, TODAY, { groupBy: 'cliente' });
     expect(m.groupBy).toBe('cliente');
-    expect(m.groups.map((g) => [g.label, g.abertas])).toEqual([['Acme', 5], ['Zeta', 1]]);
+    expect(m.groups.map((g) => [g.label, g.abertas])).toEqual([
+      ['Acme', 5],
+      ['Zeta', 1],
+    ]);
   });
 
   it('ordena os itens: vencidas, hoje, em breve, depois sem prazo', () => {

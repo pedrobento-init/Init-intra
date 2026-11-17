@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const raizRepo = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+const raizRepo = path.join(
+  path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')),
+  '..'
+);
 const ARQUIVO = path.join(raizRepo, 'js', 'projeto-pagina.js');
 
 // O feed real não é exportado por pendencias-detalhe.js, que é escopo global. Compila só
@@ -13,10 +16,18 @@ function feedReal() {
   const fonte = fs.readFileSync(path.join(raizRepo, 'js', 'pendencias-detalhe.js'), 'utf8');
   const ini = fonte.indexOf('function _penFeedItens');
   const fim = fonte.indexOf('/** Marcador discreto', ini);
-  return new Function(fonte.slice(ini, fim) + '; return { _penFeedItens, _penValorLabel, _PEN_EVENT_VERBO };')();
+  return new Function(
+    fonte.slice(ini, fim) + '; return { _penFeedItens, _penValorLabel, _PEN_EVENT_VERBO };'
+  )();
 }
 
-const escapeReal = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const escapeReal = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 const XSS = '<img src=x onerror=alert(1)>';
 const XSS_ESC = '&lt;img src=x onerror=alert(1)&gt;';
 const semTags = (html) => html.replace(/<[^>]+>/g, '');
@@ -55,7 +66,10 @@ beforeEach(() => {
     pgpVoltarHtml: (r) => '<a class="pgp-voltar" href="#pendencias">← ' + escapeReal(r) + '</a>',
     pgpSeletoresHtml: () => '<div class="pgp-seletores"><select id="chgStatus"></select></div>',
     pgpAvatarHtml: (n) => '<span class="pgp-avatar" aria-label="' + escapeReal(n) + '"></span>',
-    clientAvatar: (c) => c.logo ? '<img src="' + escapeReal(c.logo) + '" alt="' + escapeReal(c.name) + '">' : '<span>' + escapeReal(c.initials || '') + '</span>',
+    clientAvatar: (c) =>
+      c.logo
+        ? '<img src="' + escapeReal(c.logo) + '" alt="' + escapeReal(c.name) + '">'
+        : '<span>' + escapeReal(c.initials || '') + '</span>',
     pgpTempoAtras: (iso) => (iso ? 'há 1 h' : ''),
     getPendenciaTitulo: (p) => p.title,
     penDisplayNumber: () => '#001',
@@ -100,23 +114,32 @@ describe('renderProjetoPagina: escape de dado de usuário', () => {
   });
 
   it('escapa o texto da nota no feed e no trecho da lateral', () => {
-    const html = desenhar(projeto({ title: 't', notes: [{ text: XSS, author: 'Ana', createdAt: '2026-11-01T10:00:00Z' }] }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        notes: [{ text: XSS, author: 'Ana', createdAt: '2026-11-01T10:00:00Z' }],
+      })
+    );
     expect(html).not.toContain(XSS);
     expect(html.split(XSS_ESC).length - 1).toBe(2);
   });
 
   it('escapa o nome do autor, do responsável e o valor de evento', () => {
-    const html = desenhar(projeto({
-      title: 't',
-      responsible: XSS,
-      notes: [{ text: 'oi', author: XSS, createdAt: '2026-11-01T10:00:00Z' }],
-      events: [{ type: 'responsavel', para: XSS, by: XSS, at: '2026-11-01T11:00:00Z' }],
-    }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        responsible: XSS,
+        notes: [{ text: 'oi', author: XSS, createdAt: '2026-11-01T10:00:00Z' }],
+        events: [{ type: 'responsavel', para: XSS, by: XSS, at: '2026-11-01T11:00:00Z' }],
+      })
+    );
     expect(html).not.toContain(XSS);
   });
 
   it('escapa o texto da etapa também no aria-label do botão de remover', () => {
-    const html = desenhar(projeto({ title: 't', checklist: [{ text: '"><script>x</script>', done: false }] }));
+    const html = desenhar(
+      projeto({ title: 't', checklist: [{ text: '"><script>x</script>', done: false }] })
+    );
     expect(html).not.toContain('<script>');
     expect(html).toContain('aria-label="Remover etapa: &quot;&gt;&lt;script&gt;');
   });
@@ -129,11 +152,16 @@ describe('renderProjetoPagina: escape de dado de usuário', () => {
 
 describe('renderProjetoPagina: abas', () => {
   it('conta notas e eventos no contador de Atividade', () => {
-    const html = desenhar(projeto({
-      title: 't',
-      notes: [{ text: 'a', createdAt: '2026-11-01T10:00:00Z' }],
-      events: [{ type: 'criado', at: '2026-10-01T10:00:00Z' }, { type: 'status', de: 'a', para: 'b', at: '2026-10-02T10:00:00Z' }],
-    }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        notes: [{ text: 'a', createdAt: '2026-11-01T10:00:00Z' }],
+        events: [
+          { type: 'criado', at: '2026-10-01T10:00:00Z' },
+          { type: 'status', de: 'a', para: 'b', at: '2026-10-02T10:00:00Z' },
+        ],
+      })
+    );
     expect(html).toContain('<span class="prj-aba-contador">3</span>');
   });
 
@@ -149,8 +177,16 @@ describe('renderProjetoPagina: abas', () => {
   });
 
   it('prjTrocarAba alterna aria-selected e hidden sem redesenhar', () => {
-    const botoes = ['visao', 'atividade'].map((k) => ({ dataset: { pgpAba: k }, setAttribute(a, v) { this[a] = v; } }));
-    const paineis = ['visao', 'atividade'].map((k) => ({ dataset: { prjPainel: k }, hidden: false }));
+    const botoes = ['visao', 'atividade'].map((k) => ({
+      dataset: { pgpAba: k },
+      setAttribute(a, v) {
+        this[a] = v;
+      },
+    }));
+    const paineis = ['visao', 'atividade'].map((k) => ({
+      dataset: { prjPainel: k },
+      hidden: false,
+    }));
     const raiz = { querySelectorAll: (sel) => (sel.includes('aba') ? botoes : paineis) };
     mod.prjTrocarAba(raiz, 'atividade');
     expect(botoes[1]['aria-selected']).toBe('true');
@@ -168,22 +204,31 @@ describe('renderProjetoPagina: estado de redesenho', () => {
   });
 
   // _pgpRestaurarEstado só devolve rascunho a campo presente: sumir com o da aba oculta perde o texto.
-  it.each([['visao'], ['atividade']])('mantém os dois campos de rascunho no DOM com a aba %s aberta', (aba) => {
-    const html = desenhar(projeto({ title: 't' }), { aba, rascunhos: {} });
-    expect(html).toContain('data-pgp-rascunho="prj-etapa"');
-    expect(html).toContain('data-pgp-rascunho="prj-nota"');
-  });
+  it.each([['visao'], ['atividade']])(
+    'mantém os dois campos de rascunho no DOM com a aba %s aberta',
+    (aba) => {
+      const html = desenhar(projeto({ title: 't' }), { aba, rascunhos: {} });
+      expect(html).toContain('data-pgp-rascunho="prj-etapa"');
+      expect(html).toContain('data-pgp-rascunho="prj-nota"');
+    }
+  );
 
   it('não inicia os campos com valor, para a restauração da base ser a única fonte', () => {
-    const html = desenhar(projeto({ title: 't' }), { aba: 'visao', rascunhos: { 'prj-nota': 'x' } });
+    const html = desenhar(projeto({ title: 't' }), {
+      aba: 'visao',
+      rascunhos: { 'prj-nota': 'x' },
+    });
     expect(html).toMatch(/<textarea[^>]*data-pgp-rascunho="prj-nota"[^>]*><\/textarea>/);
   });
 });
 
 describe('checklist', () => {
   it('calcula o progresso pelos itens marcados', () => {
-    expect(mod.prjProgressoChecklist({ checklist: [{ done: true }, { done: false }, { done: true }, { done: false }] }))
-      .toEqual({ feitos: 2, total: 4, percentual: 50 });
+    expect(
+      mod.prjProgressoChecklist({
+        checklist: [{ done: true }, { done: false }, { done: true }, { done: false }],
+      })
+    ).toEqual({ feitos: 2, total: 4, percentual: 50 });
   });
 
   it('não divide por zero sem etapas', () => {
@@ -191,13 +236,29 @@ describe('checklist', () => {
   });
 
   it('mostra X de Y e a barra de progresso', () => {
-    const html = desenhar(projeto({ title: 't', checklist: [{ text: 'a', done: true }, { text: 'b', done: false }] }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        checklist: [
+          { text: 'a', done: true },
+          { text: 'b', done: false },
+        ],
+      })
+    );
     expect(html).toContain('1 de 2');
     expect(html).toContain('<progress class="prj-progresso" value="1" max="2"');
   });
 
   it('marca como feita só a etapa concluída', () => {
-    const html = desenhar(projeto({ title: 't', checklist: [{ text: 'a', done: true }, { text: 'b', done: false }] }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        checklist: [
+          { text: 'a', done: true },
+          { text: 'b', done: false },
+        ],
+      })
+    );
     expect(html.split('prj-etapa-feita').length - 1).toBe(1);
     expect(html.split(' checked').length - 1).toBe(1);
   });
@@ -211,7 +272,9 @@ describe('checklist', () => {
   // addCheckItem lê este id e o teclado delegado ignora Enter em input: sem form, Enter não adiciona.
   it('o campo de adicionar etapa fica dentro de um form com submit delegado', () => {
     const html = desenhar(projeto({ title: 't' }));
-    expect(html).toMatch(/<form[^>]*data-submit="prjAdicionarEtapa"[^>]*data-arg="p1"[\s\S]*id="newCheckItem"[\s\S]*<\/form>/);
+    expect(html).toMatch(
+      /<form[^>]*data-submit="prjAdicionarEtapa"[^>]*data-arg="p1"[\s\S]*id="newCheckItem"[\s\S]*<\/form>/
+    );
   });
 
   it('adicionar chama addCheckItem e redesenha a página', () => {
@@ -234,14 +297,17 @@ describe('checklist', () => {
 });
 
 describe('feed de atividade', () => {
-  const comFeed = () => projeto({
-    title: 't',
-    notes: [
-      { text: 'nota-antiga', author: 'Ana', createdAt: '2026-10-01T10:00:00Z' },
-      { text: 'nota-nova', author: 'Bia', createdAt: '2026-11-01T10:00:00Z' },
-    ],
-    events: [{ type: 'prioridade', de: 'baixa', para: 'alta', by: 'Caio', at: '2026-10-15T10:00:00Z' }],
-  });
+  const comFeed = () =>
+    projeto({
+      title: 't',
+      notes: [
+        { text: 'nota-antiga', author: 'Ana', createdAt: '2026-10-01T10:00:00Z' },
+        { text: 'nota-nova', author: 'Bia', createdAt: '2026-11-01T10:00:00Z' },
+      ],
+      events: [
+        { type: 'prioridade', de: 'baixa', para: 'alta', by: 'Caio', at: '2026-10-15T10:00:00Z' },
+      ],
+    });
 
   it('ordena do mais recente para o mais antigo, misturando notas e eventos', () => {
     const html = painel(desenhar(comFeed()), 'atividade');
@@ -258,7 +324,10 @@ describe('feed de atividade', () => {
   });
 
   it('atribui ao Sistema o item sem autor', () => {
-    const html = painel(desenhar(projeto({ title: 't', events: [{ type: 'criado', at: '2026-10-01T10:00:00Z' }] })), 'atividade');
+    const html = painel(
+      desenhar(projeto({ title: 't', events: [{ type: 'criado', at: '2026-10-01T10:00:00Z' }] })),
+      'atividade'
+    );
     expect(html).toContain('<strong class="prj-feed-autor">Sistema</strong>');
   });
 
@@ -271,7 +340,9 @@ describe('feed de atividade', () => {
   });
 
   it('corta o trecho longo da última atualização', () => {
-    const html = desenhar(projeto({ title: 't', notes: [{ text: 'x'.repeat(300), createdAt: '2026-11-01T10:00:00Z' }] }));
+    const html = desenhar(
+      projeto({ title: 't', notes: [{ text: 'x'.repeat(300), createdAt: '2026-11-01T10:00:00Z' }] })
+    );
     const lateral = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
     expect(lateral).toContain('x'.repeat(120) + '…');
     expect(lateral).not.toContain('x'.repeat(121));
@@ -295,7 +366,9 @@ describe('publicar atualização', () => {
   it('limpa o campo antes de redesenhar', () => {
     const el = campo('avanço');
     let valorAoRedesenhar;
-    globalThis.penPaginaAtualizar = vi.fn(() => { valorAoRedesenhar = el.value; });
+    globalThis.penPaginaAtualizar = vi.fn(() => {
+      valorAoRedesenhar = el.value;
+    });
     acoes.prjPublicar({}, 'p1');
     expect(valorAoRedesenhar).toBe('');
   });
@@ -333,11 +406,15 @@ describe('lateral', () => {
   });
 
   it('avisa por extenso quando o prazo venceu e o projeto segue aberto', () => {
-    expect(lateral(desenhar(projeto({ title: 't', deadline: '2026-10-01' })))).toContain('atrasado');
+    expect(lateral(desenhar(projeto({ title: 't', deadline: '2026-10-01' })))).toContain(
+      'atrasado'
+    );
   });
 
   it('não acusa atraso em projeto já resolvido', () => {
-    expect(lateral(desenhar(projeto({ title: 't', status: 'resolvido', deadline: '2026-10-01' })))).not.toContain('atrasado');
+    expect(
+      lateral(desenhar(projeto({ title: 't', status: 'resolvido', deadline: '2026-10-01' })))
+    ).not.toContain('atrasado');
   });
 
   it('o cliente abre pela ação existente, com botão real', () => {
@@ -347,7 +424,11 @@ describe('lateral', () => {
   });
 
   it('usa a logo cadastrada no avatar do cliente', () => {
-    globalThis.getClientById = () => ({ id: 'c1', name: 'Acme', logo: 'https://cdn.exemplo/acme.png' });
+    globalThis.getClientById = () => ({
+      id: 'c1',
+      name: 'Acme',
+      logo: 'https://cdn.exemplo/acme.png',
+    });
     const html = lateral(desenhar(projeto({ title: 't', clientId: 'c1' })));
     expect(html).toContain('<img src="https://cdn.exemplo/acme.png" alt="Acme">');
   });
@@ -377,16 +458,35 @@ describe('anexos', () => {
     globalThis.getAttachments = () => [{ id: 'a1' }];
     const container = { innerHTML: '' };
     let tinhaContainer = false;
-    globalThis.renderAttachmentList = vi.fn(() => { tinhaContainer = container.innerHTML.includes('prjAnexosLista'); });
+    globalThis.renderAttachmentList = vi.fn(() => {
+      tinhaContainer = container.innerHTML.includes('prjAnexosLista');
+    });
     mod.renderProjetoPagina(projeto({ title: 't' }), container, null);
-    expect(globalThis.renderAttachmentList).toHaveBeenCalledWith('pendencias', 'p1', 'prjAnexosLista');
+    expect(globalThis.renderAttachmentList).toHaveBeenCalledWith(
+      'pendencias',
+      'p1',
+      'prjAnexosLista'
+    );
     expect(tinhaContainer).toBe(true);
   });
 });
 
 describe('o que esta tela não tem', () => {
-  it.each(['timer', 'SLA', 'Transferir', 'Compartilhar', 'Cancelar', 'Canal', 'Solicitante', 'Categoria', 'Assunto', 'Tempo'])('não mostra %s', (termo) => {
-    const html = desenhar(projeto({ title: 't', timeSpent: 100, sla: {}, canal: 'x', solicitante: 'y', category: 'z' }));
+  it.each([
+    'timer',
+    'SLA',
+    'Transferir',
+    'Compartilhar',
+    'Cancelar',
+    'Canal',
+    'Solicitante',
+    'Categoria',
+    'Assunto',
+    'Tempo',
+  ])('não mostra %s', (termo) => {
+    const html = desenhar(
+      projeto({ title: 't', timeSpent: 100, sla: {}, canal: 'x', solicitante: 'y', category: 'z' })
+    );
     expect(semTags(html).toLowerCase()).not.toContain(termo.toLowerCase());
     expect(html).not.toContain('data-action="' + termo);
   });
@@ -399,9 +499,13 @@ describe('o que esta tela não tem', () => {
 
 describe('estrutura', () => {
   it('não tem handler inline', () => {
-    const html = desenhar(projeto({
-      title: 't', checklist: [{ text: 'a', done: false }], notes: [{ text: 'n', createdAt: '2026-11-01T10:00:00Z' }],
-    }));
+    const html = desenhar(
+      projeto({
+        title: 't',
+        checklist: [{ text: 'a', done: false }],
+        notes: [{ text: 'n', createdAt: '2026-11-01T10:00:00Z' }],
+      })
+    );
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
@@ -412,7 +516,9 @@ describe('estrutura', () => {
   });
 
   it('Editar abre o formulário existente', () => {
-    expect(desenhar(projeto({ title: 't' }))).toMatch(/<button[^>]*data-action="prjEditar" data-arg="p1">Editar<\/button>/);
+    expect(desenhar(projeto({ title: 't' }))).toMatch(
+      /<button[^>]*data-action="prjEditar" data-arg="p1">Editar<\/button>/
+    );
     acoes.prjEditar({}, 'p1');
     expect(globalThis.openPendenciaForm).toHaveBeenCalledWith('p1');
   });
@@ -425,8 +531,12 @@ describe('estrutura', () => {
 
   it('não define nome global fora do prefixo prj', () => {
     const fonte = fs.readFileSync(ARQUIVO, 'utf8').replace(/\r\n/g, '\n');
-    const nomes = [...fonte.matchAll(/^(?:function|const|let|var)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+    const nomes = [...fonte.matchAll(/^(?:function|const|let|var)\s+([A-Za-z_$][\w$]*)/gm)].map(
+      (m) => m[1]
+    );
     expect(nomes.length).toBeGreaterThan(0);
-    expect(nomes.filter((n) => !/^(prj|PRJ_|_prj)/.test(n) && n !== 'renderProjetoPagina')).toEqual([]);
+    expect(nomes.filter((n) => !/^(prj|PRJ_|_prj)/.test(n) && n !== 'renderProjetoPagina')).toEqual(
+      []
+    );
   });
 });

@@ -7,46 +7,54 @@
 const MILVUS_ATEND_TTL_MS = 5 * 60 * 1000;
 const MILVUS_ATEND_CACHE = new Map(); // queryKey -> {at, data}
 
-function _milvusAtendCacheKey(filters){
-  try{ return JSON.stringify(filters || {}); }catch(_){ return String(Date.now()); }
+function _milvusAtendCacheKey(filters) {
+  try {
+    return JSON.stringify(filters || {});
+  } catch (_) {
+    return String(Date.now());
+  }
 }
-function _milvusAtendGetCache(key){
-  var entry=MILVUS_ATEND_CACHE.get(key);
-  if(!entry) return null;
-  if(Date.now() - entry.at > MILVUS_ATEND_TTL_MS){ MILVUS_ATEND_CACHE.delete(key); return null; }
+function _milvusAtendGetCache(key) {
+  var entry = MILVUS_ATEND_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.at > MILVUS_ATEND_TTL_MS) {
+    MILVUS_ATEND_CACHE.delete(key);
+    return null;
+  }
   return entry.data;
 }
-function _milvusAtendSetCache(key, data){
-  MILVUS_ATEND_CACHE.set(key, {at: Date.now(), data: data});
+function _milvusAtendSetCache(key, data) {
+  MILVUS_ATEND_CACHE.set(key, { at: Date.now(), data: data });
   // cap 50 entradas
-  if(MILVUS_ATEND_CACHE.size>50){
-    var first=MILVUS_ATEND_CACHE.keys().next().value;
+  if (MILVUS_ATEND_CACHE.size > 50) {
+    var first = MILVUS_ATEND_CACHE.keys().next().value;
     MILVUS_ATEND_CACHE.delete(first);
   }
 }
-function _normalizeHHMM(v){
-  if(v==null || v==='') return '00:00';
-  var s=String(v).trim();
+function _normalizeHHMM(v) {
+  if (v == null || v === '') return '00:00';
+  var s = String(v).trim();
   // Milvus já entrega HH:MM, mas garante padding e valida (aceita H:M)
-  var m=s.match(/^(\d{1,3}):(\d{1,2})/);
-  if(m){
-    var h=String(Math.max(0, parseInt(m[1],10))).padStart(2,'0');
-    var mm=String(Math.max(0, parseInt(m[2],10))).padStart(2,'0');
-    return h+':'+mm;
+  var m = s.match(/^(\d{1,3}):(\d{1,2})/);
+  if (m) {
+    var h = String(Math.max(0, parseInt(m[1], 10))).padStart(2, '0');
+    var mm = String(Math.max(0, parseInt(m[2], 10))).padStart(2, '0');
+    return h + ':' + mm;
   }
   // se vier decimal ou inteiro de minutos
-  var n=Number(s);
-  if(Number.isFinite(n)){
-    var hh=Math.floor(n/60); var mm2=String(Math.round(n%60)).padStart(2,'0');
-    return String(hh).padStart(2,'0')+':'+mm2;
+  var n = Number(s);
+  if (Number.isFinite(n)) {
+    var hh = Math.floor(n / 60);
+    var mm2 = String(Math.round(n % 60)).padStart(2, '0');
+    return String(hh).padStart(2, '0') + ':' + mm2;
   }
-  return s.slice(0,5);
+  return s.slice(0, 5);
 }
-function normalizeMilvusAtendimento(raw){
-  if(!raw || typeof raw!=='object') return null;
+function normalizeMilvusAtendimento(raw) {
+  if (!raw || typeof raw !== 'object') return null;
   return {
-    id: raw.id !=null ? Number(raw.id) : null,
-    codigo: raw.codigo !=null ? String(raw.codigo) : '',
+    id: raw.id != null ? Number(raw.id) : null,
+    codigo: raw.codigo != null ? String(raw.codigo) : '',
     assunto: String(raw.assunto ?? ''),
     nome_fantasia: String(raw.nome_fantasia ?? ''),
     nome: String(raw.nome ?? ''),
@@ -72,443 +80,672 @@ function normalizeMilvusAtendimento(raw){
     categoria_secundaria: raw.categoria_secundaria || null,
     status: raw.status || null,
     setor: raw.setor || null,
-    motivo_pausa: raw.motivo_pausa || null
+    motivo_pausa: raw.motivo_pausa || null,
   };
 }
-function _atendOpView(){
-  try{
-    var session=typeof getSession==='function'?getSession():null;
-    var ops=typeof getOperators==='function'?getOperators():[];
-    var me=session?ops.find(function(o){return o.id===session.opId;}):null;
-    if(me) return {team: session.team || me.team, isAdmin: session.isAdmin===true || me.isAdmin===true, active: me.active};
-    return {team: session?session.team:'init', isAdmin: session?session.isAdmin===true:false, active:true};
-  }catch(_){ return {team:'init', isAdmin:false, active:true};}
+function _atendOpView() {
+  try {
+    var session = typeof getSession === 'function' ? getSession() : null;
+    var ops = typeof getOperators === 'function' ? getOperators() : [];
+    var me = session
+      ? ops.find(function (o) {
+          return o.id === session.opId;
+        })
+      : null;
+    if (me)
+      return {
+        team: session.team || me.team,
+        isAdmin: session.isAdmin === true || me.isAdmin === true,
+        active: me.active,
+      };
+    return {
+      team: session ? session.team : 'init',
+      isAdmin: session ? session.isAdmin === true : false,
+      active: true,
+    };
+  } catch (_) {
+    return { team: 'init', isAdmin: false, active: true };
+  }
 }
-function canViewMilvusAtendimentos(operator, client){
-  if(!operator || !client) return false;
-  if(operator.active===false) return false;
-  if(operator.isAdmin===true) return true;
-  return (operator.team||'init') === (client.team||'init');
+function canViewMilvusAtendimentos(operator, client) {
+  if (!operator || !client) return false;
+  if (operator.active === false) return false;
+  if (operator.isAdmin === true) return true;
+  return (operator.team || 'init') === (client.team || 'init');
 }
 
 // (Removido _resolveAtendToken: o token do cliente é resolvido no servidor
 // a partir do clientId — não transita mais na requisição.)
-function _monthRangeISO(){
-  var now=new Date();
-  var y=now.getFullYear(), m=now.getMonth();
-  var first=new Date(y,m,1);
-  var last=new Date(y,m+1,0);
-  function fmt(d){ return d.toISOString().slice(0,10); }
-  return {start: fmt(first), end: fmt(last)};
+function _monthRangeISO() {
+  var now = new Date();
+  var y = now.getFullYear(),
+    m = now.getMonth();
+  var first = new Date(y, m, 1);
+  var last = new Date(y, m + 1, 0);
+  function fmt(d) {
+    return d.toISOString().slice(0, 10);
+  }
+  return { start: fmt(first), end: fmt(last) };
 }
 
 // Fetch paginado — resolve token, chama edge, normaliza, cacheia
-async function fetchMilvusAtendimentos(opts){
-  opts=opts||{};
-  var clientId=opts.clientId || '';
-  var dataInicial=opts.dataInicial || '';
-  var dataFinal=opts.dataFinal || '';
+async function fetchMilvusAtendimentos(opts) {
+  opts = opts || {};
+  var clientId = opts.clientId || '';
+  var dataInicial = opts.dataInicial || '';
+  var dataFinal = opts.dataFinal || '';
   // default mês atual se não vier
-  if(!dataInicial || !dataFinal){
-    var r=_monthRangeISO();
-    if(!dataInicial) dataInicial=r.start;
-    if(!dataFinal) dataFinal=r.end;
+  if (!dataInicial || !dataFinal) {
+    var r = _monthRangeISO();
+    if (!dataInicial) dataInicial = r.start;
+    if (!dataFinal) dataFinal = r.end;
   }
-  var page=Math.max(1, parseInt(opts.page,10)||1);
-  var perPage=[50,100,200].includes(Number(opts.perPage)) ? Number(opts.perPage) : 50;
-  if(perPage>1000) perPage=1000;
-  var isDescending=opts.isDescending!==false;
+  var page = Math.max(1, parseInt(opts.page, 10) || 1);
+  var perPage = [50, 100, 200].includes(Number(opts.perPage)) ? Number(opts.perPage) : 50;
+  if (perPage > 1000) perPage = 1000;
+  var isDescending = opts.isDescending !== false;
 
   // Autorização client-side (defesa; o servidor revalida e resolve o token).
   // O token do cliente NÃO transita mais na requisição: a Edge resolve
   // clients.milvus_client_token no servidor a partir do clientId.
-  if(clientId){
-    var client=typeof getClientById==='function'?getClientById(clientId):null;
-    if(!canViewMilvusAtendimentos(_atendOpView(), client)) throw new Error('Acesso negado a este cliente.');
+  if (clientId) {
+    var client = typeof getClientById === 'function' ? getClientById(clientId) : null;
+    if (!canViewMilvusAtendimentos(_atendOpView(), client))
+      throw new Error('Acesso negado a este cliente.');
   }
 
-  var cacheKey=_milvusAtendCacheKey({clientId, dataInicial, dataFinal, tecnico:opts.tecnico, codigo:opts.codigo, nomeMesa:opts.nomeMesa, isExterno:opts.isExterno, isComercial:opts.isComercial, motivoPausa:opts.motivoPausa, page, perPage, isDescending});
-  var cached=_milvusAtendGetCache(cacheKey);
-  if(cached) return cached;
+  var cacheKey = _milvusAtendCacheKey({
+    clientId,
+    dataInicial,
+    dataFinal,
+    tecnico: opts.tecnico,
+    codigo: opts.codigo,
+    nomeMesa: opts.nomeMesa,
+    isExterno: opts.isExterno,
+    isComercial: opts.isComercial,
+    motivoPausa: opts.motivoPausa,
+    page,
+    perPage,
+    isDescending,
+  });
+  var cached = _milvusAtendGetCache(cacheKey);
+  if (cached) return cached;
 
-  if(typeof isSupabaseConnected!=='function' || !isSupabaseConnected() || typeof supabaseClient==='undefined' || !supabaseClient){
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
 
-  var filtro_body={
+  var filtro_body = {
     data_inicial: dataInicial,
-    data_final: dataFinal
+    data_final: dataFinal,
   };
-  if(opts.codigo) filtro_body.codigo=String(opts.codigo);
-  if(opts.tecnico) filtro_body.nome_tecnico=String(opts.tecnico);
-  if(opts.nomeMesa) filtro_body.nome_mesa=String(opts.nomeMesa);
-  if(typeof opts.isExterno==='boolean') filtro_body.is_externo=opts.isExterno;
-  if(typeof opts.isComercial==='boolean') filtro_body.is_comercial=opts.isComercial;
-  if(opts.motivoPausa) filtro_body.motivo_pausa=String(opts.motivoPausa);
+  if (opts.codigo) filtro_body.codigo = String(opts.codigo);
+  if (opts.tecnico) filtro_body.nome_tecnico = String(opts.tecnico);
+  if (opts.nomeMesa) filtro_body.nome_mesa = String(opts.nomeMesa);
+  if (typeof opts.isExterno === 'boolean') filtro_body.is_externo = opts.isExterno;
+  if (typeof opts.isComercial === 'boolean') filtro_body.is_comercial = opts.isComercial;
+  if (opts.motivoPausa) filtro_body.motivo_pausa = String(opts.motivoPausa);
 
-  var payload={
+  var payload = {
     action: 'list',
     client_id: clientId || undefined,
     filtro_body: filtro_body,
     pagina: page,
     total_registros: perPage,
-    is_descending: isDescending
+    is_descending: isDescending,
   };
 
-  var res=await supabaseClient.functions.invoke('milvus-atendimentos', {body: payload});
-  if(res.error) throw new Error(res.error.message || 'Falha ao consultar atendimentos');
-  var data=res.data;
-  if(!data || data.error || !Array.isArray(data.lista)) throw new Error((data && data.error) || 'Resposta inválida do servidor');
+  var res = await supabaseClient.functions.invoke('milvus-atendimentos', { body: payload });
+  if (res.error) throw new Error(res.error.message || 'Falha ao consultar atendimentos');
+  var data = res.data;
+  if (!data || data.error || !Array.isArray(data.lista))
+    throw new Error((data && data.error) || 'Resposta inválida do servidor');
 
-  var lista=(data.lista||[]).map(function(r){ return normalizeMilvusAtendimento(r); }).filter(Boolean);
-  var out={
+  var lista = (data.lista || [])
+    .map(function (r) {
+      return normalizeMilvusAtendimento(r);
+    })
+    .filter(Boolean);
+  var out = {
     lista: lista,
     meta: data.meta || null,
     resumo: data.resumo || null,
-    paginate: (data.meta && data.meta.paginate) ? data.meta.paginate : null
+    paginate: data.meta && data.meta.paginate ? data.meta.paginate : null,
   };
   _milvusAtendSetCache(cacheKey, out);
   return out;
 }
 
 // Export — chama edge action export, decodifica base64 e dispara download
-async function exportMilvusAtendimentos(opts){
-  opts=opts||{};
-  var clientId=opts.clientId || '';
-  var tipoArquivo=String(opts.tipoArquivo||opts.tipo_arquivo||'csv').toLowerCase();
-  if(!['csv','xls','xlsx'].includes(tipoArquivo)) tipoArquivo='csv';
-  if(tipoArquivo==='xlsx') tipoArquivo='xls';
+async function exportMilvusAtendimentos(opts) {
+  opts = opts || {};
+  var clientId = opts.clientId || '';
+  var tipoArquivo = String(opts.tipoArquivo || opts.tipo_arquivo || 'csv').toLowerCase();
+  if (!['csv', 'xls', 'xlsx'].includes(tipoArquivo)) tipoArquivo = 'csv';
+  if (tipoArquivo === 'xlsx') tipoArquivo = 'xls';
 
-  var dataInicial=opts.dataInicial || '';
-  var dataFinal=opts.dataFinal || '';
-  if(!dataInicial || !dataFinal){
-    var r=_monthRangeISO();
-    if(!dataInicial) dataInicial=r.start;
-    if(!dataFinal) dataFinal=r.end;
+  var dataInicial = opts.dataInicial || '';
+  var dataFinal = opts.dataFinal || '';
+  if (!dataInicial || !dataFinal) {
+    var r = _monthRangeISO();
+    if (!dataInicial) dataInicial = r.start;
+    if (!dataFinal) dataFinal = r.end;
   }
 
   // O token é resolvido no servidor a partir do clientId (novo contrato).
-  if(clientId){
-    var client=typeof getClientById==='function'?getClientById(clientId):null;
-    if(!canViewMilvusAtendimentos(_atendOpView(), client)) throw new Error('Acesso negado a este cliente.');
+  if (clientId) {
+    var client = typeof getClientById === 'function' ? getClientById(clientId) : null;
+    if (!canViewMilvusAtendimentos(_atendOpView(), client))
+      throw new Error('Acesso negado a este cliente.');
   }
 
-  if(typeof isSupabaseConnected!=='function' || !isSupabaseConnected() || typeof supabaseClient==='undefined' || !supabaseClient){
+  if (
+    typeof isSupabaseConnected !== 'function' ||
+    !isSupabaseConnected() ||
+    typeof supabaseClient === 'undefined' ||
+    !supabaseClient
+  ) {
     throw new Error('Sem conexão com o servidor.');
   }
 
-  var filtro_body={
+  var filtro_body = {
     data_inicial: dataInicial,
     data_final: dataFinal,
-    tipo_arquivo: tipoArquivo
+    tipo_arquivo: tipoArquivo,
   };
-  if(opts.codigo) filtro_body.codigo=String(opts.codigo);
-  if(opts.tecnico) filtro_body.nome_tecnico=String(opts.tecnico);
-  if(opts.nomeMesa) filtro_body.nome_mesa=String(opts.nomeMesa);
-  if(typeof opts.isExterno==='boolean') filtro_body.is_externo=opts.isExterno;
-  if(typeof opts.isComercial==='boolean') filtro_body.is_comercial=opts.isComercial;
-  if(opts.motivoPausa) filtro_body.motivo_pausa=String(opts.motivoPausa);
+  if (opts.codigo) filtro_body.codigo = String(opts.codigo);
+  if (opts.tecnico) filtro_body.nome_tecnico = String(opts.tecnico);
+  if (opts.nomeMesa) filtro_body.nome_mesa = String(opts.nomeMesa);
+  if (typeof opts.isExterno === 'boolean') filtro_body.is_externo = opts.isExterno;
+  if (typeof opts.isComercial === 'boolean') filtro_body.is_comercial = opts.isComercial;
+  if (opts.motivoPausa) filtro_body.motivo_pausa = String(opts.motivoPausa);
 
-  var payload={action:'export', client_id: clientId || undefined, filtro_body: filtro_body};
+  var payload = { action: 'export', client_id: clientId || undefined, filtro_body: filtro_body };
 
-  var res=await supabaseClient.functions.invoke('milvus-atendimentos', {body: payload});
-  if(res.error) throw new Error(res.error.message || 'Falha ao exportar');
-  var data=res.data;
-  if(!data || data.error || !data.base64) throw new Error((data && data.error) || 'Resposta de exportação inválida');
+  var res = await supabaseClient.functions.invoke('milvus-atendimentos', { body: payload });
+  if (res.error) throw new Error(res.error.message || 'Falha ao exportar');
+  var data = res.data;
+  if (!data || data.error || !data.base64)
+    throw new Error((data && data.error) || 'Resposta de exportação inválida');
 
-  try{
-    var contentType=data.contentType || (tipoArquivo==='xls' ? 'application/vnd.ms-excel' : 'text/csv');
-    var blob=await _b64ToBlobAsync(data.base64, contentType);
-    var ext=tipoArquivo==='xls'?'xls':'csv';
-    var fname='relatorio-atendimentos-'+(dataInicial||'')+'_'+(dataFinal||'')+'.'+ext;
+  try {
+    var contentType =
+      data.contentType || (tipoArquivo === 'xls' ? 'application/vnd.ms-excel' : 'text/csv');
+    var blob = await _b64ToBlobAsync(data.base64, contentType);
+    var ext = tipoArquivo === 'xls' ? 'xls' : 'csv';
+    var fname =
+      'relatorio-atendimentos-' + (dataInicial || '') + '_' + (dataFinal || '') + '.' + ext;
     // usa helper existente se houver
-    if(typeof download==='function'){
+    if (typeof download === 'function') {
       // download helper do projeto espera (filename, content, type) — tenta compatibilidade
-      try{ download(fname, blob); }catch(_){ _triggerDownload(blob,fname); }
+      try {
+        download(fname, blob);
+      } catch (_) {
+        _triggerDownload(blob, fname);
+      }
     } else {
-      _triggerDownload(blob,fname);
+      _triggerDownload(blob, fname);
     }
-    if(typeof showToast==='function') showToast('Exportação gerada com sucesso!', 'success');
-    return {success:true, file: fname};
-  }catch(e){
-    if(typeof showToast==='function') showToast('Falha ao processar arquivo exportado', 'error');
+    if (typeof showToast === 'function') showToast('Exportação gerada com sucesso!', 'success');
+    return { success: true, file: fname };
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Falha ao processar arquivo exportado', 'error');
     throw e;
   }
 }
 // base64 → Bytes cedendo a thread entre fatias: exports grandes não congelam
 // a UI (o atob integral é 1 passo O(n) rápido; o loop charCodeAt é fatiado
 // com await p/ toasts/inputs respirarem). Puro exceto pelos yields.
-async function _b64ToBytesAsync(b64, sliceSize){
-  var binary=atob(b64);
-  var size=sliceSize||262144;
-  var out=new Uint8Array(binary.length);
-  var o=0, n=0;
-  for(var off=0; off<binary.length; off+=size){
-    var end=Math.min(off+size, binary.length);
-    for(var i=off;i<end;i++) out[o++]=binary.charCodeAt(i);
-    if((++n%4)===0) await new Promise(function(r){ setTimeout(r, 0); });
+async function _b64ToBytesAsync(b64, sliceSize) {
+  var binary = atob(b64);
+  var size = sliceSize || 262144;
+  var out = new Uint8Array(binary.length);
+  var o = 0,
+    n = 0;
+  for (var off = 0; off < binary.length; off += size) {
+    var end = Math.min(off + size, binary.length);
+    for (var i = off; i < end; i++) out[o++] = binary.charCodeAt(i);
+    if (++n % 4 === 0)
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
   }
   return out;
 }
-async function _b64ToBlobAsync(b64, contentType){
-  return new Blob([await _b64ToBytesAsync(b64)], {type: contentType});
+async function _b64ToBlobAsync(b64, contentType) {
+  return new Blob([await _b64ToBytesAsync(b64)], { type: contentType });
 }
-function _triggerDownload(blob, filename){  try{
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=url; a.download=filename; a.style.display='none';
-    document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
-  }catch(_){
-    if(typeof showToast==='function') showToast('Falha ao disparar download', 'error');
+function _triggerDownload(blob, filename) {
+  try {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 1000);
+  } catch (_) {
+    if (typeof showToast === 'function') showToast('Falha ao disparar download', 'error');
   }
 }
 
 // ── UI: helpers visuais ───────────────────────────────────────────────────
-function _atendStatusTag(st){
-  var txt = (st && typeof st==='object' && st.text!=null) ? String(st.text) : String(st ?? '');
-  if(!txt || txt==='[object Object]') return '<span class="tag tag-gray">—</span>';
-  var cls = (typeof canonicalStatusClass==='function') ? canonicalStatusClass(txt) : 'tag-gray';
-  return '<span class="tag '+cls+'">'+escapeHtml(txt)+'</span>';
+function _atendStatusTag(st) {
+  var txt = st && typeof st === 'object' && st.text != null ? String(st.text) : String(st ?? '');
+  if (!txt || txt === '[object Object]') return '<span class="tag tag-gray">—</span>';
+  var cls = typeof canonicalStatusClass === 'function' ? canonicalStatusClass(txt) : 'tag-gray';
+  return '<span class="tag ' + cls + '">' + escapeHtml(txt) + '</span>';
 }
-function _atendFmtDate(dt){
-  if(!dt) return '—';
-  try{
-    if(typeof formatDateTime==='function') return formatDateTime(dt);
+function _atendFmtDate(dt) {
+  if (!dt) return '—';
+  try {
+    if (typeof formatDateTime === 'function') return formatDateTime(dt);
     return new Date(String(dt).replace(' ', 'T')).toLocaleString('pt-BR');
-  }catch(_){ return String(dt); }
+  } catch (_) {
+    return String(dt);
+  }
 }
-function _atendFmtHora(h){ return _normalizeHHMM(h); }
+function _atendFmtHora(h) {
+  return _normalizeHHMM(h);
+}
 
 // Estado UI (separado por contexto: global vs cliente)
-var _atendUI = {clientId:'', dataInicial:'', dataFinal:'', codigo:'', tecnico:'', nomeMesa:'', isExterno:'', isComercial:'', motivoPausa:'', page:1, perPage:50, isDescending:true, gen:0};
-function _atendGetFilters(fromGlobal){
+var _atendUI = {
+  clientId: '',
+  dataInicial: '',
+  dataFinal: '',
+  codigo: '',
+  tecnico: '',
+  nomeMesa: '',
+  isExterno: '',
+  isComercial: '',
+  motivoPausa: '',
+  page: 1,
+  perPage: 50,
+  isDescending: true,
+  gen: 0,
+};
+function _atendGetFilters(fromGlobal) {
   var prefix = fromGlobal ? 'gAtend' : 'atend';
-  var selClient = fromGlobal ? (document.getElementById('gAtendClient')?.value || _atendUI.clientId || '') : (_atendUI.clientId||'');
+  var selClient = fromGlobal
+    ? document.getElementById('gAtendClient')?.value || _atendUI.clientId || ''
+    : _atendUI.clientId || '';
   return {
     clientId: selClient,
-    dataInicial: document.getElementById(prefix+'DataInicial')?.value || _atendUI.dataInicial || '',
-    dataFinal: document.getElementById(prefix+'DataFinal')?.value || _atendUI.dataFinal || '',
-    codigo: document.getElementById(prefix+'Codigo')?.value || '',
-    tecnico: document.getElementById(prefix+'Tecnico')?.value || '',
-    nomeMesa: document.getElementById(prefix+'NomeMesa')?.value || '',
-    isExterno: (function(){ var v=document.getElementById(prefix+'IsExterno')?.value; return v===''?'':v==='true'; })(),
-    isComercial: (function(){ var v=document.getElementById(prefix+'IsComercial')?.value; return v===''?'':v==='true'; })(),
-    motivoPausa: document.getElementById(prefix+'MotivoPausa')?.value || '',
-    page: _atendUI.page||1,
-    perPage: _atendUI.perPage||50,
-    isDescending: _atendUI.isDescending!==false
+    dataInicial:
+      document.getElementById(prefix + 'DataInicial')?.value || _atendUI.dataInicial || '',
+    dataFinal: document.getElementById(prefix + 'DataFinal')?.value || _atendUI.dataFinal || '',
+    codigo: document.getElementById(prefix + 'Codigo')?.value || '',
+    tecnico: document.getElementById(prefix + 'Tecnico')?.value || '',
+    nomeMesa: document.getElementById(prefix + 'NomeMesa')?.value || '',
+    isExterno: (function () {
+      var v = document.getElementById(prefix + 'IsExterno')?.value;
+      return v === '' ? '' : v === 'true';
+    })(),
+    isComercial: (function () {
+      var v = document.getElementById(prefix + 'IsComercial')?.value;
+      return v === '' ? '' : v === 'true';
+    })(),
+    motivoPausa: document.getElementById(prefix + 'MotivoPausa')?.value || '',
+    page: _atendUI.page || 1,
+    perPage: _atendUI.perPage || 50,
+    isDescending: _atendUI.isDescending !== false,
   };
 }
-function _atendBuildResumoHtml(resumo){
-  if(!resumo) return '';
-  var items=[
+function _atendBuildResumoHtml(resumo) {
+  if (!resumo) return '';
+  var items = [
     // [UI] Cores dos cards de resumo no padrão Dashboard (tokens ov-*)
-    {label:'Chamados', value: resumo.total_chamados ?? resumo.totalChamados ?? '—', color:'var(--ov-accent)'},
-    {label:'Total Horas', value: _atendFmtHora(resumo.total_horas ?? resumo.totalHoras), color:'var(--ov-green)'},
-    {label:'Internas', value: _atendFmtHora(resumo.total_horas_internas ?? resumo.total_horas_internas), color:'var(--ov-cyan)'},
-    {label:'Externas', value: _atendFmtHora(resumo.total_horas_externas ?? resumo.total_horas_externas), color:'var(--ov-violet)'},
-    {label:'Expediente', value: _atendFmtHora(resumo.total_horas_expediente ?? resumo.total_horas_expediente), color:'var(--ov-text)'},
-    {label:'Fora Exp.', value: _atendFmtHora(resumo.total_horas_fora_expediente ?? resumo.total_horas_fora_expediente), color:'var(--ov-amber)'}
+    {
+      label: 'Chamados',
+      value: resumo.total_chamados ?? resumo.totalChamados ?? '—',
+      color: 'var(--ov-accent)',
+    },
+    {
+      label: 'Total Horas',
+      value: _atendFmtHora(resumo.total_horas ?? resumo.totalHoras),
+      color: 'var(--ov-green)',
+    },
+    {
+      label: 'Internas',
+      value: _atendFmtHora(resumo.total_horas_internas ?? resumo.total_horas_internas),
+      color: 'var(--ov-cyan)',
+    },
+    {
+      label: 'Externas',
+      value: _atendFmtHora(resumo.total_horas_externas ?? resumo.total_horas_externas),
+      color: 'var(--ov-violet)',
+    },
+    {
+      label: 'Expediente',
+      value: _atendFmtHora(resumo.total_horas_expediente ?? resumo.total_horas_expediente),
+      color: 'var(--ov-text)',
+    },
+    {
+      label: 'Fora Exp.',
+      value: _atendFmtHora(
+        resumo.total_horas_fora_expediente ?? resumo.total_horas_fora_expediente
+      ),
+      color: 'var(--ov-amber)',
+    },
   ];
-  return '<div class="stats-grid u-87c136">'+items.map(function(it){
-    return '<div class="stat-card u-9dd319"><div><div class="stat-value" data-sty="font-size:20px;color:'+it.color+'">'+escapeHtml(String(it.value))+'</div><div class="stat-label">'+escapeHtml(it.label)+'</div></div></div>';
-  }).join('')+'</div>';
+  return (
+    '<div class="stats-grid u-87c136">' +
+    items
+      .map(function (it) {
+        return (
+          '<div class="stat-card u-9dd319"><div><div class="stat-value" data-sty="font-size:20px;color:' +
+          it.color +
+          '">' +
+          escapeHtml(String(it.value)) +
+          '</div><div class="stat-label">' +
+          escapeHtml(it.label) +
+          '</div></div></div>'
+        );
+      })
+      .join('') +
+    '</div>'
+  );
 }
-function _atendTableHtml(lista, hideCliente){
-  if(!lista || !lista.length) return '<div class="empty-state u-ddaf9e"><p>Nenhum atendimento encontrado no período</p><p class="u-8ff086">Ajuste os filtros ou tente outro período.</p></div>';
-  return '<div class="table-wrapper"><table><thead><tr><th>Código</th><th>Assunto</th>'+(hideCliente?'':'<th>Cliente</th>')+'<th>Técnico</th><th>Data Inicial</th><th>Data Final</th><th class="u-54c2af">Horas</th><th>Status</th></tr></thead><tbody>'+
-    lista.map(function(r){
-      var st=r.status || {text:r.status};
-      return '<tr>'+
-        '<td><strong>'+escapeHtml(String(r.codigo||'—'))+'</strong></td>'+
-        '<td class="u-de3130" title="'+escapeHtml(r.assunto||'')+'">'+escapeHtml(r.assunto||'—')+'</td>'+
-        (hideCliente?'':'<td>'+escapeHtml(r.nome_fantasia|| r.nome||'—')+'</td>')+
-        '<td>'+escapeHtml(r.tecnico||'—')+'</td>'+
-        '<td>'+_atendFmtDate(r.data_inicial)+'</td>'+
-        '<td>'+_atendFmtDate(r.data_final)+'</td>'+
-        '<td class="u-0c3b65">'+escapeHtml(r.total_horas_atendimento||'00:00')+'</td>'+
-        '<td>'+_atendStatusTag(st)+'</td>'+
-      '</tr>';
-    }).join('')+'</tbody></table></div>';
+function _atendTableHtml(lista, hideCliente) {
+  if (!lista || !lista.length)
+    return '<div class="empty-state u-ddaf9e"><p>Nenhum atendimento encontrado no período</p><p class="u-8ff086">Ajuste os filtros ou tente outro período.</p></div>';
+  return (
+    '<div class="table-wrapper"><table><thead><tr><th>Código</th><th>Assunto</th>' +
+    (hideCliente ? '' : '<th>Cliente</th>') +
+    '<th>Técnico</th><th>Data Inicial</th><th>Data Final</th><th class="u-54c2af">Horas</th><th>Status</th></tr></thead><tbody>' +
+    lista
+      .map(function (r) {
+        var st = r.status || { text: r.status };
+        return (
+          '<tr>' +
+          '<td><strong>' +
+          escapeHtml(String(r.codigo || '—')) +
+          '</strong></td>' +
+          '<td class="u-de3130" title="' +
+          escapeHtml(r.assunto || '') +
+          '">' +
+          escapeHtml(r.assunto || '—') +
+          '</td>' +
+          (hideCliente ? '' : '<td>' + escapeHtml(r.nome_fantasia || r.nome || '—') + '</td>') +
+          '<td>' +
+          escapeHtml(r.tecnico || '—') +
+          '</td>' +
+          '<td>' +
+          _atendFmtDate(r.data_inicial) +
+          '</td>' +
+          '<td>' +
+          _atendFmtDate(r.data_final) +
+          '</td>' +
+          '<td class="u-0c3b65">' +
+          escapeHtml(r.total_horas_atendimento || '00:00') +
+          '</td>' +
+          '<td>' +
+          _atendStatusTag(st) +
+          '</td>' +
+          '</tr>'
+        );
+      })
+      .join('') +
+    '</tbody></table></div>'
+  );
 }
-function _atendPagerHtml(paginate, perPage, currentPage, total){
-  var meta=paginate || {};
+function _atendPagerHtml(paginate, perPage, currentPage, total) {
+  var meta = paginate || {};
   var last = Number(meta.last_page || meta.lastPage || 1) || 1;
-  var from = meta.from || ((currentPage-1)*perPage+1);
-  var to = meta.to || Math.min(currentPage*perPage, total||0);
+  var from = meta.from || (currentPage - 1) * perPage + 1;
+  var to = meta.to || Math.min(currentPage * perPage, total || 0);
   total = Number(meta.total || total || 0);
-  if(!total) return '';
-  var cur=currentPage;
-  return '<div class="u-77bf62">'+
-    '<div class="u-8ff086">Página '+cur+' de '+last+' · '+from+'–'+to+' de '+total+'</div>'+
-    '<div class="u-25b528">'+
-      '<select class="form-select u-72a382" data-change="_atendChangePerPage"><option value="50" '+(perPage==50?'selected':'')+'>50</option><option value="100" '+(perPage==100?'selected':'')+'>100</option><option value="200" '+(perPage==200?'selected':'')+'>200</option></select>'+
-      '<button class="btn btn-sm btn-secondary" '+(cur<=1?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur-1)+'">‹ Anterior</button>'+
-      '<span class="u-d9c024">'+cur+' / '+last+'</span>'+
-      '<button class="btn btn-sm btn-secondary" '+(cur>=last?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur+1)+'">Próxima ›</button>'+
-    '</div>'+
-  '</div>';
+  if (!total) return '';
+  var cur = currentPage;
+  return (
+    '<div class="u-77bf62">' +
+    '<div class="u-8ff086">Página ' +
+    cur +
+    ' de ' +
+    last +
+    ' · ' +
+    from +
+    '–' +
+    to +
+    ' de ' +
+    total +
+    '</div>' +
+    '<div class="u-25b528">' +
+    '<select class="form-select u-72a382" data-change="_atendChangePerPage"><option value="50" ' +
+    (perPage == 50 ? 'selected' : '') +
+    '>50</option><option value="100" ' +
+    (perPage == 100 ? 'selected' : '') +
+    '>100</option><option value="200" ' +
+    (perPage == 200 ? 'selected' : '') +
+    '>200</option></select>' +
+    '<button class="btn btn-sm btn-secondary" ' +
+    (cur <= 1 ? 'disabled' : '') +
+    ' data-action="_atendGotoPage" data-arg="' +
+    (cur - 1) +
+    '">‹ Anterior</button>' +
+    '<span class="u-d9c024">' +
+    cur +
+    ' / ' +
+    last +
+    '</span>' +
+    '<button class="btn btn-sm btn-secondary" ' +
+    (cur >= last ? 'disabled' : '') +
+    ' data-action="_atendGotoPage" data-arg="' +
+    (cur + 1) +
+    '">Próxima ›</button>' +
+    '</div>' +
+    '</div>'
+  );
 }
-function _atendSkeleton(){
-  return '<div class="stats-grid u-87c136">'+Array(6).fill(0).map(function(){return '<div class="card u-287f77"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text short"></div></div>';}).join('')+'</div>'+
-    '<div class="skeleton-row"><div class="skeleton skeleton-text u-046678"></div></div>'.repeat(4);
+function _atendSkeleton() {
+  return (
+    '<div class="stats-grid u-87c136">' +
+    Array(6)
+      .fill(0)
+      .map(function () {
+        return '<div class="card u-287f77"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text short"></div></div>';
+      })
+      .join('') +
+    '</div>' +
+    '<div class="skeleton-row"><div class="skeleton skeleton-text u-046678"></div></div>'.repeat(4)
+  );
 }
-function _atendToggleMore(prefix){
-  var panel=document.getElementById(prefix+'MorePanel');
-  var btn=document.getElementById(prefix+'MoreBtn');
-  if(!panel||!btn) return;
-  var open=panel.dataset.open==='1';
-  panel.dataset.open=open?'0':'1';
-  panel.style.display=open?'none':'flex';
-  btn.setAttribute('aria-expanded', open?'false':'true');
+function _atendToggleMore(prefix) {
+  var panel = document.getElementById(prefix + 'MorePanel');
+  var btn = document.getElementById(prefix + 'MoreBtn');
+  if (!panel || !btn) return;
+  var open = panel.dataset.open === '1';
+  panel.dataset.open = open ? '0' : '1';
+  panel.style.display = open ? 'none' : 'flex';
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
 }
-if(typeof window!=='undefined' && !window._atendMoreBound){
-  window._atendMoreBound=true;
-  document.addEventListener('click', function(e){
-    ['atend','gAtend'].forEach(function(p){
-      var panel=document.getElementById(p+'MorePanel'); var btn=document.getElementById(p+'MoreBtn');
-      if(!panel||!btn) return;
-      if(panel.dataset.open!=='1') return;
-      if(panel.contains(e.target)||btn.contains(e.target)) return;
-      panel.dataset.open='0'; panel.style.display='none'; btn.setAttribute('aria-expanded','false');
+if (typeof window !== 'undefined' && !window._atendMoreBound) {
+  window._atendMoreBound = true;
+  document.addEventListener('click', function (e) {
+    ['atend', 'gAtend'].forEach(function (p) {
+      var panel = document.getElementById(p + 'MorePanel');
+      var btn = document.getElementById(p + 'MoreBtn');
+      if (!panel || !btn) return;
+      if (panel.dataset.open !== '1') return;
+      if (panel.contains(e.target) || btn.contains(e.target)) return;
+      panel.dataset.open = '0';
+      panel.style.display = 'none';
+      btn.setAttribute('aria-expanded', 'false');
     });
   });
 }
-function _atendDoFetchAndRender(isGlobal){
-  var prefix=isGlobal?'gAtend':'atend';
-  var filtros=_atendGetFilters(isGlobal);
+function _atendDoFetchAndRender(isGlobal) {
+  var prefix = isGlobal ? 'gAtend' : 'atend';
+  var filtros = _atendGetFilters(isGlobal);
   // normaliza vazios para boolean undefined
-  if(filtros.isExterno==='') delete filtros.isExterno;
-  if(filtros.isComercial==='') delete filtros.isComercial;
+  if (filtros.isExterno === '') delete filtros.isExterno;
+  if (filtros.isComercial === '') delete filtros.isComercial;
   // Geração da requisição: troca de cliente/página/filtro invalida respostas
   // em voo (o invoke da edge não é abortável — descarta o DOM obsoleto).
-  var myGen=++_atendUI.gen;
-  var isStale=function(){ return myGen!==_atendUI.gen || !document.getElementById(prefix+'List'); };
+  var myGen = ++_atendUI.gen;
+  var isStale = function () {
+    return myGen !== _atendUI.gen || !document.getElementById(prefix + 'List');
+  };
   // valida datas
-  var listEl=document.getElementById(prefix+'List');
-  var resumoEl=document.getElementById(prefix+'Resumo');
-  if(listEl) listEl.innerHTML='<p class="u-b4b3d2">Carregando…</p>';
-  if(resumoEl) resumoEl.innerHTML=_atendSkeleton();
+  var listEl = document.getElementById(prefix + 'List');
+  var resumoEl = document.getElementById(prefix + 'Resumo');
+  if (listEl) listEl.innerHTML = '<p class="u-b4b3d2">Carregando…</p>';
+  if (resumoEl) resumoEl.innerHTML = _atendSkeleton();
   // sincroniza seletor global antes do fetch
-  if(isGlobal){
-    var sel=document.getElementById('gAtendClient');
-    if(sel) _atendUI.clientId=sel.value||'';
+  if (isGlobal) {
+    var sel = document.getElementById('gAtendClient');
+    if (sel) _atendUI.clientId = sel.value || '';
   }
   // chama fetch
-  var opts={
+  var opts = {
     clientId: filtros.clientId || _atendUI.clientId || '',
     dataInicial: filtros.dataInicial,
     dataFinal: filtros.dataFinal,
     codigo: filtros.codigo,
     tecnico: filtros.tecnico,
     nomeMesa: filtros.nomeMesa,
-    isExterno: typeof filtros.isExterno==='boolean'?filtros.isExterno:undefined,
-    isComercial: typeof filtros.isComercial==='boolean'?filtros.isComercial:undefined,
+    isExterno: typeof filtros.isExterno === 'boolean' ? filtros.isExterno : undefined,
+    isComercial: typeof filtros.isComercial === 'boolean' ? filtros.isComercial : undefined,
     motivoPausa: filtros.motivoPausa,
     page: filtros.page,
-    perPage: _atendUI.perPage||50,
-    isDescending: filtros.isDescending
+    perPage: _atendUI.perPage || 50,
+    isDescending: filtros.isDescending,
   };
-  fetchMilvusAtendimentos(opts).then(function(data){
-    if(isStale()) return;
-    var hideCliente=!isGlobal;
-    if(resumoEl) resumoEl.innerHTML=_atendBuildResumoHtml(data.resumo);
-    if(listEl){
-      listEl.innerHTML=_atendTableHtml(data.lista, hideCliente) + _atendPagerHtml(data.paginate||data.meta?.paginate, _atendUI.perPage||50, _atendUI.page||1, data.paginate?.total || data.meta?.paginate?.total || data.lista.length);
-    }
-  }).catch(function(e){
-    if(isStale()) return;
-    var msg=(e && e.message) ? e.message : 'Falha ao consultar';
-    if(resumoEl) resumoEl.innerHTML='';
-    if(listEl) listEl.innerHTML='<div class="empty-state u-ddaf9e"><p class="u-45e7ae">'+escapeHtml(msg)+'</p><p class="u-865c33">Verifique o token do cliente e o período.</p></div>';
-    if(typeof showToast==='function') showToast(msg,'error');
-  });
+  fetchMilvusAtendimentos(opts)
+    .then(function (data) {
+      if (isStale()) return;
+      var hideCliente = !isGlobal;
+      if (resumoEl) resumoEl.innerHTML = _atendBuildResumoHtml(data.resumo);
+      if (listEl) {
+        listEl.innerHTML =
+          _atendTableHtml(data.lista, hideCliente) +
+          _atendPagerHtml(
+            data.paginate || data.meta?.paginate,
+            _atendUI.perPage || 50,
+            _atendUI.page || 1,
+            data.paginate?.total || data.meta?.paginate?.total || data.lista.length
+          );
+      }
+    })
+    .catch(function (e) {
+      if (isStale()) return;
+      var msg = e && e.message ? e.message : 'Falha ao consultar';
+      if (resumoEl) resumoEl.innerHTML = '';
+      if (listEl)
+        listEl.innerHTML =
+          '<div class="empty-state u-ddaf9e"><p class="u-45e7ae">' +
+          escapeHtml(msg) +
+          '</p><p class="u-865c33">Verifique o token do cliente e o período.</p></div>';
+      if (typeof showToast === 'function') showToast(msg, 'error');
+    });
 }
-function _atendChangePerPage(val){
-  _atendUI.perPage=Number(val)||50;
-  _atendUI.page=1;
-  var isGlobal=document.getElementById('gAtendList')!=null;
+function _atendChangePerPage(val) {
+  _atendUI.perPage = Number(val) || 50;
+  _atendUI.page = 1;
+  var isGlobal = document.getElementById('gAtendList') != null;
   _atendDoFetchAndRender(isGlobal);
 }
-function _atendGotoPage(p){
-  _atendUI.page=Math.max(1, Number(p)||1);
-  var isGlobal=document.getElementById('gAtendList')!=null;
+function _atendGotoPage(p) {
+  _atendUI.page = Math.max(1, Number(p) || 1);
+  var isGlobal = document.getElementById('gAtendList') != null;
   _atendDoFetchAndRender(isGlobal);
 }
-function _atendApplyFilters(isGlobal){
-  _atendUI.page=1;
+function _atendApplyFilters(isGlobal) {
+  _atendUI.page = 1;
   _atendDoFetchAndRender(isGlobal);
 }
-function _atendExport(tipo){
-  var isGlobal=document.getElementById('gAtendList')!=null;
-  if(isGlobal){ var sel=document.getElementById('gAtendClient'); if(sel) _atendUI.clientId=sel.value||''; }
-  var f=_atendGetFilters(isGlobal);
-  var opts={
+function _atendExport(tipo) {
+  var isGlobal = document.getElementById('gAtendList') != null;
+  if (isGlobal) {
+    var sel = document.getElementById('gAtendClient');
+    if (sel) _atendUI.clientId = sel.value || '';
+  }
+  var f = _atendGetFilters(isGlobal);
+  var opts = {
     clientId: f.clientId || _atendUI.clientId || '',
     dataInicial: f.dataInicial,
     dataFinal: f.dataFinal,
     codigo: f.codigo,
     tecnico: f.tecnico,
     nomeMesa: f.nomeMesa,
-    isExterno: typeof f.isExterno==='boolean'?f.isExterno:undefined,
-    isComercial: typeof f.isComercial==='boolean'?f.isComercial:undefined,
+    isExterno: typeof f.isExterno === 'boolean' ? f.isExterno : undefined,
+    isComercial: typeof f.isComercial === 'boolean' ? f.isComercial : undefined,
     motivoPausa: f.motivoPausa,
-    tipoArquivo: tipo
+    tipoArquivo: tipo,
   };
-  if(typeof showToast==='function') showToast('Gerando exportação...','info');
-  exportMilvusAtendimentos(opts).catch(function(e){
-    var msg=(e && e.message)||'Falha ao exportar';
-    if(typeof showToast==='function') showToast(msg,'error');
+  if (typeof showToast === 'function') showToast('Gerando exportação...', 'info');
+  exportMilvusAtendimentos(opts).catch(function (e) {
+    var msg = (e && e.message) || 'Falha ao exportar';
+    if (typeof showToast === 'function') showToast(msg, 'error');
   });
 }
-function _atendToggleExport(){
-  var m=document.getElementById('atendExportMenu');
-  if(!m) return;
-  var open=m.dataset.open==='1';
-  m.dataset.open=open?'0':'1';
-  m.style.display=open?'none':'block';
+function _atendToggleExport() {
+  var m = document.getElementById('atendExportMenu');
+  if (!m) return;
+  var open = m.dataset.open === '1';
+  m.dataset.open = open ? '0' : '1';
+  m.style.display = open ? 'none' : 'block';
 }
-if(typeof window!=='undefined'){
-  document.addEventListener('click', function(e){
-    var m=document.getElementById('atendExportMenu'); var b=document.getElementById('atendExportBtn');
-    if(!m||!b) return;
-    if(m.dataset.open!=='1') return;
-    if(m.contains(e.target)||b.contains(e.target)) return;
-    m.dataset.open='0'; m.style.display='none';
+if (typeof window !== 'undefined') {
+  document.addEventListener('click', function (e) {
+    var m = document.getElementById('atendExportMenu');
+    var b = document.getElementById('atendExportBtn');
+    if (!m || !b) return;
+    if (m.dataset.open !== '1') return;
+    if (m.contains(e.target) || b.contains(e.target)) return;
+    m.dataset.open = '0';
+    m.style.display = 'none';
   });
 }
 
 // HTML da seção Atendimentos (cliente) — reutilizado tanto pela aba unificada
 // "Chamados" (via renderMilvusAtendimentosInline) quanto pelo fallback legado.
 // IDs prefixo 'atend' (contexto cliente); o contexto global usa 'gAtend'.
-function getMilvusAtendimentosClientHtml(range){
-  var r=range || _monthRangeISO();
-  return '<div id="atendResumo">'+_atendSkeleton()+'</div>'+
-    '<div class="search-bar u-a57454">'+
-      '<input type="date" class="form-input u-7c07cd" id="atendDataInicial" value="'+r.start+'" />'+
-      // [UI] Tokens ov-* (mesmo padrão visual do Dashboard) nos filtros do cliente
-      '<span class="u-8ff086">até</span>'+
-      '<input type="date" class="form-input u-7c07cd" id="atendDataFinal" value="'+r.end+'" />'+
-      '<div class="search-input-wrap u-aae040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" data-input="atendCodigoClear" /></div>'+
-      '<button class="btn btn-primary btn-sm" data-action="_atendApplyFilters" data-arg="false">Buscar</button>'+
-      '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" data-action="_atendToggleMore" data-arg="atend" aria-expanded="false">Mais filtros</button>'+
-      '<div class="u-d461c9">'+
-        '<button class="btn btn-primary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button>'+
-        '<div id="atendExportMenu" data-open="0" class="u-861305">'+
-          '<button class="op-kebab-item" data-action="atendExportCsv">CSV</button>'+
-          '<button class="op-kebab-item" data-action="atendExportXls">XLS</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>'+
-    '<div id="atendMorePanel" data-open="0" class="u-8d33a2">'+
-      '<input class="form-input u-28c0f6" id="atendTecnico" placeholder="Técnico" />'+
-      '<input class="form-input u-830eb9" id="atendNomeMesa" placeholder="Mesa" />'+
-      '<select class="form-select u-c6fffd" id="atendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-      '<select class="form-select u-c6fffd" id="atendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-      '<input class="form-input u-7c07cd" id="atendMotivoPausa" placeholder="Motivo pausa" />'+
-    '</div>'+
-    '<div id="atendList"></div>';
+function getMilvusAtendimentosClientHtml(range) {
+  var r = range || _monthRangeISO();
+  return (
+    '<div id="atendResumo">' +
+    _atendSkeleton() +
+    '</div>' +
+    '<div class="search-bar u-a57454">' +
+    '<input type="date" class="form-input u-7c07cd" id="atendDataInicial" value="' +
+    r.start +
+    '" />' +
+    // [UI] Tokens ov-* (mesmo padrão visual do Dashboard) nos filtros do cliente
+    '<span class="u-8ff086">até</span>' +
+    '<input type="date" class="form-input u-7c07cd" id="atendDataFinal" value="' +
+    r.end +
+    '" />' +
+    '<div class="search-input-wrap u-aae040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" data-input="atendCodigoClear" /></div>' +
+    '<button class="btn btn-primary btn-sm" data-action="_atendApplyFilters" data-arg="false">Buscar</button>' +
+    '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" data-action="_atendToggleMore" data-arg="atend" aria-expanded="false">Mais filtros</button>' +
+    '<div class="u-d461c9">' +
+    '<button class="btn btn-primary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button>' +
+    '<div id="atendExportMenu" data-open="0" class="u-861305">' +
+    '<button class="op-kebab-item" data-action="atendExportCsv">CSV</button>' +
+    '<button class="op-kebab-item" data-action="atendExportXls">XLS</button>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '<div id="atendMorePanel" data-open="0" class="u-8d33a2">' +
+    '<input class="form-input u-28c0f6" id="atendTecnico" placeholder="Técnico" />' +
+    '<input class="form-input u-830eb9" id="atendNomeMesa" placeholder="Mesa" />' +
+    '<select class="form-select u-c6fffd" id="atendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>' +
+    '<select class="form-select u-c6fffd" id="atendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>' +
+    '<input class="form-input u-7c07cd" id="atendMotivoPausa" placeholder="Motivo pausa" />' +
+    '</div>' +
+    '<div id="atendList"></div>'
+  );
 }
 
 // Render da seção Atendimentos no contexto cliente — SEMPRE inline dentro da
@@ -520,86 +757,126 @@ function getMilvusAtendimentosClientHtml(range){
 // elemento indicado, sem tocar no restante da aba. Os filtros valem SOMENTE
 // para esta seção (fonte: edge milvus-atendimentos, transiente); os cards de
 // chamados acima seguem com fonte própria (edge milvus-tickets, top 10).
-function renderMilvusAtendimentosInline(clientId, mountId){
-  var mount=mountId ? document.getElementById(mountId) : null;
-  if(!mount) return;
-  _atendUI.clientId=clientId;
-  _atendUI.page=1;
-  mount.innerHTML=getMilvusAtendimentosClientHtml();
+function renderMilvusAtendimentosInline(clientId, mountId) {
+  var mount = mountId ? document.getElementById(mountId) : null;
+  if (!mount) return;
+  _atendUI.clientId = clientId;
+  _atendUI.page = 1;
+  mount.innerHTML = getMilvusAtendimentosClientHtml();
   _atendDoFetchAndRender(false);
 }
 
 // Render página global Atendimentos Milvus (rota #relatorios, chamada por app.js navigateTo) — só time init
-function renderRelatorios(){
+function renderRelatorios() {
   try {
-    var _team = typeof getCurrentTeam==='function' ? String(getCurrentTeam()||'').toLowerCase().trim() : String((typeof getSession==='function'&&getSession()?.team)||'init').toLowerCase().trim();
+    var _team =
+      typeof getCurrentTeam === 'function'
+        ? String(getCurrentTeam() || '')
+            .toLowerCase()
+            .trim()
+        : String((typeof getSession === 'function' && getSession()?.team) || 'init')
+            .toLowerCase()
+            .trim();
     if (_team !== 'init') {
-      document.getElementById('pageTitle').textContent='Atendimentos Milvus';
-      document.getElementById('contentArea').innerHTML='<div class="empty-state u-a19bf6"><p>Acesso restrito ao time Init.</p></div>';
-      if (typeof showToast==='function') showToast('Atendimentos Milvus disponível apenas para o time Init.', 'error');
+      document.getElementById('pageTitle').textContent = 'Atendimentos Milvus';
+      document.getElementById('contentArea').innerHTML =
+        '<div class="empty-state u-a19bf6"><p>Acesso restrito ao time Init.</p></div>';
+      if (typeof showToast === 'function')
+        showToast('Atendimentos Milvus disponível apenas para o time Init.', 'error');
       return;
     }
-  } catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
-  document.getElementById('pageTitle').textContent='Atendimentos Milvus';
-  var content=document.getElementById('contentArea');
-  var range=_monthRangeISO();
-  _atendUI.clientId='';
-  _atendUI.page=1;
-  var clients=typeof getMyClients==='function'?getMyClients(): (typeof getClients==='function'?getClients():[]);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos');
+  }
+  document.getElementById('pageTitle').textContent = 'Atendimentos Milvus';
+  var content = document.getElementById('contentArea');
+  var range = _monthRangeISO();
+  _atendUI.clientId = '';
+  _atendUI.page = 1;
+  var clients =
+    typeof getMyClients === 'function'
+      ? getMyClients()
+      : typeof getClients === 'function'
+        ? getClients()
+        : [];
   // [UI] Alterado para seguir padrão Dashboard: wrapper .ov-wrap + header ov-head/ov-h1
   // (filtros/resumo/lista intactos — só containers/classes visuais e tokens ov-*).
-  content.innerHTML=
-    '<div class="ov-wrap">'+
-      '<div class="search-bar page-toolbar">'+
-        '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>'+
-        '<select class="form-select pt-filter pt-full u-0fac91" id="gAtendClient" data-change="atendClientChange"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
-        '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input u-7c07cd" id="gAtendDataInicial" value="'+range.start+'" aria-label="Data inicial" />'+
-        '<span class="u-8ff086">até</span>'+
-        '<input type="date" class="form-input u-7c07cd" id="gAtendDataFinal" value="'+range.end+'" aria-label="Data final" /></div>'+
-        '<button class="btn btn-primary btn-sm pt-filter" data-action="_atendApplyFilters" data-arg="true">Buscar</button>'+
-        '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" data-action="_atendToggleMore" data-arg="gAtend" aria-expanded="false">Mais filtros</button>'+
-        '<div class="pt-actions"><div class="u-d461c9"><button class="btn btn-secondary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button><div id="atendExportMenu" data-open="0" class="u-861305"><button class="op-kebab-item" data-action="atendExportCsv">CSV</button><button class="op-kebab-item" data-action="atendExportXls">XLS</button></div></div></div>'+
-      '</div>'+
-      '<div id="gAtendMorePanel" class="ov-more u-4ae79f" data-open="0">'+
-        '<input class="form-input u-28c0f6" id="gAtendTecnico" placeholder="Técnico" />'+
-        '<input class="form-input u-830eb9" id="gAtendNomeMesa" placeholder="Mesa" />'+
-        '<select class="form-select u-c6fffd" id="gAtendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-        '<select class="form-select u-c6fffd" id="gAtendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-        '<input class="form-input u-7c07cd" id="gAtendMotivoPausa" placeholder="Motivo pausa" />'+
-      '</div>'+
-      '<div id="gAtendResumo">'+_atendSkeleton()+'</div>'+
-      '<div id="gAtendList"></div>'+
+  content.innerHTML =
+    '<div class="ov-wrap">' +
+    '<div class="search-bar page-toolbar">' +
+    '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>' +
+    '<select class="form-select pt-filter pt-full u-0fac91" id="gAtendClient" data-change="atendClientChange"><option value="">Todos clientes (sem token)</option>' +
+    clients
+      .map(function (c) {
+        return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+      })
+      .join('') +
+    '</select>' +
+    '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input u-7c07cd" id="gAtendDataInicial" value="' +
+    range.start +
+    '" aria-label="Data inicial" />' +
+    '<span class="u-8ff086">até</span>' +
+    '<input type="date" class="form-input u-7c07cd" id="gAtendDataFinal" value="' +
+    range.end +
+    '" aria-label="Data final" /></div>' +
+    '<button class="btn btn-primary btn-sm pt-filter" data-action="_atendApplyFilters" data-arg="true">Buscar</button>' +
+    '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" data-action="_atendToggleMore" data-arg="gAtend" aria-expanded="false">Mais filtros</button>' +
+    '<div class="pt-actions"><div class="u-d461c9"><button class="btn btn-secondary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button><div id="atendExportMenu" data-open="0" class="u-861305"><button class="op-kebab-item" data-action="atendExportCsv">CSV</button><button class="op-kebab-item" data-action="atendExportXls">XLS</button></div></div></div>' +
+    '</div>' +
+    '<div id="gAtendMorePanel" class="ov-more u-4ae79f" data-open="0">' +
+    '<input class="form-input u-28c0f6" id="gAtendTecnico" placeholder="Técnico" />' +
+    '<input class="form-input u-830eb9" id="gAtendNomeMesa" placeholder="Mesa" />' +
+    '<select class="form-select u-c6fffd" id="gAtendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>' +
+    '<select class="form-select u-c6fffd" id="gAtendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>' +
+    '<input class="form-input u-7c07cd" id="gAtendMotivoPausa" placeholder="Motivo pausa" />' +
+    '</div>' +
+    '<div id="gAtendResumo">' +
+    _atendSkeleton() +
+    '</div>' +
+    '<div id="gAtendList"></div>' +
     '</div>';
   _atendDoFetchAndRender(true);
 }
 
 // ── Auto-refresh global ──
-(function(){
-  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
-  if(window._atendAutoRefresh) return;
-  window._atendAutoRefresh=true;
-  onDataChanged('atendimentos', function(){
-    var h=(window.location.hash.replace('#','')||'dashboard');
+(function () {
+  if (typeof window === 'undefined' || typeof onDataChanged !== 'function') return;
+  if (window._atendAutoRefresh) return;
+  window._atendAutoRefresh = true;
+  onDataChanged('atendimentos', function () {
+    var h = window.location.hash.replace('#', '') || 'dashboard';
     // página global (Atendimentos Milvus)
-    if(h==='relatorios'){
-      try{ preserveScrollAround(function(){ _atendDoFetchAndRender(true); }); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
+    if (h === 'relatorios') {
+      try {
+        preserveScrollAround(function () {
+          _atendDoFetchAndRender(true);
+        });
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos');
+      }
       return;
     }
     // aba cliente dentro do modal (agora seção inline na aba unificada
     // "Chamados"; o alias legado 'atendimentos' também cai aqui)
-    try{
-      if(document.getElementById('atendList')){
-        preserveScrollAround(function(){ _atendDoFetchAndRender(false); });
+    try {
+      if (document.getElementById('atendList')) {
+        preserveScrollAround(function () {
+          _atendDoFetchAndRender(false);
+        });
       }
-    }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos');
+    }
   });
 })();
 
 // Helpers puros para testes/UI
-function _clearMilvusAtendCache(){ MILVUS_ATEND_CACHE.clear(); }
+function _clearMilvusAtendCache() {
+  MILVUS_ATEND_CACHE.clear();
+}
 
-if(typeof module!=='undefined' && module.exports){
-  module.exports={
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
     MILVUS_ATEND_TTL_MS,
     normalizeMilvusAtendimento,
     canViewMilvusAtendimentos,
@@ -607,7 +884,7 @@ if(typeof module!=='undefined' && module.exports){
     exportMilvusAtendimentos,
     _clearMilvusAtendCache,
     _normalizeHHMM,
-    _monthRangeISO
+    _monthRangeISO,
   };
 }
 
@@ -618,9 +895,20 @@ if (typeof registerActions === 'function') {
     _atendApplyFilters: (_el, v) => _atendApplyFilters(v === 'true'),
     _atendToggleMore: (_el, v) => _atendToggleMore(v),
     _atendToggleExport: () => _atendToggleExport(),
-    atendExportCsv: () => { _atendToggleExport(); _atendExport('csv'); },
-    atendExportXls: () => { _atendToggleExport(); _atendExport('xls'); },
-    atendClientChange: (_el, v) => { _atendUI.clientId = v; _atendApplyFilters(true); },
-    atendCodigoClear: (el) => { if (el.value === '') _atendApplyFilters(false); },
+    atendExportCsv: () => {
+      _atendToggleExport();
+      _atendExport('csv');
+    },
+    atendExportXls: () => {
+      _atendToggleExport();
+      _atendExport('xls');
+    },
+    atendClientChange: (_el, v) => {
+      _atendUI.clientId = v;
+      _atendApplyFilters(true);
+    },
+    atendCodigoClear: (el) => {
+      if (el.value === '') _atendApplyFilters(false);
+    },
   });
 }

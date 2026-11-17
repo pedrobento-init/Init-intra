@@ -23,32 +23,48 @@ describe('schema: clients carrega o token (realtime/merge sem perder)', () => {
   it('mapa remoto→local inclui milvus_client_token', () => {
     const ent = schema.ENTITIES.find((e) => e.table === 'clients');
     expect(ent.fields['milvus_client_token']).toBe('milvusClientToken');
-    expect(schema._mapFromRemote({ milvus_client_token: 'ABC123' }, { milvus_client_token: 'milvusClientToken' }))
-      .toEqual({ milvusClientToken: 'ABC123' });
+    expect(
+      schema._mapFromRemote(
+        { milvus_client_token: 'ABC123' },
+        { milvus_client_token: 'milvusClientToken' }
+      )
+    ).toEqual({ milvusClientToken: 'ABC123' });
   });
 });
 
 describe('resolveMilvusTicketsSyncState (contrato sem-token)', () => {
   it('code novo → no-token', () => {
-    expect(tk.resolveMilvusTicketsSyncState({ success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED' }))
-      .toEqual({ kind: 'no-token' });
+    expect(
+      tk.resolveMilvusTicketsSyncState({
+        success: false,
+        code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED',
+      })
+    ).toEqual({ kind: 'no-token' });
   });
   it('legado unmapped → unmapped (compat pré-deploy)', () => {
-    expect(tk.resolveMilvusTicketsSyncState({ success: true, unmapped: true }))
-      .toEqual({ kind: 'unmapped' });
+    expect(tk.resolveMilvusTicketsSyncState({ success: true, unmapped: true })).toEqual({
+      kind: 'unmapped',
+    });
   });
   it('ok carrega synced; nulo é ok zerado', () => {
-    expect(tk.resolveMilvusTicketsSyncState({ success: true, synced: 7 }))
-      .toEqual({ kind: 'ok', synced: 7 });
-    expect(tk.resolveMilvusTicketsSyncState(null))
-      .toEqual({ kind: 'ok', synced: 0 });
+    expect(tk.resolveMilvusTicketsSyncState({ success: true, synced: 7 })).toEqual({
+      kind: 'ok',
+      synced: 7,
+    });
+    expect(tk.resolveMilvusTicketsSyncState(null)).toEqual({ kind: 'ok', synced: 0 });
   });
 });
 
 describe('sync envia SOMENTE clientId (token nunca sai do backend)', () => {
   const _g = globalThis;
   const _keep = {};
-  for (const k of ['isSupabaseConnected', 'supabaseClient', 'getClientById', 'getSession', 'getOperators']) {
+  for (const k of [
+    'isSupabaseConnected',
+    'supabaseClient',
+    'getClientById',
+    'getSession',
+    'getOperators',
+  ]) {
     _keep[k] = _g[k];
   }
   afterEach(() => {
@@ -62,7 +78,10 @@ describe('sync envia SOMENTE clientId (token nunca sai do backend)', () => {
     _g.isSupabaseConnected = () => true;
     _g.supabaseClient = {
       functions: {
-        invoke: async (_fn, { body }) => { bodies.push(body); return { data: { success: true, synced: 1 }, error: null }; },
+        invoke: async (_fn, { body }) => {
+          bodies.push(body);
+          return { data: { success: true, synced: 1 }, error: null };
+        },
       },
     };
     _g.getClientById = () => ({ id: 'CLI-1', team: 'mam', milvusClientToken: 'ABC123' });

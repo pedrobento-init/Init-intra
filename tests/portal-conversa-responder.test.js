@@ -20,23 +20,31 @@ const ENV = {
 const OPERADOR = { id: 'op-1', auth_user_id: 'user-1', name: 'Ana', active: true, team: 'init' };
 
 function entrada(over) {
-  return Object.assign({
-    id: 'e1',
-    thread_id: 't1',
-    direcao: 'entrada',
-    de: 'Márcia <marcia@acme.com.br>',
-    assunto: 'Impressora',
-    team: 'init',
-    canal: 'email',
-    telefone: null,
-    pendencia_id: null,
-    client_id: 'CLI-1',
-    message_id: '<m1@acme.com.br>',
-    recebido_em: '2026-10-26T10:00:00Z',
-  }, over);
+  return Object.assign(
+    {
+      id: 'e1',
+      thread_id: 't1',
+      direcao: 'entrada',
+      de: 'Márcia <marcia@acme.com.br>',
+      assunto: 'Impressora',
+      team: 'init',
+      canal: 'email',
+      telefone: null,
+      pendencia_id: null,
+      client_id: 'CLI-1',
+      message_id: '<m1@acme.com.br>',
+      recebido_em: '2026-10-26T10:00:00Z',
+    },
+    over
+  );
 }
 
-async function chamar({ linhas = [entrada()], body = { thread_id: 't1', text: 'Vamos verificar.' }, fetchStub, contatos = [] } = {}) {
+async function chamar({
+  linhas = [entrada()],
+  body = { thread_id: 't1', text: 'Vamos verificar.' },
+  fetchStub,
+  contatos = [],
+} = {}) {
   const queries = [];
   const enviados = [];
   const { handler } = await loadHandler('conversa-responder', {
@@ -47,7 +55,10 @@ async function chamar({ linhas = [entrada()], body = { thread_id: 't1', text: 'V
       tabelas: { operators: [OPERADOR], emails_triagem: linhas, whatsapp_conversas: contatos },
     }),
     createTransport: () => ({
-      sendMail: async (msg) => { enviados.push(msg); return { messageId: 'novo@initnet.com.br' }; },
+      sendMail: async (msg) => {
+        enviados.push(msg);
+        return { messageId: 'novo@initnet.com.br' };
+      },
       close: () => {},
     }),
     fetch: fetchStub,
@@ -85,7 +96,12 @@ describe('conversa-responder: destino e escopo', () => {
     });
     expect(res.status).toBe(200);
     const up = queries.find((q) => q.patch && q.patch.status === 'anexado');
-    expect(up.filtros).toEqual(expect.arrayContaining([['thread_id', 't1'], ['team', 'init']]));
+    expect(up.filtros).toEqual(
+      expect.arrayContaining([
+        ['thread_id', 't1'],
+        ['team', 'init'],
+      ])
+    );
   });
 
   it('resposta reabre pendente e encerrada; nota interna só mexe em pendente', async () => {
@@ -93,7 +109,9 @@ describe('conversa-responder: destino e escopo', () => {
     const up = resposta.queries.find((q) => q.patch && q.patch.status === 'anexado');
     expect(up.filtros.find(([c]) => c === 'status')[1]).toEqual(['pendente', 'encerrado']);
 
-    const nota = await chamar({ body: { thread_id: 't1', text: 'só para a equipe', kind: 'internal' } });
+    const nota = await chamar({
+      body: { thread_id: 't1', text: 'só para a equipe', kind: 'internal' },
+    });
     const upNota = nota.queries.find((q) => q.patch && q.patch.status === 'anexado');
     expect(upNota.filtros.find(([c]) => c === 'status')[1]).toBe('pendente');
   });
@@ -120,7 +138,10 @@ describe('conversa-responder: destino e escopo', () => {
       contatos: [{ telefone: '5511987654321' }],
       fetchStub: async (url, init) => {
         enviadosWA.push({ url: String(url), body: JSON.parse(String(init && init.body)) });
-        return new Response(JSON.stringify({ id: 'wa-1' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ id: 'wa-1' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       },
     });
     expect(res.status).toBe(200);

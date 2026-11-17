@@ -2,12 +2,30 @@ import { describe, it, expect } from 'vitest';
 import { buildIcs, icsEscape, icsFold } from '../supabase/functions/agenda-ics/ics.ts';
 
 describe('agenda ICS', () => {
-  const ics = buildIcs([
-    { id: 'VIS-1', numero: 73, client_name: 'Acme, Ltda', motivo: 'Trocar switch; testar', date: '2026-10-20', time: '09:00', time_end: '11:30', status: 'agendada' },
-    { id: 'VIS-2', client_name: 'Zeta', date: '2026-10-21', all_day: true, status: 'concluida' },
-    { id: 'VIS-3', client_name: 'Sem fim', date: '2026-10-22', time: '14:00', status: 'cancelada' },
-    { id: 'ruim', date: '20/10/2026' },
-  ], { name: 'Init Intra — Ana', appUrl: 'https://intra.example/#visitas' });
+  const ics = buildIcs(
+    [
+      {
+        id: 'VIS-1',
+        numero: 73,
+        client_name: 'Acme, Ltda',
+        motivo: 'Trocar switch; testar',
+        date: '2026-10-20',
+        time: '09:00',
+        time_end: '11:30',
+        status: 'agendada',
+      },
+      { id: 'VIS-2', client_name: 'Zeta', date: '2026-10-21', all_day: true, status: 'concluida' },
+      {
+        id: 'VIS-3',
+        client_name: 'Sem fim',
+        date: '2026-10-22',
+        time: '14:00',
+        status: 'cancelada',
+      },
+      { id: 'ruim', date: '20/10/2026' },
+    ],
+    { name: 'Init Intra — Ana', appUrl: 'https://intra.example/#visitas' }
+  );
   const unfolded = ics.replace(/\r\n /g, '');
 
   it('cabeçalho e um evento por visita válida, com CRLF', () => {

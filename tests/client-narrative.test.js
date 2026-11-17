@@ -8,11 +8,16 @@ describe('buildClientNarrative', () => {
   let clientsMod;
   beforeEach(() => {
     globalThis.getPendencias = () => [
-      { clientId:'CLI-1', createdAt:'2024-01-01T10:00:00Z', status:'concluido', completedAt:'2024-01-02T10:00:00Z' },
-      { clientId:'CLI-1', createdAt:'2024-02-01T10:00:00Z', status:'aberto' },
-      { clientId:'CLI-2', createdAt:'2024-03-01T10:00:00Z', status:'aberto' },
+      {
+        clientId: 'CLI-1',
+        createdAt: '2024-01-01T10:00:00Z',
+        status: 'concluido',
+        completedAt: '2024-01-02T10:00:00Z',
+      },
+      { clientId: 'CLI-1', createdAt: '2024-02-01T10:00:00Z', status: 'aberto' },
+      { clientId: 'CLI-2', createdAt: '2024-03-01T10:00:00Z', status: 'aberto' },
     ];
-    globalThis.getHealthForClient = () => ({ emoji:'🟢', label:'Saudável', color:'#16a34a' });
+    globalThis.getHealthForClient = () => ({ emoji: '🟢', label: 'Saudável', color: '#16a34a' });
     globalThis.calculateAvgResolutionHours = () => 24;
     globalThis.formatDate = (iso) => new Date(iso).toLocaleDateString('pt-BR');
     globalThis.localDateISO = () => '2024-03-10';

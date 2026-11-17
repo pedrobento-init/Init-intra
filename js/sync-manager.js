@@ -15,7 +15,11 @@ function _syncBackoffDelay(retryN) {
   var base = 1000;
   var max = 30000;
   var d = Math.min(max, base * Math.pow(2, n));
-  try { d += Math.random() * 500; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  try {
+    d += Math.random() * 500;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   return d;
 }
 
@@ -39,17 +43,21 @@ function _applyOnMerged(meta, item, localItem) {
   try {
     var out = meta.onMerged([item], localItem ? [localItem] : []);
     if (Array.isArray(out) && out[0]) return out[0];
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   return item;
 }
 
 function _syncTeamFilter() {
   try {
     if (typeof isTeamAdmin === 'function' && isTeamAdmin()) {
-      return (typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam : null;
+      return typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : null;
     }
     return typeof getCurrentTeam === 'function' ? getCurrentTeam() : null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 var SYNC_FALLBACK_MIN_MS = 60000;
@@ -70,14 +78,31 @@ var SyncManager = (function () {
     _status = s;
     var detail = { status: s };
     if (extra && typeof extra === 'object') {
-      for (var k in extra) { try { detail[k] = extra[k]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
+      for (var k in extra) {
+        try {
+          detail[k] = extra[k];
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
+      }
     }
     try {
-      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sync:update', { detail: detail }));
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-    try { if (typeof emitDataChanged === 'function') emitDataChanged('sync-status', detail); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new CustomEvent('sync:update', { detail: detail }));
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+    try {
+      if (typeof emitDataChanged === 'function') emitDataChanged('sync-status', detail);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     for (var i = 0; i < _listeners.length; i++) {
-      try { _listeners[i](s, detail); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      try {
+        _listeners[i](s, detail);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
     }
   }
 
@@ -95,10 +120,15 @@ var SyncManager = (function () {
   async function applyRemote(table, event, row) {
     var meta = null;
     try {
-      meta = (typeof ENTITIES !== 'undefined')
-        ? ENTITIES.find(function (e) { return e.table === table; })
-        : null;
-    } catch (_) { meta = null; }
+      meta =
+        typeof ENTITIES !== 'undefined'
+          ? ENTITIES.find(function (e) {
+              return e.table === table;
+            })
+          : null;
+    } catch (_) {
+      meta = null;
+    }
     if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
     // O await da outbox vem ANTES de ler a lista (e da supressão de pendência): entre dbGet e dbSet não pode
     // haver ponto de suspensão, senão uma escrita local concorrente (SYNC-03)
@@ -106,13 +136,22 @@ var SyncManager = (function () {
     var enq = false;
     if (event !== 'DELETE' && row && row.id) {
       try {
-        enq = (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.has === 'function')
-          ? await Outbox.has(row.id)
-          : ((typeof outboxHas === 'function') ? await outboxHas(row.id) : false);
-      } catch (_) { enq = false; }
+        enq =
+          typeof Outbox !== 'undefined' && Outbox && typeof Outbox.has === 'function'
+            ? await Outbox.has(row.id)
+            : typeof outboxHas === 'function'
+              ? await outboxHas(row.id)
+              : false;
+      } catch (_) {
+        enq = false;
+      }
     }
     var prevSuppress = false;
-    try { prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     try {
       if (typeof window !== 'undefined') window._suppressPendingSync = true;
       var list = dbGet(meta.dbKey);
@@ -127,26 +166,48 @@ var SyncManager = (function () {
             if (typeof _clearTombstone === 'function') _clearTombstone(meta.dbKey, pid);
           }
         }
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
       if (event === 'DELETE') {
         if (!row || !row.id) return;
-        list = list.filter(function (x) { return x.id !== row.id; });
+        list = list.filter(function (x) {
+          return x.id !== row.id;
+        });
       } else if ((event === 'INSERT' || event === 'UPDATE') && row) {
-        var mapped = (typeof meta.mapRow === 'function')
-          ? meta.mapRow(row)
-          : ((typeof _mapFromRemote === 'function') ? _mapFromRemote(row, meta.fields) : row);
+        var mapped =
+          typeof meta.mapRow === 'function'
+            ? meta.mapRow(row)
+            : typeof _mapFromRemote === 'function'
+              ? _mapFromRemote(row, meta.fields)
+              : row;
         try {
-          if (meta.hasTeam && typeof mapped.team === 'string' && typeof canViewTeam === 'function' && !canViewTeam(mapped.team)) return;
-        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+          if (
+            meta.hasTeam &&
+            typeof mapped.team === 'string' &&
+            typeof canViewTeam === 'function' &&
+            !canViewTeam(mapped.team)
+          )
+            return;
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
         var idx = -1;
-        for (var i = 0; i < list.length; i++) { if (list[i] && list[i].id === mapped.id) { idx = i; break; } }
+        for (var i = 0; i < list.length; i++) {
+          if (list[i] && list[i].id === mapped.id) {
+            idx = i;
+            break;
+          }
+        }
         if (idx !== -1) {
           var loc = list[idx];
           if (shouldApplyRemote(loc, mapped, enq)) {
-            var mergedOne = (typeof _keepLocalEdits === 'function')
-              ? _keepLocalEdits(Object.assign({}, loc, mapped), loc)
-              : Object.assign({}, loc, mapped);
-            delete mergedOne.pinHash; delete mergedOne.pinSalt; // hash de senha não é mais guardado
+            var mergedOne =
+              typeof _keepLocalEdits === 'function'
+                ? _keepLocalEdits(Object.assign({}, loc, mapped), loc)
+                : Object.assign({}, loc, mapped);
+            delete mergedOne.pinHash;
+            delete mergedOne.pinSalt; // hash de senha não é mais guardado
             list[idx] = _applyOnMerged(meta, mergedOne, loc);
           }
         } else {
@@ -155,14 +216,27 @@ var SyncManager = (function () {
       } else {
         return;
       }
-      if (meta.cacheTable && typeof setCacheTable === 'function') setCacheTable(meta.cacheTable, list);
+      if (meta.cacheTable && typeof setCacheTable === 'function')
+        setCacheTable(meta.cacheTable, list);
       else dbSet(meta.dbKey, list);
       // dbSet já emite `emitDataChanged(entidade)` (storage.js); o onChange
       // abaixo preserva o refresh legado por tela (kanban/dashboard/etc).
-      if (typeof meta.onChange === 'function') { try { meta.onChange(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
+      if (typeof meta.onChange === 'function') {
+        try {
+          meta.onChange();
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
+      }
       _retryN = 0;
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } finally {
-      try { if (typeof window !== 'undefined') window._suppressPendingSync = prevSuppress; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    } finally {
+      try {
+        if (typeof window !== 'undefined') window._suppressPendingSync = prevSuppress;
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
     }
   }
 
@@ -171,20 +245,30 @@ var SyncManager = (function () {
       if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return false;
       if (typeof window !== 'undefined' && !window._supabaseAuthActive) return false;
       return typeof supabaseClient !== 'undefined' && !!supabaseClient;
-    } catch (_) { return false; }
+    } catch (_) {
+      return false;
+    }
   }
 
   // Remove e esquece o canal atual. O `removeChannel` é best-effort (o canal
   // pode já estar morto); o que importa é `_channel` voltar a null para o
   // `visibilitychange`/`pageshow` reconectarem.
   function _dropDeadChannel() {
-    try { if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     _channel = null;
   }
 
   function connect() {
     if (!_canConnect()) return;
-    try { if (_channel) supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      if (_channel) supabaseClient.removeChannel(_channel);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     _channel = null;
     _emit('connecting');
     var teamFilter = _syncTeamFilter();
@@ -192,7 +276,13 @@ var SyncManager = (function () {
     try {
       ch = supabaseClient.channel('public-changes-v2');
       var metas = [];
-      try { metas = (typeof ENTITIES !== 'undefined' ? ENTITIES : []).filter(function (e) { return e.realtime !== false; }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      try {
+        metas = (typeof ENTITIES !== 'undefined' ? ENTITIES : []).filter(function (e) {
+          return e.realtime !== false;
+        });
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
       metas.forEach(function (meta) {
         var opts = { event: '*', schema: 'public', table: meta.table };
         if (teamFilter && meta.hasTeam) opts.filter = 'team=eq.' + teamFilter;
@@ -203,8 +293,10 @@ var SyncManager = (function () {
         });
       });
       _channel = ch.subscribe(function (st) {
-        if (st === 'SUBSCRIBED') { _retryN = 0; _emit('live'); }
-        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
+        if (st === 'SUBSCRIBED') {
+          _retryN = 0;
+          _emit('live');
+        } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
           _emit('error');
           // Canal morto (ex.: erro com a aba oculta): solta a referência.
           // Sem isso o `visibilitychange` nunca reconecta — `_channel`
@@ -216,18 +308,27 @@ var SyncManager = (function () {
           // mesmos ~156 "conflitos". O reconnect barato segue o backoff.
           try {
             var _nowFb = Date.now();
-            var _hiddenFb = (typeof document !== 'undefined' && document.visibilityState === 'hidden');
-            if (!_hiddenFb && (_nowFb - _lastFallbackAt) >= SYNC_FALLBACK_MIN_MS && typeof syncSupabaseToLocal === 'function') {
+            var _hiddenFb =
+              typeof document !== 'undefined' && document.visibilityState === 'hidden';
+            if (
+              !_hiddenFb &&
+              _nowFb - _lastFallbackAt >= SYNC_FALLBACK_MIN_MS &&
+              typeof syncSupabaseToLocal === 'function'
+            ) {
               _lastFallbackAt = _nowFb;
               syncSupabaseToLocal({ reason: 'realtime-fallback' }).catch(function () {});
             }
-          } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+          } catch (_e) {
+            if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+          }
           var d = _syncBackoffDelay(_retryN++);
           setTimeout(function () {
             try {
               if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
               if (_canConnect()) connect();
-            } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+            } catch (_e) {
+              if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+            }
           }, d);
         }
       });
@@ -235,25 +336,50 @@ var SyncManager = (function () {
       _emit('error');
       _dropDeadChannel();
       var d2 = _syncBackoffDelay(_retryN++);
-      setTimeout(function () { try { if (_canConnect()) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }, d2);
+      setTimeout(function () {
+        try {
+          if (_canConnect()) connect();
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
+      }, d2);
     }
   }
 
   function disconnect() {
-    try { if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     _channel = null;
   }
 
   if (typeof window !== 'undefined') {
-    window.addEventListener('online', function () { _retryN = 0; connect(); });
-    window.addEventListener('offline', function () { _emit('offline'); });
+    window.addEventListener('online', function () {
+      _retryN = 0;
+      connect();
+    });
+    window.addEventListener('offline', function () {
+      _emit('offline');
+    });
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'visible') return;
-        try { if (_canConnect() && !_channel) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+        try {
+          if (_canConnect() && !_channel) connect();
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
       });
       window.addEventListener('pageshow', function (e) {
-        if (e && e.persisted) { try { if (_canConnect()) connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
+        if (e && e.persisted) {
+          try {
+            if (_canConnect()) connect();
+          } catch (_e) {
+            if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+          }
+        }
       });
     }
   }
@@ -262,7 +388,9 @@ var SyncManager = (function () {
     connect: connect,
     disconnect: disconnect,
     onStatus: onStatus,
-    getStatus: function () { return _status; },
+    getStatus: function () {
+      return _status;
+    },
     shouldApplyRemote: shouldApplyRemote,
     applyRemote: applyRemote,
   };
@@ -273,17 +401,32 @@ var SyncManager = (function () {
 // sozinho quando SyncManager ou dbSet atualizarem a entidade.
 function subscribeLive(entity, render) {
   if (typeof render !== 'function') return function () {};
-  try { render(); } catch (e) { try { console.warn('subscribeLive render erro', e); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
+  try {
+    render();
+  } catch (e) {
+    try {
+      console.warn('subscribeLive render erro', e);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+  }
   try {
     if (typeof onDataChanged === 'function') {
       return onDataChanged(entity, function () {
         try {
-          if (typeof preserveScrollAround === 'function') preserveScrollAround(function () { render(); });
+          if (typeof preserveScrollAround === 'function')
+            preserveScrollAround(function () {
+              render();
+            });
           else render();
-        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
       });
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   return function () {};
 }
 
@@ -309,30 +452,83 @@ function mountSyncStatus(el) {
 
   function _read() {
     var pend = 0;
-    try { if (typeof getPendingSyncCount === 'function') pend = Number(getPendingSyncCount()) || 0; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      if (typeof getPendingSyncCount === 'function') pend = Number(getPendingSyncCount()) || 0;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     var off = false;
-    try { off = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      off = typeof navigator !== 'undefined' && navigator.onLine === false;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     var st = 'idle';
-    try { st = (typeof SyncManager !== 'undefined' && SyncManager) ? SyncManager.getStatus() : 'idle'; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      st = typeof SyncManager !== 'undefined' && SyncManager ? SyncManager.getStatus() : 'idle';
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     var local = false;
-    try { local = (typeof isSupabaseConnected === 'function' && !isSupabaseConnected()); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      local = typeof isSupabaseConnected === 'function' && !isSupabaseConnected();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     return { pend: pend, off: off, st: st, local: local };
   }
   // O texto vai em .sync-label para o celular mostrar só o ponto colorido
   // (+ contador): o chip inteiro espremia o título da página na topbar.
-  function _lbl(t) { return '<span class="sync-label">' + t + '</span>'; }
+  function _lbl(t) {
+    return '<span class="sync-label">' + t + '</span>';
+  }
   // Ponto colorido via CSS ([data-sync]) no lugar dos emojis 🟢🟡🔴⚪.
   var _DOT = '<i class="sync-dot" aria-hidden="true"></i>';
   function _desired(r, n) {
     var total = Math.max(r.pend, Number(n) || 0);
-    if (r.off) return { sync: 'offline', key: 'offline|' + total, html: _DOT + _lbl('Offline') + (total ? ' (' + total + _lbl(' pendente' + (total > 1 ? 's' : '')) + ')' : ''), title: 'Sem conexão — as alterações ficam na fila e enviam ao reconectar' };
+    if (r.off)
+      return {
+        sync: 'offline',
+        key: 'offline|' + total,
+        html:
+          _DOT +
+          _lbl('Offline') +
+          (total ? ' (' + total + _lbl(' pendente' + (total > 1 ? 's' : '')) + ')' : ''),
+        title: 'Sem conexão — as alterações ficam na fila e enviam ao reconectar',
+      };
     // Sem backend configurado não há o que sincronizar: "Sincronizando..."
     // eterno passava a impressão de travamento.
-    if (r.local) return { sync: 'local', key: 'local', html: _DOT + _lbl('Modo local'), title: 'Servidor não configurado — os dados ficam só neste dispositivo' };
-    if (r.st === 'live' && !total) return { sync: 'live', key: 'live', html: _DOT + _lbl('Sincronizado'), title: 'Tempo real ativo' };
-    return { sync: 'pending', key: 'pending|' + total, html: _DOT + _lbl('Sincronizando...') + (total ? ' (' + total + ')' : ''), title: 'Sincronizando com o servidor' };
+    if (r.local)
+      return {
+        sync: 'local',
+        key: 'local',
+        html: _DOT + _lbl('Modo local'),
+        title: 'Servidor não configurado — os dados ficam só neste dispositivo',
+      };
+    if (r.st === 'live' && !total)
+      return {
+        sync: 'live',
+        key: 'live',
+        html: _DOT + _lbl('Sincronizado'),
+        title: 'Tempo real ativo',
+      };
+    return {
+      sync: 'pending',
+      key: 'pending|' + total,
+      html: _DOT + _lbl('Sincronizando...') + (total ? ' (' + total + ')' : ''),
+      title: 'Sincronizando com o servidor',
+    };
   }
-  function _clearGrace() { try { if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null; } } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }
+  function _clearGrace() {
+    try {
+      if (_graceTimer) {
+        clearTimeout(_graceTimer);
+        _graceTimer = null;
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+  }
   function _commit(d) {
     _paintedSync = d.sync;
     _paintedKey = d.key;
@@ -341,7 +537,10 @@ function mountSyncStatus(el) {
     el.title = d.title;
   }
   function _write(d) {
-    if (d.key === _paintedKey) { _clearGrace(); return; } // nada mudou: não toca no DOM
+    if (d.key === _paintedKey) {
+      _clearGrace();
+      return;
+    } // nada mudou: não toca no DOM
     var canFlap = _paintedSync !== null && _paintedSync !== 'offline' && d.sync !== 'offline';
     if (canFlap && d.sync !== _paintedSync) {
       // Troca 🟢↔🟡: só comete se o novo estado persistir (anti-flap).
@@ -349,8 +548,12 @@ function mountSyncStatus(el) {
         _graceTimer = setTimeout(function () {
           _graceTimer = null;
           try {
-            paintSync(function (x) { if (x.sync !== _paintedSync) _commit(x); });
-          } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+            paintSync(function (x) {
+              if (x.sync !== _paintedSync) _commit(x);
+            });
+          } catch (_e) {
+            if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+          }
         }, STABLE_MS);
       }
       return;
@@ -363,36 +566,94 @@ function mountSyncStatus(el) {
     var r = _read();
     function done(n) {
       var d = _desired(r, n);
-      if (cb) cb(d); else _write(d);
+      if (cb) cb(d);
+      else _write(d);
     }
     try {
       var p = null;
-      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.count === 'function') p = Outbox.count();
+      if (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.count === 'function')
+        p = Outbox.count();
       else if (typeof outboxCount === 'function') p = outboxCount();
-      if (p && typeof p.then === 'function') { p.then(function (c) { done(c); }).catch(function () { done(r.pend); }); return; }
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      if (p && typeof p.then === 'function') {
+        p.then(function (c) {
+          done(c);
+        }).catch(function () {
+          done(r.pend);
+        });
+        return;
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
     done(r.pend);
   }
   paintSync();
-  var off1 = function () { paintSync(); };
-  var off2 = function () { paintSync(); };
-  var off3 = function () { paintSync(); };
-  try { window.addEventListener('online', off1); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-  try { window.addEventListener('offline', off2); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-  try { window.addEventListener('sync:update', off3); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  var off1 = function () {
+    paintSync();
+  };
+  var off2 = function () {
+    paintSync();
+  };
+  var off3 = function () {
+    paintSync();
+  };
+  try {
+    window.addEventListener('online', off1);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
+  try {
+    window.addEventListener('offline', off2);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
+  try {
+    window.addEventListener('sync:update', off3);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   var unsub = function () {};
-  try { if (typeof onDataChanged === 'function') unsub = onDataChanged('sync-status', paintSync) || unsub; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  try {
+    if (typeof onDataChanged === 'function')
+      unsub = onDataChanged('sync-status', paintSync) || unsub;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   try {
     if (typeof document !== 'undefined' && !document._syncStatusAutoTick) {
       document._syncStatusAutoTick = true;
-      setInterval(function () { try { paintSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } }, 15000);
+      setInterval(function () {
+        try {
+          paintSync();
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
+      }, 15000);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   return function () {
-    try { window.removeEventListener('online', off1); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-    try { window.removeEventListener('offline', off2); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-    try { window.removeEventListener('sync:update', off3); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
-    try { if (typeof unsub === 'function') unsub(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+    try {
+      window.removeEventListener('online', off1);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+    try {
+      window.removeEventListener('offline', off2);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+    try {
+      window.removeEventListener('sync:update', off3);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
+    try {
+      if (typeof unsub === 'function') unsub();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+    }
   };
 }
 
@@ -403,19 +664,38 @@ if (typeof window !== 'undefined') {
   // Compat: callers legados (app.js onTeamChange/boot) continuam chamando
   // initSupabaseRealtime() — agora delega ao SyncManager com backoff.
   try {
-    window._legacyInitSupabaseRealtime = (typeof initSupabaseRealtime === 'function') ? initSupabaseRealtime : null;
-    window.initSupabaseRealtime = function () { try { SyncManager.connect(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); } };
+    window._legacyInitSupabaseRealtime =
+      typeof initSupabaseRealtime === 'function' ? initSupabaseRealtime : null;
+    window.initSupabaseRealtime = function () {
+      try {
+        SyncManager.connect();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
+    };
     initSupabaseRealtime = window.initSupabaseRealtime;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
   try {
     document.addEventListener('DOMContentLoaded', function () {
       try {
         var el = document.getElementById('syncStatus');
         if (el && typeof mountSyncStatus === 'function') mountSyncStatus(el);
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+      }
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+  }
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { _syncBackoffDelay, shouldApplyRemote, SyncManager: (typeof SyncManager !== 'undefined' ? SyncManager : null), subscribeLive: (typeof subscribeLive !== 'undefined' ? subscribeLive : null), mountSyncStatus: (typeof mountSyncStatus !== 'undefined' ? mountSyncStatus : null) };
+  module.exports = {
+    _syncBackoffDelay,
+    shouldApplyRemote,
+    SyncManager: typeof SyncManager !== 'undefined' ? SyncManager : null,
+    subscribeLive: typeof subscribeLive !== 'undefined' ? subscribeLive : null,
+    mountSyncStatus: typeof mountSyncStatus !== 'undefined' ? mountSyncStatus : null,
+  };
 }

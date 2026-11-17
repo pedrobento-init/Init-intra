@@ -8,13 +8,19 @@ globalThis.window = globalThis.window || {};
 globalThis.window.addEventListener = globalThis.window.addEventListener || (() => {});
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 globalThis.getCacheStore = (t) => _stores[t] || [];
-globalThis.setCacheStore = (t, v) => { _stores[t] = v; };
+globalThis.setCacheStore = (t, v) => {
+  _stores[t] = v;
+};
 globalThis.getCacheKV = () => null;
 globalThis.setCacheKV = () => {};
 globalThis.getCacheTable = () => null;
 globalThis.setCacheTable = () => {};
 globalThis.addLog = () => {};
-globalThis.Validators = { required: (v) => !!String(v || '').trim(), email: () => true, phone: () => true };
+globalThis.Validators = {
+  required: (v) => !!String(v || '').trim(),
+  email: () => true,
+  phone: () => true,
+};
 
 let S;
 beforeEach(() => {
@@ -43,7 +49,9 @@ describe('pessoas por id (049)', () => {
   });
 
   it('não deixa criar outro operador ativo com o mesmo nome', () => {
-    expect(S.validateOperator({ name: 'ANA', active: true })).toContain('Já existe um operador ativo chamado "Ana". Use um nome diferente (ex.: com sobrenome).');
+    expect(S.validateOperator({ name: 'ANA', active: true })).toContain(
+      'Já existe um operador ativo chamado "Ana". Use um nome diferente (ex.: com sobrenome).'
+    );
     expect(S.validateOperator({ id: 'OP-1', name: 'Ana', active: true })).toEqual([]); // ela mesma
     expect(S.validateOperator({ name: 'Ana', active: false })).toEqual([]);
   });
@@ -51,7 +59,10 @@ describe('pessoas por id (049)', () => {
 
 describe('marcação de campos editados', () => {
   it('marca só o que mudou e acumula entre saves', () => {
-    const a = S._withDirtyFields({ id: '1', name: 'X', phone: '1', notes: 'n' }, { id: '1', name: 'X', phone: '2', notes: 'n', updatedAt: 't' });
+    const a = S._withDirtyFields(
+      { id: '1', name: 'X', phone: '1', notes: 'n' },
+      { id: '1', name: 'X', phone: '2', notes: 'n', updatedAt: 't' }
+    );
     expect(a._dirtyFields).toEqual(['phone']);
     const b = S._withDirtyFields(a, { ...a, server: { ip: '1' } });
     expect(b._dirtyFields.sort()).toEqual(['phone', 'server']);

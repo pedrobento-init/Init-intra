@@ -25,8 +25,17 @@ function registerActions(map) {
 
 function _runAction(name, el, arg, ev) {
   const fn = _actions[name];
-  if (!fn) { if (typeof _logSilent === 'function') _logSilent(new Error('ação não registrada: ' + name), 'actions'); return; }
-  try { fn(el, arg, ev); } catch (e) { if (typeof _logSilent === 'function') _logSilent(e, 'action:' + name); else throw e; }
+  if (!fn) {
+    if (typeof _logSilent === 'function')
+      _logSilent(new Error('ação não registrada: ' + name), 'actions');
+    return;
+  }
+  try {
+    fn(el, arg, ev);
+  } catch (e) {
+    if (typeof _logSilent === 'function') _logSilent(e, 'action:' + name);
+    else throw e;
+  }
 }
 
 // Clique modificado em link real é pedido de nova aba/janela, e quem resolve isso é o
@@ -58,9 +67,23 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     if (_isOpenInNewContext(ev)) return;
     const t = ev.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; // digitando
+    if (
+      t &&
+      (t.tagName === 'INPUT' ||
+        t.tagName === 'SELECT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.isContentEditable)
+    )
+      return; // digitando
     const el = t && t.closest ? t.closest('[data-action]') : null;
-    if (!el || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') return;
+    if (
+      !el ||
+      el.tagName === 'BUTTON' ||
+      el.tagName === 'INPUT' ||
+      el.tagName === 'SELECT' ||
+      el.tagName === 'TEXTAREA'
+    )
+      return;
     ev.preventDefault();
     _runAction(el.dataset.action, el, el.dataset.arg, ev);
   });
@@ -68,7 +91,13 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     const t = ev.target;
-    if (!t || !t.getAttribute || t.getAttribute('role') !== 'button' || t.hasAttribute('data-action')) return;
+    if (
+      !t ||
+      !t.getAttribute ||
+      t.getAttribute('role') !== 'button' ||
+      t.hasAttribute('data-action')
+    )
+      return;
     if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
     ev.preventDefault();
     t.click();
@@ -91,21 +120,43 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 
 // Ações básicas, usadas em várias telas.
 registerActions({
-  nav: (_el, page) => { if (typeof navigateTo === 'function') navigateTo(page); },
-  openPendencia: (_el, id) => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); },
-  openVisit: (_el, id) => { if (typeof openVisitDetail === 'function') openVisitDetail(id); },
-  openClient: (_el, id) => { if (typeof viewClient === 'function') viewClient(id); },
-  newVisit: () => { if (typeof openVisitForm === 'function') openVisitForm(); },
-  newPendencia: () => { if (typeof openPendenciaForm === 'function') openPendenciaForm(); },
-  closeModal: () => { if (typeof closeModal === 'function') closeModal(); },
+  nav: (_el, page) => {
+    if (typeof navigateTo === 'function') navigateTo(page);
+  },
+  openPendencia: (_el, id) => {
+    if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+  },
+  openVisit: (_el, id) => {
+    if (typeof openVisitDetail === 'function') openVisitDetail(id);
+  },
+  openClient: (_el, id) => {
+    if (typeof viewClient === 'function') viewClient(id);
+  },
+  newVisit: () => {
+    if (typeof openVisitForm === 'function') openVisitForm();
+  },
+  newPendencia: () => {
+    if (typeof openPendenciaForm === 'function') openPendenciaForm();
+  },
+  closeModal: () => {
+    if (typeof closeModal === 'function') closeModal();
+  },
 });
 
 // Moldura do app (index.html): topo, menu, busca e modais fixos.
 // data-arg="closeMore" fecha o menu "Mais ações" depois de agir.
-const _actCall = (name, ...args) => { if (typeof globalThis[name] === 'function') return globalThis[name](...args); };
-const _thenCloseMore = (fn) => (el, arg, ev) => { fn(el, arg, ev); if (arg === 'closeMore') _actCall('closeTopbarMoreMenu'); };
+const _actCall = (name, ...args) => {
+  if (typeof globalThis[name] === 'function') return globalThis[name](...args);
+};
+const _thenCloseMore = (fn) => (el, arg, ev) => {
+  fn(el, arg, ev);
+  if (arg === 'closeMore') _actCall('closeTopbarMoreMenu');
+};
 registerActions({
-  focusContent: () => { const c = document.getElementById('contentArea'); if (c) c.focus(); },
+  focusContent: () => {
+    const c = document.getElementById('contentArea');
+    if (c) c.focus();
+  },
   openSearch: () => _actCall('openGlobalSearch'),
   closeSearch: () => _actCall('closeGlobalSearch'),
   closeSearchOverlay: (_el, _arg, ev) => _actCall('closeGlobalSearch', ev),
@@ -116,9 +167,18 @@ registerActions({
   topbarAction: _thenCloseMore(() => _actCall('topbarAction')),
   notifSettings: _thenCloseMore(() => _actCall('openNotifSettings')),
   refreshPage: _thenCloseMore(() => _actCall('refreshPage')),
-  themeToggle: _thenCloseMore(() => { const b = document.getElementById('themeToggleBtn'); if (b) b.click(); }),
-  mobileMenu: () => { const b = document.getElementById('mobileMenuBtn'); if (b) b.click(); },
-  hideOverlay: (_el, id) => { const o = document.getElementById(id); if (o) o.style.display = 'none'; },
+  themeToggle: _thenCloseMore(() => {
+    const b = document.getElementById('themeToggleBtn');
+    if (b) b.click();
+  }),
+  mobileMenu: () => {
+    const b = document.getElementById('mobileMenuBtn');
+    if (b) b.click();
+  },
+  hideOverlay: (_el, id) => {
+    const o = document.getElementById(id);
+    if (o) o.style.display = 'none';
+  },
   saveUserConfig: () => _actCall('saveUserConfig'),
   closeCrop: () => _actCall('closeCropModal'),
   applyCrop: () => _actCall('applyCrop'),

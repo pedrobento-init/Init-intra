@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { chaveTelefone, funcaoAusente, LIMITE_POR_MINUTO, LOTE_MAX } from '../supabase/functions/whatsapp/mensagem.ts';
+import {
+  chaveTelefone,
+  funcaoAusente,
+  LIMITE_POR_MINUTO,
+  LOTE_MAX,
+} from '../supabase/functions/whatsapp/mensagem.ts';
 
 // Migration 077 em Postgres de verdade (PGlite). O que não pode quebrar:
 //   * telefone_chave (SQL) e chaveTelefone (TypeScript) dão a mesma chave —
@@ -11,7 +16,8 @@ import { chaveTelefone, funcaoAusente, LIMITE_POR_MINUTO, LOTE_MAX } from '../su
 //   * append_pendencia_note não perde nota e respeita o team lido;
 //   * só o service_role chama as funções que leem ou gravam dado.
 
-const ler = (rel) => fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+const ler = (rel) =>
+  fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const M077 = ler('../supabase/migrations/077_whatsapp_desempenho.sql');
 
 let db;
@@ -34,9 +40,24 @@ beforeEach(async () => {
 
 describe('077: telefone_chave igual à chaveTelefone do webhook', () => {
   const casos = [
-    '5511987654321', '551187654321', '11987654321', '1187654321', '(11) 98765-4321', '+55 (11) 9 8765-4321',
-    '11 8765-4321', '21999998888', '4321', '', null, '55', '5521', '987654321', 'abc', '0800 123 4567',
-    '551199998888777', '+1 415 555 0100',
+    '5511987654321',
+    '551187654321',
+    '11987654321',
+    '1187654321',
+    '(11) 98765-4321',
+    '+55 (11) 9 8765-4321',
+    '11 8765-4321',
+    '21999998888',
+    '4321',
+    '',
+    null,
+    '55',
+    '5521',
+    '987654321',
+    'abc',
+    '0800 123 4567',
+    '551199998888777',
+    '+1 415 555 0100',
   ];
 
   for (const bruto of casos) {
@@ -55,7 +76,12 @@ describe('077: clientes_do_telefone', () => {
       ('C2', 'Beta', NULL, '+55 21 9999-8888'),
       ('C3', 'Gama', '31 3333-4444', NULL)`);
     const ids = async (tel) =>
-      (await db.query('SELECT id FROM public.clientes_do_telefone(public.telefone_chave($1)) ORDER BY id', [tel])).rows.map((r) => r.id);
+      (
+        await db.query(
+          'SELECT id FROM public.clientes_do_telefone(public.telefone_chave($1)) ORDER BY id',
+          [tel]
+        )
+      ).rows.map((r) => r.id);
     expect(await ids('5511987654321')).toEqual(['C1']);
     expect(await ids('552199998888')).toEqual(['C2']);
     expect(await ids('5541900000000')).toEqual([]);
@@ -64,7 +90,9 @@ describe('077: clientes_do_telefone', () => {
   it('devolve os dois quando o número está em dois clientes (a ambiguidade é decidida no webhook)', async () => {
     await db.exec(`INSERT INTO clients (id, name, owner_phone, responsible_phone) VALUES
       ('C1', 'Acme', '11 98765-4321', NULL), ('C2', 'Beta', NULL, '11987654321')`);
-    const { rows } = await db.query("SELECT id FROM public.clientes_do_telefone('1187654321') ORDER BY id");
+    const { rows } = await db.query(
+      "SELECT id FROM public.clientes_do_telefone('1187654321') ORDER BY id"
+    );
     expect(rows.map((r) => r.id)).toEqual(['C1', 'C2']);
   });
 
@@ -75,7 +103,9 @@ describe('077: clientes_do_telefone', () => {
   });
 
   it('usa os índices de expressão criados pela migration', async () => {
-    const { rows } = await db.query("SELECT indexdef FROM pg_indexes WHERE tablename = 'clients' AND indexname LIKE 'clients_%_phone_chave_idx'");
+    const { rows } = await db.query(
+      "SELECT indexdef FROM pg_indexes WHERE tablename = 'clients' AND indexname LIKE 'clients_%_phone_chave_idx'"
+    );
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => /telefone_chave/.test(r.indexdef))).toBe(true);
   });
@@ -84,14 +114,24 @@ describe('077: clientes_do_telefone', () => {
 describe('077: append_pendencia_note', () => {
   const notas = async (id) => (await um('SELECT notes FROM pendencias WHERE id = $1', [id])).notes;
   const anexar = async (id, team, nota) =>
-    (await um('SELECT public.append_pendencia_note($1, $2, $3::jsonb) AS ok', [id, team, JSON.stringify(nota)])).ok;
+    (
+      await um('SELECT public.append_pendencia_note($1, $2, $3::jsonb) AS ok', [
+        id,
+        team,
+        JSON.stringify(nota),
+      ])
+    ).ok;
 
   it('soma a nota no fim sem apagar as anteriores e marca updated_at', async () => {
-    await db.exec(`INSERT INTO pendencias (id, team, notes) VALUES ('P1', 'init', '[{"text":"a"}]')`);
+    await db.exec(
+      `INSERT INTO pendencias (id, team, notes) VALUES ('P1', 'init', '[{"text":"a"}]')`
+    );
     expect(await anexar('P1', 'init', { text: 'b' })).toBe(true);
     expect(await anexar('P1', 'init', { text: 'c' })).toBe(true);
     expect((await notas('P1')).map((n) => n.text)).toEqual(['a', 'b', 'c']);
-    expect((await um("SELECT updated_at FROM pendencias WHERE id = 'P1'")).updated_at).not.toBeNull();
+    expect(
+      (await um("SELECT updated_at FROM pendencias WHERE id = 'P1'")).updated_at
+    ).not.toBeNull();
   });
 
   it('team diferente do lido não grava (o chamado mudou de equipe no meio)', async () => {
@@ -108,7 +148,9 @@ describe('077: append_pendencia_note', () => {
   });
 
   it('notes que não é array vira lista nova em vez de quebrar', async () => {
-    await db.exec(`INSERT INTO pendencias (id, team, notes) VALUES ('P1', 'init', NULL), ('P2', 'init', '"texto antigo"')`);
+    await db.exec(
+      `INSERT INTO pendencias (id, team, notes) VALUES ('P1', 'init', NULL), ('P2', 'init', '"texto antigo"')`
+    );
     expect(await anexar('P1', 'init', { text: 'x' })).toBe(true);
     expect(await anexar('P2', 'init', { text: 'y' })).toBe(true);
     expect(await notas('P1')).toEqual([{ text: 'x' }]);
@@ -128,8 +170,13 @@ describe('077: append_pendencia_note', () => {
 
 describe('077: quem pode chamar', () => {
   const pode = async (role, fn) =>
-    (await um(`SELECT has_function_privilege($1, p.oid, 'execute') AS ok FROM pg_proc p
-                WHERE p.pronamespace = 'public'::regnamespace AND p.proname = $2`, [role, fn])).ok;
+    (
+      await um(
+        `SELECT has_function_privilege($1, p.oid, 'execute') AS ok FROM pg_proc p
+                WHERE p.pronamespace = 'public'::regnamespace AND p.proname = $2`,
+        [role, fn]
+      )
+    ).ok;
 
   it('clientes_do_telefone e append_pendencia_note só com service_role', async () => {
     for (const fn of ['clientes_do_telefone', 'append_pendencia_note']) {
@@ -158,7 +205,9 @@ describe('webhook com a 077', () => {
 
   it('casa o cliente e anexa a nota pelas funções da 077, com o caminho antigo só como reserva', () => {
     expect(webhook).toMatch(/rpc\("clientes_do_telefone", \{ p_chave: chave \}\)/);
-    expect(webhook).toMatch(/rpc\("append_pendencia_note", \{ p_id: aberto\.id, p_team: aberto\.team, p_nota: nota \}\)/);
+    expect(webhook).toMatch(
+      /rpc\("append_pendencia_note", \{ p_id: aberto\.id, p_team: aberto\.team, p_nota: nota \}\)/
+    );
     expect(webhook.match(/funcaoAusente\(error\)/g)).toHaveLength(2);
   });
 
@@ -172,7 +221,10 @@ describe('webhook com a 077', () => {
   });
 
   it('chamado que mudou de equipe manda a mensagem para a caixa em vez de perdê-la', () => {
-    const bloco = webhook.slice(webhook.indexOf('if (aberto) {'), webhook.indexOf('const c = await clienteDaMensagem'));
+    const bloco = webhook.slice(
+      webhook.indexOf('if (aberto) {'),
+      webhook.indexOf('const c = await clienteDaMensagem')
+    );
     expect(bloco).toMatch(/if \(!anexo\.naoAchou\) \{[\s\S]*continue;/);
     expect(bloco).not.toMatch(/naoAchou\) continue/);
   });

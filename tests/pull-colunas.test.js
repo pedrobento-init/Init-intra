@@ -2,12 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 // PERF-01: pulls fora do loop genérico não usam select('*') em tabela que cresce.
-const read = (f) => readFileSync(new URL('../js/' + f, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+const read = (f) =>
+  readFileSync(new URL('../js/' + f, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 describe('PERF-01 — colunas explícitas', () => {
   it('audit_logs seleciona só o que o mapRow consome', () => {
     const src = read('storage.js');
-    expect(src).toMatch(/from\('audit_logs'\)\.select\('id,operator_name,action,type,target_id,details,timestamp'\)/);
+    expect(src).toMatch(
+      /from\('audit_logs'\)\.select\('id,operator_name,action,type,target_id,details,timestamp'\)/
+    );
     expect(src).not.toMatch(/from\('audit_logs'\)\.select\('\*'\)/);
   });
   it('checklist.js não faz select("*") nos três pulls', () => {

@@ -13,32 +13,54 @@ let _penCounts = null; // FASE 6: { byStatus, total, vencidas } do banco (modo s
 // FASE 6: resumo idêntico ao penStatusSummary, mas dos totais do banco.
 function _penSummaryHtml(total, parts, vencidas, scopeLabel) {
   var venc = Number(vencidas) || 0;
-  return '<div class="pen-summary" role="status">' +
-    '<strong>' + total + '</strong>&nbsp;pendências ' + scopeLabel +
+  return (
+    '<div class="pen-summary" role="status">' +
+    '<strong>' +
+    total +
+    '</strong>&nbsp;pendências ' +
+    scopeLabel +
     (parts.length ? ' · ' + parts.join(' · ') : '') +
-    ' · <span class="pen-sum-over">' + PEN_ICO_WARN +
-    '<strong>' + venc + '</strong> vencida' + (venc === 1 ? '' : 's') +
-    '</span></div>';
+    ' · <span class="pen-sum-over">' +
+    PEN_ICO_WARN +
+    '<strong>' +
+    venc +
+    '</strong> vencida' +
+    (venc === 1 ? '' : 's') +
+    '</span></div>'
+  );
 }
 function _penSummaryParts(countFor) {
-  return penBoardCols().map(function(col) {
-    var n = countFor(col);
-    return n ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>' : '';
-  }).filter(Boolean);
+  return penBoardCols()
+    .map(function (col) {
+      var n = countFor(col);
+      return n
+        ? '<span><strong>' + n + '</strong> ' + escapeHtml(col.label.toLowerCase()) + '</span>'
+        : '';
+    })
+    .filter(Boolean);
 }
-function _penScopeLabel() { return penScope === 'archived' ? 'arquivadas' : 'ativas'; }
+function _penScopeLabel() {
+  return penScope === 'archived' ? 'arquivadas' : 'ativas';
+}
 function _penServerSummary() {
   var counts = _penCounts || { byStatus: {}, total: 0, vencidas: 0 };
-  var parts = _penSummaryParts(function(col) { return counts.byStatus[col.id] || 0; });
+  var parts = _penSummaryParts(function (col) {
+    return counts.byStatus[col.id] || 0;
+  });
   return _penSummaryHtml(counts.total || 0, parts, counts.vencidas || 0, _penScopeLabel());
 }
 function _penViewSig() {
   var team = '';
   try {
-    team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined') ? (_selectedTeam || '') : '';
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+    team =
+      typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined'
+        ? _selectedTeam || ''
+        : '';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
   return JSON.stringify({
-    scope: (typeof penScope !== 'undefined') ? penScope : 'active',
+    scope: typeof penScope !== 'undefined' ? penScope : 'active',
     q: document.getElementById('penSearch')?.value || '',
     cid: document.getElementById('penClient')?.value || '',
     resp: document.getElementById('penResponsible')?.value || '',
@@ -46,9 +68,11 @@ function _penViewSig() {
     pr: document.getElementById('penPriority')?.value || '',
     // A ordem entra na assinatura: trocar de coluna volta para a primeira
     // página, senão a página 3 de uma ordem viraria a página 3 de outra.
-    sort: (typeof penView !== 'undefined' && penView === 'fila' && typeof _penFilaSort !== 'undefined')
-      ? (_penFilaSort.col + ':' + _penFilaSort.dir) : '',
-    team: team
+    sort:
+      typeof penView !== 'undefined' && penView === 'fila' && typeof _penFilaSort !== 'undefined'
+        ? _penFilaSort.col + ':' + _penFilaSort.dir
+        : '',
+    team: team,
   });
 }
 function penGotoPage(d) {
@@ -62,15 +86,29 @@ function _penPagerBar() {
   // 4. Simplificado: se só 1 página, não renderiza nada — o total +
   // breakdown por status já aparecem no resumo abaixo (pen-summary) e no
   // contador junto às abas (pen-scope-count). Evita barra duplicada.
-  if(totalPages <= 1){
+  if (totalPages <= 1) {
     return '';
   }
   // Multi-página: mantém navegação, texto enxuto
-  return '<div class="pen-pager" role="navigation" aria-label="Paginação de pendências">' +
-    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="-1"' + (_penPage <= 0 ? ' disabled' : '') + ' title="Página anterior">‹ Anterior</button>' +
-    '<span class="pen-pager-info">Página ' + (_penPage + 1) + ' de ' + totalPages + ' · ' + _filteredPens.length + ' de ' + _penTotal + '</span>' +
-    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="1"' + ((_penPage + 1) >= totalPages ? ' disabled' : '') + ' title="Próxima página">Próxima ›</button>' +
-  '</div>';
+  return (
+    '<div class="pen-pager" role="navigation" aria-label="Paginação de pendências">' +
+    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="-1"' +
+    (_penPage <= 0 ? ' disabled' : '') +
+    ' title="Página anterior">‹ Anterior</button>' +
+    '<span class="pen-pager-info">Página ' +
+    (_penPage + 1) +
+    ' de ' +
+    totalPages +
+    ' · ' +
+    _filteredPens.length +
+    ' de ' +
+    _penTotal +
+    '</span>' +
+    '<button class="btn btn-secondary btn-sm" data-action="penGotoPage" data-arg="1"' +
+    (_penPage + 1 >= totalPages ? ' disabled' : '') +
+    ' title="Próxima página">Próxima ›</button>' +
+    '</div>'
+  );
 }
 
 // ── Patch otimista da lista em tela (Parte 2 — state sync) ─────────────────
@@ -88,68 +126,100 @@ function _optimisticPenUpsert(next, opts) {
     delete _penOptimisticRemoved[next.id];
     _penOptimistic[next.id] = { data: { ...next }, at: Date.now(), isNew: !!(opts && opts.isNew) };
     if (Array.isArray(_filteredPens)) {
-      var idx = _filteredPens.findIndex(function(x) { return x && x.id === next.id; });
+      var idx = _filteredPens.findIndex(function (x) {
+        return x && x.id === next.id;
+      });
       if (idx !== -1) {
         _filteredPens[idx] = { ..._filteredPens[idx], ...next };
       } else if (opts && opts.isNew) {
         _filteredPens.unshift({ ...next });
       }
     }
-    var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
+    var area = typeof document !== 'undefined' ? document.getElementById('penViewArea') : null;
     if (area) _penRenderAtual(area);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
 }
 function _optimisticPenRemove(id) {
   try {
     if (!id) return;
     delete _penOptimistic[id];
     _penOptimisticRemoved[id] = Date.now();
-    if (Array.isArray(_filteredPens)) _filteredPens = _filteredPens.filter(function(x) { return !x || x.id !== id; });
-    var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
+    if (Array.isArray(_filteredPens))
+      _filteredPens = _filteredPens.filter(function (x) {
+        return !x || x.id !== id;
+      });
+    var area = typeof document !== 'undefined' ? document.getElementById('penViewArea') : null;
     if (area) _penRenderAtual(area);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
 }
 function _clearOptimisticPenRemove(id) {
-  try { if (id) delete _penOptimisticRemoved[id]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  try {
+    if (id) delete _penOptimisticRemoved[id];
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
 }
 function _applyOptimisticPens(rows) {
   try {
     var now = Date.now();
-    var out = (rows || []).filter(function(r) {
-      if (!r || !r.id) return true;
-      var remAt = _penOptimisticRemoved[r.id];
-      if (remAt) {
-        if (now - remAt > _PEN_OPTIMISTIC_TTL_MS) delete _penOptimisticRemoved[r.id];
-        else return false; // servidor ainda tem o id deletado (ghost) — filtra
-      }
-      return true;
-    }).map(function(r) {
-      if (!r || !r.id) return r;
-      var o = _penOptimistic[r.id];
-      if (!o) return r;
-      if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) { delete _penOptimistic[r.id]; return r; }
-      try {
-        // Servidor com updatedAt >= patch = upsert já convergiu → descarta patch.
-        // (updatedAt igual só existe no servidor via nosso próprio upsert.)
-        var sT = new Date(r.updatedAt || 0).getTime();
-        var oT = new Date((o.data && o.data.updatedAt) || 0).getTime();
-        if (sT >= oT) { delete _penOptimistic[r.id]; return r; }
-      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
-      return { ...r, ...o.data };
-    });
+    var out = (rows || [])
+      .filter(function (r) {
+        if (!r || !r.id) return true;
+        var remAt = _penOptimisticRemoved[r.id];
+        if (remAt) {
+          if (now - remAt > _PEN_OPTIMISTIC_TTL_MS) delete _penOptimisticRemoved[r.id];
+          else return false; // servidor ainda tem o id deletado (ghost) — filtra
+        }
+        return true;
+      })
+      .map(function (r) {
+        if (!r || !r.id) return r;
+        var o = _penOptimistic[r.id];
+        if (!o) return r;
+        if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) {
+          delete _penOptimistic[r.id];
+          return r;
+        }
+        try {
+          // Servidor com updatedAt >= patch = upsert já convergiu → descarta patch.
+          // (updatedAt igual só existe no servidor via nosso próprio upsert.)
+          var sT = new Date(r.updatedAt || 0).getTime();
+          var oT = new Date((o.data && o.data.updatedAt) || 0).getTime();
+          if (sT >= oT) {
+            delete _penOptimistic[r.id];
+            return r;
+          }
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+        }
+        return { ...r, ...o.data };
+      });
     // Criações ainda não convergidas: injeta na lista para feedback imediato.
     try {
       var seen = {};
-      out.forEach(function(r) { if (r && r.id) seen[r.id] = true; });
-      Object.keys(_penOptimistic).forEach(function(id) {
+      out.forEach(function (r) {
+        if (r && r.id) seen[r.id] = true;
+      });
+      Object.keys(_penOptimistic).forEach(function (id) {
         var o = _penOptimistic[id];
         if (!o || !o.isNew || seen[id]) return;
-        if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) { delete _penOptimistic[id]; return; }
+        if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) {
+          delete _penOptimistic[id];
+          return;
+        }
         out.unshift({ ...o.data });
       });
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+    }
     return out;
-  } catch (_) { return rows; }
+  } catch (_) {
+    return rows;
+  }
 }
 
 // ── Kanban drag-and-drop de pendências ───────────────────────────────────────
@@ -157,8 +227,10 @@ function _applyOptimisticPens(rows) {
 // não cria contagens novas: total + breakdown por status do escopo atual).
 function penStatusSummary(pens) {
   var list = pens || [];
-  var parts = _penSummaryParts(function(col) {
-    return list.filter(function(p) { return p.status === col.id; }).length;
+  var parts = _penSummaryParts(function (col) {
+    return list.filter(function (p) {
+      return p.status === col.id;
+    }).length;
   });
   var vencidas = list.filter(penIsOverdue).length;
   return _penSummaryHtml(list.length, parts, vencidas, _penScopeLabel());
@@ -169,87 +241,157 @@ function renderPenKanban(area) {
   _bindPenBoardDrag(); // idempotente: liga a delegação de arrasto uma vez só
   _primePenRenderCache();
   try {
-  // FASE 3: no modo servidor o resumo por status refletiria só a página;
-  // FASE 6 usa os totais do banco (mesmo markup do resumo local).
-  var summaryHtml = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
-  var cols = penBoardCols();
-  var boardHtml = '<section class="kanban-board" role="region" aria-label="Quadro de pendências">' +
-    cols.map(function(col) {
-      var rawCards = pens.filter(function(p) { return p.status === col.id; });
-      var cards = _penSortCards(rawCards, col.id);
-      var sortMode = _penColSort[col.id] || 'criacao';
-      // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
-      // decorativo fixo ao lado do botão, que também mostrava um relógio).
-      var sortIcon = sortMode==='prazo' ? PEN_ICO_CAL : sortMode==='prioridade' ? PEN_ICO_BOLT : sortMode==='manual' ? PEN_ICO_DRAG : PEN_ICO_CLK;
-      // O ícone muda, o rótulo acessível não mudava: o leitor de tela só
-      // ouvia "Ordenar Aberto" e nunca a ordem em vigor. O aria-label
-      // sobrepõe o title, então a ordem atual precisa estar nele.
-      var sortAria = 'Ordem de ' + col.label + ': ' + penColSortLabel(sortMode) + '. Clique para mudar.';
-      // A ordem só ganha nome visível quando sai do padrão: cinco colunas
-      // repetindo "criação" seria ruído, e o que o olho precisa saber é quando
-      // AQUELA coluna foge do resto. O ícone sozinho era adivinhação.
-      var sortCustom = sortMode !== 'criacao';
-      var sortWord = sortCustom ? '<span class="kcs-word">' + escapeHtml(penColSortWord(sortMode)) + '</span>' : '';
-      var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
-      // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
-      // as colunas com cards caberem na tela sem rolagem lateral.
-      return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" data-sty="--c:' + penColColor(col.id) + '"' +
-        ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
-        ' data-col-id="' + escapeHtml(col.id) + '">' +
-        '<div class="kanban-col-header">' +
-          '<h2 class="kanban-col-title">' +
+    // FASE 3: no modo servidor o resumo por status refletiria só a página;
+    // FASE 6 usa os totais do banco (mesmo markup do resumo local).
+    var summaryHtml = _penServerMode ? _penServerSummary() : penStatusSummary(pens);
+    var cols = penBoardCols();
+    var boardHtml =
+      '<section class="kanban-board" role="region" aria-label="Quadro de pendências">' +
+      cols
+        .map(function (col) {
+          var rawCards = pens.filter(function (p) {
+            return p.status === col.id;
+          });
+          var cards = _penSortCards(rawCards, col.id);
+          var sortMode = _penColSort[col.id] || 'criacao';
+          // Um único ícone por coluna: o da ordenação atual (antes havia um relógio
+          // decorativo fixo ao lado do botão, que também mostrava um relógio).
+          var sortIcon =
+            sortMode === 'prazo'
+              ? PEN_ICO_CAL
+              : sortMode === 'prioridade'
+                ? PEN_ICO_BOLT
+                : sortMode === 'manual'
+                  ? PEN_ICO_DRAG
+                  : PEN_ICO_CLK;
+          // O ícone muda, o rótulo acessível não mudava: o leitor de tela só
+          // ouvia "Ordenar Aberto" e nunca a ordem em vigor. O aria-label
+          // sobrepõe o title, então a ordem atual precisa estar nele.
+          var sortAria =
+            'Ordem de ' + col.label + ': ' + penColSortLabel(sortMode) + '. Clique para mudar.';
+          // A ordem só ganha nome visível quando sai do padrão: cinco colunas
+          // repetindo "criação" seria ruído, e o que o olho precisa saber é quando
+          // AQUELA coluna foge do resto. O ícone sozinho era adivinhação.
+          var sortCustom = sortMode !== 'criacao';
+          var sortWord = sortCustom
+            ? '<span class="kcs-word">' + escapeHtml(penColSortWord(sortMode)) + '</span>'
+            : '';
+          var sortTitle =
+            sortMode === 'prazo'
+              ? 'Ordenado por prazo (clique para mudar)'
+              : sortMode === 'prioridade'
+                ? 'Ordenado por prioridade'
+                : sortMode === 'manual'
+                  ? 'Ordem manual — arraste os cards para reordenar'
+                  : 'Ordenado por criação';
+          // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
+          // as colunas com cards caberem na tela sem rolagem lateral.
+          return (
+            '<section class="kanban-col' +
+            (cards.length ? '' : ' is-empty') +
+            '" data-sty="--c:' +
+            penColColor(col.id) +
+            '"' +
+            ' aria-label="Coluna ' +
+            escapeHtml(col.label) +
+            ', ' +
+            cards.length +
+            ' pendência' +
+            (cards.length === 1 ? '' : 's') +
+            '"' +
+            ' data-col-id="' +
+            escapeHtml(col.id) +
+            '">' +
+            '<div class="kanban-col-header">' +
+            '<h2 class="kanban-col-title">' +
             '<span class="kb-dot" aria-hidden="true"></span>' +
             // Nome em span próprio para truncar com … e ceder largura ao selo
             // da ordem, em vez de empurrar o cabeçalho para fora da coluna.
-            '<span class="kct-nome">' + escapeHtml(col.label) + '</span>' +
-          '</h2>' +
-          '<span class="kanban-col-aside">' +
-            '<span class="kanban-col-count" aria-hidden="true">' + cards.length + '</span>' +
-            (cards.length ? '<button class="kanban-col-sort'+(sortCustom ? ' is-custom' : '')+'" data-action="penColSort" data-arg="'+escapeHtml(col.id)+'" title="'+sortTitle+' — Alternar: criação → prazo → prioridade → manual" aria-label="'+escapeHtml(sortAria)+'">'+sortIcon+sortWord+'</button>' : '') +
-          '</span>' +
-        '</div>' +
-        '<div class="kanban-cards">' +
-          (cards.length
-            ? cards.map(function(p) { return penKanbanCard(p); }).join('')
-            : '<div class="kb-col-empty">Nenhuma pendência.<br>Arraste um card para cá.<button type="button" class="kb-col-new" data-action="newPendencia">+ Nova</button></div>') +
-        '</div>' +
+            '<span class="kct-nome">' +
+            escapeHtml(col.label) +
+            '</span>' +
+            '</h2>' +
+            '<span class="kanban-col-aside">' +
+            '<span class="kanban-col-count" aria-hidden="true">' +
+            cards.length +
+            '</span>' +
+            (cards.length
+              ? '<button class="kanban-col-sort' +
+                (sortCustom ? ' is-custom' : '') +
+                '" data-action="penColSort" data-arg="' +
+                escapeHtml(col.id) +
+                '" title="' +
+                sortTitle +
+                ' — Alternar: criação → prazo → prioridade → manual" aria-label="' +
+                escapeHtml(sortAria) +
+                '">' +
+                sortIcon +
+                sortWord +
+                '</button>'
+              : '') +
+            '</span>' +
+            '</div>' +
+            '<div class="kanban-cards">' +
+            (cards.length
+              ? cards
+                  .map(function (p) {
+                    return penKanbanCard(p);
+                  })
+                  .join('')
+              : '<div class="kb-col-empty">Nenhuma pendência.<br>Arraste um card para cá.<button type="button" class="kb-col-new" data-action="newPendencia">+ Nova</button></div>') +
+            '</div>' +
+            '</section>'
+          );
+        })
+        .join('') +
       '</section>';
-    }).join('') +
-  '</section>';
-  area.innerHTML = _penPagerBar() +
-    '<div class="pen-board">' +
+    area.innerHTML =
+      _penPagerBar() +
+      '<div class="pen-board">' +
       // Sem botão de tema aqui: o protótipo era uma página solta; no app a
       // topbar já tem o seletor de tema (o botão duplicava a ação).
       '<div class="pen-board-head">' +
-        summaryHtml +
+      summaryHtml +
       '</div>' +
       // Celular: indicador da coluna visível ao deslizar ("Em Andamento · 2/5").
       '<div class="kb-pager" aria-hidden="true"><span class="kb-pager-label"></span><span class="kb-pager-dots">' +
-        cols.map(function(col) { return '<i data-sty="--c:' + penColColor(col.id) + '"></i>'; }).join('') +
+      cols
+        .map(function (col) {
+          return '<i data-sty="--c:' + penColColor(col.id) + '"></i>';
+        })
+        .join('') +
       '</span></div>' +
       boardHtml +
-    '</div>';
-  var board = area.querySelector('.kanban-board');
-  if (board) {
-    _updateKanbanScrollShadows(board);
-    _updateKanbanPager(board);
-    board.onscroll = function() { _updateKanbanScrollShadows(board); _updateKanbanPager(board); };
-    if (typeof window !== 'undefined') {
-      if (window._kanbanResizeHandler) window.removeEventListener('resize', window._kanbanResizeHandler);
-      window._kanbanResizeHandler = function() { _updateKanbanScrollShadows(board); };
-      window.addEventListener('resize', window._kanbanResizeHandler);
+      '</div>';
+    var board = area.querySelector('.kanban-board');
+    if (board) {
+      _updateKanbanScrollShadows(board);
+      _updateKanbanPager(board);
+      board.onscroll = function () {
+        _updateKanbanScrollShadows(board);
+        _updateKanbanPager(board);
+      };
+      if (typeof window !== 'undefined') {
+        if (window._kanbanResizeHandler)
+          window.removeEventListener('resize', window._kanbanResizeHandler);
+        window._kanbanResizeHandler = function () {
+          _updateKanbanScrollShadows(board);
+        };
+        window.addEventListener('resize', window._kanbanResizeHandler);
+      }
     }
-  }
-  // Hover do card (levantar + sombra) é só CSS: o Motion chega depois do
-  // quadro e deixava os primeiros cards sem animação ou presos no ar.
-  // Total como contador dentro da aba ativa ("Ativas 5")
-  try{
-    var cntEl=document.getElementById('penScopeCount');
-    if(cntEl){
-      var total = _penServerMode && _penTotal!=null ? _penTotal : pens.length;
-      cntEl.textContent = total ? String(total) : '';
+    // Hover do card (levantar + sombra) é só CSS: o Motion chega depois do
+    // quadro e deixava os primeiros cards sem animação ou presos no ar.
+    // Total como contador dentro da aba ativa ("Ativas 5")
+    try {
+      var cntEl = document.getElementById('penScopeCount');
+      if (cntEl) {
+        var total = _penServerMode && _penTotal != null ? _penTotal : pens.length;
+        cntEl.textContent = total ? String(total) : '';
+      }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
     }
-  }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   } finally {
     _clearPenRenderCache();
   }
@@ -262,14 +404,28 @@ function _updateKanbanPager(board) {
     if (!pager) return;
     var cols = board.querySelectorAll('.kanban-col');
     if (!cols.length) return;
-    var mid = board.scrollLeft + board.clientWidth / 2, idx = 0;
-    cols.forEach(function(c, i) { if (c.offsetLeft <= mid) idx = i; });
+    var mid = board.scrollLeft + board.clientWidth / 2,
+      idx = 0;
+    cols.forEach(function (c, i) {
+      if (c.offsetLeft <= mid) idx = i;
+    });
     var title = cols[idx].querySelector('.kanban-col-title');
     var count = cols[idx].querySelector('.kanban-col-count');
     var lbl = pager.querySelector('.kb-pager-label');
-    if (lbl) lbl.textContent = (title ? title.textContent.trim() : '') + (count ? ' (' + count.textContent + ')' : '') + ' · ' + (idx + 1) + '/' + cols.length;
-    pager.querySelectorAll('.kb-pager-dots i').forEach(function(d, i) { d.classList.toggle('is-on', i === idx); });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+    if (lbl)
+      lbl.textContent =
+        (title ? title.textContent.trim() : '') +
+        (count ? ' (' + count.textContent + ')' : '') +
+        ' · ' +
+        (idx + 1) +
+        '/' +
+        cols.length;
+    pager.querySelectorAll('.kb-pager-dots i').forEach(function (d, i) {
+      d.classList.toggle('is-on', i === idx);
+    });
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
 }
 
 // Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
@@ -279,7 +435,9 @@ function _updateKanbanScrollShadows(board) {
     var max = board.scrollWidth - board.clientWidth;
     board.classList.toggle('has-scroll-left', board.scrollLeft > 4);
     board.classList.toggle('has-scroll-right', max > 4 && board.scrollLeft < max - 4);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
 }
 
 // ── Cache por render (FASE 1 — memoização) ─────────────────────────────────
@@ -289,24 +447,35 @@ function _updateKanbanScrollShadows(board) {
 // renderPenKanban (único ponto de render da lista) e limpo ao fim.
 // Fora do render (modal, busca, calendário, export) o fallback calcula direto,
 // com resultado idêntico — só mais lento para chamadas isoladas (irrelevante).
-let _penNumCache = null;    // Map<penId, '#NNN'> | null
+let _penNumCache = null; // Map<penId, '#NNN'> | null
 let _penClientCache = null; // Map<clientId, client> | null
 function _primePenRenderCache() {
   try {
-    const all = (typeof getPendencias === 'function') ? getPendencias() : [];
-    _penNumCache = (typeof getPendenciaDisplayMap === 'function')
-      ? getPendenciaDisplayMap(all) : null;
+    const all = typeof getPendencias === 'function' ? getPendencias() : [];
+    _penNumCache =
+      typeof getPendenciaDisplayMap === 'function' ? getPendenciaDisplayMap(all) : null;
     _penClientCache = new Map();
-    const clients = (typeof getClients === 'function') ? getClients() : [];
-    for (const c of clients) { if (c && c.id != null && !_penClientCache.has(c.id)) _penClientCache.set(c.id, c); }
-  } catch (_) { _penNumCache = null; _penClientCache = null; }
+    const clients = typeof getClients === 'function' ? getClients() : [];
+    for (const c of clients) {
+      if (c && c.id != null && !_penClientCache.has(c.id)) _penClientCache.set(c.id, c);
+    }
+  } catch (_) {
+    _penNumCache = null;
+    _penClientCache = null;
+  }
 }
-function _clearPenRenderCache() { _penNumCache = null; _penClientCache = null; }
+function _clearPenRenderCache() {
+  _penNumCache = null;
+  _penClientCache = null;
+}
 function _penRenderClient(clientId) {
   try {
-    if (_penClientCache && _penClientCache.has(clientId)) return _penClientCache.get(clientId) || null;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
-  return (typeof getClientById === 'function') ? getClientById(clientId) : null;
+    if (_penClientCache && _penClientCache.has(clientId))
+      return _penClientCache.get(clientId) || null;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
+  return typeof getClientById === 'function' ? getClientById(clientId) : null;
 }
 
 // Número amigável de exibição (#001...). Só apresentação: usa a função pura
@@ -315,10 +484,16 @@ function _penRenderClient(clientId) {
 function penDisplayNumber(p) {
   try {
     if (p && _penNumCache && _penNumCache.has(p.id)) return _penNumCache.get(p.id);
-    if (p && typeof getPendenciaDisplayNumber === 'function' && typeof getPendencias === 'function') {
+    if (
+      p &&
+      typeof getPendenciaDisplayNumber === 'function' &&
+      typeof getPendencias === 'function'
+    ) {
       return getPendenciaDisplayNumber(getPendencias(), p.id);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
   return '#---';
 }
 
@@ -326,62 +501,128 @@ function penDisplayNumber(p) {
 // botão "Iniciar" (play em círculo verde). toggleTimer() já cuida de mover
 // a pendência para Em andamento e de pausar/retomar.
 function penTimerCell(p) {
-  var closed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(p.status) : false;
+  var closed = typeof isPendenciaClosed === 'function' ? isPendenciaClosed(p.status) : false;
   var worker = null;
-  try { if (typeof getCurrentWorker === 'function') worker = getCurrentWorker(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  try {
+    if (typeof getCurrentWorker === 'function') worker = getCurrentWorker(p);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
   var running = !!(p && p.timerRunning) || !!worker;
   var secs = 0;
-  try { if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  try {
+    if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
   // Formato curto no card: "8d 21h" em vez de "213:06:51".
-  var fmt = (typeof formatTimerCompact === 'function') ? formatTimerCompact(secs)
-    : (typeof formatTimer === 'function') ? formatTimer(secs) : '';
+  var fmt =
+    typeof formatTimerCompact === 'function'
+      ? formatTimerCompact(secs)
+      : typeof formatTimer === 'function'
+        ? formatTimer(secs)
+        : '';
   if (running || (closed && secs > 0)) {
     if (!fmt) return '';
-    var display = '<span class="kb-timer timer-display" data-format="compact" data-timer-id="' + escapeHtml(p.id) + '" data-running="' + (running ? 'true' : 'false') + '"' +
-      ' title="' + (running ? 'Cronômetro ativo' : 'Tempo total trabalhado') + '">' + fmt + '</span>';
+    var display =
+      '<span class="kb-timer timer-display" data-format="compact" data-timer-id="' +
+      escapeHtml(p.id) +
+      '" data-running="' +
+      (running ? 'true' : 'false') +
+      '"' +
+      ' title="' +
+      (running ? 'Cronômetro ativo' : 'Tempo total trabalhado') +
+      '">' +
+      fmt +
+      '</span>';
     // Sessão ligada há muito tempo: provável esquecimento — alerta âmbar e
     // atalho para parar registrando só o tempo real.
     var forgotten = running && typeof isTimerForgotten === 'function' && isTimerForgotten(p);
     if (forgotten) {
-      var ago = (typeof formatDurationWords === 'function' && typeof getSessionSeconds === 'function')
-        ? formatDurationWords(getSessionSeconds(p)) : '';
+      var ago =
+        typeof formatDurationWords === 'function' && typeof getSessionSeconds === 'function'
+          ? formatDurationWords(getSessionSeconds(p))
+          : '';
       // "ligado há X" fica no texto do botão, não só no title: o sinal de
       // esquecimento é o que importa e não pode depender do mouse (audit. #8).
       var agoHtml = ago
-        ? '<span class="kb-timer-ago">ligado há ' + escapeHtml(ago) + '</span>' : '';
-      return '<button type="button" class="kb-timer-forgot" data-action="openTimerAdjust" data-arg="' + escapeHtml(p.id) + '" data-stop="1"' +
-        ' title="Cronômetro ligado há ' + escapeHtml(ago) + ' — esqueceu ligado? Clique para parar e ajustar o tempo."' +
-        ' aria-label="Cronômetro ligado há ' + escapeHtml(ago) + '. Parar e ajustar tempo">' +
-        PEN_ICO_WARN + display + agoHtml + '</button>';
+        ? '<span class="kb-timer-ago">ligado há ' + escapeHtml(ago) + '</span>'
+        : '';
+      return (
+        '<button type="button" class="kb-timer-forgot" data-action="openTimerAdjust" data-arg="' +
+        escapeHtml(p.id) +
+        '" data-stop="1"' +
+        ' title="Cronômetro ligado há ' +
+        escapeHtml(ago) +
+        ' — esqueceu ligado? Clique para parar e ajustar o tempo."' +
+        ' aria-label="Cronômetro ligado há ' +
+        escapeHtml(ago) +
+        '. Parar e ajustar tempo">' +
+        PEN_ICO_WARN +
+        display +
+        agoHtml +
+        '</button>'
+      );
     }
     if (!running) return display; // concluída: só o tempo acumulado
     // Cronômetro rodando: o card precisa oferecer o pause aqui mesmo — antes
     // só a página/modal do chamado tinha o ⏸, e quem deu play pelo quadro
     // ficava sem como parar.
     var isMe = false;
-    try { if (typeof isCurrentWorker === 'function') isMe = isCurrentWorker(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+    try {
+      if (typeof isCurrentWorker === 'function') isMe = isCurrentWorker(p);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+    }
     if (isMe) {
-      return '<button type="button" class="kb-go kb-pause-btn" data-action="penTimerToggle" data-arg="' + escapeHtml(p.id) + '"' +
-        ' title="Pausar trabalho (a pendência vai para Pausado)" aria-label="Pausar cronômetro de ' + escapeHtml(penDisplayNumber(p)) + '">' +
-        '<span class="kb-play kb-pause" aria-hidden="true">' + PEN_ICO_PAUSE + '</span>' + display + '</button>';
+      return (
+        '<button type="button" class="kb-go kb-pause-btn" data-action="penTimerToggle" data-arg="' +
+        escapeHtml(p.id) +
+        '"' +
+        ' title="Pausar trabalho (a pendência vai para Pausado)" aria-label="Pausar cronômetro de ' +
+        escapeHtml(penDisplayNumber(p)) +
+        '">' +
+        '<span class="kb-play kb-pause" aria-hidden="true">' +
+        PEN_ICO_PAUSE +
+        '</span>' +
+        display +
+        '</button>'
+      );
     }
     // De outro operador: sem ação no card — o cadeado explica o porquê.
-    return '<span class="kb-timer-busy" title="' + escapeHtml(worker || 'Outro operador') + ' está trabalhando neste item">' +
-      '<span class="kb-lock" aria-hidden="true">' + PEN_ICO_LOCK + '</span>' + display + '</span>';
+    return (
+      '<span class="kb-timer-busy" title="' +
+      escapeHtml(worker || 'Outro operador') +
+      ' está trabalhando neste item">' +
+      '<span class="kb-lock" aria-hidden="true">' +
+      PEN_ICO_LOCK +
+      '</span>' +
+      display +
+      '</span>'
+    );
   }
   if (closed) return '';
   var label = 'Iniciar cronômetro de ' + penDisplayNumber(p);
-  return '<button class="kb-go" type="button" data-action="penTimerToggle" data-arg="' + escapeHtml(p.id) + '"' +
-    ' aria-label="' + escapeHtml(label) + '">' +
-    '<span class="kb-play" aria-hidden="true">' + PEN_ICO_PLAY + '</span>Iniciar</button>';
+  return (
+    '<button class="kb-go" type="button" data-action="penTimerToggle" data-arg="' +
+    escapeHtml(p.id) +
+    '"' +
+    ' aria-label="' +
+    escapeHtml(label) +
+    '">' +
+    '<span class="kb-play" aria-hidden="true">' +
+    PEN_ICO_PLAY +
+    '</span>Iniciar</button>'
+  );
 }
 
 function penKanbanCard(p) {
   var c = _penRenderClient(p.clientId);
   var clientName = p.clientName || (c && c.name) || '—';
-  var clientAvatarHtml = c && typeof clientAvatar === 'function'
-    ? clientAvatar(c, 22)
-    : '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>';
+  var clientAvatarHtml =
+    c && typeof clientAvatar === 'function'
+      ? clientAvatar(c, 22)
+      : '<span class="kc-av" aria-hidden="true">' + penInitials(clientName) + '</span>';
   var isOverdue = penIsOverdue(p);
   // "Parada" (sem atualização há 7+ dias) contradiz um cronômetro rodando;
   // nesse caso o alerta certo é o de cronômetro esquecido, no rodapé.
@@ -403,21 +644,38 @@ function penKanbanCard(p) {
 
   // Vencida aparece só aqui (data vermelha + ⚠), não repetida no meio do card.
   var deadlineHtml = p.deadline
-    ? '<span class="kc-deadline' + (isOverdue ? ' is-overdue' : '') + '" title="' + (isOverdue ? 'Vencida — prazo' : 'Prazo') + '">' +
-        (isOverdue ? PEN_ICO_WARN : PEN_ICO_CAL) + formatDate(parseDeadline(p.deadline)) +
-        (isOverdue ? '<span class="sr-only"> (Vencida)</span>' : '') + '</span>'
+    ? '<span class="kc-deadline' +
+      (isOverdue ? ' is-overdue' : '') +
+      '" title="' +
+      (isOverdue ? 'Vencida — prazo' : 'Prazo') +
+      '">' +
+      (isOverdue ? PEN_ICO_WARN : PEN_ICO_CAL) +
+      formatDate(parseDeadline(p.deadline)) +
+      (isOverdue ? '<span class="sr-only"> (Vencida)</span>' : '') +
+      '</span>'
     : '<span class="kc-deadline is-empty" title="Sem prazo">' + PEN_ICO_CAL + 'Sem prazo</span>';
 
-  return '<article class="kanban-card"' +
-    ' data-sty="border-left:4px solid ' + penColColor(p.status) + '"' +
+  return (
+    '<article class="kanban-card"' +
+    ' data-sty="border-left:4px solid ' +
+    penColColor(p.status) +
+    '"' +
     ' draggable="true"' +
     // Ordem manual (062): só data-*, sem handler inline. Os eventos de arrasto
     // são tratados por delegação em _bindPenBoardDrag() — a catraca de CSP
     // (tests/no-inline-handlers.test.js) não pode crescer.
-    ' data-pen-id="' + escapeHtml(p.id) + '"' +
-    ' data-pen-col="' + escapeHtml(p.status) + '"' +
-    ' data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '"' +
-    ' aria-label="' + escapeHtml(num + ' — ' + title) + '">' +
+    ' data-pen-id="' +
+    escapeHtml(p.id) +
+    '"' +
+    ' data-pen-col="' +
+    escapeHtml(p.status) +
+    '"' +
+    ' data-action="openPendencia" data-arg="' +
+    escapeHtml(p.id) +
+    '"' +
+    ' aria-label="' +
+    escapeHtml(num + ' — ' + title) +
+    '">' +
     // O título é um <button> de verdade porque é ele que recebe o foco do
     // teclado — antes o card era uma <article> com onclick e quem navega por
     // Tab não abria chamado nenhum pelo quadro. A <article> não pode virar
@@ -426,34 +684,69 @@ function penKanbanCard(p) {
     // continuar <button> pelo motivo acima. draggable="false" para o arrasto seguir com
     // o cartão, não com a URL do link.
     (typeof penPaginaHref === 'function'
-      ? '<a class="pen-display-num pgp-link-lista" href="' + escapeHtml(penPaginaHref(p)) + '" draggable="false">' + num + '</a>'
+      ? '<a class="pen-display-num pgp-link-lista" href="' +
+        escapeHtml(penPaginaHref(p)) +
+        '" draggable="false">' +
+        num +
+        '</a>'
       : '') +
-    '<button type="button" class="kanban-card-title kc-open" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '" title="' + escapeHtml(title) + '">' +
-      (typeof penPaginaHref === 'function' ? '' : '<span class="pen-display-num">' + num + '</span>') + escapeHtml(title) +
-      (p.recurrence ? '<span class="kc-recur" title="Repete: ' + escapeHtml(penRecurrenceLabel(p.recurrence)) + ' (a próxima nasce ao concluir)">' + PEN_ICO_REPEAT + '</span>' : '') +
+    '<button type="button" class="kanban-card-title kc-open" data-action="openPendencia" data-arg="' +
+    escapeHtml(p.id) +
+    '" title="' +
+    escapeHtml(title) +
+    '">' +
+    (typeof penPaginaHref === 'function'
+      ? ''
+      : '<span class="pen-display-num">' + num + '</span>') +
+    escapeHtml(title) +
+    (p.recurrence
+      ? '<span class="kc-recur" title="Repete: ' +
+        escapeHtml(penRecurrenceLabel(p.recurrence)) +
+        ' (a próxima nasce ao concluir)">' +
+        PEN_ICO_REPEAT +
+        '</span>'
+      : '') +
     '</button>' +
-    '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' + escapeHtml(num) + '" aria-haspopup="menu" aria-expanded="false"' +
-      ' data-action="openPenQuickMenu" data-arg="' + escapeHtml(p.id) + '" data-stop="1" draggable="false">' + PEN_ICO_DOTS + '</button>' +
+    '<button type="button" class="kc-menu" aria-label="Ações rápidas de ' +
+    escapeHtml(num) +
+    '" aria-haspopup="menu" aria-expanded="false"' +
+    ' data-action="openPenQuickMenu" data-arg="' +
+    escapeHtml(p.id) +
+    '" data-stop="1" draggable="false">' +
+    PEN_ICO_DOTS +
+    '</button>' +
     '<div class="kanban-card-meta">' +
-      '<span class="kc-client" title="' + escapeHtml(clientName) + '">' +
-        clientAvatarHtml +
-        '<span class="kc-client-name">' + escapeHtml(clientName) + '</span>' +
-      '</span>' +
-      '<span class="kb-pill" data-sty="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
-      (p.responsible
-        ? '<span class="kc-resp" title="Responsável">' + PEN_ICO_USER + escapeHtml(p.responsible) + '</span>'
-        : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
-      // "Parada" sozinha dizia que algo estava errado sem dizer o tamanho do
-      // problema — 8 dias e 3 meses pediam a mesma atenção. O prazo agora está
-      // no texto, e o title some junto com a necessidade de passar o mouse.
-      (isStale ? '<span class="kc-stale">' + escapeHtml(penParadaLabel(p)) + '</span>' : '') +
-      slaHtml +
+    '<span class="kc-client" title="' +
+    escapeHtml(clientName) +
+    '">' +
+    clientAvatarHtml +
+    '<span class="kc-client-name">' +
+    escapeHtml(clientName) +
+    '</span>' +
+    '</span>' +
+    '<span class="kb-pill" data-sty="--c:' +
+    penPriColor(p.priority) +
+    '">' +
+    escapeHtml(penPriLabel(p.priority)) +
+    '</span>' +
+    (p.responsible
+      ? '<span class="kc-resp" title="Responsável">' +
+        PEN_ICO_USER +
+        escapeHtml(p.responsible) +
+        '</span>'
+      : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +
+    // "Parada" sozinha dizia que algo estava errado sem dizer o tamanho do
+    // problema — 8 dias e 3 meses pediam a mesma atenção. O prazo agora está
+    // no texto, e o title some junto com a necessidade de passar o mouse.
+    (isStale ? '<span class="kc-stale">' + escapeHtml(penParadaLabel(p)) + '</span>' : '') +
+    slaHtml +
     '</div>' +
     '<div class="kanban-card-foot">' +
-      deadlineHtml +
-      penTimerCell(p) +
+    deadlineHtml +
+    penTimerCell(p) +
     '</div>' +
-  '</article>';
+    '</article>'
+  );
 }
 
 function onPenKanbanDragStart(e, id) {
@@ -470,7 +763,9 @@ function onPenKanbanDragEnd(e) {
 
 function onPenKanbanDrop(e, colId) {
   e.preventDefault();
-  document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
+  document.querySelectorAll('.kanban-col').forEach(function (c) {
+    c.classList.remove('drag-over');
+  });
   var id = e.dataTransfer.getData('penId');
   var p = getPendenciaById(id);
   // Soltar no fundo da coluna, já estando nela e em ordem manual: vai p/ o fim.
@@ -487,7 +782,12 @@ function onPenKanbanDrop(e, colId) {
 // coluna não deve mudar nada (o card volta para o lugar e um toast explica).
 function _penCardsOfCol(colId) {
   var pens = Array.isArray(_filteredPens) ? _filteredPens : [];
-  return _penSortCards(pens.filter(function(p) { return p.status === colId; }), colId);
+  return _penSortCards(
+    pens.filter(function (p) {
+      return p.status === colId;
+    }),
+    colId
+  );
 }
 
 /** Nova `position` para cair ENTRE os vizinhos — sem renumerar a coluna. */
@@ -509,8 +809,14 @@ function penReorder(id, targetId, colId) {
   if (!id || id === targetId) return;
   var p = getPendenciaById(id);
   if (!p || p.status !== colId) return;
-  var ordem = _penCardsOfCol(colId).filter(function(c) { return c.id !== id; });
-  var alvo = targetId ? ordem.findIndex(function(c) { return c.id === targetId; }) : ordem.length;
+  var ordem = _penCardsOfCol(colId).filter(function (c) {
+    return c.id !== id;
+  });
+  var alvo = targetId
+    ? ordem.findIndex(function (c) {
+        return c.id === targetId;
+      })
+    : ordem.length;
   if (alvo === -1) return;
   var pos = _penPositionBetween(ordem[alvo - 1] || null, ordem[alvo] || null);
   if (Number(p.position) === pos) return;
@@ -531,21 +837,23 @@ function _penDropCard(ev) {
   return (_penColSort[colId] || 'criacao') === 'manual' ? el : null;
 }
 function _penClearDropMark() {
-  document.querySelectorAll('.kanban-card.kb-drop-before').forEach(function(c) { c.classList.remove('kb-drop-before'); });
+  document.querySelectorAll('.kanban-card.kb-drop-before').forEach(function (c) {
+    c.classList.remove('kb-drop-before');
+  });
 }
 function _bindPenBoardDrag() {
   if (_penDragBound || typeof document === 'undefined' || !document.addEventListener) return;
   _penDragBound = true;
-  document.addEventListener('dragstart', function(ev) {
+  document.addEventListener('dragstart', function (ev) {
     var card = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
     if (!card) return;
     onPenKanbanDragStart(ev, card.getAttribute('data-pen-id'));
   });
-  document.addEventListener('dragend', function(ev) {
+  document.addEventListener('dragend', function (ev) {
     var card = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
     if (card) onPenKanbanDragEnd(ev);
   });
-  document.addEventListener('dragover', function(ev) {
+  document.addEventListener('dragover', function (ev) {
     // Realce de coluna inteira (inclusive vazia), seja o alvo o fundo da
     // coluna ou um card dentro dela.
     var col = ev.target && ev.target.closest ? ev.target.closest('.kanban-col') : null;
@@ -554,18 +862,21 @@ function _bindPenBoardDrag() {
     if (el) {
       ev.preventDefault();
       ev.stopPropagation();
-      if (!el.classList.contains('kb-drop-before')) { _penClearDropMark(); el.classList.add('kb-drop-before'); }
+      if (!el.classList.contains('kb-drop-before')) {
+        _penClearDropMark();
+        el.classList.add('kb-drop-before');
+      }
       return;
     }
     if (col) ev.preventDefault();
   });
-  document.addEventListener('dragleave', function(ev) {
+  document.addEventListener('dragleave', function (ev) {
     var col = ev.target && ev.target.closest ? ev.target.closest('.kanban-col') : null;
     if (col) col.classList.remove('drag-over');
     var el = ev.target && ev.target.closest ? ev.target.closest('.kanban-card') : null;
     if (el) el.classList.remove('kb-drop-before');
   });
-  document.addEventListener('drop', function(ev) {
+  document.addEventListener('drop', function (ev) {
     var el = _penDropCard(ev);
     if (!el) {
       // Soltando fora de um card: vale a coluna (inclusive vazia).
@@ -580,13 +891,18 @@ function _bindPenBoardDrag() {
     ev.preventDefault();
     ev.stopPropagation();
     _penClearDropMark();
-    document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
+    document.querySelectorAll('.kanban-col').forEach(function (c) {
+      c.classList.remove('drag-over');
+    });
     var id = ev.dataTransfer ? ev.dataTransfer.getData('penId') : '';
     var alvo = el.getAttribute('data-pen-id');
     colId = el.getAttribute('data-pen-col') || '';
     var p = getPendenciaById(id);
     if (!p) return;
-    if (p.status !== colId) { penMoveTo(id, colId); return; } // veio de outra coluna
+    if (p.status !== colId) {
+      penMoveTo(id, colId);
+      return;
+    } // veio de outra coluna
     penReorder(id, alvo, colId);
   });
 }
@@ -597,9 +913,13 @@ if (typeof registerActions === 'function') {
     penColSort: (_el, colId) => cyclePenColSort(colId),
     // Play/pause do rodapé do card: o closest() da delegação pega o botão,
     // então o clique nunca abre o detalhe do card por acidente.
-    penTimerToggle: (el, id) => { if (typeof toggleTimer === 'function') toggleTimer('pendencia', id, el); },
+    penTimerToggle: (el, id) => {
+      if (typeof toggleTimer === 'function') toggleTimer('pendencia', id, el);
+    },
     penGotoPage: (_el, d) => penGotoPage(d),
-    openTimerAdjust: (_el, id) => { if (typeof openTimerAdjust === 'function') openTimerAdjust(id); },
+    openTimerAdjust: (_el, id) => {
+      if (typeof openTimerAdjust === 'function') openTimerAdjust(id);
+    },
   });
 }
 
@@ -617,26 +937,32 @@ function penMoveTo(id, colId, opts) {
   // Cancelado encerra — a mesma regra do botão ⏸ e do select do detalhe.
   // Sem isto, arrastar deixava o cronômetro rodando fantasma na coluna nova.
   try {
-    var stop = (typeof timerSessionStopForStatus === 'function') ? timerSessionStopForStatus(p, colId) : null;
+    var stop =
+      typeof timerSessionStopForStatus === 'function' ? timerSessionStopForStatus(p, colId) : null;
     if (stop) timerApplyStopOnStatus(p, next, stop);
-  } catch (_e) { console.error('[pendencias-quadro] cronômetro não ajustado ao mover card', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
+  } catch (_e) {
+    console.error('[pendencias-quadro] cronômetro não ajustado ao mover card', _e);
+    if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro');
+  }
   savePendencia(next);
   _optimisticPenUpsert(next); // move o card na hora; o fetch reconcilia depois
   updateBadges();
   renderPenView(false);
-  var colLabel = PEN_KANBAN_COLS.find(function(c) { return c.id === colId; });
+  var colLabel = PEN_KANBAN_COLS.find(function (c) {
+    return c.id === colId;
+  });
   var msg = 'Pendência movida para "' + (colLabel ? colLabel.label : colId) + '"';
   // Arrastar erra fácil e o card some da coluna de origem na hora: sem
   // desfazer, só sobra refazer o caminho à mão.
   // Concluir/fechar fica de fora de propósito — a transição pode ter gerado
   // a próxima ocorrência recorrente, e voltar o status não desfaz aquele
   // nascimento. Um "Desfazer" que desfaz pela metade mente.
-  var fechado = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(colId) : false;
+  var fechado = typeof isPendenciaClosed === 'function' ? isPendenciaClosed(colId) : false;
   if ((opts && opts.semDesfazer) || fechado || typeof showUndoToast !== 'function') {
     showToast(msg, 'success');
     return;
   }
-  showUndoToast(msg, function() {
+  showUndoToast(msg, function () {
     // Entre o toast e o clique cabem 5s de outros gestos: se o status mudou,
     // este desfazer é de outra história e não pode engolir o movimento novo.
     var agora = getPendenciaById(id);

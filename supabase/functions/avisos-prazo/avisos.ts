@@ -41,22 +41,22 @@ export type Vencimento = {
   avisos?: unknown;
 };
 
-export const PEN_CLOSED_STATUSES = ["concluido", "resolvido", "cancelado", "fechado"];
+export const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 export const PEN_REMINDER_DAYS = 2;
 export const VENC_AVISOS = [30, 7, 0];
 export const VENC_TIPOS: Record<string, string> = {
-  licenca: "Licença",
-  ssl: "Certificado SSL",
-  dominio: "Domínio",
-  garantia: "Garantia",
-  backup: "Assinatura de backup",
-  contrato: "Contrato",
-  outro: "Outro",
+  licenca: 'Licença',
+  ssl: 'Certificado SSL',
+  dominio: 'Domínio',
+  garantia: 'Garantia',
+  backup: 'Assinatura de backup',
+  contrato: 'Contrato',
+  outro: 'Outro',
 };
 
 /** Data de hoje (YYYY-MM-DD) no horário de Brasília. */
 export function todayBR(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
 }
 
 /** Dias de `fromISO` até `toISO` (datas sem hora). */
@@ -67,7 +67,11 @@ export function daysBetween(fromISO: string, toISO: string): number {
 }
 
 const norm = (s: unknown) =>
-  String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  String(s ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
 
 const isActive = (o: Operator | undefined | null) => !!o && o.active !== false && !!o.email;
 
@@ -85,7 +89,7 @@ function findOperator(ops: Operator[], id?: string | null, name?: string | null)
 function uniq(list: (string | null | undefined)[]): string[] {
   const out: string[] = [];
   for (const e of list) {
-    const v = String(e ?? "").trim();
+    const v = String(e ?? '').trim();
     if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v);
   }
   return out;
@@ -98,7 +102,7 @@ function uniq(list: (string | null | undefined)[]): string[] {
 export function recipientsFor(
   ops: Operator[],
   person: { id?: string | null; name?: string | null },
-  opts: { gestao?: boolean } = {},
+  opts: { gestao?: boolean } = {}
 ): string[] {
   const resp = findOperator(ops, person.id, person.name);
   if (opts.gestao) {
@@ -110,22 +114,25 @@ export function recipientsFor(
 }
 
 export function isPendenciaGestao(p: Pendencia): boolean {
-  return norm(p.tipo) === "gestao";
+  return norm(p.tipo) === 'gestao';
 }
 
 export function pendenciaTitulo(p: Pendencia): string {
-  return String(p.assunto ?? "").trim() || String(p.descricao ?? "").trim() || "Sem descrição";
+  return String(p.assunto ?? '').trim() || String(p.descricao ?? '').trim() || 'Sem descrição';
 }
 
 /**
  * Lembrete de pendência: 'antes' (faltam 1 ou 2 dias) e 'hoje' (vence hoje).
  * Vencida/atrasada ou fechada não gera e-mail. Cada um sai uma vez por prazo.
  */
-export function pendenciaAvisoDevido(p: Pendencia, today: string): { tipo: "antes" | "hoje"; days: number } | null {
-  if (!p || !p.deadline || PEN_CLOSED_STATUSES.includes(String(p.status ?? ""))) return null;
+export function pendenciaAvisoDevido(
+  p: Pendencia,
+  today: string
+): { tipo: 'antes' | 'hoje'; days: number } | null {
+  if (!p || !p.deadline || PEN_CLOSED_STATUSES.includes(String(p.status ?? ''))) return null;
   const days = daysBetween(today, String(p.deadline).slice(0, 10));
   if (days < 0 || days > PEN_REMINDER_DAYS) return null;
-  return { tipo: days === 0 ? "hoje" : "antes", days };
+  return { tipo: days === 0 ? 'hoje' : 'antes', days };
 }
 
 /** Chave única do lembrete (tabela avisos_enviados). */
@@ -137,8 +144,11 @@ export function pendenciaAvisoKey(p: Pendencia, tipo: string): string {
  * Aviso de vencimento: o mais urgente ainda não dado (30, 7 ou no dia).
  * Entrando direto na janela de 7 dias, o de 30 é marcado junto, sem e-mail próprio.
  */
-export function vencAvisoDevido(v: Vencimento, today: string): { aviso: string; marcar: string[]; days: number } | null {
-  if (!v || v.status === "encerrado" || !v.data_vencimento) return null;
+export function vencAvisoDevido(
+  v: Vencimento,
+  today: string
+): { aviso: string; marcar: string[]; days: number } | null {
+  if (!v || v.status === 'encerrado' || !v.data_vencimento) return null;
   const days = daysBetween(today, String(v.data_vencimento).slice(0, 10));
   if (days < -7) return null;
   const sent = new Set((Array.isArray(v.avisos) ? v.avisos : []).map(String));
@@ -152,12 +162,12 @@ export function vencAvisoDevido(v: Vencimento, today: string): { aviso: string; 
 // ── E-mail ───────────────────────────────────────────────────────────
 
 export function escapeHtml(s: unknown): string {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 const dateBR = (iso: string) => {
@@ -166,10 +176,10 @@ const dateBR = (iso: string) => {
 };
 
 const PRIORITY: Record<string, [string, string]> = {
-  baixa: ["Baixa", "#16a34a"],
-  media: ["Média", "#d97706"],
-  alta: ["Alta", "#dc2626"],
-  critica: ["Crítica", "#991b1b"],
+  baixa: ['Baixa', '#16a34a'],
+  media: ['Média', '#d97706'],
+  alta: ['Alta', '#dc2626'],
+  critica: ['Crítica', '#991b1b'],
 };
 
 export function emailLayout(content: string): string {
@@ -191,17 +201,24 @@ export function emailLayout(content: string): string {
 }
 
 function button(appUrl: string, hash: string): string {
-  if (!appUrl) return "";
-  const href = escapeHtml(appUrl.replace(/#.*$/, "") + "#" + hash);
+  if (!appUrl) return '';
+  const href = escapeHtml(appUrl.replace(/#.*$/, '') + '#' + hash);
   return `<div style="text-align:center;margin-top:20px"><a href="${href}" style="display:inline-block;background:#1a56db;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Ver no Init Intra →</a></div>`;
 }
 
-export function pendenciaEmail(p: Pendencia, days: number, appUrl = ""): { subject: string; html: string } {
-  const urgency = days <= 0 ? "vence HOJE" : days === 1 ? "vence AMANHÃ" : `vence em ${days} dias`;
-  const color = days <= 0 ? "#dc2626" : days === 1 ? "#d97706" : "#1a56db";
-  const [prioLabel, prioColor] = PRIORITY[String(p.priority ?? "")] || [String(p.priority ?? "—"), "#64748b"];
+export function pendenciaEmail(
+  p: Pendencia,
+  days: number,
+  appUrl = ''
+): { subject: string; html: string } {
+  const urgency = days <= 0 ? 'vence HOJE' : days === 1 ? 'vence AMANHÃ' : `vence em ${days} dias`;
+  const color = days <= 0 ? '#dc2626' : days === 1 ? '#d97706' : '#1a56db';
+  const [prioLabel, prioColor] = PRIORITY[String(p.priority ?? '')] || [
+    String(p.priority ?? '—'),
+    '#64748b',
+  ];
   const titulo = pendenciaTitulo(p);
-  const row = (label: string, value: string, style = "") =>
+  const row = (label: string, value: string, style = '') =>
     `<tr><td style="padding:8px 12px;font-size:12px;color:#64748b;width:120px"><strong>${label}</strong></td><td style="padding:8px 12px;font-size:13px;${style}">${value}</td></tr>`;
   const html = emailLayout(`
     <div style="display:inline-block;color:${color};font-size:12px;font-weight:600;margin-bottom:8px">⏰ Lembrete de Prazo</div>
@@ -211,24 +228,31 @@ export function pendenciaEmail(p: Pendencia, days: number, appUrl = ""): { subje
       <div style="font-size:13px;color:#64748b">Prazo: ${dateBR(String(p.deadline))}</div>
     </div>
     <table width="100%" cellpadding="0" cellspacing="0">
-      ${row("Cliente", escapeHtml(p.client_name || "—"))}
-      ${row("Responsável", escapeHtml(p.responsible || "—"))}
-      ${row("Prioridade", escapeHtml(prioLabel), `color:${prioColor};font-weight:600`)}
+      ${row('Cliente', escapeHtml(p.client_name || '—'))}
+      ${row('Responsável', escapeHtml(p.responsible || '—'))}
+      ${row('Prioridade', escapeHtml(prioLabel), `color:${prioColor};font-weight:600`)}
     </table>
-    ${button(appUrl, "pendencias")}`);
+    ${button(appUrl, 'pendencias')}`);
   return { subject: `[Init Intra] ⏰ Prazo ${urgency}: ${titulo}`.slice(0, 300), html };
 }
 
-export function vencimentoEmail(v: Vencimento, days: number, appUrl = ""): { subject: string; html: string } {
-  const quando = days < 0
-    ? `VENCIDO há ${-days} ${days === -1 ? "dia" : "dias"}`
-    : days === 0 ? "vence HOJE" : `vence em ${days} dias`;
-  const tipo = VENC_TIPOS[String(v.tipo ?? "")] || "Vencimento";
+export function vencimentoEmail(
+  v: Vencimento,
+  days: number,
+  appUrl = ''
+): { subject: string; html: string } {
+  const quando =
+    days < 0
+      ? `VENCIDO há ${-days} ${days === -1 ? 'dia' : 'dias'}`
+      : days === 0
+        ? 'vence HOJE'
+        : `vence em ${days} dias`;
+  const tipo = VENC_TIPOS[String(v.tipo ?? '')] || 'Vencimento';
   const html = emailLayout(`
-    <h2 style="margin:0 0 8px;font-size:18px;color:#1e293b">${escapeHtml(v.descricao || "")}</h2>
-    <p style="margin:0 0 12px;font-size:14px;color:#475569">${escapeHtml(tipo)} · ${escapeHtml(v.client_name || "Interno")}</p>
-    <p style="font-size:20px;font-weight:800;color:${days <= 7 ? "#dc2626" : "#1a56db"};margin:0 0 6px">${quando}</p>
-    <p style="font-size:13px;color:#64748b;margin:0 0 16px">Data: ${dateBR(String(v.data_vencimento))}${v.renovacao_auto ? " · renovação automática (confira se renovou)" : ""}</p>
-    ${button(appUrl, "vencimentos")}`);
-  return { subject: `[Init Intra] ⏰ ${tipo} ${quando}: ${v.descricao || ""}`.slice(0, 300), html };
+    <h2 style="margin:0 0 8px;font-size:18px;color:#1e293b">${escapeHtml(v.descricao || '')}</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:#475569">${escapeHtml(tipo)} · ${escapeHtml(v.client_name || 'Interno')}</p>
+    <p style="font-size:20px;font-weight:800;color:${days <= 7 ? '#dc2626' : '#1a56db'};margin:0 0 6px">${quando}</p>
+    <p style="font-size:13px;color:#64748b;margin:0 0 16px">Data: ${dateBR(String(v.data_vencimento))}${v.renovacao_auto ? ' · renovação automática (confira se renovou)' : ''}</p>
+    ${button(appUrl, 'vencimentos')}`);
+  return { subject: `[Init Intra] ⏰ ${tipo} ${quando}: ${v.descricao || ''}`.slice(0, 300), html };
 }

@@ -7,29 +7,57 @@ const _iaUndo = {};
 
 function iaReportAvailable() {
   try {
-    return typeof isSupabaseConnected === 'function' && isSupabaseConnected() &&
-      typeof window !== 'undefined' && window._supabaseAuthActive === true && navigator.onLine !== false;
-  } catch (_) { return false; }
+    return (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive === true &&
+      navigator.onLine !== false
+    );
+  } catch (_) {
+    return false;
+  }
 }
 
 function iaReportButtonHtml(textareaId, visitId) {
   if (!iaReportAvailable()) return '';
-  return '<div class="ia-bar" id="iaBar_' + escapeHtml(textareaId) + '">' +
-    '<button type="button" class="btn btn-secondary btn-sm ia-btn" data-action="iaWriteReport" data-arg="' + escapeHtml(textareaId) + '" data-visit-id="' + escapeHtml(visitId) + '">✨ Escrever com IA</button>' +
+  return (
+    '<div class="ia-bar" id="iaBar_' +
+    escapeHtml(textareaId) +
+    '">' +
+    '<button type="button" class="btn btn-secondary btn-sm ia-btn" data-action="iaWriteReport" data-arg="' +
+    escapeHtml(textareaId) +
+    '" data-visit-id="' +
+    escapeHtml(visitId) +
+    '">✨ Escrever com IA</button>' +
     '<span class="ia-hint">Escreva tópicos soltos e a IA organiza para o cliente. Revise antes de salvar; não coloque senhas.</span>' +
-  '</div>';
+    '</div>'
+  );
 }
 
 async function iaWriteReport(textareaId, visitId, btn) {
   const ta = document.getElementById(textareaId);
   if (!ta) return;
   const notas = String(ta.value || '').trim();
-  if (notas.length < 10) { showToast('Escreva primeiro alguns tópicos do que foi feito.', 'warning'); ta.focus(); return; }
-  if (!iaReportAvailable()) { showToast('A IA precisa de conexão.', 'warning'); return; }
+  if (notas.length < 10) {
+    showToast('Escreva primeiro alguns tópicos do que foi feito.', 'warning');
+    ta.focus();
+    return;
+  }
+  if (!iaReportAvailable()) {
+    showToast('A IA precisa de conexão.', 'warning');
+    return;
+  }
   const v = typeof getVisitById === 'function' ? getVisitById(visitId) : null;
-  const checklist = v && Array.isArray(v.checklist) ? v.checklist.filter((i) => i && i.done).map((i) => i.text || '') : [];
+  const checklist =
+    v && Array.isArray(v.checklist)
+      ? v.checklist.filter((i) => i && i.done).map((i) => i.text || '')
+      : [];
   const label = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Escrevendo…'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Escrevendo…';
+  }
   ta.setAttribute('aria-busy', 'true');
   try {
     const { data, error } = await supabaseClient.functions.invoke('ia-relatorio', {
@@ -37,7 +65,12 @@ async function iaWriteReport(textareaId, visitId, btn) {
     });
     if (error || !data || !data.relatorio) {
       let msg = (data && data.error) || '';
-      try { if (!msg && error && error.context && typeof error.context.json === 'function') msg = (await error.context.json()).error || ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ia-relatorio'); }
+      try {
+        if (!msg && error && error.context && typeof error.context.json === 'function')
+          msg = (await error.context.json()).error || '';
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'ia-relatorio');
+      }
       throw new Error(msg || 'Não foi possível gerar o relatório agora.');
     }
     _iaUndo[textareaId] = ta.value;
@@ -57,11 +90,19 @@ async function iaWriteReport(textareaId, visitId, btn) {
       });
       bar.appendChild(u);
     }
-    showToast(data.truncado ? 'Relatório gerado (cortado no fim — revise).' : 'Relatório gerado. Revise antes de salvar.', data.truncado ? 'warning' : 'success');
+    showToast(
+      data.truncado
+        ? 'Relatório gerado (cortado no fim — revise).'
+        : 'Relatório gerado. Revise antes de salvar.',
+      data.truncado ? 'warning' : 'success'
+    );
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
     ta.removeAttribute('aria-busy');
   }
 }

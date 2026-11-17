@@ -46,7 +46,8 @@ _setGlobal(
       get: (_t, p) => {
         if (p === 'addEventListener') return () => {};
         if (p === 'querySelectorAll') return () => [];
-        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement') return (..._a) => _anyEl();
+        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement')
+          return (..._a) => _anyEl();
         if (p === 'head' || p === 'body') return _anyEl();
         if (p === 'visibilityState') return 'visible';
         return undefined;
@@ -85,7 +86,10 @@ console.warn = () => {};
 
 describe('SEC-18 — logo do cliente em atributo src', () => {
   it('URL com aspa não quebra o atributo (normalizada + escapada)', () => {
-    const html = clientAvatar({ name: 'ACME', logo: 'https://x.com/a' + D + 'onerror=' + D + 'alert(1)' });
+    const html = clientAvatar({
+      name: 'ACME',
+      logo: 'https://x.com/a' + D + 'onerror=' + D + 'alert(1)',
+    });
     // a aspa vira %22 na normalização da URL e nunca aparece crua no atributo
     expect(html.includes(D + 'onerror=' + D)).toBe(false);
     expect(html).toContain('a%22onerror=%22alert(1)');

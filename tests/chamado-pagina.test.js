@@ -140,7 +140,9 @@ describe('chamado-pagina', () => {
 
     it('escapa o texto de uma nota', () => {
       const p = chamado({
-        notes: [{ text: XSS, author: 'Ana Atendente', createdAt: antes(30), visibility: 'interna' }],
+        notes: [
+          { text: XSS, author: 'Ana Atendente', createdAt: antes(30), visibility: 'interna' },
+        ],
       });
       const html = desenhar(sb, p);
       expect(html).not.toContain(XSS);
@@ -155,29 +157,65 @@ describe('chamado-pagina', () => {
     });
 
     it('escapa o nome do anexo', () => {
-      sb.anexos = [{ id: 'a1', name: XSS, url: 'https://x.test/a.pdf', uploadedAt: antes(120), uploadedBy: 'Ana' }];
+      sb.anexos = [
+        {
+          id: 'a1',
+          name: XSS,
+          url: 'https://x.test/a.pdf',
+          uploadedAt: antes(120),
+          uploadedBy: 'Ana',
+        },
+      ];
       const html = desenhar(sb, chamado());
       expect(html).not.toContain(XSS);
       expect(html).toContain('&lt;img src=x');
     });
 
     it('não vira link o anexo com URL insegura', () => {
-      sb.anexos = [{ id: 'a1', name: 'mau.html', url: 'javascript:alert(1)', uploadedAt: antes(120), uploadedBy: 'Ana' }];
+      sb.anexos = [
+        {
+          id: 'a1',
+          name: 'mau.html',
+          url: 'javascript:alert(1)',
+          uploadedAt: antes(120),
+          uploadedBy: 'Ana',
+        },
+      ];
       const html = desenhar(sb, chamado());
       expect(html).not.toContain('javascript:alert');
       expect(html).toContain('chp-anexo--off');
     });
 
     it('PDF em data: vira download, nunca navegação', () => {
-      sb.anexos = [{ id: 'a1', name: 'contrato.pdf', mimeType: 'application/pdf', data: 'data:application/pdf;base64,AAA', uploadedAt: antes(120), uploadedBy: 'Ana' }];
+      sb.anexos = [
+        {
+          id: 'a1',
+          name: 'contrato.pdf',
+          mimeType: 'application/pdf',
+          data: 'data:application/pdf;base64,AAA',
+          uploadedAt: antes(120),
+          uploadedBy: 'Ana',
+        },
+      ];
       const html = desenhar(sb, chamado());
-      expect(html).toMatch(/<a class="chp-anexo" href="data:application\/pdf;base64,AAA" download="contrato.pdf">/);
+      expect(html).toMatch(
+        /<a class="chp-anexo" href="data:application\/pdf;base64,AAA" download="contrato.pdf">/
+      );
       expect(html).not.toContain('target="_blank"');
       expect(html).not.toContain('chp-anexo--off');
     });
 
     it('data:text/html não vira link nem src', () => {
-      sb.anexos = [{ id: 'a1', name: 'mau.html', mimeType: 'text/html', data: 'data:text/html,<script>alert(1)</script>', uploadedAt: antes(120), uploadedBy: 'Ana' }];
+      sb.anexos = [
+        {
+          id: 'a1',
+          name: 'mau.html',
+          mimeType: 'text/html',
+          data: 'data:text/html,<script>alert(1)</script>',
+          uploadedAt: antes(120),
+          uploadedBy: 'Ana',
+        },
+      ];
       const html = desenhar(sb, chamado());
       expect(html).not.toContain('data:text/html');
       expect(html).not.toContain('href="data:');
@@ -186,15 +224,30 @@ describe('chamado-pagina', () => {
   });
 
   describe('mudança automática de status (078)', () => {
-    const automatico = (motivo) => ({ at: antes(60), by: 'Sistema', type: 'status', de: 'aguardando_cliente', para: 'em_andamento', motivo });
+    const automatico = (motivo) => ({
+      at: antes(60),
+      by: 'Sistema',
+      type: 'status',
+      de: 'aguardando_cliente',
+      para: 'em_andamento',
+      motivo,
+    });
 
     it('o Andamento diz por que o status mudou sozinho', () => {
       const itens = sb.chpAndamento(chamado({ events: [automatico('Cliente respondeu')] }));
-      expect(itens.find((i) => i.titulo.indexOf('Status') === 0)).toMatchObject({ autor: 'Sistema · Cliente respondeu' });
+      expect(itens.find((i) => i.titulo.indexOf('Status') === 0)).toMatchObject({
+        autor: 'Sistema · Cliente respondeu',
+      });
     });
 
     it('evento feito por gente continua mostrando só quem fez', () => {
-      const itens = sb.chpAndamento(chamado({ events: [{ at: antes(60), by: 'Ana', type: 'status', de: 'aberto', para: 'em_andamento' }] }));
+      const itens = sb.chpAndamento(
+        chamado({
+          events: [
+            { at: antes(60), by: 'Ana', type: 'status', de: 'aberto', para: 'em_andamento' },
+          ],
+        })
+      );
       expect(itens.find((i) => i.titulo.indexOf('Status') === 0).autor).toBe('Ana');
     });
 
@@ -212,10 +265,20 @@ describe('chamado-pagina', () => {
   describe('Recebido e Visto no Andamento', () => {
     const titulos = (p) => sb.chpAndamento(p).map((i) => i.titulo);
     const item = (p, titulo) => sb.chpAndamento(p).find((i) => i.titulo === titulo);
-    const troca = (min, de, para) => ({ at: antes(min), by: 'Gestor', type: 'responsavel', de, para });
+    const troca = (min, de, para) => ({
+      at: antes(min),
+      by: 'Gestor',
+      type: 'responsavel',
+      de,
+      para,
+    });
 
     it('aberto já com responsável: Recebido no instante da abertura, logo depois de Aberto', () => {
-      const p = chamado({ responsible: 'Ana', events: [{ at: antes(600), by: '', type: 'criado', de: null, para: 'aberto' }], createdAt: antes(600) });
+      const p = chamado({
+        responsible: 'Ana',
+        events: [{ at: antes(600), by: '', type: 'criado', de: null, para: 'aberto' }],
+        createdAt: antes(600),
+      });
       expect(titulos(p)).toEqual(['Chamado aberto', 'Recebido']);
       expect(item(p, 'Recebido')).toMatchObject({ autor: 'Ana', at: antes(600) });
     });
@@ -227,7 +290,10 @@ describe('chamado-pagina', () => {
     });
 
     it('transferências depois da chegada continuam como "Passou para"', () => {
-      const p = chamado({ responsible: 'Beto', events: [troca(300, '', 'Ana'), troca(100, 'Ana', 'Beto')] });
+      const p = chamado({
+        responsible: 'Beto',
+        events: [troca(300, '', 'Ana'), troca(100, 'Ana', 'Beto')],
+      });
       expect(item(p, 'Recebido').autor).toBe('Ana');
       expect(titulos(p)).toContain('Passou para Beto');
     });
@@ -242,13 +308,19 @@ describe('chamado-pagina', () => {
     });
 
     it('Visto mostra quem viu, em ordem com o resto', () => {
-      const p = chamado({ responsible: 'Ana', events: [{ at: antes(200), by: 'Ana', by_id: 'OP-A', type: 'visto' }] });
+      const p = chamado({
+        responsible: 'Ana',
+        events: [{ at: antes(200), by: 'Ana', by_id: 'OP-A', type: 'visto' }],
+      });
       expect(titulos(p)).toEqual(['Chamado aberto', 'Recebido', 'Visto']);
       expect(item(p, 'Visto').autor).toBe('Ana');
     });
 
     it('Visto não entra na conversa: é marco do Andamento', () => {
-      const p = chamado({ responsible: 'Ana', events: [{ at: antes(200), by: 'Ana', type: 'visto' }] });
+      const p = chamado({
+        responsible: 'Ana',
+        events: [{ at: antes(200), by: 'Ana', type: 'visto' }],
+      });
       expect(desenhar(sb, p)).not.toContain('visualizou');
     });
 
@@ -268,14 +340,30 @@ describe('chamado-pagina', () => {
     beforeEach(() => {
       chamadas = [];
       cache = [chamado({ id: 'p1', responsible: 'Ana Atendente', status: 'aberto' })];
-      resposta = { data: { events: [{ at: '2026-10-30T15:00:00.000Z', by: 'Ana Atendente', by_id: 'OP-A', type: 'visto' }], updated_at: '2026-10-30T15:00:00Z' }, error: null };
-      sb.supabaseClient = { rpc: (nome, args) => { chamadas.push([nome, args]); return Promise.resolve(resposta); } };
+      resposta = {
+        data: {
+          events: [
+            { at: '2026-10-30T15:00:00.000Z', by: 'Ana Atendente', by_id: 'OP-A', type: 'visto' },
+          ],
+          updated_at: '2026-10-30T15:00:00Z',
+        },
+        error: null,
+      };
+      sb.supabaseClient = {
+        rpc: (nome, args) => {
+          chamadas.push([nome, args]);
+          return Promise.resolve(resposta);
+        },
+      };
       sb.isSupabaseConnected = () => true;
       sb._supabaseAuthActive = true;
       sb.getPendencias = () => cache;
       sb.DB = { PENDENCIAS: 'pendencias' };
-      sb.dbSet = (_k, lista) => { cache = lista; };
-      sb.isPendenciaClosed = (st) => ['resolvido', 'cancelado', 'concluido', 'fechado'].includes(st);
+      sb.dbSet = (_k, lista) => {
+        cache = lista;
+      };
+      sb.isPendenciaClosed = (st) =>
+        ['resolvido', 'cancelado', 'concluido', 'fechado'].includes(st);
     });
 
     it('precisa marcar só quando o usuário é o responsável, o chamado está aberto e ainda não viu', () => {
@@ -283,7 +371,9 @@ describe('chamado-pagina', () => {
       expect(sb.chpPrecisaMarcarVisto(p, 'Ana')).toBe(true);
       expect(sb.chpPrecisaMarcarVisto(p, 'Beto')).toBe(false);
       expect(sb.chpPrecisaMarcarVisto({ ...p, status: 'resolvido' }, 'Ana')).toBe(false);
-      expect(sb.chpPrecisaMarcarVisto({ ...p, events: [{ type: 'visto', by: 'Ana' }] }, 'Ana')).toBe(false);
+      expect(
+        sb.chpPrecisaMarcarVisto({ ...p, events: [{ type: 'visto', by: 'Ana' }] }, 'Ana')
+      ).toBe(false);
     });
 
     it('chama o banco uma vez por sessão e soma o evento no cache', async () => {
@@ -323,7 +413,14 @@ describe('chamado-pagina', () => {
   describe('fio da conversa', () => {
     it('tem a mensagem original como primeira bolha', () => {
       const p = chamado({
-        notes: [{ text: 'mais antiga que tudo', author: 'Ana', createdAt: antes(900), visibility: 'interna' }],
+        notes: [
+          {
+            text: 'mais antiga que tudo',
+            author: 'Ana',
+            createdAt: antes(900),
+            visibility: 'interna',
+          },
+        ],
       });
       expect(tiposDasBolhas(desenhar(sb, p))[0]).toBe('original');
     });
@@ -342,7 +439,14 @@ describe('chamado-pagina', () => {
 
     it('põe a mensagem de quem pediu no lado de quem pediu', () => {
       const p = chamado({
-        notes: [{ text: 'Voltou a falhar', author: 'Bia', createdAt: antes(30), visibility: 'solicitante' }],
+        notes: [
+          {
+            text: 'Voltou a falhar',
+            author: 'Bia',
+            createdAt: antes(30),
+            visibility: 'solicitante',
+          },
+        ],
       });
       expect(desenhar(sb, p)).toMatch(/chp-msg--solicitante[^>]*data-chp-tipo="solicitante"/);
     });
@@ -368,7 +472,9 @@ describe('chamado-pagina', () => {
     });
 
     it('não deixa o ⏹ aparecer no fio como anotação interna', () => {
-      const p = chamado({ notes: [{ text: '⏹ Cronômetro de Ana parado.', author: 'Ana', createdAt: antes(30) }] });
+      const p = chamado({
+        notes: [{ text: '⏹ Cronômetro de Ana parado.', author: 'Ana', createdAt: antes(30) }],
+      });
       const html = desenhar(sb, p);
       expect(html).not.toContain('⏹');
       expect(html).toContain('Cronômetro de Ana parado.');
@@ -389,9 +495,24 @@ describe('chamado-pagina', () => {
       const p = chamado({
         createdAt: '2026-10-28T12:00:00.000Z',
         notes: [
-          { text: 'a', author: 'Ana', createdAt: '2026-10-28T13:00:00.000Z', visibility: 'interna' },
-          { text: 'b', author: 'Ana', createdAt: '2026-10-29T13:00:00.000Z', visibility: 'interna' },
-          { text: 'c', author: 'Ana', createdAt: '2026-10-29T14:00:00.000Z', visibility: 'interna' },
+          {
+            text: 'a',
+            author: 'Ana',
+            createdAt: '2026-10-28T13:00:00.000Z',
+            visibility: 'interna',
+          },
+          {
+            text: 'b',
+            author: 'Ana',
+            createdAt: '2026-10-29T13:00:00.000Z',
+            visibility: 'interna',
+          },
+          {
+            text: 'c',
+            author: 'Ana',
+            createdAt: '2026-10-29T14:00:00.000Z',
+            visibility: 'interna',
+          },
         ],
       });
       const divisores = desenhar(sb, p).match(/class="chp-dia"/g) || [];
@@ -451,7 +572,9 @@ describe('chamado-pagina', () => {
     // chamado parecido precisa do texto pronto e das variáveis na página também.
     it('tem respostas prontas e variáveis, que escrevem no mesmo #newNoteText', () => {
       const composer = sb.chpComposerHtml(chamado(), 'resposta');
-      expect(composer).toMatch(/data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false"/);
+      expect(composer).toMatch(
+        /data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false"/
+      );
       expect(composer).toContain('id="rpPainel"');
       for (const v of ['nome', 'protocolo', 'atendente']) {
         expect(composer).toContain('data-action="chdInserirVariavel" data-arg="' + v + '"');
@@ -486,7 +609,8 @@ describe('chamado-pagina', () => {
   describe('canal WhatsApp', () => {
     // A thread "whatsapp:" é o que chamado-canal.js usa para definir o canal,
     // mesmo com e-mail preenchido: a ajuda tem de seguir o canal real.
-    const whatsapp = () => chamado({ emailThreadId: 'whatsapp:5511999990000', solicitanteEmail: 'bia@cliente.com' });
+    const whatsapp = () =>
+      chamado({ emailThreadId: 'whatsapp:5511999990000', solicitanteEmail: 'bia@cliente.com' });
 
     it('mostra na ajuda que a resposta vai por WhatsApp', () => {
       const composer = sb.chpComposerHtml(whatsapp(), 'resposta');
@@ -497,15 +621,21 @@ describe('chamado-pagina', () => {
 
   describe('selos de prazo', () => {
     it('cumprido quando respondeu no prazo', () => {
-      expect(sb.chpSeloPrazo({ estado: 'respondida', noPrazo: true, minutos: 3 }).rotulo).toBe('Cumprido');
+      expect(sb.chpSeloPrazo({ estado: 'respondida', noPrazo: true, minutos: 3 }).rotulo).toBe(
+        'Cumprido'
+      );
     });
 
     it('cumprido quando resolveu no prazo', () => {
-      expect(sb.chpSeloPrazo({ estado: 'resolvida', noPrazo: true, minutos: 3 }).rotulo).toBe('Cumprido');
+      expect(sb.chpSeloPrazo({ estado: 'resolvida', noPrazo: true, minutos: 3 }).rotulo).toBe(
+        'Cumprido'
+      );
     });
 
     it('atrasado quando respondeu fora do prazo', () => {
-      expect(sb.chpSeloPrazo({ estado: 'respondida', noPrazo: false, minutos: 3 }).rotulo).toBe('Atrasado');
+      expect(sb.chpSeloPrazo({ estado: 'respondida', noPrazo: false, minutos: 3 }).rotulo).toBe(
+        'Atrasado'
+      );
     });
 
     it('atrasado quando a resposta está vencida', () => {
@@ -563,7 +693,13 @@ describe('chamado-pagina', () => {
   });
 
   describe('posição do anexo', () => {
-    const nota = (extra) => ({ text: 'x', author: 'Ana', createdAt: antes(60), visibility: 'interna', ...extra });
+    const nota = (extra) => ({
+      text: 'x',
+      author: 'Ana',
+      createdAt: antes(60),
+      visibility: 'interna',
+      ...extra,
+    });
 
     it('sem data válida fica no topo, sem atribuir a quem pediu', () => {
       const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedBy: 'Ana' }, chamado(), [nota()]);
@@ -571,42 +707,70 @@ describe('chamado-pagina', () => {
     });
 
     it('com data inválida também fica no topo', () => {
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: 'ontem', uploadedBy: 'Ana' }, chamado(), []);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: 'ontem', uploadedBy: 'Ana' },
+        chamado(),
+        []
+      );
       expect(pos.onde).toBe('topo');
     });
 
     it('mesmo autor e até 5 minutos entra na bolha da nota', () => {
       const n = nota();
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(56), uploadedBy: 'Ana' }, chamado(), [n]);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(56), uploadedBy: 'Ana' },
+        chamado(),
+        [n]
+      );
       expect(pos.onde).toBe('nota');
       expect(pos.nota).toBe(n);
     });
 
     it('mesmo autor e passou de 5 minutos não entra na bolha', () => {
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(54), uploadedBy: 'Ana' }, chamado(), [nota()]);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(54), uploadedBy: 'Ana' },
+        chamado(),
+        [nota()]
+      );
       expect(pos.onde).toBe('evento');
     });
 
     it('autor diferente não entra na bolha, mesmo no mesmo minuto', () => {
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(60), uploadedBy: 'Caio' }, chamado(), [nota()]);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(60), uploadedBy: 'Caio' },
+        chamado(),
+        [nota()]
+      );
       expect(pos.onde).toBe('evento');
     });
 
     it('escolhe a nota mais próxima quando duas se qualificam', () => {
       const longe = nota({ createdAt: antes(64) });
       const perto = nota({ createdAt: antes(61) });
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(60), uploadedBy: 'Ana' }, chamado(), [longe, perto]);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(60), uploadedBy: 'Ana' },
+        chamado(),
+        [longe, perto]
+      );
       expect(pos.nota).toBe(perto);
     });
 
     it('até 5 minutos da criação do chamado entra na primeira bolha', () => {
       const p = chamado();
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(598), uploadedBy: 'Caio' }, p, []);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(598), uploadedBy: 'Caio' },
+        p,
+        []
+      );
       expect(pos.onde).toBe('original');
     });
 
     it('fora de todas as janelas vira evento central', () => {
-      const pos = sb.chpPosicaoAnexo({ name: 'a.pdf', uploadedAt: antes(300), uploadedBy: 'Caio' }, chamado(), []);
+      const pos = sb.chpPosicaoAnexo(
+        { name: 'a.pdf', uploadedAt: antes(300), uploadedBy: 'Caio' },
+        chamado(),
+        []
+      );
       expect(pos.onde).toBe('evento');
     });
 
@@ -614,7 +778,15 @@ describe('chamado-pagina', () => {
       const p = chamado({
         notes: [{ text: 'Segue', author: 'Ana', createdAt: antes(60), visibility: 'resposta' }],
       });
-      sb.anexos = [{ id: 'a1', name: 'a.pdf', url: 'https://x.test/a.pdf', uploadedAt: antes(59), uploadedBy: 'Ana' }];
+      sb.anexos = [
+        {
+          id: 'a1',
+          name: 'a.pdf',
+          url: 'https://x.test/a.pdf',
+          uploadedAt: antes(59),
+          uploadedBy: 'Ana',
+        },
+      ];
       expect(desenhar(sb, p)).toContain('Não foi enviado a quem pediu');
     });
   });

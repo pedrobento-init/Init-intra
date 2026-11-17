@@ -7,9 +7,9 @@
 // rótulo "Backups" do Gmail. Eventos delegados no document (CSP).
 
 const SAUDE_CACHE = 'intra_saude_extra';
-const SAUDE_DISP_DIAS = 7;       // dispositivo parado há mais que isso pesa
+const SAUDE_DISP_DIAS = 7; // dispositivo parado há mais que isso pesa
 const SAUDE_SEM_VISITA_DIAS = 120;
-let _saudeExtra = null;          // { devices: { clientId: [{nome, dias}] }, monitores: [...], em }
+let _saudeExtra = null; // { devices: { clientId: [{nome, dias}] }, monitores: [...], em }
 let _saudeCarregando = null;
 
 // ── Nota (puro) ─────────────────────────────────────────────────────────────
@@ -25,7 +25,8 @@ function backupMonitorAlerta(m, agora) {
   if (!m || m.ativo === false) return null;
   if (m.ultimo_status === 'falha') return 'falha';
   const desde = Date.parse(m.ultimo_em || m.created_at || '');
-  if (!isNaN(desde) && ((agora || Date.now()) - desde) / 3600000 > (Number(m.max_horas) || 48)) return 'silencio';
+  if (!isNaN(desde) && ((agora || Date.now()) - desde) / 3600000 > (Number(m.max_horas) || 48))
+    return 'silencio';
   return m.ultimo_status === 'aviso' ? 'aviso' : null;
 }
 
@@ -39,13 +40,22 @@ function calcularSaude(d) {
   const base = d.base || { level: 'green', totalAbertas: 0, vencidas: 0, avgHours: 0 };
   const motivos = [];
   let nota = 100;
-  const tira = (pts, max, n, txt) => { if (n > 0) { nota -= Math.min(max, pts * n); motivos.push(txt); } };
+  const tira = (pts, max, n, txt) => {
+    if (n > 0) {
+      nota -= Math.min(max, pts * n);
+      motivos.push(txt);
+    }
+  };
 
   tira(12, 36, base.vencidas || 0, _pl(base.vencidas, 'pendência vencida', 'pendências vencidas'));
   tira(3, 15, Math.max(0, (base.totalAbertas || 0) - 3), `${base.totalAbertas} pendências abertas`);
-  if ((base.avgHours || 0) > 72) { nota -= 5; motivos.push(`resolução média de ${Math.round(base.avgHours)}h`); }
+  if ((base.avgHours || 0) > 72) {
+    nota -= 5;
+    motivos.push(`resolução média de ${Math.round(base.avgHours)}h`);
+  }
 
-  const vencs = (d.vencimentos || []).filter((v) => v && v.status !== 'encerrado' && v.dataVencimento)
+  const vencs = (d.vencimentos || [])
+    .filter((v) => v && v.status !== 'encerrado' && v.dataVencimento)
     .map((v) => _saudeDias(d.today, String(v.dataVencimento).slice(0, 10)));
   const vencidos = vencs.filter((x) => x < 0).length;
   const em7 = vencs.filter((x) => x >= 0 && x <= 7).length;
@@ -54,18 +64,36 @@ function calcularSaude(d) {
   tira(12, 24, em7, _pl(em7, 'vencimento em até 7 dias', 'vencimentos em até 7 dias'));
   tira(4, 8, em30, _pl(em30, 'vencimento em até 30 dias', 'vencimentos em até 30 dias'));
 
-  const al = (d.monitores || []).map((m) => ({ m, a: backupMonitorAlerta(m, d.agora) })).filter((x) => x.a);
+  const al = (d.monitores || [])
+    .map((m) => ({ m, a: backupMonitorAlerta(m, d.agora) }))
+    .filter((x) => x.a);
   al.forEach(({ m, a }) => {
-    if (a === 'falha') { nota -= 25; motivos.push(`backup "${m.nome}" com falha`); }
-    else if (a === 'silencio') { nota -= 15; motivos.push(`backup "${m.nome}" sem notícia`); }
-    else { nota -= 8; motivos.push(`backup "${m.nome}" com aviso`); }
+    if (a === 'falha') {
+      nota -= 25;
+      motivos.push(`backup "${m.nome}" com falha`);
+    } else if (a === 'silencio') {
+      nota -= 15;
+      motivos.push(`backup "${m.nome}" sem notícia`);
+    } else {
+      nota -= 8;
+      motivos.push(`backup "${m.nome}" com aviso`);
+    }
   });
 
   const parados = d.dispositivosParados || [];
-  tira(3, 15, parados.length, _pl(parados.length, 'dispositivo', 'dispositivos') + ` sem falar com o Milvus há mais de ${SAUDE_DISP_DIAS} dias`);
+  tira(
+    3,
+    15,
+    parados.length,
+    _pl(parados.length, 'dispositivo', 'dispositivos') +
+      ` sem falar com o Milvus há mais de ${SAUDE_DISP_DIAS} dias`
+  );
 
-  const ultima = (d.visitas || []).filter((v) => v && v.status !== 'cancelada' && v.date && v.date <= d.today)
-    .map((v) => v.date).sort().pop();
+  const ultima = (d.visitas || [])
+    .filter((v) => v && v.status !== 'cancelada' && v.date && v.date <= d.today)
+    .map((v) => v.date)
+    .sort()
+    .pop();
   if (ultima && _saudeDias(ultima, d.today) > SAUDE_SEM_VISITA_DIAS) {
     nota -= 5;
     motivos.push(`sem visita há ${_saudeDias(ultima, d.today)} dias`);
@@ -75,7 +103,11 @@ function calcularSaude(d) {
   const peso = { green: 0, yellow: 1, red: 2 };
   const pelaNota = nota >= 80 ? 'green' : nota >= 55 ? 'yellow' : 'red';
   const level = peso[base.level] > peso[pelaNota] ? base.level : pelaNota;
-  const meta = { green: ['🟢', '#16a34a', 'Saudável'], yellow: ['🟡', '#d97706', 'Atenção'], red: ['🔴', '#dc2626', 'Crítico'] }[level];
+  const meta = {
+    green: ['🟢', '#16a34a', 'Saudável'],
+    yellow: ['🟡', '#d97706', 'Atenção'],
+    red: ['🔴', '#dc2626', 'Crítico'],
+  }[level];
   return { ...base, level, emoji: meta[0], color: meta[1], label: meta[2], nota, motivos };
 }
 
@@ -83,12 +115,21 @@ function calcularSaude(d) {
 
 function _saudeLer() {
   if (_saudeExtra) return _saudeExtra;
-  try { _saudeExtra = JSON.parse(localStorage.getItem(SAUDE_CACHE) || 'null'); } catch (_) { _saudeExtra = null; }
+  try {
+    _saudeExtra = JSON.parse(localStorage.getItem(SAUDE_CACHE) || 'null');
+  } catch (_) {
+    _saudeExtra = null;
+  }
   return _saudeExtra || { devices: {}, monitores: [] };
 }
 
 function _saudeOnline() {
-  return typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive === true;
+  return (
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    typeof window !== 'undefined' &&
+    window._supabaseAuthActive === true
+  );
 }
 
 /** Busca dispositivos parados e monitores de backup (leve: só as colunas da conta). */
@@ -100,23 +141,40 @@ function carregarSaudeExtra(force) {
   _saudeCarregando = (async () => {
     const novo = { devices: {}, monitores: atual.monitores || [], em: Date.now() };
     try {
-      const { data } = await supabaseClient.from('client_devices')
-        .select('client_id, hostname, apelido, is_ativo, data_ultima_atualizacao, updated_at').eq('is_ativo', true).limit(5000);
+      const { data } = await supabaseClient
+        .from('client_devices')
+        .select('client_id, hostname, apelido, is_ativo, data_ultima_atualizacao, updated_at')
+        .eq('is_ativo', true)
+        .limit(5000);
       (data || []).forEach((d) => {
         const visto = Date.parse(d.data_ultima_atualizacao || '');
         const sync = Date.parse(d.updated_at || '') || Date.now();
         if (isNaN(visto)) return;
         const dias = Math.floor((sync - visto) / 86400000);
         if (dias <= SAUDE_DISP_DIAS) return;
-        (novo.devices[d.client_id] = novo.devices[d.client_id] || []).push({ nome: d.apelido || d.hostname || 'Dispositivo', dias });
+        (novo.devices[d.client_id] = novo.devices[d.client_id] || []).push({
+          nome: d.apelido || d.hostname || 'Dispositivo',
+          dias,
+        });
       });
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'cliente-saude'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'cliente-saude');
+    }
     try {
-      const { data, error } = await supabaseClient.from('backup_monitores').select('*').order('nome');
+      const { data, error } = await supabaseClient
+        .from('backup_monitores')
+        .select('*')
+        .order('nome');
       if (!error) novo.monitores = data || [];
-    } catch (_e) { /* banco sem a 060: segue sem backups */ }
+    } catch (_e) {
+      /* banco sem a 060: segue sem backups */
+    }
     _saudeExtra = novo;
-    try { localStorage.setItem(SAUDE_CACHE, JSON.stringify(novo)); } catch (_) { /* sem espaço: só memória */ }
+    try {
+      localStorage.setItem(SAUDE_CACHE, JSON.stringify(novo));
+    } catch (_) {
+      /* sem espaço: só memória */
+    }
     _saudeCarregando = null;
     return novo;
   })();
@@ -128,13 +186,21 @@ function ajustarSaudeCliente(base, clientId, todayISO) {
   try {
     const x = _saudeLer();
     return calcularSaude({
-      base, today: todayISO, agora: Date.now(),
-      vencimentos: (typeof getVencimentos === 'function' ? getVencimentos() : []).filter((v) => v.clientId === clientId),
-      visitas: (typeof getVisits === 'function' ? getVisits() : []).filter((v) => v.clientId === clientId),
+      base,
+      today: todayISO,
+      agora: Date.now(),
+      vencimentos: (typeof getVencimentos === 'function' ? getVencimentos() : []).filter(
+        (v) => v.clientId === clientId
+      ),
+      visitas: (typeof getVisits === 'function' ? getVisits() : []).filter(
+        (v) => v.clientId === clientId
+      ),
       monitores: (x.monitores || []).filter((m) => m.client_id === clientId),
       dispositivosParados: (x.devices || {})[clientId] || [],
     });
-  } catch (_) { return base; }
+  } catch (_) {
+    return base;
+  }
 }
 
 function saudeMotivosHtml(health) {
@@ -152,7 +218,9 @@ function _bkStatusTag(m) {
   if (a === 'falha') return '<span class="tag tag-red">Falha</span>';
   if (a === 'silencio') return '<span class="tag tag-red">Sem notícia</span>';
   if (a === 'aviso') return '<span class="tag tag-yellow">Aviso</span>';
-  return m.ultimo_status === 'ok' ? '<span class="tag tag-green">OK</span>' : '<span class="tag">Aguardando 1º e-mail</span>';
+  return m.ultimo_status === 'ok'
+    ? '<span class="tag tag-green">OK</span>'
+    : '<span class="tag">Aguardando 1º e-mail</span>';
 }
 
 async function renderClientBackupsTab(clientId) {
@@ -163,19 +231,42 @@ async function renderClientBackupsTab(clientId) {
   const x = await carregarSaudeExtra(true);
   if (_bkClient !== clientId || !document.getElementById('clientTabContent')) return;
   const mons = (x.monitores || []).filter((m) => m.client_id === clientId);
-  const quando = (iso) => iso ? (typeof formatDateTime === 'function' ? formatDateTime(iso) : new Date(iso).toLocaleString('pt-BR')) : '—';
+  const quando = (iso) =>
+    iso
+      ? typeof formatDateTime === 'function'
+        ? formatDateTime(iso)
+        : new Date(iso).toLocaleString('pt-BR')
+      : '—';
   el.innerHTML = `
     <p class="feed-lead">O robô lê os e-mails com o rótulo <b>Backups</b> no Gmail dele e acha a rotina pelo <b>identificador</b> (um texto que aparece no remetente ou no assunto, ex.: o nome do job). Falha, ou nenhum e-mail dentro do limite de horas, abre uma pendência sozinha.</p>
     <div class="u-da12f2"><button type="button" class="btn btn-primary btn-sm" data-bk-novo>+ Monitorar um backup</button></div>
     <div id="bkForm"></div>
-    ${mons.length ? mons.map((m) => `
+    ${
+      mons.length
+        ? mons
+            .map(
+              (m) => `
       <div class="bk-card">
         <div class="bk-head"><b>${escapeHtml(m.nome)}</b> ${_bkStatusTag(m)}
           <span class="bk-acts"><button type="button" class="btn btn-secondary btn-sm" data-bk-editar="${escapeHtml(m.id)}">Editar</button></span></div>
         <div class="bk-meta">Identificador: <code>${escapeHtml(m.identificador)}</code> · limite ${Number(m.max_horas) || 48} h${m.responsavel ? ' · ' + escapeHtml(m.responsavel) : ''}</div>
         <div class="bk-meta">Último e-mail: ${escapeHtml(quando(m.ultimo_em))}${m.ultimo_assunto ? ' — ' + escapeHtml(m.ultimo_assunto) : ''}</div>
-        ${(m.historico || []).length ? `<details><summary class="bk-meta">Histórico (${m.historico.length})</summary><ul class="bk-hist">${m.historico.slice(0, 10).map((h) => `<li>${escapeHtml(quando(h.em))} · ${escapeHtml(h.status)} · ${escapeHtml(h.assunto)}</li>`).join('')}</ul></details>` : ''}
-      </div>`).join('') : '<div class="empty-state"><p>Nenhum backup monitorado para este cliente.</p></div>'}`;
+        ${
+          (m.historico || []).length
+            ? `<details><summary class="bk-meta">Histórico (${m.historico.length})</summary><ul class="bk-hist">${m.historico
+                .slice(0, 10)
+                .map(
+                  (h) =>
+                    `<li>${escapeHtml(quando(h.em))} · ${escapeHtml(h.status)} · ${escapeHtml(h.assunto)}</li>`
+                )
+                .join('')}</ul></details>`
+            : ''
+        }
+      </div>`
+            )
+            .join('')
+        : '<div class="empty-state"><p>Nenhum backup monitorado para este cliente.</p></div>'
+    }`;
 }
 
 function _bkForm(m) {
@@ -204,19 +295,35 @@ function _bkForm(m) {
 }
 
 async function _bkSalvar(form) {
-  if (!_saudeOnline()) { showToast('Salvar o monitor precisa de conexão.', 'warning'); return; }
+  if (!_saudeOnline()) {
+    showToast('Salvar o monitor precisa de conexão.', 'warning');
+    return;
+  }
   const c = typeof getClientById === 'function' ? getClientById(_bkClient) : null;
   const fd = new FormData(form);
-  const id = form.dataset.bkForm || (typeof nextId === 'function' ? nextId('BKP') : 'BKP-' + Date.now());
+  const id =
+    form.dataset.bkForm || (typeof nextId === 'function' ? nextId('BKP') : 'BKP-' + Date.now());
   const row = {
-    id, client_id: _bkClient, client_name: c ? c.name : '', team: (c && c.team) || 'init',
-    nome: String(fd.get('nome') || '').trim(), identificador: String(fd.get('identificador') || '').trim(),
+    id,
+    client_id: _bkClient,
+    client_name: c ? c.name : '',
+    team: (c && c.team) || 'init',
+    nome: String(fd.get('nome') || '').trim(),
+    identificador: String(fd.get('identificador') || '').trim(),
     max_horas: Math.max(1, Math.min(2160, Number(fd.get('max_horas')) || 48)),
-    responsavel: String(fd.get('responsavel') || ''), ativo: fd.get('ativo') === 'on', updated_at: new Date().toISOString(),
+    responsavel: String(fd.get('responsavel') || ''),
+    ativo: fd.get('ativo') === 'on',
+    updated_at: new Date().toISOString(),
   };
-  if (!row.nome || row.identificador.length < 3) { showToast('Preencha o nome e um identificador com 3+ letras.', 'error'); return; }
+  if (!row.nome || row.identificador.length < 3) {
+    showToast('Preencha o nome e um identificador com 3+ letras.', 'error');
+    return;
+  }
   const { error } = await supabaseClient.from('backup_monitores').upsert(row);
-  if (error) { showToast('Não foi possível salvar o monitor.', 'error'); return; }
+  if (error) {
+    showToast('Não foi possível salvar o monitor.', 'error');
+    return;
+  }
   showToast('Monitor salvo.', 'success');
   renderClientBackupsTab(_bkClient);
 }
@@ -226,29 +333,54 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     const t = e.target && e.target.closest ? e.target : null;
     if (!t) return;
     const aba = t.closest('[data-client-tab]');
-    if (aba && typeof switchClientTab === 'function') { switchClientTab(aba.dataset.clientTab, aba.dataset.clientId); return; }
-    if (t.closest('[data-bk-novo]')) { _bkForm(null); return; }
-    if (t.closest('[data-bk-cancelar]')) { const b = document.getElementById('bkForm'); if (b) b.innerHTML = ''; return; }
+    if (aba && typeof switchClientTab === 'function') {
+      switchClientTab(aba.dataset.clientTab, aba.dataset.clientId);
+      return;
+    }
+    if (t.closest('[data-bk-novo]')) {
+      _bkForm(null);
+      return;
+    }
+    if (t.closest('[data-bk-cancelar]')) {
+      const b = document.getElementById('bkForm');
+      if (b) b.innerHTML = '';
+      return;
+    }
     const ed = t.closest('[data-bk-editar]');
-    if (ed) { _bkForm((_saudeLer().monitores || []).find((m) => m.id === ed.dataset.bkEditar)); return; }
+    if (ed) {
+      _bkForm((_saudeLer().monitores || []).find((m) => m.id === ed.dataset.bkEditar));
+      return;
+    }
     const del = t.closest('[data-bk-apagar]');
     if (del) {
       if (!window.confirm('Apagar este monitor de backup?')) return;
-      const { error } = await supabaseClient.from('backup_monitores').delete().eq('id', del.dataset.bkApagar);
-      if (error) showToast('Não foi possível apagar.', 'error'); else renderClientBackupsTab(_bkClient);
+      const { error } = await supabaseClient
+        .from('backup_monitores')
+        .delete()
+        .eq('id', del.dataset.bkApagar);
+      if (error) showToast('Não foi possível apagar.', 'error');
+      else renderClientBackupsTab(_bkClient);
     }
   });
   document.addEventListener('submit', (e) => {
     const f = e.target;
-    if (f && f.matches && f.matches('[data-bk-form]')) { e.preventDefault(); _bkSalvar(f); }
+    if (f && f.matches && f.matches('[data-bk-form]')) {
+      e.preventDefault();
+      _bkSalvar(f);
+    }
   });
   // Primeira carga depois do login; a lista de clientes redesenha com a nota completa.
   if (typeof window !== 'undefined') {
-    window.addEventListener('load', () => setTimeout(() => {
-      carregarSaudeExtra().then(() => {
-        if (document.getElementById('clientGrid') && typeof renderClientGrid === 'function') renderClientGrid();
-      }).catch(() => {});
-    }, 4000));
+    window.addEventListener('load', () =>
+      setTimeout(() => {
+        carregarSaudeExtra()
+          .then(() => {
+            if (document.getElementById('clientGrid') && typeof renderClientGrid === 'function')
+              renderClientGrid();
+          })
+          .catch(() => {});
+      }, 4000)
+    );
   }
 }
 

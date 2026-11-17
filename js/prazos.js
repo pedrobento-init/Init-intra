@@ -3,8 +3,8 @@
 // gestor vê, por responsável ou por cliente, o que venceu, o que vence hoje
 // e nos próximos dias, o que está sem prazo e quanto foi entregue no prazo.
 
-const PRAZOS_SOON_DAYS = 3;     // "vence em breve" = até 3 dias
-const PRAZOS_HIT_WINDOW = 30;   // cumprimento: concluídas nos últimos 30 dias
+const PRAZOS_SOON_DAYS = 3; // "vence em breve" = até 3 dias
+const PRAZOS_HIT_WINDOW = 30; // cumprimento: concluídas nos últimos 30 dias
 const PRAZOS_GROUP_KEY = 'intra_prazos_group_v1';
 
 function _prazosClosed(status) {
@@ -29,7 +29,13 @@ function _prazosLocalDate(iso) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return (
+    d.getFullYear() +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  );
 }
 
 /** Faixa do prazo de uma pendência aberta: vencida | hoje | breve | semana | futuro | sem_prazo. */
@@ -56,16 +62,39 @@ function buildPrazosModel(pens, todayISO, opts) {
     d.setDate(d.getDate() - PRAZOS_HIT_WINDOW);
     return _prazosLocalDate(d.toISOString());
   })();
-  const keyOf = (p) => groupBy === 'cliente'
-    ? { key: p.clientId || '_sem', label: p.clientName || 'Sem cliente' }
-    : { key: p.responsible || '_sem', label: p.responsible || 'Sem responsável' };
+  const keyOf = (p) =>
+    groupBy === 'cliente'
+      ? { key: p.clientId || '_sem', label: p.clientName || 'Sem cliente' }
+      : { key: p.responsible || '_sem', label: p.responsible || 'Sem responsável' };
 
-  const kpis = { abertas: 0, vencidas: 0, hoje: 0, breve: 0, semPrazo: 0, noPrazo: 0, entregues: 0, pct: null };
+  const kpis = {
+    abertas: 0,
+    vencidas: 0,
+    hoje: 0,
+    breve: 0,
+    semPrazo: 0,
+    noPrazo: 0,
+    entregues: 0,
+    pct: null,
+  };
   const groups = new Map();
   const group = (p) => {
     const k = keyOf(p);
     if (!groups.has(k.key)) {
-      groups.set(k.key, { key: k.key, label: k.label, abertas: 0, vencidas: 0, hoje: 0, breve: 0, semPrazo: 0, piorAtraso: 0, noPrazo: 0, entregues: 0, pct: null, items: [] });
+      groups.set(k.key, {
+        key: k.key,
+        label: k.label,
+        abertas: 0,
+        vencidas: 0,
+        hoje: 0,
+        breve: 0,
+        semPrazo: 0,
+        piorAtraso: 0,
+        noPrazo: 0,
+        entregues: 0,
+        pct: null,
+        items: [],
+      });
     }
     return groups.get(k.key);
   };
@@ -79,19 +108,35 @@ function buildPrazosModel(pens, todayISO, opts) {
       if (!done || done < since || done > todayISO) continue;
       const g = group(p);
       const ok = done <= String(p.deadline).slice(0, 10);
-      g.entregues++; kpis.entregues++;
-      if (ok) { g.noPrazo++; kpis.noPrazo++; }
+      g.entregues++;
+      kpis.entregues++;
+      if (ok) {
+        g.noPrazo++;
+        kpis.noPrazo++;
+      }
       continue;
     }
     const band = classifyDeadline(p, todayISO);
     const g = group(p);
-    g.abertas++; kpis.abertas++;
+    g.abertas++;
+    kpis.abertas++;
     if (band === 'vencida') {
-      g.vencidas++; kpis.vencidas++;
-      g.piorAtraso = Math.max(g.piorAtraso, -prazosDaysBetween(todayISO, String(p.deadline).slice(0, 10)));
-    } else if (band === 'hoje') { g.hoje++; kpis.hoje++; }
-    else if (band === 'breve') { g.breve++; kpis.breve++; }
-    else if (band === 'sem_prazo') { g.semPrazo++; kpis.semPrazo++; }
+      g.vencidas++;
+      kpis.vencidas++;
+      g.piorAtraso = Math.max(
+        g.piorAtraso,
+        -prazosDaysBetween(todayISO, String(p.deadline).slice(0, 10))
+      );
+    } else if (band === 'hoje') {
+      g.hoje++;
+      kpis.hoje++;
+    } else if (band === 'breve') {
+      g.breve++;
+      kpis.breve++;
+    } else if (band === 'sem_prazo') {
+      g.semPrazo++;
+      kpis.semPrazo++;
+    }
     g.items.push({ p, band });
   }
 
@@ -99,13 +144,22 @@ function buildPrazosModel(pens, todayISO, opts) {
   const list = [...groups.values()];
   for (const g of list) {
     g.pct = g.entregues ? Math.round((g.noPrazo / g.entregues) * 100) : null;
-    g.items.sort((a, b) => (order[a.band] - order[b.band]) ||
-      String(a.p.deadline || '9999').localeCompare(String(b.p.deadline || '9999')));
+    g.items.sort(
+      (a, b) =>
+        order[a.band] - order[b.band] ||
+        String(a.p.deadline || '9999').localeCompare(String(b.p.deadline || '9999'))
+    );
   }
   kpis.pct = kpis.entregues ? Math.round((kpis.noPrazo / kpis.entregues) * 100) : null;
   // Quem tem mais risco primeiro; grupos só com entregues (nada aberto) por último.
-  list.sort((a, b) => (b.vencidas - a.vencidas) || (b.hoje - a.hoje) || (b.breve - a.breve) ||
-    (b.abertas - a.abertas) || a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }));
+  list.sort(
+    (a, b) =>
+      b.vencidas - a.vencidas ||
+      b.hoje - a.hoje ||
+      b.breve - a.breve ||
+      b.abertas - a.abertas ||
+      a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' })
+  );
   return { groupBy, kpis, groups: list };
 }
 
@@ -118,7 +172,11 @@ let _prazosOnlyRisk = false;
 function _prazosLoadGroup() {
   if (_prazosGroupBy) return _prazosGroupBy;
   let v = 'responsavel';
-  try { v = localStorage.getItem(PRAZOS_GROUP_KEY) || v; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
+  try {
+    v = localStorage.getItem(PRAZOS_GROUP_KEY) || v;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'prazos');
+  }
   _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   return _prazosGroupBy;
 }
@@ -126,7 +184,11 @@ function _prazosLoadGroup() {
 function setPrazosGroup(v) {
   _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   _prazosOpen = new Set();
-  try { localStorage.setItem(PRAZOS_GROUP_KEY, _prazosGroupBy); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
+  try {
+    localStorage.setItem(PRAZOS_GROUP_KEY, _prazosGroupBy);
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'prazos');
+  }
   renderPrazos();
 }
 
@@ -140,25 +202,48 @@ function togglePrazosGroup(btn) {
   const row = btn && btn.closest ? btn.closest('.pz-group') : null;
   if (!row) return;
   const key = row.dataset.key;
-  if (_prazosOpen.has(key)) _prazosOpen.delete(key); else _prazosOpen.add(key);
+  if (_prazosOpen.has(key)) _prazosOpen.delete(key);
+  else _prazosOpen.add(key);
   const open = _prazosOpen.has(key);
   row.classList.toggle('is-open', open);
   btn.setAttribute('aria-expanded', String(open));
 }
 
 function _prazosScope() {
-  const team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) ? _selectedTeam : null;
-  const pens = team && typeof getPendenciasByTeam === 'function' ? getPendenciasByTeam(team) : (typeof getMyPendencias === 'function' ? getMyPendencias() : []);
-  const today = typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
+  const team =
+    typeof isTeamAdmin === 'function' &&
+    isTeamAdmin() &&
+    typeof _selectedTeam !== 'undefined' &&
+    _selectedTeam
+      ? _selectedTeam
+      : null;
+  const pens =
+    team && typeof getPendenciasByTeam === 'function'
+      ? getPendenciasByTeam(team)
+      : typeof getMyPendencias === 'function'
+        ? getMyPendencias()
+        : [];
+  const today =
+    typeof localDateISO === 'function' ? localDateISO() : new Date().toISOString().slice(0, 10);
   return { pens, today };
 }
 
 function _prazosBandLabel(p, band, today) {
   if (band === 'sem_prazo') return '<span class="fila-due">Sem prazo</span>';
   const d = prazosDaysBetween(today, String(p.deadline).slice(0, 10));
-  if (band === 'vencida') return '<span class="fila-due is-over">' + (-d === 1 ? 'Venceu ontem' : 'Venceu há ' + (-d) + ' dias') + '</span>';
+  if (band === 'vencida')
+    return (
+      '<span class="fila-due is-over">' +
+      (-d === 1 ? 'Venceu ontem' : 'Venceu há ' + -d + ' dias') +
+      '</span>'
+    );
   if (band === 'hoje') return '<span class="fila-due is-today">Vence hoje</span>';
-  if (band === 'breve') return '<span class="fila-due is-soon">' + (d === 1 ? 'Vence amanhã' : 'Em ' + d + ' dias') + '</span>';
+  if (band === 'breve')
+    return (
+      '<span class="fila-due is-soon">' +
+      (d === 1 ? 'Vence amanhã' : 'Em ' + d + ' dias') +
+      '</span>'
+    );
   return '<span class="fila-due">' + escapeHtml(formatDate(p.deadline)) + '</span>';
 }
 
@@ -166,22 +251,45 @@ function _prazosItemRow(it, today, groupBy) {
   const p = it.p;
   const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
-  const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
-  const other = groupBy === 'cliente' ? (p.responsible || 'Sem responsável') : (p.clientName || 'Sem cliente');
-  return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
-    '<span class="fila-dot" data-sty="--c:' + pri + '" aria-hidden="true"></span>' +
-    '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
-    '<span class="fila-meta">' + escapeHtml(other) + '</span></span>' +
-    _prazosBandLabel(p, it.band, today) + '</li>';
+  const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : p.assunto || '';
+  const other =
+    groupBy === 'cliente' ? p.responsible || 'Sem responsável' : p.clientName || 'Sem cliente';
+  return (
+    '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' +
+    escapeHtml(p.id) +
+    '">' +
+    '<span class="fila-dot" data-sty="--c:' +
+    pri +
+    '" aria-hidden="true"></span>' +
+    '<span class="fila-main"><span class="fila-title"><small>' +
+    escapeHtml(num) +
+    '</small>' +
+    escapeHtml(title) +
+    '</span>' +
+    '<span class="fila-meta">' +
+    escapeHtml(other) +
+    '</span></span>' +
+    _prazosBandLabel(p, it.band, today) +
+    '</li>'
+  );
 }
 
 function _prazosPct(pct) {
-  if (pct === null) return '<span class="pz-pct is-none" title="Nada com prazo entregue nos últimos 30 dias">—</span>';
+  if (pct === null)
+    return '<span class="pz-pct is-none" title="Nada com prazo entregue nos últimos 30 dias">—</span>';
   const cls = pct >= 85 ? 'is-ok' : pct >= 60 ? 'is-warn' : 'is-bad';
   return '<span class="pz-pct ' + cls + '">' + pct + '%</span>';
 }
 
-const _pzKpi = (n, label, cls, extra) => '<div class="ov-k ov-k-static ' + (cls || '') + '"><b>' + n + '</b><span>' + label + (extra ? ' <small>' + extra + '</small>' : '') + '</span></div>';
+const _pzKpi = (n, label, cls, extra) =>
+  '<div class="ov-k ov-k-static ' +
+  (cls || '') +
+  '"><b>' +
+  n +
+  '</b><span>' +
+  label +
+  (extra ? ' <small>' + extra + '</small>' : '') +
+  '</span></div>';
 
 // ── 1ª resposta (056) ──
 function _prazosRespostaHtml(pens) {
@@ -189,32 +297,71 @@ function _prazosRespostaHtml(pens) {
   const now = Date.now();
   const r = buildRespostaKpis(pens, now, 30);
   if (!r.aguardando && !r.respondidas) return '';
-  const esperando = pens.map((p) => ({ p, st: slaRespostaEstado(p, now) }))
+  const esperando = pens
+    .map((p) => ({ p, st: slaRespostaEstado(p, now) }))
     .filter((x) => ['atrasada', 'vence_logo', 'no_prazo'].includes(x.st.estado))
     .sort((a, b) => String(a.p.firstResponseDue).localeCompare(String(b.p.firstResponseDue)));
   const row = (x) => {
     const p = x.p;
     const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
-    const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
-    const quando = x.st.estado === 'atrasada'
-      ? '<span class="fila-due is-over">Atrasada ' + slaDuracaoCurta(x.st.minutos) + '</span>'
-      : '<span class="fila-due' + (x.st.estado === 'vence_logo' ? ' is-soon' : '') + '">Responder em ' + slaDuracaoCurta(x.st.minutos) + '</span>';
-    const meta = (p.clientName || 'Interno') + (p.solicitante ? ' · ' + p.solicitante : '') + ' · ' + (p.responsible || 'Sem responsável');
-    return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
-      '<span class="fila-dot" data-sty="--c:' + (typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)') + '" aria-hidden="true"></span>' +
-      '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
-      '<span class="fila-meta">' + escapeHtml(meta) + '</span></span>' + quando + '</li>';
+    const title =
+      typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : p.assunto || '';
+    const quando =
+      x.st.estado === 'atrasada'
+        ? '<span class="fila-due is-over">Atrasada ' + slaDuracaoCurta(x.st.minutos) + '</span>'
+        : '<span class="fila-due' +
+          (x.st.estado === 'vence_logo' ? ' is-soon' : '') +
+          '">Responder em ' +
+          slaDuracaoCurta(x.st.minutos) +
+          '</span>';
+    const meta =
+      (p.clientName || 'Interno') +
+      (p.solicitante ? ' · ' + p.solicitante : '') +
+      ' · ' +
+      (p.responsible || 'Sem responsável');
+    return (
+      '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' +
+      escapeHtml(p.id) +
+      '">' +
+      '<span class="fila-dot" data-sty="--c:' +
+      (typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)') +
+      '" aria-hidden="true"></span>' +
+      '<span class="fila-main"><span class="fila-title"><small>' +
+      escapeHtml(num) +
+      '</small>' +
+      escapeHtml(title) +
+      '</span>' +
+      '<span class="fila-meta">' +
+      escapeHtml(meta) +
+      '</span></span>' +
+      quando +
+      '</li>'
+    );
   };
-  return '<section class="card ov-panel pz-resposta">' +
+  return (
+    '<section class="card ov-panel pz-resposta">' +
     '<div class="ov-ph"><h2 class="ov-h2">1ª resposta</h2><span class="ov-sub">Prazo pela prioridade, em horário comercial</span></div>' +
     '<div class="ov-kpis pz-kpis">' +
-      _pzKpi(r.aguardando, 'Aguardando resposta', r.aguardando ? 'amber' : '') +
-      _pzKpi(r.atrasadas, 'Resposta atrasada', r.atrasadas ? 'red' : '') +
-      _pzKpi(r.pctNoPrazo === null ? '—' : r.pctNoPrazo + '%', 'Respondidas no prazo', '', '(' + r.respondidas + ', 30 dias)') +
-      _pzKpi(r.medianaMin === null ? '—' : slaDuracaoCurta(r.medianaMin), 'Tempo típico de resposta', '', '(mediana)') +
+    _pzKpi(r.aguardando, 'Aguardando resposta', r.aguardando ? 'amber' : '') +
+    _pzKpi(r.atrasadas, 'Resposta atrasada', r.atrasadas ? 'red' : '') +
+    _pzKpi(
+      r.pctNoPrazo === null ? '—' : r.pctNoPrazo + '%',
+      'Respondidas no prazo',
+      '',
+      '(' + r.respondidas + ', 30 dias)'
+    ) +
+    _pzKpi(
+      r.medianaMin === null ? '—' : slaDuracaoCurta(r.medianaMin),
+      'Tempo típico de resposta',
+      '',
+      '(mediana)'
+    ) +
     '</div>' +
-    (esperando.length ? '<ul class="fila-list">' + esperando.slice(0, 15).map(row).join('') + '</ul>' : '') +
-  '</section>';
+    (esperando.length
+      ? '<ul class="fila-list">' + esperando.slice(0, 15).map(row).join('') + '</ul>'
+      : '') +
+    '</section>'
+  );
 }
 
 // ── Problemas recorrentes (056) ──
@@ -223,36 +370,116 @@ function _prazosRecorrentesHtml(pens, today) {
   const m = buildRecorrentesModel(pens, today, { dias: 90, minimo: 3 });
   const barras = (lista, labelFn) => {
     const max = lista.length ? lista[0].total : 1;
-    return '<ul class="rc-bars">' + lista.map((x) =>
-      '<li><span class="rc-lbl">' + escapeHtml(labelFn(x.value) || x.value) + '</span>' +
-      '<span class="rc-track" aria-hidden="true"><i data-sty="width:' + Math.max(4, Math.round((x.total / max) * 100)) + '%"></i></span>' +
-      '<b>' + x.total + '</b></li>').join('') + '</ul>';
+    return (
+      '<ul class="rc-bars">' +
+      lista
+        .map(
+          (x) =>
+            '<li><span class="rc-lbl">' +
+            escapeHtml(labelFn(x.value) || x.value) +
+            '</span>' +
+            '<span class="rc-track" aria-hidden="true"><i data-sty="width:' +
+            Math.max(4, Math.round((x.total / max) * 100)) +
+            '%"></i></span>' +
+            '<b>' +
+            x.total +
+            '</b></li>'
+        )
+        .join('') +
+      '</ul>'
+    );
   };
-  const item = (it) => '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(it.id) + '">' +
-    '<span class="fila-main"><span class="fila-title">' + escapeHtml(it.assunto) + '</span></span>' +
-    '<span class="fila-due">' + escapeHtml(formatDate(it.createdAt)) + '</span></li>';
+  const item = (it) =>
+    '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' +
+    escapeHtml(it.id) +
+    '">' +
+    '<span class="fila-main"><span class="fila-title">' +
+    escapeHtml(it.assunto) +
+    '</span></span>' +
+    '<span class="fila-due">' +
+    escapeHtml(formatDate(it.createdAt)) +
+    '</span></li>';
   const recHtml = m.recorrentes.length
-    ? '<ul class="rc-list">' + m.recorrentes.map((g) =>
-      '<li class="rc-item"><div class="rc-head"><b>' + escapeHtml(g.clientName || 'Cliente') + '</b><span>' + escapeHtml(penCategoriaLabel(g.categoria)) + '</span>' +
-        '<span class="pz-chip is-over">' + g.total + 'x em ' + m.dias + ' dias</span>' +
-        (g.abertas ? '<span class="pz-chip">' + g.abertas + ' aberta' + (g.abertas === 1 ? '' : 's') + '</span>' : '') + '</div>' +
-        '<ul class="fila-list">' + g.itens.map(item).join('') + '</ul></li>').join('') + '</ul>'
-    : '<div class="empty-state"><p>Nenhum cliente com o mesmo tipo de problema ' + m.minimo + ' ou mais vezes nos últimos ' + m.dias + ' dias.</p></div>';
-  return '<section class="card ov-panel">' +
-      '<div class="ov-ph"><h2 class="ov-h2">Problemas que se repetem</h2><span class="ov-sub">Mesmo cliente e categoria ' + m.minimo + '+ vezes em ' + m.dias + ' dias: vale atacar a causa</span></div>' +
-      recHtml +
+    ? '<ul class="rc-list">' +
+      m.recorrentes
+        .map(
+          (g) =>
+            '<li class="rc-item"><div class="rc-head"><b>' +
+            escapeHtml(g.clientName || 'Cliente') +
+            '</b><span>' +
+            escapeHtml(penCategoriaLabel(g.categoria)) +
+            '</span>' +
+            '<span class="pz-chip is-over">' +
+            g.total +
+            'x em ' +
+            m.dias +
+            ' dias</span>' +
+            (g.abertas
+              ? '<span class="pz-chip">' +
+                g.abertas +
+                ' aberta' +
+                (g.abertas === 1 ? '' : 's') +
+                '</span>'
+              : '') +
+            '</div>' +
+            '<ul class="fila-list">' +
+            g.itens.map(item).join('') +
+            '</ul></li>'
+        )
+        .join('') +
+      '</ul>'
+    : '<div class="empty-state"><p>Nenhum cliente com o mesmo tipo de problema ' +
+      m.minimo +
+      ' ou mais vezes nos últimos ' +
+      m.dias +
+      ' dias.</p></div>';
+  return (
+    '<section class="card ov-panel">' +
+    '<div class="ov-ph"><h2 class="ov-h2">Problemas que se repetem</h2><span class="ov-sub">Mesmo cliente e categoria ' +
+    m.minimo +
+    '+ vezes em ' +
+    m.dias +
+    ' dias: vale atacar a causa</span></div>' +
+    recHtml +
     '</section>' +
     '<div class="rc-grid">' +
-      '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por categoria</h2><span class="ov-sub">' + m.total + ' pendências em ' + m.dias + ' dias</span></div>' +
-        (m.porCategoria.length ? barras(m.porCategoria, penCategoriaLabel) : '<p class="ov-empty">Nenhuma pendência com categoria ainda.</p>') +
-        (m.semCategoria ? '<p class="sla-muted">' + m.semCategoria + ' sem categoria. Preencha ao abrir para o relatório ficar completo.</p>' : '') +
-      '</section>' +
-      '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por canal</h2></div>' +
-        (m.porCanal.length ? barras(m.porCanal, penCanalLabel) : '<p class="ov-empty">Nenhuma pendência com canal ainda.</p>') +
-        (m.solicitantes.length ? '<h3 class="rc-sub">Quem mais pede</h3><ul class="rc-bars">' + m.solicitantes.map((x) =>
-          '<li><span class="rc-lbl">' + escapeHtml(x.nome) + ' <small>' + escapeHtml(x.clientName || '') + '</small></span><b>' + x.total + '</b></li>').join('') + '</ul>' : '') +
-      '</section>' +
-    '</div>';
+    '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por categoria</h2><span class="ov-sub">' +
+    m.total +
+    ' pendências em ' +
+    m.dias +
+    ' dias</span></div>' +
+    (m.porCategoria.length
+      ? barras(m.porCategoria, penCategoriaLabel)
+      : '<p class="ov-empty">Nenhuma pendência com categoria ainda.</p>') +
+    (m.semCategoria
+      ? '<p class="sla-muted">' +
+        m.semCategoria +
+        ' sem categoria. Preencha ao abrir para o relatório ficar completo.</p>'
+      : '') +
+    '</section>' +
+    '<section class="card ov-panel"><div class="ov-ph"><h2 class="ov-h2">Por canal</h2></div>' +
+    (m.porCanal.length
+      ? barras(m.porCanal, penCanalLabel)
+      : '<p class="ov-empty">Nenhuma pendência com canal ainda.</p>') +
+    (m.solicitantes.length
+      ? '<h3 class="rc-sub">Quem mais pede</h3><ul class="rc-bars">' +
+        m.solicitantes
+          .map(
+            (x) =>
+              '<li><span class="rc-lbl">' +
+              escapeHtml(x.nome) +
+              ' <small>' +
+              escapeHtml(x.clientName || '') +
+              '</small></span><b>' +
+              x.total +
+              '</b></li>'
+          )
+          .join('') +
+        '</ul>'
+      : '') +
+    '</section>' +
+    '</div>'
+  );
 }
 
 function renderPrazos() {
@@ -261,73 +488,151 @@ function renderPrazos() {
   const s = _prazosScope();
   const m = buildPrazosModel(s.pens, s.today, { groupBy });
   const k = m.kpis;
-  const groups = _prazosOnlyRisk ? m.groups.filter((g) => g.vencidas || g.hoje || g.breve) : m.groups.filter((g) => g.abertas || g.entregues);
+  const groups = _prazosOnlyRisk
+    ? m.groups.filter((g) => g.vencidas || g.hoje || g.breve)
+    : m.groups.filter((g) => g.abertas || g.entregues);
   const who = groupBy === 'cliente' ? 'cliente' : 'responsável';
 
-  const kpi = (n, label, cls, extra) => '<div class="ov-k ov-k-static ' + (cls || '') + '"><b>' + n + '</b><span>' + label + (extra ? ' <small>' + extra + '</small>' : '') + '</span></div>';
-  const groupHtml = groups.map((g) => {
-    const open = _prazosOpen.has(g.key);
-    const chips = [
-      g.vencidas ? '<span class="pz-chip is-over">' + g.vencidas + ' vencida' + (g.vencidas === 1 ? '' : 's') + '</span>' : '',
-      g.hoje ? '<span class="pz-chip is-today">' + g.hoje + ' hoje</span>' : '',
-      g.breve ? '<span class="pz-chip is-soon">' + g.breve + ' em breve</span>' : '',
-      g.semPrazo ? '<span class="pz-chip">' + g.semPrazo + ' sem prazo</span>' : '',
-    ].join('');
-    const items = g.items.filter((it) => !_prazosOnlyRisk || ['vencida', 'hoje', 'breve'].includes(it.band));
-    return '<li class="pz-group' + (open ? ' is-open' : '') + '" data-key="' + escapeHtml(g.key) + '">' +
-      '<button type="button" class="pz-head" aria-expanded="' + open + '" data-action="pzToggleGroup">' +
+  const kpi = (n, label, cls, extra) =>
+    '<div class="ov-k ov-k-static ' +
+    (cls || '') +
+    '"><b>' +
+    n +
+    '</b><span>' +
+    label +
+    (extra ? ' <small>' + extra + '</small>' : '') +
+    '</span></div>';
+  const groupHtml = groups
+    .map((g) => {
+      const open = _prazosOpen.has(g.key);
+      const chips = [
+        g.vencidas
+          ? '<span class="pz-chip is-over">' +
+            g.vencidas +
+            ' vencida' +
+            (g.vencidas === 1 ? '' : 's') +
+            '</span>'
+          : '',
+        g.hoje ? '<span class="pz-chip is-today">' + g.hoje + ' hoje</span>' : '',
+        g.breve ? '<span class="pz-chip is-soon">' + g.breve + ' em breve</span>' : '',
+        g.semPrazo ? '<span class="pz-chip">' + g.semPrazo + ' sem prazo</span>' : '',
+      ].join('');
+      const items = g.items.filter(
+        (it) => !_prazosOnlyRisk || ['vencida', 'hoje', 'breve'].includes(it.band)
+      );
+      return (
+        '<li class="pz-group' +
+        (open ? ' is-open' : '') +
+        '" data-key="' +
+        escapeHtml(g.key) +
+        '">' +
+        '<button type="button" class="pz-head" aria-expanded="' +
+        open +
+        '" data-action="pzToggleGroup">' +
         '<svg class="pz-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>' +
-        '<span class="pz-name">' + escapeHtml(g.label) + '</span>' +
-        '<span class="pz-chips">' + chips + '</span>' +
-        '<span class="pz-open" title="Abertas">' + g.abertas + '<small> abertas</small></span>' +
-        '<span class="pz-late" title="Maior atraso">' + (g.piorAtraso ? g.piorAtraso + 'd<small> atraso</small>' : '') + '</span>' +
+        '<span class="pz-name">' +
+        escapeHtml(g.label) +
+        '</span>' +
+        '<span class="pz-chips">' +
+        chips +
+        '</span>' +
+        '<span class="pz-open" title="Abertas">' +
+        g.abertas +
+        '<small> abertas</small></span>' +
+        '<span class="pz-late" title="Maior atraso">' +
+        (g.piorAtraso ? g.piorAtraso + 'd<small> atraso</small>' : '') +
+        '</span>' +
         _prazosPct(g.pct) +
-      '</button>' +
-      '<ul class="fila-list pz-items">' + (items.length ? items.map((it) => _prazosItemRow(it, s.today, groupBy)).join('') : '<li class="pz-empty">Nada em aberto.</li>') + '</ul>' +
-    '</li>';
-  }).join('');
+        '</button>' +
+        '<ul class="fila-list pz-items">' +
+        (items.length
+          ? items.map((it) => _prazosItemRow(it, s.today, groupBy)).join('')
+          : '<li class="pz-empty">Nada em aberto.</li>') +
+        '</ul>' +
+        '</li>'
+      );
+    })
+    .join('');
 
-  const segBtn = (v, label) => '<button type="button" class="period-btn' + (groupBy === v ? ' active' : '') + '" aria-pressed="' + (groupBy === v) + '" data-action="pzGroup" data-arg="' + v + '">' + label + '</button>';
-  const bar = '<div class="ov-bar">' +
-      '<div class="ov-seg" role="group" aria-label="Agrupar por">' +
-        segBtn('responsavel', 'Por responsável') + segBtn('cliente', 'Por cliente') +
-        (typeof buildRecorrentesModel === 'function' ? segBtn('recorrentes', 'Problemas recorrentes') : '') +
-      '</div>' +
-      (groupBy === 'recorrentes' ? '' : '<label class="pz-toggle"><input type="checkbox"' + (_prazosOnlyRisk ? ' checked' : '') + ' data-change="pzRisk"> Só com risco</label>') +
+  const segBtn = (v, label) =>
+    '<button type="button" class="period-btn' +
+    (groupBy === v ? ' active' : '') +
+    '" aria-pressed="' +
+    (groupBy === v) +
+    '" data-action="pzGroup" data-arg="' +
+    v +
+    '">' +
+    label +
+    '</button>';
+  const bar =
+    '<div class="ov-bar">' +
+    '<div class="ov-seg" role="group" aria-label="Agrupar por">' +
+    segBtn('responsavel', 'Por responsável') +
+    segBtn('cliente', 'Por cliente') +
+    (typeof buildRecorrentesModel === 'function'
+      ? segBtn('recorrentes', 'Problemas recorrentes')
+      : '') +
+    '</div>' +
+    (groupBy === 'recorrentes'
+      ? ''
+      : '<label class="pz-toggle"><input type="checkbox"' +
+        (_prazosOnlyRisk ? ' checked' : '') +
+        ' data-change="pzRisk"> Só com risco</label>') +
     '</div>';
   if (groupBy === 'recorrentes') {
-    document.getElementById('contentArea').innerHTML = '<div class="ov-wrap prazos">' + bar + _prazosRecorrentesHtml(s.pens, s.today) + '</div>';
+    document.getElementById('contentArea').innerHTML =
+      '<div class="ov-wrap prazos">' + bar + _prazosRecorrentesHtml(s.pens, s.today) + '</div>';
     return;
   }
 
   document.getElementById('contentArea').innerHTML =
     '<div class="ov-wrap prazos">' +
-      bar +
-      _prazosRespostaHtml(s.pens) +
-      '<div class="ov-kpis pz-kpis">' +
-        kpi(k.vencidas, 'Vencidas', k.vencidas ? 'red' : '') +
-        kpi(k.hoje, 'Vencem hoje', k.hoje ? 'amber' : '') +
-        kpi(k.breve, 'Próximos ' + PRAZOS_SOON_DAYS + ' dias') +
-        kpi(k.semPrazo, 'Sem prazo') +
-        kpi(k.pct === null ? '—' : k.pct + '%', 'Entregues no prazo', '', k.entregues ? '(' + k.noPrazo + ' de ' + k.entregues + ', 30 dias)' : '(30 dias)') +
-      '</div>' +
-      '<section class="card ov-panel">' +
-        '<div class="ov-ph"><h2 class="ov-h2">Por ' + who + '</h2><span class="ov-sub">' + k.abertas + ' em aberto · % no prazo nos últimos 30 dias</span></div>' +
-        (groupHtml ? '<ul class="pz-list">' + groupHtml + '</ul>'
-          : '<div class="empty-state"><p>' + (_prazosOnlyRisk ? 'Nenhum prazo em risco. 🎉' : 'Nenhuma pendência em aberto.') + '</p></div>') +
-      '</section>' +
+    bar +
+    _prazosRespostaHtml(s.pens) +
+    '<div class="ov-kpis pz-kpis">' +
+    kpi(k.vencidas, 'Vencidas', k.vencidas ? 'red' : '') +
+    kpi(k.hoje, 'Vencem hoje', k.hoje ? 'amber' : '') +
+    kpi(k.breve, 'Próximos ' + PRAZOS_SOON_DAYS + ' dias') +
+    kpi(k.semPrazo, 'Sem prazo') +
+    kpi(
+      k.pct === null ? '—' : k.pct + '%',
+      'Entregues no prazo',
+      '',
+      k.entregues ? '(' + k.noPrazo + ' de ' + k.entregues + ', 30 dias)' : '(30 dias)'
+    ) +
+    '</div>' +
+    '<section class="card ov-panel">' +
+    '<div class="ov-ph"><h2 class="ov-h2">Por ' +
+    who +
+    '</h2><span class="ov-sub">' +
+    k.abertas +
+    ' em aberto · % no prazo nos últimos 30 dias</span></div>' +
+    (groupHtml
+      ? '<ul class="pz-list">' + groupHtml + '</ul>'
+      : '<div class="empty-state"><p>' +
+        (_prazosOnlyRisk ? 'Nenhum prazo em risco. 🎉' : 'Nenhuma pendência em aberto.') +
+        '</p></div>') +
+    '</section>' +
     '</div>';
 }
 
 // Atualiza sozinho quando pendências mudam (local, sync ou realtime).
 (function () {
-  if (typeof window === 'undefined' || typeof onDataChanged !== 'function' || window._prazosAutoRefresh) return;
+  if (
+    typeof window === 'undefined' ||
+    typeof onDataChanged !== 'function' ||
+    window._prazosAutoRefresh
+  )
+    return;
   window._prazosAutoRefresh = true;
   onDataChanged('pendencias', function () {
     try {
       if ((window.location.hash || '').replace('#', '') !== 'prazos') return;
-      if (typeof preserveScrollAround === 'function') preserveScrollAround(renderPrazos); else renderPrazos();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
+      if (typeof preserveScrollAround === 'function') preserveScrollAround(renderPrazos);
+      else renderPrazos();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'prazos');
+    }
   });
 })();
 

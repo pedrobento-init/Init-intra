@@ -10,7 +10,9 @@ beforeEach(() => {
   mem = {};
   globalThis.DB = { RESPOSTAS_PRONTAS: 'intra_respostas_prontas' };
   globalThis.dbGet = (k) => mem[k];
-  globalThis.dbSet = (k, v) => { mem[k] = v; };
+  globalThis.dbSet = (k, v) => {
+    mem[k] = v;
+  };
   globalThis.isSupabaseConnected = () => false;
   globalThis.getCurrentTeam = () => 'suporte';
   globalThis.getUser = () => ({ name: 'Ana' });
@@ -52,13 +54,15 @@ describe('respostas prontas', () => {
     mem.intra_respostas_prontas = [
       { id: '1', titulo: 'Zeta', conteudo: 'z', team: 'suporte' },
       { id: '2', titulo: 'Alfa', conteudo: 'a', team: 'suporte' },
-      { id: '3', titulo: 'Beta', conteudo: 'b', team: 'campo' }
+      { id: '3', titulo: 'Beta', conteudo: 'b', team: 'campo' },
     ];
     expect(rp.respostasProntasDaEquipe().map((r) => r.titulo)).toEqual(['Alfa', 'Zeta']);
   });
 
   it('inserir acrescenta ao texto já digitado', () => {
-    mem.intra_respostas_prontas = [{ id: 'a', titulo: 'T', conteudo: 'Reinicie o roteador.', team: 'suporte' }];
+    mem.intra_respostas_prontas = [
+      { id: 'a', titulo: 'T', conteudo: 'Reinicie o roteador.', team: 'suporte' },
+    ];
     const ta = { value: 'Olá!  \n', focus() {} };
     globalThis.document = { getElementById: (id) => (id === 'newNoteText' ? ta : null) };
     expect(rp.inserirRespostaPronta('a')).toBe(true);
@@ -74,21 +78,46 @@ describe('seletor no composer do chamado', () => {
   let acoes, ta, painel, chamadas;
   beforeEach(() => {
     chamadas = { openModal: 0, closeModal: 0, toast: [] };
-    globalThis.escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    globalThis.openModal = () => { chamadas.openModal++; };
-    globalThis.closeModal = () => { chamadas.closeModal++; };
-    globalThis.showToast = (m) => { chamadas.toast.push(m); };
-    globalThis.registerActions = (m) => { acoes = m; };
+    globalThis.escapeHtml = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    globalThis.openModal = () => {
+      chamadas.openModal++;
+    };
+    globalThis.closeModal = () => {
+      chamadas.closeModal++;
+    };
+    globalThis.showToast = (m) => {
+      chamadas.toast.push(m);
+    };
+    globalThis.registerActions = (m) => {
+      acoes = m;
+    };
     ta = { value: 'Bom dia, João.', focus() {} };
     painel = { innerHTML: '', hidden: true };
-    globalThis.document = { getElementById: (id) => ({ newNoteText: ta, rpPainel: painel })[id] || null };
-    mem.intra_respostas_prontas = [{ id: 'a', titulo: 'Roteador', conteudo: 'Reinicie o roteador.', team: 'suporte' }];
+    globalThis.document = {
+      getElementById: (id) => ({ newNoteText: ta, rpPainel: painel })[id] || null,
+    };
+    mem.intra_respostas_prontas = [
+      { id: 'a', titulo: 'Roteador', conteudo: 'Reinicie o roteador.', team: 'suporte' },
+    ];
     delete require.cache[require.resolve('../js/respostas-prontas.js')];
     rp = require('../js/respostas-prontas.js');
   });
 
   afterEach(() => {
-    for (const k of ['document', 'escapeHtml', 'openModal', 'closeModal', 'showToast', 'registerActions']) delete globalThis[k];
+    for (const k of [
+      'document',
+      'escapeHtml',
+      'openModal',
+      'closeModal',
+      'showToast',
+      'registerActions',
+    ])
+      delete globalThis[k];
   });
 
   it('abre no painel do composer, sem trocar o modal do chamado', () => {
@@ -116,8 +145,14 @@ describe('seletor no composer do chamado', () => {
   });
 
   it('salvar recarrega o painel com a resposta nova, sem abrir modal', () => {
-    const campos = { rpId: { value: '' }, rpTitulo: { value: 'Senha Wi-Fi' }, rpConteudo: { value: 'Troque a senha.' } };
-    globalThis.document = { getElementById: (id) => ({ newNoteText: ta, rpPainel: painel, ...campos })[id] || null };
+    const campos = {
+      rpId: { value: '' },
+      rpTitulo: { value: 'Senha Wi-Fi' },
+      rpConteudo: { value: 'Troque a senha.' },
+    };
+    globalThis.document = {
+      getElementById: (id) => ({ newNoteText: ta, rpPainel: painel, ...campos })[id] || null,
+    };
     acoes.rpSalvar();
     expect(chamadas.openModal).toBe(0);
     expect(painel.innerHTML).toContain('Senha Wi-Fi');
@@ -132,7 +167,14 @@ describe('seletor no composer do chamado', () => {
   });
 
   it('escapa título e texto da resposta no painel', () => {
-    mem.intra_respostas_prontas = [{ id: 'x"y', titulo: '<img src=x onerror=alert(1)>', conteudo: '<script>1</script>', team: 'suporte' }];
+    mem.intra_respostas_prontas = [
+      {
+        id: 'x"y',
+        titulo: '<img src=x onerror=alert(1)>',
+        conteudo: '<script>1</script>',
+        team: 'suporte',
+      },
+    ];
     acoes.rpAbrir();
     expect(painel.innerHTML).not.toContain('<img');
     expect(painel.innerHTML).not.toContain('<script>');

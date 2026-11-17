@@ -14,21 +14,45 @@ describe('clearAuditLogs (apagar todo o histórico)', () => {
   let calls, cleared, remote;
   const mk = ({ admin, hasClient = true, authActive = true } = {}) => {
     const q = {
-      delete: () => { calls.push(['delete']); return q; },
-      not: (...a) => { calls.push(['not', ...a]); return Promise.resolve(remote()); },
-      gte: () => { calls.push(['gte']); return Promise.resolve({ error: null }); },
+      delete: () => {
+        calls.push(['delete']);
+        return q;
+      },
+      not: (...a) => {
+        calls.push(['not', ...a]);
+        return Promise.resolve(remote());
+      },
+      gte: () => {
+        calls.push(['gte']);
+        return Promise.resolve({ error: null });
+      },
     };
     return build({
       isCurrentAdmin: () => admin,
-      supabaseClient: hasClient ? { from: (t) => { calls.push(['from', t]); return q; } } : null,
+      supabaseClient: hasClient
+        ? {
+            from: (t) => {
+              calls.push(['from', t]);
+              return q;
+            },
+          }
+        : null,
       window: { _supabaseAuthActive: authActive },
-      setCacheTable: (t, v) => { cleared.push([t, v]); },
-      dbSet: () => { throw new Error('não deveria cair no dbSet'); },
+      setCacheTable: (t, v) => {
+        cleared.push([t, v]);
+      },
+      dbSet: () => {
+        throw new Error('não deveria cair no dbSet');
+      },
       DB: { LOGS: 'logs' },
       console: { warn() {} },
     });
   };
-  beforeEach(() => { calls = []; cleared = []; remote = () => ({ error: null }); });
+  beforeEach(() => {
+    calls = [];
+    cleared = [];
+    remote = () => ({ error: null });
+  });
 
   it('não-admin: recusa antes de qualquer chamada remota ou limpeza local', async () => {
     const r = await mk({ admin: false })();
@@ -52,7 +76,9 @@ describe('clearAuditLogs (apagar todo o histórico)', () => {
   });
 
   it('falha de rede (exceção): cache local fica intacto', async () => {
-    remote = () => { throw new Error('rede'); };
+    remote = () => {
+      throw new Error('rede');
+    };
     const r = await mk({ admin: true })();
     expect(r).toEqual({ ok: false, reason: 'remote' });
     expect(cleared).toEqual([]);
@@ -77,10 +103,11 @@ describe('clearAuditLogs (apagar todo o histórico)', () => {
 });
 
 describe('delete/update remotos do cliente têm filtro', () => {
-  const walk = (d) => fs.readdirSync(d).flatMap((f) => {
-    const p = path.join(d, f);
-    return fs.statSync(p).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : [];
-  });
+  const walk = (d) =>
+    fs.readdirSync(d).flatMap((f) => {
+      const p = path.join(d, f);
+      return fs.statSync(p).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : [];
+    });
   const filtro = /\.(eq|in|not|match|neq|gte|lte|lt|gt|like|ilike|is)\(/;
 
   it('toda cadeia supabaseClient...delete()/update() leva um filtro', () => {

@@ -9,9 +9,21 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // anterior deixou no global, e a limpeza passaria a restaurar lixo.
 // Chave ausente vira delete — é o padrão de milvus-client-token.test.js.
 const _globalKeys = [
-  'getClientById', 'isCurrentAdmin', 'saveClient', 'showToast', 'closeModal',
-  'openModal', 'getVisitsByClient', 'getPendenciasByClient', 'document', 'escapeHtml',
-  'renderClientDocumentsList', 'renderAttachmentList', 'isSupabaseConnected', 'supabaseClient', 'window',
+  'getClientById',
+  'isCurrentAdmin',
+  'saveClient',
+  'showToast',
+  'closeModal',
+  'openModal',
+  'getVisitsByClient',
+  'getPendenciasByClient',
+  'document',
+  'escapeHtml',
+  'renderClientDocumentsList',
+  'renderAttachmentList',
+  'isSupabaseConnected',
+  'supabaseClient',
+  'window',
 ];
 const _keep = {};
 for (const k of _globalKeys) _keep[k] = globalThis[k];
@@ -27,7 +39,9 @@ const BASE = 'https://drive.google.com/drive/folders/';
 
 describe('parseDriveFolderId', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('extrai o ID com query, com barra final e na forma /u/<n>/', () => {
     expect(mod.parseDriveFolderId(BASE + ID)).toBe(ID);
@@ -46,7 +60,9 @@ describe('parseDriveFolderId', () => {
 
   it('recusa arquivo, planilha, outro domínio, vazio e nulo', () => {
     expect(mod.parseDriveFolderId('https://drive.google.com/file/d/' + ID + '/view')).toBeNull();
-    expect(mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
+    expect(
+      mod.parseDriveFolderId('https://docs.google.com/spreadsheets/d/' + ID + '/edit')
+    ).toBeNull();
     expect(mod.parseDriveFolderId('https://example.com/pasta')).toBeNull();
     expect(mod.parseDriveFolderId('')).toBeNull();
     expect(mod.parseDriveFolderId(null)).toBeNull();
@@ -62,11 +78,15 @@ describe('parseDriveFolderId', () => {
 
 describe('parseDriveFolderId — normalização flexível', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('aceita host sem esquema, host em maiúsculas e a forma legada open?id=', () => {
     expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID)).toBe(ID);
-    expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')).toBe(ID);
+    expect(
+      mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID + '/?usp=sharing')
+    ).toBe(ID);
     expect(mod.parseDriveFolderId('https://drive.google.com/open?id=' + ID)).toBe(ID);
     expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID + '&usp=sharing')).toBe(ID);
   });
@@ -75,18 +95,23 @@ describe('parseDriveFolderId — normalização flexível', () => {
     expect(mod.driveFolderUrl('HTTPS://DRIVE.GOOGLE.COM/drive/folders/' + ID)).toBe(BASE + ID);
     expect(mod.parseDriveFolderId('HTTPS://DRIVE.GOOGLE.COM/file/d/' + ID + '/view')).toBeNull();
     expect(mod.parseDriveFolderId('docs.google.com/spreadsheets/d/' + ID + '/edit')).toBeNull();
-    expect(mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')).toBeNull();
+    expect(
+      mod.parseDriveFolderId('drive.google.com/drive/folders/' + ID + '" onmouseover=x')
+    ).toBeNull();
     expect(mod.parseDriveFolderId('drive.google.com/open?id=' + ID.slice(0, 14))).toBeNull();
   });
 });
 
 describe('driveFolderUrl', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); });
+  beforeEach(() => {
+    mod = requireParts('clients');
+  });
 
   it('remonta a URL pelo ID e descarta o que foi colado', () => {
-    expect(mod.driveFolderUrl('https://drive.google.com/drive/u/3/folders/' + ID + '?usp=sharing'))
-      .toBe(BASE + ID);
+    expect(
+      mod.driveFolderUrl('https://drive.google.com/drive/u/3/folders/' + ID + '?usp=sharing')
+    ).toBe(BASE + ID);
   });
 
   it('devolve vazio quando inválido', () => {
@@ -124,8 +149,13 @@ describe('saveDriveFolderLink', () => {
   it('salva a URL canônica, não a colada', () => {
     global.isCurrentAdmin = () => true;
     let salvo = null;
-    global.saveClient = (c) => { salvo = c; };
-    const r = mod.saveDriveFolderLink('cli-1', 'https://drive.google.com/drive/u/2/folders/' + ID + '?usp=sharing');
+    global.saveClient = (c) => {
+      salvo = c;
+    };
+    const r = mod.saveDriveFolderLink(
+      'cli-1',
+      'https://drive.google.com/drive/u/2/folders/' + ID + '?usp=sharing'
+    );
     expect(r.ok).toBe(true);
     expect(salvo.driveFolderUrl).toBe(BASE + ID);
   });
@@ -133,7 +163,9 @@ describe('saveDriveFolderLink', () => {
   it('campo vazio desvincula', () => {
     global.isCurrentAdmin = () => true;
     let salvo = null;
-    global.saveClient = (c) => { salvo = c; };
+    global.saveClient = (c) => {
+      salvo = c;
+    };
     expect(mod.saveDriveFolderLink('cli-1', '  ').ok).toBe(true);
     expect(salvo.driveFolderUrl).toBeNull();
   });
@@ -173,24 +205,39 @@ function _domFalso(ids, catchAll) {
   const els = {};
   for (const id of ids) els[id] = { innerHTML: '' };
   global.document = {
-    getElementById: (id) => els[id] || (catchAll ? (els[id] = {
-      innerHTML: '', scrollTop: 0,
-      classList: { add() {}, remove() {} },
-      querySelector: () => null, querySelectorAll: () => [],
-      getAttribute: () => '', setAttribute() {}, addEventListener() {},
-    }) : null),
+    getElementById: (id) =>
+      els[id] ||
+      (catchAll
+        ? (els[id] = {
+            innerHTML: '',
+            scrollTop: 0,
+            classList: { add() {}, remove() {} },
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            getAttribute: () => '',
+            setAttribute() {},
+            addEventListener() {},
+          })
+        : null),
     querySelector: () => null,
     querySelectorAll: () => [],
   };
-  global.escapeHtml = (s) => String(s === null || s === undefined ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  global.escapeHtml = (s) =>
+    String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   return els;
 }
 
 describe('renderClientDriveSection', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); global.isCurrentAdmin = () => false; });
+  beforeEach(() => {
+    mod = requireParts('clients');
+    global.isCurrentAdmin = () => false;
+  });
 
   // Cliente salvo antes da migration 068 não tem o campo: a ficha mostra o
   // estado vazio em vez de quebrar.
@@ -247,7 +294,9 @@ describe('submitDriveFolderLink reabre a ficha', () => {
     const els = _domFalso(['driveLinkInput'], true);
     els.driveLinkInput.value = BASE + ID;
     let titulo = null;
-    global.openModal = (t) => { titulo = t; };
+    global.openModal = (t) => {
+      titulo = t;
+    };
     global.getVisitsByClient = () => [];
     global.getPendenciasByClient = () => [];
     // Dois dos quatro renderizadores do timer moram em js/storage-anexos.js,
@@ -310,11 +359,21 @@ describe('a coluna chega ao servidor', () => {
 
 describe('selo da pasta (069)', () => {
   let mod;
-  beforeEach(() => { mod = requireParts('clients'); global.isCurrentAdmin = () => false; });
+  beforeEach(() => {
+    mod = requireParts('clients');
+    global.isCurrentAdmin = () => false;
+  });
 
   it('texto por status; sem status ou desconhecido não tem selo', () => {
-    expect(mod.driveFolderBadge({ drive_folder_status: 'ok', drive_folder_checked_at: '2026-03-05T12:00:00' })).toBe('✅ verificada em 05/03');
-    expect(mod.driveFolderBadge({ drive_folder_status: 'inacessivel' })).toMatch(/apagada ou sem acesso/);
+    expect(
+      mod.driveFolderBadge({
+        drive_folder_status: 'ok',
+        drive_folder_checked_at: '2026-03-05T12:00:00',
+      })
+    ).toBe('✅ verificada em 05/03');
+    expect(mod.driveFolderBadge({ drive_folder_status: 'inacessivel' })).toMatch(
+      /apagada ou sem acesso/
+    );
     expect(mod.driveFolderBadge({ drive_folder_status: 'invalido' })).toMatch(/não é uma pasta/);
     expect(mod.driveFolderBadge({ drive_folder_status: null })).toBe('');
     expect(mod.driveFolderBadge({ drive_folder_status: 'x' })).toBe('');
@@ -327,7 +386,11 @@ describe('selo da pasta (069)', () => {
     global.getClientById = () => ({ id: 'cli-1', driveFolderUrl: BASE + ID });
     global.isSupabaseConnected = () => true;
     global.window = { _supabaseAuthActive: true };
-    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { drive_folder_status: 'invalido' }, error: null }) };
+    const q = {
+      select: () => q,
+      eq: () => q,
+      maybeSingle: async () => ({ data: { drive_folder_status: 'invalido' }, error: null }),
+    };
     global.supabaseClient = { from: () => q };
     await mod.renderClientDriveSection('cli-1');
     expect(els.cliDriveSelo.innerHTML).toMatch(/não é uma pasta/);
@@ -339,7 +402,11 @@ describe('selo da pasta (069)', () => {
     global.getClientById = () => ({ id: 'cli-1', driveFolderUrl: BASE + ID });
     global.isSupabaseConnected = () => true;
     global.window = { _supabaseAuthActive: true };
-    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: { code: '42703' } }) };
+    const q = {
+      select: () => q,
+      eq: () => q,
+      maybeSingle: async () => ({ data: null, error: { code: '42703' } }),
+    };
     global.supabaseClient = { from: () => q };
     await mod.renderClientDriveSection('cli-1');
     expect(els.cliDriveSelo.innerHTML).toBe('');

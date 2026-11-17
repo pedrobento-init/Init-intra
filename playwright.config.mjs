@@ -31,8 +31,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], channel, launchOptions, viewport: { width: 1366, height: 860 } }, testIgnore: '**/mobile.e2e.js' },
-    { name: 'mobile', use: { ...devices['Pixel 7'], channel, launchOptions }, testMatch: '**/mobile.e2e.js' },
+    {
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        channel,
+        launchOptions,
+        viewport: { width: 1366, height: 860 },
+      },
+      testIgnore: '**/mobile.e2e.js',
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'], channel, launchOptions },
+      testMatch: '**/mobile.e2e.js',
+    },
   ],
   webServer: {
     command: `node node_modules/vite/bin/vite.js --port ${PORT} --strictPort`,

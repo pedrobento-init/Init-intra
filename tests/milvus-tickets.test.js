@@ -86,11 +86,26 @@ describe('normalizeMilvusTicket (linha real do Milvus)', () => {
     expect(s).not.toContain('<p>');
     expect(s).not.toContain('ultimas_cinco_logs');
     expect(s).not.toContain('dispositivo_vinculado');
-    expect(Object.keys(t).sort()).toEqual([
-      'assunto', 'categoria_primaria', 'categoria_secundaria', 'client_id', 'codigo',
-      'data_criacao', 'data_modificacao', 'data_solucao', 'descricao', 'id',
-      'milvus_ticket_id', 'prioridade', 'status', 'team', 'tecnico', 'ultima_log',
-    ].sort());
+    expect(Object.keys(t).sort()).toEqual(
+      [
+        'assunto',
+        'categoria_primaria',
+        'categoria_secundaria',
+        'client_id',
+        'codigo',
+        'data_criacao',
+        'data_modificacao',
+        'data_solucao',
+        'descricao',
+        'id',
+        'milvus_ticket_id',
+        'prioridade',
+        'status',
+        'team',
+        'tecnico',
+        'ultima_log',
+      ].sort()
+    );
   });
   it('null-safe: sem id descarta; nulos viram vazio/null', () => {
     expect(tk.normalizeMilvusTicket({ assunto: 'x' }, 'CLI-1', 'mam')).toBeNull();
@@ -120,7 +135,12 @@ describe('topMilvusTickets + staleMilvusTicketIds (teto de 10, prune por cliente
   });
   it('stale = existentes fora do top (escopo do chamador = 1 cliente)', () => {
     const keep = tk.topMilvusTickets(rows).map((r) => r.milvus_ticket_id);
-    expect(tk.staleMilvusTicketIds(rows.map((r) => r.milvus_ticket_id), keep)).toEqual([1, 2]);
+    expect(
+      tk.staleMilvusTicketIds(
+        rows.map((r) => r.milvus_ticket_id),
+        keep
+      )
+    ).toEqual([1, 2]);
     expect(tk.staleMilvusTicketIds([1, 2], [1, 2])).toEqual([]);
   });
   it('re-sync com os mesmos 10: nada stale, nada duplica', () => {
@@ -140,7 +160,11 @@ describe('shouldAutoSyncMilvusTickets (sem chamada a cada render)', () => {
   });
   it('recente (<60min) → não; antigo (>60min) → sim', () => {
     const now = 100 * H;
-    expect(tk.shouldAutoSyncMilvusTickets(new Date(now - 10 * 60000).toISOString(), now)).toBe(false);
-    expect(tk.shouldAutoSyncMilvusTickets(new Date(now - 61 * 60000).toISOString(), now)).toBe(true);
+    expect(tk.shouldAutoSyncMilvusTickets(new Date(now - 10 * 60000).toISOString(), now)).toBe(
+      false
+    );
+    expect(tk.shouldAutoSyncMilvusTickets(new Date(now - 61 * 60000).toISOString(), now)).toBe(
+      true
+    );
   });
 });

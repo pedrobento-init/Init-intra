@@ -21,7 +21,13 @@ describe('páginas de pendência', () => {
   let pagina;
 
   beforeEach(() => {
-    globalThis.escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    globalThis.escapeHtml = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     globalThis.STATUS_PEN_MAP = STATUS_FALSO;
     pagina = requireParts('pagina');
   });
@@ -51,7 +57,10 @@ describe('páginas de pendência', () => {
       expect(pagina.penPaginaRotaDe('#projetos')).toBeNull();
     });
     it('recusa id maior que 128 caracteres e aceita o limite exato', () => {
-      expect(pagina.penPaginaRotaDe('#chamados/' + 'a'.repeat(128))).toEqual({ tipo: 'chamado', id: 'a'.repeat(128) });
+      expect(pagina.penPaginaRotaDe('#chamados/' + 'a'.repeat(128))).toEqual({
+        tipo: 'chamado',
+        id: 'a'.repeat(128),
+      });
       expect(pagina.penPaginaRotaDe('#chamados/' + 'a'.repeat(129))).toBeNull();
     });
     it('hash de outra página não é rota', () => {
@@ -117,8 +126,9 @@ describe('páginas de pendência', () => {
       expect(pagina.penPaginaHref(null)).toBe('#pendencias');
     });
     it('o hash gerado é lido de volta pela rota com o mesmo id e tipo', () => {
-      expect(pagina.penPaginaRotaDe(pagina.penPaginaHref({ id: 'x_1', canal: 'whatsapp' })))
-        .toEqual({ tipo: 'chamado', id: 'x_1' });
+      expect(
+        pagina.penPaginaRotaDe(pagina.penPaginaHref({ id: 'x_1', canal: 'whatsapp' }))
+      ).toEqual({ tipo: 'chamado', id: 'x_1' });
     });
   });
 
@@ -181,7 +191,9 @@ describe('páginas de pendência', () => {
     it('tamanho fora da faixa ou que não é número volta para o padrão', () => {
       expect(pagina.pgpAvatarHtml('Ana')).toContain('--pgp-avatar-size:32px');
       expect(pagina.pgpAvatarHtml('Ana', 200)).toContain('--pgp-avatar-size:32px');
-      expect(pagina.pgpAvatarHtml('Ana', '1px;background:url(x)')).toContain('--pgp-avatar-size:32px');
+      expect(pagina.pgpAvatarHtml('Ana', '1px;background:url(x)')).toContain(
+        '--pgp-avatar-size:32px'
+      );
     });
     it('tamanho válido é respeitado', () => {
       expect(pagina.pgpAvatarHtml('Ana', 48)).toContain('--pgp-avatar-size:48px');
@@ -190,7 +202,9 @@ describe('páginas de pendência', () => {
 
   describe('pgpVoltarHtml', () => {
     it('é link real para a lista, para o histórico e a nova aba funcionarem', () => {
-      expect(pagina.pgpVoltarHtml('Chamados')).toContain('<a class="pgp-voltar" href="#pendencias">');
+      expect(pagina.pgpVoltarHtml('Chamados')).toContain(
+        '<a class="pgp-voltar" href="#pendencias">'
+      );
     });
     it('sem rótulo, usa Pendências', () => {
       expect(pagina.pgpVoltarHtml()).toContain('Pendências</a>');
@@ -231,23 +245,33 @@ describe('páginas de pendência', () => {
       expect(html).not.toMatch(/\son[a-z]+=/);
     });
     it('escapa o id nos dois seletores', () => {
-      const html = pagina.pgpSeletoresHtml({ id: '"><script>', status: 'backlog', priority: 'alta' });
+      const html = pagina.pgpSeletoresHtml({
+        id: '"><script>',
+        status: 'backlog',
+        priority: 'alta',
+      });
       expect(html).not.toContain('<script>');
       expect(html.match(/data-id="&quot;&gt;&lt;script&gt;"/g)).toHaveLength(2);
     });
     it('status fora do mapa fica visível, desabilitado e escapado', () => {
       const html = pagina.pgpSeletoresHtml({ id: 'a', status: '<b>velho', priority: 'alta' });
       expect(html).not.toContain('<b>');
-      expect(html).toContain('<option value="&lt;b&gt;velho" selected disabled>&lt;b&gt;velho (antigo)</option>');
+      expect(html).toContain(
+        '<option value="&lt;b&gt;velho" selected disabled>&lt;b&gt;velho (antigo)</option>'
+      );
       expect(html).toContain('data-status="&lt;b&gt;velho"');
     });
     it('status legado conhecido mostra o nome legível', () => {
       const html = pagina.pgpSeletoresHtml({ id: 'a', status: 'concluido', priority: 'alta' });
-      expect(html).toContain('<option value="concluido" selected disabled>Concluído (antigo)</option>');
+      expect(html).toContain(
+        '<option value="concluido" selected disabled>Concluído (antigo)</option>'
+      );
     });
     it('prioridade fora da lista fica visível, desabilitada e escapada', () => {
       const html = pagina.pgpSeletoresHtml({ id: 'a', status: 'backlog', priority: '"x"' });
-      expect(html).toContain('<option value="&quot;x&quot;" selected disabled>&quot;x&quot; (antigo)</option>');
+      expect(html).toContain(
+        '<option value="&quot;x&quot;" selected disabled>&quot;x&quot; (antigo)</option>'
+      );
       expect(html).toContain('data-prioridade="&quot;x&quot;"');
     });
     it('item nulo não quebra e não inventa opção de legado', () => {
@@ -268,7 +292,11 @@ describe('páginas de pendência', () => {
       globalThis._clientPenOrigin = { clientId: 'CLI-1', penId: 'PEN-1' };
       globalThis.openPendenciaDetailModal = (id) => chamadas.modal.push(id);
       globalThis.navigateTo = (hash) => chamadas.rota.push(hash);
-      globalThis.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
+      globalThis.document = {
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+      };
       globalThis.window = { location: { hash: '', replace() {} }, scrollY: 0, scrollTo() {} };
     });
 
@@ -306,7 +334,8 @@ describe('páginas de pendência', () => {
         document: {
           querySelectorAll: () => [],
           getElementById: (id) => {
-            if (id === 'topbarActionBtn' || id === 'loginOverlay' || id === 'loginContent') return { style: {} };
+            if (id === 'topbarActionBtn' || id === 'loginOverlay' || id === 'loginContent')
+              return { style: {} };
             return null;
           },
         },

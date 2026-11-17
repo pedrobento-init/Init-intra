@@ -18,18 +18,26 @@ describe('matchMilvusClientToLocal (sem fuzzy: CNPJ ou nome exato)', () => {
     { id: 'CLI-2', name: 'Beta SA', cnpj: '' },
   ]);
   it('CNPJ tem precedência sobre nome', () => {
-    expect(imp.matchMilvusClientToLocal({ nome: 'Outro Nome', cnpj: '19.033.684/0001-56' }, index)).toBe('existe_cnpj');
+    expect(
+      imp.matchMilvusClientToLocal({ nome: 'Outro Nome', cnpj: '19.033.684/0001-56' }, index)
+    ).toBe('existe_cnpj');
   });
   it('nome igual (normalizado) → existe_nome', () => {
-    expect(imp.matchMilvusClientToLocal({ nome: '  acme  LTDA ', cnpj: '' }, index)).toBe('existe_nome');
+    expect(imp.matchMilvusClientToLocal({ nome: '  acme  LTDA ', cnpj: '' }, index)).toBe(
+      'existe_nome'
+    );
     expect(imp.matchMilvusClientToLocal({ nome: 'BETA sa', cnpj: '' }, index)).toBe('existe_nome');
   });
   it('nomes parecidos NÃO casam', () => {
-    expect(imp.matchMilvusClientToLocal({ nome: 'ACME SERVICOS LTDA', cnpj: '' }, index)).toBe('novo');
+    expect(imp.matchMilvusClientToLocal({ nome: 'ACME SERVICOS LTDA', cnpj: '' }, index)).toBe(
+      'novo'
+    );
     expect(imp.matchMilvusClientToLocal({ nome: 'ACME', cnpj: '' }, index)).toBe('novo');
   });
   it('novo de verdade', () => {
-    expect(imp.matchMilvusClientToLocal({ nome: 'Nova Empresa', cnpj: '11111111000111' }, index)).toBe('novo');
+    expect(
+      imp.matchMilvusClientToLocal({ nome: 'Nova Empresa', cnpj: '11111111000111' }, index)
+    ).toBe('novo');
   });
 });
 
@@ -44,18 +52,32 @@ describe('clientInitialsForName (mesmo padrão do cadastro)', () => {
 
 describe('summarizeImportPreview', () => {
   it('conta por status', () => {
-    expect(imp.summarizeImportPreview([
-      { status: 'novo' }, { status: 'novo' },
-      { status: 'existe_cnpj' }, { status: 'existe_nome' },
-    ])).toEqual({ total: 4, novos: 2, existeCnpj: 1, existeNome: 1 });
-    expect(imp.summarizeImportPreview([])).toEqual({ total: 0, novos: 0, existeCnpj: 0, existeNome: 0 });
+    expect(
+      imp.summarizeImportPreview([
+        { status: 'novo' },
+        { status: 'novo' },
+        { status: 'existe_cnpj' },
+        { status: 'existe_nome' },
+      ])
+    ).toEqual({ total: 4, novos: 2, existeCnpj: 1, existeNome: 1 });
+    expect(imp.summarizeImportPreview([])).toEqual({
+      total: 0,
+      novos: 0,
+      existeCnpj: 0,
+      existeNome: 0,
+    });
   });
 });
 
 describe('service guards (admin + online + erro amigável)', () => {
   const _g = globalThis;
   const _keep = {};
-  for (const k of ['isMilvusMappingAdmin', 'isCurrentAdmin', 'isSupabaseConnected', 'supabaseClient']) {
+  for (const k of [
+    'isMilvusMappingAdmin',
+    'isCurrentAdmin',
+    'isSupabaseConnected',
+    'supabaseClient',
+  ]) {
     _keep[k] = _g[k];
   }
   afterEach(() => {
@@ -68,7 +90,9 @@ describe('service guards (admin + online + erro amigável)', () => {
     _g.isMilvusMappingAdmin = () => false;
     _g.isCurrentAdmin = () => false;
     _g.isSupabaseConnected = () => true;
-    _g.supabaseClient = { functions: { invoke: async () => ({ data: { success: true }, error: null }) } };
+    _g.supabaseClient = {
+      functions: { invoke: async () => ({ data: { success: true }, error: null }) },
+    };
     await expect(imp.previewMilvusClientsImport()).rejects.toThrow('Somente administradores');
     await expect(imp.commitMilvusClientsImport([1])).rejects.toThrow('Somente administradores');
   });
@@ -76,15 +100,26 @@ describe('service guards (admin + online + erro amigável)', () => {
     let called = false;
     _g.isMilvusMappingAdmin = () => true;
     _g.isSupabaseConnected = () => false;
-    _g.supabaseClient = { functions: { invoke: async () => { called = true; return {}; } } };
+    _g.supabaseClient = {
+      functions: {
+        invoke: async () => {
+          called = true;
+          return {};
+        },
+      },
+    };
     await expect(imp.previewMilvusClientsImport()).rejects.toThrow('Sem conexão');
     expect(called).toBe(false);
   });
   it('erro da Edge vira mensagem amigável (sem vazar nada)', async () => {
     _g.isMilvusMappingAdmin = () => true;
     _g.isSupabaseConnected = () => true;
-    _g.supabaseClient = { functions: { invoke: async () => ({ data: null, error: { message: 'TOKEN_XYZ interno' } }) } };
-    await expect(imp.previewMilvusClientsImport()).rejects.toThrow('Falha na importação de clientes');
+    _g.supabaseClient = {
+      functions: { invoke: async () => ({ data: null, error: { message: 'TOKEN_XYZ interno' } }) },
+    };
+    await expect(imp.previewMilvusClientsImport()).rejects.toThrow(
+      'Falha na importação de clientes'
+    );
   });
   it('preview/commit repassam dry_run/onlyIds', async () => {
     const bodies = [];
@@ -92,7 +127,10 @@ describe('service guards (admin + online + erro amigável)', () => {
     _g.isSupabaseConnected = () => true;
     _g.supabaseClient = {
       functions: {
-        invoke: async (_fn, { body }) => { bodies.push(body); return { data: { success: true }, error: null }; },
+        invoke: async (_fn, { body }) => {
+          bodies.push(body);
+          return { data: { success: true }, error: null };
+        },
       },
     };
     await imp.previewMilvusClientsImport();

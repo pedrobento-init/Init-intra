@@ -7,15 +7,20 @@ import { fileURLToPath } from 'node:url';
 // o robô novo grava linha com motivo nulo e status 'anexado' — se um dos dois
 // faltar, a caixa perde a mensagem (o chamado continua, mas a linha some).
 
-const ler = (rel) => fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+const ler = (rel) =>
+  fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const sql = ler('../supabase/migrations/073_caixa_entrada.sql');
-const corpo = sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+const corpo = sql
+  .split('\n')
+  .filter((l) => !l.trim().startsWith('--'))
+  .join('\n');
 
 describe('073_caixa_entrada', () => {
   it('status aceita anexado sem perder os estados da 066', () => {
     const check = corpo.match(/emails_triagem_status_check\s+check \(status in \(([^)]*)\)\)/);
     expect(check).not.toBeNull();
-    for (const s of ['pendente', 'virou_chamado', 'anexado', 'descartado']) expect(check[1]).toContain(`'${s}'`);
+    for (const s of ['pendente', 'virou_chamado', 'anexado', 'descartado'])
+      expect(check[1]).toContain(`'${s}'`);
   });
 
   it('motivo deixa de ser obrigatório: linha que virou chamado não tem motivo', () => {
@@ -27,8 +32,9 @@ describe('073_caixa_entrada', () => {
   });
 
   it('é idempotente: constraint cai antes de voltar, colunas e índice com if not exists', () => {
-    expect(corpo.indexOf('drop constraint if exists emails_triagem_status_check'))
-      .toBeLessThan(corpo.indexOf('add constraint emails_triagem_status_check'));
+    expect(corpo.indexOf('drop constraint if exists emails_triagem_status_check')).toBeLessThan(
+      corpo.indexOf('add constraint emails_triagem_status_check')
+    );
     for (const c of ['client_id', 'atribuido_a', 'atribuido_em', 'atribuicao_nota']) {
       expect(corpo).toMatch(new RegExp(`add column if not exists ${c}\\b`));
     }
@@ -43,8 +49,9 @@ describe('073_caixa_entrada', () => {
     expect(sql).toMatch(/-- VERIFICAR:/);
     expect(sql).toMatch(/-- esperado:/);
     const rev = sql.slice(sql.indexOf('-- REVERTER'));
-    expect(rev.indexOf("status = 'anexado' or motivo is null"))
-      .toBeLessThan(rev.indexOf("check (status in ('pendente', 'virou_chamado', 'descartado'))"));
+    expect(rev.indexOf("status = 'anexado' or motivo is null")).toBeLessThan(
+      rev.indexOf("check (status in ('pendente', 'virou_chamado', 'descartado'))")
+    );
     expect(rev).toMatch(/alter column motivo set not null/);
   });
 });

@@ -10,18 +10,34 @@ import { describe, it, expect, beforeEach } from 'vitest';
 function setGlobal(name, value) {
   try {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
-  } catch (_) { globalThis[name] = value; }
+  } catch (_) {
+    globalThis[name] = value;
+  }
 }
 
 const _stores = { clients: [], pendencias: [], operators: [], visits: [] };
 const _tables = {};
 let _session = null;
 
-setGlobal('window', { _pendingSyncCount: 0, _syncPending: 0, _supabaseAuthActive: false, _suppressPendingSync: true, addEventListener() {}, location: { hash: '' } });
-setGlobal('document', { addEventListener() {}, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] });
+setGlobal('window', {
+  _pendingSyncCount: 0,
+  _syncPending: 0,
+  _supabaseAuthActive: false,
+  _suppressPendingSync: true,
+  addEventListener() {},
+  location: { hash: '' },
+});
+setGlobal('document', {
+  addEventListener() {},
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+});
 setGlobal('navigator', { onLine: true });
 setGlobal('getCacheStore', (name) => _stores[name] || []);
-setGlobal('setCacheStore', (name, items) => { _stores[name] = Array.isArray(items) ? [...items] : items; });
+setGlobal('setCacheStore', (name, items) => {
+  _stores[name] = Array.isArray(items) ? [...items] : items;
+});
 setGlobal('getCacheKV', (k, d) => d);
 setGlobal('setCacheKV', () => {});
 setGlobal('getCacheTable', (t) => {
@@ -29,15 +45,25 @@ setGlobal('getCacheTable', (t) => {
   if (t === 'audit_logs' && _tables.audit_logs) return _tables.audit_logs;
   return {};
 });
-setGlobal('setCacheTable', (t, v) => { _tables[t] = v; });
+setGlobal('setCacheTable', (t, v) => {
+  _tables[t] = v;
+});
 setGlobal('getOperatorNames', () => []);
 setGlobal('escapeHtml', (s) => String(s ?? ''));
 
 const pen = (over = {}) => ({
-  id: 'PEN-1', clientId: 'CLI-1', clientName: 'BT', tipo: 'Projeto',
-  assunto: 'Bitlocker', descricao: 'Ativar', responsible: 'Ana',
-  status: 'aberto', priority: 'media', team: 'init',
-  createdAt: '2026-01-01T10:00:00Z', updatedAt: '2026-01-02T10:00:00Z',
+  id: 'PEN-1',
+  clientId: 'CLI-1',
+  clientName: 'BT',
+  tipo: 'Projeto',
+  assunto: 'Bitlocker',
+  descricao: 'Ativar',
+  responsible: 'Ana',
+  status: 'aberto',
+  priority: 'media',
+  team: 'init',
+  createdAt: '2026-01-01T10:00:00Z',
+  updatedAt: '2026-01-02T10:00:00Z',
   ...over,
 });
 
@@ -68,7 +94,12 @@ describe('eventos gerados ao salvar', () => {
   });
 
   it('trocar responsável, prioridade e prazo também viram eventos', () => {
-    storage.savePendencia({ ...storage.getPendenciaById('PEN-1'), responsible: 'Beto', priority: 'alta', deadline: '2026-03-01' });
+    storage.savePendencia({
+      ...storage.getPendenciaById('PEN-1'),
+      responsible: 'Beto',
+      priority: 'alta',
+      deadline: '2026-03-01',
+    });
     expect(tipos('PEN-1').sort()).toEqual(['prazo', 'prioridade', 'responsavel']);
   });
 
@@ -78,7 +109,11 @@ describe('eventos gerados ao salvar', () => {
   });
 
   it('editar só o texto não cria evento — a linha conta a história, não cada toque', () => {
-    storage.savePendencia({ ...storage.getPendenciaById('PEN-1'), descricao: 'outro texto', assunto: 'outro assunto' });
+    storage.savePendencia({
+      ...storage.getPendenciaById('PEN-1'),
+      descricao: 'outro texto',
+      assunto: 'outro assunto',
+    });
     expect(tipos('PEN-1')).toEqual([]);
   });
 
@@ -106,12 +141,18 @@ describe('eventos gerados ao salvar', () => {
 
 describe('teto de eventos', () => {
   it('corta os mais antigos, mantendo os últimos — o registro viaja em todo sync', () => {
-    const muitos = Array.from({ length: 205 }, (_, i) => ({ at: '2026-01-01T00:00:00Z', by: 'x', type: 'status', de: 'a', para: 'b' + i }));
+    const muitos = Array.from({ length: 205 }, (_, i) => ({
+      at: '2026-01-01T00:00:00Z',
+      by: 'x',
+      type: 'status',
+      de: 'a',
+      para: 'b' + i,
+    }));
     _stores.pendencias = [pen({ events: muitos })];
     storage.savePendencia({ ...storage.getPendenciaById('PEN-1'), status: 'resolvido' });
     const ev = storage.getPendenciaById('PEN-1').events;
     expect(ev.length).toBe(200);
     expect(ev[ev.length - 1].para).toBe('resolvido'); // o novo entrou
-    expect(ev[0].para).not.toBe('b0');                // o mais antigo saiu
+    expect(ev[0].para).not.toBe('b0'); // o mais antigo saiu
   });
 });

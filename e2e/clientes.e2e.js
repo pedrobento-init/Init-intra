@@ -29,5 +29,7 @@ test('preenchimento por CNPJ preserva dados manuais e preenche campos vazios', a
 
   await expect(modal.locator('[name="name"]')).toHaveValue('Nome informado manualmente');
   await expect(modal.locator('[name="segment"]')).toHaveValue('Serviços de informação');
-  await expect(modal.locator('[name="address"]')).toHaveValue('Avenida Brigadeiro Faria Lima, 3477 · 17º andar · Itaim Bibi · São Paulo - SP');
+  await expect(modal.locator('[name="address"]')).toHaveValue(
+    'Avenida Brigadeiro Faria Lima, 3477 · 17º andar · Itaim Bibi · São Paulo - SP'
+  );
 });

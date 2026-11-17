@@ -25,27 +25,47 @@ function _setGlobal(name, value) {
     globalThis[name] = value;
   }
 }
-_setGlobal('window', { _pendingSyncCount: 0, _syncPending: 0, _supabaseAuthActive: false, _suppressPendingSync: false, addEventListener() {}, location: { hash: '' } });
+_setGlobal('window', {
+  _pendingSyncCount: 0,
+  _syncPending: 0,
+  _supabaseAuthActive: false,
+  _suppressPendingSync: false,
+  addEventListener() {},
+  location: { hash: '' },
+});
 _setGlobal('navigator', { onLine: true });
-_setGlobal('document', new Proxy({}, {
-  get: (_t, p) => {
-    if (p === 'addEventListener') return () => {};
-    if (p === 'getElementById' || p === 'querySelector' || p === 'createElement') return (..._a) => _anyEl();
-    if (p === 'head' || p === 'body') return _anyEl();
-    if (p === 'visibilityState') return 'visible';
-    return undefined;
-  },
-  set: () => true,
-}));
+_setGlobal(
+  'document',
+  new Proxy(
+    {},
+    {
+      get: (_t, p) => {
+        if (p === 'addEventListener') return () => {};
+        if (p === 'getElementById' || p === 'querySelector' || p === 'createElement')
+          return (..._a) => _anyEl();
+        if (p === 'head' || p === 'body') return _anyEl();
+        if (p === 'visibilityState') return 'visible';
+        return undefined;
+      },
+      set: () => true,
+    }
+  )
+);
 const _ls = {};
 _setGlobal('localStorage', {
   getItem: (k) => (k in _ls ? _ls[k] : null),
-  setItem: (k, v) => { _ls[k] = String(v); },
-  removeItem: (k) => { delete _ls[k]; },
+  setItem: (k, v) => {
+    _ls[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _ls[k];
+  },
 });
 globalThis.Dexie = class {
   constructor() {}
-  version() { return { stores() {} }; }
+  version() {
+    return { stores() {} };
+  }
 };
 
 // ── Código REAL no escopo global ─────────────────────────────────────────
@@ -65,9 +85,13 @@ console.warn = () => {};
 const _stores = { clients: [], pendencias: [], visits: [] };
 const _kv = {};
 _setGlobal('getCacheStore', (name) => _stores[name] || []);
-_setGlobal('setCacheStore', (name, items) => { _stores[name] = Array.isArray(items) ? [...items] : items; });
+_setGlobal('setCacheStore', (name, items) => {
+  _stores[name] = Array.isArray(items) ? [...items] : items;
+});
 _setGlobal('getCacheKV', (k, d) => (k in _kv ? _kv[k] : d));
-_setGlobal('setCacheKV', (k, v) => { _kv[k] = v; });
+_setGlobal('setCacheKV', (k, v) => {
+  _kv[k] = v;
+});
 _setGlobal('getCacheTable', (t) =>
   t === 'sessions'
     ? { key: 'intra_session', value: { opId: 'OP-1', name: 'Teste', team: 'init' } }
@@ -81,9 +105,18 @@ const schema = require('../js/schema.js');
 
 function mkVisit(date, extra) {
   saveVisit({
-    id: null, clientId: 'CLI-1', clientName: 'Cliente X', operator: 'Op',
-    date, time: '09:00', timeEnd: '10:00', motivo: 'Preventiva',
-    observacoes: '', relatorio: '', status: 'agendada', recurrence: '',
+    id: null,
+    clientId: 'CLI-1',
+    clientName: 'Cliente X',
+    operator: 'Op',
+    date,
+    time: '09:00',
+    timeEnd: '10:00',
+    motivo: 'Preventiva',
+    observacoes: '',
+    relatorio: '',
+    status: 'agendada',
+    recurrence: '',
     ...(extra || {}),
   });
   const all = getVisits();
@@ -160,7 +193,14 @@ describe('TESTE 6 — sync mantém o número (schema real)', () => {
   });
   it('local-only nova é classificada p/ push (não descartada)', () => {
     const cls = schema._classifyLocalOnly(
-      [{ id: 'VIS-x', numero: 25, createdAt: '2026-09-22T10:00:00.000Z', updatedAt: '2026-09-22T10:00:00.000Z' }],
+      [
+        {
+          id: 'VIS-x',
+          numero: 25,
+          createdAt: '2026-09-22T10:00:00.000Z',
+          updatedAt: '2026-09-22T10:00:00.000Z',
+        },
+      ],
       '2026-09-20T10:00:00.000Z'
     );
     expect(cls.toPush.map((r) => r.numero)).toEqual([25]);
@@ -182,15 +222,35 @@ describe('TESTE 8 — sync de várias sem duplicar numero', () => {
     const a = mkVisit('2026-09-15');
     const b = mkVisit('2026-09-16');
     const fields = schema.ENTITIES.find((e) => e.table === 'visits').fields;
-    const remote = [a, b].map((v) => ({ id: v.id, numero: v.numero, updated_at: v.updatedAt, created_at: v.createdAt }));
+    const remote = [a, b].map((v) => ({
+      id: v.id,
+      numero: v.numero,
+      updated_at: v.updatedAt,
+      created_at: v.createdAt,
+    }));
     const { merged } = schema._mergeRecords([a, b], remote, fields);
     expect(merged.map((r) => r.numero).sort()).toEqual([1, 2]);
   });
   it('colisão real (mesmo numero, ids distintos) é reparada deterministicamente', () => {
     _stores.visits = [
-      { id: 'A', numero: 2, createdAt: '2026-09-01T10:00:00.000Z', updatedAt: '2026-09-01T10:00:00.000Z' },
-      { id: 'B', numero: 2, createdAt: '2026-09-02T10:00:00.000Z', updatedAt: '2026-09-02T10:00:00.000Z' },
-      { id: 'C', numero: 5, createdAt: '2026-09-03T10:00:00.000Z', updatedAt: '2026-09-03T10:00:00.000Z' },
+      {
+        id: 'A',
+        numero: 2,
+        createdAt: '2026-09-01T10:00:00.000Z',
+        updatedAt: '2026-09-01T10:00:00.000Z',
+      },
+      {
+        id: 'B',
+        numero: 2,
+        createdAt: '2026-09-02T10:00:00.000Z',
+        updatedAt: '2026-09-02T10:00:00.000Z',
+      },
+      {
+        id: 'C',
+        numero: 5,
+        createdAt: '2026-09-03T10:00:00.000Z',
+        updatedAt: '2026-09-03T10:00:00.000Z',
+      },
     ];
     expect(maintainVisitNumeros()).toBeGreaterThan(0);
     const byId = Object.fromEntries(getVisits().map((v) => [v.id, v.numero]));
@@ -207,7 +267,9 @@ describe('TESTE 9 — recorrência: cada ocorrência com número próprio', () =
     saveVisit({ ...getVisitById(v0.id), relatorio: 'Ok', status: 'concluida' });
     const v1 = getVisits().find((x) => x.date === '2026-09-22');
     saveVisit({ ...getVisitById(v1.id), relatorio: 'Ok', status: 'concluida' });
-    const nums = getVisits().map((v) => v.numero).sort((x, y) => x - y);
+    const nums = getVisits()
+      .map((v) => v.numero)
+      .sort((x, y) => x - y);
     expect(nums).toEqual([1, 2, 3]);
     expect(new Set(getVisits().map((v) => v.id)).size).toBe(3);
   });
@@ -225,10 +287,21 @@ describe('TESTE 10 — visitas antigas ganham número persistente', () => {
     expect(byId).toEqual({ 'OLD-a': 1, 'OLD-b': 2, 'OLD-c': 3 });
     expect(maintainVisitNumeros()).toBe(0);
     // UUIDs intactos
-    expect(getVisits().map((v) => v.id).sort()).toEqual(['OLD-a', 'OLD-b', 'OLD-c']);
+    expect(
+      getVisits()
+        .map((v) => v.id)
+        .sort()
+    ).toEqual(['OLD-a', 'OLD-b', 'OLD-c']);
   });
   it('edição de visita antiga sem número não quebra; backfill cobre depois', () => {
-    _stores.visits = [{ id: 'OLD-1', motivo: 'X', createdAt: '2024-01-01T10:00:00.000Z', updatedAt: '2024-01-01T10:00:00.000Z' }];
+    _stores.visits = [
+      {
+        id: 'OLD-1',
+        motivo: 'X',
+        createdAt: '2024-01-01T10:00:00.000Z',
+        updatedAt: '2024-01-01T10:00:00.000Z',
+      },
+    ];
     saveVisit({ ...getVisitById('OLD-1'), motivo: 'Y' });
     expect(getVisitById('OLD-1').motivo).toBe('Y');
     maintainVisitNumeros();
@@ -239,11 +312,15 @@ describe('TESTE 10 — visitas antigas ganham número persistente', () => {
 describe('estabilidade: reparo propaga (updatedAt) e merge não zera', () => {
   const visitsEntity = () => schema.ENTITIES.find((e) => e.table === 'visits');
   it('maintain carimba updatedAt junto do numero', () => {
-    _stores.visits = [{ id: 'OLD-1', createdAt: '2024-01-01T10:00:00.000Z', updatedAt: '2024-01-01T10:00:00.000Z' }];
+    _stores.visits = [
+      { id: 'OLD-1', createdAt: '2024-01-01T10:00:00.000Z', updatedAt: '2024-01-01T10:00:00.000Z' },
+    ];
     maintainVisitNumeros();
     const v = getVisitById('OLD-1');
     expect(v.numero).toBe(1);
-    expect(new Date(v.updatedAt).getTime()).toBeGreaterThan(new Date('2024-01-01T10:00:00.000Z').getTime());
+    expect(new Date(v.updatedAt).getTime()).toBeGreaterThan(
+      new Date('2024-01-01T10:00:00.000Z').getTime()
+    );
   });
   it('onMerged restaura numero local quando o merge zerou', () => {
     const e = visitsEntity();

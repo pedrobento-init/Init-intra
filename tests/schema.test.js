@@ -45,11 +45,23 @@ describe('ENTITIES (schema central)', () => {
   });
 
   it('apenas as tabelas com RLS por equipe têm hasTeam=true', () => {
-    const teamScoped = ENTITIES.filter((e) => e.hasTeam).map((e) => e.table).sort();
+    const teamScoped = ENTITIES.filter((e) => e.hasTeam)
+      .map((e) => e.table)
+      .sort();
     // emails_triagem (066) entra aqui: a policy filtra por team igual às
     // outras. E-mail sem cliente não tem equipe para herdar, então a entrada
     // nasce com o team padrão — a caixa do robô é uma caixa só.
-    expect(teamScoped).toEqual(['clients', 'emails_triagem', 'equipamentos', 'pendencias', 'respostas_prontas', 'reunioes', 'time_entries', 'vencimentos', 'visits']);
+    expect(teamScoped).toEqual([
+      'clients',
+      'emails_triagem',
+      'equipamentos',
+      'pendencias',
+      'respostas_prontas',
+      'reunioes',
+      'time_entries',
+      'vencimentos',
+      'visits',
+    ]);
   });
 });
 
@@ -110,12 +122,39 @@ describe('_needsPush', () => {
 });
 
 describe('merge por campo (edições locais não enviadas)', () => {
-  const fields = { id: 'id', name: 'name', phone: 'phone', notes: 'notes', updated_at: 'updatedAt' };
+  const fields = {
+    id: 'id',
+    name: 'name',
+    phone: 'phone',
+    notes: 'notes',
+    updated_at: 'updatedAt',
+  };
   it('servidor mais novo: fica a versão dele + os campos editados aqui', () => {
-    const local = [{ id: '1', name: 'Acme', phone: '9999', notes: 'velha', updatedAt: '2026-10-18T10:00:00Z', _dirtyFields: ['phone'] }];
-    const remote = [{ id: '1', name: 'Acme', phone: '1111', notes: 'nota da Ana', updated_at: '2026-10-18T11:00:00Z' }];
+    const local = [
+      {
+        id: '1',
+        name: 'Acme',
+        phone: '9999',
+        notes: 'velha',
+        updatedAt: '2026-10-18T10:00:00Z',
+        _dirtyFields: ['phone'],
+      },
+    ];
+    const remote = [
+      {
+        id: '1',
+        name: 'Acme',
+        phone: '1111',
+        notes: 'nota da Ana',
+        updated_at: '2026-10-18T11:00:00Z',
+      },
+    ];
     const { merged, conflictDetails } = _mergeRecords(local, remote, fields);
-    expect(merged[0]).toMatchObject({ phone: '9999', notes: 'nota da Ana', _dirtyFields: ['phone'] });
+    expect(merged[0]).toMatchObject({
+      phone: '9999',
+      notes: 'nota da Ana',
+      _dirtyFields: ['phone'],
+    });
     expect(Date.parse(merged[0].updatedAt)).toBeGreaterThan(Date.parse('2026-10-18T11:00:00Z')); // volta a ser enviado
     const lostFields = conflictDetails[0].fields.map((f) => f.field);
     expect(lostFields).toContain('notes'); // substituído pelo servidor

@@ -2,24 +2,52 @@
 // Regras puras (sem rede, sem banco) do briefing antes da visita e do
 // monitoramento de backup por e-mail. Testado em tests/robo-campo.test.js.
 
-import { daysBetween, escapeHtml, PEN_CLOSED_STATUSES, VENC_TIPOS } from "../avisos-prazo/avisos.ts";
-import type { Pend, Venc, Visita } from "./relatorios.ts";
+import {
+  daysBetween,
+  escapeHtml,
+  PEN_CLOSED_STATUSES,
+  VENC_TIPOS,
+} from '../avisos-prazo/avisos.ts';
+import type { Pend, Venc, Visita } from './relatorios.ts';
 
-const norm = (s: unknown) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const norm = (s: unknown) =>
+  String(s ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
 const dateBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 export type Device = {
-  hostname?: string | null; apelido?: string | null; is_ativo?: boolean | null;
-  data_ultima_atualizacao?: string | null; updated_at?: string | null;
+  hostname?: string | null;
+  apelido?: string | null;
+  is_ativo?: boolean | null;
+  data_ultima_atualizacao?: string | null;
+  updated_at?: string | null;
 };
 export type Monitor = {
-  id: string; client_id: string; client_name?: string | null; team?: string | null; nome: string;
-  identificador: string; max_horas: number; responsavel?: string | null; ativo?: boolean | null;
-  ultimo_status?: string | null; ultimo_em?: string | null; ultimo_assunto?: string | null;
-  historico?: { em: string; status: string; assunto: string }[] | null; pendencia_id?: string | null;
+  id: string;
+  client_id: string;
+  client_name?: string | null;
+  team?: string | null;
+  nome: string;
+  identificador: string;
+  max_horas: number;
+  responsavel?: string | null;
+  ativo?: boolean | null;
+  ultimo_status?: string | null;
+  ultimo_em?: string | null;
+  ultimo_assunto?: string | null;
+  historico?: { em: string; status: string; assunto: string }[] | null;
+  pendencia_id?: string | null;
   created_at?: string | null;
 };
-export type EmailBackup = { id: string; de: string; assunto: string; data: string; trecho?: string };
+export type EmailBackup = {
+  id: string;
+  de: string;
+  assunto: string;
+  data: string;
+  trecho?: string;
+};
 
 export const DISPOSITIVO_SEM_COMUNICAR_DIAS = 7;
 
@@ -27,7 +55,7 @@ export const DISPOSITIVO_SEM_COMUNICAR_DIAS = 7;
 export function diasSemComunicar(d: Device): number | null {
   if (!d || d.is_ativo === false || !d.data_ultima_atualizacao) return null;
   const visto = Date.parse(d.data_ultima_atualizacao);
-  const sync = Date.parse(d.updated_at || "") || Date.now();
+  const sync = Date.parse(d.updated_at || '') || Date.now();
   if (isNaN(visto)) return null;
   const dias = Math.floor((sync - visto) / 86400000);
   return dias > DISPOSITIVO_SEM_COMUNICAR_DIAS ? dias : null;
@@ -36,114 +64,246 @@ export function diasSemComunicar(d: Device): number | null {
 // ── Briefing ────────────────────────────────────────────────────────────────
 
 export type Briefing = {
-  cliente: string; data: string; hora: string; motivo: string; observacoes: string;
+  cliente: string;
+  data: string;
+  hora: string;
+  motivo: string;
+  observacoes: string;
   levar: string[];
   ultimas_visitas: { data: string; motivo: string; relatorio: string }[];
-  pendencias_abertas: { assunto: string; status: string; prioridade: string; prazo: string; atrasada: boolean }[];
+  pendencias_abertas: {
+    assunto: string;
+    status: string;
+    prioridade: string;
+    prazo: string;
+    atrasada: boolean;
+  }[];
   vencimentos_proximos: { tipo: string; descricao: string; data: string; dias: number }[];
   dispositivos_sem_comunicar: { nome: string; dias: number }[];
   backups: { nome: string; status: string; ultimo: string }[];
 };
 
 /** Fatos do cliente para a visita (o mesmo pacote vai para a IA no Make). */
-export function briefingDados(v: Visita & { observacoes?: string | null; client_id?: string | null }, ctx: {
-  today: string; visitas: (Visita & { relatorio?: string | null })[]; pendencias: Pend[]; vencimentos: Venc[];
-  devices: Device[]; monitores: Monitor[];
-}): Briefing {
+export function briefingDados(
+  v: Visita & { observacoes?: string | null; client_id?: string | null },
+  ctx: {
+    today: string;
+    visitas: (Visita & { relatorio?: string | null })[];
+    pendencias: Pend[];
+    vencimentos: Venc[];
+    devices: Device[];
+    monitores: Monitor[];
+  }
+): Briefing {
   const { today } = ctx;
   const ultimas = ctx.visitas
-    .filter((x) => x.id !== v.id && x.status === "concluida" && String(x.date || "") < String(v.date || today))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 3)
-    .map((x) => ({ data: String(x.date), motivo: x.motivo || "", relatorio: String(x.relatorio || "").trim().slice(0, 400) }));
-  const pend = ctx.pendencias.filter((p) => !PEN_CLOSED_STATUSES.includes(String(p.status ?? "")))
-    .sort((a, b) => String(a.deadline || "9999").localeCompare(String(b.deadline || "9999"))).slice(0, 8)
+    .filter(
+      (x) =>
+        x.id !== v.id && x.status === 'concluida' && String(x.date || '') < String(v.date || today)
+    )
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 3)
+    .map((x) => ({
+      data: String(x.date),
+      motivo: x.motivo || '',
+      relatorio: String(x.relatorio || '')
+        .trim()
+        .slice(0, 400),
+    }));
+  const pend = ctx.pendencias
+    .filter((p) => !PEN_CLOSED_STATUSES.includes(String(p.status ?? '')))
+    .sort((a, b) => String(a.deadline || '9999').localeCompare(String(b.deadline || '9999')))
+    .slice(0, 8)
     .map((p) => ({
-      assunto: String(p.assunto || p.descricao || "Sem descrição").slice(0, 140), status: p.status || "",
-      prioridade: p.priority || "", prazo: p.deadline ? String(p.deadline).slice(0, 10) : "",
+      assunto: String(p.assunto || p.descricao || 'Sem descrição').slice(0, 140),
+      status: p.status || '',
+      prioridade: p.priority || '',
+      prazo: p.deadline ? String(p.deadline).slice(0, 10) : '',
       atrasada: !!p.deadline && String(p.deadline).slice(0, 10) < today,
     }));
-  const venc = ctx.vencimentos.filter((x) => x.status !== "encerrado" && x.data_vencimento)
+  const venc = ctx.vencimentos
+    .filter((x) => x.status !== 'encerrado' && x.data_vencimento)
     .map((x) => ({ x, dias: daysBetween(today, String(x.data_vencimento).slice(0, 10)) }))
-    .filter(({ dias }) => dias <= 45).sort((a, b) => a.dias - b.dias).slice(0, 5)
-    .map(({ x, dias }) => ({ tipo: VENC_TIPOS[String(x.tipo)] || "Vencimento", descricao: x.descricao || "", data: String(x.data_vencimento).slice(0, 10), dias }));
-  const devs = ctx.devices.map((d) => ({ nome: d.apelido || d.hostname || "Dispositivo", dias: diasSemComunicar(d) }))
-    .filter((d): d is { nome: string; dias: number } => d.dias !== null).sort((a, b) => b.dias - a.dias).slice(0, 8);
-  const backups = ctx.monitores.filter((m) => m.ativo !== false)
-    .map((m) => ({ nome: m.nome, status: m.ultimo_status || "sem notícia", ultimo: m.ultimo_em ? String(m.ultimo_em) : "" }));
+    .filter(({ dias }) => dias <= 45)
+    .sort((a, b) => a.dias - b.dias)
+    .slice(0, 5)
+    .map(({ x, dias }) => ({
+      tipo: VENC_TIPOS[String(x.tipo)] || 'Vencimento',
+      descricao: x.descricao || '',
+      data: String(x.data_vencimento).slice(0, 10),
+      dias,
+    }));
+  const devs = ctx.devices
+    .map((d) => ({ nome: d.apelido || d.hostname || 'Dispositivo', dias: diasSemComunicar(d) }))
+    .filter((d): d is { nome: string; dias: number } => d.dias !== null)
+    .sort((a, b) => b.dias - a.dias)
+    .slice(0, 8);
+  const backups = ctx.monitores
+    .filter((m) => m.ativo !== false)
+    .map((m) => ({
+      nome: m.nome,
+      status: m.ultimo_status || 'sem notícia',
+      ultimo: m.ultimo_em ? String(m.ultimo_em) : '',
+    }));
   return {
-    cliente: v.client_name || "", data: String(v.date || ""), hora: v.all_day ? "dia inteiro" : String(v.time || "").slice(0, 5),
-    motivo: v.motivo || "", observacoes: String(v.observacoes || "").slice(0, 600),
-    levar: (Array.isArray(v.levar) ? v.levar : []).map((i) => String(i?.t || "")).filter(Boolean),
-    ultimas_visitas: ultimas, pendencias_abertas: pend, vencimentos_proximos: venc, dispositivos_sem_comunicar: devs, backups,
+    cliente: v.client_name || '',
+    data: String(v.date || ''),
+    hora: v.all_day ? 'dia inteiro' : String(v.time || '').slice(0, 5),
+    motivo: v.motivo || '',
+    observacoes: String(v.observacoes || '').slice(0, 600),
+    levar: (Array.isArray(v.levar) ? v.levar : []).map((i) => String(i?.t || '')).filter(Boolean),
+    ultimas_visitas: ultimas,
+    pendencias_abertas: pend,
+    vencimentos_proximos: venc,
+    dispositivos_sem_comunicar: devs,
+    backups,
   };
 }
 
 /** O briefing tem algo além do básico da visita? (sem nada, não vale e-mail nem IA). */
 export function briefingTemConteudo(b: Briefing): boolean {
-  return !!(b.ultimas_visitas.length || b.pendencias_abertas.length || b.vencimentos_proximos.length
-    || b.dispositivos_sem_comunicar.length || b.backups.some((x) => x.status !== "ok"));
+  return !!(
+    b.ultimas_visitas.length ||
+    b.pendencias_abertas.length ||
+    b.vencimentos_proximos.length ||
+    b.dispositivos_sem_comunicar.length ||
+    b.backups.some((x) => x.status !== 'ok')
+  );
 }
 
 /** Bloco HTML do briefing no e-mail "Seu dia". */
 export function briefingHtml(b: Briefing, ia?: string | null): string {
   const li = (s: string) => `<li style="margin-bottom:3px">${s}</li>`;
-  const bloco = (t: string, itens: string[]) => itens.length
-    ? `<div style="margin-top:6px"><b style="font-size:12px;color:#334155">${t}</b><ul style="margin:2px 0 0;padding-left:18px">${itens.join("")}</ul></div>` : "";
+  const bloco = (t: string, itens: string[]) =>
+    itens.length
+      ? `<div style="margin-top:6px"><b style="font-size:12px;color:#334155">${t}</b><ul style="margin:2px 0 0;padding-left:18px">${itens.join('')}</ul></div>`
+      : '';
   const partes = [
-    ia ? `<div style="margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:6px;font-size:13px">💡 ${escapeHtml(ia).replace(/\n/g, "<br>")}</div>` : "",
-    bloco("Últimas visitas", b.ultimas_visitas.map((x) => li(`${dateBR(x.data)} — ${escapeHtml(x.motivo)}${x.relatorio ? `: <span style="color:#64748b">${escapeHtml(x.relatorio.slice(0, 160))}${x.relatorio.length > 160 ? "…" : ""}</span>` : ""}`))),
-    bloco("Pendências abertas", b.pendencias_abertas.map((p) => li(`${escapeHtml(p.assunto)}${p.atrasada ? ' <span style="color:#dc2626">(atrasada)</span>' : p.prazo ? ` (prazo ${dateBR(p.prazo)})` : ""}`))),
-    bloco("Vencimentos próximos", b.vencimentos_proximos.map((x) => li(`${escapeHtml(x.tipo)}: ${escapeHtml(x.descricao)} — ${x.dias < 0 ? `<span style="color:#dc2626">venceu há ${-x.dias} dias</span>` : `em ${x.dias} dias`}`))),
-    bloco("Sem comunicar com o Milvus", b.dispositivos_sem_comunicar.map((d) => li(`${escapeHtml(d.nome)} — ${d.dias} dias`))),
-    bloco("Backups", b.backups.filter((x) => x.status !== "ok").map((x) => li(`${escapeHtml(x.nome)}: <span style="color:#dc2626">${escapeHtml(x.status)}</span>`))),
-  ].join("");
-  return partes ? `<div style="margin:4px 0 4px 4px;padding-left:10px;border-left:3px solid #cbd5e1;font-size:12.5px;color:#1e293b">${partes}</div>` : "";
+    ia
+      ? `<div style="margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:6px;font-size:13px">💡 ${escapeHtml(ia).replace(/\n/g, '<br>')}</div>`
+      : '',
+    bloco(
+      'Últimas visitas',
+      b.ultimas_visitas.map((x) =>
+        li(
+          `${dateBR(x.data)} — ${escapeHtml(x.motivo)}${x.relatorio ? `: <span style="color:#64748b">${escapeHtml(x.relatorio.slice(0, 160))}${x.relatorio.length > 160 ? '…' : ''}</span>` : ''}`
+        )
+      )
+    ),
+    bloco(
+      'Pendências abertas',
+      b.pendencias_abertas.map((p) =>
+        li(
+          `${escapeHtml(p.assunto)}${p.atrasada ? ' <span style="color:#dc2626">(atrasada)</span>' : p.prazo ? ` (prazo ${dateBR(p.prazo)})` : ''}`
+        )
+      )
+    ),
+    bloco(
+      'Vencimentos próximos',
+      b.vencimentos_proximos.map((x) =>
+        li(
+          `${escapeHtml(x.tipo)}: ${escapeHtml(x.descricao)} — ${x.dias < 0 ? `<span style="color:#dc2626">venceu há ${-x.dias} dias</span>` : `em ${x.dias} dias`}`
+        )
+      )
+    ),
+    bloco(
+      'Sem comunicar com o Milvus',
+      b.dispositivos_sem_comunicar.map((d) => li(`${escapeHtml(d.nome)} — ${d.dias} dias`))
+    ),
+    bloco(
+      'Backups',
+      b.backups
+        .filter((x) => x.status !== 'ok')
+        .map((x) =>
+          li(`${escapeHtml(x.nome)}: <span style="color:#dc2626">${escapeHtml(x.status)}</span>`)
+        )
+    ),
+  ].join('');
+  return partes
+    ? `<div style="margin:4px 0 4px 4px;padding-left:10px;border-left:3px solid #cbd5e1;font-size:12.5px;color:#1e293b">${partes}</div>`
+    : '';
 }
 
 /** Os mesmos fatos em texto corrido — é o que o cenário do Make põe no prompt da IA. */
 export function briefingTexto(b: Briefing): string {
-  const l: string[] = [`Cliente: ${b.cliente}`, `Visita: ${dateBR(b.data)} ${b.hora} — motivo: ${b.motivo}`];
+  const l: string[] = [
+    `Cliente: ${b.cliente}`,
+    `Visita: ${dateBR(b.data)} ${b.hora} — motivo: ${b.motivo}`,
+  ];
   if (b.observacoes) l.push(`Observações da visita: ${b.observacoes}`);
-  if (b.levar.length) l.push(`O técnico vai levar: ${b.levar.join(", ")}`);
-  if (b.ultimas_visitas.length) l.push("Últimas visitas:", ...b.ultimas_visitas.map((x) => `- ${dateBR(x.data)}: ${x.motivo}${x.relatorio ? ` — relatório: ${x.relatorio}` : ""}`));
-  if (b.pendencias_abertas.length) l.push("Pendências abertas:", ...b.pendencias_abertas.map((p) => `- ${p.assunto} (${p.status}${p.prioridade ? ", prioridade " + p.prioridade : ""}${p.atrasada ? ", ATRASADA" : p.prazo ? ", prazo " + dateBR(p.prazo) : ""})`));
-  if (b.vencimentos_proximos.length) l.push("Vencimentos próximos:", ...b.vencimentos_proximos.map((x) => `- ${x.tipo}: ${x.descricao} — ${x.dias < 0 ? `venceu há ${-x.dias} dias` : `em ${x.dias} dias`}`));
-  if (b.dispositivos_sem_comunicar.length) l.push("Dispositivos sem comunicar com o Milvus:", ...b.dispositivos_sem_comunicar.map((d) => `- ${d.nome}: ${d.dias} dias`));
-  const bk = b.backups.filter((x) => x.status !== "ok");
-  if (bk.length) l.push("Backups com problema:", ...bk.map((x) => `- ${x.nome}: ${x.status}`));
-  return l.join("\n").slice(0, 4000);
+  if (b.levar.length) l.push(`O técnico vai levar: ${b.levar.join(', ')}`);
+  if (b.ultimas_visitas.length)
+    l.push(
+      'Últimas visitas:',
+      ...b.ultimas_visitas.map(
+        (x) =>
+          `- ${dateBR(x.data)}: ${x.motivo}${x.relatorio ? ` — relatório: ${x.relatorio}` : ''}`
+      )
+    );
+  if (b.pendencias_abertas.length)
+    l.push(
+      'Pendências abertas:',
+      ...b.pendencias_abertas.map(
+        (p) =>
+          `- ${p.assunto} (${p.status}${p.prioridade ? ', prioridade ' + p.prioridade : ''}${p.atrasada ? ', ATRASADA' : p.prazo ? ', prazo ' + dateBR(p.prazo) : ''})`
+      )
+    );
+  if (b.vencimentos_proximos.length)
+    l.push(
+      'Vencimentos próximos:',
+      ...b.vencimentos_proximos.map(
+        (x) =>
+          `- ${x.tipo}: ${x.descricao} — ${x.dias < 0 ? `venceu há ${-x.dias} dias` : `em ${x.dias} dias`}`
+      )
+    );
+  if (b.dispositivos_sem_comunicar.length)
+    l.push(
+      'Dispositivos sem comunicar com o Milvus:',
+      ...b.dispositivos_sem_comunicar.map((d) => `- ${d.nome}: ${d.dias} dias`)
+    );
+  const bk = b.backups.filter((x) => x.status !== 'ok');
+  if (bk.length) l.push('Backups com problema:', ...bk.map((x) => `- ${x.nome}: ${x.status}`));
+  return l.join('\n').slice(0, 4000);
 }
 
 /** Resposta do Make: { texto } em JSON ou texto puro. max 1.200 serve ao briefing; o relatório da visita pede mais. */
 export function textoDaIa(body: string, max = 1200): string | null {
   let t = body;
-  try { const j = JSON.parse(body); t = typeof j === "string" ? j : (j?.texto ?? j?.text ?? j?.result ?? ""); } catch { /* texto puro */ }
-  t = String(t || "").trim();
-  if (!t || /^accepted$/i.test(t)) return null;  // webhook sem "Webhook response" devolve "Accepted"
+  try {
+    const j = JSON.parse(body);
+    t = typeof j === 'string' ? j : (j?.texto ?? j?.text ?? j?.result ?? '');
+  } catch {
+    /* texto puro */
+  }
+  t = String(t || '').trim();
+  if (!t || /^accepted$/i.test(t)) return null; // webhook sem "Webhook response" devolve "Accepted"
   return t.slice(0, max);
 }
 
 // ── Backup por e-mail ───────────────────────────────────────────────────────
 
-const FALHA = /\b(falha|falhou|failed|failure|erro|error|unsuccessful|nao concluido|not completed|aborted|abortado)\b/;
-const AVISO = /\b(warning|aviso|alerta|partial|parcial|concluido com avisos|completed with warnings)\b/;
-const OK = /\b(success|successful|successfully|sucesso|concluido|completed|ok|bem-sucedido|bem sucedido)\b/;
+const FALHA =
+  /\b(falha|falhou|failed|failure|erro|error|unsuccessful|nao concluido|not completed|aborted|abortado)\b/;
+const AVISO =
+  /\b(warning|aviso|alerta|partial|parcial|concluido com avisos|completed with warnings)\b/;
+const OK =
+  /\b(success|successful|successfully|sucesso|concluido|completed|ok|bem-sucedido|bem sucedido)\b/;
 
 /** Status pelo assunto (e começo do corpo): falha > aviso > ok; null = não deu para saber. */
-export function classificarBackup(assunto: string, trecho = ""): "falha" | "aviso" | "ok" | null {
+export function classificarBackup(assunto: string, trecho = ''): 'falha' | 'aviso' | 'ok' | null {
   const a = norm(assunto);
   const t = norm(trecho).slice(0, 600);
   for (const txt of [a, t]) {
-    if (FALHA.test(txt)) return "falha";
-    if (AVISO.test(txt)) return "aviso";
-    if (OK.test(txt)) return "ok";
+    if (FALHA.test(txt)) return 'falha';
+    if (AVISO.test(txt)) return 'aviso';
+    if (OK.test(txt)) return 'ok';
   }
   return null;
 }
 
 /** Monitor do e-mail: identificador no remetente ou assunto; o mais específico (longo) vence. */
 export function monitorDoEmail(monitores: Monitor[], e: EmailBackup): Monitor | null {
-  const alvo = norm(e.de + " " + e.assunto);
+  const alvo = norm(e.de + ' ' + e.assunto);
   let melhor: Monitor | null = null;
   for (const m of monitores) {
     const id = norm(m.identificador).trim();
@@ -154,39 +314,73 @@ export function monitorDoEmail(monitores: Monitor[], e: EmailBackup): Monitor | 
 }
 
 /** Aplica o e-mail ao monitor (só se for mais novo que o último). */
-export function aplicarEmail(m: Monitor, e: EmailBackup, status: "falha" | "aviso" | "ok"): Monitor {
+export function aplicarEmail(
+  m: Monitor,
+  e: EmailBackup,
+  status: 'falha' | 'aviso' | 'ok'
+): Monitor {
   const hist = [{ em: e.data, status, assunto: e.assunto.slice(0, 200) }, ...(m.historico || [])]
-    .sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 20);
+    .sort((a, b) => String(b.em).localeCompare(String(a.em)))
+    .slice(0, 20);
   const novo = !m.ultimo_em || Date.parse(e.data) >= Date.parse(m.ultimo_em);
   return novo
-    ? { ...m, ultimo_status: status, ultimo_em: e.data, ultimo_assunto: e.assunto.slice(0, 300), historico: hist }
+    ? {
+        ...m,
+        ultimo_status: status,
+        ultimo_em: e.data,
+        ultimo_assunto: e.assunto.slice(0, 300),
+        historico: hist,
+      }
     : { ...m, historico: hist };
 }
 
 /** Precisa de atenção? Falha no último e-mail, ou silêncio além de max_horas. */
-export function backupAlerta(m: Monitor, agora: Date = new Date()): { tipo: "falha" | "silencio"; horas?: number } | null {
+export function backupAlerta(
+  m: Monitor,
+  agora: Date = new Date()
+): { tipo: 'falha' | 'silencio'; horas?: number } | null {
   if (m.ativo === false) return null;
-  if (m.ultimo_status === "falha") return { tipo: "falha" };
-  const desde = Date.parse(m.ultimo_em || m.created_at || "");
+  if (m.ultimo_status === 'falha') return { tipo: 'falha' };
+  const desde = Date.parse(m.ultimo_em || m.created_at || '');
   if (isNaN(desde)) return null;
   const horas = Math.floor((agora.getTime() - desde) / 3600000);
-  return horas > m.max_horas ? { tipo: "silencio", horas } : null;
+  return horas > m.max_horas ? { tipo: 'silencio', horas } : null;
 }
 
 /** Pendência automática do alerta. */
-export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; horas?: number }, id: string, agora: Date = new Date()) {
+export function pendenciaDoAlerta(
+  m: Monitor,
+  a: { tipo: 'falha' | 'silencio'; horas?: number },
+  id: string,
+  agora: Date = new Date()
+) {
   const iso = agora.toISOString();
-  const assunto = a.tipo === "falha"
-    ? `Backup com falha: ${m.nome}`
-    : `Backup sem notícia há ${a.horas} h: ${m.nome}`;
-  const descricao = a.tipo === "falha"
-    ? `O último e-mail do backup "${m.nome}" indicou falha.\nAssunto: ${m.ultimo_assunto || "—"}\nRecebido em: ${m.ultimo_em || "—"}`
-    : `Nenhum e-mail do backup "${m.nome}" chegou nas últimas ${a.horas} horas (limite: ${m.max_horas} h).\nÚltimo recebido: ${m.ultimo_em || "nunca"}`;
+  const assunto =
+    a.tipo === 'falha'
+      ? `Backup com falha: ${m.nome}`
+      : `Backup sem notícia há ${a.horas} h: ${m.nome}`;
+  const descricao =
+    a.tipo === 'falha'
+      ? `O último e-mail do backup "${m.nome}" indicou falha.\nAssunto: ${m.ultimo_assunto || '—'}\nRecebido em: ${m.ultimo_em || '—'}`
+      : `Nenhum e-mail do backup "${m.nome}" chegou nas últimas ${a.horas} horas (limite: ${m.max_horas} h).\nÚltimo recebido: ${m.ultimo_em || 'nunca'}`;
   return {
-    id, client_id: m.client_id, client_name: m.client_name || "", team: m.team || "init",
-    tipo: "Manutenção", assunto, descricao: descricao + "\n\nAberta automaticamente pelo monitor de backup do Init Intra.",
-    responsible: m.responsavel || "", status: "aberto", priority: "alta", canal: "proativo", categoria: "backup",
-    attachments: [], checklist: [], tags: ["backup-automatico"], created_at: iso, updated_at: iso,
+    id,
+    client_id: m.client_id,
+    client_name: m.client_name || '',
+    team: m.team || 'init',
+    tipo: 'Manutenção',
+    assunto,
+    descricao: descricao + '\n\nAberta automaticamente pelo monitor de backup do Init Intra.',
+    responsible: m.responsavel || '',
+    status: 'aberto',
+    priority: 'alta',
+    canal: 'proativo',
+    categoria: 'backup',
+    attachments: [],
+    checklist: [],
+    tags: ['backup-automatico'],
+    created_at: iso,
+    updated_at: iso,
   };
 }
 
@@ -207,43 +401,85 @@ export function pendenciaDoAlerta(m: Monitor, a: { tipo: "falha" | "silencio"; h
 // (respostaAutomatica). Opcional: Robo.gs antigo não manda, e aí a detecção
 // fica no assunto e no corpo.
 export type EmailEntrada = EmailBackup & {
-  message_id?: string | null; thread_id?: string | null;
+  message_id?: string | null;
+  thread_id?: string | null;
   cabecalhos?: Record<string, unknown> | null;
 };
 export type Cliente = {
-  id: string; name: string; team?: string | null; technician?: string | null;
+  id: string;
+  name: string;
+  team?: string | null;
+  technician?: string | null;
   emails?: Record<string, unknown> | null;
 };
 export type Triagem = {
-  ignorar: boolean; assunto: string; descricao: string; categoria: string;
-  prioridade: string; tipo: string; solicitante: string; semIa: boolean;
+  ignorar: boolean;
+  assunto: string;
+  descricao: string;
+  categoria: string;
+  prioridade: string;
+  tipo: string;
+  solicitante: string;
+  semIa: boolean;
 };
 
 // Listas fechadas do app: migration 056 (canal/categoria) e js/pendencias.js (tipo).
-export const PEN_CATEGORIAS = ["rede", "email", "impressora", "hardware", "software", "acesso",
-  "backup", "servidor", "seguranca", "telefonia", "outro"];
-export const PEN_PRIORIDADES = ["baixa", "media", "alta", "critica"];
-export const PEN_TIPOS = ["Projeto", "Operacional / Interno", "Manutenção", "Suporte", "Gestão", "Outro"];
+export const PEN_CATEGORIAS = [
+  'rede',
+  'email',
+  'impressora',
+  'hardware',
+  'software',
+  'acesso',
+  'backup',
+  'servidor',
+  'seguranca',
+  'telefonia',
+  'outro',
+];
+export const PEN_PRIORIDADES = ['baixa', 'media', 'alta', 'critica'];
+export const PEN_TIPOS = [
+  'Projeto',
+  'Operacional / Interno',
+  'Manutenção',
+  'Suporte',
+  'Gestão',
+  'Outro',
+];
 /** Prioridade máxima que a triagem dá sozinha. "critica" vale SLA de 1 h: fica para a equipe. */
-export const TRIAGEM_PRIORIDADE_MAX = "alta";
+export const TRIAGEM_PRIORIDADE_MAX = 'alta';
 // Domínio de e-mail grátis nunca casa cliente: o remetente pode ser qualquer um.
-const DOMINIOS_PUBLICOS = ["gmail.com", "hotmail.com", "hotmail.com.br", "outlook.com", "outlook.com.br",
-  "live.com", "yahoo.com", "yahoo.com.br", "icloud.com", "me.com", "msn.com",
-  "uol.com.br", "bol.com.br", "terra.com.br", "globo.com"];
+const DOMINIOS_PUBLICOS = [
+  'gmail.com',
+  'hotmail.com',
+  'hotmail.com.br',
+  'outlook.com',
+  'outlook.com.br',
+  'live.com',
+  'yahoo.com',
+  'yahoo.com.br',
+  'icloud.com',
+  'me.com',
+  'msn.com',
+  'uol.com.br',
+  'bol.com.br',
+  'terra.com.br',
+  'globo.com',
+];
 
 /** `Márcia <m@acme.com.br>` → `m@acme.com.br` (vazio se não houver e-mail). */
 export function enderecoDoRemetente(de: string): string {
-  const m = /<([^>]+)>/.exec(String(de || ""));
-  const alvo = (m ? m[1] : String(de || "")).trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alvo) ? alvo : "";
+  const m = /<([^>]+)>/.exec(String(de || ''));
+  const alvo = (m ? m[1] : String(de || '')).trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alvo) ? alvo : '';
 }
 
 /** Nome de quem escreveu; sem nome no remetente, a parte antes do @. */
 export function nomeDoRemetente(de: string): string {
-  const s = String(de || "").trim();
+  const s = String(de || '').trim();
   const m = /^\s*"?([^"<]+?)"?\s*</.exec(s);
   if (m) return m[1].trim().slice(0, 120);
-  return (enderecoDoRemetente(s).split("@")[0] || s).trim().slice(0, 120);
+  return (enderecoDoRemetente(s).split('@')[0] || s).trim().slice(0, 120);
 }
 
 // ── Corpo do e-mail: só o que a pessoa escreveu agora ──────────────────────
@@ -272,7 +508,8 @@ const MARCAS_CITACAO: RegExp[] = [
 
 // O delimitador do RFC 3676 ("-- " sozinho na linha): sem ambiguidade nenhuma.
 const MARCA_SIG_RFC = /^-- ?[ \t]*$/m;
-const DESPEDIDAS = /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Obg\.?|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
+const DESPEDIDAS =
+  /^[ \t]*(Atenciosamente|Att\.?|Abraços?|Abraço|Obrigad[oa]|Obg\.?|Agradeço|Grat[oa]|Cordialmente|Saudações|Respeitosamente)[ \t]*[,.!]?[ \t]*$/im;
 // Sinais de bloco de contato: telefone, site ou e-mail soltos.
 const SINAL_CONTATO = /(\+?\d[\d ().-]{7,}\d)|(https?:\/\/|www\.)|([^\s@]+@[^\s@]+\.[^\s@]{2,})/i;
 
@@ -312,11 +549,13 @@ function _semAssinatura(s: string): string {
  * de duas linhas não pode virar um chamado vazio.
  */
 export function corpoLimpo(trecho: string): string {
-  const original = String(trecho || "").replace(/\r\n?/g, "\n");
-  if (!original.trim()) return "";
+  const original = String(trecho || '').replace(/\r\n?/g, '\n');
+  if (!original.trim()) return '';
   const corte = _primeiroCorte(original, MARCAS_CITACAO);
   const semCitacao = corte > 0 ? original.slice(0, corte) : original;
-  const limpo = _semAssinatura(semCitacao).replace(/\n{3,}/g, "\n\n").trim();
+  const limpo = _semAssinatura(semCitacao)
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   // Sobrou pouco demais: algum marcador pegou texto de verdade.
   if (limpo.length < 20 && original.trim().length >= 20) return original.trim();
   return limpo;
@@ -329,20 +568,27 @@ export function corpoLimpo(trecho: string): string {
  * chamado devolveria o e-mail para a própria Init.
  */
 export function remetenteInterno(de: string, dominios: string[]): boolean {
-  const d = (enderecoDoRemetente(de).split("@")[1] || "").trim();
+  const d = (enderecoDoRemetente(de).split('@')[1] || '').trim();
   if (!d) return false;
   return (dominios || []).some((x) => {
-    const n = String(x || "").trim().toLowerCase().replace(/^@/, "");
-    return !!n && n.includes(".") && (d === n || d.endsWith("." + n));
+    const n = String(x || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, '');
+    return !!n && n.includes('.') && (d === n || d.endsWith('.' + n));
   });
 }
 
 /** Domínio da caixa do robô (GMAIL_USER): o domínio "de casa", sem secret novo. */
 export function dominiosInternos(gmailUser: string): string[] {
-  const d = (String(gmailUser || "").trim().toLowerCase().split("@")[1] || "").trim();
-  return d.includes(".") ? [d] : [];
+  const d = (
+    String(gmailUser || '')
+      .trim()
+      .toLowerCase()
+      .split('@')[1] || ''
+  ).trim();
+  return d.includes('.') ? [d] : [];
 }
-
 
 /**
  * Chave da conversa que liga a mensagem a um chamado aberto.
@@ -355,67 +601,97 @@ export function dominiosInternos(gmailUser: string): string[] {
  * email_thread_id só serve para casar a conversa — a resposta sai pelo
  * message_id —, então guardar ali "octadesk:1234" não quebra o envio.
  */
-export function conversaDoEmail(e: { de?: string; assunto?: string; thread_id?: string | null }): string {
-  const m = String(e.assunto || "").match(/(?:ticket\s*#?|\[#)\s*(\d{2,10})\b/i);
-  if (m && /octadesk/i.test(String(e.de || ""))) return "octadesk:" + m[1];
-  return String(e.thread_id || "").trim().slice(0, 200);
+export function conversaDoEmail(e: {
+  de?: string;
+  assunto?: string;
+  thread_id?: string | null;
+}): string {
+  const m = String(e.assunto || '').match(/(?:ticket\s*#?|\[#)\s*(\d{2,10})\b/i);
+  if (m && /octadesk/i.test(String(e.de || ''))) return 'octadesk:' + m[1];
+  return String(e.thread_id || '')
+    .trim()
+    .slice(0, 200);
 }
 
 /** Tira os Re:/Enc: empilhados do assunto. */
 export function assuntoLimpo(assunto: string): string {
   const prefixo = /^\s*(re|res|ref|enc|encaminhada|fwd|fw)\s*:\s*/i;
-  let s = String(assunto || "").trim();
-  for (let i = 0; i < 5 && prefixo.test(s); i++) s = s.replace(prefixo, "").trim();
+  let s = String(assunto || '').trim();
+  for (let i = 0; i < 5 && prefixo.test(s); i++) s = s.replace(prefixo, '').trim();
   return s.slice(0, 140);
 }
 
 /** Vínculo aprendido na caixa (migration 072): quem vincula um cliente ensina o robô. */
 export type Remetente = {
-  remetente: string; tipo: string; client_id: string; team?: string | null; updated_at?: string | null;
+  remetente: string;
+  tipo: string;
+  client_id: string;
+  team?: string | null;
+  updated_at?: string | null;
 };
 
 // O que alguém vinculou à mão vale mais que o domínio da ficha: é a correção
 // de um erro que o robô já cometeu. O endereço exato vem antes do domínio, e
 // domínio público nunca casa por domínio — mesmo que uma linha antiga o tenha.
 // Com duas equipes vinculando o mesmo remetente, o vínculo mais recente vence.
-function clienteAprendido(clientes: Cliente[], remetentes: Remetente[], endereco: string): Cliente | null {
+function clienteAprendido(
+  clientes: Cliente[],
+  remetentes: Remetente[],
+  endereco: string
+): Cliente | null {
   if (!endereco || !remetentes.length) return null;
-  const dominio = endereco.split("@")[1] || "";
+  const dominio = endereco.split('@')[1] || '';
   const porId = new Map(clientes.map((c) => [c.id, c]));
   const maisRecente = (lista: Remetente[]) => {
-    let melhor: Cliente | null = null; let quando = "";
+    let melhor: Cliente | null = null;
+    let quando = '';
     for (const r of lista) {
       const c = porId.get(r.client_id);
       // Cliente que esta rodada não enxerga (apagado, outra base) não decide nada.
       if (!c) continue;
-      const t = String(r.updated_at || "");
-      if (!melhor || t > quando) { melhor = c; quando = t; }
+      const t = String(r.updated_at || '');
+      if (!melhor || t > quando) {
+        melhor = c;
+        quando = t;
+      }
     }
     return melhor;
   };
-  const exato = maisRecente(remetentes.filter((r) => r.tipo === "endereco" && norm(r.remetente).trim() === endereco));
+  const exato = maisRecente(
+    remetentes.filter((r) => r.tipo === 'endereco' && norm(r.remetente).trim() === endereco)
+  );
   if (exato || !dominio || DOMINIOS_PUBLICOS.includes(dominio)) return exato;
-  return maisRecente(remetentes.filter((r) => {
-    const d = norm(r.remetente).replace(/^@/, "").trim();
-    return r.tipo === "dominio" && d.includes(".") && !DOMINIOS_PUBLICOS.includes(d) &&
-      (dominio === d || dominio.endsWith("." + d));
-  }));
+  return maisRecente(
+    remetentes.filter((r) => {
+      const d = norm(r.remetente).replace(/^@/, '').trim();
+      return (
+        r.tipo === 'dominio' &&
+        d.includes('.') &&
+        !DOMINIOS_PUBLICOS.includes(d) &&
+        (dominio === d || dominio.endsWith('.' + d))
+      );
+    })
+  );
 }
 
 /** Cliente do e-mail: vínculo aprendido na caixa; senão, domínio da ficha (emails.domain); senão, nome do cliente no remetente ou no assunto. */
-export function clienteDoEmail(clientes: Cliente[], e: EmailEntrada, remetentes: Remetente[] = []): Cliente | null {
+export function clienteDoEmail(
+  clientes: Cliente[],
+  e: EmailEntrada,
+  remetentes: Remetente[] = []
+): Cliente | null {
   const endereco = enderecoDoRemetente(e.de);
   const aprendido = clienteAprendido(clientes, remetentes, endereco);
   if (aprendido) return aprendido;
-  const dominio = endereco.split("@")[1] || "";
+  const dominio = endereco.split('@')[1] || '';
   if (dominio && !DOMINIOS_PUBLICOS.includes(dominio)) {
     for (const c of clientes) {
-      const d = norm(c.emails?.domain).replace(/^@/, "").trim();
-      if (d.includes(".") && (dominio === d || dominio.endsWith("." + d))) return c;
+      const d = norm(c.emails?.domain).replace(/^@/, '').trim();
+      if (d.includes('.') && (dominio === d || dominio.endsWith('.' + d))) return c;
     }
   }
   // Sem domínio na ficha: o nome do cliente no remetente ou no assunto; o mais específico vence.
-  const alvo = norm(e.de + " " + e.assunto);
+  const alvo = norm(e.de + ' ' + e.assunto);
   let melhor: Cliente | null = null;
   for (const c of clientes) {
     const nome = norm(c.name).trim();
@@ -433,23 +709,29 @@ export function triagemDaIa(body: string, e: EmailEntrada): Triagem {
   let j: Record<string, unknown> | null = null;
   try {
     const p = JSON.parse(body);
-    if (p && typeof p === "object" && !Array.isArray(p)) j = p as Record<string, unknown>;
-  } catch { /* webhook fora do ar ou "Accepted": segue sem IA */ }
-  const texto = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-  let prioridade = umaDe(j?.prioridade, PEN_PRIORIDADES, "media");
+    if (p && typeof p === 'object' && !Array.isArray(p)) j = p as Record<string, unknown>;
+  } catch {
+    /* webhook fora do ar ou "Accepted": segue sem IA */
+  }
+  const texto = (v: unknown, max: number) =>
+    String(v ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, max);
+  let prioridade = umaDe(j?.prioridade, PEN_PRIORIDADES, 'media');
   if (PEN_PRIORIDADES.indexOf(prioridade) > PEN_PRIORIDADES.indexOf(TRIAGEM_PRIORIDADE_MAX)) {
     prioridade = TRIAGEM_PRIORIDADE_MAX;
   }
   return {
-    ignorar: j?.ignorar === true || String(j?.ignorar ?? "").toLowerCase() === "true",
-    assunto: texto(j?.assunto, 140) || assuntoLimpo(e.assunto) || "Pedido por e-mail",
+    ignorar: j?.ignorar === true || String(j?.ignorar ?? '').toLowerCase() === 'true',
+    assunto: texto(j?.assunto, 140) || assuntoLimpo(e.assunto) || 'Pedido por e-mail',
     // Sem IA, a descrição é o e-mail: corpoLimpo tira a conversa citada e a
     // assinatura antes do corte de 600, que era o que terminava no meio de
     // "Em qui., 22 de".
-    descricao: texto(j?.descricao, 600) || texto(corpoLimpo(e.trecho || ""), 600),
-    categoria: umaDe(j?.categoria, PEN_CATEGORIAS, "outro"),
+    descricao: texto(j?.descricao, 600) || texto(corpoLimpo(e.trecho || ''), 600),
+    categoria: umaDe(j?.categoria, PEN_CATEGORIAS, 'outro'),
     prioridade,
-    tipo: umaDe(j?.tipo, PEN_TIPOS, "Suporte"),
+    tipo: umaDe(j?.tipo, PEN_TIPOS, 'Suporte'),
     solicitante: texto(j?.solicitante, 120) || nomeDoRemetente(e.de),
     semIa: !j,
   };
@@ -458,22 +740,38 @@ export function triagemDaIa(body: string, e: EmailEntrada): Triagem {
 // Expediente e prazos de 1ª resposta iguais aos do app (js/sla.js).
 const SLA_EXPEDIENTE = { inicio: 8, fim: 18 };
 const SLA_RESPOSTA_HORAS: Record<string, number> = { critica: 1, alta: 4, media: 8, baixa: 24 };
-const BRT_MS = 3 * 3600000;  // Brasília = UTC-3 (sem horário de verão desde 2019)
+const BRT_MS = 3 * 3600000; // Brasília = UTC-3 (sem horário de verão desde 2019)
 
 /** Prazo da 1ª resposta em horas úteis (8h–18h, seg–sex, horário de Brasília). */
 export function primeiraRespostaDue(prioridade: string, agora: Date = new Date()): string {
-  const d = new Date(agora.getTime() - BRT_MS);  // relógio de Brasília lido em UTC
+  const d = new Date(agora.getTime() - BRT_MS); // relógio de Brasília lido em UTC
   let restante = Math.round((SLA_RESPOSTA_HORAS[prioridade] ?? SLA_RESPOSTA_HORAS.media) * 60);
-  const inicioDoDia = (x: Date) => { x.setUTCHours(SLA_EXPEDIENTE.inicio, 0, 0, 0); };
-  const proximoDia = (x: Date) => { x.setUTCDate(x.getUTCDate() + 1); inicioDoDia(x); };
+  const inicioDoDia = (x: Date) => {
+    x.setUTCHours(SLA_EXPEDIENTE.inicio, 0, 0, 0);
+  };
+  const proximoDia = (x: Date) => {
+    x.setUTCDate(x.getUTCDate() + 1);
+    inicioDoDia(x);
+  };
   for (let guard = 0; guard < 400; guard++) {
-    if ([0, 6].includes(d.getUTCDay())) { proximoDia(d); continue; }
-    const ini = new Date(d); inicioDoDia(ini);
-    const fim = new Date(d); fim.setUTCHours(SLA_EXPEDIENTE.fim, 0, 0, 0);
+    if ([0, 6].includes(d.getUTCDay())) {
+      proximoDia(d);
+      continue;
+    }
+    const ini = new Date(d);
+    inicioDoDia(ini);
+    const fim = new Date(d);
+    fim.setUTCHours(SLA_EXPEDIENTE.fim, 0, 0, 0);
     if (d < ini) d.setTime(ini.getTime());
-    if (d >= fim) { proximoDia(d); continue; }
+    if (d >= fim) {
+      proximoDia(d);
+      continue;
+    }
     const livres = Math.floor((fim.getTime() - d.getTime()) / 60000);
-    if (restante <= livres) { d.setTime(d.getTime() + restante * 60000); break; }
+    if (restante <= livres) {
+      d.setTime(d.getTime() + restante * 60000);
+      break;
+    }
     restante -= livres;
     proximoDia(d);
   }
@@ -481,30 +779,52 @@ export function primeiraRespostaDue(prioridade: string, agora: Date = new Date()
 }
 
 /** Pendência da triagem: o que a IA entendeu, com o e-mail original no fim da descrição. */
-export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: string, agora: Date = new Date()) {
+export function pendenciaDaTriagem(
+  t: Triagem,
+  e: EmailEntrada,
+  c: Cliente,
+  id: string,
+  agora: Date = new Date()
+) {
   const iso = agora.toISOString();
-  const tags = ["triagem-automatica"];
-  if (t.semIa) tags.push("sem-classificacao-ia");
-  const origem = `\n\n— Aberta pela triagem de e-mail do Init Intra.\nDe: ${e.de}\nRecebido em: ${e.data}`
-    + `\nAssunto original: ${String(e.assunto || "").slice(0, 200)}`;
+  const tags = ['triagem-automatica'];
+  if (t.semIa) tags.push('sem-classificacao-ia');
+  const origem =
+    `\n\n— Aberta pela triagem de e-mail do Init Intra.\nDe: ${e.de}\nRecebido em: ${e.data}` +
+    `\nAssunto original: ${String(e.assunto || '').slice(0, 200)}`;
   return {
-    id, client_id: c.id, client_name: c.name || "", team: c.team || "init",
-    tipo: t.tipo, assunto: t.assunto, descricao: t.descricao + origem,
-    responsible: c.technician || "", solicitante: t.solicitante,
+    id,
+    client_id: c.id,
+    client_name: c.name || '',
+    team: c.team || 'init',
+    tipo: t.tipo,
+    assunto: t.assunto,
+    descricao: t.descricao + origem,
+    responsible: c.technician || '',
+    solicitante: t.solicitante,
     // O e-mail inteiro (066). A `descricao` é resumo: a IA escreve em 600
     // caracteres, e sem IA o corte de 600 come o fim do que a pessoa escreveu.
     // Quem atende precisa do texto todo, e ir buscar no Gmail é o que fazia a
     // triagem parecer meio caminho.
-    email_corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
+    email_corpo: corpoLimpo(e.trecho || '').slice(0, 20000) || null,
     solicitante_email: enderecoDoRemetente(e.de) || null,
-    email_message_id: String(e.message_id || "").trim().slice(0, 500) || null,
+    email_message_id:
+      String(e.message_id || '')
+        .trim()
+        .slice(0, 500) || null,
     email_thread_id: conversaDoEmail(e) || null,
-    status: "aberto", priority: t.prioridade, canal: "email", categoria: t.categoria,
+    status: 'aberto',
+    priority: t.prioridade,
+    canal: 'email',
+    categoria: t.categoria,
     first_response_due: primeiraRespostaDue(t.prioridade, agora),
-    attachments: [], checklist: [], tags, created_at: iso, updated_at: iso,
+    attachments: [],
+    checklist: [],
+    tags,
+    created_at: iso,
+    updated_at: iso,
   };
 }
-
 
 /**
  * Nota de uma mensagem que chegou na conversa de um chamado que já existe.
@@ -515,27 +835,39 @@ export function pendenciaDaTriagem(t: Triagem, e: EmailEntrada, c: Cliente, id: 
  * dia alguém esquecer deste caminho, o pior que acontece é não contar.
  */
 export function notaDoSolicitante(e: EmailEntrada, agora: Date = new Date()) {
-  const texto = corpoLimpo(e.trecho || "").slice(0, 4000);
+  const texto = corpoLimpo(e.trecho || '').slice(0, 4000);
   return {
-    text: texto || "(mensagem sem texto)",
+    text: texto || '(mensagem sem texto)',
     author: nomeDoRemetente(e.de),
     createdAt: (Date.parse(e.data) ? new Date(e.data) : agora).toISOString(),
     mentionedOperators: [],
-    visibility: "solicitante",
+    visibility: 'solicitante',
   };
 }
 
 /** Por que um e-mail que chegou não virou chamado. */
-export type MotivoNaoAproveitado = "sem_cliente" | "ignorado_ia" | "auto_resposta";
+export type MotivoNaoAproveitado = 'sem_cliente' | 'ignorado_ia' | 'auto_resposta';
 
 const ASSUNTO_AUTOMATICO = [
-  "resposta automatica", "respuesta automatica", "automatic reply", "auto-reply", "autoreply",
-  "out of office", "ausente do escritorio", "fora do escritorio", "em ferias",
-  "undeliverable", "delivery status notification", "mail delivery failed",
+  'resposta automatica',
+  'respuesta automatica',
+  'automatic reply',
+  'auto-reply',
+  'autoreply',
+  'out of office',
+  'ausente do escritorio',
+  'fora do escritorio',
+  'em ferias',
+  'undeliverable',
+  'delivery status notification',
+  'mail delivery failed',
 ];
 const CORPO_AUTOMATICO = [
-  "esta e uma resposta automatica", "esta e uma mensagem automatica",
-  "this is an automatic reply", "this is an automated reply", "this is an automated message",
+  'esta e uma resposta automatica',
+  'esta e uma mensagem automatica',
+  'this is an automatic reply',
+  'this is an automated reply',
+  'this is an automated message',
 ];
 
 /**
@@ -554,12 +886,12 @@ const CORPO_AUTOMATICO = [
  */
 export function respostaAutomatica(e: EmailEntrada): boolean {
   const h: Record<string, string> = {};
-  const brutos = e.cabecalhos && typeof e.cabecalhos === "object" ? e.cabecalhos : {};
+  const brutos = e.cabecalhos && typeof e.cabecalhos === 'object' ? e.cabecalhos : {};
   for (const [k, v] of Object.entries(brutos)) h[k.toLowerCase()] = norm(v).trim();
-  const auto = h["auto-submitted"];
-  if (auto && auto !== "no") return true;
-  if (h["x-autoreply"] || h["x-autorespond"]) return true;
-  if (["bulk", "auto_reply", "junk"].includes(h["precedence"] || "")) return true;
+  const auto = h['auto-submitted'];
+  if (auto && auto !== 'no') return true;
+  if (h['x-autoreply'] || h['x-autorespond']) return true;
+  if (['bulk', 'auto_reply', 'junk'].includes(h['precedence'] || '')) return true;
   if (/^(mailer-daemon|postmaster)@/.test(enderecoDoRemetente(e.de))) return true;
   const assunto = norm(e.assunto);
   if (ASSUNTO_AUTOMATICO.some((p) => assunto.includes(p))) return true;
@@ -568,7 +900,7 @@ export function respostaAutomatica(e: EmailEntrada): boolean {
 }
 
 /** Caminho que a mensagem tomou na triagem; `pendente` é o que espera alguém decidir. */
-export type StatusDaCaixa = "pendente" | "virou_chamado" | "anexado";
+export type StatusDaCaixa = 'pendente' | 'virou_chamado' | 'anexado';
 
 export interface OpcoesDaCaixa {
   motivo?: MotivoNaoAproveitado | null;
@@ -595,27 +927,41 @@ export interface OpcoesDaCaixa {
  */
 export function entradaDaCaixa(
   e: EmailEntrada,
-  { motivo = null, status = "pendente", pendenciaId = null, clientId = null, team = "init" }: OpcoesDaCaixa,
+  {
+    motivo = null,
+    status = 'pendente',
+    pendenciaId = null,
+    clientId = null,
+    team = 'init',
+  }: OpcoesDaCaixa,
   id: string,
-  agora: Date = new Date(),
+  agora: Date = new Date()
 ) {
-  const recebido = Date.parse(String(e.data || "")) ? new Date(String(e.data)).toISOString() : agora.toISOString();
-  const resolvida = status !== "pendente";
+  const recebido = Date.parse(String(e.data || ''))
+    ? new Date(String(e.data)).toISOString()
+    : agora.toISOString();
+  const resolvida = status !== 'pendente';
   return {
     id,
-    email_id: String(e.id || "").slice(0, 200),
-    thread_id: String(e.thread_id || "").trim().slice(0, 200) || null,
-    message_id: String(e.message_id || "").trim().slice(0, 500) || null,
-    de: String(e.de || "").slice(0, 300),
-    assunto: String(e.assunto || "").slice(0, 300),
-    corpo: corpoLimpo(e.trecho || "").slice(0, 20000) || null,
+    email_id: String(e.id || '').slice(0, 200),
+    thread_id:
+      String(e.thread_id || '')
+        .trim()
+        .slice(0, 200) || null,
+    message_id:
+      String(e.message_id || '')
+        .trim()
+        .slice(0, 500) || null,
+    de: String(e.de || '').slice(0, 300),
+    assunto: String(e.assunto || '').slice(0, 300),
+    corpo: corpoLimpo(e.trecho || '').slice(0, 20000) || null,
     recebido_em: recebido,
     motivo,
     status,
     pendencia_id: pendenciaId || null,
     client_id: clientId || null,
-    team: team || "init",
-    tratado_por: resolvida ? "robo" : null,
+    team: team || 'init',
+    tratado_por: resolvida ? 'robo' : null,
     tratado_em: resolvida ? agora.toISOString() : null,
     created_at: agora.toISOString(),
     updated_at: agora.toISOString(),
@@ -628,8 +974,13 @@ export function itensDaIa(body: string, jaTem: string[] = [], max = 8): string[]
   if (!texto) return [];
   const vistos = new Set(jaTem.map((t) => norm(t)));
   const out: string[] = [];
-  for (const linha of texto.split("\n")) {
-    const t = linha.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/\s+/g, " ").replace(/\.$/, "").trim().slice(0, 120);
+  for (const linha of texto.split('\n')) {
+    const t = linha
+      .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\.$/, '')
+      .trim()
+      .slice(0, 120);
     if (t.length < 2 || /^(nada|nenhum|sem item|n\/a)\b/i.test(t)) continue;
     const k = norm(t);
     if (vistos.has(k)) continue;
@@ -644,10 +995,12 @@ export function itensDaIa(body: string, jaTem: string[] = [], max = 8): string[]
 // Espelho exato do parseDriveFolderId de js/clients-form.js: o servidor
 // revalida tudo que grava, porque o robô e o banco não confiam um no outro.
 export function parseDriveFolderId(v: unknown): string | null {
-  let s = String(v === null || v === undefined ? "" : v).trim();
+  let s = String(v === null || v === undefined ? '' : v).trim();
   if (!s) return null;
-  if (/^drive\.google\.com\//i.test(s)) s = "https://" + s;
-  const m = s.match(/^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i);
+  if (/^drive\.google\.com\//i.test(s)) s = 'https://' + s;
+  const m = s.match(
+    /^https?:\/\/drive\.google\.com\/(?:(?:drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]{15,})\/?(?:[?#].*)?|open\?id=([a-zA-Z0-9_-]{15,})(?:[?&#].*)?)$/i
+  );
   if (m) return m[1] || m[2];
   if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s;
   return null;
@@ -655,26 +1008,34 @@ export function parseDriveFolderId(v: unknown): string | null {
 
 export function driveFolderUrl(v: unknown): string {
   const id = parseDriveFolderId(v);
-  return id ? "https://drive.google.com/drive/folders/" + id : "";
+  return id ? 'https://drive.google.com/drive/folders/' + id : '';
 }
 
 // Só planilha "de verdade" (/d/<id>): a publicada (/d/e/...) não abre no DriveApp.
 function idDaPlanilha(v: unknown): string | null {
-  const s = String(v ?? "").trim();
+  const s = String(v ?? '').trim();
   const m = s.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (m && m[1] !== "e") return m[1];
+  if (m && m[1] !== 'e') return m[1];
   return /^[a-zA-Z0-9-_]{20,}$/.test(s) ? s : null;
 }
 
 export type ClientePasta = {
-  id: string; name?: string | null; cnpj?: string | null;
-  google_sheet_url?: string | null; drive_folder_url?: string | null;
+  id: string;
+  name?: string | null;
+  cnpj?: string | null;
+  google_sheet_url?: string | null;
+  drive_folder_url?: string | null;
 };
 
 // O Drive aceita barra no nome, mas ela vira caminho na exportação e no Drive para desktop.
 export const NOME_PASTA_MAX = 100;
 export function nomeDaPasta(nome: unknown): string {
-  return String(nome ?? "").replace(/[/\\]/g, "-").replace(/\s+/g, " ").trim().slice(0, NOME_PASTA_MAX).trim();
+  return String(nome ?? '')
+    .replace(/[/\\]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NOME_PASTA_MAX)
+    .trim();
 }
 
 // Homônimo ganha o CNPJ (ou o começo do id) porque a raiz é uma só para todas
@@ -690,7 +1051,10 @@ function nomesEsperados(clientes: ClientePasta[]) {
     const base = nomeDaPasta(c.name);
     if (!base) continue;
     const repetido = (conta.get(base.toLowerCase()) ?? 0) > 1;
-    nomes.set(c.id, repetido ? base + " (" + (String(c.cnpj ?? "").trim() || c.id.slice(0, 8)) + ")" : base);
+    nomes.set(
+      c.id,
+      repetido ? base + ' (' + (String(c.cnpj ?? '').trim() || c.id.slice(0, 8)) + ')' : base
+    );
   }
   return nomes;
 }
@@ -702,7 +1066,8 @@ function nomesEsperados(clientes: ClientePasta[]) {
  */
 export function planoPastas(clientes: ClientePasta[]) {
   const candidatos: { client_id: string; sheet_id: string }[] = [];
-  const vigiar: { client_id: string; folder_id: string; nome: string; compartilhada: boolean }[] = [];
+  const vigiar: { client_id: string; folder_id: string; nome: string; compartilhada: boolean }[] =
+    [];
   const buscar: { client_id: string; nome: string }[] = [];
   const invalidos: string[] = [];
   const nomes = nomesEsperados(clientes);
@@ -711,12 +1076,20 @@ export function planoPastas(clientes: ClientePasta[]) {
     if (c.drive_folder_url) {
       const id = parseDriveFolderId(c.drive_folder_url);
       if (id) {
-        vigiar.push({ client_id: c.id, folder_id: id, nome: nomes.get(c.id) ?? "", compartilhada: false });
+        vigiar.push({
+          client_id: c.id,
+          folder_id: id,
+          nome: nomes.get(c.id) ?? '',
+          compartilhada: false,
+        });
         usos.set(id, (usos.get(id) ?? 0) + 1);
       } else invalidos.push(c.id);
     } else {
       const sheet = idDaPlanilha(c.google_sheet_url);
-      if (sheet) { candidatos.push({ client_id: c.id, sheet_id: sheet }); continue; }
+      if (sheet) {
+        candidatos.push({ client_id: c.id, sheet_id: sheet });
+        continue;
+      }
       // Link de planilha inválido cai aqui também: a busca pelo nome evita duplicar a pasta que já exista.
       const nome = nomes.get(c.id);
       if (nome) buscar.push({ client_id: c.id, nome });
@@ -728,17 +1101,24 @@ export function planoPastas(clientes: ClientePasta[]) {
 }
 
 // 42703 com o nome da coluna nova: a 069 ainda não foi aplicada neste banco.
-export const AVISO_069 = "aplique a 069_clients_drive_folder_status.sql";
+export const AVISO_069 = 'aplique a 069_clients_drive_folder_status.sql';
 const sem069 = (e: { code?: string; message?: string } | null) =>
-  !!e && e.code === "42703" && /drive_folder_(status|checked_at)/.test(e.message ?? "");
+  !!e && e.code === '42703' && /drive_folder_(status|checked_at)/.test(e.message ?? '');
 
 // deno-lint-ignore no-explicit-any
 type Db = { from: (t: string) => any };
 
 /** Marca como "invalido" quem tem link que não é pasta; não vai ao Google. */
-export async function marcarPastasInvalidas(db: Db, ids: string[], agora: string): Promise<string | null> {
+export async function marcarPastasInvalidas(
+  db: Db,
+  ids: string[],
+  agora: string
+): Promise<string | null> {
   if (!ids.length) return null;
-  const { error } = await db.from("clients").update({ drive_folder_status: "invalido", drive_folder_checked_at: agora }).in("id", ids);
+  const { error } = await db
+    .from('clients')
+    .update({ drive_folder_status: 'invalido', drive_folder_checked_at: agora })
+    .in('id', ids);
   if (sem069(error)) return AVISO_069;
   if (error) throw new Error(error.message);
   return null;
@@ -750,22 +1130,40 @@ export async function marcarPastasInvalidas(db: Db, ids: string[], agora: string
  * o .is(null) impede o robô de sobrescrever um vínculo feito por gente no meio tempo.
  */
 export async function gravarResultadoPastas(
-  db: Db, plano: ReturnType<typeof planoPastas>,
-  input: { achados?: unknown; testes?: unknown }, agora: string,
+  db: Db,
+  plano: ReturnType<typeof planoPastas>,
+  input: { achados?: unknown; testes?: unknown },
+  agora: string
 ) {
   const cand = new Set([...plano.candidatos, ...plano.buscar].map((c) => c.client_id));
   const vig = new Set(plano.vigiar.map((c) => c.client_id));
   const lista = (v: unknown) => (Array.isArray(v) ? v : []) as Record<string, unknown>[];
-  let gravados = 0, atualizados = 0, ignorados = 0, log: string | null = null;
+  let gravados = 0,
+    atualizados = 0,
+    ignorados = 0,
+    log: string | null = null;
 
   for (const a of lista(input.achados)) {
-    const id = String(a?.client_id ?? ""), url = driveFolderUrl(a?.folder_url);
-    if (!cand.has(id) || !url) { ignorados++; continue; }
-    let r = await db.from("clients").update({ drive_folder_url: url, drive_folder_status: "ok", drive_folder_checked_at: agora })
-      .eq("id", id).is("drive_folder_url", null).select("id");
+    const id = String(a?.client_id ?? ''),
+      url = driveFolderUrl(a?.folder_url);
+    if (!cand.has(id) || !url) {
+      ignorados++;
+      continue;
+    }
+    let r = await db
+      .from('clients')
+      .update({ drive_folder_url: url, drive_folder_status: 'ok', drive_folder_checked_at: agora })
+      .eq('id', id)
+      .is('drive_folder_url', null)
+      .select('id');
     if (sem069(r.error)) {
-      log = AVISO_069;  // o vínculo vale mais que o selo: grava sem o status
-      r = await db.from("clients").update({ drive_folder_url: url }).eq("id", id).is("drive_folder_url", null).select("id");
+      log = AVISO_069; // o vínculo vale mais que o selo: grava sem o status
+      r = await db
+        .from('clients')
+        .update({ drive_folder_url: url })
+        .eq('id', id)
+        .is('drive_folder_url', null)
+        .select('id');
     }
     if (r.error) throw new Error(r.error.message);
     gravados += (r.data ?? []).length;
@@ -773,14 +1171,24 @@ export async function gravarResultadoPastas(
 
   const porStatus: Record<string, string[]> = { ok: [], inacessivel: [] };
   for (const t of lista(input.testes)) {
-    const id = String(t?.client_id ?? ""), st = String(t?.status ?? "");
-    if (!vig.has(id) || !porStatus[st]) { ignorados++; continue; }
+    const id = String(t?.client_id ?? ''),
+      st = String(t?.status ?? '');
+    if (!vig.has(id) || !porStatus[st]) {
+      ignorados++;
+      continue;
+    }
     porStatus[st].push(id);
   }
   for (const [st, ids] of Object.entries(porStatus)) {
     if (!ids.length || log) continue;
-    const { error } = await db.from("clients").update({ drive_folder_status: st, drive_folder_checked_at: agora }).in("id", ids);
-    if (sem069(error)) { log = AVISO_069; continue; }
+    const { error } = await db
+      .from('clients')
+      .update({ drive_folder_status: st, drive_folder_checked_at: agora })
+      .in('id', ids);
+    if (sem069(error)) {
+      log = AVISO_069;
+      continue;
+    }
     if (error) throw new Error(error.message);
     atualizados += ids.length;
   }
@@ -792,14 +1200,14 @@ export async function gravarResultadoPastas(
 // remetentes — nada disso deve ir parar numa tabela que o app inteiro lê.
 export function resumoDaRodada(body: unknown): Record<string, number | boolean | string> {
   const out: Record<string, number | boolean | string> = {};
-  if (!body || typeof body !== "object" || Array.isArray(body)) return out;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return out;
   for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
-    if (k === "success") continue;
-    if (k === "error" && typeof v === "string") out.error = v.slice(0, 300);
-    else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
-    else if (typeof v === "boolean") out[k] = v;
+    if (k === 'success') continue;
+    if (k === 'error' && typeof v === 'string') out.error = v.slice(0, 300);
+    else if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+    else if (typeof v === 'boolean') out[k] = v;
     else if (Array.isArray(v)) out[k] = v.length;
-    else if (v && typeof v === "object") out[k] = Object.keys(v).length;
+    else if (v && typeof v === 'object') out[k] = Object.keys(v).length;
   }
   return out;
 }

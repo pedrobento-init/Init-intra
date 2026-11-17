@@ -74,7 +74,14 @@ describe('clienteDoTelefone', () => {
   });
 
   it('o mesmo cliente casando pelos dois telefones não é ambiguidade', () => {
-    const dobrado = [{ id: 'c4', name: 'Loja', owner_phone: '11 98765-4321', responsible_phone: '(11) 98765-4321' }];
+    const dobrado = [
+      {
+        id: 'c4',
+        name: 'Loja',
+        owner_phone: '11 98765-4321',
+        responsible_phone: '(11) 98765-4321',
+      },
+    ];
     expect(clienteDoTelefone(dobrado, '5511987654321')?.id).toBe('c4');
   });
 });
@@ -133,22 +140,35 @@ describe('pendenciaDoWhatsapp', () => {
   });
 
   it('cliente sem team cai na init, como o resto da triagem', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), { id: 'c', name: 'X' }, 'p1', agora).team).toBe('init');
+    expect(pendenciaDoWhatsapp(triagem(), msg(), { id: 'c', name: 'X' }, 'p1', agora).team).toBe(
+      'init'
+    );
   });
 
   it('não tem e-mail de solicitante, para a resposta não cair no pendencia-responder', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).solicitante_email).toBeNull();
+    expect(
+      pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).solicitante_email
+    ).toBeNull();
   });
 
   it('marca as tags da triagem e o fallback sem IA', () => {
-    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).tags)
-      .toEqual(['triagem-automatica', 'whatsapp']);
-    expect(pendenciaDoWhatsapp(triagem({ semIa: true }), msg(), cliente, 'p1', agora).tags)
-      .toContain('sem-classificacao-ia');
+    expect(pendenciaDoWhatsapp(triagem(), msg(), cliente, 'p1', agora).tags).toEqual([
+      'triagem-automatica',
+      'whatsapp',
+    ]);
+    expect(
+      pendenciaDoWhatsapp(triagem({ semIa: true }), msg(), cliente, 'p1', agora).tags
+    ).toContain('sem-classificacao-ia');
   });
 
   it('a chave gravada é a mesma que o webhook procura', () => {
-    const p = pendenciaDoWhatsapp(triagem(), msg({ telefone: '55 11 98765-4321' }), cliente, 'p1', agora);
+    const p = pendenciaDoWhatsapp(
+      triagem(),
+      msg({ telefone: '55 11 98765-4321' }),
+      cliente,
+      'p1',
+      agora
+    );
     expect(p.email_thread_id).toBe(conversaDoTelefone('5511987654321'));
   });
 });

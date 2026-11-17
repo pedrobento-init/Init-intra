@@ -4,7 +4,20 @@
 // os atendimentos do Milvus. Sai como PDF pelo "Salvar como PDF" do navegador
 // (sem biblioteca nova e sem pop-up: imprime uma área da própria página).
 
-const RPT_MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const RPT_MONTHS = [
+  'janeiro',
+  'fevereiro',
+  'março',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro',
+];
 
 /** 'YYYY-MM' → { start, end, label } (datas locais YYYY-MM-DD). */
 function rptMonthRange(ym) {
@@ -12,7 +25,11 @@ function rptMonthRange(ym) {
   const m = Number(String(ym).slice(5, 7));
   const last = new Date(y, m, 0).getDate();
   const mm = String(m).padStart(2, '0');
-  return { start: y + '-' + mm + '-01', end: y + '-' + mm + '-' + String(last).padStart(2, '0'), label: RPT_MONTHS[m - 1] + ' de ' + y };
+  return {
+    start: y + '-' + mm + '-01',
+    end: y + '-' + mm + '-' + String(last).padStart(2, '0'),
+    label: RPT_MONTHS[m - 1] + ' de ' + y,
+  };
 }
 
 function _rptLocalDate(iso) {
@@ -20,7 +37,13 @@ function _rptLocalDate(iso) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return (
+    d.getFullYear() +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  );
 }
 
 const _RPT_SESSION_RE = /sess[ãa]o(?: registrada)?:\s*(\d+):(\d{2}):(\d{2})/i;
@@ -44,7 +67,10 @@ function parseTimerSessions(notes) {
 /** Duração da visita em minutos pelo horário (null se dia inteiro/sem fim). */
 function visitDurationMinutes(v) {
   if (!v || v.allDay || !v.time || !v.timeEnd) return null;
-  const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+  const toMin = (t) => {
+    const [h, m] = String(t).split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
   const d = toMin(v.timeEnd) - toMin(v.time);
   return Number.isFinite(d) && d > 0 ? d : null;
 }
@@ -59,7 +85,9 @@ function _rptHHMM(s) {
 function _rptClock(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Minutos → "3h 20min". */
@@ -87,7 +115,11 @@ function buildClientMonthReport(src, ym) {
 
   const visits = (src.visits || [])
     .filter((v) => v && inMonth(v.date) && v.status !== 'cancelada')
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))
+    .sort(
+      (a, b) =>
+        String(a.date).localeCompare(String(b.date)) ||
+        String(a.time || '').localeCompare(String(b.time || ''))
+    )
     .map((v) => ({ v, minutes: visitDurationMinutes(v) }));
   const visitsDone = visits.filter((x) => x.v.status === 'concluida');
   const visitMinutes = visitsDone.reduce((s, x) => s + (x.minutes || 0), 0);
@@ -112,26 +144,46 @@ function buildClientMonthReport(src, ym) {
   }
 
   const resolved = (src.pens || [])
-    .filter((p) => p && ['concluido', 'resolvido'].includes(p.status) && inMonth(_rptLocalDate(p.completedAt || p.updatedAt)))
-    .sort((a, b) => String(a.completedAt || a.updatedAt).localeCompare(String(b.completedAt || b.updatedAt)))
+    .filter(
+      (p) =>
+        p &&
+        ['concluido', 'resolvido'].includes(p.status) &&
+        inMonth(_rptLocalDate(p.completedAt || p.updatedAt))
+    )
+    .sort((a, b) =>
+      String(a.completedAt || a.updatedAt).localeCompare(String(b.completedAt || b.updatedAt))
+    )
     .map((p) => ({ p, seconds: penTime.get(p.id) || 0 }));
   const opened = (src.pens || []).filter((p) => p && inMonth(_rptLocalDate(p.createdAt))).length;
-  const today = typeof localDateISO === 'function' ? localDateISO() : _rptLocalDate(new Date().toISOString());
+  const today =
+    typeof localDateISO === 'function' ? localDateISO() : _rptLocalDate(new Date().toISOString());
   const stillOpen = (src.pens || [])
     .filter((p) => p && !_rptClosed(p.status))
     .sort((a, b) => String(a.deadline || '9999').localeCompare(String(b.deadline || '9999')))
     .map((p) => ({ p, overdue: !!(p.deadline && p.deadline < today) }));
 
   const atend = Array.isArray(src.atend) ? src.atend : null;
-  const atendMinutes = atend ? atend.reduce((s, a) => s + _rptHHMM(a.total_horas_atendimento), 0) : 0;
+  const atendMinutes = atend
+    ? atend.reduce((s, a) => s + _rptHHMM(a.total_horas_atendimento), 0)
+    : 0;
   // Chamados: os abertos pelas visitas do mês + os que aparecem nos atendimentos.
   const tickets = new Map();
   for (const x of visits) {
-    if (x.v.milvusChamadoCodigo) tickets.set(String(x.v.milvusChamadoCodigo), { codigo: String(x.v.milvusChamadoCodigo), assunto: x.v.motivo || 'Visita técnica', origem: 'Visita' });
+    if (x.v.milvusChamadoCodigo)
+      tickets.set(String(x.v.milvusChamadoCodigo), {
+        codigo: String(x.v.milvusChamadoCodigo),
+        assunto: x.v.motivo || 'Visita técnica',
+        origem: 'Visita',
+      });
   }
   for (const a of atend || []) {
     if (!a || !a.codigo) continue;
-    const cur = tickets.get(String(a.codigo)) || { codigo: String(a.codigo), assunto: a.assunto || '', origem: 'Milvus', minutes: 0 };
+    const cur = tickets.get(String(a.codigo)) || {
+      codigo: String(a.codigo),
+      assunto: a.assunto || '',
+      origem: 'Milvus',
+      minutes: 0,
+    };
     cur.minutes = (cur.minutes || 0) + _rptHHMM(a.total_horas_atendimento);
     if (!cur.tecnico && a.tecnico) cur.tecnico = a.tecnico;
     tickets.set(String(a.codigo), cur);
@@ -140,10 +192,16 @@ function buildClientMonthReport(src, ym) {
   return {
     client: src.client || {},
     period: r,
-    visits, visitsDone: visitsDone.length, visitMinutes,
+    visits,
+    visitsDone: visitsDone.length,
+    visitMinutes,
     penMinutes: Math.round(penSeconds / 60),
-    resolved, opened, stillOpen,
-    atendAvailable: !!atend, atendMinutes, atendTruncated: !!src.atendTruncated,
+    resolved,
+    opened,
+    stillOpen,
+    atendAvailable: !!atend,
+    atendMinutes,
+    atendTruncated: !!src.atendTruncated,
     tickets: [...tickets.values()].sort((a, b) => Number(a.codigo) - Number(b.codigo)),
     totalMinutes: visitMinutes + Math.round(penSeconds / 60),
   };
@@ -151,88 +209,214 @@ function buildClientMonthReport(src, ym) {
 
 // ── HTML do relatório (mesmo HTML na prévia e na impressão) ─────────────
 
-function _rptDate(d) { return typeof formatDate === 'function' ? formatDate(d) : d; }
-function _rptPenNum(p) { return typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : ''; }
-function _rptPenTitle(p) { return typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || ''); }
-function _rptCut(s, n) { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+function _rptDate(d) {
+  return typeof formatDate === 'function' ? formatDate(d) : d;
+}
+function _rptPenNum(p) {
+  return typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
+}
+function _rptPenTitle(p) {
+  return typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : p.assunto || '';
+}
+function _rptCut(s, n) {
+  const t = String(s || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.length > n ? t.slice(0, n - 1) + '…' : t;
+}
 
 function renderClientReportHtml(m) {
   const e = escapeHtml;
   const kpi = (v, l) => '<div class="rpt-kpi"><b>' + v + '</b><span>' + l + '</span></div>';
-  const empty = (cols, txt) => '<tr><td colspan="' + cols + '" class="rpt-none">' + txt + '</td></tr>';
-  const statusLabel = (s) => (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[s] && VISIT_STATUS_MAP[s].label) || s || '—';
+  const empty = (cols, txt) =>
+    '<tr><td colspan="' + cols + '" class="rpt-none">' + txt + '</td></tr>';
+  const statusLabel = (s) =>
+    (typeof VISIT_STATUS_MAP !== 'undefined' && VISIT_STATUS_MAP[s] && VISIT_STATUS_MAP[s].label) ||
+    s ||
+    '—';
 
-  const visitRows = m.visits.map((x) => {
-    const v = x.v;
-    const realIn = _rptClock(v.checkinAt);
-    const realOut = _rptClock(v.checkoutAt);
-    const signedAt = _rptClock(v.assinaturaEm);
-    return '<tr>' +
-    '<td>' + e(_rptDate(v.date)) + '</td>' +
-    '<td>' + e(v.allDay ? 'Dia inteiro' : (v.time || '—')) + (realIn ? '<div class="rpt-sub">real ' + e(realIn) + '</div>' : '') + '</td>' +
-    '<td>' + e(v.allDay ? '—' : (v.timeEnd || '—')) + (realOut ? '<div class="rpt-sub">real ' + e(realOut) + '</div>' : '') + '</td>' +
-    '<td>' + e(v.operator || '—') + '</td>' +
-    '<td>' + e(_rptCut(v.motivo, 45) || '—') +
-      (v.observacoes ? '<div class="rpt-sub">Obs.: ' + e(_rptCut(v.observacoes, 90)) + '</div>' : '') +
-      (v.relatorio ? '<div class="rpt-sub">' + e(_rptCut(v.relatorio, 150)) + '</div>' : '') + '</td>' +
-    '<td class="rpt-num">' + (x.minutes ? rptFormatMinutes(x.minutes) : '—') + '</td>' +
-    '<td>' + e(statusLabel(v.status)) +
-      (v.milvusChamadoCodigo ? '<div class="rpt-sub">Chamado #' + e(String(v.milvusChamadoCodigo)) + '</div>' : '') +
-      ((v.assinaturaNome || signedAt) ? '<div class="rpt-sub">Ass.: ' + e(v.assinaturaNome || 'Cliente') + (signedAt ? ' · ' + e(signedAt) : '') + '</div>' : '') +
-      '</td>' +
-    '</tr>';
-  }).join('');
+  const visitRows = m.visits
+    .map((x) => {
+      const v = x.v;
+      const realIn = _rptClock(v.checkinAt);
+      const realOut = _rptClock(v.checkoutAt);
+      const signedAt = _rptClock(v.assinaturaEm);
+      return (
+        '<tr>' +
+        '<td>' +
+        e(_rptDate(v.date)) +
+        '</td>' +
+        '<td>' +
+        e(v.allDay ? 'Dia inteiro' : v.time || '—') +
+        (realIn ? '<div class="rpt-sub">real ' + e(realIn) + '</div>' : '') +
+        '</td>' +
+        '<td>' +
+        e(v.allDay ? '—' : v.timeEnd || '—') +
+        (realOut ? '<div class="rpt-sub">real ' + e(realOut) + '</div>' : '') +
+        '</td>' +
+        '<td>' +
+        e(v.operator || '—') +
+        '</td>' +
+        '<td>' +
+        e(_rptCut(v.motivo, 45) || '—') +
+        (v.observacoes
+          ? '<div class="rpt-sub">Obs.: ' + e(_rptCut(v.observacoes, 90)) + '</div>'
+          : '') +
+        (v.relatorio ? '<div class="rpt-sub">' + e(_rptCut(v.relatorio, 150)) + '</div>' : '') +
+        '</td>' +
+        '<td class="rpt-num">' +
+        (x.minutes ? rptFormatMinutes(x.minutes) : '—') +
+        '</td>' +
+        '<td>' +
+        e(statusLabel(v.status)) +
+        (v.milvusChamadoCodigo
+          ? '<div class="rpt-sub">Chamado #' + e(String(v.milvusChamadoCodigo)) + '</div>'
+          : '') +
+        (v.assinaturaNome || signedAt
+          ? '<div class="rpt-sub">Ass.: ' +
+            e(v.assinaturaNome || 'Cliente') +
+            (signedAt ? ' · ' + e(signedAt) : '') +
+            '</div>'
+          : '') +
+        '</td>' +
+        '</tr>'
+      );
+    })
+    .join('');
 
-  const resolvedRows = m.resolved.map((x) => '<tr>' +
-    '<td>' + e(_rptPenNum(x.p)) + '</td>' +
-    '<td>' + e(_rptCut(_rptPenTitle(x.p), 80)) + '</td>' +
-    '<td>' + e(x.p.responsible || '—') + '</td>' +
-    '<td>' + e(_rptDate(_rptLocalDate(x.p.completedAt || x.p.updatedAt))) + '</td>' +
-    '<td class="rpt-num">' + (x.seconds ? rptFormatMinutes(x.seconds / 60) : '—') + '</td>' +
-    '</tr>').join('');
+  const resolvedRows = m.resolved
+    .map(
+      (x) =>
+        '<tr>' +
+        '<td>' +
+        e(_rptPenNum(x.p)) +
+        '</td>' +
+        '<td>' +
+        e(_rptCut(_rptPenTitle(x.p), 80)) +
+        '</td>' +
+        '<td>' +
+        e(x.p.responsible || '—') +
+        '</td>' +
+        '<td>' +
+        e(_rptDate(_rptLocalDate(x.p.completedAt || x.p.updatedAt))) +
+        '</td>' +
+        '<td class="rpt-num">' +
+        (x.seconds ? rptFormatMinutes(x.seconds / 60) : '—') +
+        '</td>' +
+        '</tr>'
+    )
+    .join('');
 
-  const openRows = m.stillOpen.map((x) => '<tr>' +
-    '<td>' + e(_rptPenNum(x.p)) + '</td>' +
-    '<td>' + e(_rptCut(_rptPenTitle(x.p), 80)) + '</td>' +
-    '<td>' + e(x.p.responsible || '—') + '</td>' +
-    '<td' + (x.overdue ? ' class="rpt-over"' : '') + '>' + (x.p.deadline ? e(_rptDate(x.p.deadline)) + (x.overdue ? ' (vencida)' : '') : '—') + '</td>' +
-    '</tr>').join('');
+  const openRows = m.stillOpen
+    .map(
+      (x) =>
+        '<tr>' +
+        '<td>' +
+        e(_rptPenNum(x.p)) +
+        '</td>' +
+        '<td>' +
+        e(_rptCut(_rptPenTitle(x.p), 80)) +
+        '</td>' +
+        '<td>' +
+        e(x.p.responsible || '—') +
+        '</td>' +
+        '<td' +
+        (x.overdue ? ' class="rpt-over"' : '') +
+        '>' +
+        (x.p.deadline ? e(_rptDate(x.p.deadline)) + (x.overdue ? ' (vencida)' : '') : '—') +
+        '</td>' +
+        '</tr>'
+    )
+    .join('');
 
-  const ticketRows = m.tickets.map((t) => '<tr>' +
-    '<td>#' + e(t.codigo) + '</td>' +
-    '<td>' + e(_rptCut(t.assunto, 80) || '—') + '</td>' +
-    '<td>' + e(t.tecnico || '—') + '</td>' +
-    '<td class="rpt-num">' + (t.minutes ? rptFormatMinutes(t.minutes) : '—') + '</td>' +
-    '</tr>').join('');
+  const ticketRows = m.tickets
+    .map(
+      (t) =>
+        '<tr>' +
+        '<td>#' +
+        e(t.codigo) +
+        '</td>' +
+        '<td>' +
+        e(_rptCut(t.assunto, 80) || '—') +
+        '</td>' +
+        '<td>' +
+        e(t.tecnico || '—') +
+        '</td>' +
+        '<td class="rpt-num">' +
+        (t.minutes ? rptFormatMinutes(t.minutes) : '—') +
+        '</td>' +
+        '</tr>'
+    )
+    .join('');
 
   const atendNote = !m.atendAvailable
     ? '<p class="rpt-note">Horas do Milvus indisponíveis agora (sem conexão ou cliente sem integração). Os chamados abaixo vêm só das visitas.</p>'
-    : (m.atendTruncated ? '<p class="rpt-note">Mostrando os primeiros 200 atendimentos do Milvus no mês.</p>' : '');
+    : m.atendTruncated
+      ? '<p class="rpt-note">Mostrando os primeiros 200 atendimentos do Milvus no mês.</p>'
+      : '';
 
-  return '<article class="rpt">' +
+  return (
+    '<article class="rpt">' +
     '<header class="rpt-head">' +
-      '<div><div class="rpt-brand">Init · Relatório mensal</div><h1>' + e(m.client.name || 'Cliente') + '</h1>' +
-      '<div class="rpt-period">' + e(m.period.label.charAt(0).toUpperCase() + m.period.label.slice(1)) + ' · ' + e(_rptDate(m.period.start)) + ' a ' + e(_rptDate(m.period.end)) + '</div></div>' +
-      '<div class="rpt-gen">Gerado em ' + e(new Date().toLocaleDateString('pt-BR')) + '</div>' +
+    '<div><div class="rpt-brand">Init · Relatório mensal</div><h1>' +
+    e(m.client.name || 'Cliente') +
+    '</h1>' +
+    '<div class="rpt-period">' +
+    e(m.period.label.charAt(0).toUpperCase() + m.period.label.slice(1)) +
+    ' · ' +
+    e(_rptDate(m.period.start)) +
+    ' a ' +
+    e(_rptDate(m.period.end)) +
+    '</div></div>' +
+    '<div class="rpt-gen">Gerado em ' +
+    e(new Date().toLocaleDateString('pt-BR')) +
+    '</div>' +
     '</header>' +
     '<section class="rpt-kpis">' +
-      kpi(rptFormatMinutes(m.totalMinutes), 'Horas no app (visitas + pendências)') +
-      kpi(m.atendAvailable ? rptFormatMinutes(m.atendMinutes) : '—', 'Horas no Milvus') +
-      kpi(m.visitsDone + (m.visits.length !== m.visitsDone ? '<small>/' + m.visits.length + '</small>' : ''), 'Visitas realizadas') +
-      kpi(m.visitsDone ? rptFormatMinutes(m.visitMinutes / m.visitsDone) : '—', 'Tempo médio por visita') +
-      kpi(m.resolved.length, 'Pendências resolvidas') +
-      kpi(m.stillOpen.length, 'Em aberto hoje') +
+    kpi(rptFormatMinutes(m.totalMinutes), 'Horas no app (visitas + pendências)') +
+    kpi(m.atendAvailable ? rptFormatMinutes(m.atendMinutes) : '—', 'Horas no Milvus') +
+    kpi(
+      m.visitsDone +
+        (m.visits.length !== m.visitsDone ? '<small>/' + m.visits.length + '</small>' : ''),
+      'Visitas realizadas'
+    ) +
+    kpi(
+      m.visitsDone ? rptFormatMinutes(m.visitMinutes / m.visitsDone) : '—',
+      'Tempo médio por visita'
+    ) +
+    kpi(m.resolved.length, 'Pendências resolvidas') +
+    kpi(m.stillOpen.length, 'Em aberto hoje') +
     '</section>' +
-    '<p class="rpt-note">Horas no app: ' + rptFormatMinutes(m.visitMinutes) + ' em visitas concluídas (pelo horário previsto) e ' + rptFormatMinutes(m.penMinutes) + ' de cronômetro em pendências. ' + m.opened + ' pendência' + (m.opened === 1 ? '' : 's') + ' aberta' + (m.opened === 1 ? '' : 's') + ' no mês.</p>' +
+    '<p class="rpt-note">Horas no app: ' +
+    rptFormatMinutes(m.visitMinutes) +
+    ' em visitas concluídas (pelo horário previsto) e ' +
+    rptFormatMinutes(m.penMinutes) +
+    ' de cronômetro em pendências. ' +
+    m.opened +
+    ' pendência' +
+    (m.opened === 1 ? '' : 's') +
+    ' aberta' +
+    (m.opened === 1 ? '' : 's') +
+    ' no mês.</p>' +
     '<h2>Visitas</h2>' +
-    '<table><thead><tr><th>Data</th><th>Chegada</th><th>Saída</th><th>Técnico</th><th>Motivo / relatório</th><th class="rpt-num">Duração</th><th>Situação</th></tr></thead><tbody>' + (visitRows || empty(7, 'Nenhuma visita no mês.')) + '</tbody></table>' +
+    '<table><thead><tr><th>Data</th><th>Chegada</th><th>Saída</th><th>Técnico</th><th>Motivo / relatório</th><th class="rpt-num">Duração</th><th>Situação</th></tr></thead><tbody>' +
+    (visitRows || empty(7, 'Nenhuma visita no mês.')) +
+    '</tbody></table>' +
     '<h2>Pendências resolvidas</h2>' +
-    '<table><thead><tr><th>Nº</th><th>Assunto</th><th>Responsável</th><th>Concluída</th><th class="rpt-num">Tempo no mês</th></tr></thead><tbody>' + (resolvedRows || empty(5, 'Nenhuma pendência resolvida no mês.')) + '</tbody></table>' +
-    '<h2>Chamados</h2>' + atendNote +
-    '<table><thead><tr><th>Chamado</th><th>Assunto</th><th>Técnico</th><th class="rpt-num">Horas</th></tr></thead><tbody>' + (ticketRows || empty(4, 'Nenhum chamado no mês.')) + '</tbody></table>' +
+    '<table><thead><tr><th>Nº</th><th>Assunto</th><th>Responsável</th><th>Concluída</th><th class="rpt-num">Tempo no mês</th></tr></thead><tbody>' +
+    (resolvedRows || empty(5, 'Nenhuma pendência resolvida no mês.')) +
+    '</tbody></table>' +
+    '<h2>Chamados</h2>' +
+    atendNote +
+    '<table><thead><tr><th>Chamado</th><th>Assunto</th><th>Técnico</th><th class="rpt-num">Horas</th></tr></thead><tbody>' +
+    (ticketRows || empty(4, 'Nenhum chamado no mês.')) +
+    '</tbody></table>' +
     '<h2>Em aberto</h2>' +
-    '<table><thead><tr><th>Nº</th><th>Assunto</th><th>Responsável</th><th>Prazo</th></tr></thead><tbody>' + (openRows || empty(4, 'Nada em aberto.')) + '</tbody></table>' +
-  '</article>';
+    '<table><thead><tr><th>Nº</th><th>Assunto</th><th>Responsável</th><th>Prazo</th></tr></thead><tbody>' +
+    (openRows || empty(4, 'Nada em aberto.')) +
+    '</tbody></table>' +
+    '</article>'
+  );
 }
 
 // ── Impressão (PDF) sem pop-up ──────────────────────────────────────────
@@ -258,7 +442,13 @@ function printHtmlDocument(html, title) {
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);
-  setTimeout(() => { try { window.print(); } catch (_) { done(); } }, 50);
+  setTimeout(() => {
+    try {
+      window.print();
+    } catch (_) {
+      done();
+    }
+  }, 50);
 }
 
 // ── Tela (modal com prévia) ─────────────────────────────────────────────
@@ -282,7 +472,9 @@ function openClientReport(clientId) {
   // Mês passado por padrão nos primeiros dias (fechamento); senão o atual.
   const opts = _rptMonthOptions();
   const def = new Date().getDate() <= 10 ? opts[1].ym : opts[0].ym;
-  openModal('Relatório mensal — ' + escapeHtml(c.name), `
+  openModal(
+    'Relatório mensal — ' + escapeHtml(c.name),
+    `
     <div class="rpt-bar">
       <label class="form-label u-116966" for="rptMonth">Mês</label>
       <select class="form-select u-30e741" id="rptMonth" data-change="loadClientReport" data-arg="${escapeHtml(clientId)}">
@@ -290,7 +482,9 @@ function openClientReport(clientId) {
       </select>
       <button type="button" class="btn btn-primary btn-sm" id="rptPrintBtn" data-action="printClientReport" disabled>Imprimir / salvar PDF</button>
     </div>
-    <div class="rpt-preview" id="rptPreview"><p class="rpt-loading">Montando o relatório…</p></div>`, 'lg');
+    <div class="rpt-preview" id="rptPreview"><p class="rpt-loading">Montando o relatório…</p></div>`,
+    'lg'
+  );
   loadClientReport(clientId);
 }
 
@@ -301,7 +495,8 @@ async function loadClientReport(clientId) {
   if (!box) return;
   if (!c || !sel) {
     // Sem isso o modal fica preso em "Montando o relatório…" sem explicação.
-    box.innerHTML = '<p class="rpt-loading">Não foi possível montar o relatório (cliente não encontrado). Feche o modal e abra de novo.</p>';
+    box.innerHTML =
+      '<p class="rpt-loading">Não foi possível montar o relatório (cliente não encontrado). Feche o modal e abra de novo.</p>';
     return;
   }
   const ym = sel.value;
@@ -311,33 +506,51 @@ async function loadClientReport(clientId) {
   box.innerHTML = '<p class="rpt-loading">Montando o relatório…</p>';
 
   try {
-  const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter((p) => p && p.clientId === clientId);
-  const visits = (typeof getVisits === 'function' ? getVisits() : []).filter((v) => v && v.clientId === clientId);
-  const penIds = new Set(pens.map((p) => p.id));
-  const entries = (typeof getTimeEntries === 'function' ? getTimeEntries() : []).filter((e) => e && penIds.has(e.pendenciaId));
+    const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(
+      (p) => p && p.clientId === clientId
+    );
+    const visits = (typeof getVisits === 'function' ? getVisits() : []).filter(
+      (v) => v && v.clientId === clientId
+    );
+    const penIds = new Set(pens.map((p) => p.id));
+    const entries = (typeof getTimeEntries === 'function' ? getTimeEntries() : []).filter(
+      (e) => e && penIds.has(e.pendenciaId)
+    );
 
-  // Atendimentos do Milvus: opcional (online + cliente integrado).
-  let atend = null;
-  let atendTruncated = false;
-  if (typeof fetchMilvusAtendimentos === 'function') {
-    try {
-      const res = await fetchMilvusAtendimentos({ clientId, dataInicial: r.start, dataFinal: r.end, perPage: 200 });
-      atend = (res && res.lista) || [];
-      atendTruncated = atend.length >= 200;
-    } catch (_) { atend = null; }
-  }
-  // Trocou de mês/fechou enquanto buscava: descarta.
-  if (!document.getElementById('rptPreview') || document.getElementById('rptMonth').value !== ym) return;
+    // Atendimentos do Milvus: opcional (online + cliente integrado).
+    let atend = null;
+    let atendTruncated = false;
+    if (typeof fetchMilvusAtendimentos === 'function') {
+      try {
+        const res = await fetchMilvusAtendimentos({
+          clientId,
+          dataInicial: r.start,
+          dataFinal: r.end,
+          perPage: 200,
+        });
+        atend = (res && res.lista) || [];
+        atendTruncated = atend.length >= 200;
+      } catch (_) {
+        atend = null;
+      }
+    }
+    // Trocou de mês/fechou enquanto buscava: descarta.
+    if (!document.getElementById('rptPreview') || document.getElementById('rptMonth').value !== ym)
+      return;
 
-  const model = buildClientMonthReport({ client: c, pens, visits, entries, atend, atendTruncated }, ym);
-  const html = renderClientReportHtml(model);
-  _rptLast = { html, title: 'Relatório ' + c.name + ' ' + ym };
-  box.innerHTML = html;
-  if (btn) btn.disabled = false;
+    const model = buildClientMonthReport(
+      { client: c, pens, visits, entries, atend, atendTruncated },
+      ym
+    );
+    const html = renderClientReportHtml(model);
+    _rptLast = { html, title: 'Relatório ' + c.name + ' ' + ym };
+    box.innerHTML = html;
+    if (btn) btn.disabled = false;
   } catch (err) {
     // Nunca deixar a tela presa em "Montando…": mostra o erro e loga.
     if (typeof _logSilent === 'function') _logSilent(err, 'relatorio-cliente');
-    box.innerHTML = '<p class="rpt-loading">Não foi possível montar o relatório. Tente de novo.</p>';
+    box.innerHTML =
+      '<p class="rpt-loading">Não foi possível montar o relatório. Tente de novo.</p>';
     if (btn) btn.disabled = true;
   }
 }
@@ -345,7 +558,13 @@ async function loadClientReport(clientId) {
 function printClientReport() {
   if (!_rptLast) return;
   printHtmlDocument(_rptLast.html, _rptLast.title);
-  if (typeof addLog === 'function') { try { addLog('Gerou relatório mensal', 'Cliente', _rptLast.title.replace(/^Relatório /, ''), ''); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'relatorio-cliente'); } }
+  if (typeof addLog === 'function') {
+    try {
+      addLog('Gerou relatório mensal', 'Cliente', _rptLast.title.replace(/^Relatório /, ''), '');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'relatorio-cliente');
+    }
+  }
 }
 
 if (typeof registerActions === 'function') {
@@ -357,5 +576,12 @@ if (typeof registerActions === 'function') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { rptMonthRange, parseTimerSessions, visitDurationMinutes, rptFormatMinutes, buildClientMonthReport, renderClientReportHtml };
+  module.exports = {
+    rptMonthRange,
+    parseTimerSessions,
+    visitDurationMinutes,
+    rptFormatMinutes,
+    buildClientMonthReport,
+    renderClientReportHtml,
+  };
 }

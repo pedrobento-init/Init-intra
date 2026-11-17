@@ -22,15 +22,24 @@ describe('buildBackfillPreview (match exato, sem fuzzy, sem sobrescrita)', () =>
   it('preenche vazio com match exato normalizado', () => {
     const out = bf.buildBackfillPreview(MAP, {}, MILVUS);
     const pano = out.find((r) => r.milvusNome === 'PANOBIANCO');
-    expect(pano).toEqual({ milvusNome: 'PANOBIANCO', clientId: 'CLI-1', token: '2JWX2PU', status: 'pronto' });
+    expect(pano).toEqual({
+      milvusNome: 'PANOBIANCO',
+      clientId: 'CLI-1',
+      token: '2JWX2PU',
+      status: 'pronto',
+    });
     const aus = out.find((r) => r.milvusNome === 'AUS ADVOGADOS');
     expect(aus.status).toBe('pronto');
     expect(aus.token).toBe('AAA111');
   });
   it('nunca sobrescreve valor manual', () => {
     const out = bf.buildBackfillPreview(MAP, { 'CLI-1': 'MANUAL9' }, MILVUS);
-    expect(out.find((r) => r.milvusNome === 'PANOBIANCO'))
-      .toEqual({ milvusNome: 'PANOBIANCO', clientId: 'CLI-1', token: null, status: 'ja_preenchido' });
+    expect(out.find((r) => r.milvusNome === 'PANOBIANCO')).toEqual({
+      milvusNome: 'PANOBIANCO',
+      clientId: 'CLI-1',
+      token: null,
+      status: 'ja_preenchido',
+    });
   });
   it('ausente no Milvus → nao_encontrado; 2 tokens → ambiguo', () => {
     const out = bf.buildBackfillPreview(MAP, {}, MILVUS);
@@ -41,27 +50,47 @@ describe('buildBackfillPreview (match exato, sem fuzzy, sem sobrescrita)', () =>
   });
   it('nomes parecidos NÃO casam', () => {
     const out = bf.buildBackfillPreview(
-      [{ milvus_nome: 'PANOBIANCO FILIAL', client_id: 'CLI-9' }], {}, MILVUS);
+      [{ milvus_nome: 'PANOBIANCO FILIAL', client_id: 'CLI-9' }],
+      {},
+      MILVUS
+    );
     expect(out[0].status).toBe('nao_encontrado');
   });
   it('linhas sem nome são ignoradas', () => {
-    expect(bf.buildBackfillPreview([{ milvus_nome: '  ', client_id: 'CLI-9' }], {}, MILVUS)).toEqual([]);
+    expect(
+      bf.buildBackfillPreview([{ milvus_nome: '  ', client_id: 'CLI-9' }], {}, MILVUS)
+    ).toEqual([]);
   });
 });
 
 describe('summarizeBackfillPreview', () => {
   it('conta por status', () => {
-    expect(bf.summarizeBackfillPreview(bf.buildBackfillPreview(MAP, {}, MILVUS)))
-      .toEqual({ total: 4, prontos: 2, jaPreenchidos: 0, naoEncontrados: 1, ambiguos: 1 });
-    expect(bf.summarizeBackfillPreview([]))
-      .toEqual({ total: 0, prontos: 0, jaPreenchidos: 0, naoEncontrados: 0, ambiguos: 0 });
+    expect(bf.summarizeBackfillPreview(bf.buildBackfillPreview(MAP, {}, MILVUS))).toEqual({
+      total: 4,
+      prontos: 2,
+      jaPreenchidos: 0,
+      naoEncontrados: 1,
+      ambiguos: 1,
+    });
+    expect(bf.summarizeBackfillPreview([])).toEqual({
+      total: 0,
+      prontos: 0,
+      jaPreenchidos: 0,
+      naoEncontrados: 0,
+      ambiguos: 0,
+    });
   });
 });
 
 describe('service guards (admin + online + erro amigável)', () => {
   const _g = globalThis;
   const _keep = {};
-  for (const k of ['isMilvusMappingAdmin', 'isCurrentAdmin', 'isSupabaseConnected', 'supabaseClient']) {
+  for (const k of [
+    'isMilvusMappingAdmin',
+    'isCurrentAdmin',
+    'isSupabaseConnected',
+    'supabaseClient',
+  ]) {
     _keep[k] = _g[k];
   }
   afterEach(() => {
@@ -74,7 +103,9 @@ describe('service guards (admin + online + erro amigável)', () => {
     _g.isMilvusMappingAdmin = () => false;
     _g.isCurrentAdmin = () => false;
     _g.isSupabaseConnected = () => true;
-    _g.supabaseClient = { functions: { invoke: async () => ({ data: { success: true }, error: null }) } };
+    _g.supabaseClient = {
+      functions: { invoke: async () => ({ data: { success: true }, error: null }) },
+    };
     await expect(bf.previewMilvusTokenBackfill()).rejects.toThrow('Somente administradores');
     await expect(bf.commitMilvusTokenBackfill(['X'])).rejects.toThrow('Somente administradores');
   });
@@ -82,7 +113,14 @@ describe('service guards (admin + online + erro amigável)', () => {
     let called = false;
     _g.isMilvusMappingAdmin = () => true;
     _g.isSupabaseConnected = () => false;
-    _g.supabaseClient = { functions: { invoke: async () => { called = true; return {}; } } };
+    _g.supabaseClient = {
+      functions: {
+        invoke: async () => {
+          called = true;
+          return {};
+        },
+      },
+    };
     await expect(bf.previewMilvusTokenBackfill()).rejects.toThrow('Sem conexão');
     expect(called).toBe(false);
   });
@@ -92,7 +130,10 @@ describe('service guards (admin + online + erro amigável)', () => {
     _g.isSupabaseConnected = () => true;
     _g.supabaseClient = {
       functions: {
-        invoke: async (_fn, { body }) => { bodies.push(body); return { data: { success: true }, error: null }; },
+        invoke: async (_fn, { body }) => {
+          bodies.push(body);
+          return { data: { success: true }, error: null };
+        },
       },
     };
     await bf.previewMilvusTokenBackfill();

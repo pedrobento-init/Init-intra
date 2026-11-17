@@ -20,9 +20,9 @@ function carregar() {
         invoke: (nome, opts) => {
           chamadas.push([nome, opts]);
           return typeof resposta === 'function' ? resposta() : Promise.resolve(resposta);
-        }
-      }
-    }
+        },
+      },
+    },
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
@@ -42,7 +42,9 @@ beforeEach(() => {
 describe('canal do chamado', () => {
   it('só a coluna canal, sem thread, não basta: o responder não teria destino', () => {
     expect(s.chamadoCanalDe({ canal: 'whatsapp' })).toBeNull();
-    expect(s.chamadoCanalDe({ canal: 'whatsapp', solicitanteEmail: 'marcia@acme.com.br' })).toBe('email');
+    expect(s.chamadoCanalDe({ canal: 'whatsapp', solicitanteEmail: 'marcia@acme.com.br' })).toBe(
+      'email'
+    );
   });
 
   it('thread id com prefixo whatsapp: basta, mesmo sem a coluna canal', () => {
@@ -55,7 +57,9 @@ describe('canal do chamado', () => {
   });
 
   it('chamado com e-mail do solicitante responde por e-mail', () => {
-    expect(s.chamadoCanalDe({ solicitanteEmail: 'marcia@acme.com.br', emailThreadId: 'thread-9' })).toBe('email');
+    expect(
+      s.chamadoCanalDe({ solicitanteEmail: 'marcia@acme.com.br', emailThreadId: 'thread-9' })
+    ).toBe('email');
   });
 
   it('chamado aberto à mão, sem e-mail nem telefone, não tem canal', () => {
@@ -64,7 +68,12 @@ describe('canal do chamado', () => {
   });
 
   it('WhatsApp vence o e-mail herdado do cadastro: a pessoa espera a resposta onde falou', () => {
-    expect(s.chamadoCanalDe({ emailThreadId: 'whatsapp:5511987654321', solicitanteEmail: 'marcia@acme.com.br' })).toBe('whatsapp');
+    expect(
+      s.chamadoCanalDe({
+        emailThreadId: 'whatsapp:5511987654321',
+        solicitanteEmail: 'marcia@acme.com.br',
+      })
+    ).toBe('whatsapp');
   });
 
   it('canal desconhecido aparece como "Sem canal"', () => {
@@ -80,7 +89,13 @@ describe('canal do chamado', () => {
 
 describe('chave e formato do telefone', () => {
   it('com e sem 55, com e sem nono dígito, dão a mesma chave', () => {
-    const chaves = ['5511987654321', '11987654321', '(11) 98765-4321', '1187654321', '551187654321'].map(s.chamadoTelefoneChave);
+    const chaves = [
+      '5511987654321',
+      '11987654321',
+      '(11) 98765-4321',
+      '1187654321',
+      '551187654321',
+    ].map(s.chamadoTelefoneChave);
     expect(new Set(chaves)).toEqual(new Set(['1187654321']));
   });
 
@@ -124,7 +139,10 @@ describe('enviar a resposta pelo canal', () => {
     conectado = false;
     await s.chamadoEnviarResposta(whats, 'oi');
     expect(chamadas).toHaveLength(0);
-    expect(toasts[0]).toEqual(['A nota foi salva, mas a mensagem não saiu: sem conexão com o servidor.', 'error']);
+    expect(toasts[0]).toEqual([
+      'A nota foi salva, mas a mensagem não saiu: sem conexão com o servidor.',
+      'error',
+    ]);
   });
 
   it('sessão sem auth ativa conta como offline', async () => {
@@ -136,13 +154,19 @@ describe('enviar a resposta pelo canal', () => {
   it('erro devolvido pela função aparece no toast', async () => {
     resposta = { data: { success: false, error: 'número sem WhatsApp' } };
     await s.chamadoEnviarResposta(whats, 'oi');
-    expect(toasts[0]).toEqual(['A nota foi salva, mas a mensagem não saiu: número sem WhatsApp', 'error']);
+    expect(toasts[0]).toEqual([
+      'A nota foi salva, mas a mensagem não saiu: número sem WhatsApp',
+      'error',
+    ]);
   });
 
   it('erro de transporte usa a mensagem do cliente do Supabase', async () => {
     resposta = { data: null, error: { message: 'Failed to fetch' } };
     await s.chamadoEnviarResposta(whats, 'oi');
-    expect(toasts[0]).toEqual(['A nota foi salva, mas a mensagem não saiu: Failed to fetch', 'error']);
+    expect(toasts[0]).toEqual([
+      'A nota foi salva, mas a mensagem não saiu: Failed to fetch',
+      'error',
+    ]);
   });
 
   it('promise rejeitada vira toast genérico e log silencioso, sem estourar', async () => {

@@ -11,18 +11,31 @@ let _clientPenOrigin = null;
 
 function openClientPenRow(e, clientId, penId) {
   try {
-    if (e && e.target && e.target.closest && e.target.closest('button,select,a,input,textarea,label')) return;
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+    if (
+      e &&
+      e.target &&
+      e.target.closest &&
+      e.target.closest('button,select,a,input,textarea,label')
+    )
+      return;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
   openClientPendencia(clientId, penId);
 }
 
 function openClientPendencia(clientId, penId) {
   let p = null;
-  try { p = (typeof getPendenciaById === 'function') ? getPendenciaById(penId) : null; } catch (_) { p = null; }
+  try {
+    p = typeof getPendenciaById === 'function' ? getPendenciaById(penId) : null;
+  } catch (_) {
+    p = null;
+  }
   if (!p) {
     _clientPenReturn = null;
     _clientPenOrigin = null;
-    if (typeof showToast === 'function') showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
     return;
   }
   _clientPenReturn = { clientId };
@@ -32,7 +45,8 @@ function openClientPendencia(clientId, penId) {
   } catch (_) {
     _clientPenReturn = null;
     _clientPenOrigin = null;
-    if (typeof showToast === 'function') showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Não foi possível abrir a pendência. Tente novamente.', 'error');
   }
 }
 
@@ -46,62 +60,99 @@ function _milvusImportStatusTag(st) {
 }
 
 async function openMilvusClientsImportModal() {
-  openModal('📥 Importar clientes do Milvus', `
+  openModal(
+    '📥 Importar clientes do Milvus',
+    `
     <p class="u-cf2be3">Novos entram com equipe <strong>init</strong> e vínculo no mapa Milvus. Existentes (mesmo CNPJ ou nome) são pulados.</p>
-    <div id="milvusImportBody"><p class="u-2bb516">Consultando clientes no Milvus…</p></div>`);
+    <div id="milvusImportBody"><p class="u-2bb516">Consultando clientes no Milvus…</p></div>`
+  );
   try {
     const data = await previewMilvusClientsImport();
     _milvusImportPreview = data.preview || [];
-    const t = data.totals || summarizeImportPreview(_milvusImportPreview.map((p) => ({ status: p.status })));
+    const t =
+      data.totals ||
+      summarizeImportPreview(_milvusImportPreview.map((p) => ({ status: p.status })));
     const body = document.getElementById('milvusImportBody');
     if (!body) return;
     if (!_milvusImportPreview.length) {
-      body.innerHTML = '<div class="empty-state"><p>Nenhum cliente retornado pelo Milvus.</p></div>';
+      body.innerHTML =
+        '<div class="empty-state"><p>Nenhum cliente retornado pelo Milvus.</p></div>';
       return;
     }
     body.innerHTML = `
       <div class="u-430b60">${t.total} no Milvus · <strong>${t.novos} novos</strong> · ${t.existeCnpj} por CNPJ · ${t.existeNome} por nome</div>
       <div class="table-wrapper u-39b4fb"><table><thead><tr><th></th><th>Nome</th><th>CNPJ</th><th>Status</th></tr></thead><tbody>
-      ${_milvusImportPreview.map((p, i) => `<tr>
+      ${_milvusImportPreview
+        .map(
+          (p, i) => `<tr>
         <td>${p.status === 'novo' ? `<input type="checkbox" data-mi-idx="${i}" checked />` : ''}</td>
         <td><strong>${escapeHtml(p.nome)}</strong>${p.razao && p.razao !== p.nome ? `<div class="u-749148">${escapeHtml(p.razao)}</div>` : ''}</td>
         <td class="u-6cb285">${escapeHtml(p.cnpj || '—')}</td>
         <td>${_milvusImportStatusTag(p.status)}</td>
-      </tr>`).join('')}</tbody></table></div>
+      </tr>`
+        )
+        .join('')}</tbody></table></div>
       <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" data-action="confirmMilvusClientsImport">Importar selecionados</button></div>
       <div id="milvusImportMsg" class="u-f99aa7"></div>`;
   } catch (_e) {
     const body = document.getElementById('milvusImportBody');
-    if (body) body.innerHTML = '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
+    if (body)
+      body.innerHTML =
+        '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
   }
 }
 
 async function confirmMilvusClientsImport() {
   const btn = document.getElementById('milvusImportConfirmBtn');
-  const setMsg = (html) => { const m = document.getElementById('milvusImportMsg'); if (m) m.innerHTML = html; };
-  const checked = [...document.querySelectorAll('[data-mi-idx]:checked')].map((el) => Number(el.dataset.miIdx));
+  const setMsg = (html) => {
+    const m = document.getElementById('milvusImportMsg');
+    if (m) m.innerHTML = html;
+  };
+  const checked = [...document.querySelectorAll('[data-mi-idx]:checked')].map((el) =>
+    Number(el.dataset.miIdx)
+  );
   const onlyIds = checked
-    .map((i) => _milvusImportPreview[i] && _milvusImportPreview[i].status === 'novo' ? _milvusImportPreview[i].milvusId : null)
+    .map((i) =>
+      _milvusImportPreview[i] && _milvusImportPreview[i].status === 'novo'
+        ? _milvusImportPreview[i].milvusId
+        : null
+    )
     .filter((v) => typeof v === 'number');
   if (!onlyIds.length) {
     setMsg('<span class="u-5872de">Nenhum cliente novo selecionado.</span>');
     return;
   }
-  if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Importando…';
+  }
   try {
     const res = await commitMilvusClientsImport(onlyIds);
-    setMsg(`<span class="u-0ce87a">${plural(res.created, 'cliente importado', 'clientes importados')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`);
+    setMsg(
+      `<span class="u-0ce87a">${plural(res.created, 'cliente importado', 'clientes importados')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`
+    );
     try {
       if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal().catch(() => {});
-      if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${plural(res.created, 'novo', 'novos')} do Milvus`);
+      if (typeof addLog === 'function')
+        addLog(
+          'Importou clientes',
+          'Cliente',
+          'Milvus',
+          `${plural(res.created, 'novo', 'novos')} do Milvus`
+        );
       // A grade atrás do modal estava ficando stale: reconstrói o filtro e os badges.
       if (typeof _refreshClientsInPlace === 'function') _refreshClientsInPlace();
       if (typeof updateBadges === 'function') updateBadges();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+    }
   } catch (_e) {
     setMsg('<span class="u-5afed3">Falha na importação. Tente novamente.</span>');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Importar selecionados'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Importar selecionados';
+    }
   }
 }
 
@@ -110,7 +161,8 @@ let _milvusTicketsSyncing = {};
 let _mticketsReq = null; // token p/ descartar resposta de cliente/aba anterior
 
 function milvusTicketStatusTag(status) {
-  const cls = (typeof canonicalStatusClass === 'function') ? canonicalStatusClass(status) : 'tag-gray';
+  const cls =
+    typeof canonicalStatusClass === 'function' ? canonicalStatusClass(status) : 'tag-gray';
   return `<span class="tag ${cls}">${escapeHtml(status || '—')}</span>`;
 }
 
@@ -118,18 +170,29 @@ function _fmtTicketDate(iso) {
   if (!iso) return '—';
   try {
     if (typeof formatDateTime === 'function') return formatDateTime(iso);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
-  try { return new Date(iso).toLocaleString('pt-BR'); } catch (_) { return '—'; }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
+  try {
+    return new Date(iso).toLocaleString('pt-BR');
+  } catch (_) {
+    return '—';
+  }
 }
 
 function renderClientMilvusTicketsTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   let lastSync = null;
-  try { lastSync = typeof getMilvusTicketsLastSyncAt === 'function' ? getMilvusTicketsLastSyncAt(clientId) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
-  const lastTxt = lastSync
-    ? _fmtTicketDate(lastSync)
-    : 'nunca';
+  try {
+    lastSync =
+      typeof getMilvusTicketsLastSyncAt === 'function'
+        ? getMilvusTicketsLastSyncAt(clientId)
+        : null;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
+  const lastTxt = lastSync ? _fmtTicketDate(lastSync) : 'nunca';
   el.innerHTML = `
     <div class="u-87a5d6">
       <span class="mtickets-title">📋 Últimos chamados no Milvus</span>
@@ -146,13 +209,21 @@ function renderClientMilvusTicketsTab(clientId) {
     <div id="chamadosAtendSection"></div>`;
   loadClientMilvusTicketsUI(clientId);
   try {
-    if (typeof renderMilvusAtendimentosInline === 'function') renderMilvusAtendimentosInline(clientId, 'chamadosAtendSection');
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+    if (typeof renderMilvusAtendimentosInline === 'function')
+      renderMilvusAtendimentosInline(clientId, 'chamadosAtendSection');
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
   try {
-    if (typeof shouldAutoSyncMilvusTickets === 'function' && shouldAutoSyncMilvusTickets(lastSync, Date.now())) {
+    if (
+      typeof shouldAutoSyncMilvusTickets === 'function' &&
+      shouldAutoSyncMilvusTickets(lastSync, Date.now())
+    ) {
       syncClientMilvusTicketsUI(clientId, { silent: true });
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
 }
 
 async function loadClientMilvusTicketsUI(clientId) {
@@ -165,14 +236,23 @@ async function loadClientMilvusTicketsUI(clientId) {
   const isStale = () => _mticketsReq !== myReq || !document.getElementById('milvusTicketsList');
   let tickets = [];
   try {
-    tickets = typeof getClientMilvusTickets === 'function' ? await getClientMilvusTickets(clientId) : [];
-  } catch (_) { tickets = []; }
+    tickets =
+      typeof getClientMilvusTickets === 'function' ? await getClientMilvusTickets(clientId) : [];
+  } catch (_) {
+    tickets = [];
+  }
   if (isStale()) return;
   if (!tickets.length) {
-    wrap.innerHTML = '<div class="empty-state u-287f77"><p>Nenhum chamado sincronizado.</p><p class="u-6cb285">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
+    wrap.innerHTML =
+      '<div class="empty-state u-287f77"><p>Nenhum chamado sincronizado.</p><p class="u-6cb285">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
     return;
   }
-  wrap.innerHTML = `<div class="mticket-list">` + tickets.slice(0, 10).map((t) => `
+  wrap.innerHTML =
+    `<div class="mticket-list">` +
+    tickets
+      .slice(0, 10)
+      .map(
+        (t) => `
     <div class="mticket-row" role="button" tabindex="0" data-action="openMilvusTicketDetail" data-arg="${escapeHtml(clientId)}" data-ticket="${escapeHtml(t.id)}" title="Ver detalhes">
       <div class="mticket-top">
         <strong class="mticket-code">#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))}</strong>
@@ -180,7 +260,10 @@ async function loadClientMilvusTicketsUI(clientId) {
         ${milvusTicketStatusTag(t.status)}
       </div>
       <div class="mticket-meta">${_fmtTicketDate(t.data_criacao)}${t.tecnico ? ` · ${escapeHtml(t.tecnico)}` : ''}</div>
-    </div>`).join('') + `</div>`;
+    </div>`
+      )
+      .join('') +
+    `</div>`;
 }
 
 async function syncClientMilvusTicketsUI(clientId, opts) {
@@ -188,51 +271,80 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
   if (_milvusTicketsSyncing[clientId]) return;
   _milvusTicketsSyncing[clientId] = true;
   const btn = document.getElementById('milvusTicketsSyncBtn');
-  const setMsg = (html) => { const m = document.getElementById('milvusTicketsMsg'); if (m) m.innerHTML = html; };
-  if (btn && !silent) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
+  const setMsg = (html) => {
+    const m = document.getElementById('milvusTicketsMsg');
+    if (m) m.innerHTML = html;
+  };
+  if (btn && !silent) {
+    btn.disabled = true;
+    btn.textContent = 'Sincronizando…';
+  }
   try {
     const res = await syncClientMilvusTickets(clientId);
-    const st = typeof resolveMilvusTicketsSyncState === 'function'
-      ? resolveMilvusTicketsSyncState(res)
-      : { kind: res && res.unmapped ? 'unmapped' : 'ok', synced: (res && res.synced) || 0 };
+    const st =
+      typeof resolveMilvusTicketsSyncState === 'function'
+        ? resolveMilvusTicketsSyncState(res)
+        : { kind: res && res.unmapped ? 'unmapped' : 'ok', synced: (res && res.synced) || 0 };
     if (st.kind === 'no-token') {
-      setMsg('<span class="u-5872de">Este cliente ainda não possui token configurado no Milvus.</span>');
+      setMsg(
+        '<span class="u-5872de">Este cliente ainda não possui token configurado no Milvus.</span>'
+      );
     } else if (st.kind === 'unmapped') {
       setMsg('<span class="u-5872de">Cliente não possui mapeamento no Milvus.</span>');
     } else if (!silent) {
       const s = (res && res.synced) || 0;
-      setMsg(`<span class="u-0ce87a">${plural(s, 'chamado atualizado', 'chamados atualizados')}.</span>`);
+      setMsg(
+        `<span class="u-0ce87a">${plural(s, 'chamado atualizado', 'chamados atualizados')}.</span>`
+      );
     } else {
       setMsg('');
     }
     try {
-      const last = typeof getMilvusTicketsLastSyncAt === 'function' ? getMilvusTicketsLastSyncAt(clientId) : null;
+      const last =
+        typeof getMilvusTicketsLastSyncAt === 'function'
+          ? getMilvusTicketsLastSyncAt(clientId)
+          : null;
       const lastEl = document.getElementById('milvusTicketsLastSync');
       if (last && lastEl) lastEl.textContent = _fmtTicketDate(last);
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+    }
     await loadClientMilvusTicketsUI(clientId);
   } catch (_e) {
     // Erro discreto; mantém os já sincronizados (não apaga nada).
-    if (!silent) setMsg('<span class="u-5afed3">Não foi possível atualizar os chamados do Milvus.</span>');
+    if (!silent)
+      setMsg('<span class="u-5afed3">Não foi possível atualizar os chamados do Milvus.</span>');
   } finally {
     _milvusTicketsSyncing[clientId] = false;
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '↻ Sincronizar';
+    }
   }
 }
 
 async function openMilvusTicketDetail(clientId, ticketId) {
   let tickets = [];
   try {
-    tickets = typeof getClientMilvusTickets === 'function' ? await getClientMilvusTickets(clientId) : [];
-  } catch (_) { tickets = []; }
+    tickets =
+      typeof getClientMilvusTickets === 'function' ? await getClientMilvusTickets(clientId) : [];
+  } catch (_) {
+    tickets = [];
+  }
   const t = tickets.find((x) => x && x.id === ticketId);
   if (!t) return;
-  const ir = (label, val) => `<div class="info-item"><div class="info-key">${label}</div><div class="info-value ${val && val !== '—' ? '' : 'empty'}">${val || '—'}</div></div>`;
-  const cat = [t.categoria_primaria, t.categoria_secundaria].filter(Boolean).map(escapeHtml).join(' / ') || '—';
-  const log = t.ultima_log && (t.ultima_log.texto || t.ultima_log.data)
-    ? `<div class="mticket-log-text">${escapeHtml(t.ultima_log.texto || '')}</div><div class="mticket-meta">${_fmtTicketDate(t.ultima_log.data)}${t.ultima_log.tecnico ? ` · ${escapeHtml(t.ultima_log.tecnico)}` : ''}</div>`
-    : '<span class="u-aad8e6">—</span>';
-  openModal(`#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))} · ${escapeHtml(t.assunto || 'Chamado')}`, `
+  const ir = (label, val) =>
+    `<div class="info-item"><div class="info-key">${label}</div><div class="info-value ${val && val !== '—' ? '' : 'empty'}">${val || '—'}</div></div>`;
+  const cat =
+    [t.categoria_primaria, t.categoria_secundaria].filter(Boolean).map(escapeHtml).join(' / ') ||
+    '—';
+  const log =
+    t.ultima_log && (t.ultima_log.texto || t.ultima_log.data)
+      ? `<div class="mticket-log-text">${escapeHtml(t.ultima_log.texto || '')}</div><div class="mticket-meta">${_fmtTicketDate(t.ultima_log.data)}${t.ultima_log.tecnico ? ` · ${escapeHtml(t.ultima_log.tecnico)}` : ''}</div>`
+      : '<span class="u-aad8e6">—</span>';
+  openModal(
+    `#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))} · ${escapeHtml(t.assunto || 'Chamado')}`,
+    `
     <div class="u-3c1172">
       ${milvusTicketStatusTag(t.status)}
       ${t.prioridade ? `<span class="tag tag-yellow">${escapeHtml(t.prioridade)}</span>` : ''}
@@ -246,7 +358,8 @@ async function openMilvusTicketDetail(clientId, ticketId) {
       ${ir('Solucionado em', t.data_solucao ? _fmtTicketDate(t.data_solucao) : '')}
     </div>
     ${t.descricao ? `<div class="client-detail-section"><div class="client-detail-section-title">📝 Descrição</div><div class="mticket-desc">${escapeHtml(t.descricao)}</div></div>` : ''}
-    <div class="client-detail-section mticket-log"><div class="client-detail-section-title">💬 Última interação</div><div>${log}</div></div>`);
+    <div class="client-detail-section mticket-log"><div class="client-detail-section-title">💬 Última interação</div><div>${log}</div></div>`
+  );
 }
 
 // ── Inventário Milvus (somente listagem; sem licença, sem status, sem softwares) ──
@@ -254,9 +367,15 @@ function renderClientInventoryTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   let lastSync = null;
-  try { lastSync = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+  try {
+    lastSync = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+  }
   const lastTxt = lastSync
-    ? (typeof formatDateTime === 'function' ? formatDateTime(lastSync) : new Date(lastSync).toLocaleString('pt-BR'))
+    ? typeof formatDateTime === 'function'
+      ? formatDateTime(lastSync)
+      : new Date(lastSync).toLocaleString('pt-BR')
     : 'nunca';
   el.innerHTML = `
     <div class="u-3c1172">
@@ -280,40 +399,66 @@ async function loadClientInventoryUI(clientId) {
   let devices = [];
   try {
     devices = typeof getClientDevices === 'function' ? await getClientDevices(clientId) : [];
-  } catch (_) { devices = []; }
+  } catch (_) {
+    devices = [];
+  }
   if (!devices.length) {
-    wrap.innerHTML = '<div class="empty-state"><p>Nenhum dispositivo sincronizado para este cliente.</p></div>';
+    wrap.innerHTML =
+      '<div class="empty-state"><p>Nenhum dispositivo sincronizado para este cliente.</p></div>';
     return;
   }
-  wrap.innerHTML = `<table class="milvus-table"><thead><tr><th>Hostname</th><th>Apelido</th><th>Processador</th><th>Marca</th><th>Modelo</th><th>Sistema operacional</th><th>Nº serial</th><th>Usuário logado</th><th>Tipo</th><th>IP interno</th><th>Status</th><th>Atualizado em</th></tr></thead><tbody>${devices.map((d) => {
-    const upd = d.data_ultima_atualizacao || d.updatedAt;
-    const updTxt = upd ? (typeof formatDateTime === 'function' ? formatDateTime(upd) : new Date(upd).toLocaleString('pt-BR')) : '—';
-    return `<tr><td class="c-main" title="${escapeHtml(d.hostname || '')}"><strong>${escapeHtml(d.hostname || '—')}</strong></td><td>${escapeHtml(d.apelido || '—')}</td><td class="c-so" title="${escapeHtml(d.processador || '')}">${escapeHtml(d.processador || '—')}</td><td>${escapeHtml(d.marca || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.modelo_notebook || '')}">${escapeHtml(d.modelo_notebook || '—')}</td><td class="c-so" title="${escapeHtml(d.sistema_operacional || '')}">${escapeHtml(d.sistema_operacional || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.numero_serial || '')}">${escapeHtml(d.numero_serial || '—')}</td><td>${escapeHtml(d.usuario_logado || '—')}</td><td>${escapeHtml(d.tipo_dispositivo_text || '—')}</td><td class="c-nowrap">${escapeHtml(d.ip_interno || '—')}</td><td>${d.is_ativo !== false ? '<span class="tag tag-green">Ativo</span>' : '<span class="tag tag-red">Inativo</span>'}</td><td class="c-nowrap">${escapeHtml(updTxt)}</td></tr>`;
-  }).join('')}</tbody></table>`;
+  wrap.innerHTML = `<table class="milvus-table"><thead><tr><th>Hostname</th><th>Apelido</th><th>Processador</th><th>Marca</th><th>Modelo</th><th>Sistema operacional</th><th>Nº serial</th><th>Usuário logado</th><th>Tipo</th><th>IP interno</th><th>Status</th><th>Atualizado em</th></tr></thead><tbody>${devices
+    .map((d) => {
+      const upd = d.data_ultima_atualizacao || d.updatedAt;
+      const updTxt = upd
+        ? typeof formatDateTime === 'function'
+          ? formatDateTime(upd)
+          : new Date(upd).toLocaleString('pt-BR')
+        : '—';
+      return `<tr><td class="c-main" title="${escapeHtml(d.hostname || '')}"><strong>${escapeHtml(d.hostname || '—')}</strong></td><td>${escapeHtml(d.apelido || '—')}</td><td class="c-so" title="${escapeHtml(d.processador || '')}">${escapeHtml(d.processador || '—')}</td><td>${escapeHtml(d.marca || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.modelo_notebook || '')}">${escapeHtml(d.modelo_notebook || '—')}</td><td class="c-so" title="${escapeHtml(d.sistema_operacional || '')}">${escapeHtml(d.sistema_operacional || '—')}</td><td class="c-nowrap" title="${escapeHtml(d.numero_serial || '')}">${escapeHtml(d.numero_serial || '—')}</td><td>${escapeHtml(d.usuario_logado || '—')}</td><td>${escapeHtml(d.tipo_dispositivo_text || '—')}</td><td class="c-nowrap">${escapeHtml(d.ip_interno || '—')}</td><td>${d.is_ativo !== false ? '<span class="tag tag-green">Ativo</span>' : '<span class="tag tag-red">Inativo</span>'}</td><td class="c-nowrap">${escapeHtml(updTxt)}</td></tr>`;
+    })
+    .join('')}</tbody></table>`;
 }
 
 async function syncClientInventoryUI(clientId) {
   const btn = document.getElementById('milvusSyncBtn');
   const msg = document.getElementById('milvusSyncMsg');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando inventário…'; }
-  if (msg) { msg.innerHTML = '<span class="u-5872de">Sincronizando inventário…</span>'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Sincronizando inventário…';
+  }
+  if (msg) {
+    msg.innerHTML = '<span class="u-5872de">Sincronizando inventário…</span>';
+  }
   try {
     const res = await syncClientDevices(clientId);
-    const fmt = typeof formatMilvusSyncResult === 'function'
-      ? formatMilvusSyncResult(res)
-      : { line: `${(res && res.synced) || 0} dispositivos sincronizados`, unresolved: 0 };
+    const fmt =
+      typeof formatMilvusSyncResult === 'function'
+        ? formatMilvusSyncResult(res)
+        : { line: `${(res && res.synced) || 0} dispositivos sincronizados`, unresolved: 0 };
     if (msg) msg.innerHTML = `<span class="u-0ce87a">${escapeHtml(fmt.line)}</span>`;
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
-      if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+      if (last && lastEl)
+        lastEl.textContent =
+          typeof formatDateTime === 'function'
+            ? formatDateTime(last)
+            : new Date(last).toLocaleString('pt-BR');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+    }
     await loadClientInventoryUI(clientId);
   } catch (_e) {
     // Mensagem amigável; sem token ou detalhe sensível.
-    if (msg) msg.innerHTML = '<span class="u-5afed3">Não foi possível sincronizar o inventário. Tente novamente.</span>';
+    if (msg)
+      msg.innerHTML =
+        '<span class="u-5afed3">Não foi possível sincronizar o inventário. Tente novamente.</span>';
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar inventário'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '↻ Sincronizar inventário';
+    }
   }
 }
 
@@ -321,40 +466,62 @@ async function importClientInventoryUI(clientId, input) {
   const file = input && input.files && input.files[0];
   if (input) input.value = '';
   if (!file) return;
-  const setMsg = (html) => { const m = document.getElementById('milvusSyncMsg'); if (m) m.innerHTML = html; };
+  const setMsg = (html) => {
+    const m = document.getElementById('milvusSyncMsg');
+    if (m) m.innerHTML = html;
+  };
   try {
     setMsg('<span class="u-5872de">Lendo planilha…</span>');
     const rows = await readMilvusExportFile(file);
     setMsg(`<span class="u-5872de">Importando ${plural(rows.length, 'linha', 'linhas')}…</span>`);
     const res = await importClientDevicesFromRows(clientId, rows);
-    setMsg(`<span class="u-0ce87a">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outros clientes, ignorados` : ''}</span>`);
+    setMsg(
+      `<span class="u-0ce87a">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outros clientes, ignorados` : ''}</span>`
+    );
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
-      if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
+      if (last && lastEl)
+        lastEl.textContent =
+          typeof formatDateTime === 'function'
+            ? formatDateTime(last)
+            : new Date(last).toLocaleString('pt-BR');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas');
+    }
     await loadClientInventoryUI(clientId);
   } catch (e) {
-    setMsg(`<span class="u-5afed3">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`);
+    setMsg(
+      `<span class="u-5afed3">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`
+    );
   }
 }
 
 function duplicateProcedure(clientId, procId) {
-  const p = getProcedures(clientId).find(x => x.id === procId);
+  const p = getProcedures(clientId).find((x) => x.id === procId);
   if (!p) return;
-  saveProcedure({ clientId, title: (p.title || '') + ' (cópia)', category: p.category, content: p.content });
+  saveProcedure({
+    clientId,
+    title: (p.title || '') + ' (cópia)',
+    category: p.category,
+    content: p.content,
+  });
   renderClientTab('procedimentos', clientId);
   showToast('Procedimento duplicado!', 'success');
 }
 
 function openProcedureForm(clientId, procId = null) {
-  const p = (procId ? getProcedures(clientId).find(x => x.id === procId) : null) || {};
+  const p = (procId ? getProcedures(clientId).find((x) => x.id === procId) : null) || {};
   const templates = typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [];
   const cid = escapeHtml(clientId);
 
-  openModal(procId ? 'Editar Procedimento' : 'Novo Procedimento', `
+  openModal(
+    procId ? 'Editar Procedimento' : 'Novo Procedimento',
+    `
     <form class="ov-form ps-form" data-submit="procSave" data-client="${cid}" data-arg="${escapeHtml(procId || '')}">
-      ${templates.length ? `
+      ${
+        templates.length
+          ? `
         <div class="ps-tpl-load">
           <div>
             <div class="ps-tpl-load-t">Começar de um modelo</div>
@@ -363,22 +530,26 @@ function openProcedureForm(clientId, procId = null) {
           <div class="ps-tpl-load-c">
             <select class="form-select" id="templatePickerSelect" aria-label="Modelo de procedimento">
               <option value="">Selecione um modelo...</option>
-              ${templates.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title)}${t.category ? ` (${escapeHtml(t.category)})` : ''}</option>`).join('')}
+              ${templates.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title)}${t.category ? ` (${escapeHtml(t.category)})` : ''}</option>`).join('')}
             </select>
             <button type="button" class="btn btn-secondary btn-sm" data-action="procLoadTpl">Carregar</button>
           </div>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
       <div class="ps-form-head">
-        <div class="form-group"><label class="form-label" for="procTitleInput">Título *</label><input class="form-input" id="procTitleInput" name="title" value="${escapeHtml(p.title||'')}" required /></div>
-        <div class="form-group"><label class="form-label" for="procCategoryInput">Categoria</label><input class="form-input" id="procCategoryInput" name="category" value="${escapeHtml(p.category||'')}" placeholder="Ex: Acesso, Backup, Rede..." /></div>
+        <div class="form-group"><label class="form-label" for="procTitleInput">Título *</label><input class="form-input" id="procTitleInput" name="title" value="${escapeHtml(p.title || '')}" required /></div>
+        <div class="form-group"><label class="form-label" for="procCategoryInput">Categoria</label><input class="form-input" id="procCategoryInput" name="category" value="${escapeHtml(p.category || '')}" placeholder="Ex: Acesso, Backup, Rede..." /></div>
       </div>
       <div class="form-group ps-form-steps">
         <span class="form-label">Passo a passo</span>
         ${procEditorHtml(p.content || '')}
       </div>
       <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="openClient" data-arg="${cid}">Cancelar</button><button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button></div>
-    </form>`, 'xl');
+    </form>`,
+    'xl'
+  );
   procEditorMount(document.querySelector('#modalBody [data-pse]'));
 }
 
@@ -398,7 +569,8 @@ function loadTemplateIntoProcedureForm() {
   if (catInp) catInp.value = tpl.category || '';
   procEditorSet(document.querySelector('#modalBody [data-pse]'), tpl.content || '');
 
-  if (typeof showToast === 'function') showToast(`Modelo "${tpl.title}" carregado no formulário!`, 'success');
+  if (typeof showToast === 'function')
+    showToast(`Modelo "${tpl.title}" carregado no formulário!`, 'success');
 }
 
 function submitProcedureForm(e, clientId, procId) {
@@ -419,64 +591,82 @@ function submitProcedureForm(e, clientId, procId) {
 
 function offerSaveProcedureAsTemplate(proc) {
   if (!proc || !proc.title) return;
-  confirmAction('Deseja salvar este procedimento também como <strong>modelo</strong>?', function() {
-    const titleNorm = (proc.title || '').trim().toLowerCase();
-    const existing = (typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : [])
-      .find(t => (t.title || '').trim().toLowerCase() === titleNorm);
-    if (existing) {
-      setTimeout(() => {
-        confirmAction(
-          'Já existe um modelo com o título <strong>' + escapeHtml(proc.title) + '</strong>. Deseja <strong>atualizar</strong> o modelo existente?',
-          function() {
-            saveProcedureTemplate({
-              id: existing.id,
-              title: proc.title,
-              category: proc.category || '',
-              content: proc.content || '',
-            });
-            showToast('Modelo atualizado!', 'success');
-            if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
-              renderTemplates();
+  confirmAction(
+    'Deseja salvar este procedimento também como <strong>modelo</strong>?',
+    function () {
+      const titleNorm = (proc.title || '').trim().toLowerCase();
+      const existing = (
+        typeof getProcedureTemplates === 'function' ? getProcedureTemplates() : []
+      ).find((t) => (t.title || '').trim().toLowerCase() === titleNorm);
+      if (existing) {
+        setTimeout(() => {
+          confirmAction(
+            'Já existe um modelo com o título <strong>' +
+              escapeHtml(proc.title) +
+              '</strong>. Deseja <strong>atualizar</strong> o modelo existente?',
+            function () {
+              saveProcedureTemplate({
+                id: existing.id,
+                title: proc.title,
+                category: proc.category || '',
+                content: proc.content || '',
+              });
+              showToast('Modelo atualizado!', 'success');
+              if (
+                typeof currentHash === 'function' &&
+                currentHash() === 'templates' &&
+                typeof renderTemplates === 'function'
+              ) {
+                renderTemplates();
+              }
             }
+          );
+          const btn = document.getElementById('confirmBtn');
+          if (btn) {
+            btn.textContent = 'Atualizar modelo';
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-primary');
           }
-        );
-        const btn = document.getElementById('confirmBtn');
-        if (btn) {
-          btn.textContent = 'Atualizar modelo';
-          btn.classList.remove('btn-danger');
-          btn.classList.add('btn-primary');
-        }
-        const cancel = document.getElementById('confirmCancelBtn');
-        if (cancel) {
-          cancel.textContent = 'Criar novo';
-          cancel.onclick = function() {
-            closeModal();
-            saveProcedureTemplate({
-              id: null,
-              title: proc.title,
-              category: proc.category || '',
-              content: proc.content || '',
-            });
-            showToast('Novo modelo criado!', 'success');
-            if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
-              renderTemplates();
-            }
-          };
-        }
-      }, 50);
-      return;
+          const cancel = document.getElementById('confirmCancelBtn');
+          if (cancel) {
+            cancel.textContent = 'Criar novo';
+            cancel.onclick = function () {
+              closeModal();
+              saveProcedureTemplate({
+                id: null,
+                title: proc.title,
+                category: proc.category || '',
+                content: proc.content || '',
+              });
+              showToast('Novo modelo criado!', 'success');
+              if (
+                typeof currentHash === 'function' &&
+                currentHash() === 'templates' &&
+                typeof renderTemplates === 'function'
+              ) {
+                renderTemplates();
+              }
+            };
+          }
+        }, 50);
+        return;
+      }
+      saveProcedureTemplate({
+        id: null,
+        title: proc.title,
+        category: proc.category || '',
+        content: proc.content || '',
+      });
+      showToast('Modelo criado a partir do procedimento!', 'success');
+      if (
+        typeof currentHash === 'function' &&
+        currentHash() === 'templates' &&
+        typeof renderTemplates === 'function'
+      ) {
+        renderTemplates();
+      }
     }
-    saveProcedureTemplate({
-      id: null,
-      title: proc.title,
-      category: proc.category || '',
-      content: proc.content || '',
-    });
-    showToast('Modelo criado a partir do procedimento!', 'success');
-    if (typeof currentHash === 'function' && currentHash() === 'templates' && typeof renderTemplates === 'function') {
-      renderTemplates();
-    }
-  });
+  );
   const btn = document.getElementById('confirmBtn');
   if (btn) {
     btn.textContent = 'Salvar como modelo';
@@ -490,12 +680,15 @@ function offerSaveProcedureAsTemplate(proc) {
 function deleteProcedureConfirm(procId, clientId) {
   var proc = null;
   var all = dbGet(DB.PROCEDURES);
-  if (all) proc = all.find(function(p) { return p.id === procId; });
-  confirmAction('Excluir este procedimento?', function() {
+  if (all)
+    proc = all.find(function (p) {
+      return p.id === procId;
+    });
+  confirmAction('Excluir este procedimento?', function () {
     var snapshot = proc ? JSON.parse(JSON.stringify(proc)) : null;
     deleteProcedure(procId);
     if (snapshot) {
-      showUndoToast('Procedimento removido.', function() {
+      showUndoToast('Procedimento removido.', function () {
         saveProcedure(snapshot);
         viewClient(clientId);
         switchClientTab('procedimentos', clientId);
@@ -520,17 +713,18 @@ function deleteClientConfirm(id) {
   // undo e não encosta no deleteClient (que também é guardado). Vale mesmo
   // offline — nenhuma exclusão entra na fila.
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
-    if (typeof showToast === 'function') showToast('Apenas administradores podem excluir clientes.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Apenas administradores podem excluir clientes.', 'error');
     return;
   }
   var c = getClientById(id);
   if (!c) return;
-  confirmAction('Excluir cliente <strong>' + escapeHtml(c.name) + '</strong>?', function() {
+  confirmAction('Excluir cliente <strong>' + escapeHtml(c.name) + '</strong>?', function () {
     var snapshot = JSON.parse(JSON.stringify(c));
     deleteClient(id);
     _refreshClientsInPlace(); // reconstrói _filteredClients (busca ativa) em vez de renderizar o array stale
     updateBadges();
-    showUndoToast('Cliente "' + c.name + '" removido.', function() {
+    showUndoToast('Cliente "' + c.name + '" removido.', function () {
       saveClient(snapshot);
       _refreshClientsInPlace();
       updateBadges();
@@ -552,7 +746,9 @@ if (typeof registerActions === 'function') {
     syncClientMilvusTicketsUI: (_el, id) => syncClientMilvusTicketsUI(id),
     openMilvusTicketDetail: (el, clientId) => openMilvusTicketDetail(clientId, el.dataset.ticket),
     syncClientInventoryUI: (_el, id) => syncClientInventoryUI(id),
-    exportClientInventory: (_el, id) => { if (typeof exportClientInventory === 'function') exportClientInventory(id); },
+    exportClientInventory: (_el, id) => {
+      if (typeof exportClientInventory === 'function') exportClientInventory(id);
+    },
     // actions.js entrega el.value (fakepath) no change — o clientId vem do data-arg.
     importClientInventoryUI: (el) => importClientInventoryUI(el.dataset.arg, el),
   });

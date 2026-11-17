@@ -9,11 +9,18 @@ import { PGlite } from '@electric-sql/pglite';
 //   confirmação de envio reenfileirava a própria visita, num loop);
 // - google_agenda_shared é invisível para o app (só service_role);
 // - my_google_agenda_status() passa a trazer shared_ok/shared_error.
-const M057 = fs.readFileSync(new URL('../supabase/migrations/057_google_agenda.sql', import.meta.url), 'utf8');
-const M081 = fs.readFileSync(new URL('../supabase/migrations/081_agenda_compartilhada.sql', import.meta.url), 'utf8');
+const M057 = fs.readFileSync(
+  new URL('../supabase/migrations/057_google_agenda.sql', import.meta.url),
+  'utf8'
+);
+const M081 = fs.readFileSync(
+  new URL('../supabase/migrations/081_agenda_compartilhada.sql', import.meta.url),
+  'utf8'
+);
 
 let db;
-const fila = async () => (await db.query('SELECT visit_id FROM google_agenda_queue ORDER BY seq')).rows;
+const fila = async () =>
+  (await db.query('SELECT visit_id FROM google_agenda_queue ORDER BY seq')).rows;
 
 beforeAll(async () => {
   db = new PGlite();
@@ -43,23 +50,35 @@ beforeEach(async () => {
 
 describe('081: agenda compartilhada', () => {
   it('gravar só google_hash_shared não entra na fila (sem loop)', async () => {
-    await db.exec(`INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-1', 'OP-1', '2026-10-20', 'agendada')`);
+    await db.exec(
+      `INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-1', 'OP-1', '2026-10-20', 'agendada')`
+    );
     await db.exec('DELETE FROM google_agenda_queue');
-    await db.exec(`UPDATE visits SET google_hash_shared = 'abc', updated_at = now() WHERE id = 'VIS-1'`);
+    await db.exec(
+      `UPDATE visits SET google_hash_shared = 'abc', updated_at = now() WHERE id = 'VIS-1'`
+    );
     expect(await fila()).toEqual([]);
   });
 
   it('mudança de verdade continua entrando na fila', async () => {
-    await db.exec(`INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-2', 'OP-1', '2026-10-20', 'agendada')`);
+    await db.exec(
+      `INSERT INTO visits (id, operator_id, date, status) VALUES ('VIS-2', 'OP-1', '2026-10-20', 'agendada')`
+    );
     await db.exec('DELETE FROM google_agenda_queue');
-    await db.exec(`UPDATE visits SET "time" = '10:00', google_hash_shared = 'abc' WHERE id = 'VIS-2'`);
+    await db.exec(
+      `UPDATE visits SET "time" = '10:00', google_hash_shared = 'abc' WHERE id = 'VIS-2'`
+    );
     expect(await fila()).toEqual([{ visit_id: 'VIS-2' }]);
   });
 
   it('app não lê google_agenda_shared; o estado vem pela RPC', async () => {
-    const g = await db.query(`SELECT has_table_privilege('authenticated', 'google_agenda_shared', 'SELECT') AS ok`);
+    const g = await db.query(
+      `SELECT has_table_privilege('authenticated', 'google_agenda_shared', 'SELECT') AS ok`
+    );
     expect(g.rows[0].ok).toBe(false);
-    await db.exec(`INSERT INTO google_agenda_shared (calendar_id, ok, last_error) VALUES ('c_x@group.calendar.google.com', false, 'Agenda não compartilhada')`);
+    await db.exec(
+      `INSERT INTO google_agenda_shared (calendar_id, ok, last_error) VALUES ('c_x@group.calendar.google.com', false, 'Agenda não compartilhada')`
+    );
     await db.exec(`SET request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000a1'`);
     const ana = (await db.query('SELECT my_google_agenda_status() AS s')).rows[0].s;
     expect(ana).toMatchObject({ shared_ok: false, shared_error: 'Agenda não compartilhada' });

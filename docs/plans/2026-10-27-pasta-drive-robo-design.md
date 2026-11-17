@@ -102,7 +102,7 @@ roboNoite (2h, gatilho existente)
   `candidatos` = `google_sheet_url` preenchido **e** `drive_folder_url` nulo;
   `vigiar` = `drive_folder_url` preenchido, com o ID já extraído e validado
   pelo parser de servidor. URL guardada que não parseia → `status='invalido'`
-  + `checked_at` na própria fase plano, não vai ao Google.
+  - `checked_at` na própria fase plano, não vai ao Google.
 - **Parser de servidor = espelho exato do `parseDriveFolderId` de
   `origin/main`** (pós-PR #59: canônica, sem esquema, host em maiúsculas,
   `/u/<n>/`, `open?id=` e ID cru ≥15, com a mesma recusa de aspa/espaço —
@@ -118,7 +118,7 @@ roboNoite (2h, gatilho existente)
   (parser + `client_id` tinha de estar na lista enviada — defesa em
   profundidade, mesmo com secret), grava:
   - achado: `update {drive_folder_url, status:'ok', checked_at}
-    .eq('id', x).is('drive_folder_url', null)` — **o `.is(..., null)` é a
+.eq('id', x).is('drive_folder_url', null)` — **o `.is(..., null)` é a
     trava que impede sobrescrever vínculo humano** (corrida com quem vincula
     às 2h);
   - teste: `update {status, checked_at}` agrupado por status (`ok` /
@@ -146,12 +146,12 @@ offline o selo simplesmente não aparece (sem mentira).
 Em `renderClientDriveSection` (`js/clients-form.js`), depois do botão "📁
 Abrir pasta", em `#cliDriveActions`:
 
-| `drive_folder_status` | Mostra |
-| --- | --- |
-| nula / sem `drive_folder_url` | nada (o botão já some sem URL) |
-| `'ok'` | ✅ "verificada em dd/mm" (da `checked_at`) |
-| `'inacessivel'` | ⚠️ "pasta apagada ou sem acesso para o robô" |
-| `'invalido'` | ⚠️ "link não é uma pasta do Drive" |
+| `drive_folder_status`         | Mostra                                       |
+| ----------------------------- | -------------------------------------------- |
+| nula / sem `drive_folder_url` | nada (o botão já some sem URL)               |
+| `'ok'`                        | ✅ "verificada em dd/mm" (da `checked_at`)   |
+| `'inacessivel'`               | ⚠️ "pasta apagada ou sem acesso para o robô" |
+| `'invalido'`                  | ⚠️ "link não é uma pasta do Drive"           |
 
 Texto visível por `escapeHtml`; sem atributo novo com dado cru. Erro da query
 → sem selo. Qualquer um que vê o cliente vê o selo (escopo de equipe, mesma
@@ -197,38 +197,38 @@ regra da coluna).
 
 ### Inputs
 
-| Input | Tipo | Obrigatório | Restrições | Padrão |
-| --- | --- | --- | --- | --- |
-| `action:'pastas'` (sem corpo) | POST + `x-agenda-secret` | — | — | devolve o plano |
-| `action:'pastas-resultado', achados[]` | `{client_id, folder_url}` | — | `folder_url` revalidada no servidor; `client_id` tinha de estar em `candidatos` | ignorado se fora do plano |
-| `... , testes[]` | `{client_id, status:'ok'\|'inacessivel'}` | — | idem, tinha de estar em `vigiar` | ignorado se fora do plano |
-| `... , erros[]` | `{client_id, fase, detalhe}` | — | só log | — |
+| Input                                  | Tipo                                      | Obrigatório | Restrições                                                                      | Padrão                    |
+| -------------------------------------- | ----------------------------------------- | ----------- | ------------------------------------------------------------------------------- | ------------------------- |
+| `action:'pastas'` (sem corpo)          | POST + `x-agenda-secret`                  | —           | —                                                                               | devolve o plano           |
+| `action:'pastas-resultado', achados[]` | `{client_id, folder_url}`                 | —           | `folder_url` revalidada no servidor; `client_id` tinha de estar em `candidatos` | ignorado se fora do plano |
+| `... , testes[]`                       | `{client_id, status:'ok'\|'inacessivel'}` | —           | idem, tinha de estar em `vigiar`                                                | ignorado se fora do plano |
+| `... , erros[]`                        | `{client_id, fase, detalhe}`              | —           | só log                                                                          | —                         |
 
 ### Outputs
 
-| Caso | Resultado |
-| --- | --- |
-| fase plano | `{ candidatos:[...], vigiar:[...] }` (vazios é caso normal) |
-| fase gravação | `{ gravados:n, atualizados:n }` |
-| URL guardada de `vigiar` não parseia | `status='invalido'` + `checked_at`, sem ida ao Google |
-| Drive: existe, fora da lixeira | `status='ok'` |
-| Drive: apagada, lixeira ou sem acesso | `status='inacessivel'` (o Drive não distingue os três — ver Sources) |
-| banco sem 069 | log de instrução, `gravados/atualizados=0`, exito da rodada preservado |
+| Caso                                  | Resultado                                                              |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| fase plano                            | `{ candidatos:[...], vigiar:[...] }` (vazios é caso normal)            |
+| fase gravação                         | `{ gravados:n, atualizados:n }`                                        |
+| URL guardada de `vigiar` não parseia  | `status='invalido'` + `checked_at`, sem ida ao Google                  |
+| Drive: existe, fora da lixeira        | `status='ok'`                                                          |
+| Drive: apagada, lixeira ou sem acesso | `status='inacessivel'` (o Drive não distingue os três — ver Sources)   |
+| banco sem 069                         | log de instrução, `gravados/atualizados=0`, exito da rodada preservado |
 
 ### Edge cases
 
-| Caso | Comportamento esperado |
-| --- | --- |
-| Planilha sem pai (Minha unidade de alguém) | `erros` com `fase:'sem-pasta'`, sem gravação |
-| Planilha com vários pais (herança) | primeiro pai não-lixeira |
-| Planilha apagada/inacessível para o robô | `erros` com `fase:'planilha'` |
-| Raiz não compartilhada com o robô | todos os itens em `erros`, log dirá — instalação incompleta |
-| Cliente ganha vínculo humano entre plano e gravação | `.is('drive_folder_url', null)` não sobrescreve |
-| `candidatos` e `vigiar` vazios | robô nem chama a fase de gravação |
-| Robô devolve `client_id` que não foi enviado | ignorado e logado |
-| Sync do app ecoar status velho | próxima madrugada o `testes` sobrescreve todos |
+| Caso                                                       | Comportamento esperado                                                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Planilha sem pai (Minha unidade de alguém)                 | `erros` com `fase:'sem-pasta'`, sem gravação                                                                   |
+| Planilha com vários pais (herança)                         | primeiro pai não-lixeira                                                                                       |
+| Planilha apagada/inacessível para o robô                   | `erros` com `fase:'planilha'`                                                                                  |
+| Raiz não compartilhada com o robô                          | todos os itens em `erros`, log dirá — instalação incompleta                                                    |
+| Cliente ganha vínculo humano entre plano e gravação        | `.is('drive_folder_url', null)` não sobrescreve                                                                |
+| `candidatos` e `vigiar` vazios                             | robô nem chama a fase de gravação                                                                              |
+| Robô devolve `client_id` que não foi enviado               | ignorado e logado                                                                                              |
+| Sync do app ecoar status velho                             | próxima madrugada o `testes` sobrescreve todos                                                                 |
 | URL com aspa/espaço logo após o ID (`...<ID>"onmouseover`) | parser de servidor recusa → `invalido` (SEC-18); na `?query` é aceita, pois a URL gravada é remontada só do ID |
-| CRLF do arquivo de teste no Windows | teste de texto normaliza `\r\n` (`tests/rls-055.test.js`) |
+| CRLF do arquivo de teste no Windows                        | teste de texto normaliza `\r\n` (`tests/rls-055.test.js`)                                                      |
 
 ### Acceptance criteria
 

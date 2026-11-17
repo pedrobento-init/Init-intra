@@ -7,9 +7,12 @@ import vm from 'node:vm';
 // ── Sandbox com stubs de browser; ui.js + pendencias.js rodam no MESMO
 // contexto VM para que os `const` (STATUS_PEN_MAP etc.) sejam visíveis ──────
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const sandbox = {

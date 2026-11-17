@@ -37,44 +37,97 @@
 // BACKUP: sem segredos (token Milvus do cliente, PIN dos operadores) e sem
 // as tabelas de credenciais/sincronização.
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
-import { type Operator, todayBR } from "../avisos-prazo/avisos.ts";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+import { type SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.16';
+import { type Operator, todayBR } from '../avisos-prazo/avisos.ts';
 import {
-  dominioDe, type Dominio, expiracaoRdap, type Hora, montarIndicadores, montarResumos, type Pend,
-  resumoChat, type Venc, vencimentoEvento, type Visita,
-} from "./relatorios.ts";
+  dominioDe,
+  type Dominio,
+  expiracaoRdap,
+  type Hora,
+  montarIndicadores,
+  montarResumos,
+  type Pend,
+  resumoChat,
+  type Venc,
+  vencimentoEvento,
+  type Visita,
+} from './relatorios.ts';
 import {
-  aplicarEmail, backupAlerta, briefingDados, briefingHtml, briefingTemConteudo, briefingTexto, classificarBackup,
-  type Cliente, clienteDoEmail, corpoLimpo, type Device, dominiosInternos, type EmailBackup, type EmailEntrada,
-  enderecoDoRemetente, entradaDaCaixa, gravarResultadoPastas, marcarPastasInvalidas, type ClientePasta, planoPastas,
-  conversaDoEmail, type Monitor, monitorDoEmail, notaDoSolicitante, type OpcoesDaCaixa, pendenciaDaTriagem, pendenciaDoAlerta,
-  remetenteInterno, respostaAutomatica, resumoDaRodada, textoDaIa, triagemDaIa, type Remetente,
-} from "./campo.ts";
+  aplicarEmail,
+  backupAlerta,
+  briefingDados,
+  briefingHtml,
+  briefingTemConteudo,
+  briefingTexto,
+  classificarBackup,
+  type Cliente,
+  clienteDoEmail,
+  corpoLimpo,
+  type Device,
+  dominiosInternos,
+  type EmailBackup,
+  type EmailEntrada,
+  enderecoDoRemetente,
+  entradaDaCaixa,
+  gravarResultadoPastas,
+  marcarPastasInvalidas,
+  type ClientePasta,
+  planoPastas,
+  conversaDoEmail,
+  type Monitor,
+  monitorDoEmail,
+  notaDoSolicitante,
+  type OpcoesDaCaixa,
+  pendenciaDaTriagem,
+  pendenciaDoAlerta,
+  remetenteInterno,
+  respostaAutomatica,
+  resumoDaRodada,
+  textoDaIa,
+  triagemDaIa,
+  type Remetente,
+} from './campo.ts';
 
-const SECRET = Deno.env.get("AGENDA_SYNC_SECRET") ?? "";
-const APP_URL = (Deno.env.get("APP_URL") ?? "").replace(/\/$/, "");
-const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
-const GMAIL_APP_PASSWORD = (Deno.env.get("GMAIL_APP_PASSWORD") ?? "").replace(/\s+/g, "");
-const GMAIL_FROM = Deno.env.get("GMAIL_FROM") || GMAIL_USER;
+const SECRET = Deno.env.get('AGENDA_SYNC_SECRET') ?? '';
+const APP_URL = (Deno.env.get('APP_URL') ?? '').replace(/\/$/, '');
+const GMAIL_USER = Deno.env.get('GMAIL_USER') ?? '';
+const GMAIL_APP_PASSWORD = (Deno.env.get('GMAIL_APP_PASSWORD') ?? '').replace(/\s+/g, '');
+const GMAIL_FROM = Deno.env.get('GMAIL_FROM') || GMAIL_USER;
 // Cenário único do Make (GOOGLE-AGENDA.md → "IA pelo Make"): o campo "tarefa"
 // escolhe a rota. "briefing" devolve o parágrafo da visita; sem ele, o briefing
 // sai só com os fatos. "triagem" devolve a classificação do e-mail; sem ela, a
 // pendência abre com o texto do próprio e-mail.
-const IA_WEBHOOK_URL = Deno.env.get("IA_WEBHOOK_URL") ?? "";
+const IA_WEBHOOK_URL = Deno.env.get('IA_WEBHOOK_URL') ?? '';
 
 // Tabela → colunas tiradas do backup (segredos).
 const BACKUP: Record<string, string[]> = {
-  clients: ["milvus_client_token"],
-  operators: ["pin_hash", "pin_salt"],
-  pendencias: [], visits: [], vencimentos: [], time_entries: [], procedures: [], procedure_templates: [],
-  reunioes: [], equipamentos: [], checklists: [], checklist_modelo_itens: [], checklist_marcacoes: [],
-  client_devices: [], client_milvus_tickets: [], milvus_client_map: [], levar_regras: [], audit_logs: [],
+  clients: ['milvus_client_token'],
+  operators: ['pin_hash', 'pin_salt'],
+  pendencias: [],
+  visits: [],
+  vencimentos: [],
+  time_entries: [],
+  procedures: [],
+  procedure_templates: [],
+  reunioes: [],
+  equipamentos: [],
+  checklists: [],
+  checklist_modelo_itens: [],
+  checklist_marcacoes: [],
+  client_devices: [],
+  client_milvus_tickets: [],
+  milvus_client_map: [],
+  levar_regras: [],
+  audit_logs: [],
 };
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 function safeEqual(a: string, b: string) {
@@ -84,10 +137,18 @@ function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-async function all<T>(db: SupabaseClient, table: string, cols = "*", filter?: (q: any) => any): Promise<T[]> {
+async function all<T>(
+  db: SupabaseClient,
+  table: string,
+  cols = '*',
+  filter?: (q: any) => any
+): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; ; from += 1000) {
-    let q = db.from(table).select(cols).range(from, from + 999);
+    let q = db
+      .from(table)
+      .select(cols)
+      .range(from, from + 999);
     if (filter) q = filter(q);
     const { data, error } = await q;
     if (error) throw new Error(`${table}: ${error.message}`);
@@ -96,46 +157,66 @@ async function all<T>(db: SupabaseClient, table: string, cols = "*", filter?: (q
   }
 }
 
-const OPS_COLS = "id, name, email, active, is_admin, is_gestao";
-const VIS_COLS = "id, numero, client_id, client_name, operator, operator_id, date, time, time_end, all_day, motivo, status, levar";
-const PEN_COLS = "id, assunto, descricao, client_name, responsible, responsible_id, priority, status, tipo, deadline, categoria, canal, created_at, completed_at, first_response_due, first_response_at";
-const VENC_COLS = "id, tipo, descricao, client_name, data_vencimento, responsavel, responsavel_id, renovacao_auto, status, observacoes";
+const OPS_COLS = 'id, name, email, active, is_admin, is_gestao';
+const VIS_COLS =
+  'id, numero, client_id, client_name, operator, operator_id, date, time, time_end, all_day, motivo, status, levar';
+const PEN_COLS =
+  'id, assunto, descricao, client_name, responsible, responsible_id, priority, status, tipo, deadline, categoria, canal, created_at, completed_at, first_response_due, first_response_at';
+const VENC_COLS =
+  'id, tipo, descricao, client_name, data_vencimento, responsavel, responsavel_id, renovacao_auto, status, observacoes';
 
 async function vencimentos(db: SupabaseClient) {
   const [ops, vencs] = await Promise.all([
-    all<Operator>(db, "operators", OPS_COLS),
-    all<Venc>(db, "vencimentos", VENC_COLS, (q) => q.neq("status", "encerrado")),
+    all<Operator>(db, 'operators', OPS_COLS),
+    all<Venc>(db, 'vencimentos', VENC_COLS, (q) => q.neq('status', 'encerrado')),
   ]);
   return json({
-    calendario: "Vencimentos Init",
-    leitores: ops.filter((o) => o.active !== false && o.email).map((o) => o.email!.trim().toLowerCase()),
-    eventos: vencs.filter((v) => /^\d{4}-\d{2}-\d{2}/.test(String(v.data_vencimento || ""))).map((v) => vencimentoEvento(v, APP_URL)),
+    calendario: 'Vencimentos Init',
+    leitores: ops
+      .filter((o) => o.active !== false && o.email)
+      .map((o) => o.email!.trim().toLowerCase()),
+    eventos: vencs
+      .filter((v) => /^\d{4}-\d{2}-\d{2}/.test(String(v.data_vencimento || '')))
+      .map((v) => vencimentoEvento(v, APP_URL)),
   });
 }
 
 async function dominios(db: SupabaseClient) {
-  const vencs = await all<Venc>(db, "vencimentos", VENC_COLS, (q) => q.eq("tipo", "dominio").neq("status", "encerrado"));
+  const vencs = await all<Venc>(db, 'vencimentos', VENC_COLS, (q) =>
+    q.eq('tipo', 'dominio').neq('status', 'encerrado')
+  );
   const out: Dominio[] = [];
   for (const v of vencs) {
     const dominio = dominioDe(v);
-    let expira: string | null = null, erro: string | null = null;
+    let expira: string | null = null,
+      erro: string | null = null;
     if (!dominio) {
-      erro = "Domínio não encontrado na descrição (ex.: escreva cliente.com.br)";
+      erro = 'Domínio não encontrado na descrição (ex.: escreva cliente.com.br)';
     } else {
       try {
         // rdap.org encaminha para o registro certo (.br → registro.br).
-        const res = await fetch("https://rdap.org/domain/" + encodeURIComponent(dominio), {
-          headers: { Accept: "application/rdap+json" }, signal: AbortSignal.timeout(10000),
+        const res = await fetch('https://rdap.org/domain/' + encodeURIComponent(dominio), {
+          headers: { Accept: 'application/rdap+json' },
+          signal: AbortSignal.timeout(10000),
         });
-        if (res.status === 404) erro = "Domínio não encontrado no registro";
-        else if (!res.ok) erro = "Registro respondeu " + res.status;
-        else { expira = expiracaoRdap(await res.json()); if (!expira) erro = "Registro não informa a expiração"; }
+        if (res.status === 404) erro = 'Domínio não encontrado no registro';
+        else if (!res.ok) erro = 'Registro respondeu ' + res.status;
+        else {
+          expira = expiracaoRdap(await res.json());
+          if (!expira) erro = 'Registro não informa a expiração';
+        }
       } catch (e) {
-        erro = "Falha ao consultar: " + String((e as Error).message).slice(0, 120);
+        erro = 'Falha ao consultar: ' + String((e as Error).message).slice(0, 120);
       }
     }
-    const row = { vencimento_id: v.id, dominio: dominio || "", expira_registro: expira, erro, verificado_em: new Date().toISOString() };
-    await db.from("vencimento_dominios").upsert(row);
+    const row = {
+      vencimento_id: v.id,
+      dominio: dominio || '',
+      expira_registro: expira,
+      erro,
+      verificado_em: new Date().toISOString(),
+    };
+    await db.from('vencimento_dominios').upsert(row);
     out.push(row);
   }
   return json({ success: true, verificados: out.length, dominios: out });
@@ -144,91 +225,180 @@ async function dominios(db: SupabaseClient) {
 async function resumo(db: SupabaseClient, input: { enviar?: unknown }) {
   const today = todayBR();
   const [ops, visitas, pendencias, vencs, doms] = await Promise.all([
-    all<Operator>(db, "operators", OPS_COLS),
-    all<Visita>(db, "visits", VIS_COLS, (q) => q.eq("date", today)),
-    all<Pend>(db, "pendencias", PEN_COLS, (q) => q.lte("deadline", today)),
-    all<Venc>(db, "vencimentos", VENC_COLS, (q) => q.neq("status", "encerrado")),
-    all<Dominio>(db, "vencimento_dominios", "vencimento_id, dominio, expira_registro, erro").catch(() => [] as Dominio[]),
+    all<Operator>(db, 'operators', OPS_COLS),
+    all<Visita>(db, 'visits', VIS_COLS, (q) => q.eq('date', today)),
+    all<Pend>(db, 'pendencias', PEN_COLS, (q) => q.lte('deadline', today)),
+    all<Venc>(db, 'vencimentos', VENC_COLS, (q) => q.neq('status', 'encerrado')),
+    all<Dominio>(db, 'vencimento_dominios', 'vencimento_id, dominio, expira_registro, erro').catch(
+      () => [] as Dominio[]
+    ),
   ]);
   const chat = resumoChat({ today, ops, visitas, pendencias, vencimentos: vencs });
   if (input.enviar === false) return json({ success: true, enviados: 0, chat });
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return json({ error: "Gmail não configurado (GMAIL_USER/GMAIL_APP_PASSWORD)" }, 500);
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD)
+    return json({ error: 'Gmail não configurado (GMAIL_USER/GMAIL_APP_PASSWORD)' }, 500);
 
-  const briefings = await montarBriefings(db, today, visitas.filter((v) => v.status !== "cancelada"), vencs).catch((e) => {
-    console.error("robo briefing:", (e as Error).message);  // briefing é extra: o resumo sai sem ele
+  const briefings = await montarBriefings(
+    db,
+    today,
+    visitas.filter((v) => v.status !== 'cancelada'),
+    vencs
+  ).catch((e) => {
+    console.error('robo briefing:', (e as Error).message); // briefing é extra: o resumo sai sem ele
     return new Map<string, string>();
   });
-  const cliIds = [...new Set(visitas.map((v) => (v as VisitaHoje).client_id).filter(Boolean))] as string[];
-  const clis = cliIds.length ? await all<{ id: string; name: string; address: string | null }>(db, "clients", "id, name, address", (q) => q.in("id", cliIds)).catch(() => []) : [];
-  const paradas = new Map(visitas.map((v) => {
-    const c = clis.find((x) => x.id === (v as VisitaHoje).client_id);
-    return [v.id, (c && String(c.address || "").trim()) || (c && c.name) || v.client_name || ""] as [string, string];
-  }));
-  const fimDeSemana = [0, 6].includes(new Date(today + "T12:00:00Z").getUTCDay());
-  const resumos = montarResumos({ today, ops, visitas, pendencias, vencimentos: vencs, dominios: doms, appUrl: APP_URL, briefings, paradas })
-    .filter((r) => !r.vazio && (!fimDeSemana || r.visitasHoje > 0));
+  const cliIds = [
+    ...new Set(visitas.map((v) => (v as VisitaHoje).client_id).filter(Boolean)),
+  ] as string[];
+  const clis = cliIds.length
+    ? await all<{ id: string; name: string; address: string | null }>(
+        db,
+        'clients',
+        'id, name, address',
+        (q) => q.in('id', cliIds)
+      ).catch(() => [])
+    : [];
+  const paradas = new Map(
+    visitas.map((v) => {
+      const c = clis.find((x) => x.id === (v as VisitaHoje).client_id);
+      return [
+        v.id,
+        (c && String(c.address || '').trim()) || (c && c.name) || v.client_name || '',
+      ] as [string, string];
+    })
+  );
+  const fimDeSemana = [0, 6].includes(new Date(today + 'T12:00:00Z').getUTCDay());
+  const resumos = montarResumos({
+    today,
+    ops,
+    visitas,
+    pendencias,
+    vencimentos: vencs,
+    dominios: doms,
+    appUrl: APP_URL,
+    briefings,
+    paradas,
+  }).filter((r) => !r.vazio && (!fimDeSemana || r.visitasHoje > 0));
   const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com", port: 465, secure: true, auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
   });
   let enviados = 0;
   const falhas: string[] = [];
   try {
     for (const r of resumos) {
       const key = `resumo:${today}:${r.op.id}`;
-      const { error } = await db.from("avisos_enviados").insert({ key });
-      if (error) { if (error.code === "23505") continue; throw new Error("avisos_enviados: " + error.message); }
+      const { error } = await db.from('avisos_enviados').insert({ key });
+      if (error) {
+        if (error.code === '23505') continue;
+        throw new Error('avisos_enviados: ' + error.message);
+      }
       try {
-        await transporter.sendMail({ from: { name: "Init Intra", address: GMAIL_FROM }, to: r.op.email!, subject: r.subject, html: r.html });
+        await transporter.sendMail({
+          from: { name: 'Init Intra', address: GMAIL_FROM },
+          to: r.op.email!,
+          subject: r.subject,
+          html: r.html,
+        });
         enviados++;
       } catch (e) {
-        await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo na próxima chamada
+        await db.from('avisos_enviados').delete().eq('key', key); // tenta de novo na próxima chamada
         falhas.push(`${r.op.id}: ${(e as Error).message}`);
       }
     }
   } finally {
     transporter.close();
   }
-  if (falhas.length) console.error("robo resumo falhas:", falhas);
+  if (falhas.length) console.error('robo resumo falhas:', falhas);
   return json({ success: true, enviados, falhas: falhas.length, chat });
 }
 
-type VisitaHoje = Visita & { client_id?: string | null; observacoes?: string | null; briefing_ia?: string | null; briefing_em?: string | null };
+type VisitaHoje = Visita & {
+  client_id?: string | null;
+  observacoes?: string | null;
+  briefing_ia?: string | null;
+  briefing_em?: string | null;
+};
 
 /** Briefing de cada visita de hoje (fatos + IA do Make, uma vez por dia). */
-async function montarBriefings(db: SupabaseClient, today: string, visitas: Visita[], vencs: Venc[]) {
+async function montarBriefings(
+  db: SupabaseClient,
+  today: string,
+  visitas: Visita[],
+  vencs: Venc[]
+) {
   const out = new Map<string, string>();
   const ids = visitas.map((v) => v.id);
   if (!ids.length) return out;
-  const { data: hoje, error } = await db.from("visits").select(VIS_COLS + ", observacoes, briefing_ia, briefing_em").in("id", ids);
-  if (error) throw new Error("visits: " + error.message);
-  const clientes = [...new Set((hoje || []).map((v: VisitaHoje) => v.client_id).filter(Boolean))] as string[];
+  const { data: hoje, error } = await db
+    .from('visits')
+    .select(VIS_COLS + ', observacoes, briefing_ia, briefing_em')
+    .in('id', ids);
+  if (error) throw new Error('visits: ' + error.message);
+  const clientes = [
+    ...new Set((hoje || []).map((v: VisitaHoje) => v.client_id).filter(Boolean)),
+  ] as string[];
   if (!clientes.length) return out;
   const [hist, pends, devs, mons] = await Promise.all([
-    all<Visita & { client_id: string; relatorio: string }>(db, "visits", "id, client_id, date, motivo, status, relatorio", (q) => q.in("client_id", clientes).eq("status", "concluida")),
-    all<Pend & { client_id: string }>(db, "pendencias", PEN_COLS + ", client_id", (q) => q.in("client_id", clientes)),
-    all<Device & { client_id: string }>(db, "client_devices", "client_id, hostname, apelido, is_ativo, data_ultima_atualizacao, updated_at", (q) => q.in("client_id", clientes)),
-    all<Monitor>(db, "backup_monitores", "*", (q) => q.in("client_id", clientes)).catch(() => [] as Monitor[]),
+    all<Visita & { client_id: string; relatorio: string }>(
+      db,
+      'visits',
+      'id, client_id, date, motivo, status, relatorio',
+      (q) => q.in('client_id', clientes).eq('status', 'concluida')
+    ),
+    all<Pend & { client_id: string }>(db, 'pendencias', PEN_COLS + ', client_id', (q) =>
+      q.in('client_id', clientes)
+    ),
+    all<Device & { client_id: string }>(
+      db,
+      'client_devices',
+      'client_id, hostname, apelido, is_ativo, data_ultima_atualizacao, updated_at',
+      (q) => q.in('client_id', clientes)
+    ),
+    all<Monitor>(db, 'backup_monitores', '*', (q) => q.in('client_id', clientes)).catch(
+      () => [] as Monitor[]
+    ),
   ]);
-  const vencCli = await all<Venc & { client_id: string }>(db, "vencimentos", VENC_COLS + ", client_id", (q) => q.in("client_id", clientes).neq("status", "encerrado"))
-    .catch(() => vencs as (Venc & { client_id: string })[]);
+  const vencCli = await all<Venc & { client_id: string }>(
+    db,
+    'vencimentos',
+    VENC_COLS + ', client_id',
+    (q) => q.in('client_id', clientes).neq('status', 'encerrado')
+  ).catch(() => vencs as (Venc & { client_id: string })[]);
   for (const v of (hoje || []) as VisitaHoje[]) {
     const c = v.client_id;
     if (!c) continue;
     const dados = briefingDados(v, {
-      today, visitas: hist.filter((x) => x.client_id === c), pendencias: pends.filter((x) => x.client_id === c),
-      vencimentos: vencCli.filter((x) => x.client_id === c), devices: devs.filter((x) => x.client_id === c),
+      today,
+      visitas: hist.filter((x) => x.client_id === c),
+      pendencias: pends.filter((x) => x.client_id === c),
+      vencimentos: vencCli.filter((x) => x.client_id === c),
+      devices: devs.filter((x) => x.client_id === c),
       monitores: mons.filter((x) => x.client_id === c),
     });
     if (!briefingTemConteudo(dados)) continue;
-    let ia = v.briefing_em && String(v.briefing_em).slice(0, 10) === today ? v.briefing_ia || null : null;
+    let ia =
+      v.briefing_em && String(v.briefing_em).slice(0, 10) === today ? v.briefing_ia || null : null;
     if (!ia && IA_WEBHOOK_URL) {
       try {
         const res = await fetch(IA_WEBHOOK_URL, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tarefa: "briefing", visita_id: v.id, contexto: briefingTexto(dados) }), signal: AbortSignal.timeout(25000),
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tarefa: 'briefing',
+            visita_id: v.id,
+            contexto: briefingTexto(dados),
+          }),
+          signal: AbortSignal.timeout(25000),
         });
         ia = res.ok ? textoDaIa(await res.text()) : null;
-        if (ia) await db.from("visits").update({ briefing_ia: ia, briefing_em: new Date().toISOString() }).eq("id", v.id);
+        if (ia)
+          await db
+            .from('visits')
+            .update({ briefing_ia: ia, briefing_em: new Date().toISOString() })
+            .eq('id', v.id);
       } catch (e) {
         console.error(`robo briefing IA ${v.id}:`, (e as Error).message);
       }
@@ -240,15 +410,22 @@ async function montarBriefings(db: SupabaseClient, today: string, visitas: Visit
 
 /** E-mails que o Apps Script mandou, do mais antigo para o mais novo. */
 function emailsDaEntrada(input: { mensagens?: unknown }, max: number): EmailBackup[] {
-  return (Array.isArray(input.mensagens) ? input.mensagens : []).slice(0, max)
-    .filter((m): m is EmailBackup => !!m && typeof m.id === "string" && typeof m.assunto === "string" && !isNaN(Date.parse(m.data)))
-    .map((m) => ({ ...m, de: String(m.de || ""), trecho: String(m.trecho || "").slice(0, 2000) }))
+  return (Array.isArray(input.mensagens) ? input.mensagens : [])
+    .slice(0, max)
+    .filter(
+      (m): m is EmailBackup =>
+        !!m &&
+        typeof m.id === 'string' &&
+        typeof m.assunto === 'string' &&
+        !isNaN(Date.parse(m.data))
+    )
+    .map((m) => ({ ...m, de: String(m.de || ''), trecho: String(m.trecho || '').slice(0, 2000) }))
     .sort((a, b) => a.data.localeCompare(b.data));
 }
 
 async function backups(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 500);
-  const mons = new Map((await all<Monitor>(db, "backup_monitores", "*")).map((m) => [m.id, m]));
+  const mons = new Map((await all<Monitor>(db, 'backup_monitores', '*')).map((m) => [m.id, m]));
   const mudou = new Set<string>();
   let casadas = 0;
   for (const e of msgs) {
@@ -264,54 +441,70 @@ async function backups(db: SupabaseClient, input: { mensagens?: unknown }) {
   const agora = new Date();
   const abertas = [...mons.values()].map((m) => m.pendencia_id).filter(Boolean) as string[];
   const { data: pens } = abertas.length
-    ? await db.from("pendencias").select("id, status").in("id", abertas)
+    ? await db.from('pendencias').select('id, status').in('id', abertas)
     : { data: [] as { id: string; status: string }[] };
   const fechada = (id: string) => {
     const p = (pens || []).find((x) => x.id === id);
-    return !p || ["concluido", "resolvido", "cancelado", "fechado"].includes(String(p.status));
+    return !p || ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(String(p.status));
   };
   let alertas = 0;
   for (const m of mons.values()) {
     const a = backupAlerta(m, agora);
     if (!a || (m.pendencia_id && !fechada(m.pendencia_id))) continue;
-    const pen = pendenciaDoAlerta(m, a, "PEN-" + crypto.randomUUID(), agora);
-    const { error } = await db.from("pendencias").insert(pen);
-    if (error) { console.error(`robo backup pendência ${m.id}:`, error.message); continue; }
+    const pen = pendenciaDoAlerta(m, a, 'PEN-' + crypto.randomUUID(), agora);
+    const { error } = await db.from('pendencias').insert(pen);
+    if (error) {
+      console.error(`robo backup pendência ${m.id}:`, error.message);
+      continue;
+    }
     m.pendencia_id = pen.id;
     mudou.add(m.id);
     alertas++;
   }
   for (const id of mudou) {
     const m = mons.get(id)!;
-    await db.from("backup_monitores").update({
-      ultimo_status: m.ultimo_status, ultimo_em: m.ultimo_em, ultimo_assunto: m.ultimo_assunto,
-      historico: m.historico || [], pendencia_id: m.pendencia_id, updated_at: agora.toISOString(),
-    }).eq("id", id);
+    await db
+      .from('backup_monitores')
+      .update({
+        ultimo_status: m.ultimo_status,
+        ultimo_em: m.ultimo_em,
+        ultimo_assunto: m.ultimo_assunto,
+        historico: m.historico || [],
+        pendencia_id: m.pendencia_id,
+        updated_at: agora.toISOString(),
+      })
+      .eq('id', id);
   }
   return json({ success: true, mensagens: msgs.length, casadas, alertas });
 }
 
 // Mesma lista de PEN_CLOSED_FOR_COUNT (campo.ts) e de isPendenciaClosed no app.
-const PEN_FECHADOS = ["concluido", "resolvido", "cancelado", "fechado"];
+const PEN_FECHADOS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 
 /** Classificação do e-mail pelo Make; falhou ou não tem webhook, devolve "" (vale o e-mail). */
 async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
-  if (!IA_WEBHOOK_URL) return "";
+  if (!IA_WEBHOOK_URL) return '';
   try {
     const res = await fetch(IA_WEBHOOK_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tarefa: "triagem", email_id: e.id, de: e.de, assunto: e.assunto, data: e.data,
+        tarefa: 'triagem',
+        email_id: e.id,
+        de: e.de,
+        assunto: e.assunto,
+        data: e.data,
         // Vai o corpo limpo, não o e-mail cru: a IA classifica o que a pessoa
         // escreveu agora, e a conversa citada deixa de passar pelo Make.
-        trecho: corpoLimpo(e.trecho || "").slice(0, 2000), cliente: c.name || "",
+        trecho: corpoLimpo(e.trecho || '').slice(0, 2000),
+        cliente: c.name || '',
       }),
       signal: AbortSignal.timeout(25000),
     });
-    return res.ok ? await res.text() : "";
+    return res.ok ? await res.text() : '';
   } catch (err) {
     console.error(`robo triagem IA ${e.id}:`, (err as Error).message);
-    return "";
+    return '';
   }
 }
 
@@ -324,21 +517,21 @@ async function classificarComIa(e: EmailEntrada, c: Cliente): Promise<string> {
  * banco, o erro volta aqui e a triagem segue abrindo chamado novo.
  */
 async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
-  const t = String(threadId || "").trim();
+  const t = String(threadId || '').trim();
   if (!t) return null;
-  const { data, error } = await db.from("pendencias")
-    .select("id, status, notes, solicitante_email, client_id, team")
-    .eq("email_thread_id", t)
-    .order("created_at", { ascending: false })
+  const { data, error } = await db
+    .from('pendencias')
+    .select('id, status, notes, solicitante_email, client_id, team')
+    .eq('email_thread_id', t)
+    .order('created_at', { ascending: false })
     .limit(10);
   if (error) {
-    console.error("robo triagem thread:", error.message);  // banco sem a 065
+    console.error('robo triagem thread:', error.message); // banco sem a 065
     return null;
   }
   const aberto = (data || []).find((p) => !PEN_FECHADOS.includes(String(p.status)));
   return aberto || null;
 }
-
 
 /**
  * Guarda na caixa de entrada (066 + 073) a mensagem externa, em TODOS os
@@ -364,39 +557,68 @@ async function chamadoDaConversa(db: SupabaseClient, threadId: string) {
 async function guardarEntrada(
   db: SupabaseClient,
   e: EmailEntrada,
-  opcoes: OpcoesDaCaixa,
+  opcoes: OpcoesDaCaixa
 ): Promise<boolean> {
-  const linha = entradaDaCaixa(e, opcoes, "ETR-" + crypto.randomUUID());
-  const { error } = await db.from("emails_triagem").insert(linha);
+  const linha = entradaDaCaixa(e, opcoes, 'ETR-' + crypto.randomUUID());
+  const { error } = await db.from('emails_triagem').insert(linha);
   if (!error) return true;
   // Já registrado: a rodada anterior gravou e caiu antes de seguir.
-  if (error.code === "23505") return true;
+  if (error.code === '23505') return true;
   console.error(`robo triagem caixa ${e.id} (a mensagem NÃO apareceu na caixa):`, error.message);
   return false;
 }
 
 async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
   const msgs = emailsDaEntrada(input, 100);
-  if (!msgs.length) return json({ success: true, mensagens: 0, abertas: 0, ignorados: 0, internos: 0, notas: 0, auto_respostas: 0, sem_cliente: [], caixa: 0, caixa_erros: 0 });
-  const clientes = await all<Cliente>(db, "clients", "id, name, team, technician, emails");
+  if (!msgs.length)
+    return json({
+      success: true,
+      mensagens: 0,
+      abertas: 0,
+      ignorados: 0,
+      internos: 0,
+      notas: 0,
+      auto_respostas: 0,
+      sem_cliente: [],
+      caixa: 0,
+      caixa_erros: 0,
+    });
+  const clientes = await all<Cliente>(db, 'clients', 'id, name, team, technician, emails');
   // Sem a migration 072 a tabela não existe: o robô segue casando só pela ficha.
-  const remetentes = await all<Remetente>(db, "clientes_remetentes", "remetente, tipo, client_id, team, updated_at").catch(() => [] as Remetente[]);
-  const abertas: string[] = [], semCliente: string[] = [];
+  const remetentes = await all<Remetente>(
+    db,
+    'clientes_remetentes',
+    'remetente, tipo, client_id, team, updated_at'
+  ).catch(() => [] as Remetente[]);
+  const abertas: string[] = [],
+    semCliente: string[] = [];
   const dominios = dominiosInternos(GMAIL_USER);
-  let ignorados = 0, internos = 0, notas_em_aberto = 0, auto_respostas = 0, caixa = 0, caixa_erros = 0;
+  let ignorados = 0,
+    internos = 0,
+    notas_em_aberto = 0,
+    auto_respostas = 0,
+    caixa = 0,
+    caixa_erros = 0;
   const naCaixa = async (e: EmailEntrada, opcoes: OpcoesDaCaixa) => {
-    if (await guardarEntrada(db, e, opcoes)) caixa++; else caixa_erros++;
+    if (await guardarEntrada(db, e, opcoes)) caixa++;
+    else caixa_erros++;
   };
   for (const e of msgs) {
     // O robô varre a CONVERSA inteira do rótulo: a nossa própria resposta ao
     // cliente chega aqui como mensagem nova. Ela não é pedido novo — abria um
     // chamado com o técnico como solicitante, e responder ali devolveria o
     // e-mail para a própria Init. Sai antes de tocar no banco.
-    if (remetenteInterno(e.de, dominios)) { internos++; continue; }
+    if (remetenteInterno(e.de, dominios)) {
+      internos++;
+      continue;
+    }
     // Uma pendência por mensagem, mesmo que o robô mande o e-mail duas vezes.
     const key = `triagem:${e.id}`;
-    const { error } = await db.from("avisos_enviados").insert({ key });
-    if (error) { if (error.code === "23505") continue; throw new Error("avisos_enviados: " + error.message); }
+    const { error } = await db.from('avisos_enviados').insert({ key });
+    if (error) {
+      if (error.code === '23505') continue;
+      throw new Error('avisos_enviados: ' + error.message);
+    }
     // Antes da conversa e da IA: auto-resposta na conversa de um chamado
     // virava nota do solicitante (e podia ecoar com a nossa resposta), e fora
     // dela gastava uma chamada ao Make para ser ignorada. Vai para a caixa,
@@ -404,7 +626,11 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
     if (respostaAutomatica(e)) {
       auto_respostas++;
       const dono = clienteDoEmail(clientes, e, remetentes);
-      await naCaixa(e, { motivo: "auto_resposta", clientId: dono?.id ?? null, team: dono?.team || "init" });
+      await naCaixa(e, {
+        motivo: 'auto_resposta',
+        clientId: dono?.id ?? null,
+        team: dono?.team || 'init',
+      });
       continue;
     }
     // Mensagem numa conversa que já abriu chamado: é a MESMA história, e um
@@ -422,21 +648,28 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       // A resposta da tela sai em cima da ÚLTIMA mensagem da conversa: sem
       // isto o In-Reply-To apontaria para o e-mail que abriu o chamado, lá
       // atrás, e alguns clientes de e-mail desgrudam a conversa.
-      const mid = String(e.message_id || "").trim().slice(0, 500);
+      const mid = String(e.message_id || '')
+        .trim()
+        .slice(0, 500);
       if (mid) patch.email_message_id = mid;
       // Chamado antigo pode não ter endereço (aberto antes da 064).
       if (!aberto.solicitante_email) {
         const end = enderecoDoRemetente(e.de);
         if (end) patch.solicitante_email = end;
       }
-      const { error: erroNota } = await db.from("pendencias").update(patch).eq("id", aberto.id);
+      const { error: erroNota } = await db.from('pendencias').update(patch).eq('id', aberto.id);
       if (erroNota) {
-        await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo depois
+        await db.from('avisos_enviados').delete().eq('key', key); // tenta de novo depois
         console.error(`robo triagem nota ${e.id}:`, erroNota.message);
         continue;
       }
       notas_em_aberto++;
-      await naCaixa(e, { status: "anexado", pendenciaId: aberto.id, clientId: aberto.client_id ?? null, team: aberto.team || "init" });
+      await naCaixa(e, {
+        status: 'anexado',
+        pendenciaId: aberto.id,
+        clientId: aberto.client_id ?? null,
+        team: aberto.team || 'init',
+      });
       continue;
     }
     const c = clienteDoEmail(clientes, e, remetentes);
@@ -445,8 +678,8 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       // assunto ia para um JSON que ninguém lê. Domínio fora da ficha e Gmail
       // pessoal (que nunca casa, de propósito) são pedido de cliente tanto
       // quanto os outros — agora ficam na caixa de triagem (066).
-      semCliente.push(String(e.assunto || "").slice(0, 80));
-      await naCaixa(e, { motivo: "sem_cliente" });
+      semCliente.push(String(e.assunto || '').slice(0, 80));
+      await naCaixa(e, { motivo: 'sem_cliente' });
       continue;
     }
     const t = triagemDaIa(await classificarComIa(e, c), e);
@@ -457,32 +690,54 @@ async function triagem(db: SupabaseClient, input: { mensagens?: unknown }) {
       ignorados++;
       // Com cliente na mão, a entrada nasce na equipe dele: senão a caixa da
       // mam/bt nunca veria o que a IA ignorou de um cliente da mam/bt.
-      await naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team });
+      await naCaixa(e, { motivo: 'ignorado_ia', clientId: c.id, team: c.team });
       continue;
     }
-    const pen = pendenciaDaTriagem(t, e, c, "PEN-" + crypto.randomUUID(), new Date());
-    const { error: erroPen } = await db.from("pendencias").insert(pen);
+    const pen = pendenciaDaTriagem(t, e, c, 'PEN-' + crypto.randomUUID(), new Date());
+    const { error: erroPen } = await db.from('pendencias').insert(pen);
     if (erroPen) {
-      await db.from("avisos_enviados").delete().eq("key", key);  // tenta de novo na próxima chamada
+      await db.from('avisos_enviados').delete().eq('key', key); // tenta de novo na próxima chamada
       console.error(`robo triagem pendência ${e.id}:`, erroPen.message);
       continue;
     }
     abertas.push(pen.id);
-    await naCaixa(e, { status: "virou_chamado", pendenciaId: pen.id, clientId: c.id, team: c.team });
+    await naCaixa(e, {
+      status: 'virou_chamado',
+      pendenciaId: pen.id,
+      clientId: c.id,
+      team: c.team,
+    });
   }
-  return json({ success: true, mensagens: msgs.length, abertas: abertas.length, ignorados, internos,
-    notas: notas_em_aberto, auto_respostas, sem_cliente: semCliente, caixa, caixa_erros });
+  return json({
+    success: true,
+    mensagens: msgs.length,
+    abertas: abertas.length,
+    ignorados,
+    internos,
+    notas: notas_em_aberto,
+    auto_respostas,
+    sem_cliente: semCliente,
+    caixa,
+    caixa_erros,
+  });
 }
 
 async function indicadores(db: SupabaseClient) {
   const [ops, visitas, pendencias, horas, clientes] = await Promise.all([
-    all<Operator>(db, "operators", OPS_COLS),
-    all<Visita>(db, "visits", VIS_COLS),
-    all<Pend>(db, "pendencias", PEN_COLS),
-    all<Hora>(db, "time_entries", "id, operator_id, operator_name, client_id, started_at, ended_at, seconds, source, note").catch(() => [] as Hora[]),
-    all<{ id: string; name: string }>(db, "clients", "id, name"),
+    all<Operator>(db, 'operators', OPS_COLS),
+    all<Visita>(db, 'visits', VIS_COLS),
+    all<Pend>(db, 'pendencias', PEN_COLS),
+    all<Hora>(
+      db,
+      'time_entries',
+      'id, operator_id, operator_name, client_id, started_at, ended_at, seconds, source, note'
+    ).catch(() => [] as Hora[]),
+    all<{ id: string; name: string }>(db, 'clients', 'id, name'),
   ]);
-  return json({ abas: montarIndicadores({ ops, visitas, pendencias, horas, clientes }), atualizado_em: new Date().toISOString() });
+  return json({
+    abas: montarIndicadores({ ops, visitas, pendencias, horas, clientes }),
+    atualizado_em: new Date().toISOString(),
+  });
 }
 
 async function backup(db: SupabaseClient) {
@@ -491,9 +746,15 @@ async function backup(db: SupabaseClient) {
   for (const [t, tirar] of Object.entries(BACKUP)) {
     try {
       const rows = await all<Record<string, unknown>>(db, t);
-      tabelas[t] = tirar.length ? rows.map((r) => { const c = { ...r }; for (const k of tirar) delete c[k]; return c; }) : rows;
+      tabelas[t] = tirar.length
+        ? rows.map((r) => {
+            const c = { ...r };
+            for (const k of tirar) delete c[k];
+            return c;
+          })
+        : rows;
     } catch (e) {
-      erros[t] = String((e as Error).message).slice(0, 200);  // tabela que não existe neste banco
+      erros[t] = String((e as Error).message).slice(0, 200); // tabela que não existe neste banco
     }
   }
   return json({ gerado_em: new Date().toISOString(), tabelas, erros });
@@ -501,73 +762,132 @@ async function backup(db: SupabaseClient) {
 
 // PASTAS: o plano é refeito do banco nas duas chamadas; o robô só diz o que o Drive respondeu.
 const planoDoBanco = async (db: SupabaseClient) =>
-  planoPastas(await all<ClientePasta>(db, "clients", "id, name, cnpj, google_sheet_url, drive_folder_url"));
+  planoPastas(
+    await all<ClientePasta>(db, 'clients', 'id, name, cnpj, google_sheet_url, drive_folder_url')
+  );
 
 async function pastas(db: SupabaseClient) {
   const plano = await planoDoBanco(db);
   const log = await marcarPastasInvalidas(db, plano.invalidos, new Date().toISOString());
-  if (log) console.warn("robo pastas:", log);
+  if (log) console.warn('robo pastas:', log);
   return json({ candidatos: plano.candidatos, vigiar: plano.vigiar, buscar: plano.buscar });
 }
 
-async function pastasResultado(db: SupabaseClient, input: { achados?: unknown; testes?: unknown; erros?: unknown; ambiguas?: unknown; orfas?: unknown }) {
-  const r = await gravarResultadoPastas(db, await planoDoBanco(db), input, new Date().toISOString());
-  if (r.log) console.warn("robo pastas:", r.log);
-  if (Array.isArray(input.erros) && input.erros.length) console.warn("robo pastas: erros do Drive", input.erros.slice(0, 20));
+async function pastasResultado(
+  db: SupabaseClient,
+  input: {
+    achados?: unknown;
+    testes?: unknown;
+    erros?: unknown;
+    ambiguas?: unknown;
+    orfas?: unknown;
+  }
+) {
+  const r = await gravarResultadoPastas(
+    db,
+    await planoDoBanco(db),
+    input,
+    new Date().toISOString()
+  );
+  if (r.log) console.warn('robo pastas:', r.log);
+  if (Array.isArray(input.erros) && input.erros.length)
+    console.warn('robo pastas: erros do Drive', input.erros.slice(0, 20));
   // Nada disso vira dado: o robô não decide entre pastas de mesmo nome nem apaga órfã — fica no log para alguém olhar.
-  if (Array.isArray(input.ambiguas) && input.ambiguas.length) console.warn("robo pastas: ambíguas", input.ambiguas.slice(0, 20));
-  if (Array.isArray(input.orfas) && input.orfas.length) console.warn("robo pastas: órfãs", input.orfas.slice(0, 20));
+  if (Array.isArray(input.ambiguas) && input.ambiguas.length)
+    console.warn('robo pastas: ambíguas', input.ambiguas.slice(0, 20));
+  if (Array.isArray(input.orfas) && input.orfas.length)
+    console.warn('robo pastas: órfãs', input.orfas.slice(0, 20));
   return json({ gravados: r.gravados, atualizados: r.atualizados });
 }
 
-type Entrada = { action?: string; enviar?: unknown; mensagens?: unknown; achados?: unknown; testes?: unknown; erros?: unknown; ambiguas?: unknown; orfas?: unknown };
+type Entrada = {
+  action?: string;
+  enviar?: unknown;
+  mensagens?: unknown;
+  achados?: unknown;
+  testes?: unknown;
+  erros?: unknown;
+  ambiguas?: unknown;
+  orfas?: unknown;
+};
 
 // Cada ação vira uma linha em robo_execucoes (071): é o único jeito de o app
 // saber que o robô parou sem alguém abrir o log da Edge Function.
 async function despachar(db: SupabaseClient, input: Entrada) {
   switch (input.action) {
-    case "vencimentos": return await vencimentos(db);
-    case "dominios": return await dominios(db);
-    case "resumo": return await resumo(db, input);
-    case "indicadores": return await indicadores(db);
-    case "backup": return await backup(db);
-    case "backups": return await backups(db, input);
-    case "triagem": return await triagem(db, input);
-    case "pastas": return await pastas(db);
-    case "pastas-resultado": return await pastasResultado(db, input);
-    default: return json({ error: "Ação desconhecida" }, 400);
+    case 'vencimentos':
+      return await vencimentos(db);
+    case 'dominios':
+      return await dominios(db);
+    case 'resumo':
+      return await resumo(db, input);
+    case 'indicadores':
+      return await indicadores(db);
+    case 'backup':
+      return await backup(db);
+    case 'backups':
+      return await backups(db, input);
+    case 'triagem':
+      return await triagem(db, input);
+    case 'pastas':
+      return await pastas(db);
+    case 'pastas-resultado':
+      return await pastasResultado(db, input);
+    default:
+      return json({ error: 'Ação desconhecida' }, 400);
   }
 }
 
 // Falhar aqui nunca muda a resposta: sem a 071 aplicada o robô segue como antes.
-async function registrarRodada(db: SupabaseClient, acao: string, inicio: Date, res: Response, erro: string | null) {
+async function registrarRodada(
+  db: SupabaseClient,
+  acao: string,
+  inicio: Date,
+  res: Response,
+  erro: string | null
+) {
   try {
-    const body = await res.clone().json().catch(() => null);
+    const body = await res
+      .clone()
+      .json()
+      .catch(() => null);
     const resultado = resumoDaRodada(body);
     const fim = new Date();
-    const { error } = await db.from("robo_execucoes").insert({
-      acao: acao.slice(0, 60) || "?", inicio: inicio.toISOString(), fim: fim.toISOString(),
-      duracao_ms: fim.getTime() - inicio.getTime(), ok: res.status < 400 && !erro,
-      erro: erro ?? (res.status >= 400 ? String(resultado.error ?? `HTTP ${res.status}`) : null), resultado,
+    const { error } = await db.from('robo_execucoes').insert({
+      acao: acao.slice(0, 60) || '?',
+      inicio: inicio.toISOString(),
+      fim: fim.toISOString(),
+      duracao_ms: fim.getTime() - inicio.getTime(),
+      ok: res.status < 400 && !erro,
+      erro: erro ?? (res.status >= 400 ? String(resultado.error ?? `HTTP ${res.status}`) : null),
+      resultado,
     });
-    if (error) { console.error("robo: rodada não gravada (aplique a 071_robo_execucoes.sql)", error.message); return; }
+    if (error) {
+      console.error('robo: rodada não gravada (aplique a 071_robo_execucoes.sql)', error.message);
+      return;
+    }
     // A triagem roda a cada 5 min (~288 linhas/dia); 14 dias bastam para ver
     // quando o robô parou, e a faxina aqui dispensa um cron só para isso.
     const corte = new Date(fim.getTime() - 14 * 86_400_000).toISOString();
-    await db.from("robo_execucoes").delete().lt("inicio", corte);
+    await db.from('robo_execucoes').delete().lt('inicio', corte);
   } catch (e) {
-    console.error("robo: rodada não gravada", (e as Error).message);
+    console.error('robo: rodada não gravada', (e as Error).message);
   }
 }
 
 // auth: "none" desliga só a checagem de JWT da plataforma: quem chama é o Apps
 // Script, que não tem JWT. O x-agenda-secret continua sendo o primeiro teste.
 async function handle(req: Request, ctx: SupabaseContext) {
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!SECRET || !safeEqual(req.headers.get("x-agenda-secret") ?? "", SECRET)) return json({ error: "Não autorizado" }, 401);
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  if (!SECRET || !safeEqual(req.headers.get('x-agenda-secret') ?? '', SECRET))
+    return json({ error: 'Não autorizado' }, 401);
 
   let input: Entrada;
-  try { input = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
+  try {
+    input = await req.json();
+  } catch {
+    return json({ error: 'JSON inválido' }, 400);
+  }
   const db = ctx.supabaseAdmin;
   const inicio = new Date();
   let res: Response;
@@ -576,11 +896,11 @@ async function handle(req: Request, ctx: SupabaseContext) {
     res = await despachar(db, input);
   } catch (e) {
     erro = String((e as Error).message ?? e).slice(0, 500);
-    console.error("robo:", input.action, erro);
-    res = json({ error: "Falha no servidor" }, 500);
+    console.error('robo:', input.action, erro);
+    res = json({ error: 'Falha no servidor' }, 500);
   }
-  await registrarRodada(db, String(input.action ?? ""), inicio, res, erro);
+  await registrarRodada(db, String(input.action ?? ''), inicio, res, erro);
   return res;
 }
 
-export default { fetch: withSupabase({ auth: "none" }, handle) };
+export default { fetch: withSupabase({ auth: 'none' }, handle) };

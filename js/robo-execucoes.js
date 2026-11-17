@@ -22,10 +22,17 @@ var _rbxCache = { linhas: null, em: 0, buscando: false };
 
 function _rbxSupabaseReady() {
   try {
-    return typeof isSupabaseConnected === 'function' && isSupabaseConnected()
-      && typeof supabaseClient !== 'undefined' && supabaseClient
-      && typeof window !== 'undefined' && window._supabaseAuthActive === true;
-  } catch (_) { return false; }
+    return (
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      typeof supabaseClient !== 'undefined' &&
+      supabaseClient &&
+      typeof window !== 'undefined' &&
+      window._supabaseAuthActive === true
+    );
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -49,14 +56,23 @@ function roboSituacao(linhas, agoraMs) {
     a.rodadas++;
     if (r.ok === false) a.falhas++;
   });
-  var acoes = ordem.map(function (k) { return porAcao[k]; });
+  var acoes = ordem.map(function (k) {
+    return porAcao[k];
+  });
   var triagem = porAcao.triagem ? porAcao.triagem.ultima : null;
   var inicioTriagem = triagem ? Date.parse(triagem.inicio) : NaN;
   // Sem nenhuma rodada de triagem carregada também é "parado": a migration
   // está aplicada (senão nem haveria linhas) e o robô não deu sinal.
-  var parado = acoes.length > 0 && (!triagem || !isFinite(inicioTriagem)
-    || (agoraMs - inicioTriagem) > ROBO_TRIAGEM_PARADA_MS);
-  var falhando = acoes.filter(function (a) { return a.ultima.ok === false; }).map(function (a) { return a.acao; });
+  var parado =
+    acoes.length > 0 &&
+    (!triagem || !isFinite(inicioTriagem) || agoraMs - inicioTriagem > ROBO_TRIAGEM_PARADA_MS);
+  var falhando = acoes
+    .filter(function (a) {
+      return a.ultima.ok === false;
+    })
+    .map(function (a) {
+      return a.acao;
+    });
   return { acoes: acoes, parado: parado, falhando: falhando, ultimaTriagem: triagem };
 }
 
@@ -75,9 +91,14 @@ function _rbxIdade(iso, agoraMs) {
 /** Contadores devolvidos pela ação, sem o erro (que tem linha própria). */
 function _rbxResumo(resultado) {
   if (!resultado || typeof resultado !== 'object') return '';
-  return Object.keys(resultado).filter(function (k) { return k !== 'error'; }).map(function (k) {
-    return k + ': ' + resultado[k];
-  }).join(' · ');
+  return Object.keys(resultado)
+    .filter(function (k) {
+      return k !== 'error';
+    })
+    .map(function (k) {
+      return k + ': ' + resultado[k];
+    })
+    .join(' · ');
 }
 
 function _rbxLinhaHtml(a, agoraMs) {
@@ -85,44 +106,75 @@ function _rbxLinhaHtml(a, agoraMs) {
   var falhou = r.ok === false;
   var quando = r.inicio || '';
   var exato = quando;
-  try { if (Date.parse(quando) && typeof formatDateTime === 'function') exato = formatDateTime(quando); } catch (_e) { /* data estranha: mostra crua */ }
+  try {
+    if (Date.parse(quando) && typeof formatDateTime === 'function') exato = formatDateTime(quando);
+  } catch (_e) {
+    /* data estranha: mostra crua */
+  }
   var resumo = _rbxResumo(r.resultado);
-  return '<li class="rbx-acao' + (falhou ? ' is-falha' : '') + '">'
-    + '<div class="rbx-top">'
-    + '<span class="rbx-status">' + (falhou ? '✕' : '✓') + '</span>'
-    + '<span class="rbx-nome">' + escapeHtml(a.acao) + '</span>'
-    + (a.falhas ? '<span class="rbx-falhas">' + a.falhas + ' de ' + a.rodadas + ' falharam</span>' : '')
-    + '<span class="rbx-quando" title="' + escapeHtml(exato) + '">' + escapeHtml(_rbxIdade(quando, agoraMs)) + '</span>'
-    + '</div>'
-    + (falhou && r.erro ? '<div class="rbx-erro">' + escapeHtml(r.erro) + '</div>' : '')
-    + (resumo ? '<div class="rbx-resumo">' + escapeHtml(resumo) + '</div>' : '')
-    + '</li>';
+  return (
+    '<li class="rbx-acao' +
+    (falhou ? ' is-falha' : '') +
+    '">' +
+    '<div class="rbx-top">' +
+    '<span class="rbx-status">' +
+    (falhou ? '✕' : '✓') +
+    '</span>' +
+    '<span class="rbx-nome">' +
+    escapeHtml(a.acao) +
+    '</span>' +
+    (a.falhas
+      ? '<span class="rbx-falhas">' + a.falhas + ' de ' + a.rodadas + ' falharam</span>'
+      : '') +
+    '<span class="rbx-quando" title="' +
+    escapeHtml(exato) +
+    '">' +
+    escapeHtml(_rbxIdade(quando, agoraMs)) +
+    '</span>' +
+    '</div>' +
+    (falhou && r.erro ? '<div class="rbx-erro">' + escapeHtml(r.erro) + '</div>' : '') +
+    (resumo ? '<div class="rbx-resumo">' + escapeHtml(resumo) + '</div>' : '') +
+    '</li>'
+  );
 }
 
 /** Busca as últimas rodadas e redesenha. Erro de query (sem 071) esconde o painel. */
 function carregarRoboExecucoes() {
   if (!_rbxSupabaseReady() || _rbxCache.buscando) return;
   _rbxCache.buscando = true;
-  supabaseClient.from('robo_execucoes')
+  supabaseClient
+    .from('robo_execucoes')
     .select('acao,inicio,fim,duracao_ms,ok,erro,resultado')
     .order('inicio', { ascending: false })
     .limit(40)
     .then(function (res) {
-      _rbxCache.linhas = res.error ? [] : (res.data || []);
+      _rbxCache.linhas = res.error ? [] : res.data || [];
       _rbxCache.em = Date.now();
     })
-    .catch(function () { _rbxCache.linhas = []; _rbxCache.em = Date.now(); })
-    .then(function () { _rbxCache.buscando = false; renderRoboExecucoes(); });
+    .catch(function () {
+      _rbxCache.linhas = [];
+      _rbxCache.em = Date.now();
+    })
+    .then(function () {
+      _rbxCache.buscando = false;
+      renderRoboExecucoes();
+    });
 }
 
 function renderRoboExecucoes() {
   var node = document.getElementById('roboStatus');
   if (!node) return;
-  if (!_rbxSupabaseReady()) { node.innerHTML = ''; return; }
+  if (!_rbxSupabaseReady()) {
+    node.innerHTML = '';
+    return;
+  }
   var agora = Date.now();
   if (agora - _rbxCache.em > ROBO_RECARGA_MS) carregarRoboExecucoes();
   var linhas = _rbxCache.linhas;
-  if (!linhas || !linhas.length) { node.innerHTML = ''; return; }
+  if (!linhas || !linhas.length) {
+    node.innerHTML = '';
+    return;
+  }
 
   var s = roboSituacao(linhas, agora);
   var problema = s.parado || s.falhando.length > 0;
@@ -142,27 +194,52 @@ function renderRoboExecucoes() {
   try {
     var pref = localStorage.getItem('intra_rbx_fechada');
     if (!problema && pref === '0') fechado = false;
-  } catch (_e) { /* sem localStorage: usa o padrão */ }
-  node.innerHTML = '<section class="rbx-box' + (problema ? ' is-problema' : '') + (fechado ? ' is-fechada' : '') + '">'
-    + '<button type="button" class="rbx-head" data-action="rbxToggle" aria-expanded="' + (fechado ? 'false' : 'true') + '">'
-    + '<span class="rbx-head-title">' + (problema ? '⚠️ ' : '🤖 ') + escapeHtml(titulo) + '</span>'
-    + '<span class="rbx-chevron" aria-hidden="true">' + (fechado ? '▸' : '▾') + '</span>'
-    + '</button>'
-    + (fechado ? '' : '<ul class="rbx-lista">' + s.acoes.map(function (a) { return _rbxLinhaHtml(a, agora); }).join('') + '</ul>')
-    + '</section>';
+  } catch (_e) {
+    /* sem localStorage: usa o padrão */
+  }
+  node.innerHTML =
+    '<section class="rbx-box' +
+    (problema ? ' is-problema' : '') +
+    (fechado ? ' is-fechada' : '') +
+    '">' +
+    '<button type="button" class="rbx-head" data-action="rbxToggle" aria-expanded="' +
+    (fechado ? 'false' : 'true') +
+    '">' +
+    '<span class="rbx-head-title">' +
+    (problema ? '⚠️ ' : '🤖 ') +
+    escapeHtml(titulo) +
+    '</span>' +
+    '<span class="rbx-chevron" aria-hidden="true">' +
+    (fechado ? '▸' : '▾') +
+    '</span>' +
+    '</button>' +
+    (fechado
+      ? ''
+      : '<ul class="rbx-lista">' +
+        s.acoes
+          .map(function (a) {
+            return _rbxLinhaHtml(a, agora);
+          })
+          .join('') +
+        '</ul>') +
+    '</section>';
 }
 
 function roboExecucoesToggle() {
   try {
     var aberta = localStorage.getItem('intra_rbx_fechada') === '0';
     localStorage.setItem('intra_rbx_fechada', aberta ? '1' : '0');
-  } catch (_e) { /* sem localStorage: não lembra, e tudo bem */ }
+  } catch (_e) {
+    /* sem localStorage: não lembra, e tudo bem */
+  }
   renderRoboExecucoes();
 }
 
 if (typeof registerActions === 'function') {
   registerActions({
-    rbxToggle: function () { roboExecucoesToggle(); }
+    rbxToggle: function () {
+      roboExecucoesToggle();
+    },
   });
 }
 
@@ -170,8 +247,10 @@ if (typeof registerActions === 'function') {
 // texto fica fora de #roboStatus porque o render zera o nó quando não há dado.
 function abrirConfiguracoes() {
   if (typeof openModal !== 'function') return;
-  openModal('Configurações',
-    '<p class="u-be71c9">Status do robô de triagem (últimas rodadas). Sem Supabase conectado, nada aparece aqui.</p>'
-    + '<div id="roboStatus"></div>');
+  openModal(
+    'Configurações',
+    '<p class="u-be71c9">Status do robô de triagem (últimas rodadas). Sem Supabase conectado, nada aparece aqui.</p>' +
+      '<div id="roboStatus"></div>'
+  );
   renderRoboExecucoes();
 }

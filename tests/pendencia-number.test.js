@@ -11,7 +11,11 @@ function pen(id, createdAt) {
 
 describe('getPendenciaDisplayNumber (só exibição, id interno intacto)', () => {
   it('ordena por createdAt crescente (#001 é a mais antiga)', () => {
-    const list = [pen('PEN-c', '2024-05-03T10:00:00Z'), pen('PEN-a', '2024-05-01T10:00:00Z'), pen('PEN-b', '2024-05-02T10:00:00Z')];
+    const list = [
+      pen('PEN-c', '2024-05-03T10:00:00Z'),
+      pen('PEN-a', '2024-05-01T10:00:00Z'),
+      pen('PEN-b', '2024-05-02T10:00:00Z'),
+    ];
     expect(getPendenciaDisplayNumber(list, 'PEN-a')).toBe('#001');
     expect(getPendenciaDisplayNumber(list, 'PEN-b')).toBe('#002');
     expect(getPendenciaDisplayNumber(list, 'PEN-c')).toBe('#003');
@@ -34,7 +38,9 @@ describe('getPendenciaDisplayNumber (só exibição, id interno intacto)', () =>
   });
 
   it('id desconhecido ou lista vazia retorna #--- (nunca quebra a tela)', () => {
-    expect(getPendenciaDisplayNumber([pen('PEN-a', '2024-05-01T10:00:00Z')], 'PEN-zzz')).toBe('#---');
+    expect(getPendenciaDisplayNumber([pen('PEN-a', '2024-05-01T10:00:00Z')], 'PEN-zzz')).toBe(
+      '#---'
+    );
     expect(getPendenciaDisplayNumber([], 'PEN-a')).toBe('#---');
     expect(getPendenciaDisplayNumber(null, 'PEN-a')).toBe('#---');
   });
@@ -53,7 +59,11 @@ describe('getPendenciaDisplayNumber (só exibição, id interno intacto)', () =>
   });
 
   it('exclusão fecha o buraco (posteriores andam um número — Opção A)', () => {
-    const list = [pen('PEN-a', '2024-05-01T10:00:00Z'), pen('PEN-b', '2024-05-02T10:00:00Z'), pen('PEN-c', '2024-05-03T10:00:00Z')];
+    const list = [
+      pen('PEN-a', '2024-05-01T10:00:00Z'),
+      pen('PEN-b', '2024-05-02T10:00:00Z'),
+      pen('PEN-c', '2024-05-03T10:00:00Z'),
+    ];
     expect(getPendenciaDisplayNumber(list, 'PEN-c')).toBe('#003');
     const semB = list.filter((p) => p.id !== 'PEN-b');
     expect(getPendenciaDisplayNumber(semB, 'PEN-c')).toBe('#002');
@@ -62,7 +72,11 @@ describe('getPendenciaDisplayNumber (só exibição, id interno intacto)', () =>
 
 describe('getPendenciaDisplayMap (FASE 1 — memoização por render)', () => {
   it('retorna o mesmo número que getPendenciaDisplayNumber para todos os ids', () => {
-    const list = [pen('PEN-c', '2024-05-03T10:00:00Z'), pen('PEN-a', '2024-05-01T10:00:00Z'), pen('PEN-b', '2024-05-02T10:00:00Z')];
+    const list = [
+      pen('PEN-c', '2024-05-03T10:00:00Z'),
+      pen('PEN-a', '2024-05-01T10:00:00Z'),
+      pen('PEN-b', '2024-05-02T10:00:00Z'),
+    ];
     const map = getPendenciaDisplayMap(list);
     for (const p of list) {
       expect(map.get(p.id)).toBe(getPendenciaDisplayNumber(list, p.id));

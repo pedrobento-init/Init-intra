@@ -10,7 +10,10 @@ function makeClassList(initial) {
     remove: (c) => s.delete(c),
     contains: (c) => s.has(c),
     toggle: (c) => {
-      if (s.has(c)) { s.delete(c); return false; }
+      if (s.has(c)) {
+        s.delete(c);
+        return false;
+      }
       s.add(c);
       return true;
     },
@@ -113,8 +116,8 @@ describe('contrato do card e do CSS', () => {
   });
 
   it('botão ver mais só para descrições longas', () => {
-    expect(src).toContain("descView.long ? `<button type=\"button\" class=\"meet-desc-toggle\"");
-    expect(src).toContain("data-action=\"meetingToggleDesc\" data-arg=\"${escapeHtml(p.id)}\"");
+    expect(src).toContain('descView.long ? `<button type="button" class="meet-desc-toggle"');
+    expect(src).toContain('data-action="meetingToggleDesc" data-arg="${escapeHtml(p.id)}"');
   });
 
   it('apresentação: fonte maior, sem clamp, sem botão', () => {

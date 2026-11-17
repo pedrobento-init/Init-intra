@@ -1,62 +1,90 @@
 // operadores.js – Módulo de gestão de operadores
 
 const OP_COLORS = [
-  '#1a56db','#3b82f6','#0891b2','#0f766e','#16a34a',
-  '#4f46e5','#6366f1','#7c3aed','#d97706','#dc2626'
+  '#1a56db',
+  '#3b82f6',
+  '#0891b2',
+  '#0f766e',
+  '#16a34a',
+  '#4f46e5',
+  '#6366f1',
+  '#7c3aed',
+  '#d97706',
+  '#dc2626',
 ];
 
-function _opHash(str){
-  var s=String(str||'').toLowerCase().trim();
-  var h=0; for(var i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0; }
+function _opHash(str) {
+  var s = String(str || '')
+    .toLowerCase()
+    .trim();
+  var h = 0;
+  for (var i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i);
+    h |= 0;
+  }
   return Math.abs(h);
 }
-function getOpAvatarColor(opOrName){
-  var name = typeof opOrName==='string' ? opOrName : (opOrName && opOrName.name) || '';
+function getOpAvatarColor(opOrName) {
+  var name = typeof opOrName === 'string' ? opOrName : (opOrName && opOrName.name) || '';
   var idx = _opHash(name || '?') % OP_COLORS.length;
   return OP_COLORS[idx];
 }
-function _opKebabIcon(){
+function _opKebabIcon() {
   return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
 }
-function _opTrashIcon(){
+function _opTrashIcon() {
   return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 }
-function _opKeyIcon(){
+function _opKeyIcon() {
   return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="7.5" r="3.5"/><path d="M10.5 10.5 L21 21"/><path d="M15 21l3-3-3-3"/><path d="M19 11a7 7 0 1 1-7-7"/></svg>';
 }
-function _opLeaveIcon(){
+function _opLeaveIcon() {
   return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a4 4 0 1 0-8 0 4 4 0 0 0 8 0z"/><path d="M4 20a8 8 0 0 1 16 0"/><line x1="4" y1="4" x2="20" y2="20"/></svg>';
 }
-function toggleOpMenu(id){
-  var menu=document.getElementById('opMenu-'+id);
-  if(!menu) return;
-  var isOpen=menu.dataset.open==='1';
-  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function(m){
-    m.dataset.open='0'; m.style.display='none';
-    var c=m.closest && m.closest('.op-card'); if(c) c.classList.remove('op-card--menu-open');
+function toggleOpMenu(id) {
+  var menu = document.getElementById('opMenu-' + id);
+  if (!menu) return;
+  var isOpen = menu.dataset.open === '1';
+  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function (m) {
+    m.dataset.open = '0';
+    m.style.display = 'none';
+    var c = m.closest && m.closest('.op-card');
+    if (c) c.classList.remove('op-card--menu-open');
   });
-  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
-  if(isOpen) return;
-  menu.dataset.open='1'; menu.style.display='flex';
-  var card=menu.closest && menu.closest('.op-card'); if(card) card.classList.add('op-card--menu-open');
-  var wrap=menu.closest('.op-kebab-wrap'); if(wrap){ var b2=wrap.querySelector('.op-kebab-btn'); if(b2) b2.setAttribute('aria-expanded','true'); }
-}
-function _closeOpMenus(e){
-  if(e.target.closest && e.target.closest('.op-kebab-wrap')) return;
-  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function(m){
-    m.dataset.open='0'; m.style.display='none';
-    var c=m.closest && m.closest('.op-card'); if(c) c.classList.remove('op-card--menu-open');
+  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function (b) {
+    b.setAttribute('aria-expanded', 'false');
   });
-  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
+  if (isOpen) return;
+  menu.dataset.open = '1';
+  menu.style.display = 'flex';
+  var card = menu.closest && menu.closest('.op-card');
+  if (card) card.classList.add('op-card--menu-open');
+  var wrap = menu.closest('.op-kebab-wrap');
+  if (wrap) {
+    var b2 = wrap.querySelector('.op-kebab-btn');
+    if (b2) b2.setAttribute('aria-expanded', 'true');
+  }
 }
-if(typeof window!=='undefined' && !window._opMenuBound){
-  window._opMenuBound=true;
+function _closeOpMenus(e) {
+  if (e.target.closest && e.target.closest('.op-kebab-wrap')) return;
+  document.querySelectorAll('.op-kebab-menu[data-open="1"]').forEach(function (m) {
+    m.dataset.open = '0';
+    m.style.display = 'none';
+    var c = m.closest && m.closest('.op-card');
+    if (c) c.classList.remove('op-card--menu-open');
+  });
+  document.querySelectorAll('.op-kebab-btn[aria-expanded="true"]').forEach(function (b) {
+    b.setAttribute('aria-expanded', 'false');
+  });
+}
+if (typeof window !== 'undefined' && !window._opMenuBound) {
+  window._opMenuBound = true;
   document.addEventListener('click', _closeOpMenus);
 }
 
 let _opPage = 1;
 let _filteredOps = [];
-const OP_PAGE_SIZE = (typeof UI_PAGE_SIZE !== 'undefined') ? UI_PAGE_SIZE : 30;
+const OP_PAGE_SIZE = typeof UI_PAGE_SIZE !== 'undefined' ? UI_PAGE_SIZE : 30;
 
 // ── Render principal ──────────────────────────────────────────────────────────
 function renderOperadores() {
@@ -64,7 +92,10 @@ function renderOperadores() {
   // Leitura liberada a todos; o CTA administrativo só existe para admin
   // (não-admin recebe botão morto se exibido — ver openOperadorForm).
   if (typeof isCurrentAdmin === 'function' && isCurrentAdmin()) {
-    setTopbarAction('Novo Operador', '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+    setTopbarAction(
+      'Novo Operador',
+      '<svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    );
     window._topbarAction = () => openOperadorForm();
   } else {
     const _btn = document.getElementById('topbarActionBtn');
@@ -80,12 +111,12 @@ function _buildOperadoresPage(savedFilters = {}) {
   var ops = getOperators();
   // Filter by team
   if (!isTeamAdmin()) {
-    ops = ops.filter(o => (o.team || 'init') === getCurrentTeam());
+    ops = ops.filter((o) => (o.team || 'init') === getCurrentTeam());
   } else if (typeof _selectedTeam !== 'undefined' && _selectedTeam) {
-    ops = ops.filter(o => (o.team || 'init') === _selectedTeam);
+    ops = ops.filter((o) => (o.team || 'init') === _selectedTeam);
   }
-  var ativos   = ops.filter(o => o.active);
-  var inativos = ops.filter(o => !o.active);
+  var ativos = ops.filter((o) => o.active);
+  var inativos = ops.filter((o) => !o.active);
   _filteredOps = ops;
   _opPage = 1;
 
@@ -128,7 +159,7 @@ function _buildOperadoresPage(savedFilters = {}) {
     window._opFilter = savedFilters.filter;
     const activeBtn = document.querySelector(`.op-filter-btn[data-filter="${window._opFilter}"]`);
     if (activeBtn) {
-      document.querySelectorAll('.op-filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.op-filter-btn').forEach((b) => b.classList.remove('active'));
       activeBtn.classList.add('active');
     }
   } else {
@@ -143,7 +174,7 @@ window.debouncedFilterOperadores = debounce(filterOperadores, 300);
 
 function setOpFilter(btn, filter) {
   window._opFilter = filter;
-  document.querySelectorAll('.op-filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.op-filter-btn').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   filterOperadores();
 }
@@ -154,15 +185,19 @@ function filterOperadores() {
   let ops = getOperators();
   // Filter by team (admin sees all, others see only their team)
   if (!isTeamAdmin()) {
-    ops = ops.filter(o => (o.team || 'init') === getCurrentTeam());
+    ops = ops.filter((o) => (o.team || 'init') === getCurrentTeam());
   } else if (typeof _selectedTeam !== 'undefined' && _selectedTeam) {
-    ops = ops.filter(o => (o.team || 'init') === _selectedTeam);
+    ops = ops.filter((o) => (o.team || 'init') === _selectedTeam);
   }
-  if (window._opFilter === 'ativos')   ops = ops.filter(o => o.active);
-  if (window._opFilter === 'inativos') ops = ops.filter(o => !o.active);
-  if (q) ops = ops.filter(o => o.name?.toLowerCase().includes(q) || o.role?.toLowerCase().includes(q));
+  if (window._opFilter === 'ativos') ops = ops.filter((o) => o.active);
+  if (window._opFilter === 'inativos') ops = ops.filter((o) => !o.active);
+  if (q)
+    ops = ops.filter((o) => o.name?.toLowerCase().includes(q) || o.role?.toLowerCase().includes(q));
   _filteredOps = ops;
-  saveFilterState('operadores', {search: document.getElementById('opSearch')?.value || '', filter: window._opFilter});
+  saveFilterState('operadores', {
+    search: document.getElementById('opSearch')?.value || '',
+    filter: window._opFilter,
+  });
   _renderOpGrid();
 }
 
@@ -171,7 +206,7 @@ function _renderOpGrid() {
   if (!grid) return;
   const ops = _filteredOps;
   if (!ops.length) {
-    const _canCreate = (typeof isCurrentAdmin === 'function' && isCurrentAdmin());
+    const _canCreate = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
     grid.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>Nenhum operador encontrado</p>${_canCreate ? '<button class="btn btn-primary btn-sm" data-action="openOperadorForm">+ Novo Operador</button>' : ''}</div>`;
     return;
   }
@@ -184,42 +219,47 @@ function _renderOpGrid() {
   const pageOps = ops.slice(startIdx, startIdx + OP_PAGE_SIZE);
 
   // Count active tasks per operator
-  const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(p => !isPendenciaClosed(p.status));
+  const pens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(
+    (p) => !isPendenciaClosed(p.status)
+  );
   const session = getSession();
   const isAdminUser = isCurrentAdmin();
 
-  grid.innerHTML = pageOps.map(op => {
-    const penCount = pens.filter(p => p.responsible === op.name).length;
-    // Defesa: registro sem nome/iniciais não pode travar a grade no skeleton.
-    const initials  = op.initials || ((op.name || '?').substring(0, 2).toUpperCase() || '?');
-    const color     = op.color || getOpAvatarColor(op.name);
-    const isActive  = op.active !== false;
-    const isSelf = session && session.opId === op.id;
-    // 1. Ação principal sempre visível + menu ⋮ para secundárias
-    let actionsHtml = '';
-    let kebabItems = '';
-    if (isAdminUser || isSelf) {
-      actionsHtml += `<button class="btn btn-secondary btn-sm op-edit-btn" data-action="openOperadorForm" data-arg="${escapeHtml(op.id)}" data-stop="1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
-    }
-    if (isAdminUser) {
-      kebabItems += `
+  grid.innerHTML =
+    pageOps
+      .map((op) => {
+        const penCount = pens.filter((p) => p.responsible === op.name).length;
+        // Defesa: registro sem nome/iniciais não pode travar a grade no skeleton.
+        const initials = op.initials || (op.name || '?').substring(0, 2).toUpperCase() || '?';
+        const color = op.color || getOpAvatarColor(op.name);
+        const isActive = op.active !== false;
+        const isSelf = session && session.opId === op.id;
+        // 1. Ação principal sempre visível + menu ⋮ para secundárias
+        let actionsHtml = '';
+        let kebabItems = '';
+        if (isAdminUser || isSelf) {
+          actionsHtml += `<button class="btn btn-secondary btn-sm op-edit-btn" data-action="openOperadorForm" data-arg="${escapeHtml(op.id)}" data-stop="1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar</button>`;
+        }
+        if (isAdminUser) {
+          kebabItems += `
         <button class="op-kebab-item" data-action="opToggleActive" data-arg="${escapeHtml(op.id)}" data-stop="1" title="${isActive ? 'Desativar' : 'Ativar'}">
-          ${isActive
-            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`
-            : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 14 14"/></svg>`
+          ${
+            isActive
+              ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`
+              : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 14 14"/></svg>`
           }
           <span>${isActive ? 'Desativar' : 'Ativar'}</span>
         </button>`;
-      if(op.email){
-        kebabItems += `<button class="op-kebab-item" data-action="opResendInvite" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Reenviar convite"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span>Reenviar convite</span></button>`;
-      }
-      kebabItems += `<button class="op-kebab-item op-kebab-item--danger" data-action="opDeleteConfirm" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
-    }
-    if(kebabItems){
-      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" data-action="toggleOpMenu" data-arg="${escapeHtml(op.id)}" data-stop="1" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu u-6b99de" id="opMenu-${escapeHtml(op.id)}" data-open="0">${kebabItems}</div></div>`;
-    }
+          if (op.email) {
+            kebabItems += `<button class="op-kebab-item" data-action="opResendInvite" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Reenviar convite"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span>Reenviar convite</span></button>`;
+          }
+          kebabItems += `<button class="op-kebab-item op-kebab-item--danger" data-action="opDeleteConfirm" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
+        }
+        if (kebabItems) {
+          actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" data-action="toggleOpMenu" data-arg="${escapeHtml(op.id)}" data-stop="1" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu u-6b99de" id="opMenu-${escapeHtml(op.id)}" data-open="0">${kebabItems}</div></div>`;
+        }
 
-    return `
+        return `
       <div class="op-card ${isActive ? '' : 'op-card--inactive'} u-3b6a3a" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
           <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}</div>
@@ -241,16 +281,20 @@ function _renderOpGrid() {
         </div>
         ${actionsHtml ? `<div class="op-card-actions">${actionsHtml}</div>` : ''}
       </div>`;
-  }).join('') + (totalPages > 1 ? `
+      })
+      .join('') +
+    (totalPages > 1
+      ? `
     <div class="u-048982">
-      <div class="u-8ff086">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
+      <div class="u-8ff086">Mostrando ${startIdx + 1}–${Math.min(startIdx + OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
       <div class="u-49cd09">
-        <button class="btn btn-sm btn-secondary" ${_opPage===1?'disabled':''} data-action="opPageDelta" data-arg="-1">← Anterior</button>
+        <button class="btn btn-sm btn-secondary" ${_opPage === 1 ? 'disabled' : ''} data-action="opPageDelta" data-arg="-1">← Anterior</button>
         <span class="u-48936d">${_opPage} / ${totalPages}</span>
-        <button class="btn btn-sm btn-secondary" ${_opPage===totalPages?'disabled':''} data-action="opPageDelta" data-arg="1">Próxima →</button>
+        <button class="btn btn-sm btn-secondary" ${_opPage === totalPages ? 'disabled' : ''} data-action="opPageDelta" data-arg="1">Próxima →</button>
       </div>
     </div>
-  ` : '');
+  `
+      : '');
 }
 
 // ── Toggle ativo/inativo ──────────────────────────────────────────────────────
@@ -274,7 +318,7 @@ function deleteOpConfirm(id) {
   }
   var op = getOperatorById(id);
   if (!op) return;
-  confirmAction('Excluir operador <strong>' + escapeHtml(op.name) + '</strong>?', function() {
+  confirmAction('Excluir operador <strong>' + escapeHtml(op.name) + '</strong>?', function () {
     var snapshot = JSON.parse(JSON.stringify(op));
     deleteOperator(id);
     if (getOperatorById(id)) {
@@ -283,15 +327,20 @@ function deleteOpConfirm(id) {
     }
     _refreshOpListKeepPage();
     _refreshOpStats();
-    showUndoToast('Operador "' + op.name + '" removido.', function() {
+    showUndoToast('Operador "' + op.name + '" removido.', function () {
       // saveOperator é async (hash); só atualiza a UI após persistir.
-      Promise.resolve(saveOperator(snapshot)).then(function() {
-        _refreshOpListKeepPage();
-        _refreshOpStats();
-        showToast('Operador restaurado.', 'success');
-      }).catch(function(err) {
-        showToast('Falha ao restaurar operador: ' + (err && err.message ? err.message : err), 'error');
-      });
+      Promise.resolve(saveOperator(snapshot))
+        .then(function () {
+          _refreshOpListKeepPage();
+          _refreshOpStats();
+          showToast('Operador restaurado.', 'success');
+        })
+        .catch(function (err) {
+          showToast(
+            'Falha ao restaurar operador: ' + (err && err.message ? err.message : err),
+            'error'
+          );
+        });
     });
   });
 }
@@ -310,7 +359,11 @@ async function resendOperatorInvite(operatorId) {
   showToast(`Enviando convite para ${op.email}...`, 'info', 2500);
   const result = await authResendInvite(op.email);
   if (result.ok) {
-    showToast(`📧 Convite (redefinição de senha) enviado para ${op.email}.\nO operador define a senha ao clicar no link.`, 'success', 6000);
+    showToast(
+      `📧 Convite (redefinição de senha) enviado para ${op.email}.\nO operador define a senha ao clicar no link.`,
+      'success',
+      6000
+    );
   } else {
     showToast(`Falha ao enviar convite: ${result.message}`, 'error', 6000);
   }
@@ -327,16 +380,35 @@ function _refreshOpStats() {
   try {
     var ops = typeof getOperators === 'function' ? getOperators() : [];
     if (typeof isTeamAdmin === 'function' && !isTeamAdmin()) {
-      ops = ops.filter(function(o) { return (o.team || 'init') === (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init'); });
+      ops = ops.filter(function (o) {
+        return (
+          (o.team || 'init') === (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init')
+        );
+      });
     } else if (typeof _selectedTeam !== 'undefined' && _selectedTeam) {
-      ops = ops.filter(function(o) { return (o.team || 'init') === _selectedTeam; });
+      ops = ops.filter(function (o) {
+        return (o.team || 'init') === _selectedTeam;
+      });
     }
     var vals = document.querySelectorAll('.op-stats-row .op-stat-value');
-    if (!vals || vals.length < 3) { _updateOpStats(); return; } // fallback: rebuild
+    if (!vals || vals.length < 3) {
+      _updateOpStats();
+      return;
+    } // fallback: rebuild
     vals[0].textContent = ops.length;
-    vals[1].textContent = ops.filter(function(o) { return o.active; }).length;
-    vals[2].textContent = ops.filter(function(o) { return !o.active; }).length;
-  } catch (_) { try { _updateOpStats(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
+    vals[1].textContent = ops.filter(function (o) {
+      return o.active;
+    }).length;
+    vals[2].textContent = ops.filter(function (o) {
+      return !o.active;
+    }).length;
+  } catch (_) {
+    try {
+      _updateOpStats();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+    }
+  }
 }
 
 // Reaplica busca/filtro atuais à grade preservando a página (filterOperadores
@@ -344,11 +416,13 @@ function _refreshOpStats() {
 function _refreshOpListKeepPage() {
   try {
     if (!document.getElementById('opGridWrap')) return;
-    var pg = (typeof _opPage === 'number' && _opPage > 0) ? _opPage : 1;
+    var pg = typeof _opPage === 'number' && _opPage > 0 ? _opPage : 1;
     if (typeof filterOperadores === 'function') filterOperadores(); // reseta para 1
     _opPage = pg;
     if (typeof _renderOpGrid === 'function') _renderOpGrid(); // fixa se passou do total
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+  }
 }
 
 // ── Formulário ───────────────────────────────────────────────────────────────
@@ -369,35 +443,45 @@ function openOperadorForm(id = null) {
   const selColor = op?.color || getOpAvatarColor(op?.name || '') || OP_COLORS[0];
   const isSelf = session && session.opId === op.id;
   // Trocar a própria senha pede a atual, conferida no Supabase Auth (online).
-  const hasCurrentPassword = !!(op.email && typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive);
-  const esc = v => escapeHtml(v || '');
+  const hasCurrentPassword = !!(
+    op.email &&
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive
+  );
+  const esc = (v) => escapeHtml(v || '');
 
-  const currentPasswordHtml = (isSelf && hasCurrentPassword) ? `
+  const currentPasswordHtml =
+    isSelf && hasCurrentPassword
+      ? `
     <div class="form-row u-e28b04">
       <div class="form-group u-046678">
         <label class="form-label">Senha atual <span class="u-fb927a">(só para trocar a senha)</span></label>
         <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
       </div>
     </div>
-  ` : '';
+  `
+      : '';
 
-  const adminBanner = isAdminUser 
+  const adminBanner = isAdminUser
     ? `<div class="u-d7e9ed">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
     : '';
 
-  openModal(id ? 'Editar Operador' : 'Novo Operador', `
+  openModal(
+    id ? 'Editar Operador' : 'Novo Operador',
+    `
     <form id="opForm" class="ov-form" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
       ${adminBanner}
       <div class="u-41f38a">
         <div id="opAvatarPreview" data-sty="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
-          ${esc(op?.initials || (op?.name ? op.name.substring(0,2).toUpperCase() : '?'))}
+          ${esc(op?.initials || (op?.name ? op.name.substring(0, 2).toUpperCase() : '?'))}
         </div>
         <div class="u-97445a">
           <div class="form-group u-d9f228"><label class="form-label">Cor do avatar</label>
             <div class="u-6157e8" id="opColorPicker">
-              ${OP_COLORS.map(col => {
-                var isSel = selColor===col;
-                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
+              ${OP_COLORS.map((col) => {
+                var isSel = selColor === col;
+                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel ? 'true' : 'false'}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel ? '#0f172a' : 'transparent'};outline:${isSel ? '2px solid #fff' : ''};outline-offset:${isSel ? '-4px' : '0'};box-shadow:${isSel ? '0 0 0 2px #0f172a' : ''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</button>`;
               }).join('')}
             </div>
           </div>
@@ -422,12 +506,14 @@ function openOperadorForm(id = null) {
             <input class="form-input" name="role" value="${esc(op?.role || 'Técnico')}" placeholder="Ex: Técnico, Analista..." ${isAdminUser ? '' : 'readonly'} />
           </div>
         </div>
-        ${isAdminUser ? `
+        ${
+          isAdminUser
+            ? `
         <div class="form-row">
           <div class="form-group u-97445a">
             <label class="form-label">Equipe *</label>
             <select class="form-select" name="team" required>
-              ${TEAM_OPTIONS.map(o => `<option value="${o.value}" ${(op?.team||'init')===o.value?'selected':''}>${o.label}</option>`).join('')}
+              ${TEAM_OPTIONS.map((o) => `<option value="${o.value}" ${(op?.team || 'init') === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
             </select>
           </div>
           <div class="form-group u-97445a">
@@ -439,22 +525,24 @@ function openOperadorForm(id = null) {
           </div>
         </div>
         <div class="form-group u-face9f">
-          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} class="u-fefb41" />
+          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin === true ? 'checked' : ''} class="u-fefb41" />
           <label for="opIsAdmin" class="form-label u-ffe959">Perfil Administrador</label>
         </div>
         <div class="form-group u-e081d8">
-          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao===true ? 'checked' : ''} class="u-fefb41" />
+          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao === true ? 'checked' : ''} class="u-fefb41" />
           <label for="opIsGestao" class="form-label u-7ec31c">Gestão <span class="u-fb927a">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
         </div>
         <div class="form-group u-e081d8">
-          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} class="u-fefb41" />
+          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave === true ? 'checked' : ''} class="u-fefb41" />
           <label for="opOnLeave" class="form-label u-7cfea5">${_opLeaveIcon()} Afastado</label>
         </div>
-        ` : `
-        <input type="hidden" name="team" value="${op?.team||'init'}" />
+        `
+            : `
+        <input type="hidden" name="team" value="${op?.team || 'init'}" />
         <input type="hidden" name="active" value="${op?.active !== false ? '1' : '0'}" />
         <input type="hidden" name="isAdmin" value="${op?.isAdmin ? '1' : '0'}" />
-        `}
+        `
+        }
       </div>
 
       <div class="form-section">
@@ -496,31 +584,36 @@ function openOperadorForm(id = null) {
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
       </div>
-    </form>`, 'sm');
+    </form>`,
+    'sm'
+  );
 
   window._selectedOpColor = selColor;
 }
 
 function selectOpColor(col) {
   window._selectedOpColor = col;
-  document.querySelectorAll('#opColorPicker button').forEach(function(btn){
+  document.querySelectorAll('#opColorPicker button').forEach(function (btn) {
     var isSel = btn.dataset.color === col;
     btn.style.border = isSel ? '2px solid #0f172a' : '2px solid transparent';
     btn.style.outline = isSel ? '2px solid #fff' : '';
     btn.style.outlineOffset = isSel ? '-4px' : '0';
     btn.style.boxShadow = isSel ? '0 0 0 2px #0f172a' : '';
     btn.setAttribute('aria-pressed', isSel ? 'true' : 'false');
-    btn.innerHTML = isSel ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+    btn.innerHTML = isSel
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '';
   });
   updateOpPreview();
 }
 
 function updateOpPreview() {
-  const name     = document.getElementById('opNameInput')?.value || '';
-  const initials = document.getElementById('opInitialsInput')?.value ||
-                   (name ? name.substring(0, 2).toUpperCase() : '?');
-  const color    = window._selectedOpColor || OP_COLORS[0];
-  const preview  = document.getElementById('opAvatarPreview');
+  const name = document.getElementById('opNameInput')?.value || '';
+  const initials =
+    document.getElementById('opInitialsInput')?.value ||
+    (name ? name.substring(0, 2).toUpperCase() : '?');
+  const color = window._selectedOpColor || OP_COLORS[0];
+  const preview = document.getElementById('opAvatarPreview');
   if (preview) {
     preview.style.background = color;
     preview.textContent = initials;
@@ -531,12 +624,15 @@ async function submitOperadorForm(e, id) {
   e.preventDefault();
   try {
     const fd = new FormData(e.target);
-    const g  = k => fd.get(k) || '';
+    const g = (k) => fd.get(k) || '';
     const name = g('name').trim();
-    if (!name) { showToast('Nome é obrigatório.', 'error'); return; }
+    if (!name) {
+      showToast('Nome é obrigatório.', 'error');
+      return;
+    }
 
     const session = getSession();
-  const isAdminUser = typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false;
+    const isAdminUser = typeof isCurrentAdmin === 'function' ? isCurrentAdmin() : false;
     const isSelf = session && session.opId === id;
 
     if (id && !isAdminUser && !isSelf) {
@@ -552,16 +648,29 @@ async function submitOperadorForm(e, id) {
 
     // Trocar a PRÓPRIA senha exige a atual, conferida no Supabase Auth (quem
     // pegar o aparelho desbloqueado não troca a senha do dono).
-    if (isSelf && existing && g('newPwd').trim() && existing.email &&
-        typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
+    if (
+      isSelf &&
+      existing &&
+      g('newPwd').trim() &&
+      existing.email &&
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected() &&
+      window._supabaseAuthActive
+    ) {
       const currentPwd = g('currentPwd').trim();
       if (!currentPwd) {
         showToast('Para trocar a senha, digite a senha atual.', 'error');
         return;
       }
       try {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email: existing.email, password: currentPwd });
-        if (error) { showToast('Senha atual incorreta.', 'error'); return; }
+        const { error } = await supabaseClient.auth.signInWithPassword({
+          email: existing.email,
+          password: currentPwd,
+        });
+        if (error) {
+          showToast('Senha atual incorreta.', 'error');
+          return;
+        }
       } catch (_) {
         showToast('Não foi possível conferir a senha atual agora.', 'error');
         return;
@@ -571,19 +680,24 @@ async function submitOperadorForm(e, id) {
     const initials = g('initials').trim() || name.substring(0, 2).toUpperCase();
 
     // Handle password
-    const newPwd     = g('newPwd').trim();
+    const newPwd = g('newPwd').trim();
     const confirmPwd = g('confirmPwd').trim();
-    
+
     if (!id && !newPwd) {
       showToast('A senha é obrigatória para novos operadores.', 'error');
       return;
     }
 
     if (newPwd || confirmPwd) {
-      if (newPwd !== confirmPwd) { showToast('As senhas não coincidem.', 'error'); return; }
-      if (newPwd.length < 8)    { showToast('A senha deve ter pelo menos 8 caracteres.', 'error'); return; }
+      if (newPwd !== confirmPwd) {
+        showToast('As senhas não coincidem.', 'error');
+        return;
+      }
+      if (newPwd.length < 8) {
+        showToast('A senha deve ter pelo menos 8 caracteres.', 'error');
+        return;
+      }
     }
-
 
     let activeVal = true;
     if (isAdminUser) {
@@ -600,7 +714,11 @@ async function submitOperadorForm(e, id) {
     }
 
     // Gestão: só admin altera; demais preservam o valor atual.
-    const isGestaoVal = isAdminUser ? fd.get('isGestao') !== null : (existing ? existing.isGestao === true : false);
+    const isGestaoVal = isAdminUser
+      ? fd.get('isGestao') !== null
+      : existing
+        ? existing.isGestao === true
+        : false;
 
     let onLeaveVal = false;
     if (isAdminUser) {
@@ -613,24 +731,31 @@ async function submitOperadorForm(e, id) {
       id: id || null,
       name,
       initials,
-      color:  window._selectedOpColor || getOpAvatarColor(name) || OP_COLORS[0],
-      role:   g('role') || 'Técnico',
-      phone:  g('phone'),
-      email:  g('email'),
-      notes:  g('notes'),
+      color: window._selectedOpColor || getOpAvatarColor(name) || OP_COLORS[0],
+      role: g('role') || 'Técnico',
+      phone: g('phone'),
+      email: g('email'),
+      notes: g('notes'),
       active: activeVal,
       isAdmin: isAdminVal,
       isGestao: isGestaoVal,
       onLeave: onLeaveVal,
-      team:   g('team') || 'init',
+      team: g('team') || 'init',
     };
 
     const opErrors = validateOperator(opData);
-    if (opErrors.length) { showToast(opErrors[0], 'error'); return; }
+    if (opErrors.length) {
+      showToast(opErrors[0], 'error');
+      return;
+    }
 
     // Anti duplo-submit: a sequência abaixo tem awaits longos (hash + rede).
     var _opSubmitBtn = null;
-    try { _opSubmitBtn = e.target.querySelector('button[type="submit"]'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
+    try {
+      _opSubmitBtn = e.target.querySelector('button[type="submit"]');
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+    }
     if (_opSubmitBtn) _opSubmitBtn.disabled = true;
     await saveOperator(opData);
 
@@ -648,11 +773,15 @@ async function submitOperadorForm(e, id) {
     } else if (id && isAdminUser && newPwd && existing?.auth_user_id) {
       // Admin alterando senha de outro operador — via Edge Function (service role)
       try {
-        const { data: resetData, error: resetErr } = await supabaseClient.functions.invoke('update-user-password', {
-          body: { userId: existing.auth_user_id, password: newPwd }
-        });
+        const { data: resetData, error: resetErr } = await supabaseClient.functions.invoke(
+          'update-user-password',
+          {
+            body: { userId: existing.auth_user_id, password: newPwd },
+          }
+        );
         if (resetErr || (resetData && resetData.error)) {
-          authMsg = 'Operador salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
+          authMsg =
+            'Operador salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
         }
       } catch (_) {
         authMsg = 'Operador salvo, mas a senha de login não pôde ser atualizada. Tente novamente.';
@@ -665,8 +794,10 @@ async function submitOperadorForm(e, id) {
         const result = await authCreateUser(opData.email, newPwd);
         if (result.ok) {
           // Vínculo automático com o operador recém-criado
-           const list = dbGet(DB.OPERATORS);
-          const opIdx = list.findIndex(o => o.email?.toLowerCase() === opData.email.toLowerCase());
+          const list = dbGet(DB.OPERATORS);
+          const opIdx = list.findIndex(
+            (o) => o.email?.toLowerCase() === opData.email.toLowerCase()
+          );
           if (opIdx !== -1 && result.authUserId && !list[opIdx].auth_user_id) {
             list[opIdx].auth_user_id = result.authUserId;
             list[opIdx].updatedAt = new Date().toISOString();
@@ -677,7 +808,8 @@ async function submitOperadorForm(e, id) {
                   .from('operators')
                   .update({ auth_user_id: result.authUserId, updated_at: new Date().toISOString() })
                   .eq('id', list[opIdx].id);
-                if (linkErr) console.warn('⚠️ Falha ao vincular auth_user_id no Supabase:', linkErr.message);
+                if (linkErr)
+                  console.warn('⚠️ Falha ao vincular auth_user_id no Supabase:', linkErr.message);
               } catch (linkErr) {
                 console.warn('⚠️ Erro ao vincular auth_user_id no Supabase:', linkErr.message);
               }
@@ -708,23 +840,27 @@ async function submitOperadorForm(e, id) {
       showToast(id ? 'Operador atualizado!' : 'Operador cadastrado!', 'success');
     }
   } catch (err) {
-    try { var _b = e.target.querySelector('button[type="submit"]'); if (_b) _b.disabled = false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
+    try {
+      var _b = e.target.querySelector('button[type="submit"]');
+      if (_b) _b.disabled = false;
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+    }
     showToast('Erro ao salvar operador: ' + err.message, 'error');
   }
 }
 
-
 // ── Helper: lista de nomes para selects em outros módulos ────────────────────
 function getOperatorNames(team) {
-  const ops = getOperators().filter(o => o.active !== false);
-  if (!team) return ops.map(o => o.name);
-  return ops.filter(o => (o.team || 'init') === team).map(o => o.name);
+  const ops = getOperators().filter((o) => o.active !== false);
+  if (!team) return ops.map((o) => o.name);
+  return ops.filter((o) => (o.team || 'init') === team).map((o) => o.name);
 }
 
 function isOperatorOnLeave(name) {
   if (!name) return false;
   const ops = getOperators();
-  const byName = ops.find(o => o.name === name);
+  const byName = ops.find((o) => o.name === name);
   if (byName) return byName.onLeave === true;
   const byId = typeof getOperatorById === 'function' ? getOperatorById(name) : null;
   return byId ? byId.onLeave === true : false;
@@ -735,17 +871,20 @@ function openOpPendencias(opId) {
   const op = getOperatorById(opId);
   if (!op) return;
 
-  const allPens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(p => p.responsible === op.name);
-  const activePens = allPens.filter(p => !isPendenciaClosed(p.status));
-  const donePens   = allPens.filter(p => isPendenciaClosed(p.status));
+  const allPens = (typeof getPendencias === 'function' ? getPendencias() : []).filter(
+    (p) => p.responsible === op.name
+  );
+  const activePens = allPens.filter((p) => !isPendenciaClosed(p.status));
+  const donePens = allPens.filter((p) => isPendenciaClosed(p.status));
 
   const renderPenList = (list) => {
     if (!list.length) return '<p class="text-muted u-c278f3">Nenhuma pendência.</p>';
-    return list.map(p => {
-      const c = getClientById(p.clientId);
-      const color = c?.color || '#2563eb';
+    return list
+      .map((p) => {
+        const c = getClientById(p.clientId);
+        const color = c?.color || '#2563eb';
         const isOverdue = p.deadline && p.deadline < localDateISO() && !isPendenciaClosed(p.status);
-      return `
+        return `
         <div class="opd-pendencia-delay-card"
              role="button" tabindex="0"
              data-action="opOpenPendenciaDelayed" data-arg="${escapeHtml(p.id)}">
@@ -759,13 +898,16 @@ function openOpPendencias(opId) {
           </div>
           <div class="u-0ddf6f">${statusTag(p.status)} ${priorityTag(p.priority)}</div>
         </div>`;
-    }).join('');
+      })
+      .join('');
   };
 
   const color = op.color || '#1a56db';
   const initials = op.initials || op.name.substring(0, 2).toUpperCase();
 
-  openModal(op.name, `
+  openModal(
+    op.name,
+    `
     <div class="op-detail-header u-e2fe7f">
       <div data-sty="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
       <div class="u-59eddc">
@@ -789,90 +931,166 @@ function openOpPendencias(opId) {
     </div>
     ${renderPenList(activePens)}
 
-    ${donePens.length ? `
+    ${
+      donePens.length
+        ? `
     <hr class="divider"/>
     <div class="u-c7d537">
       ✅ Concluídas (${donePens.length})
     </div>
     ${renderPenList(donePens)}
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="form-actions u-1b0f49">
       <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
       <button class="btn btn-primary" data-action="opNewPendenciaDelayed">+ Nova Pendência</button>
     </div>
-  `, 'lg');
+  `,
+    'lg'
+  );
 }
 
 // ── Auto-refresh global (preserva filtros/paginação/scroll) ──
-function _refreshOperadoresInPlace(){
-  try{
-    var q=(document.getElementById('opSearch')?.value||'').toLowerCase();
-    var ops=typeof getOperators==='function'?getOperators():[];
-    if(typeof isTeamAdmin==='function' && !isTeamAdmin()){
-      ops=ops.filter(function(o){ return (o.team||'init')=== (typeof getCurrentTeam==='function'?getCurrentTeam():'init'); });
-    } else if(typeof _selectedTeam!=='undefined' && _selectedTeam){
-      ops=ops.filter(function(o){ return (o.team||'init')===_selectedTeam; });
+function _refreshOperadoresInPlace() {
+  try {
+    var q = (document.getElementById('opSearch')?.value || '').toLowerCase();
+    var ops = typeof getOperators === 'function' ? getOperators() : [];
+    if (typeof isTeamAdmin === 'function' && !isTeamAdmin()) {
+      ops = ops.filter(function (o) {
+        return (
+          (o.team || 'init') === (typeof getCurrentTeam === 'function' ? getCurrentTeam() : 'init')
+        );
+      });
+    } else if (typeof _selectedTeam !== 'undefined' && _selectedTeam) {
+      ops = ops.filter(function (o) {
+        return (o.team || 'init') === _selectedTeam;
+      });
     }
-    if(window._opFilter==='ativos') ops=ops.filter(function(o){return o.active;});
-    if(window._opFilter==='inativos') ops=ops.filter(function(o){return !o.active;});
-    if(q) ops=ops.filter(function(o){ return (o.name||'').toLowerCase().indexOf(q)!==-1 || (o.role||'').toLowerCase().indexOf(q)!==-1; });
-    _filteredOps=ops;
-    preserveScrollAround(function(){ _renderOpGrid(); });
-  }catch(_){ try{ _renderOpGrid(); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
+    if (window._opFilter === 'ativos')
+      ops = ops.filter(function (o) {
+        return o.active;
+      });
+    if (window._opFilter === 'inativos')
+      ops = ops.filter(function (o) {
+        return !o.active;
+      });
+    if (q)
+      ops = ops.filter(function (o) {
+        return (
+          (o.name || '').toLowerCase().indexOf(q) !== -1 ||
+          (o.role || '').toLowerCase().indexOf(q) !== -1
+        );
+      });
+    _filteredOps = ops;
+    preserveScrollAround(function () {
+      _renderOpGrid();
+    });
+  } catch (_) {
+    try {
+      _renderOpGrid();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+    }
+  }
 }
-(function(){
-  if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
-  if(window._opAutoRefresh) return;
-  window._opAutoRefresh=true;
-  onDataChanged('operadores', function(){
-    var h=(window.location.hash.replace('#','')||'dashboard');
-    if(h!=='operadores') return;
+(function () {
+  if (typeof window === 'undefined' || typeof onDataChanged !== 'function') return;
+  if (window._opAutoRefresh) return;
+  window._opAutoRefresh = true;
+  onDataChanged('operadores', function () {
+    var h = window.location.hash.replace('#', '') || 'dashboard';
+    if (h !== 'operadores') return;
     _refreshOperadoresInPlace();
   });
   // Mudança de sessão/permissões: refresh suave em vez de reload total
   // (reload perdia filtros, scroll, modal e estado Milvus).
-  onDataChanged('session', function(){
+  onDataChanged('session', function () {
     try {
       if (typeof updateUserUI === 'function') updateUserUI();
       if (typeof initTeamSelector === 'function') initTeamSelector();
       if (typeof updateBadges === 'function') updateBadges();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+    }
     try {
-      var h = ((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace('#', '') || 'dashboard';
+      var h =
+        ((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace(
+          '#',
+          ''
+        ) || 'dashboard';
       if (typeof navigateTo === 'function') navigateTo(h);
       else if (typeof refreshPage === 'function') refreshPage();
       else window.location.reload();
-    } catch (_) { try { window.location.reload(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
+    } catch (_) {
+      try {
+        window.location.reload();
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+      }
+    }
   });
 })();
 
 // Ações da tela de operadores (clique/enter/input/submit por delegação em js/actions.js).
 if (typeof registerActions === 'function') {
   registerActions({
-    debouncedFilterOperadores: () => { if (typeof debouncedFilterOperadores === 'function') debouncedFilterOperadores(); },
-    setOpFilter: (el) => { if (el && typeof setOpFilter === 'function') setOpFilter(el, el.dataset.filter); },
-    openOperadorForm: (_el, id) => { if (typeof openOperadorForm === 'function') openOperadorForm(id || null); },
-    selectOpColor: (_el, col) => { if (typeof selectOpColor === 'function') selectOpColor(col); },
-    updateOpPreview: () => { if (typeof updateOpPreview === 'function') updateOpPreview(); },
-    submitOperadorForm: (el, id, ev) => { if (typeof submitOperadorForm === 'function') submitOperadorForm(ev, id || ''); },
-    openOpPendencias: (_el, id) => { if (typeof openOpPendencias === 'function') openOpPendencias(id); },
-    opPageDelta: (_el, d) => { _opPage += parseInt(d, 10) || 0; if (typeof _renderOpGrid === 'function') _renderOpGrid(); },
-    toggleOpMenu: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); },
-    opToggleActive: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); toggleOp(id); },
-    opResendInvite: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); resendOperatorInvite(id); },
-    opDeleteConfirm: (_el, id) => { if (typeof toggleOpMenu === 'function') toggleOpMenu(id); deleteOpConfirm(id); },
+    debouncedFilterOperadores: () => {
+      if (typeof debouncedFilterOperadores === 'function') debouncedFilterOperadores();
+    },
+    setOpFilter: (el) => {
+      if (el && typeof setOpFilter === 'function') setOpFilter(el, el.dataset.filter);
+    },
+    openOperadorForm: (_el, id) => {
+      if (typeof openOperadorForm === 'function') openOperadorForm(id || null);
+    },
+    selectOpColor: (_el, col) => {
+      if (typeof selectOpColor === 'function') selectOpColor(col);
+    },
+    updateOpPreview: () => {
+      if (typeof updateOpPreview === 'function') updateOpPreview();
+    },
+    submitOperadorForm: (el, id, ev) => {
+      if (typeof submitOperadorForm === 'function') submitOperadorForm(ev, id || '');
+    },
+    openOpPendencias: (_el, id) => {
+      if (typeof openOpPendencias === 'function') openOpPendencias(id);
+    },
+    opPageDelta: (_el, d) => {
+      _opPage += parseInt(d, 10) || 0;
+      if (typeof _renderOpGrid === 'function') _renderOpGrid();
+    },
+    toggleOpMenu: (_el, id) => {
+      if (typeof toggleOpMenu === 'function') toggleOpMenu(id);
+    },
+    opToggleActive: (_el, id) => {
+      if (typeof toggleOpMenu === 'function') toggleOpMenu(id);
+      toggleOp(id);
+    },
+    opResendInvite: (_el, id) => {
+      if (typeof toggleOpMenu === 'function') toggleOpMenu(id);
+      resendOperatorInvite(id);
+    },
+    opDeleteConfirm: (_el, id) => {
+      if (typeof toggleOpMenu === 'function') toggleOpMenu(id);
+      deleteOpConfirm(id);
+    },
     // Fechar o modal, ir para a lista e só então abrir o detalhe: a lista
     // precisa renderizar antes de o detalhe procurar o registro.
     opOpenPendenciaDelayed: (_el, id) => {
       if (typeof closeModal === 'function') closeModal();
       if (typeof navigateTo === 'function') navigateTo('pendencias');
-      setTimeout(() => { if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id); }, 100);
+      setTimeout(() => {
+        if (typeof openPendenciaDetail === 'function') openPendenciaDetail(id);
+      }, 100);
     },
     opNewPendenciaDelayed: () => {
       if (typeof closeModal === 'function') closeModal();
       if (typeof navigateTo === 'function') navigateTo('pendencias');
-      setTimeout(() => { if (typeof openPendenciaForm === 'function') openPendenciaForm(null, null); }, 100);
+      setTimeout(() => {
+        if (typeof openPendenciaForm === 'function') openPendenciaForm(null, null);
+      }, 100);
     },
   });
 }

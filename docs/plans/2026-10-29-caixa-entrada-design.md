@@ -102,14 +102,14 @@ somar estados e colunas.
 `entradaNaoAproveitada` vira `entradaDaCaixa(e, { motivo, status, pendenciaId,
 clientId, team }, id, agora)`; o nome antigo sai.
 
-| Caminho na triagem | Linha gravada |
-| --- | --- |
-| Remetente interno | nenhuma (como hoje) |
-| Resposta automática | `pendente`, motivo `auto_resposta`, client e team do cliente se casou |
-| Thread com chamado aberto (nota) | `anexado`, `pendencia_id` do chamado, client e team do chamado |
-| Sem cliente | `pendente`, motivo `sem_cliente`, team padrão |
-| IA mandou ignorar | `pendente`, motivo `ignorado_ia`, client e team do cliente |
-| Chamado aberto | `virou_chamado`, `pendencia_id` novo, client e team do cliente |
+| Caminho na triagem               | Linha gravada                                                         |
+| -------------------------------- | --------------------------------------------------------------------- |
+| Remetente interno                | nenhuma (como hoje)                                                   |
+| Resposta automática              | `pendente`, motivo `auto_resposta`, client e team do cliente se casou |
+| Thread com chamado aberto (nota) | `anexado`, `pendencia_id` do chamado, client e team do chamado        |
+| Sem cliente                      | `pendente`, motivo `sem_cliente`, team padrão                         |
+| IA mandou ignorar                | `pendente`, motivo `ignorado_ia`, client e team do cliente            |
+| Chamado aberto                   | `virou_chamado`, `pendencia_id` novo, client e team do cliente        |
 
 - A linha dos caminhos que já gravam chamado ou nota é gravada **depois** deles:
   se o insert falhar (073 não aplicada, CHECK), o chamado já existe e só se loga.
@@ -149,7 +149,7 @@ O worktree `Init-intra-csat` (`feat/csat-email`) partiu de f4cbd33, bem antes da
 
 - colide em número com `068_clients_drive_folder`;
 - recria `emails_triagem_motivo_check` como `('sem_cliente', 'ignorado_ia',
-  'pos_resolucao')`, **sem** `auto_resposta` (070). Aplicada depois da 070,
+'pos_resolucao')`, **sem** `auto_resposta` (070). Aplicada depois da 070,
   quebra a gravação de resposta automática; depois da 073, também.
 
 Este PR não mexe nela. Quando o CSAT voltar, a migration dele precisa ser

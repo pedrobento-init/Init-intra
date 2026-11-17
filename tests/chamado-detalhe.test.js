@@ -11,9 +11,13 @@ import vm from 'node:vm';
 // quem pediu entra cru no HTML.
 
 const FECHADOS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
-const _escape = (s) => String(s == null ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const _escape = (s) =>
+  String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 // Sandbox mínimo para js/chamado-detalhe.js: só os globais que ele consulta.
 // Cada teste troca os espiões; o arquivo é carregado uma vez só.
@@ -33,7 +37,9 @@ function criarSandbox() {
   };
   sb.globalThis = sb;
   vm.createContext(sb);
-  vm.runInContext(fs.readFileSync('js/chamado-detalhe.js', 'utf8'), sb, { filename: 'chamado-detalhe.js' });
+  vm.runInContext(fs.readFileSync('js/chamado-detalhe.js', 'utf8'), sb, {
+    filename: 'chamado-detalhe.js',
+  });
   return sb;
 }
 
@@ -47,10 +53,18 @@ beforeEach(() => {
   envios = [];
   statusTrocados = [];
   for (const k of Object.keys(sb.els)) delete sb.els[k];
-  sb.addPendenciaNote = (id, texto, autor, vis) => { notas.push({ id, texto, autor, vis }); return true; };
-  sb.chamadoEnviarResposta = (p, texto) => { envios.push({ id: p.id, texto }); return Promise.resolve(true); };
+  sb.addPendenciaNote = (id, texto, autor, vis) => {
+    notas.push({ id, texto, autor, vis });
+    return true;
+  };
+  sb.chamadoEnviarResposta = (p, texto) => {
+    envios.push({ id: p.id, texto });
+    return Promise.resolve(true);
+  };
   sb.chamadoCanalDe = (p) => (p.solicitanteEmail ? 'email' : null);
-  sb.changePenStatus = (id) => { statusTrocados.push({ id, status: sb.els.chgStatus && sb.els.chgStatus.value }); };
+  sb.changePenStatus = (id) => {
+    statusTrocados.push({ id, status: sb.els.chgStatus && sb.els.chgStatus.value });
+  };
   sb.getPendenciaById = () => null;
 });
 
@@ -58,42 +72,63 @@ describe('chamadoAplicarVariaveis', () => {
   const p = { id: 'p1', solicitante: 'Maria  da Silva', team: 'Suporte' };
 
   it('substitui as variáveis conhecidas pelos dados do chamado', () => {
-    const out = sb.chamadoAplicarVariaveis('Olá {primeiro_nome} ({nome}), protocolo {protocolo}, área {area}, {atendente} em {data_hoje}', p,
-      { atendente: 'Ana', hoje: new Date(2026, 9, 30) });
+    const out = sb.chamadoAplicarVariaveis(
+      'Olá {primeiro_nome} ({nome}), protocolo {protocolo}, área {area}, {atendente} em {data_hoje}',
+      p,
+      { atendente: 'Ana', hoje: new Date(2026, 9, 30) }
+    );
     expect(out).toBe('Olá Maria (Maria  da Silva), protocolo p1, área Suporte, Ana em 30/10/2026');
   });
 
   it('variável conhecida sem valor vira vazio, não "undefined"', () => {
-    expect(sb.chamadoAplicarVariaveis('Oi {nome}!', { id: 'x' }, { atendente: 'Ana' })).toBe('Oi !');
+    expect(sb.chamadoAplicarVariaveis('Oi {nome}!', { id: 'x' }, { atendente: 'Ana' })).toBe(
+      'Oi !'
+    );
   });
 
   it('chave desconhecida fica como estava (não some texto do atendente)', () => {
-    expect(sb.chamadoAplicarVariaveis('Custo {valor} e {nome}', p, { atendente: 'Ana' })).toBe('Custo {valor} e Maria  da Silva');
+    expect(sb.chamadoAplicarVariaveis('Custo {valor} e {nome}', p, { atendente: 'Ana' })).toBe(
+      'Custo {valor} e Maria  da Silva'
+    );
   });
 });
 
 describe('chamadoRotuloComposer', () => {
   it('diz o canal quando a resposta sai por e-mail', () => {
-    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, 'email')).toBe('Responder a João por E-mail');
+    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, 'email')).toBe(
+      'Responder a João por E-mail'
+    );
   });
 
   it('diz o canal quando a resposta sai por WhatsApp', () => {
-    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, 'whatsapp')).toBe('Responder a João por WhatsApp');
+    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, 'whatsapp')).toBe(
+      'Responder a João por WhatsApp'
+    );
   });
 
   it('sem canal avisa que não há por onde responder', () => {
-    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, null)).toBe('Responder a João — sem canal de resposta');
+    expect(sb.chamadoRotuloComposer({ solicitante: 'João' }, null)).toBe(
+      'Responder a João — sem canal de resposta'
+    );
   });
 
   it('o nome de quem pediu sai escapado no composer', () => {
-    const html = sb.chamadoComposerHtml({ id: 'p1', solicitante: '<img src=x onerror=alert(1)>', solicitanteEmail: 'a@b.c' });
+    const html = sb.chamadoComposerHtml({
+      id: 'p1',
+      solicitante: '<img src=x onerror=alert(1)>',
+      solicitanteEmail: 'a@b.c',
+    });
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   });
 });
 
 describe('chamadoComposerHtml', () => {
-  const html = sb.chamadoComposerHtml({ id: 'p1', solicitante: 'João', solicitanteEmail: 'j@x.com' });
+  const html = sb.chamadoComposerHtml({
+    id: 'p1',
+    solicitante: 'João',
+    solicitanteEmail: 'j@x.com',
+  });
 
   it('tem os três botões de resposta e nenhum de IA', () => {
     expect(html).toContain('data-arg="responder"');
@@ -144,7 +179,9 @@ describe('chamadoNotaInterna', () => {
     sb.els.chamadoNotaTexto = { value: ' @Bruno olha isso ' };
     sb.getPendenciaById = () => ({ id: 'p1', solicitanteEmail: 'j@x.com' });
     expect(sb.chamadoNotaInterna('p1')).toBe(true);
-    expect(notas).toEqual([{ id: 'p1', texto: '@Bruno olha isso', autor: 'Ana Atendente', vis: 'interna' }]);
+    expect(notas).toEqual([
+      { id: 'p1', texto: '@Bruno olha isso', autor: 'Ana Atendente', vis: 'interna' },
+    ]);
     expect(envios).toEqual([]);
   });
 
@@ -158,9 +195,15 @@ describe('chamadoNotaInterna', () => {
 describe('chamadoResponderAcao', () => {
   it('com canal, grava como resposta (conta para o SLA) e envia o texto já com variáveis', () => {
     sb.els.newNoteText = { value: 'Oi {primeiro_nome}' };
-    sb.getPendenciaById = () => ({ id: 'p1', solicitante: 'João Souza', solicitanteEmail: 'j@x.com' });
+    sb.getPendenciaById = () => ({
+      id: 'p1',
+      solicitante: 'João Souza',
+      solicitanteEmail: 'j@x.com',
+    });
     expect(sb.chamadoResponderAcao('p1', 'responder')).toBe(true);
-    expect(notas).toEqual([{ id: 'p1', texto: 'Oi João', autor: 'Ana Atendente', vis: 'resposta' }]);
+    expect(notas).toEqual([
+      { id: 'p1', texto: 'Oi João', autor: 'Ana Atendente', vis: 'resposta' },
+    ]);
     expect(envios).toEqual([{ id: 'p1', texto: 'Oi João' }]);
     expect(sb.els.newNoteText.value).toBe('');
   });
@@ -208,7 +251,11 @@ describe('chamadoResponderAcao', () => {
   it('responder enquanto aguarda o cliente não tira o chamado da espera', () => {
     sb.els.newNoteText = { value: 'Conseguiu ver o print?' };
     sb.els.chgStatus = { value: 'aguardando_cliente' };
-    sb.getPendenciaById = () => ({ id: 'p1', status: 'aguardando_cliente', solicitanteEmail: 'j@x.com' });
+    sb.getPendenciaById = () => ({
+      id: 'p1',
+      status: 'aguardando_cliente',
+      solicitanteEmail: 'j@x.com',
+    });
     sb.chamadoResponderAcao('p1', 'responder');
     expect(statusTrocados).toEqual([]);
   });
@@ -245,7 +292,14 @@ describe('chamadoStatusAposResposta', () => {
   });
 
   it('responder não mexe em quem já anda, espera alguém ou está fechado', () => {
-    for (const st of ['em_andamento', 'aguardando_cliente', 'aguardando', 'resolvido', 'cancelado', undefined]) {
+    for (const st of [
+      'em_andamento',
+      'aguardando_cliente',
+      'aguardando',
+      'resolvido',
+      'cancelado',
+      undefined,
+    ]) {
       expect(sb.chamadoStatusAposResposta(st, 'responder')).toBeNull();
     }
   });
@@ -253,7 +307,13 @@ describe('chamadoStatusAposResposta', () => {
 
 describe('cabeçalho e cartões', () => {
   it('assunto e nome de quem pediu entram escapados', () => {
-    const p = { id: 'p1', assunto: '<script>x</script>', solicitante: '"><b>', status: 'aberto', priority: 'alta' };
+    const p = {
+      id: 'p1',
+      assunto: '<script>x</script>',
+      solicitante: '"><b>',
+      status: 'aberto',
+      priority: 'alta',
+    };
     const html = sb.chamadoCabecalhoHtml(p, {}) + sb.chamadoCartoesHtml(p, null);
     expect(html).not.toContain('<script>x');
     expect(html).not.toContain('"><b>');
@@ -269,9 +329,12 @@ describe('cabeçalho e cartões', () => {
 // ── Item do chat (pendencias-detalhe.js) ──────────────────────────────────
 // Carrega as partes de pendências num vm, como tests/email-chamado-visual.
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const pen = {
@@ -314,13 +377,24 @@ try {
 
 describe('_penChatItemHtml', () => {
   it('escapa autor e texto da nota', () => {
-    const html = pen._penChatItemHtml({ author: '<b>x</b>', text: '<img src=x onerror=alert(1)>', visibility: 'resposta', createdAt: '2026-10-30' }, 'Ana');
+    const html = pen._penChatItemHtml(
+      {
+        author: '<b>x</b>',
+        text: '<img src=x onerror=alert(1)>',
+        visibility: 'resposta',
+        createdAt: '2026-10-30',
+      },
+      'Ana'
+    );
     expect(html).not.toContain('<img src=x');
     expect(html).not.toContain('<b>x</b>');
   });
 
   it('nota interna ganha a classe e a etiqueta "Interna"', () => {
-    const html = pen._penChatItemHtml({ author: 'Ana', text: 'só a equipe', visibility: 'interna', createdAt: '' }, 'Ana');
+    const html = pen._penChatItemHtml(
+      { author: 'Ana', text: 'só a equipe', visibility: 'interna', createdAt: '' },
+      'Ana'
+    );
     expect(html).toContain('is-interna');
     expect(html).toContain('Interna');
     expect(html).toContain('is-equipe');
@@ -332,14 +406,20 @@ describe('_penChatItemHtml', () => {
   });
 
   it('fala de quem pediu fica do lado do solicitante, sem etiqueta de interna', () => {
-    const html = pen._penChatItemHtml({ author: 'João', text: 'oi', visibility: 'solicitante', createdAt: '' }, 'Ana');
+    const html = pen._penChatItemHtml(
+      { author: 'João', text: 'oi', visibility: 'solicitante', createdAt: '' },
+      'Ana'
+    );
     expect(html).toContain('is-solicitante');
     expect(html).not.toContain('is-equipe');
     expect(html).not.toContain('is-interna');
   });
 
   it('resposta da equipe vai para o lado da equipe e não é interna', () => {
-    const html = pen._penChatItemHtml({ author: 'Ana', text: 'oi', visibility: 'resposta', createdAt: '' }, 'Ana');
+    const html = pen._penChatItemHtml(
+      { author: 'Ana', text: 'oi', visibility: 'resposta', createdAt: '' },
+      'Ana'
+    );
     expect(html).toContain('is-equipe');
     expect(html).not.toContain('is-interna');
   });

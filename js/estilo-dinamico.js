@@ -23,7 +23,11 @@ function _estiloDinamicoAplicar(el) {
   for (const ch of raw) {
     if (ch === '(') depth++;
     else if (ch === ')') depth = Math.max(0, depth - 1);
-    if (ch === ';' && depth === 0) { decls.push(cur); cur = ''; continue; }
+    if (ch === ';' && depth === 0) {
+      decls.push(cur);
+      cur = '';
+      continue;
+    }
     cur += ch;
   }
   decls.push(cur);
@@ -34,7 +38,10 @@ function _estiloDinamicoAplicar(el) {
     let val = d.slice(i + 1).trim();
     if (!val || val.length > 300 || !_STY_PROP.test(prop) || _STY_PERIGO.test(val)) continue;
     let prio = '';
-    if (/\s*!important$/i.test(val)) { val = val.replace(/\s*!important$/i, ''); prio = 'important'; }
+    if (/\s*!important$/i.test(val)) {
+      val = val.replace(/\s*!important$/i, '');
+      prio = 'important';
+    }
     el.style.setProperty(prop, val, prio);
   }
 }

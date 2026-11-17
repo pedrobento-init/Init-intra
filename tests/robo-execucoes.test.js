@@ -15,27 +15,50 @@ const sandbox = {
   document: { getElementById: (id) => nodes[id] || null },
   localStorage: {
     getItem: (k) => (k in store ? store[k] : null),
-    setItem: (k, v) => { store[k] = String(v); },
+    setItem: (k, v) => {
+      store[k] = String(v);
+    },
   },
   isSupabaseConnected: () => true,
-  supabaseClient: { from: () => { throw new Error('rede não deveria ser chamada'); } },
-  escapeHtml: (s) => String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
+  supabaseClient: {
+    from: () => {
+      throw new Error('rede não deveria ser chamada');
+    },
+  },
+  escapeHtml: (s) =>
+    String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;'),
   formatDateTime: (s) => s,
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync('js/robo-execucoes.js', 'utf8'), sandbox, { filename: 'robo-execucoes.js' });
+vm.runInContext(fs.readFileSync('js/robo-execucoes.js', 'utf8'), sandbox, {
+  filename: 'robo-execucoes.js',
+});
 
 const AGORA = Date.parse('2026-10-29T12:00:00.000Z');
 const minAtras = (m) => new Date(AGORA - m * 60000).toISOString();
-const rodada = (acao, min, over = {}) => Object.assign({
-  acao, inicio: minAtras(min), ok: true, erro: null, resultado: null,
-}, over);
+const rodada = (acao, min, over = {}) =>
+  Object.assign(
+    {
+      acao,
+      inicio: minAtras(min),
+      ok: true,
+      erro: null,
+      resultado: null,
+    },
+    over
+  );
 
 describe('roboSituacao', () => {
   it('usa a rodada mais nova de cada ação', () => {
-    const s = sandbox.roboSituacao([rodada('triagem', 2), rodada('triagem', 7), rodada('backup', 30)], AGORA);
+    const s = sandbox.roboSituacao(
+      [rodada('triagem', 2), rodada('triagem', 7), rodada('backup', 30)],
+      AGORA
+    );
     expect(s.acoes.map((a) => a.acao)).toEqual(['triagem', 'backup']);
     expect(s.acoes[0].ultima.inicio).toBe(minAtras(2));
     expect(s.acoes[0].rodadas).toBe(2);
@@ -57,20 +80,23 @@ describe('roboSituacao', () => {
   });
 
   it('falha antiga seguida de sucesso não entra em falhando', () => {
-    const s = sandbox.roboSituacao([
-      rodada('triagem', 2),
-      rodada('triagem', 7, { ok: false, erro: 'timeout' }),
-    ], AGORA);
+    const s = sandbox.roboSituacao(
+      [rodada('triagem', 2), rodada('triagem', 7, { ok: false, erro: 'timeout' })],
+      AGORA
+    );
     expect(s.falhando).toEqual([]);
     expect(s.acoes[0].falhas).toBe(1);
   });
 
   it('falha na rodada mais nova entra em falhando', () => {
-    const s = sandbox.roboSituacao([
-      rodada('triagem', 2),
-      rodada('briefing', 3, { ok: false, erro: 'x' }),
-      rodada('briefing', 60, { ok: false, erro: 'x' }),
-    ], AGORA);
+    const s = sandbox.roboSituacao(
+      [
+        rodada('triagem', 2),
+        rodada('briefing', 3, { ok: false, erro: 'x' }),
+        rodada('briefing', 60, { ok: false, erro: 'x' }),
+      ],
+      AGORA
+    );
     expect(s.falhando).toEqual(['briefing']);
     expect(s.acoes[1].falhas).toBe(2);
   });
@@ -97,7 +123,10 @@ describe('renderRoboExecucoes', () => {
 
   // Cache "fresco" impede a busca na rede durante o teste.
   const comCache = (linhas) => {
-    vm.runInContext('_rbxCache.em = Date.now(); _rbxCache.linhas = ' + JSON.stringify(linhas) + ';', sandbox);
+    vm.runInContext(
+      '_rbxCache.em = Date.now(); _rbxCache.linhas = ' + JSON.stringify(linhas) + ';',
+      sandbox
+    );
   };
 
   it('sem linhas limpa o painel', () => {
@@ -108,7 +137,15 @@ describe('renderRoboExecucoes', () => {
 
   it('escapa o erro vindo do banco', () => {
     const agora = Date.now();
-    comCache([{ acao: 'triagem', inicio: new Date(agora - 60000).toISOString(), ok: false, erro: '<img src=x onerror=alert(1)>', resultado: null }]);
+    comCache([
+      {
+        acao: 'triagem',
+        inicio: new Date(agora - 60000).toISOString(),
+        ok: false,
+        erro: '<img src=x onerror=alert(1)>',
+        resultado: null,
+      },
+    ]);
     sandbox.renderRoboExecucoes();
     const html = nodes.roboStatus.innerHTML;
     expect(html).not.toContain('<img');
@@ -117,7 +154,15 @@ describe('renderRoboExecucoes', () => {
 
   it('com problema abre o painel mesmo com preferência de fechado', () => {
     store.intra_rbx_fechada = '1';
-    comCache([{ acao: 'triagem', inicio: new Date(Date.now() - 60000).toISOString(), ok: false, erro: 'x', resultado: null }]);
+    comCache([
+      {
+        acao: 'triagem',
+        inicio: new Date(Date.now() - 60000).toISOString(),
+        ok: false,
+        erro: 'x',
+        resultado: null,
+      },
+    ]);
     sandbox.renderRoboExecucoes();
     const html = nodes.roboStatus.innerHTML;
     expect(html).toContain('is-problema');
@@ -126,7 +171,15 @@ describe('renderRoboExecucoes', () => {
   });
 
   it('tudo ok fica fechado por padrão', () => {
-    comCache([{ acao: 'triagem', inicio: new Date(Date.now() - 60000).toISOString(), ok: true, erro: null, resultado: { lidos: 3 } }]);
+    comCache([
+      {
+        acao: 'triagem',
+        inicio: new Date(Date.now() - 60000).toISOString(),
+        ok: true,
+        erro: null,
+        resultado: { lidos: 3 },
+      },
+    ]);
     sandbox.renderRoboExecucoes();
     const html = nodes.roboStatus.innerHTML;
     expect(html).toContain('is-fechada');

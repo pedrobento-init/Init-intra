@@ -8,17 +8,32 @@ const block = src.slice(src.indexOf('const LOGIN_GUARD_KEY'), src.indexOf('/**\n
 
 // Cada chamada é um "reload": estado em memória novo, mesmo storage.
 const load = (storage) =>
-  new Function('localStorage', block + '\nreturn { loginLockRemainingMs, formatLoginLockWait, _assertLoginAllowed, _recordLoginFailure, _recordLoginSuccess };')(storage);
+  new Function(
+    'localStorage',
+    block +
+      '\nreturn { loginLockRemainingMs, formatLoginLockWait, _assertLoginAllowed, _recordLoginFailure, _recordLoginSuccess };'
+  )(storage);
 
 const memStorage = () => {
   const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), _m: m };
+  return {
+    getItem: (k) => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => m.set(k, String(v)),
+    removeItem: (k) => m.delete(k),
+    _m: m,
+  };
 };
-const fail = (g, n) => { for (let i = 0; i < n; i++) g._recordLoginFailure(); };
+const fail = (g, n) => {
+  for (let i = 0; i < n; i++) g._recordLoginFailure();
+};
 
 describe('trava de login (SEC-08)', () => {
   let st;
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-17T12:00:00Z')); st = memStorage(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-17T12:00:00Z'));
+    st = memStorage();
+  });
   afterEach(() => vi.useRealTimers());
 
   it('4 falhas não travam; a 5ª trava por 30 s', () => {
@@ -60,7 +75,8 @@ describe('trava de login (SEC-08)', () => {
 
   it('o tempo restante diminui e libera no fim; mensagem em pt-BR mostra minutos e segundos', () => {
     const g = load(st);
-    fail(g, 5); fail(g, 0);
+    fail(g, 5);
+    fail(g, 0);
     vi.advanceTimersByTime(30001);
     expect(g.loginLockRemainingMs()).toBe(0);
     fail(g, 5); // nível 1: 60 s
@@ -83,8 +99,10 @@ describe('trava de login (SEC-08)', () => {
 
   it('1 h sem falhar zera o nível de backoff', () => {
     const g = load(st);
-    fail(g, 5); vi.advanceTimersByTime(31000);
-    fail(g, 5); vi.advanceTimersByTime(61000); // nível agora 2 (próxima trava = 120 s)
+    fail(g, 5);
+    vi.advanceTimersByTime(31000);
+    fail(g, 5);
+    vi.advanceTimersByTime(61000); // nível agora 2 (próxima trava = 120 s)
     vi.advanceTimersByTime(61 * 60 * 1000);
     const r = load(st);
     fail(r, 5);
@@ -92,7 +110,17 @@ describe('trava de login (SEC-08)', () => {
   });
 
   it('storage que lança (modo privado/bloqueado): continua funcionando em memória', () => {
-    const boom = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); }, removeItem() { throw new Error('x'); } };
+    const boom = {
+      getItem() {
+        throw new Error('x');
+      },
+      setItem() {
+        throw new Error('x');
+      },
+      removeItem() {
+        throw new Error('x');
+      },
+    };
     const g = load(boom);
     fail(g, 5);
     expect(g.loginLockRemainingMs()).toBe(30000);
@@ -109,7 +137,10 @@ describe('trava de login (SEC-08)', () => {
   it('registro adulterado/corrompido é ignorado; relógio voltado não passa do teto', () => {
     st.setItem('initintra:login-guard', '{nao e json');
     expect(load(st).loginLockRemainingMs()).toBe(0);
-    st.setItem('initintra:login-guard', JSON.stringify({ fails: 'x', level: -3, lockUntil: Date.now() + 10 * 24 * 3600 * 1000 }));
+    st.setItem(
+      'initintra:login-guard',
+      JSON.stringify({ fails: 'x', level: -3, lockUntil: Date.now() + 10 * 24 * 3600 * 1000 })
+    );
     expect(load(st).loginLockRemainingMs()).toBe(30 * 60 * 1000);
     st.setItem('initintra:login-guard', JSON.stringify({ lockUntil: 'abc' }));
     expect(load(st).loginLockRemainingMs()).toBe(0);

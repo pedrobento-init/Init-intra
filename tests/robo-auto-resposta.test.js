@@ -8,7 +8,8 @@ import { respostaAutomatica, entradaDaCaixa } from '../supabase/functions/robo/c
 // nota do solicitante. Pior: a nossa resposta gerava outra auto-resposta, que
 // virava outra nota. A triagem agora separa a máquina antes de olhar a conversa.
 
-const ler = (rel) => fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+const ler = (rel) =>
+  fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 
 const email = (over = {}) => ({
   id: 'msg-1',
@@ -23,7 +24,9 @@ const email = (over = {}) => ({
 
 describe('o cabeçalho manda primeiro', () => {
   it('Auto-Submitted: auto-replied é máquina (RFC 3834)', () => {
-    expect(respostaAutomatica(email({ cabecalhos: { 'Auto-Submitted': 'auto-replied' } }))).toBe(true);
+    expect(respostaAutomatica(email({ cabecalhos: { 'Auto-Submitted': 'auto-replied' } }))).toBe(
+      true
+    );
   });
 
   it('Auto-Submitted: no é gente — o servidor afirmou que não é automático', () => {
@@ -56,16 +59,22 @@ describe('o cabeçalho manda primeiro', () => {
 
 describe('sem cabeçalho, remetente, assunto e corpo cobrem', () => {
   it('aviso de não entrega do mailer-daemon é máquina', () => {
-    expect(respostaAutomatica(email({ de: 'Mail Delivery Subsystem <mailer-daemon@googlemail.com>' }))).toBe(true);
+    expect(
+      respostaAutomatica(email({ de: 'Mail Delivery Subsystem <mailer-daemon@googlemail.com>' }))
+    ).toBe(true);
   });
 
   it('assunto de férias com acento e maiúscula é reconhecido', () => {
-    expect(respostaAutomatica(email({ assunto: 'Resposta Automática: Re: Impressora' }))).toBe(true);
+    expect(respostaAutomatica(email({ assunto: 'Resposta Automática: Re: Impressora' }))).toBe(
+      true
+    );
     expect(respostaAutomatica(email({ assunto: 'Out of Office: Impressora' }))).toBe(true);
   });
 
   it('corpo que se declara automático é reconhecido', () => {
-    expect(respostaAutomatica(email({ trecho: 'Esta é uma resposta automática. Retorno dia 3.' }))).toBe(true);
+    expect(
+      respostaAutomatica(email({ trecho: 'Esta é uma resposta automática. Retorno dia 3.' }))
+    ).toBe(true);
   });
 
   it('e-mail comum de cliente segue para a conversa', () => {
@@ -73,13 +82,19 @@ describe('sem cabeçalho, remetente, assunto e corpo cobrem', () => {
   });
 
   it('a palavra "automática" no meio do pedido não basta', () => {
-    expect(respostaAutomatica(email({ trecho: 'A atualização automática do Windows travou o computador.' }))).toBe(false);
+    expect(
+      respostaAutomatica(
+        email({ trecho: 'A atualização automática do Windows travou o computador.' })
+      )
+    ).toBe(false);
   });
 });
 
 describe('a auto-resposta não some: vai para a caixa de triagem', () => {
   it('vira entrada com motivo auto_resposta', () => {
-    expect(entradaDaCaixa(email(), { motivo: 'auto_resposta' }, 'ETR-1').motivo).toBe('auto_resposta');
+    expect(entradaDaCaixa(email(), { motivo: 'auto_resposta' }, 'ETR-1').motivo).toBe(
+      'auto_resposta'
+    );
   });
 
   it('o robô separa a máquina antes de olhar a conversa do chamado', () => {
@@ -105,6 +120,6 @@ describe('a auto-resposta não some: vai para a caixa de triagem', () => {
   it('o Apps Script manda os cabeçalhos que a detecção lê', () => {
     const gs = ler('../tools/google-agenda-apps-script/Robo.gs');
     expect(gs).toContain("m.getHeader('Auto-Submitted')");
-    expect(gs).toContain("everyMinutes(5)");
+    expect(gs).toContain('everyMinutes(5)');
   });
 });

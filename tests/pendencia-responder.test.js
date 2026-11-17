@@ -13,14 +13,18 @@ import { fileURLToPath } from 'node:url';
 
 const src = fs.readFileSync(
   fileURLToPath(new URL('../supabase/functions/pendencia-responder/index.ts', import.meta.url)),
-  'utf8',
+  'utf8'
 );
 
 describe('pendencia-responder: o destinatário nunca vem do app', () => {
   it('o corpo da requisição só traz pendencia_id e text', () => {
     const destruct = /const\s*\{([^}]*)\}\s*=\s*await\s+req\.json\(\)/.exec(src);
     expect(destruct, 'não achei a leitura do corpo da requisição').not.toBeNull();
-    const campos = destruct[1].split(',').map((s) => s.trim()).filter(Boolean).sort();
+    const campos = destruct[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .sort();
     expect(campos).toEqual(['pendencia_id', 'text']);
   });
 

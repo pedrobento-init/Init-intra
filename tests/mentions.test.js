@@ -8,9 +8,15 @@ describe('parseMentionedOperators', () => {
   let storage;
   beforeEach(() => {
     globalThis.getOperatorNames = () => ['Pedro', 'João Silva', 'Maria'];
-    globalThis.escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    globalThis.escapeHtml = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     // clear require cache
-        storage = requireStorage();
+    storage = requireStorage();
   });
   it('detecta @Pedro case-insensitive', () => {
     const r = storage.parseMentionedOperators('Oi @pedro tudo bem?');
@@ -40,8 +46,14 @@ describe('highlightMentions', () => {
   let storage;
   beforeEach(() => {
     globalThis.getOperatorNames = () => ['Pedro', 'João Silva'];
-    globalThis.escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        storage = requireStorage();
+    globalThis.escapeHtml = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    storage = requireStorage();
   });
   it('envolve @Nome com span estilizado', () => {
     const out = storage.highlightMentions('Oi @Pedro tudo bem');

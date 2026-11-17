@@ -13,7 +13,11 @@ function _startApp() {
   updateBadges();
 
   if (typeof initSupabaseRealtime === 'function') {
-    try { initSupabaseRealtime(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+    try {
+      initSupabaseRealtime();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+    }
   }
 
   var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
@@ -26,25 +30,51 @@ function _startApp() {
   if (typeof updateRelatoriosVisibility === 'function') updateRelatoriosVisibility();
   if (typeof setSidebarMoreAdmin === 'function') setSidebarMoreAdmin(isAdmin);
 
-  const hash  = window.location.hash.replace('#','');
-  const pages = ['fila','dashboard','prazos','vencimentos','conhecimento','clientes','pendencias','caixa','calendario','operadores','relatorios','equipamentos','historico','templates','visitas','reuniao'];
+  const hash = window.location.hash.replace('#', '');
+  const pages = [
+    'fila',
+    'dashboard',
+    'prazos',
+    'vencimentos',
+    'conhecimento',
+    'clientes',
+    'pendencias',
+    'caixa',
+    'calendario',
+    'operadores',
+    'relatorios',
+    'equipamentos',
+    'historico',
+    'templates',
+    'visitas',
+    'reuniao',
+  ];
   // Tela inicial: gestão (admin/supervisor) cai no Dashboard; quem está no
   // dia a dia cai na Minha fila.
-  const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';
+  const homePage = typeof isTeamAdmin === 'function' && isTeamAdmin() ? 'dashboard' : 'fila';
   // Números amigáveis antes da primeira pintura (local, sem rede): evita
   // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
-  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+  try {
+    if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros();
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+  }
   // Rota de item carrega por id: o F5 e o link colado precisam voltar ao mesmo item.
   const _isRota = (h) => typeof penPaginaRotaDe === 'function' && !!penPaginaRotaDe(h);
   navigateTo(pages.includes(hash) || _isRota(hash) ? hash : homePage);
   // Offline-first: a UI já montou a partir do banco local; a sincronização
   // automática roda agora em segundo plano, sem bloquear (toda falha de rede
   // vira fallback local + retry — ver triggerStartupSync em storage.js).
-  try { if (typeof triggerStartupSync === 'function') triggerStartupSync('app-start'); } catch (_e) { console.error('[app] sync de inicialização falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+  try {
+    if (typeof triggerStartupSync === 'function') triggerStartupSync('app-start');
+  } catch (_e) {
+    console.error('[app] sync de inicialização falhou', _e);
+    if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+  }
   if (!_appStarted) {
     _appStarted = true;
     window.addEventListener('hashchange', () => {
-      const p = window.location.hash.replace('#','');
+      const p = window.location.hash.replace('#', '');
       if ((pages.includes(p) || _isRota(p)) && p !== _currentPage) navigateTo(p);
     });
   }
@@ -62,7 +92,9 @@ function forgotPassword() {
   }
   authResetPassword(email)
     .then(() => {
-      alert('Se o e-mail estiver cadastrado, você receberá um link de redefinição.\nVerifique a caixa de entrada e o spam.');
+      alert(
+        'Se o e-mail estiver cadastrado, você receberá um link de redefinição.\nVerifique a caixa de entrada e o spam.'
+      );
     })
     .catch(() => {
       alert('Não foi possível enviar o e-mail agora. Tente novamente ou contate um administrador.');
@@ -116,7 +148,10 @@ function showLoginScreen() {
 
   // Enter no e-mail pula para a senha; Enter na senha entra (antes era onkeydown no HTML).
   document.getElementById('loginEmail')?.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('loginPassword')?.focus(); }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      document.getElementById('loginPassword')?.focus();
+    }
   });
   document.getElementById('loginPassword')?.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') doLogin();
@@ -130,19 +165,27 @@ function showLoginScreen() {
 // vive em auth.js e sobrevive ao reload; ver o aviso sobre defesa server-side).
 let _loginLockTimer = null;
 function _loginLockCountdown() {
-  if (_loginLockTimer) { clearInterval(_loginLockTimer); _loginLockTimer = null; }
+  if (_loginLockTimer) {
+    clearInterval(_loginLockTimer);
+    _loginLockTimer = null;
+  }
   if (typeof loginLockRemainingMs !== 'function' || loginLockRemainingMs() <= 0) return;
   const tick = () => {
     const errEl = document.getElementById('loginError');
     const btn = document.getElementById('loginBtn');
     const left = loginLockRemainingMs();
     if (left <= 0) {
-      clearInterval(_loginLockTimer); _loginLockTimer = null;
+      clearInterval(_loginLockTimer);
+      _loginLockTimer = null;
       if (errEl) errEl.textContent = '';
       if (btn) btn.disabled = false;
       return;
     }
-    if (errEl) { errEl.textContent = 'Muitas tentativas. Aguarde ' + formatLoginLockWait(left) + ' e tente novamente.'; errEl.style.color = '#f87171'; }
+    if (errEl) {
+      errEl.textContent =
+        'Muitas tentativas. Aguarde ' + formatLoginLockWait(left) + ' e tente novamente.';
+      errEl.style.color = '#f87171';
+    }
     if (btn) btn.disabled = true;
   };
   tick();
@@ -150,10 +193,10 @@ function _loginLockCountdown() {
 }
 
 async function doLogin() {
-  const email    = document.getElementById('loginEmail')?.value?.trim() || '';
+  const email = document.getElementById('loginEmail')?.value?.trim() || '';
   const password = document.getElementById('loginPassword')?.value || '';
-  const errEl    = document.getElementById('loginError');
-  const btn      = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
 
   if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) {
     if (errEl) errEl.textContent = 'Serviço de autenticação indisponível.';
@@ -170,7 +213,8 @@ async function doLogin() {
 
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="u-9cb0f7"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Autenticando...';
+    btn.innerHTML =
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="u-9cb0f7"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Autenticando...';
   }
   if (errEl) errEl.textContent = '';
 
@@ -191,13 +235,21 @@ async function doLogin() {
     var msg = 'Não foi possível entrar. Verifique seus dados e tente novamente.';
     if (raw.includes('Muitas tentativas')) {
       msg = raw;
-    } else if (raw.includes('não cadastrado') || raw.includes('desativado') || raw.includes('Contate')) {
+    } else if (
+      raw.includes('não cadastrado') ||
+      raw.includes('desativado') ||
+      raw.includes('Contate')
+    ) {
       msg = raw;
     } else if (raw.includes('Email not confirmed') || raw.includes('email_not_confirmed')) {
       msg = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
     } else if (raw.includes('Invalid login credentials') || raw.includes('invalid_credentials')) {
       msg = 'E-mail ou senha incorretos.';
-    } else if (raw.includes('fetch') || raw.includes('network') || raw.includes('Failed to fetch')) {
+    } else if (
+      raw.includes('fetch') ||
+      raw.includes('network') ||
+      raw.includes('Failed to fetch')
+    ) {
       msg = 'Sem conexão com o servidor. Verifique sua internet.';
     } else if (raw.includes('Informe')) {
       msg = raw;
@@ -205,7 +257,10 @@ async function doLogin() {
     if (errEl) errEl.textContent = msg;
     if (errEl) errEl.style.color = '#f87171';
     const input = document.getElementById('loginPassword');
-    if (input) { input.value = ''; input.focus(); }
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -218,13 +273,26 @@ async function doLogin() {
 async function doLogout() {
   // Alterações ainda não enviadas ficam só neste aparelho: avisa antes de sair.
   try {
-    if (typeof getPendingChanges === 'function' && typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
+    if (
+      typeof getPendingChanges === 'function' &&
+      typeof isSupabaseConnected === 'function' &&
+      isSupabaseConnected()
+    ) {
       const pend = await getPendingChanges();
-      if (pend.length && !window.confirm(
-        (pend.length === 1 ? 'Há 1 alteração que ainda não foi enviada' : 'Há ' + pend.length + ' alterações que ainda não foram enviadas') +
-        ' ao servidor.\n\nElas continuam salvas neste aparelho e sobem no próximo acesso, mas não aparecem para a equipe até lá.\n\nSair mesmo assim?')) return;
+      if (
+        pend.length &&
+        !window.confirm(
+          (pend.length === 1
+            ? 'Há 1 alteração que ainda não foi enviada'
+            : 'Há ' + pend.length + ' alterações que ainda não foram enviadas') +
+            ' ao servidor.\n\nElas continuam salvas neste aparelho e sobem no próximo acesso, mas não aparecem para a equipe até lá.\n\nSair mesmo assim?'
+        )
+      )
+        return;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+  }
   try {
     await authSignOut();
   } catch (err) {
@@ -236,12 +304,14 @@ async function doLogout() {
   window._supabaseAuthActive = false;
   // Limpar tokens Supabase do localStorage (safety net adicional)
   try {
-    Object.keys(localStorage).forEach(key => {
+    Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
         localStorage.removeItem(key);
       }
     });
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+  }
   showLoginScreen();
 }
 
@@ -258,7 +328,9 @@ function _bootOpWithTimeout(promise, fallback) {
         () => fallback
       );
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'app');
+  }
   return Promise.resolve(promise).then(
     (v) => (v === undefined ? fallback : v),
     () => fallback

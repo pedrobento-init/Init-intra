@@ -37,11 +37,20 @@ describe('canSyncClientDevices (isolamento operador→equipe→cliente)', () => 
 
 describe('normalizeMilvusDevice', () => {
   it('mapeia campos incl. macaddres e preserva null como vazio/nulo', () => {
-    const r = milvus.normalizeMilvusDevice({
-      id: 7, hostname: 'PC-01', macaddres: 'AA:BB', marca: null,
-      is_ativo: 1, total_processadores: '4', data_compra: '2023-01-15T00:00:00Z',
-      sistema_operacional_licenca: 'XXXXX-SECRETA',
-    }, 'CLI-1', 'mam');
+    const r = milvus.normalizeMilvusDevice(
+      {
+        id: 7,
+        hostname: 'PC-01',
+        macaddres: 'AA:BB',
+        marca: null,
+        is_ativo: 1,
+        total_processadores: '4',
+        data_compra: '2023-01-15T00:00:00Z',
+        sistema_operacional_licenca: 'XXXXX-SECRETA',
+      },
+      'CLI-1',
+      'mam'
+    );
     expect(r.milvus_device_id).toBe(7);
     expect(r.id).toBe('CLI-1:milvus-7');
     expect(r.mac_address).toBe('AA:BB');
@@ -51,7 +60,11 @@ describe('normalizeMilvusDevice', () => {
     expect(r.is_ativo).toBe(true);
   });
   it('NUNCA persiste licença (chave nem aparece no objeto)', () => {
-    const r = milvus.normalizeMilvusDevice({ id: 1, sistema_operacional_licenca: 'KEY-123' }, 'CLI-1', 'mam');
+    const r = milvus.normalizeMilvusDevice(
+      { id: 1, sistema_operacional_licenca: 'KEY-123' },
+      'CLI-1',
+      'mam'
+    );
     expect(JSON.stringify(r).toLowerCase()).not.toContain('licenca');
     expect(JSON.stringify(r)).not.toContain('KEY-123');
   });
@@ -69,14 +82,21 @@ describe('normalizeMilvusDevice', () => {
 describe('paginação Milvus', () => {
   it('payload segue o contrato (paginate/order/total/pagina)', () => {
     expect(milvus.buildMilvusListPayload(3)).toEqual({
-      is_paginate: true, is_descending: false, order_by: 'id',
-      total_registros: 1000, pagina: 3,
+      is_paginate: true,
+      is_descending: false,
+      order_by: 'id',
+      total_registros: 1000,
+      pagina: 3,
     });
   });
   it('parse lê current_page/last_page e lista', () => {
-    const p = milvus.parseMilvusPage({
-      meta: { paginate: { current_page: 1, last_page: 95 } }, lista: [{ id: 1 }],
-    }, 1);
+    const p = milvus.parseMilvusPage(
+      {
+        meta: { paginate: { current_page: 1, last_page: 95 } },
+        lista: [{ id: 1 }],
+      },
+      1
+    );
     expect(p).toEqual({ list: [{ id: 1 }], current: 1, last: 95 });
   });
   it('parse rejeita resposta sem lista', () => {
@@ -109,12 +129,16 @@ describe('classifyMilvusError', () => {
 
 describe('formatMilvusSyncResult', () => {
   it('linha padrão sem pendências', () => {
-    expect(milvus.formatMilvusSyncResult({ synced: 88, created: 80, updated: 8 }))
-      .toEqual({ line: '88 dispositivos sincronizados · 80 novos · 8 atualizados', unresolved: 0 });
+    expect(milvus.formatMilvusSyncResult({ synced: 88, created: 80, updated: 8 })).toEqual({
+      line: '88 dispositivos sincronizados · 80 novos · 8 atualizados',
+      unresolved: 0,
+    });
   });
   it('lista nomes sem resolução (máx. 5 + reticência)', () => {
     const r = milvus.formatMilvusSyncResult({
-      synced: 0, created: 0, updated: 0,
+      synced: 0,
+      created: 0,
+      updated: 0,
       unresolvedNames: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
     });
     expect(r.unresolved).toBe(7);
@@ -123,18 +147,26 @@ describe('formatMilvusSyncResult', () => {
     expect(r.line.endsWith('…')).toBe(true);
   });
   it('tolerante a resposta vazia', () => {
-    expect(milvus.formatMilvusSyncResult(null))
-      .toEqual({ line: '0 dispositivos sincronizados · 0 novos · 0 atualizados', unresolved: 0 });
+    expect(milvus.formatMilvusSyncResult(null)).toEqual({
+      line: '0 dispositivos sincronizados · 0 novos · 0 atualizados',
+      unresolved: 0,
+    });
   });
 });
 
 describe('fabricante fora / processador dentro', () => {
   it('normalize: não puxa fabricante; processador passa direto', () => {
-    const r = milvus.normalizeMilvusDevice({ id: 1, marca: null, fabricante: 'Dell', processador: 'i5-1235U' }, 'C', 't');
+    const r = milvus.normalizeMilvusDevice(
+      { id: 1, marca: null, fabricante: 'Dell', processador: 'i5-1235U' },
+      'C',
+      't'
+    );
     expect(r.fabricante).toBe('');
     expect(r.marca).toBe('');
     expect(r.processador).toBe('i5-1235U');
-    expect(milvus.normalizeMilvusDevice({ id: 1, marca: 'Lenovo', fabricante: 'X' }, 'C', 't').marca).toBe('Lenovo');
+    expect(
+      milvus.normalizeMilvusDevice({ id: 1, marca: 'Lenovo', fabricante: 'X' }, 'C', 't').marca
+    ).toBe('Lenovo');
   });
   it('exibição: marca || placa_mae; processador passa direto', () => {
     expect(milvus.mapMilvusRowToLocal({ marca: '', placa_mae: 'LENOVO' }).marca).toBe('LENOVO');
@@ -160,27 +192,54 @@ describe('diffMilvusUpsert + idempotência (dupla sincronização)', () => {
   });
   it('chave é (client+milvus id): mesmo milvus id em clientes distintos não colide', () => {
     // diff opera por cliente (existingIds já filtrados por client_id no servidor).
-    expect(milvus.diffMilvusUpsert([], [{ milvus_device_id: 9 }])).toEqual({ created: 1, updated: 0 });
+    expect(milvus.diffMilvusUpsert([], [{ milvus_device_id: 9 }])).toEqual({
+      created: 1,
+      updated: 0,
+    });
   });
 });
 
 describe('buildInventoryExportSheet (mesmas colunas da tabela)', () => {
   it('cabeçalho na ordem exibida, com Processador e sem Fabricante', () => {
     const sheet = milvus.buildInventoryExportSheet([]);
-    expect(sheet.header).toEqual(['Hostname', 'Apelido', 'Processador', 'Marca', 'Modelo',
-      'Sistema operacional', 'Nº serial', 'Usuário logado', 'Tipo', 'IP interno',
-      'Status', 'Atualizado em']);
+    expect(sheet.header).toEqual([
+      'Hostname',
+      'Apelido',
+      'Processador',
+      'Marca',
+      'Modelo',
+      'Sistema operacional',
+      'Nº serial',
+      'Usuário logado',
+      'Tipo',
+      'IP interno',
+      'Status',
+      'Atualizado em',
+    ]);
     expect(sheet.rows).toEqual([]);
   });
   it('mapeia valores, status e vazios como string vazia', () => {
-    const sheet = milvus.buildInventoryExportSheet([{
-      hostname: 'GMAR-01', apelido: '', processador: 'i5-1235U', marca: 'Dell Inc.',
-      modelo_notebook: '', sistema_operacional: 'Win 11', numero_serial: 'ABC123',
-      usuario_logado: 'Diego', tipo_dispositivo_text: 'Notebook', ip_interno: '10.0.0.5',
-      is_ativo: true, data_ultima_atualizacao: null, updatedAt: null,
-    }, {
-      hostname: 'OLD', is_ativo: false,
-    }]);
+    const sheet = milvus.buildInventoryExportSheet([
+      {
+        hostname: 'GMAR-01',
+        apelido: '',
+        processador: 'i5-1235U',
+        marca: 'Dell Inc.',
+        modelo_notebook: '',
+        sistema_operacional: 'Win 11',
+        numero_serial: 'ABC123',
+        usuario_logado: 'Diego',
+        tipo_dispositivo_text: 'Notebook',
+        ip_interno: '10.0.0.5',
+        is_ativo: true,
+        data_ultima_atualizacao: null,
+        updatedAt: null,
+      },
+      {
+        hostname: 'OLD',
+        is_ativo: false,
+      },
+    ]);
     expect(sheet.rows[0][0]).toBe('GMAR-01');
     expect(sheet.rows[0][2]).toBe('i5-1235U');
     expect(sheet.rows[0][1]).toBe('');

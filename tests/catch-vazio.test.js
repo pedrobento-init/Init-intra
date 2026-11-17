@@ -14,14 +14,21 @@ const read = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 
 function walk(n, cb) {
   if (!n || typeof n !== 'object') return;
-  if (Array.isArray(n)) { n.forEach((x) => walk(x, cb)); return; }
+  if (Array.isArray(n)) {
+    n.forEach((x) => walk(x, cb));
+    return;
+  }
   if (n.type) cb(n);
   for (const k in n) if (k !== 'type') walk(n[k], cb);
 }
 
 // Mesmo critério do no-empty do ESLint: bloco sem instrução e sem comentário.
 function emptyCatches(src) {
-  const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script', allowReturnOutsideFunction: true });
+  const ast = acorn.parse(src, {
+    ecmaVersion: 2022,
+    sourceType: 'script',
+    allowReturnOutsideFunction: true,
+  });
   const found = [];
   walk(ast, (n) => {
     if (n.type !== 'CatchClause' || n.body.body.length) return;
@@ -42,7 +49,8 @@ describe('catch vazio em js/', () => {
   });
 
   it('o detector enxerga catch {} e catch (e) {} mas aceita catch comentado', () => {
-    const src = 'try { a(); } catch {}\ntry { b(); } catch (e) {\n}\ntry { c(); } catch (_) { /* ok */ }\n';
+    const src =
+      'try { a(); } catch {}\ntry { b(); } catch (e) {\n}\ntry { c(); } catch (_) { /* ok */ }\n';
     expect(emptyCatches(src)).toEqual([1, 2]);
   });
 
@@ -61,16 +69,27 @@ describe('falha de push não é engolida (time-entries)', () => {
       console,
       window: { _supabaseAuthActive: true },
       isSupabaseConnected: () => true,
-      supabaseClient: { from() { throw new Error('boom'); } },
-      markSyncPushFailed: () => { calls.failed++; },
-      _logSilent: (_e, where) => { calls.logged.push(where); },
+      supabaseClient: {
+        from() {
+          throw new Error('boom');
+        },
+      },
+      markSyncPushFailed: () => {
+        calls.failed++;
+      },
+      _logSilent: (_e, where) => {
+        calls.logged.push(where);
+      },
       DB: { TIME_ENTRIES: 'time_entries' },
       dbGet: () => [],
       dbSet: () => {},
       _addTombstone: () => {},
     };
     vm.createContext(ctx);
-    vm.runInContext(read(path.join(jsDir, 'time-entries.js')) + '\nthis.deleteTimeEntry = deleteTimeEntry;', ctx);
+    vm.runInContext(
+      read(path.join(jsDir, 'time-entries.js')) + '\nthis.deleteTimeEntry = deleteTimeEntry;',
+      ctx
+    );
     return { ctx, calls };
   }
 

@@ -12,11 +12,7 @@ const globaisDoApp = Object.fromEntries(
 
 export default [
   {
-    ignores: [
-      'node_modules/**',
-      'js/config.js',
-      'js/supabase-config.js'
-    ],
+    ignores: ['node_modules/**', 'js/config.js', 'js/supabase-config.js'],
   },
   js.configs.recommended,
   {
@@ -46,8 +42,8 @@ export default [
         Dexie: 'readonly',
         Chart: 'readonly',
         FullCalendar: 'readonly',
-        Motion: 'readonly'
-      }
+        Motion: 'readonly',
+      },
     },
     rules: {
       // Os globais entre scripts vêm de `globaisDoApp` (declarações de topo
@@ -56,7 +52,17 @@ export default [
       // vars: 'local' — funções/consts de topo são globais usados por outros
       // scripts e por onclick="..." no HTML; o ESLint não enxerga esse uso e
       // acusava ~800 falsos positivos. Variáveis locais seguem verificadas.
-      'no-unused-vars': ['warn', { vars: 'local', args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'all', caughtErrorsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        {
+          vars: 'local',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-prototype-builtins': 'off',
       'no-useless-escape': 'off',
       // catch vazio engolia falha em silêncio: use _logSilent (js/error-log.js)
@@ -64,8 +70,8 @@ export default [
       'no-empty': ['error', { allowEmptyCatch: false }],
       // Pega `var x`/`function x` repetidos no mesmo arquivo. Colisão ENTRE
       // arquivos é coberta por tests/globais-colisao.test.js.
-      'no-redeclare': ['error', { builtinGlobals: false }]
-    }
+      'no-redeclare': ['error', { builtinGlobals: false }],
+    },
   },
   {
     files: ['tools/**/*.js'],
@@ -73,12 +79,15 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'commonjs',
       globals: {
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-      'no-empty': ['error', { allowEmptyCatch: false }]
-    }
-  }
+      'no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+      'no-empty': ['error', { allowEmptyCatch: false }],
+    },
+  },
 ];

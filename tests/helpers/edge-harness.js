@@ -92,10 +92,7 @@ export async function loadHandler(
     withSupabase: (cfg, handle) => async (req) => {
       let ctx = { supabaseAdmin: null, userClaims: null };
       if (cfg?.auth === 'user') {
-        const token = String(req.headers.get('Authorization') ?? '').replace(
-          /^Bearer\s+/i,
-          ''
-        );
+        const token = String(req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
         if (!token) return new Response('Unauthorized', { status: 401 });
         const anon = injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {});
         const { data } = await anon.auth.getUser(token);
@@ -104,21 +101,13 @@ export async function loadHandler(
           supabase: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
             global: { headers: { Authorization: `Bearer ${token}` } },
           }),
-          supabaseAdmin: injectCreateClient(
-            env.SUPABASE_URL,
-            env.SUPABASE_SERVICE_ROLE_KEY,
-            {}
-          ),
+          supabaseAdmin: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {}),
           userClaims: { id: data.user.id },
         };
       } else {
         ctx = {
           supabase: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {}),
-          supabaseAdmin: injectCreateClient(
-            env.SUPABASE_URL,
-            env.SUPABASE_SERVICE_ROLE_KEY,
-            {}
-          ),
+          supabaseAdmin: injectCreateClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {}),
           userClaims: null,
         };
       }

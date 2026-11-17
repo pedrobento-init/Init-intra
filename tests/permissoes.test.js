@@ -9,12 +9,23 @@ import vm from 'node:vm';
 // ── Stubs de browser com innerHTML gravável ────────────────────────────────
 function mkEl(id) {
   return {
-    _id: id, innerHTML: '', textContent: '', value: '', disabled: false,
-    style: {}, dataset: {}, children: [], firstChild: null,
+    _id: id,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    disabled: false,
+    style: {},
+    dataset: {},
+    children: [],
+    firstChild: null,
     classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    addEventListener() {}, appendChild() {}, remove() {},
-    querySelector: () => mkEl(id + ':q'), querySelectorAll: () => [],
-    focus() {}, click() {},
+    addEventListener() {},
+    appendChild() {},
+    remove() {},
+    querySelector: () => mkEl(id + ':q'),
+    querySelectorAll: () => [],
+    focus() {},
+    click() {},
   };
 }
 const _el = {};
@@ -25,7 +36,14 @@ function _setGlobal(name, value) {
     globalThis[name] = value;
   }
 }
-_setGlobal('window', { _pendingSyncCount: 0, _syncPending: 0, _supabaseAuthActive: false, _suppressPendingSync: false, addEventListener() {}, location: { hash: '#operadores' } });
+_setGlobal('window', {
+  _pendingSyncCount: 0,
+  _syncPending: 0,
+  _supabaseAuthActive: false,
+  _suppressPendingSync: false,
+  addEventListener() {},
+  location: { hash: '#operadores' },
+});
 _setGlobal('navigator', { onLine: true });
 _setGlobal('document', {
   addEventListener() {},
@@ -33,18 +51,25 @@ _setGlobal('document', {
   querySelector: () => mkEl('q'),
   querySelectorAll: () => [],
   createElement: () => mkEl('c'),
-  head: mkEl('head'), body: mkEl('body'),
+  head: mkEl('head'),
+  body: mkEl('body'),
   visibilityState: 'visible',
 });
 const _ls = {};
 _setGlobal('localStorage', {
   getItem: (k) => (k in _ls ? _ls[k] : null),
-  setItem: (k, v) => { _ls[k] = String(v); },
-  removeItem: (k) => { delete _ls[k]; },
+  setItem: (k, v) => {
+    _ls[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _ls[k];
+  },
 });
 globalThis.Dexie = class {
   constructor() {}
-  version() { return { stores() {} }; }
+  version() {
+    return { stores() {} };
+  }
 };
 
 // ── Código REAL ────────────────────────────────────────────────────────────
@@ -66,18 +91,42 @@ const _stores = { clients: [], pendencias: [], visits: [], operators: [] };
 const _kv = {};
 let _session = null;
 _setGlobal('getCacheStore', (name) => _stores[name] || []);
-_setGlobal('setCacheStore', (name, items) => { _stores[name] = Array.isArray(items) ? [...items] : items; });
+_setGlobal('setCacheStore', (name, items) => {
+  _stores[name] = Array.isArray(items) ? [...items] : items;
+});
 _setGlobal('getCacheKV', (k, d) => (k in _kv ? _kv[k] : d));
-_setGlobal('setCacheKV', (k, v) => { _kv[k] = v; });
-_setGlobal('getCacheTable', (t) => (t === 'sessions' && _session ? { key: 's', value: _session } : {}));
+_setGlobal('setCacheKV', (k, v) => {
+  _kv[k] = v;
+});
+_setGlobal('getCacheTable', (t) =>
+  t === 'sessions' && _session ? { key: 's', value: _session } : {}
+);
 _setGlobal('setCacheTable', () => {});
 
 const ADMIN = { id: 'OP-1', name: 'Ana Admin', team: 'init', isAdmin: true, active: true };
-const TEC_MAM = { id: 'OP-2', name: 'Bob Mam', team: 'mam', isAdmin: false, active: true, role: 'Técnico' };
-const TEC_MAM2 = { id: 'OP-3', name: 'Cara Mam', team: 'mam', isAdmin: false, active: true, role: 'Técnico' };
+const TEC_MAM = {
+  id: 'OP-2',
+  name: 'Bob Mam',
+  team: 'mam',
+  isAdmin: false,
+  active: true,
+  role: 'Técnico',
+};
+const TEC_MAM2 = {
+  id: 'OP-3',
+  name: 'Cara Mam',
+  team: 'mam',
+  isAdmin: false,
+  active: true,
+  role: 'Técnico',
+};
 
-function asAdmin() { _session = { opId: 'OP-1', name: 'Ana Admin', team: 'init', isAdmin: true }; }
-function asTec() { _session = { opId: 'OP-2', name: 'Bob Mam', team: 'mam', isAdmin: false }; }
+function asAdmin() {
+  _session = { opId: 'OP-1', name: 'Ana Admin', team: 'init', isAdmin: true };
+}
+function asTec() {
+  _session = { opId: 'OP-2', name: 'Bob Mam', team: 'mam', isAdmin: false };
+}
 
 beforeEach(() => {
   for (const k of Object.keys(_el)) delete _el[k];
@@ -155,7 +204,9 @@ describe('PARTE 2 — exclusão de clientes bloqueada p/ não-admin em todas as 
   it('handler: não-admin nem abre o modal (toast de negação)', () => {
     asTec();
     const toasts = [];
-    globalThis.showToast = (m, t) => { toasts.push(String(m)); };
+    globalThis.showToast = (m, t) => {
+      toasts.push(String(m));
+    };
     deleteClientConfirm('CLI-1');
     expect(toasts.join(' ')).toMatch(/administradores/i);
     expect(_el['modalOverlay']).toBe(undefined); // modal nunca aberto

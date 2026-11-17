@@ -14,7 +14,9 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 const listeners = {};
-const hook = (scope) => (ev, cb) => { (listeners[scope + ev] = listeners[scope + ev] || []).push(cb); };
+const hook = (scope) => (ev, cb) => {
+  (listeners[scope + ev] = listeners[scope + ev] || []).push(cb);
+};
 
 let channelCount = 0;
 const subscribeCbs = [];
@@ -37,15 +39,23 @@ globalThis.supabaseClient = {
   channel() {
     channelCount++;
     const ch = {
-      on() { return ch; },
-      subscribe(cb) { subscribeCbs.push(cb); return ch; },
+      on() {
+        return ch;
+      },
+      subscribe(cb) {
+        subscribeCbs.push(cb);
+        return ch;
+      },
     };
     return ch;
   },
   removeChannel() {},
 };
 globalThis.dbGet = () => store.slice();
-globalThis.dbSet = (_key, value) => { captured = value; store = value; };
+globalThis.dbSet = (_key, value) => {
+  captured = value;
+  store = value;
+};
 globalThis._tombTimeFor = () => null;
 // Mesma proteção do pull (schema.js): remoto sem numero não apaga o local.
 globalThis.ENTITIES = [
@@ -56,7 +66,7 @@ globalThis.ENTITIES = [
     realtime: true,
     mapRow: (r) => ({
       id: r.id,
-      numero: (Number.isInteger(r.numero) && r.numero > 0) ? r.numero : null,
+      numero: Number.isInteger(r.numero) && r.numero > 0 ? r.numero : null,
       updatedAt: r.updated_at,
     }),
     onMerged: (merged, local) => {
@@ -102,13 +112,21 @@ describe('SyncManager — applyRemote e o onMerged do pull (SYNC-11)', () => {
   });
 
   it('UPDATE remoto sem numero não zera o numero local pelo realtime', async () => {
-    await SyncManager.applyRemote('visits', 'UPDATE', { id: 'V1', numero: null, updated_at: '2026-06-01T00:00:00.000Z' });
+    await SyncManager.applyRemote('visits', 'UPDATE', {
+      id: 'V1',
+      numero: null,
+      updated_at: '2026-06-01T00:00:00.000Z',
+    });
     expect(captured).not.toBeNull();
     expect(captured[0].numero).toBe(7);
   });
 
   it('UPDATE remoto com numero entra pelo merge (reparo de outro aparelho)', async () => {
-    await SyncManager.applyRemote('visits', 'UPDATE', { id: 'V1', numero: 9, updated_at: '2026-06-01T00:00:00.000Z' });
+    await SyncManager.applyRemote('visits', 'UPDATE', {
+      id: 'V1',
+      numero: 9,
+      updated_at: '2026-06-01T00:00:00.000Z',
+    });
     expect(captured[0].numero).toBe(9);
   });
 });

@@ -12,9 +12,12 @@ import vm from 'node:vm';
 // os chamados que já existem — que são os que estão feios hoje.
 
 const _dummyEl = {
-  addEventListener() {}, removeEventListener() {}, style: {},
+  addEventListener() {},
+  removeEventListener() {},
+  style: {},
   classList: { add() {}, remove() {}, toggle() {} },
-  querySelector: () => null, querySelectorAll: () => [],
+  querySelector: () => null,
+  querySelectorAll: () => [],
   innerHTML: '',
 };
 const FECHADOS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
@@ -97,7 +100,8 @@ describe('separar o pedido do carimbo da triagem', () => {
 
   it('serve para outro canal com o mesmo carimbo', () => {
     // A triagem de WhatsApp usa a mesma frase, trocando só o canal.
-    const d = 'Notebook não liga.\n\n— Aberta pela triagem de WhatsApp do Init Intra.\nDe: Beatriz · +5511999990000\nRecebido em: 2026-10-26T12:00:00.000Z';
+    const d =
+      'Notebook não liga.\n\n— Aberta pela triagem de WhatsApp do Init Intra.\nDe: Beatriz · +5511999990000\nRecebido em: 2026-10-26T12:00:00.000Z';
     const { origem, corpo } = _penOrigemTriagem(d);
     expect(corpo).toBe('Notebook não liga.');
     expect(origem.canal).toBe('WhatsApp');
@@ -129,7 +133,8 @@ describe('separar o pedido do carimbo da triagem', () => {
   });
 
   it('linha que parece campo mas não é do carimbo também é texto da pessoa', () => {
-    const d = 'Pedido.\n\n— Aberta pela triagem de e-mail do Init Intra.\nDe: x@y.com\nRegra interna: não priorizar.';
+    const d =
+      'Pedido.\n\n— Aberta pela triagem de e-mail do Init Intra.\nDe: x@y.com\nRegra interna: não priorizar.';
     const r = _penOrigemTriagem(d);
     expect(r.origem.de).toBe('x@y.com');
     expect(r.depois).toBe('Regra interna: não priorizar.');
@@ -155,19 +160,34 @@ describe('o cartão de origem', () => {
   });
 
   it('data que o Date não entende sai crua, sem quebrar', () => {
-    const html = _penOrigemHtml({ canal: 'e-mail', de: 'x', recebidoEm: 'ontem', assuntoOriginal: '' });
+    const html = _penOrigemHtml({
+      canal: 'e-mail',
+      de: 'x',
+      recebidoEm: 'ontem',
+      assuntoOriginal: '',
+    });
     expect(html).toContain('ontem');
   });
 
   it('campo vazio não vira linha vazia', () => {
-    const html = _penOrigemHtml({ canal: 'e-mail', de: 'x@y.com', recebidoEm: '', assuntoOriginal: '' });
+    const html = _penOrigemHtml({
+      canal: 'e-mail',
+      de: 'x@y.com',
+      recebidoEm: '',
+      assuntoOriginal: '',
+    });
     expect(html).toContain('x@y.com');
     expect(html).not.toContain('<dt>Recebido</dt>');
   });
 
   it('o que veio do e-mail é escapado antes de virar HTML', () => {
     // O remetente é texto de fora: é o caminho clássico de XSS.
-    const html = _penOrigemHtml({ canal: 'e-mail', de: '<img src=x onerror=alert(1)>', recebidoEm: '', assuntoOriginal: '' });
+    const html = _penOrigemHtml({
+      canal: 'e-mail',
+      de: '<img src=x onerror=alert(1)>',
+      recebidoEm: '',
+      assuntoOriginal: '',
+    });
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');
   });
@@ -199,7 +219,9 @@ describe('a triagem mora na Caixa de entrada', () => {
     // desistisse no meio. O id da entrada vem do hidden do formulário —
     // morre no cancelar, em vez de sobreviver em window.
     expect(penSrc).toContain('emailTriagemMarcarAberta(data.id,');
-    expect(etrSrc).toContain("_emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId })");
+    expect(etrSrc).toContain(
+      "_emailTriagemSalvar(id, { status: 'virou_chamado', pendenciaId: pendenciaId })"
+    );
   });
 
   it('não adivinha o cliente ao abrir o chamado', () => {

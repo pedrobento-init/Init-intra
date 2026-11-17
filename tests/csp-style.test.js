@@ -14,11 +14,24 @@ const ATTR = /\bstyle=["']/g;
 // fora dele (o CSS do app não existe lá). Faixa de linhas, para um style novo
 // no resto do arquivo falhar.
 const ALLOW = {
-  'js/notifications.js': { de: 150, ate: 460, motivo: 'corpo de e-mail HTML (cliente de e-mail não carrega o CSS do app)' },
-  'js/visitas.js': { de: 985, ate: 1215, motivo: 'exportação .xls do relatório de visitas (o Excel lê o HTML baixado)' },
+  'js/notifications.js': {
+    de: 150,
+    ate: 460,
+    motivo: 'corpo de e-mail HTML (cliente de e-mail não carrega o CSS do app)',
+  },
+  'js/visitas.js': {
+    de: 985,
+    ate: 1215,
+    motivo: 'exportação .xls do relatório de visitas (o Excel lê o HTML baixado)',
+  },
 };
 
-const arquivos = () => fs.readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => 'js/' + f).concat(['index.html']);
+const arquivos = () =>
+  fs
+    .readdirSync('js')
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => 'js/' + f)
+    .concat(['index.html']);
 
 function ocorrencias(f) {
   const src = read(f);
@@ -30,10 +43,14 @@ function ocorrencias(f) {
 }
 
 describe('CSP: style-src sem unsafe-inline', () => {
-  const csp = JSON.parse(read('vercel.json')).headers
-    .flatMap((h) => h.headers)
+  const csp = JSON.parse(read('vercel.json'))
+    .headers.flatMap((h) => h.headers)
     .find((h) => h.key === 'Content-Security-Policy').value;
-  const diretiva = (nome) => (csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(nome + ' ')) || '');
+  const diretiva = (nome) =>
+    csp
+      .split(';')
+      .map((s) => s.trim())
+      .find((s) => s.startsWith(nome + ' ')) || '';
 
   it("style-src e style-src-attr não liberam 'unsafe-inline'", () => {
     expect(diretiva('style-src')).not.toContain("'unsafe-inline'");
@@ -53,12 +70,16 @@ describe('atributo style fora do markup do app', () => {
       const linhas = ocorrencias(f);
       const permitido = ALLOW[f];
       const fora = permitido ? linhas.filter((l) => l < permitido.de || l > permitido.ate) : linhas;
-      expect(fora, `${f} linhas ${fora.join(',')}: use classe (css/utilidades.css) ou data-sty`).toEqual([]);
+      expect(
+        fora,
+        `${f} linhas ${fora.join(',')}: use classe (css/utilidades.css) ou data-sty`
+      ).toEqual([]);
     }
   });
 
   it('a allowlist não envelhece: cada faixa ainda tem style inline', () => {
-    for (const [f, { motivo }] of Object.entries(ALLOW)) expect(ocorrencias(f).length, f + ' — ' + motivo).toBeGreaterThan(0);
+    for (const [f, { motivo }] of Object.entries(ALLOW))
+      expect(ocorrencias(f).length, f + ' — ' + motivo).toBeGreaterThan(0);
   });
 });
 
@@ -69,7 +90,8 @@ describe('classes utilitárias (css/utilidades.css)', () => {
   it('toda classe u-xxxxxx usada no markup existe no CSS', () => {
     const faltando = [];
     for (const f of arquivos().concat(['tests/mentions.test.js'])) {
-      for (const m of read(f).matchAll(/\bu-[0-9a-f]{6}\b/g)) if (!definidas.has(m[0])) faltando.push(f + ': ' + m[0]);
+      for (const m of read(f).matchAll(/\bu-[0-9a-f]{6}\b/g))
+        if (!definidas.has(m[0])) faltando.push(f + ': ' + m[0]);
     }
     expect(faltando).toEqual([]);
   });
@@ -90,21 +112,34 @@ describe('js/estilo-dinamico.js', () => {
   vm.runInContext(read('js/estilo-dinamico.js'), ctx);
   const aplicar = (raw) => {
     const set = [];
-    const el = { getAttribute: () => raw, style: { setProperty: (p, v, pr) => set.push([p, v, pr]) } };
+    const el = {
+      getAttribute: () => raw,
+      style: { setProperty: (p, v, pr) => set.push([p, v, pr]) },
+    };
     ctx._estiloDinamicoAplicar(el);
     return set;
   };
 
   it('aplica propriedades comuns e variáveis CSS', () => {
-    expect(aplicar('width:40%;--c:#1a56db')).toEqual([['width', '40%', ''], ['--c', '#1a56db', '']]);
+    expect(aplicar('width:40%;--c:#1a56db')).toEqual([
+      ['width', '40%', ''],
+      ['--c', '#1a56db', ''],
+    ]);
   });
 
   it('não corta rgba(...) no ponto e vírgula interno e respeita !important', () => {
-    expect(aplicar('background:rgba(1,2,3,.5);color:red !important')).toEqual([['background', 'rgba(1,2,3,.5)', ''], ['color', 'red', 'important']]);
+    expect(aplicar('background:rgba(1,2,3,.5);color:red !important')).toEqual([
+      ['background', 'rgba(1,2,3,.5)', ''],
+      ['color', 'red', 'important'],
+    ]);
   });
 
   it('descarta url(), expression(), @import e propriedade malformada', () => {
-    expect(aplicar('background:url(https://evil.example/x);width:expression(alert(1));--x:@import "a";0bad:1;color:red')).toEqual([['color', 'red', '']]);
+    expect(
+      aplicar(
+        'background:url(https://evil.example/x);width:expression(alert(1));--x:@import "a";0bad:1;color:red'
+      )
+    ).toEqual([['color', 'red', '']]);
   });
 
   it('atributo ausente ou vazio não faz nada', () => {

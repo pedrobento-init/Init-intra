@@ -6,19 +6,30 @@ const MAX_TITLE = 80;
 const MAX_BODY = 180;
 
 function clip(s: unknown, n: number): string {
-  const t = String(s ?? "").replace(/\s+/g, " ").trim();
-  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+  const t = String(s ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.length > n ? t.slice(0, n - 1) + '…' : t;
 }
 
 /**
  * Normaliza o que vai no push. O link só pode ser uma rota do próprio app
  * ("#pendencias", "/#visitas"): nada de mandar o aparelho para outro site.
  */
-export function buildPushPayload(input: { title?: unknown; body?: unknown; url?: unknown; tag?: unknown }): PushPayload | null {
+export function buildPushPayload(input: {
+  title?: unknown;
+  body?: unknown;
+  url?: unknown;
+  tag?: unknown;
+}): PushPayload | null {
   const title = clip(input.title, MAX_TITLE);
   if (!title) return null;
-  const rawUrl = String(input.url ?? "").trim();
-  const url = /^\/?#[a-z0-9_-]*$/i.test(rawUrl) ? (rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl) : "/";
+  const rawUrl = String(input.url ?? '').trim();
+  const url = /^\/?#[a-z0-9_-]*$/i.test(rawUrl)
+    ? rawUrl.startsWith('/')
+      ? rawUrl
+      : '/' + rawUrl
+    : '/';
   const tag = clip(input.tag, 64);
   return { title, body: clip(input.body, MAX_BODY), url, ...(tag ? { tag } : {}) };
 }
@@ -32,12 +43,31 @@ export function isGoneStatus(status: number | undefined): boolean {
 export function pushRecipients(
   operators: { id: string; email?: string | null; active?: boolean | null }[],
   emails: unknown[],
-  exceptOperatorId?: string | null,
+  exceptOperatorId?: string | null
 ): string[] {
-  const wanted = new Set(emails.map((e) => String(e ?? "").trim().toLowerCase()).filter(Boolean));
-  return [...new Set(
-    operators
-      .filter((o) => o.active !== false && o.id !== exceptOperatorId && wanted.has(String(o.email ?? "").trim().toLowerCase()))
-      .map((o) => o.id),
-  )];
+  const wanted = new Set(
+    emails
+      .map((e) =>
+        String(e ?? '')
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean)
+  );
+  return [
+    ...new Set(
+      operators
+        .filter(
+          (o) =>
+            o.active !== false &&
+            o.id !== exceptOperatorId &&
+            wanted.has(
+              String(o.email ?? '')
+                .trim()
+                .toLowerCase()
+            )
+        )
+        .map((o) => o.id)
+    ),
+  ];
 }

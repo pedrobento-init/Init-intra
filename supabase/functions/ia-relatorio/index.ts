@@ -22,82 +22,98 @@
 //   IA dele — não coloque senhas nas anotações (o app avisa no botão).
 // - Sem rate limit próprio (como as outras funções, SEC-16): monitorar uso.
 
-import { type SupabaseContext, withSupabase } from "npm:@supabase/server@1";
-import { textoDaIa } from "../robo/campo.ts";
+import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
+import { textoDaIa } from '../robo/campo.ts';
 
-const IA_WEBHOOK_URL = Deno.env.get("IA_WEBHOOK_URL") ?? "";
+const IA_WEBHOOK_URL = Deno.env.get('IA_WEBHOOK_URL') ?? '';
 
 const MAX_CHARS = 6000;
-const TIMEOUT_MS = 60000;  // o Make leva ~10 s; o técnico espera olhando a tela
+const TIMEOUT_MS = 60000; // o Make leva ~10 s; o técnico espera olhando a tela
 
 // CORS e preflight ficam com o withSupabase: sem `allowedHeaders` na config,
 // ele ecoa os headers pedidos no preflight — os que o supabase-js envia.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!IA_WEBHOOK_URL) {
-    console.error("ia-relatorio: secrets ausentes");
-    return json({ error: "IA não configurada" }, 500);
+    console.error('ia-relatorio: secrets ausentes');
+    return json({ error: 'IA não configurada' }, 500);
   }
 
   // JWT já verificado pelo withSupabase (auth: "user"); o client admin vem
   // pronto no contexto.
   const admin = ctx.supabaseAdmin;
   const uid = ctx.userClaims?.id ?? null;
-  if (!uid) return json({ error: "Não autenticado" }, 401);
-  const { data: op } = await admin.from("operators").select("id, active").eq("auth_user_id", uid).maybeSingle();
-  if (!op || op.active === false) return json({ error: "Operador sem acesso" }, 403);
+  if (!uid) return json({ error: 'Não autenticado' }, 401);
+  const { data: op } = await admin
+    .from('operators')
+    .select('id, active')
+    .eq('auth_user_id', uid)
+    .maybeSingle();
+  if (!op || op.active === false) return json({ error: 'Operador sem acesso' }, 403);
 
-  let notas = "", cliente = "", motivo = "";
+  let notas = '',
+    cliente = '',
+    motivo = '';
   let checklist: string[] = [];
   try {
     const body = await req.json();
-    notas = String(body?.notas ?? "").trim();
-    cliente = String(body?.cliente ?? "").trim().slice(0, 120);
-    motivo = String(body?.motivo ?? "").trim().slice(0, 300);
-    checklist = Array.isArray(body?.checklist) ? body.checklist.map((x: unknown) => String(x).slice(0, 200)).slice(0, 40) : [];
+    notas = String(body?.notas ?? '').trim();
+    cliente = String(body?.cliente ?? '')
+      .trim()
+      .slice(0, 120);
+    motivo = String(body?.motivo ?? '')
+      .trim()
+      .slice(0, 300);
+    checklist = Array.isArray(body?.checklist)
+      ? body.checklist.map((x: unknown) => String(x).slice(0, 200)).slice(0, 40)
+      : [];
   } catch {
-    return json({ error: "Corpo inválido" }, 400);
+    return json({ error: 'Corpo inválido' }, 400);
   }
-  if (notas.length < 10) return json({ error: "Escreva pelo menos uma linha sobre o que foi feito." }, 400);
-  if (notas.length > MAX_CHARS) return json({ error: `Anotações muito longas (máx. ${MAX_CHARS} caracteres).` }, 400);
+  if (notas.length < 10)
+    return json({ error: 'Escreva pelo menos uma linha sobre o que foi feito.' }, 400);
+  if (notas.length > MAX_CHARS)
+    return json({ error: `Anotações muito longas (máx. ${MAX_CHARS} caracteres).` }, 400);
 
   const contexto = [
-    cliente ? `Cliente: ${cliente}` : "",
-    motivo ? `Motivo da visita: ${motivo}` : "",
-    checklist.length ? `Itens do checklist concluídos:\n- ${checklist.join("\n- ")}` : "",
+    cliente ? `Cliente: ${cliente}` : '',
+    motivo ? `Motivo da visita: ${motivo}` : '',
+    checklist.length ? `Itens do checklist concluídos:\n- ${checklist.join('\n- ')}` : '',
     `Anotações do técnico:\n${notas}`,
-  ].filter(Boolean).join("\n\n");
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 
   let res: Response;
   try {
     res = await fetch(IA_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tarefa: "relatorio", contexto }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tarefa: 'relatorio', contexto }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (e) {
-    console.error("ia-relatorio: Make não respondeu:", (e as Error).name);
-    return json({ error: "A IA demorou para responder. Tente de novo." }, 504);
+    console.error('ia-relatorio: Make não respondeu:', (e as Error).name);
+    return json({ error: 'A IA demorou para responder. Tente de novo.' }, 504);
   }
-  if (res.status === 429) return json({ error: "IA ocupada agora. Tente em instantes." }, 429);
+  if (res.status === 429) return json({ error: 'IA ocupada agora. Tente em instantes.' }, 429);
   if (!res.ok) {
     console.error(`ia-relatorio: Make respondeu ${res.status}`);
-    return json({ error: "Falha ao gerar o relatório." }, 502);
+    return json({ error: 'Falha ao gerar o relatório.' }, 502);
   }
   // textoDaIa: aceita texto puro ou { texto }, e descarta o "Accepted" de um
   // cenário sem o módulo "Webhook response".
   const relatorio = textoDaIa(await res.text(), MAX_CHARS + 2000);
-  if (!relatorio) return json({ error: "Resposta vazia da IA." }, 502);
+  if (!relatorio) return json({ error: 'Resposta vazia da IA.' }, 502);
   console.log(`ia-relatorio: op=${op.id} in_chars=${notas.length} out_chars=${relatorio.length}`);
   return json({ success: true, relatorio });
 }
 
-export default { fetch: withSupabase({ auth: "user" }, handle) };
+export default { fetch: withSupabase({ auth: 'user' }, handle) };

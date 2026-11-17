@@ -16,10 +16,31 @@ const CLIENT = {
   responsiblePhone: '(11) 98888-7777',
   technician: 'Carla',
   milvusClientToken: 'mv_abc123',
-  server: { type: 'Cloud (AWS)', os: 'Ubuntu 22.04', ip: '10.0.0.5', remoteAccess: 'AnyDesk', remoteId: '123 456 789', notes: '' },
+  server: {
+    type: 'Cloud (AWS)',
+    os: 'Ubuntu 22.04',
+    ip: '10.0.0.5',
+    remoteAccess: 'AnyDesk',
+    remoteId: '123 456 789',
+    notes: '',
+  },
   hosting: { provider: 'HostGator', panelUrl: 'https://panel.ex.com', user: 'admin', notes: '' },
-  backup: { frequency: 'Diário', time: '03:00', destination: 'S3', tool: 'restic', lastCheck: '2024-05-01', lastBackupAt: '2024-05-02T03:10:00Z', lastBackupStatus: 'OK' },
-  emails: { provider: 'Google', domain: 'ex.com', server: 'smtp.ex.com', port: '587', quota: '30GB' },
+  backup: {
+    frequency: 'Diário',
+    time: '03:00',
+    destination: 'S3',
+    tool: 'restic',
+    lastCheck: '2024-05-01',
+    lastBackupAt: '2024-05-02T03:10:00Z',
+    lastBackupStatus: 'OK',
+  },
+  emails: {
+    provider: 'Google',
+    domain: 'ex.com',
+    server: 'smtp.ex.com',
+    port: '587',
+    quota: '30GB',
+  },
   notes: 'senha do rack na gaveta',
   licenses: [{ software: 'ESET', expiry: '2025-01-01', key: 'AAAA-BBBB-CCCC' }],
   createdAt: '2023-06-01T12:00:00Z',
@@ -36,8 +57,12 @@ describe('Ficha TI', () => {
     globalThis.getClientById = (id) => (id === CLIENT.id ? CLIENT : null);
     globalThis.formatDate = (iso) => (iso ? 'DATA:' + String(iso).slice(0, 10) : '-');
     globalThis.formatDateTime = (iso) => (iso ? 'DATETIME:' + String(iso) : '-');
-    globalThis.escapeHtml = (v) => String(v == null ? '' : v)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    globalThis.escapeHtml = (v) =>
+      String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     globalThis.getPendencias = () => pendencias;
     globalThis.getMyPendencias = () => pendencias;
     mod = requireParts('clients');
@@ -45,23 +70,23 @@ describe('Ficha TI', () => {
 
   describe('modelo (campos, acesso rápido, resumo)', () => {
     it('todo campo do Acesso rápido existe no modelo de seções', () => {
-      const keys = mod.FICHA_SECTIONS.flatMap(s => s.fields.map(f => f.k));
-      mod.FICHA_QUICK_KEYS.forEach(k => expect(keys).toContain(k));
+      const keys = mod.FICHA_SECTIONS.flatMap((s) => s.fields.map((f) => f.k));
+      mod.FICHA_QUICK_KEYS.forEach((k) => expect(keys).toContain(k));
     });
     it('seções têm id, título, ícone e contagem coerente', () => {
-      const ids = mod.FICHA_SECTIONS.map(s => s.id);
+      const ids = mod.FICHA_SECTIONS.map((s) => s.id);
       expect(new Set(ids).size).toBe(ids.length);
-      mod.FICHA_SECTIONS.forEach(s => {
+      mod.FICHA_SECTIONS.forEach((s) => {
         expect(s.title).toBeTruthy();
         expect(s.icon).toBeTruthy();
         expect(typeof mod.cfSectionCount(s, CLIENT)).toBe('string');
       });
     });
     it('chaves aninhadas usam ponto (server.ip, backup.frequency, ...)', () => {
-      const keys = mod.FICHA_SECTIONS.flatMap(s => s.fields.map(f => f.k));
+      const keys = mod.FICHA_SECTIONS.flatMap((s) => s.fields.map((f) => f.k));
       expect(keys).toContain('server.ip');
       expect(keys).toContain('backup.lastBackupAt');
-      expect(keys.filter(k => k.includes('.')).length).toBeGreaterThan(10);
+      expect(keys.filter((k) => k.includes('.')).length).toBeGreaterThan(10);
     });
   });
 
@@ -104,11 +129,11 @@ describe('Ficha TI', () => {
       expect(total).toBeGreaterThan(0);
     });
     it('contagem por seção reflete só aquela seção', () => {
-      const backup = mod.FICHA_SECTIONS.find(s => s.id === 'backup');
+      const backup = mod.FICHA_SECTIONS.find((s) => s.id === 'backup');
       expect(mod.cfSectionCount(backup, CLIENT)).toBe('7 de 7 preenchidos');
-      const obs = mod.FICHA_SECTIONS.find(s => s.id === 'observacoes');
+      const obs = mod.FICHA_SECTIONS.find((s) => s.id === 'observacoes');
       expect(mod.cfSectionCount(obs, { id: 'Y' })).toBe('Nenhum dado preenchido');
-      const lics = mod.FICHA_SECTIONS.find(s => s.id === 'licencas');
+      const lics = mod.FICHA_SECTIONS.find((s) => s.id === 'licencas');
       expect(mod.cfSectionCount(lics, CLIENT)).toBe('1 licença');
       expect(mod.cfSectionCount(lics, { id: 'Z', licenses: [] })).toBe('Nenhuma licença');
     });
@@ -137,7 +162,9 @@ describe('Ficha TI', () => {
       ];
       expect(mod.cfClientSince(CLIENT, pendencias)).toBe('DATA:2023-08-01');
       expect(mod.cfClientSince({ id: 'X' }, pendencias)).toBe('');
-      expect(mod.cfClientSince({ id: 'X', createdAt: '2023-06-01T12:00:00Z' }, [])).toBe('DATA:2023-06-01');
+      expect(mod.cfClientSince({ id: 'X', createdAt: '2023-06-01T12:00:00Z' }, [])).toBe(
+        'DATA:2023-06-01'
+      );
       expect(mod.cfClientSince({ id: 'X' }, [])).toBe('');
     });
   });
@@ -150,11 +177,17 @@ describe('Ficha TI', () => {
     });
     it('omite o trecho quando não há data ou autor', () => {
       expect(mod.cfUpdatedMeta({ id: 'X' })).toBe('');
-      expect(mod.cfUpdatedMeta({ id: 'X', updatedAt: '2024-05-02T10:00:00Z' })).toBe('Atualizada em DATA:2024-05-02');
+      expect(mod.cfUpdatedMeta({ id: 'X', updatedAt: '2024-05-02T10:00:00Z' })).toBe(
+        'Atualizada em DATA:2024-05-02'
+      );
       expect(mod.cfUpdatedMeta(null)).toBe('');
     });
     it('escapa o nome do autor', () => {
-      const meta = mod.cfUpdatedMeta({ id: 'X', updatedAt: '2024-05-02T10:00:00Z', updatedBy: '<script>x</script>' });
+      const meta = mod.cfUpdatedMeta({
+        id: 'X',
+        updatedAt: '2024-05-02T10:00:00Z',
+        updatedBy: '<script>x</script>',
+      });
       expect(meta).toContain('&lt;script&gt;');
       expect(meta).not.toContain('<script>');
     });
@@ -183,7 +216,9 @@ describe('Ficha TI', () => {
     });
 
     it('usa a razão social quando não há nome fantasia', () => {
-      expect(mod.clientCnpjFormData({ ...empresa, nome_fantasia: '' }).name).toBe('Padaria Central LTDA');
+      expect(mod.clientCnpjFormData({ ...empresa, nome_fantasia: '' }).name).toBe(
+        'Padaria Central LTDA'
+      );
     });
 
     it('preenche somente campos vazios e restaura o botão', async () => {
@@ -210,8 +245,8 @@ describe('Ficha TI', () => {
 
     it('a política de segurança do deploy permite consultar a BrasilAPI', () => {
       const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
-      const headers = config.headers.find(h => h.source === '/(.*)').headers;
-      const csp = headers.find(h => h.key === 'Content-Security-Policy').value;
+      const headers = config.headers.find((h) => h.source === '/(.*)').headers;
+      const csp = headers.find((h) => h.key === 'Content-Security-Policy').value;
       const connectSrc = csp.match(/connect-src ([^;]+)/)[1];
       expect(connectSrc.split(' ')).toContain('https://brasilapi.com.br');
     });

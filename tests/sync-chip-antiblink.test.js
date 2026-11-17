@@ -15,16 +15,28 @@ function _setGlobal(name, value) {
 // escrita idêntica repetida = piscar) e atributos capturados.
 const writes = [];
 let inner = '';
-const chip = { title: '', setAttribute(n, v) { this['attr_' + n] = v; } };
+const chip = {
+  title: '',
+  setAttribute(n, v) {
+    this['attr_' + n] = v;
+  },
+};
 Object.defineProperty(chip, 'innerHTML', {
-  get() { return inner; },
-  set(v) { writes.push(String(v)); inner = String(v); },
+  get() {
+    return inner;
+  },
+  set(v) {
+    writes.push(String(v));
+    inner = String(v);
+  },
   configurable: true,
 });
 
 const winHandlers = {};
 _setGlobal('window', {
-  addEventListener(type, cb) { (winHandlers[type] = winHandlers[type] || []).push(cb); },
+  addEventListener(type, cb) {
+    (winHandlers[type] = winHandlers[type] || []).push(cb);
+  },
   removeEventListener(type, cb) {
     const list = winHandlers[type];
     if (!list) return;
@@ -51,8 +63,12 @@ _setGlobal('Outbox', { count: () => Promise.resolve(outboxN) });
 
 const { mountSyncStatus } = require('../js/sync-manager.js');
 
-function fire(type) { (winHandlers[type] || []).forEach((cb) => cb()); }
-async function flush() { await new Promise((r) => setTimeout(r, 0)); }
+function fire(type) {
+  (winHandlers[type] || []).forEach((cb) => cb());
+}
+async function flush() {
+  await new Promise((r) => setTimeout(r, 0));
+}
 
 beforeEach(() => {
   writes.length = 0;

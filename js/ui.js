@@ -8,7 +8,10 @@ function loadScript(url, integrity) {
     s.src = url;
     s.crossOrigin = 'anonymous';
     if (integrity) s.integrity = integrity;
-    s.onload = () => { _loadedScripts.add(url); resolve(); };
+    s.onload = () => {
+      _loadedScripts.add(url);
+      resolve();
+    };
     s.onerror = () => reject(new Error('Falha ao carregar: ' + url));
     document.head.appendChild(s);
   });
@@ -64,8 +67,10 @@ function hideLoading(containerId) {
 function showSkeleton(containerId, rows = 5) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const rowHtml = Array.from({ length: rows }, () =>
-    `<div class="skeleton-row">
+  const rowHtml = Array.from(
+    { length: rows },
+    () =>
+      `<div class="skeleton-row">
       <div class="skeleton skeleton-avatar"></div>
       <div class="u-97445a">
         <div class="skeleton skeleton-text"></div>
@@ -111,10 +116,18 @@ function safeUrl(url) {
   const trimmed = url.trim();
   try {
     const parsed = new URL(trimmed);
-    if (parsed.protocol === 'javascript:' || parsed.protocol === 'data:' || parsed.protocol === 'vbscript:') {
+    if (
+      parsed.protocol === 'javascript:' ||
+      parsed.protocol === 'data:' ||
+      parsed.protocol === 'vbscript:'
+    ) {
       return '#';
     }
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+    if (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'mailto:'
+    ) {
       return trimmed;
     }
     return '#';
@@ -128,7 +141,11 @@ let _prevFocus = null;
 // o @media (prefers-reduced-motion) do CSS não alcança essas animações.
 function _canAnimate() {
   if (typeof Motion === 'undefined') return false;
-  try { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return true; }
+  try {
+    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (_) {
+    return true;
+  }
 }
 // Formulário do modal com campo alterado: Esc ou toque fora pedem confirmação
 // antes de fechar (os botões Cancelar/× e o salvar continuam fechando direto).
@@ -144,7 +161,10 @@ let _modalTrapHandler = null;
 let _modalHideTimer = null;
 
 function openModal(title, bodyHTML, size = '') {
-  if (_modalHideTimer) { clearTimeout(_modalHideTimer); _modalHideTimer = null; }
+  if (_modalHideTimer) {
+    clearTimeout(_modalHideTimer);
+    _modalHideTimer = null;
+  }
   _prevFocus = document.activeElement;
   _modalDirty = false;
   document.getElementById('modalTitle').textContent = title;
@@ -153,15 +173,29 @@ function openModal(title, bodyHTML, size = '') {
   const overlay = document.getElementById('modalOverlay');
   const modal = document.getElementById('modal');
   overlay.style.display = 'flex';
-  const focusable = modal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+  const focusable = modal.querySelectorAll(
+    'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
   if (focusable.length) focusable[0].focus();
-  _modalTrapHandler = function(e) {
+  _modalTrapHandler = function (e) {
     if (e.key !== 'Tab') return;
-    const els = modal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+    const els = modal.querySelectorAll(
+      'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
     if (!els.length) return;
-    const first = els[0], last = els[els.length - 1];
-    if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
-    else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    const first = els[0],
+      last = els[els.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
   modal.addEventListener('keydown', _modalTrapHandler);
 
@@ -175,12 +209,15 @@ function openModal(title, bodyHTML, size = '') {
     overlay.dataset.drawerOpen = isDrawer ? '1' : '0';
     if (!(isDrawer && wasOpen)) {
       Motion.animate(overlay, { opacity: [0, 1] }, { duration: 0.18, ease: 'easeOut' });
-      Motion.animate(modal, isDrawer
-        ? { opacity: [0, 1], x: [40, 0] }
-        : isMobile
-          ? { opacity: [0, 1], y: [28, 0] }
-          : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
-        { duration: isDrawer ? 0.25 : 0.4, ease: isDrawer ? 'easeOut' : [0.34, 1.56, 0.64, 1] });
+      Motion.animate(
+        modal,
+        isDrawer
+          ? { opacity: [0, 1], x: [40, 0] }
+          : isMobile
+            ? { opacity: [0, 1], y: [28, 0] }
+            : { opacity: [0, 1], scale: [0.96, 1], y: [16, 0] },
+        { duration: isDrawer ? 0.25 : 0.4, ease: isDrawer ? 'easeOut' : [0.34, 1.56, 0.64, 1] }
+      );
     }
   }
 }
@@ -188,16 +225,32 @@ function closeModal() {
   const modal = document.getElementById('modal');
   const overlay = document.getElementById('modalOverlay');
   _modalDirty = false;
-  if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
-  const hide = () => { overlay.style.display = 'none'; overlay.dataset.drawerOpen = '0'; };
+  if (_modalTrapHandler) {
+    modal.removeEventListener('keydown', _modalTrapHandler);
+    _modalTrapHandler = null;
+  }
+  const hide = () => {
+    overlay.style.display = 'none';
+    overlay.dataset.drawerOpen = '0';
+  };
   if (_canAnimate() && overlay.style.display !== 'none') {
-    Motion.animate(modal, { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] }, { duration: 0.14, ease: 'easeIn' });
+    Motion.animate(
+      modal,
+      { opacity: [1, 0], scale: [1, 0.98], y: [0, 8] },
+      { duration: 0.14, ease: 'easeIn' }
+    );
     Motion.animate(overlay, { opacity: [1, 0] }, { duration: 0.14, ease: 'easeIn' });
-    _modalHideTimer = setTimeout(() => { hide(); _modalHideTimer = null; }, 150);
+    _modalHideTimer = setTimeout(() => {
+      hide();
+      _modalHideTimer = null;
+    }, 150);
   } else {
     hide();
   }
-  if (_prevFocus && _prevFocus.focus) { _prevFocus.focus(); _prevFocus = null; }
+  if (_prevFocus && _prevFocus.focus) {
+    _prevFocus.focus();
+    _prevFocus = null;
+  }
   // Volta à aba Pendências do cliente (abertura via openClientPendencia).
   // Adiado: fluxos que fecham e reabrem o modal no mesmo tick (ex.: Editar)
   // mantêm o overlay visível e o retorno é ignorado.
@@ -205,17 +258,25 @@ function closeModal() {
     if (typeof _clientPenReturn !== 'undefined' && _clientPenReturn && _clientPenReturn.clientId) {
       const _ret = _clientPenReturn;
       _clientPenReturn = null;
-      try { if (typeof _clientPenOrigin !== 'undefined') _clientPenOrigin = null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+      try {
+        if (typeof _clientPenOrigin !== 'undefined') _clientPenOrigin = null;
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+      }
       setTimeout(() => {
         try {
           if (document.getElementById('modalOverlay').style.display !== 'none') return;
           if (typeof getClientById === 'function' && !getClientById(_ret.clientId)) return;
           if (typeof viewClient === 'function') viewClient(_ret.clientId);
           if (typeof switchClientTab === 'function') switchClientTab('pendencias', _ret.clientId);
-        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+        }
       }, 220);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
 
 function showToast(message, type = 'info') {
@@ -224,8 +285,10 @@ function showToast(message, type = 'info') {
   const t = document.createElement('div');
   t.className = `toast ${type}`;
   const iconMap = {
-    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="16 8 10 16 7 13"/></svg>',
-    error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    success:
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="16 8 10 16 7 13"/></svg>',
+    error:
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
     info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
   };
   const iconSpan = document.createElement('span');
@@ -239,15 +302,18 @@ function showToast(message, type = 'info') {
     t.style.animation = 'none';
     Motion.animate(t, { opacity: [0, 1], x: [24, 0] }, { duration: 0.35, ease: 'easeOut' });
   }
-  setTimeout(() => {
-    if (_canAnimate()) {
-      Motion.animate(t, { opacity: [1, 0], x: [0, -24] }, { duration: 0.22, ease: 'easeIn' });
-      setTimeout(() => t.remove(), 230);
-    } else {
-      t.classList.add('removing');
-      setTimeout(() => t.remove(), 300);
-    }
-  }, type === 'error' ? 7000 : 4000);
+  setTimeout(
+    () => {
+      if (_canAnimate()) {
+        Motion.animate(t, { opacity: [1, 0], x: [0, -24] }, { duration: 0.22, ease: 'easeIn' });
+        setTimeout(() => t.remove(), 230);
+      } else {
+        t.classList.add('removing');
+        setTimeout(() => t.remove(), 300);
+      }
+    },
+    type === 'error' ? 7000 : 4000
+  );
 }
 
 function showUndoToast(message, onUndo) {
@@ -261,8 +327,18 @@ function showUndoToast(message, onUndo) {
   t.innerHTML = `<span>${escapeHtml(message)}</span><button class="btn btn-sm btn-secondary u-e1dc02">Desfazer</button>`;
   c.appendChild(t);
   let undone = false;
-  const timer = setTimeout(() => { if (!undone) { t.classList.add('removing'); setTimeout(() => t.remove(), 300); } }, 5000);
-  t.querySelector('button').onclick = () => { undone = true; clearTimeout(timer); t.remove(); onUndo(); };
+  const timer = setTimeout(() => {
+    if (!undone) {
+      t.classList.add('removing');
+      setTimeout(() => t.remove(), 300);
+    }
+  }, 5000);
+  t.querySelector('button').onclick = () => {
+    undone = true;
+    clearTimeout(timer);
+    t.remove();
+    onUndo();
+  };
 }
 
 function saveFilterState(pageKey, state) {
@@ -271,22 +347,28 @@ function saveFilterState(pageKey, state) {
 function loadFilterState(pageKey, defaults) {
   try {
     var raw = localStorage.getItem('intra_filter_' + pageKey);
-    return raw ? JSON.parse(raw) : (defaults || {});
-  } catch (_e) { return defaults || {}; }
+    return raw ? JSON.parse(raw) : defaults || {};
+  } catch (_e) {
+    return defaults || {};
+  }
 }
 
 function confirmAction(message, onConfirm) {
   const prevTitle = document.getElementById('modalTitle').textContent;
-  const prevBody  = document.getElementById('modalBody').innerHTML;
+  const prevBody = document.getElementById('modalBody').innerHTML;
   const prevClass = document.getElementById('modal').className;
-  const wasOpen   = document.getElementById('modalOverlay').style.display !== 'none';
+  const wasOpen = document.getElementById('modalOverlay').style.display !== 'none';
 
-  openModal('Confirmar', `
+  openModal(
+    'Confirmar',
+    `
     <p class="u-13d2c5">${message}</p>
     <div class="form-actions">
       <button class="btn btn-secondary" id="confirmCancelBtn">Cancelar</button>
       <button class="btn btn-danger" id="confirmBtn">Confirmar</button>
-    </div>`, 'sm');
+    </div>`,
+    'sm'
+  );
 
   document.getElementById('confirmBtn').onclick = () => {
     closeModal();
@@ -295,13 +377,15 @@ function confirmAction(message, onConfirm) {
     try {
       var _r = onConfirm();
       if (_r && typeof _r.then === 'function') {
-        _r.catch(function(err) {
-          if (typeof showToast === 'function') showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
+        _r.catch(function (err) {
+          if (typeof showToast === 'function')
+            showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
           else console.error(err);
         });
       }
     } catch (err) {
-      if (typeof showToast === 'function') showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
+      if (typeof showToast === 'function')
+        showToast('Erro: ' + (err && err.message ? err.message : err), 'error');
       else console.error(err);
     }
   };
@@ -315,16 +399,33 @@ function confirmAction(message, onConfirm) {
       document.getElementById('modal').className = prevClass;
       // Refresh focus trap for restored content
       const modal = document.getElementById('modal');
-      if (_modalTrapHandler) { modal.removeEventListener('keydown', _modalTrapHandler); _modalTrapHandler = null; }
-      const focusable = modal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (_modalTrapHandler) {
+        modal.removeEventListener('keydown', _modalTrapHandler);
+        _modalTrapHandler = null;
+      }
+      const focusable = modal.querySelectorAll(
+        'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
       if (focusable.length) focusable[0].focus();
-      _modalTrapHandler = function(e) {
+      _modalTrapHandler = function (e) {
         if (e.key !== 'Tab') return;
-        const els = modal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+        const els = modal.querySelectorAll(
+          'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
         if (!els.length) return;
-        const first = els[0], last = els[els.length - 1];
-        if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
-        else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+        const first = els[0],
+          last = els[els.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       };
       modal.addEventListener('keydown', _modalTrapHandler);
     };
@@ -335,14 +436,23 @@ function confirmAction(message, onConfirm) {
 
 const APP_TIME_ZONE = 'America/Sao_Paulo';
 function localDateISO(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(date);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
   const values = {};
-  parts.forEach(p => { values[p.type] = p.value; });
+  parts.forEach((p) => {
+    values[p.type] = p.value;
+  });
   return `${values.year}-${values.month}-${values.day}`;
 }
 function parseDateOnly(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : new Date(value);
+  return match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+    : new Date(value);
 }
 // ── Convenções visuais centralizadas ────────────────────────────────────────
 // Datas: formatDate/formatDateTime (abaixo, com APP_TIME_ZONE) são canônicos —
@@ -359,7 +469,14 @@ function formatDate(iso) {
 }
 function formatDateTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('pt-BR', { timeZone: APP_TIME_ZONE, day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  return new Date(iso).toLocaleString('pt-BR', {
+    timeZone: APP_TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 function parseDeadline(deadlineStr) {
   if (!deadlineStr) return null;
@@ -405,7 +522,8 @@ function nextRecurrenceDate(baseISO, recurrence) {
 function nextRecurrenceDateFrom(baseISO, recurrence, todayISO) {
   let next = nextRecurrenceDate(baseISO, recurrence);
   let guard = 0;
-  while (next && todayISO && next < todayISO && guard++ < 400) next = nextRecurrenceDate(next, recurrence);
+  while (next && todayISO && next < todayISO && guard++ < 400)
+    next = nextRecurrenceDate(next, recurrence);
   return next;
 }
 function copyToClipboard(text) {
@@ -413,36 +531,42 @@ function copyToClipboard(text) {
 }
 
 const PRIORITY_MAP = {
-  baixa:   { label: 'Baixa',   cls: 'tag-green',  dot: '#16a34a' },
-  media:   { label: 'Média',   cls: 'tag-yellow', dot: '#d97706' },
-  alta:    { label: 'Alta',    cls: 'tag-red',    dot: '#dc2626' },
-  critica: { label: 'Crítica', cls: 'tag-red',    dot: '#991b1b' },
+  baixa: { label: 'Baixa', cls: 'tag-green', dot: '#16a34a' },
+  media: { label: 'Média', cls: 'tag-yellow', dot: '#d97706' },
+  alta: { label: 'Alta', cls: 'tag-red', dot: '#dc2626' },
+  critica: { label: 'Crítica', cls: 'tag-red', dot: '#991b1b' },
 };
 const STATUS_PEN_MAP = {
-  aberto:             { label: 'Aberto',         cls: 'tag-blue',   dot: '#3b82f6' },
-  em_andamento:       { label: 'Em Andamento',   cls: 'tag-indigo', dot: '#6366f1' },
-  pausado:            { label: 'Pausado',        cls: 'tag-yellow', dot: '#f59e0b' },
-  aguardando:         { label: 'Aguard. Terceiro', cls: 'tag-purple', dot: '#7c3aed' },
+  aberto: { label: 'Aberto', cls: 'tag-blue', dot: '#3b82f6' },
+  em_andamento: { label: 'Em Andamento', cls: 'tag-indigo', dot: '#6366f1' },
+  pausado: { label: 'Pausado', cls: 'tag-yellow', dot: '#f59e0b' },
+  aguardando: { label: 'Aguard. Terceiro', cls: 'tag-purple', dot: '#7c3aed' },
   aguardando_cliente: { label: 'Aguard. Cliente', cls: 'tag-purple', dot: '#7c3aed' },
-  resolvido:          { label: 'Resolvido',      cls: 'tag-green',  dot: '#16a34a' },
-  cancelado:          { label: 'Cancelado',      cls: 'tag-gray',   dot: '#94a3b8' },
+  resolvido: { label: 'Resolvido', cls: 'tag-green', dot: '#16a34a' },
+  cancelado: { label: 'Cancelado', cls: 'tag-gray', dot: '#94a3b8' },
 };
 // 'concluido'/'fechado' saíram das opções (migração p/ resolvido/cancelado),
 // mas seguem em PEN_CLOSED_STATUSES/isPendenciaResolvida para não ressuscitar
 // nem deixar de contar registros legados.
 
 const PEN_CLOSED_STATUSES = ['concluido', 'resolvido', 'cancelado', 'fechado'];
-function isPendenciaClosed(status) { return PEN_CLOSED_STATUSES.includes(status || ''); }
+function isPendenciaClosed(status) {
+  return PEN_CLOSED_STATUSES.includes(status || '');
+}
 // Êxito (verde): Concluído + Resolvido contam nas métricas de "resolvidas".
 // Cancelado/Fechado são finais, mas não contam como resolvidas.
-function isPendenciaResolvida(status) { return ['concluido', 'resolvido'].includes(status || ''); }
+function isPendenciaResolvida(status) {
+  return ['concluido', 'resolvido'].includes(status || '');
+}
 
 // ── ASSUNTO x DESCRIÇÃO da pendência ─────────────────────────────────────────
 // `assunto`: título/resumo curto (obrigatório em novas pendências).
 // `descricao`: detalhamento completo (obrigatório em novas pendências).
 // Registros antigos podem ter `assunto` vazio — o título cai para `descricao`
 // (somente leitura/fallback, sem alterar os dados salvos).
-function getPendenciaAssunto(p) { return String((p && p.assunto) || '').trim(); }
+function getPendenciaAssunto(p) {
+  return String((p && p.assunto) || '').trim();
+}
 function getPendenciaTitulo(p) {
   const a = getPendenciaAssunto(p);
   if (a) return a;
@@ -454,7 +578,7 @@ function isStalePendencia(p, days = 7) {
   if (!p || isPendenciaClosed(p.status)) return false;
   const ref = p.updatedAt || p.createdAt;
   if (!ref) return false;
-  return ((Date.now() - new Date(ref).getTime()) / 86400000) >= days;
+  return (Date.now() - new Date(ref).getTime()) / 86400000 >= days;
 }
 
 function priorityTag(p) {
@@ -472,7 +596,9 @@ function statusTag(s) {
 // índigo=em atendimento, amarelo=pausado, roxo=aguardando/conferência,
 // cinza=cancelado/sem leitura. Centraliza para não divergir por tela.
 function canonicalStatusClass(s) {
-  const t = String(s === null || s === undefined ? '' : (s.text !== undefined ? s.text : s)).toLowerCase();
+  const t = String(
+    s === null || s === undefined ? '' : s.text !== undefined ? s.text : s
+  ).toLowerCase();
   if (!t) return 'tag-gray';
   if (/finaliz|conclu|resolv|fechado/.test(t)) return 'tag-green';
   if (/cancel/.test(t)) return 'tag-gray';
@@ -489,9 +615,15 @@ function slaCountdown(item, defaultHours) {
   // Regra de negócio: chamado resolvido/fechado nunca está vencido.
   // O status final tem prioridade sobre o SLA/prazo — não gera alerta vermelho.
   try {
-    if (typeof isPendenciaClosed === 'function' ? isPendenciaClosed(item.status) : ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(item.status || '')) return null;
+    if (
+      typeof isPendenciaClosed === 'function'
+        ? isPendenciaClosed(item.status)
+        : ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(item.status || '')
+    )
+      return null;
   } catch (_) {
-    if (['concluido', 'resolvido', 'cancelado', 'fechado'].includes((item && item.status) || '')) return null;
+    if (['concluido', 'resolvido', 'cancelado', 'fechado'].includes((item && item.status) || ''))
+      return null;
   }
   var created = new Date(item.createdAt).getTime();
   var slaMs = (defaultHours || 24) * 60 * 60 * 1000;
@@ -500,16 +632,25 @@ function slaCountdown(item, defaultHours) {
   var total = slaMs;
   var pct = Math.max(0, Math.min(100, (remaining / total) * 100));
   var hoursLeft = Math.max(0, remaining / (1000 * 60 * 60));
-  var label = remaining > 0
-    ? (hoursLeft >= 1 ? Math.round(hoursLeft) + 'h' : Math.round(remaining / 60000) + 'm')
-    : 'Vencido';
+  var label =
+    remaining > 0
+      ? hoursLeft >= 1
+        ? Math.round(hoursLeft) + 'h'
+        : Math.round(remaining / 60000) + 'm'
+      : 'Vencido';
   var color = pct > 50 ? 'var(--green)' : pct > 10 ? 'var(--yellow)' : 'var(--red)';
   return { pct: pct, hoursLeft: hoursLeft, label: label, color: color, expired: remaining <= 0 };
 }
 // Supports logoShape: 'circle' (default) or 'square'
 function _safeLogoUrl(url) {
   if (!url) return '#';
-  if (/^https?:\/\//i.test(url)) { try { return new URL(url).href; } catch { return '#'; } }
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      return new URL(url).href;
+    } catch {
+      return '#';
+    }
+  }
   if (/^data:image\/(?!svg\+xml)[a-z+-]+;/i.test(url)) return url;
   return '#';
 }
@@ -518,10 +659,10 @@ function clientAvatar(c, size = 40) {
   const shape = c.logoShape || 'circle';
   const shapeClass = shape === 'square' ? 'client-logo-square' : 'client-logo-circle';
   if (c.logo) {
-    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" data-sty="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
+    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" data-sty="width:${size}px;height:${size}px" alt="${escapeHtml(c.name || '')}" />`;
   }
   const borderRadius = shape === 'square' ? '6px' : '50%';
-  return `<div data-sty="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${escapeHtml(c.color||'#1a56db')};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
+  return `<div data-sty="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${escapeHtml(c.color || '#1a56db')};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size * 0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials || c.name?.substring(0, 2).toUpperCase() || '?')}</div>`;
 }
 
 // Sidebar toggle + auto-colapso responsivo (desktop/notebook/split-screen)
@@ -537,13 +678,17 @@ const _sidebarToggleBtn = document.getElementById('sidebarToggle');
 function _getSidebarPref() {
   try {
     if (typeof getCacheKV === 'function') return getCacheKV(SIDEBAR_PREF_KEY, null);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   return null;
 }
 function _setSidebarPref(collapsed) {
   try {
     if (typeof setCacheKV === 'function') setCacheKV(SIDEBAR_PREF_KEY, collapsed === true);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
 function setSidebarCollapsed(collapsed, save) {
   const sidebar = document.getElementById('sidebar');
@@ -558,7 +703,9 @@ function _autoSidebarForWidth() {
     if (window.innerWidth <= 768) return; // mobile off-canvas intacto
     if (_getSidebarPref() !== null) return; // preferência manual vence
     setSidebarCollapsed(window.innerWidth <= SIDEBAR_AUTO_BREAKPOINT, false);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
 if (_sidebarToggleBtn) {
   _sidebarToggleBtn.addEventListener('click', () => {
@@ -577,15 +724,25 @@ if (typeof window !== 'undefined' && window.matchMedia) {
     } else if (typeof _sbMedia.addListener === 'function') {
       _sbMedia.addListener(_autoSidebarForWidth);
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
-if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPromise.then === 'function') {
-  _initDBPromise.then(() => {
-    try {
-      const pref = _getSidebarPref();
-      if (pref !== null && window.innerWidth > 768) setSidebarCollapsed(pref, false);
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
-  }).catch(() => {});
+if (
+  typeof _initDBPromise !== 'undefined' &&
+  _initDBPromise &&
+  typeof _initDBPromise.then === 'function'
+) {
+  _initDBPromise
+    .then(() => {
+      try {
+        const pref = _getSidebarPref();
+        if (pref !== null && window.innerWidth > 768) setSidebarCollapsed(pref, false);
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+      }
+    })
+    .catch(() => {});
 }
 
 // Menu recolhido (só ícones): rótulo flutuante na hora, com o nome do item e
@@ -597,27 +754,49 @@ if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPro
   let tip = null;
   let section = '';
   Array.prototype.forEach.call(nav.children || [], (el) => {
-    if (el.classList && el.classList.contains('nav-section')) { section = (el.textContent || '').trim(); return; }
+    if (el.classList && el.classList.contains('nav-section')) {
+      section = (el.textContent || '').trim();
+      return;
+    }
     if (!el.classList || !el.classList.contains('nav-item')) return;
     const label = el.querySelector('span:not(.badge)');
     el.dataset.tip = (label && label.textContent.trim()) || el.getAttribute('title') || '';
     el.dataset.tipSection = section;
-    if (el.getAttribute('title')) { el.setAttribute('aria-label', el.getAttribute('title')); el.removeAttribute('title'); }
+    if (el.getAttribute('title')) {
+      el.setAttribute('aria-label', el.getAttribute('title'));
+      el.removeAttribute('title');
+    }
   });
   const show = (item) => {
     const sb = document.getElementById('sidebar');
     if (!sb || !sb.classList.contains('collapsed') || !item.dataset.tip) return;
-    if (!tip) { tip = document.createElement('div'); tip.className = 'sidebar-tip'; tip.setAttribute('aria-hidden', 'true'); document.body.appendChild(tip); }
-    tip.innerHTML = escapeHtml(item.dataset.tip) + (item.dataset.tipSection ? '<small>' + escapeHtml(item.dataset.tipSection) + '</small>' : '');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'sidebar-tip';
+      tip.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(tip);
+    }
+    tip.innerHTML =
+      escapeHtml(item.dataset.tip) +
+      (item.dataset.tipSection ? '<small>' + escapeHtml(item.dataset.tipSection) + '</small>' : '');
     const r = item.getBoundingClientRect();
     tip.style.top = Math.round(r.top + r.height / 2) + 'px';
     tip.style.left = Math.round(sb.getBoundingClientRect().right + 8) + 'px';
     tip.classList.add('is-on');
   };
-  const hide = () => { if (tip) tip.classList.remove('is-on'); };
-  nav.addEventListener('mouseover', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); else hide(); });
+  const hide = () => {
+    if (tip) tip.classList.remove('is-on');
+  };
+  nav.addEventListener('mouseover', (e) => {
+    const it = e.target.closest && e.target.closest('.nav-item');
+    if (it) show(it);
+    else hide();
+  });
   nav.addEventListener('mouseleave', hide);
-  nav.addEventListener('focusin', (e) => { const it = e.target.closest && e.target.closest('.nav-item'); if (it) show(it); });
+  nav.addEventListener('focusin', (e) => {
+    const it = e.target.closest && e.target.closest('.nav-item');
+    if (it) show(it);
+  });
   nav.addEventListener('focusout', hide);
   nav.addEventListener('click', hide);
   nav.addEventListener('scroll', hide);
@@ -655,7 +834,7 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
   });
   sidebarOverlay.addEventListener('click', closeMobileMenu);
 
-  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user').forEach(item => {
+  sidebar.querySelectorAll('.sidebar-nav a, .btn-logout, .current-user').forEach((item) => {
     item.addEventListener('click', () => {
       if (window.innerWidth <= 768) closeMobileMenu();
     });
@@ -667,7 +846,7 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
     }
   });
 
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
       closeMobileMenu();
     }
@@ -675,13 +854,15 @@ if (mobileMenuBtn && sidebarOverlay && sidebar) {
 }
 
 // Modal close on overlay click
-document.getElementById('modalOverlay').addEventListener('click', e => {
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modalOverlay')) requestCloseModal();
 });
-['input', 'change'].forEach((t) => document.getElementById('modalBody').addEventListener(t, _markModalDirty));
+['input', 'change'].forEach((t) =>
+  document.getElementById('modalBody').addEventListener(t, _markModalDirty)
+);
 
 // Esc fecha modais
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   // Modal filho (Checklist → "Ver procedimento") tem prioridade: fecha só ele.
   try {
@@ -690,12 +871,17 @@ document.addEventListener('keydown', e => {
       closeChecklistProc();
       return;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   if (document.getElementById('modalOverlay').style.display !== 'none') requestCloseModal();
   if (document.getElementById('userModalOverlay').style.display !== 'none')
     document.getElementById('userModalOverlay').style.display = 'none';
-  if (document.getElementById('cropModalOverlay').style.display !== 'none' &&
-      typeof closeCropModal === 'function') closeCropModal();
+  if (
+    document.getElementById('cropModalOverlay').style.display !== 'none' &&
+    typeof closeCropModal === 'function'
+  )
+    closeCropModal();
 });
 
 // User modal
@@ -710,14 +896,16 @@ document.getElementById('userQuickBtn').addEventListener('click', () => {
     document.getElementById('userModalOverlay').style.display = 'flex';
   }
 });
-document.getElementById('userModalOverlay').addEventListener('click', e => {
+document.getElementById('userModalOverlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('userModalOverlay'))
     document.getElementById('userModalOverlay').style.display = 'none';
 });
 
 function saveUserConfig() {
-  const name     = document.getElementById('userNameInput').value.trim() || 'Suporte TI';
-  const initials = document.getElementById('userInitialsInput').value.trim().toUpperCase() || name.substring(0,2).toUpperCase();
+  const name = document.getElementById('userNameInput').value.trim() || 'Suporte TI';
+  const initials =
+    document.getElementById('userInitialsInput').value.trim().toUpperCase() ||
+    name.substring(0, 2).toUpperCase();
   saveUser({ name, initials });
   updateUserUI();
   document.getElementById('userModalOverlay').style.display = 'none';
@@ -729,8 +917,8 @@ function updateUserUI() {
   const session = getSession();
   const u = session || getUser();
   document.getElementById('user-name-display').textContent = u.name || 'Suporte TI';
-  const initials = u.initials || (u.name ? u.name.substring(0,2).toUpperCase() : 'TI');
-  const avatar   = document.getElementById('user-avatar');
+  const initials = u.initials || (u.name ? u.name.substring(0, 2).toUpperCase() : 'TI');
+  const avatar = document.getElementById('user-avatar');
   avatar.textContent = initials;
   if (u.color) avatar.style.setProperty('background', u.color, 'important'); // a classe de css/utilidades.css usa !important
   const roleEl = document.getElementById('user-role-display');
@@ -743,11 +931,17 @@ function updateUserUI() {
 // além dos últimos 500 que o sync traz para o aparelho.
 const AUDIT_PAGE = 100;
 
-function _auditNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function _auditNorm(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
 
 /** Valores distintos para os filtros (puro). */
 function auditFacets(logs) {
-  const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const uniq = (arr) =>
+    [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   return {
     types: uniq((logs || []).map((l) => l.type)),
     actions: uniq((logs || []).map((l) => l.action)),
@@ -759,16 +953,29 @@ function auditFacets(logs) {
 function filterAuditLogs(logs, f) {
   const o = f || {};
   const q = _auditNorm(o.q);
-  const day = (l) => (l.timestamp ? (typeof localDateISO === 'function' ? localDateISO(new Date(l.timestamp)) : String(l.timestamp).slice(0, 10)) : '');
-  return (logs || []).filter((l) => {
-    if (o.type && l.type !== o.type) return false;
-    if (o.action && l.action !== o.action) return false;
-    if (o.person && (l.operatorName || 'Sistema') !== o.person) return false;
-    if (o.from && day(l) < o.from) return false;
-    if (o.to && day(l) > o.to) return false;
-    if (q && ![l.action, l.type, l.details, l.operatorName, l.targetId].some((v) => _auditNorm(v).includes(q))) return false;
-    return true;
-  }).sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+  const day = (l) =>
+    l.timestamp
+      ? typeof localDateISO === 'function'
+        ? localDateISO(new Date(l.timestamp))
+        : String(l.timestamp).slice(0, 10)
+      : '';
+  return (logs || [])
+    .filter((l) => {
+      if (o.type && l.type !== o.type) return false;
+      if (o.action && l.action !== o.action) return false;
+      if (o.person && (l.operatorName || 'Sistema') !== o.person) return false;
+      if (o.from && day(l) < o.from) return false;
+      if (o.to && day(l) > o.to) return false;
+      if (
+        q &&
+        ![l.action, l.type, l.details, l.operatorName, l.targetId].some((v) =>
+          _auditNorm(v).includes(q)
+        )
+      )
+        return false;
+      return true;
+    })
+    .sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
 }
 
 /** Agrupa por dia (já ordenado) com rótulo Hoje/Ontem/data (puro). */
@@ -778,10 +985,21 @@ function groupAuditLogsByDay(logs, todayISO) {
   const yesterday = d.toISOString().slice(0, 10);
   const groups = [];
   let cur = null;
-  for (const l of (logs || [])) {
-    const key = l.timestamp ? (typeof localDateISO === 'function' ? localDateISO(new Date(l.timestamp)) : String(l.timestamp).slice(0, 10)) : '—';
+  for (const l of logs || []) {
+    const key = l.timestamp
+      ? typeof localDateISO === 'function'
+        ? localDateISO(new Date(l.timestamp))
+        : String(l.timestamp).slice(0, 10)
+      : '—';
     if (!cur || cur.key !== key) {
-      const label = key === todayISO ? 'Hoje' : key === yesterday ? 'Ontem' : (key === '—' ? 'Sem data' : key.split('-').reverse().join('/'));
+      const label =
+        key === todayISO
+          ? 'Hoje'
+          : key === yesterday
+            ? 'Ontem'
+            : key === '—'
+              ? 'Sem data'
+              : key.split('-').reverse().join('/');
       cur = { key, label, items: [] };
       groups.push(cur);
     }
@@ -797,7 +1015,9 @@ function openAuditTarget(type, id) {
     if (t === 'pendencia' && getPendenciaById(id)) return openPendenciaDetail(id);
     if (t === 'visita' && getVisitById(id)) return openVisitDetail(id);
     if (t === 'cliente' && getClientById(id)) return viewClient(id);
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   showToast('Registro não encontrado (pode ter sido excluído).', 'info');
 }
 
@@ -815,7 +1035,11 @@ function renderLogs() {
   _auditState = { f: {}, shown: AUDIT_PAGE, remote: null };
 
   const facets = auditFacets(_auditLocalLogs());
-  const opt = (arr, all) => '<option value="">' + all + '</option>' + arr.map((v) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
+  const opt = (arr, all) =>
+    '<option value="">' +
+    all +
+    '</option>' +
+    arr.map((v) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
   document.getElementById('contentArea').innerHTML = `
     <div class="log-toolbar search-bar page-toolbar">
       <div class="search-input-wrap pt-search">
@@ -851,9 +1075,17 @@ function renderLogs() {
     <div class="audit-summary" id="auditSummary" aria-live="polite"></div>
     <div id="logsContainer"></div>`;
 
-  const rerender = () => { _auditState.shown = AUDIT_PAGE; _auditState.remote = null; _renderAuditList(); };
-  document.getElementById('logSearch').addEventListener('input', typeof debounce === 'function' ? debounce(rerender, 200) : rerender);
-  ['logTypeFilter', 'logOpFilter', 'logActionFilter', 'logDateFrom', 'logDateTo'].forEach((id) => document.getElementById(id).addEventListener('change', rerender));
+  const rerender = () => {
+    _auditState.shown = AUDIT_PAGE;
+    _auditState.remote = null;
+    _renderAuditList();
+  };
+  document
+    .getElementById('logSearch')
+    .addEventListener('input', typeof debounce === 'function' ? debounce(rerender, 200) : rerender);
+  ['logTypeFilter', 'logOpFilter', 'logActionFilter', 'logDateFrom', 'logDateTo'].forEach((id) =>
+    document.getElementById(id).addEventListener('change', rerender)
+  );
   _renderAuditList();
 }
 
@@ -862,14 +1094,28 @@ function _auditLocalLogs() {
   // Gestão: esconde logs de pendência Gestão de quem não é Gestão.
   try {
     if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
-    else if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') logs = logs.filter((l) => !isGestaoLog(l));
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+    else if (
+      typeof canViewGestao === 'function' &&
+      !canViewGestao() &&
+      typeof isGestaoLog === 'function'
+    )
+      logs = logs.filter((l) => !isGestaoLog(l));
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   return logs;
 }
 
 function _auditFilters() {
   const v = (id) => (document.getElementById(id) || {}).value || '';
-  return { q: v('logSearch'), type: v('logTypeFilter'), action: v('logActionFilter'), person: v('logOpFilter'), from: v('logDateFrom'), to: v('logDateTo') };
+  return {
+    q: v('logSearch'),
+    type: v('logTypeFilter'),
+    action: v('logActionFilter'),
+    person: v('logOpFilter'),
+    from: v('logDateFrom'),
+    to: v('logDateTo'),
+  };
 }
 
 function auditQuickPeriod(p) {
@@ -877,11 +1123,23 @@ function auditQuickPeriod(p) {
   const from = document.getElementById('logDateFrom');
   const to = document.getElementById('logDateTo');
   if (!from || !to) return;
-  if (!p) { from.value = ''; to.value = ''; }
-  else if (p === 'today') { from.value = today; to.value = today; }
-  else { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - (Number(p) - 1)); from.value = d.toISOString().slice(0, 10); to.value = today; }
-  document.querySelectorAll('.audit-quick .vis-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === p)));
-  _auditState.shown = AUDIT_PAGE; _auditState.remote = null;
+  if (!p) {
+    from.value = '';
+    to.value = '';
+  } else if (p === 'today') {
+    from.value = today;
+    to.value = today;
+  } else {
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - (Number(p) - 1));
+    from.value = d.toISOString().slice(0, 10);
+    to.value = today;
+  }
+  document
+    .querySelectorAll('.audit-quick .vis-chip')
+    .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === p)));
+  _auditState.shown = AUDIT_PAGE;
+  _auditState.remote = null;
   _renderAuditList();
 }
 
@@ -900,46 +1158,109 @@ function _renderAuditList() {
   const list = _auditCurrentList();
   const people = new Set(list.map((l) => l.operatorName || 'Sistema')).size;
   const sum = document.getElementById('auditSummary');
-  const online = typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive;
+  const online =
+    typeof isSupabaseConnected === 'function' &&
+    isSupabaseConnected() &&
+    window._supabaseAuthActive;
   if (sum) {
-    sum.innerHTML = '<b>' + plural(list.length, 'registro', 'registros') + '</b> · ' + plural(people, 'pessoa', 'pessoas') +
-      (online && !_auditState.remote ? ' · <button type="button" class="link-btn" data-action="auditFetchRemote" title="O aparelho guarda só os últimos 500 registros">Buscar também no servidor</button>' : '') +
+    sum.innerHTML =
+      '<b>' +
+      plural(list.length, 'registro', 'registros') +
+      '</b> · ' +
+      plural(people, 'pessoa', 'pessoas') +
+      (online && !_auditState.remote
+        ? ' · <button type="button" class="link-btn" data-action="auditFetchRemote" title="O aparelho guarda só os últimos 500 registros">Buscar também no servidor</button>'
+        : '') +
       (_auditState.remote ? ' · inclui registros do servidor' : '');
   }
   if (!list.length) {
-    container.innerHTML = '<div class="empty-state u-a19bf6"><p>Nenhum registro encontrado com esses filtros.</p></div>';
+    container.innerHTML =
+      '<div class="empty-state u-a19bf6"><p>Nenhum registro encontrado com esses filtros.</p></div>';
     return;
   }
   const page = list.slice(0, _auditState.shown);
   const groups = groupAuditLogsByDay(page, localDateISO());
   const actionClass = (log) => {
     const k = _auditNorm(log.action).split(/\s+/)[0];
-    return ['criou', 'ativou', 'editou', 'excluiu', 'desativou', 'login', 'backup', 'limpou'].includes(k) ? 'log-action-' + k : 'log-action-default';
+    return [
+      'criou',
+      'ativou',
+      'editou',
+      'excluiu',
+      'desativou',
+      'login',
+      'backup',
+      'limpou',
+    ].includes(k)
+      ? 'log-action-' + k
+      : 'log-action-default';
   };
-  const time = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
-  const canOpen = (l) => ['pendencia', 'visita', 'cliente'].includes(_auditNorm(l.type)) && l.targetId;
-  container.innerHTML = groups.map((g) =>
-    '<section class="audit-day"><h3 class="audit-day-label">' + escapeHtml(g.label) + ' <small>' + g.items.length + '</small></h3>' +
-    '<div class="log-timeline">' + g.items.map((log) => {
-      const cls = actionClass(log);
-      return '<div class="log-card">' +
-        '<div class="log-dot ' + cls + ' u-be5c13"></div>' +
-        '<div class="log-header">' +
-          '<span class="log-action-label">' + escapeHtml(log.action) + '</span>' +
-          '<span class="log-type-badge ' + cls + '">' + escapeHtml(log.type) + '</span>' +
-          '<span class="u-97445a"></span>' +
-          '<span class="log-meta">' + escapeHtml(time(log.timestamp)) + '</span>' +
-        '</div>' +
-        '<div class="log-details">' + escapeHtml(log.details) + '</div>' +
-        '<div class="log-meta">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
-          escapeHtml(log.operatorName || 'Sistema') +
-          (canOpen(log) ? ' · <button type="button" class="link-btn" data-action="openAuditTarget" data-arg="' + escapeHtml(log.targetId) + '" data-type="' + escapeHtml(log.type) + '">Abrir</button>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('') + '</div></section>').join('') +
+  const time = (iso) => {
+    try {
+      return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } catch (_) {
+      return '';
+    }
+  };
+  const canOpen = (l) =>
+    ['pendencia', 'visita', 'cliente'].includes(_auditNorm(l.type)) && l.targetId;
+  container.innerHTML =
+    groups
+      .map(
+        (g) =>
+          '<section class="audit-day"><h3 class="audit-day-label">' +
+          escapeHtml(g.label) +
+          ' <small>' +
+          g.items.length +
+          '</small></h3>' +
+          '<div class="log-timeline">' +
+          g.items
+            .map((log) => {
+              const cls = actionClass(log);
+              return (
+                '<div class="log-card">' +
+                '<div class="log-dot ' +
+                cls +
+                ' u-be5c13"></div>' +
+                '<div class="log-header">' +
+                '<span class="log-action-label">' +
+                escapeHtml(log.action) +
+                '</span>' +
+                '<span class="log-type-badge ' +
+                cls +
+                '">' +
+                escapeHtml(log.type) +
+                '</span>' +
+                '<span class="u-97445a"></span>' +
+                '<span class="log-meta">' +
+                escapeHtml(time(log.timestamp)) +
+                '</span>' +
+                '</div>' +
+                '<div class="log-details">' +
+                escapeHtml(log.details) +
+                '</div>' +
+                '<div class="log-meta">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+                escapeHtml(log.operatorName || 'Sistema') +
+                (canOpen(log)
+                  ? ' · <button type="button" class="link-btn" data-action="openAuditTarget" data-arg="' +
+                    escapeHtml(log.targetId) +
+                    '" data-type="' +
+                    escapeHtml(log.type) +
+                    '">Abrir</button>'
+                  : '') +
+                '</div>' +
+                '</div>'
+              );
+            })
+            .join('') +
+          '</div></section>'
+      )
+      .join('') +
     (list.length > page.length
-      ? '<div class="u-0e7080"><button type="button" class="btn btn-secondary" data-action="auditLoadMore">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
+      ? '<div class="u-0e7080"><button type="button" class="btn btn-secondary" data-action="auditLoadMore">Carregar mais (' +
+        (list.length - page.length) +
+        ' restantes)</button></div>'
       : '');
 }
 
@@ -949,7 +1270,11 @@ async function auditFetchRemote(btn) {
   if (btn) btn.disabled = true;
   const f = _auditFilters();
   try {
-    let q = supabaseClient.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(1000);
+    let q = supabaseClient
+      .from('audit_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(1000);
     if (f.type) q = q.eq('type', f.type);
     if (f.action) q = q.eq('action', f.action);
     if (f.person) q = q.eq('operator_name', f.person);
@@ -957,8 +1282,20 @@ async function auditFetchRemote(btn) {
     if (f.to) q = q.lte('timestamp', new Date(f.to + 'T23:59:59.999').toISOString());
     const { data, error } = await q;
     if (error) throw error;
-    let rows = (data || []).map((l) => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
-    try { if (typeof filterGestaoLogs === 'function') rows = filterGestaoLogs(rows); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+    let rows = (data || []).map((l) => ({
+      id: l.id,
+      operatorName: l.operator_name,
+      action: l.action,
+      type: l.type,
+      targetId: l.target_id,
+      details: l.details,
+      timestamp: l.timestamp,
+    }));
+    try {
+      if (typeof filterGestaoLogs === 'function') rows = filterGestaoLogs(rows);
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+    }
     _auditState.remote = rows;
     _auditState.shown = AUDIT_PAGE;
     _renderAuditList();
@@ -978,14 +1315,18 @@ async function auditFetchRemote(btn) {
  * com reason = 'forbidden' | 'offline' | 'remote'.
  */
 async function clearAuditLogs() {
-  if (typeof isCurrentAdmin !== 'function' || !isCurrentAdmin()) return { ok: false, reason: 'forbidden' };
+  if (typeof isCurrentAdmin !== 'function' || !isCurrentAdmin())
+    return { ok: false, reason: 'forbidden' };
   const hasRemote = typeof supabaseClient !== 'undefined' && !!supabaseClient;
   if (hasRemote) {
     if (!window._supabaseAuthActive) return { ok: false, reason: 'offline' };
     try {
       // "id não nulo" = todas as linhas; o PostgREST exige algum filtro no delete.
       const { error } = await supabaseClient.from('audit_logs').delete().not('id', 'is', null);
-      if (error) { console.warn('⚠️ Falha ao limpar logs remotos:', error.message); return { ok: false, reason: 'remote' }; }
+      if (error) {
+        console.warn('⚠️ Falha ao limpar logs remotos:', error.message);
+        return { ok: false, reason: 'remote' };
+      }
     } catch (e) {
       console.warn('⚠️ Rede ao limpar logs:', e && e.message);
       return { ok: false, reason: 'remote' };
@@ -1001,23 +1342,28 @@ function clearLogs() {
     showToast('Apenas administradores podem limpar o histórico.', 'error');
     return;
   }
-  confirmAction('Tem certeza que deseja apagar todo o histórico de atividades? Esta ação não pode ser desfeita.', async () => {
-    const res = await clearAuditLogs();
-    if (!res.ok) {
-      showToast(
-        res.reason === 'forbidden' ? 'Apenas administradores podem limpar o histórico.'
-          : res.reason === 'offline' ? 'Sem conexão autenticada com o servidor: o histórico não foi apagado.'
-          : 'Não foi possível apagar o histórico no servidor. Nada foi apagado; tente de novo.',
-        'error'
-      );
-      return;
+  confirmAction(
+    'Tem certeza que deseja apagar todo o histórico de atividades? Esta ação não pode ser desfeita.',
+    async () => {
+      const res = await clearAuditLogs();
+      if (!res.ok) {
+        showToast(
+          res.reason === 'forbidden'
+            ? 'Apenas administradores podem limpar o histórico.'
+            : res.reason === 'offline'
+              ? 'Sem conexão autenticada com o servidor: o histórico não foi apagado.'
+              : 'Não foi possível apagar o histórico no servidor. Nada foi apagado; tente de novo.',
+          'error'
+        );
+        return;
+      }
+      if (typeof addLog === 'function') {
+        addLog('Limpou Histórico', 'Histórico', 'Geral', 'Histórico limpo por admin');
+      }
+      renderLogs();
+      showToast('Histórico limpo com sucesso!', 'success');
     }
-    if (typeof addLog === 'function') {
-      addLog('Limpou Histórico', 'Histórico', 'Geral', 'Histórico limpo por admin');
-    }
-    renderLogs();
-    showToast('Histórico limpo com sucesso!', 'success');
-  });
+  );
 }
 
 function _themeIconSvg(isDark) {
@@ -1038,19 +1384,22 @@ function _applyThemeUI(isDark) {
 
 function _storedTheme() {
   const t = localStorage.getItem('intra_theme');
-  return (t === 'dark' || t === 'light') ? t : null;
+  return t === 'dark' || t === 'light' ? t : null;
 }
 
 function _systemThemeIsDark() {
   return typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : false;
 }
 
 function initTheme() {
   _applyThemeUI((_storedTheme() || (_systemThemeIsDark() ? 'dark' : 'light')) === 'dark');
   if (typeof window === 'undefined' || !window.matchMedia) return;
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  const onChange = function() { if (!_storedTheme()) _applyThemeUI(_systemThemeIsDark()); };
+  const onChange = function () {
+    if (!_storedTheme()) _applyThemeUI(_systemThemeIsDark());
+  };
   if (mq.addEventListener) mq.addEventListener('change', onChange);
   else if (mq.addListener) mq.addListener(onChange);
 }
@@ -1096,7 +1445,7 @@ function csvRow(cells) {
 }
 
 function exportCSV(filename, headers, rows) {
-  const csvContent = "\uFEFF" + csvRow(headers) + "\n" + rows.map(csvRow).join("\n");
+  const csvContent = '\uFEFF' + csvRow(headers) + '\n' + rows.map(csvRow).join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1132,7 +1481,9 @@ function _syncTopbarMoreAction(text) {
       const label = item.querySelector('.topbar-more-action-text');
       if (label) label.textContent = text;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
 function toggleTopbarMoreMenu(e) {
   if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -1153,9 +1504,16 @@ function closeTopbarMoreMenu() {
     menu.hidden = true;
     menu.dataset.open = '0';
     if (btn) btn.setAttribute('aria-expanded', 'false');
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
 }
-if (typeof window !== 'undefined' && !window._topbarMoreBound && typeof document !== 'undefined' && document.addEventListener) {
+if (
+  typeof window !== 'undefined' &&
+  !window._topbarMoreBound &&
+  typeof document !== 'undefined' &&
+  document.addEventListener
+) {
   window._topbarMoreBound = true;
   document.addEventListener('click', function (e) {
     try {
@@ -1164,54 +1522,86 @@ if (typeof window !== 'undefined' && !window._topbarMoreBound && typeof document
       if (!menu || menu.hidden) return;
       if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
       closeTopbarMoreMenu();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+    }
   });
   document.addEventListener('keydown', function (e) {
     try {
       if (e && e.key === 'Escape') closeTopbarMoreMenu();
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+    }
   });
 }
 
 function exportClientsCSV() {
   if (typeof canExport === 'function' && !canExport()) {
-    if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Exportação restrita a administradores/supervisores.', 'error');
     return;
   }
   const clients = typeof getClients === 'function' ? getClients() : [];
-  const headers = ['ID', 'Nome', 'CNPJ/CPF', 'Segmento', 'Telefone Dono', 'Telefone Resp.', 'Responsável TI', 'Técnico', 'Data Cadastro'];
-  const rows = clients.map(c => [
-    c.id, 
-    c.name || '', 
-    c.cnpj || '', 
-    c.segment || '', 
-    c.ownerPhone || '', 
+  const headers = [
+    'ID',
+    'Nome',
+    'CNPJ/CPF',
+    'Segmento',
+    'Telefone Dono',
+    'Telefone Resp.',
+    'Responsável TI',
+    'Técnico',
+    'Data Cadastro',
+  ];
+  const rows = clients.map((c) => [
+    c.id,
+    c.name || '',
+    c.cnpj || '',
+    c.segment || '',
+    c.ownerPhone || '',
     c.responsiblePhone || '',
     c.responsible || '',
     c.technician || '',
-    formatDate(c.createdAt)
+    formatDate(c.createdAt),
   ]);
   exportCSV('clientes_init_intra', headers, rows);
 }
 
 function exportPendenciasCSV() {
   if (typeof canExport === 'function' && !canExport()) {
-    if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
+    if (typeof showToast === 'function')
+      showToast('Exportação restrita a administradores/supervisores.', 'error');
     return;
   }
-  const pens = (typeof getMyPendencias === 'function') ? getMyPendencias()
-    : (typeof filterGestaoPendencias === 'function' && typeof getPendencias === 'function' ? filterGestaoPendencias(getPendencias()) : (typeof getPendencias === 'function' ? getPendencias() : []));
-  const headers = ['ID', 'Cliente', 'Assunto', 'Descrição', 'Status', 'Prioridade', 'Responsável', 'Criado Em', 'Prazo'];
-  const rows = pens.map(p => [
+  const pens =
+    typeof getMyPendencias === 'function'
+      ? getMyPendencias()
+      : typeof filterGestaoPendencias === 'function' && typeof getPendencias === 'function'
+        ? filterGestaoPendencias(getPendencias())
+        : typeof getPendencias === 'function'
+          ? getPendencias()
+          : [];
+  const headers = [
+    'ID',
+    'Cliente',
+    'Assunto',
+    'Descrição',
+    'Status',
+    'Prioridade',
+    'Responsável',
+    'Criado Em',
+    'Prazo',
+  ];
+  const rows = pens.map((p) => [
     p.id,
     p.clientName || '',
     p.assunto ? String(p.assunto).replace(/\n/g, ' ') : '',
     p.descricao ? p.descricao.replace(/\n/g, ' ') : '',
-    p.status || '', 
-    p.priority || '', 
-    p.responsible || '', 
-    formatDateTime(p.createdAt), 
-    formatDate(p.deadline)
+    p.status || '',
+    p.priority || '',
+    p.responsible || '',
+    formatDateTime(p.createdAt),
+    formatDate(p.deadline),
   ]);
   exportCSV('pendencias_init_intra', headers, rows);
 }
@@ -1222,36 +1612,59 @@ function exportLogsCSV() {
     return;
   }
   // Na tela de histórico, exporta exatamente o que está filtrado.
-  const logs = (document.getElementById('logsContainer') && typeof _auditCurrentList === 'function') ? _auditCurrentList() : (function(){
-    var _l = typeof getLogs === 'function' ? getLogs() : [];
-    try {
-      if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l);
-      if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') return _l.filter(l => !isGestaoLog(l));
-    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
-    return _l;
-  })();
+  const logs =
+    document.getElementById('logsContainer') && typeof _auditCurrentList === 'function'
+      ? _auditCurrentList()
+      : (function () {
+          var _l = typeof getLogs === 'function' ? getLogs() : [];
+          try {
+            if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l);
+            if (
+              typeof canViewGestao === 'function' &&
+              !canViewGestao() &&
+              typeof isGestaoLog === 'function'
+            )
+              return _l.filter((l) => !isGestaoLog(l));
+          } catch (_e) {
+            if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+          }
+          return _l;
+        })();
   const headers = ['Data/Hora', 'Ação', 'Tipo', 'Detalhes', 'Operador'];
-  const rows = logs.map(l => [
+  const rows = logs.map((l) => [
     formatDateTime(l.timestamp),
     l.action || '',
     l.type || '',
     l.details ? l.details.replace(/\n/g, ' ') : '',
-    l.operatorName || 'Sistema'
+    l.operatorName || 'Sistema',
   ]);
   exportCSV('historico_init_intra', headers, rows);
 }
 
 // ── ATALHOS DE TECLADO GLOBAIS ──
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   // Esc dentro de campo já é tratado pelo handler "Esc fecha modais" (com confirmação).
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 
   // Alt + 1..9 -> Navegar entre abas
   if (e.altKey && !e.ctrlKey && !e.metaKey) {
-    var tabMap = { '1':'dashboard','2':'pendencias','3':'calendario','4':'clientes','5':'templates','6':'operadores','7':'visitas','8':'equipamentos','9':'historico' };
+    var tabMap = {
+      1: 'dashboard',
+      2: 'pendencias',
+      3: 'calendario',
+      4: 'clientes',
+      5: 'templates',
+      6: 'operadores',
+      7: 'visitas',
+      8: 'equipamentos',
+      9: 'historico',
+    };
     var page = tabMap[e.key];
     if (page === 'historico' && typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) return;
-    if (page && typeof navigateTo === 'function') { e.preventDefault(); navigateTo(page); }
+    if (page && typeof navigateTo === 'function') {
+      e.preventDefault();
+      navigateTo(page);
+    }
   }
 
   // Alt + N -> Criar Novo Item (conforme aba atual)
@@ -1281,8 +1694,12 @@ function checkOverdueAlerts() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = localDateISO(tomorrow);
 
-  const dueToday = pens.filter(p => p.deadline && p.deadline === todayStr && !isPendenciaClosed(p.status));
-  const dueTomorrow = pens.filter(p => p.deadline && p.deadline === tomorrowStr && !isPendenciaClosed(p.status));
+  const dueToday = pens.filter(
+    (p) => p.deadline && p.deadline === todayStr && !isPendenciaClosed(p.status)
+  );
+  const dueTomorrow = pens.filter(
+    (p) => p.deadline && p.deadline === tomorrowStr && !isPendenciaClosed(p.status)
+  );
 
   if (dueToday.length > 0 || dueTomorrow.length > 0) {
     let msg = '';
@@ -1299,7 +1716,7 @@ function checkOverdueAlerts() {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Init Intra – Alerta de Prazos', {
         body: msg,
-        icon: 'icon.svg'
+        icon: 'icon.svg',
       });
     } else if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -1344,7 +1761,12 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 // ── PWA Install Prompt ─────────────────────────────────────────────────────────
 let _deferredInstall = null;
 function _setInstallBtnVisible(v) {
-  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? 'flex' : 'none'; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  try {
+    const b = document.getElementById('installAppBtn');
+    if (b) b.style.display = v ? 'flex' : 'none';
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   refreshSidebarMore();
 }
 
@@ -1353,7 +1775,7 @@ function _setInstallBtnVisible(v) {
 // vivem num popover. Cada item controla a própria visibilidade; o botão
 // "Mais opções" só aparece se houver ao menos um item visível.
 function setSidebarMoreAdmin(isAdmin) {
-  ['exportDataBtn', 'importDataBtn'].forEach(id => {
+  ['exportDataBtn', 'importDataBtn'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
@@ -1364,7 +1786,9 @@ function refreshSidebarMore() {
   const btn = document.getElementById('sidebarMoreBtn');
   const menu = document.getElementById('sidebarMoreMenu');
   if (!btn || !menu) return;
-  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(el => getComputedStyle(el).display !== 'none');
+  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(
+    (el) => getComputedStyle(el).display !== 'none'
+  );
   btn.style.display = any ? 'flex' : 'none';
   if (!any) closeSidebarMore();
 }
@@ -1393,7 +1817,9 @@ function openSidebarMore() {
   const bottom = mobile ? window.innerHeight - r.top + 6 : window.innerHeight - r.bottom;
   menu.style.left = Math.max(8, left) + 'px';
   menu.style.bottom = Math.max(8, bottom) + 'px';
-  const first = Array.from(menu.querySelectorAll('.sidebar-more-item')).find(el => el.style.display !== 'none');
+  const first = Array.from(menu.querySelectorAll('.sidebar-more-item')).find(
+    (el) => el.style.display !== 'none'
+  );
   if (first) first.focus();
 }
 
@@ -1401,29 +1827,41 @@ document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('sidebarMoreBtn');
   const menu = document.getElementById('sidebarMoreMenu');
   if (!btn || !menu) return;
-  btn.addEventListener('click', e => {
+  btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (menu.hidden) openSidebarMore(); else closeSidebarMore();
+    if (menu.hidden) openSidebarMore();
+    else closeSidebarMore();
   });
-  menu.addEventListener('click', e => {
+  menu.addEventListener('click', (e) => {
     const item = e.target.closest('.sidebar-more-item');
     if (!item) return;
     closeSidebarMore();
-    if (window.innerWidth <= 768 && typeof window.closeMobileMenu === 'function') window.closeMobileMenu();
+    if (window.innerWidth <= 768 && typeof window.closeMobileMenu === 'function')
+      window.closeMobileMenu();
     const fn = window[item.dataset.moreAction];
     if (typeof fn === 'function') fn();
   });
-  menu.addEventListener('keydown', e => {
-    const items = Array.from(menu.querySelectorAll('.sidebar-more-item')).filter(el => el.style.display !== 'none');
+  menu.addEventListener('keydown', (e) => {
+    const items = Array.from(menu.querySelectorAll('.sidebar-more-item')).filter(
+      (el) => el.style.display !== 'none'
+    );
     const i = items.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      items[(i + 1) % items.length].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[(i - 1 + items.length) % items.length].focus();
+    }
   });
-  document.addEventListener('click', e => {
+  document.addEventListener('click', (e) => {
     if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) closeSidebarMore();
   });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !menu.hidden) { closeSidebarMore(); btn.focus(); }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) {
+      closeSidebarMore();
+      btn.focus();
+    }
   });
   window.addEventListener('resize', closeSidebarMore);
   refreshSidebarMore();
@@ -1439,9 +1877,12 @@ window.addEventListener('appinstalled', () => {
 });
 
 function promptInstall() {
-  if (!_deferredInstall) { showToast('Instale o app pelo menu do navegador.', 'info'); return; }
+  if (!_deferredInstall) {
+    showToast('Instale o app pelo menu do navegador.', 'info');
+    return;
+  }
   _deferredInstall.prompt();
-  _deferredInstall.userChoice.then(r => {
+  _deferredInstall.userChoice.then((r) => {
     if (r.outcome === 'accepted') showToast('App instalado com sucesso!', 'success');
     _deferredInstall = null;
     _setInstallBtnVisible(false);
@@ -1459,8 +1900,11 @@ function promptInstall() {
 function _richEsc(str) {
   if (typeof escapeHtml === 'function') return escapeHtml(str);
   return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function _richMentionNames() {
   try {
@@ -1468,7 +1912,9 @@ function _richMentionNames() {
       var n = getOperatorNames();
       if (n && n.length) return n;
     }
-  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
+  } catch (_e) {
+    if (typeof _logSilent === 'function') _logSilent(_e, 'ui');
+  }
   return [];
 }
 function _richApplyMentions(escapedChunk) {
@@ -1478,7 +1924,11 @@ function _richApplyMentions(escapedChunk) {
     var tl = String(p1).toLowerCase();
     var isMention = names.some(function (n) {
       var parts = String(n).toLowerCase().split(/\s+/);
-      return parts.some(function (p) { return p === tl; }) || String(n).toLowerCase() === tl;
+      return (
+        parts.some(function (p) {
+          return p === tl;
+        }) || String(n).toLowerCase() === tl
+      );
     });
     if (isMention) return '<span class="u-3b66ce">@' + p1 + '</span>';
     return match;
@@ -1487,9 +1937,17 @@ function _richApplyMentions(escapedChunk) {
 function renderRichText(text) {
   var raw = String(text == null ? '' : text);
   if (!raw) return '';
-  var re = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
-  var out = '', last = 0, m;
-  var safeFn = (typeof safeUrl === 'function') ? safeUrl : function () { return '#'; };
+  var re =
+    /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+  var out = '',
+    last = 0,
+    m;
+  var safeFn =
+    typeof safeUrl === 'function'
+      ? safeUrl
+      : function () {
+          return '#';
+        };
   while ((m = re.exec(raw)) !== null) {
     out += _richEsc(raw.slice(last, m.index));
     var tok = m[0];
@@ -1497,18 +1955,43 @@ function renderRichText(text) {
     var trail = '';
     var tm = tok.match(/[.,;:!?)\]}'"”’]+$/);
     var clean = tok;
-    if (tm) { trail = tm[0]; clean = tok.slice(0, tok.length - trail.length); }
-    if (!clean) { out += _richEsc(tok); last = m.index + tok.length; continue; }
+    if (tm) {
+      trail = tm[0];
+      clean = tok.slice(0, tok.length - trail.length);
+    }
+    if (!clean) {
+      out += _richEsc(tok);
+      last = m.index + tok.length;
+      continue;
+    }
     var href = clean;
     var isEmail = false;
     if (/^www\./i.test(clean)) href = 'https://' + clean;
-    else if (!/^https?:\/\//i.test(clean) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) { href = 'mailto:' + clean; isEmail = true; }
+    else if (!/^https?:\/\//i.test(clean) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) {
+      href = 'mailto:' + clean;
+      isEmail = true;
+    }
     var safe = safeFn(href);
-    if (safe === '#') { out += _richEsc(clean) + _richEsc(trail); }
-    else if (!isEmail && clean.length > 60) {
-      out += '<a href="' + _richEsc(safe) + '" target="_blank" rel="noopener noreferrer" class="rich-link rich-link--short" title="' + _richEsc(clean) + '">🔗 Abrir link</a>' + _richEsc(trail);
+    if (safe === '#') {
+      out += _richEsc(clean) + _richEsc(trail);
+    } else if (!isEmail && clean.length > 60) {
+      out +=
+        '<a href="' +
+        _richEsc(safe) +
+        '" target="_blank" rel="noopener noreferrer" class="rich-link rich-link--short" title="' +
+        _richEsc(clean) +
+        '">🔗 Abrir link</a>' +
+        _richEsc(trail);
     } else {
-      out += '<a href="' + _richEsc(safe) + '" target="_blank" rel="noopener noreferrer" class="rich-link" title="' + _richEsc(clean) + '">' + _richEsc(clean) + '</a>' + _richEsc(trail);
+      out +=
+        '<a href="' +
+        _richEsc(safe) +
+        '" target="_blank" rel="noopener noreferrer" class="rich-link" title="' +
+        _richEsc(clean) +
+        '">' +
+        _richEsc(clean) +
+        '</a>' +
+        _richEsc(trail);
     }
     last = m.index + tok.length;
   }
@@ -1543,20 +2026,48 @@ function formatElapsedFriendly(totalSeconds) {
 // Ações da tela de Histórico/auditoria (clique por delegação em js/actions.js).
 if (typeof registerActions === 'function') {
   registerActions({
-    exportLogsCSV: () => { if (typeof exportLogsCSV === 'function') exportLogsCSV(); },
-    openClientErrors: () => { if (typeof openClientErrors === 'function') openClientErrors(); },
-    clearLogs: () => { if (typeof clearLogs === 'function') clearLogs(); },
-    auditQuickPeriod: (_el, p) => { if (typeof auditQuickPeriod === 'function') auditQuickPeriod(p); },
-    auditFetchRemote: (el) => { if (typeof auditFetchRemote === 'function') auditFetchRemote(el); },
-    openAuditTarget: (el, id) => { if (typeof openAuditTarget === 'function') openAuditTarget(el.dataset.type, id); },
-    auditLoadMore: () => { _auditState.shown += AUDIT_PAGE; if (typeof _renderAuditList === 'function') _renderAuditList(); },
+    exportLogsCSV: () => {
+      if (typeof exportLogsCSV === 'function') exportLogsCSV();
+    },
+    openClientErrors: () => {
+      if (typeof openClientErrors === 'function') openClientErrors();
+    },
+    clearLogs: () => {
+      if (typeof clearLogs === 'function') clearLogs();
+    },
+    auditQuickPeriod: (_el, p) => {
+      if (typeof auditQuickPeriod === 'function') auditQuickPeriod(p);
+    },
+    auditFetchRemote: (el) => {
+      if (typeof auditFetchRemote === 'function') auditFetchRemote(el);
+    },
+    openAuditTarget: (el, id) => {
+      if (typeof openAuditTarget === 'function') openAuditTarget(el.dataset.type, id);
+    },
+    auditLoadMore: () => {
+      _auditState.shown += AUDIT_PAGE;
+      if (typeof _renderAuditList === 'function') _renderAuditList();
+    },
   });
 }
 
 // Estado inicial "escondido" dos elementos do index.html. O markup os esconde por
 // classe (css/utilidades.css, sem atributo style por causa do CSP); o resto do app
 // lê e escreve `el.style.display`, então o estado inline precisa existir também.
-['globalSearchModal', 'teamSelectorWrap', 'sidebarMoreBtn', 'installAppBtn', 'topbarActionBtn', 'sidebarOverlay', 'modalOverlay', 'userModalOverlay', 'cropModalOverlay', 'notifModalOverlay', 'loginOverlay', 'ckProcOverlay'].forEach(id => {
+[
+  'globalSearchModal',
+  'teamSelectorWrap',
+  'sidebarMoreBtn',
+  'installAppBtn',
+  'topbarActionBtn',
+  'sidebarOverlay',
+  'modalOverlay',
+  'userModalOverlay',
+  'cropModalOverlay',
+  'notifModalOverlay',
+  'loginOverlay',
+  'ckProcOverlay',
+].forEach((id) => {
   const el = document.getElementById(id);
   if (el && !el.style.display) el.style.display = 'none';
 });

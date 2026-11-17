@@ -63,7 +63,7 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
 ### 1. Arquitetura
 
 - O select de `planoDoBanco` passa a `"id, name, created_at, google_sheet_url,
-  drive_folder_url"`.
+drive_folder_url"`.
 - `planoPastas` ganha a lista `criar`. A resposta de `pastas` ganha
   `criar: plano.criar`; `Robo.gs` antigo ignora o campo.
 - O robô lê a Script Property `CLIENTES_ROOT_ID`, abre a raiz, procura por nome
@@ -91,7 +91,7 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
   `criar`. O link de `getUrl()` passa por `driveFolderUrl`, que já normaliza
   para `https://drive.google.com/drive/folders/<id>`; nada muda ali.
 - `index.ts`: cabeçalho da linha 20 vira `"pastas" → { candidatos, vigiar,
-  criar }`.
+criar }`.
 
 ### 3. Robô (`tools/google-agenda-apps-script/Robo.gs`)
 
@@ -110,15 +110,15 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
 
 ### 4. Erros e degradação
 
-| Falha | O que acontece |
-| --- | --- |
-| Raiz vazia ou inacessível | Um erro no log; nada criado; tenta na noite seguinte. |
-| `createFolder` falha | Erro por cliente; tenta na noite seguinte. |
-| Pasta criada, resultado não gravado | Na noite seguinte é reaproveitada pelo nome. Idempotente. |
-| Pessoa gravou link no meio-tempo | `.is(null)` vence; fica uma pasta órfã inofensiva na raiz. |
-| Cliente apagado ou id forjado | Contado em `ignorados`. |
-| Banco sem a migration 069 | O fallback `sem069` grava só a URL. |
-| Robô antigo ou função antiga | Compatíveis: campo novo é ignorado ou ausente (`r.criar || []`). |
+| Falha                               | O que acontece                                             |
+| ----------------------------------- | ---------------------------------------------------------- |
+| Raiz vazia ou inacessível           | Um erro no log; nada criado; tenta na noite seguinte.      |
+| `createFolder` falha                | Erro por cliente; tenta na noite seguinte.                 |
+| Pasta criada, resultado não gravado | Na noite seguinte é reaproveitada pelo nome. Idempotente.  |
+| Pessoa gravou link no meio-tempo    | `.is(null)` vence; fica uma pasta órfã inofensiva na raiz. |
+| Cliente apagado ou id forjado       | Contado em `ignorados`.                                    |
+| Banco sem a migration 069           | O fallback `sem069` grava só a URL.                        |
+| Robô antigo ou função antiga        | Compatíveis: campo novo é ignorado ou ausente (`r.criar    |     | []`). |
 
 ### 5. Testes (`tests/robo-campo.test.js`, bloco das pastas, `fakeDb`)
 
@@ -150,37 +150,37 @@ uma pasta com o nome dele dentro da raiz; nenhum cliente antigo ganha pasta.
 
 ### Inputs
 
-| Input | Tipo | Obrigatório | Restrições | Padrão |
-| --- | --- | --- | --- | --- |
-| `clients.name` | text | sim | aparado; vazio não cria | — |
-| `clients.created_at` | timestamptz | sim | nulo não cria; `>= PASTAS_CRIAR_DESDE` | — |
-| `clients.google_sheet_url` | text | não | vazio para entrar em `criar` | null |
-| `clients.drive_folder_url` | text | não | nulo para entrar em `criar` | null |
-| `PASTAS_CRIAR_DESDE` | string ISO | sim | data do deploy | constante |
-| `CLIENTES_ROOT_ID` | Script Property | sim para criar | id de pasta do drive compartilhado | vazio |
+| Input                      | Tipo            | Obrigatório    | Restrições                             | Padrão    |
+| -------------------------- | --------------- | -------------- | -------------------------------------- | --------- |
+| `clients.name`             | text            | sim            | aparado; vazio não cria                | —         |
+| `clients.created_at`       | timestamptz     | sim            | nulo não cria; `>= PASTAS_CRIAR_DESDE` | —         |
+| `clients.google_sheet_url` | text            | não            | vazio para entrar em `criar`           | null      |
+| `clients.drive_folder_url` | text            | não            | nulo para entrar em `criar`            | null      |
+| `PASTAS_CRIAR_DESDE`       | string ISO      | sim            | data do deploy                         | constante |
+| `CLIENTES_ROOT_ID`         | Script Property | sim para criar | id de pasta do drive compartilhado     | vazio     |
 
 ### Outputs
 
-| Caso | Resultado |
-| --- | --- |
-| `pastas` | `{ candidatos, vigiar, criar: [{client_id, nome}] }` |
+| Caso                          | Resultado                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `pastas`                      | `{ candidatos, vigiar, criar: [{client_id, nome}] }`                                |
 | Pasta criada ou reaproveitada | `achados` com `{client_id, folder_url}`; `drive_folder_url` gravado com status `ok` |
-| Raiz ausente ou inacessível | Um erro no log; nada gravado |
-| Falha por cliente | `erros` com `id: mensagem`; nada gravado para ele |
+| Raiz ausente ou inacessível   | Um erro no log; nada gravado                                                        |
+| Falha por cliente             | `erros` com `id: mensagem`; nada gravado para ele                                   |
 
 ### Edge cases
 
-| Caso | Comportamento esperado |
-| --- | --- |
-| `created_at` exatamente igual ao corte, em fuso diferente | Entra em `criar` |
-| `created_at` antes do corte | Fora de `criar` |
-| Nome com espaços nas pontas | Pasta com nome aparado |
-| Nome vazio ou só espaços | Fora de `criar` |
-| Link de planilha inválido | Fora de `candidatos` e de `criar` |
-| Pasta de mesmo nome na lixeira | Ignorada; cria outra |
-| Pasta de mesmo nome fora da lixeira | Reaproveitada |
-| Dois clientes novos com o mesmo nome | Compartilham a pasta (limite aceito) |
-| Link gravado por pessoa antes do resultado | Não sobrescrito |
+| Caso                                                      | Comportamento esperado               |
+| --------------------------------------------------------- | ------------------------------------ |
+| `created_at` exatamente igual ao corte, em fuso diferente | Entra em `criar`                     |
+| `created_at` antes do corte                               | Fora de `criar`                      |
+| Nome com espaços nas pontas                               | Pasta com nome aparado               |
+| Nome vazio ou só espaços                                  | Fora de `criar`                      |
+| Link de planilha inválido                                 | Fora de `candidatos` e de `criar`    |
+| Pasta de mesmo nome na lixeira                            | Ignorada; cria outra                 |
+| Pasta de mesmo nome fora da lixeira                       | Reaproveitada                        |
+| Dois clientes novos com o mesmo nome                      | Compartilham a pasta (limite aceito) |
+| Link gravado por pessoa antes do resultado                | Não sobrescrito                      |
 
 ### Acceptance criteria
 

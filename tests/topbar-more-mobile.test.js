@@ -7,16 +7,30 @@ import vm from 'node:vm';
 // ── Menu suspenso do topbar (mobile ≤768px): ações agrupadas em ⋮ ────────────
 function mkEl(id) {
   const el = {
-    _id: id, innerHTML: '', textContent: '', value: '', disabled: false,
-    hidden: true, dataset: {},
-    style: {}, children: [],
+    _id: id,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    disabled: false,
+    hidden: true,
+    dataset: {},
+    style: {},
+    children: [],
     classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
     attrs: {},
-    setAttribute(k, v) { el.attrs[k] = String(v); },
-    getAttribute(k) { return el.attrs[k]; },
-    addEventListener() {}, appendChild() {}, remove() {}, click() {},
+    setAttribute(k, v) {
+      el.attrs[k] = String(v);
+    },
+    getAttribute(k) {
+      return el.attrs[k];
+    },
+    addEventListener() {},
+    appendChild() {},
+    remove() {},
+    click() {},
     contains: () => false,
-    querySelector: () => null, querySelectorAll: () => [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
     focus() {},
   };
   return el;
@@ -28,7 +42,9 @@ const sandbox = {
   window: { addEventListener() {}, location: { hash: '#dashboard' } },
   navigator: { onLine: true },
   document: {
-    addEventListener(type, fn) { (_listeners[type] = _listeners[type] || []).push(fn); },
+    addEventListener(type, fn) {
+      (_listeners[type] = _listeners[type] || []).push(fn);
+    },
     getElementById: (id) => _el[id] || (_el[id] = mkEl(id)),
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -60,8 +76,7 @@ const fire = (type, evt) => (_listeners[type] || []).forEach((fn) => fn(evt || {
 
 function labelEl() {
   const label = mkEl('topbarMoreAction:q');
-  _el.topbarMoreAction.querySelector = (sel) =>
-    sel === '.topbar-more-action-text' ? label : null;
+  _el.topbarMoreAction.querySelector = (sel) => (sel === '.topbar-more-action-text' ? label : null);
   return label;
 }
 

@@ -23,12 +23,12 @@ const PERMITIDAS = {
       'storage-pendencias.js carrega antes e a função real prevalece',
   },
   highlightMentions: {
-    motivo:
-      'idem parseMentionedOperators: fallback guardado por typeof em pendencias.js',
+    motivo: 'idem parseMentionedOperators: fallback guardado por typeof em pendencias.js',
   },
 };
 // Os helpers de escape do snippet têm nomes diferentes nas duas cópias.
-const normalizaEspelho = (t) => t.replace(/_escapeForSnippet|_snippetEscapeHtml/g, 'ESC').replace(/\s+/g, ' ');
+const normalizaEspelho = (t) =>
+  t.replace(/_escapeForSnippet|_snippetEscapeHtml/g, 'ESC').replace(/\s+/g, ' ');
 
 describe('colisão de globais entre scripts de js/', () => {
   const { arquivos, declaracoes } = coletarDeclaracoes();
@@ -60,7 +60,8 @@ describe('colisão de globais entre scripts de js/', () => {
       const porArq = new Map();
       for (const d of ds) porArq.set(d.arquivo, [...(porArq.get(d.arquivo) || []), d.tipo]);
       for (const tipos of porArq.values()) {
-        if (tipos.length > 1 && tipos.some((t) => t === 'let' || t === 'const' || t === 'class')) dup.push(nome);
+        if (tipos.length > 1 && tipos.some((t) => t === 'let' || t === 'const' || t === 'class'))
+          dup.push(nome);
       }
     }
     expect(dup).toEqual([]);
@@ -69,7 +70,12 @@ describe('colisão de globais entre scripts de js/', () => {
   it('cópias "espelho" da allowlist têm corpo idêntico', () => {
     for (const [nome, info] of Object.entries(PERMITIDAS)) {
       if (!info.espelho) continue;
-      const corpos = new Set(porNome.get(nome).filter((d) => d.tipo === 'function').map((d) => normalizaEspelho(d.corpo)));
+      const corpos = new Set(
+        porNome
+          .get(nome)
+          .filter((d) => d.tipo === 'function')
+          .map((d) => normalizaEspelho(d.corpo))
+      );
       expect(corpos.size, `${nome} divergiu entre as cópias`).toBe(1);
     }
   });

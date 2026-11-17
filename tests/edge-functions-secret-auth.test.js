@@ -215,7 +215,9 @@ describe('google-agenda — x-agenda-secret', () => {
   it('sem header e com segredo errado: 401', async () => {
     const { handler } = await loadHandler('google-agenda', duble({}, ENV_AGENDA));
     expect(await status(handler, postJson({ action: 'begin' }))).toBe(401);
-    expect(await status(handler, postJson({ action: 'begin' }, { 'x-agenda-secret': 'errado' }))).toBe(401);
+    expect(
+      await status(handler, postJson({ action: 'begin' }, { 'x-agenda-secret': 'errado' }))
+    ).toBe(401);
   });
 
   it('JSON inválido e ação desconhecida: 400', async () => {
@@ -243,7 +245,9 @@ describe('robo — x-agenda-secret e as nove ações', () => {
   it('sem header e com segredo errado: 401', async () => {
     const { handler } = await loadHandler('robo', duble({}, ENV_AGENDA));
     expect(await status(handler, postJson({ action: 'resumo' }))).toBe(401);
-    expect(await status(handler, postJson({ action: 'resumo' }, { 'x-agenda-secret': 'errado' }))).toBe(401);
+    expect(
+      await status(handler, postJson({ action: 'resumo' }, { 'x-agenda-secret': 'errado' }))
+    ).toBe(401);
   });
 
   it('JSON inválido e ação desconhecida: 400', async () => {
