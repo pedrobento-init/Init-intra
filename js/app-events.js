@@ -1,3 +1,4 @@
+// @ts-check
 // app-events.js — Event bus central para refresh automático pós-mutação
 // =====================================================================
 // Uso: emitDataChanged('pendencias'|'operadores'|'clientes'|'atendimentos', payload?)

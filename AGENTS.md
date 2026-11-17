@@ -22,10 +22,19 @@ npm run dev                            # vercel dev
 npm test                               # vitest run
 npm run test:e2e                       # playwright
 npm run lint                           # eslint js tools --max-warnings 0
+npm run typecheck                      # tsc: só arquivos com // @ts-check
 ```
 
+**Type-check gradual.** `tsconfig.json` tem `allowJs` e `checkJs: false`: o tsc só
+confere os arquivos de `js/` que começam com `// @ts-check` (hoje `app-events.js`,
+`lazy-libs.js` e `sw-register.js`). Para ampliar: escolha um arquivo pequeno, ponha
+`// @ts-check` na primeira linha e rode `npm run typecheck`. Nome global que o
+arquivo usa e o tsc não acha entra em `js/globals.d.ts` (arquivo só de tipos: não
+é carregado pelo `index.html` nem vai ao bundle). Isso acontece sobretudo com
+funções de arquivos que terminam em `module.exports`, que o tsc trata como módulo.
+
 Sem `js/config.js`, o app roda em modo local com dados de demonstração. O CI
-roda `lint`, `test` e `node tools/build-assets.js --check` em cada PR.
+roda `lint`, `typecheck`, `test`, o E2E (job separado) e `node tools/build-assets.js --check` em cada PR.
 
 ## As armadilhas que custam caro
 
@@ -33,7 +42,10 @@ roda `lint`, `test` e `node tools/build-assets.js --check` em cada PR.
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,
-procure se já existe.
+procure se já existe. `tests/globais-colisao.test.js` falha se dois arquivos
+declaram o mesmo nome, e o ESLint (`no-undef`) usa as declarações de topo do
+`index.html` como lista de globais — global criado só via `window.X` precisa entrar
+em `eslint.config.mjs`.
 
 **Nada de handler inline no HTML.** As ações passam por delegação em
 `js/actions.js`. `onclick="..."` no markup não é o padrão daqui.

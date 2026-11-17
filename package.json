@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "lint": "eslint js tools --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -24,6 +25,7 @@
     "globals": "^15.14.0",
     "prettier": "^3.4.2",
     "terser": "^5.51.2",
+    "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }

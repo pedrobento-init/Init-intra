@@ -1,3 +1,4 @@
+// @ts-check
 // ── Bibliotecas carregadas só quando usadas ───────────────────────────────
 // SheetJS (861 KB), mammoth (628 KB) e motion (136 KB) saíram do index.html:
 // eram baixadas e interpretadas em todo acesso, mas só servem para
