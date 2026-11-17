@@ -1,5 +1,6 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
+const { norm } = __partsReq(import.meta.url)('./_fonte.cjs');
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -328,7 +329,7 @@ describe('a coluna chega ao servidor', () => {
     const path = __partsReq(import.meta.url)('node:path');
     const url = __partsReq(import.meta.url)('node:url');
     const root = path.join(path.dirname(url.fileURLToPath(import.meta.url)), '..');
-    return fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
+    return norm(fs.readFileSync(path.join(root, f), 'utf8'));
   };
 
   // Sem isto, desvincular nunca sai do aparelho: _mapToRemote descarta null em
@@ -336,12 +337,12 @@ describe('a coluna chega ao servidor', () => {
   // servidor é este upsert mandar a chave explicitamente.
   it('saveClient manda drive_folder_url quando a chave está presente', () => {
     const src = lerFonte('js/storage-pendencias.js');
-    const i = src.indexOf("from('clients').upsert({");
+    const i = src.indexOf(norm("from('clients').upsert({"));
     expect(i).toBeGreaterThan(-1);
     // Até o .then: o payload tem `{}` dentro dos spreads opcionais, então
     // cortar no primeiro `})` pararia antes do fim.
     const payload = src.slice(i, src.indexOf('.then(', i));
-    expect(payload).toMatch(/'driveFolderUrl' in data/);
+    expect(payload).toContain(norm("'driveFolderUrl' in data"));
     expect(payload).toMatch(/drive_folder_url/);
   });
 
@@ -350,10 +351,10 @@ describe('a coluna chega ao servidor', () => {
   // O precedente é o address, que fica fora deste payload.
   it('o envio do backup só manda a coluna quando há valor', () => {
     const src = lerFonte('js/app.js');
-    const i = src.indexOf("chunk('clients'");
+    const i = src.indexOf(norm("chunk('clients'"));
     expect(i).toBeGreaterThan(-1);
-    const payload = src.slice(i, src.indexOf('})))', i));
-    expect(payload).toMatch(/\.\.\.\(c\.driveFolderUrl \? \{ drive_folder_url/);
+    const payload = src.slice(i, src.indexOf('}))', i));
+    expect(payload).toContain(norm('...(c.driveFolderUrl ? { drive_folder_url'));
   });
 });
 

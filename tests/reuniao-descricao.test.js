@@ -122,7 +122,7 @@ describe('contrato do card e do CSS', () => {
 
   it('apresentação: fonte maior, sem clamp, sem botão', () => {
     expect(css).toContain('.presentation-mode .meet-desc');
-    expect(css).toContain('.presentation-mode .meet-desc-toggle { display: none; }');
+    expect(css).toMatch(/\.presentation-mode \.meet-desc-toggle\s*\{\s*display:\s*none;?\s*\}/);
   });
 
   it('preserva quebras com pre-wrap e quebra textos longos', () => {

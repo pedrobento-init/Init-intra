@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+
+const { fonte, norm } = createRequire(import.meta.url)('./_fonte.cjs');
 
 // Contrato: toda tela com busca/filtros usa o cabeçalho único .page-toolbar
 // (busca .pt-search → filtros .pt-filter → ações .pt-actions à direita).
@@ -36,11 +39,11 @@ describe('cabeçalho de página único', () => {
   });
 
   it('CSS do padrão presente (desktop + celular)', () => {
-    const css = fs.readFileSync('css/styles.css', 'utf8');
+    const css = fonte('css/styles.css');
     expect(css).toContain('.page-toolbar > .pt-search');
     expect(css).toContain('.page-toolbar > .pt-actions');
-    expect(css).toMatch(
-      /@media \(max-width:768px\)[^]*\.page-toolbar > \.pt-filter \{ flex: 1 1 calc\(50% - 4px\)/
-    );
+    // No celular o filtro divide a linha em duas colunas.
+    const mobile = css.slice(css.indexOf(norm('@media (max-width: 768px)')));
+    expect(mobile).toContain(norm('.page-toolbar > .pt-filter { flex: 1 1 calc(50% - 4px)'));
   });
 });

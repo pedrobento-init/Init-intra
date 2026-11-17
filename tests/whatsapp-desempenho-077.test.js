@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { PGlite } from '@electric-sql/pglite';
 import {
   chaveTelefone,
@@ -16,6 +17,7 @@ import {
 //   * append_pendencia_note não perde nota e respeita o team lido;
 //   * só o service_role chama as funções que leem ou gravam dado.
 
+const { norm } = createRequire(import.meta.url)('./_fonte.cjs');
 const ler = (rel) =>
   fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const M077 = ler('../supabase/migrations/077_whatsapp_desempenho.sql');
@@ -204,17 +206,20 @@ describe('webhook com a 077', () => {
   });
 
   it('casa o cliente e anexa a nota pelas funções da 077, com o caminho antigo só como reserva', () => {
-    expect(webhook).toMatch(/rpc\("clientes_do_telefone", \{ p_chave: chave \}\)/);
-    expect(webhook).toMatch(
-      /rpc\("append_pendencia_note", \{ p_id: aberto\.id, p_team: aberto\.team, p_nota: nota \}\)/
+    const w = norm(webhook);
+    expect(w).toContain(norm('rpc("clientes_do_telefone", { p_chave: chave })'));
+    expect(w).toContain(
+      norm('rpc("append_pendencia_note", { p_id: aberto.id, p_team: aberto.team, p_nota: nota })')
     );
     expect(webhook.match(/funcaoAusente\(error\)/g)).toHaveLength(2);
   });
 
   it('o limite por número vem depois da chave de dedupe e antes de tocar caixa ou chamado', () => {
-    const dedupe = webhook.indexOf('from("avisos_enviados").insert');
-    const limite = webhook.indexOf('recentesDoNumero(db, m.telefone) >= LIMITE_POR_MINUTO');
-    const conversa = webhook.indexOf('from("whatsapp_conversas")');
+    const w = norm(webhook);
+    const dedupe = w.indexOf(norm('from("avisos_enviados").insert'));
+    // O prettier pode envolver o await em parênteses: `(await f(...)) >= N`.
+    const limite = w.search(/recentesDoNumero\(db,m\.telefone\)\)? ?>= ?LIMITE_POR_MINUTO/);
+    const conversa = w.indexOf(norm('from("whatsapp_conversas")'));
     expect(dedupe).toBeGreaterThan(-1);
     expect(limite).toBeGreaterThan(dedupe);
     expect(conversa).toBeGreaterThan(limite);

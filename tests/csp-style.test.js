@@ -11,20 +11,42 @@ const read = (f) => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
 const ATTR = /\bstyle=["']/g;
 
 // Único lugar onde style inline continua legítimo: HTML que sai do app e é lido
-// fora dele (o CSS do app não existe lá). Faixa de linhas, para um style novo
-// no resto do arquivo falhar.
+// fora dele (o CSS do app não existe lá). A permissão é por FUNÇÃO (e não por
+// faixa de linhas, que muda a cada reformatação): um style novo em qualquer
+// outra função do arquivo falha.
 const ALLOW = {
   'js/notifications.js': {
-    de: 150,
-    ate: 460,
+    funcoes: [
+      'sendTestEmail',
+      'emailHeader',
+      'emailFooter',
+      'emailBody',
+      'notifyPendenciaCreated',
+      'notifyPendenciaUpdated',
+      '_notaEmailHtml',
+    ],
     motivo: 'corpo de e-mail HTML (cliente de e-mail não carrega o CSS do app)',
   },
   'js/visitas.js': {
-    de: 985,
-    ate: 1215,
+    funcoes: ['_exportVisitMonthExcel'],
     motivo: 'exportação .xls do relatório de visitas (o Excel lê o HTML baixado)',
   },
 };
+
+/** Faixa [de, ate] (1-based) da função de topo `nome`: até a próxima declaração de topo. */
+function faixaDaFuncao(src, nome) {
+  const linhas = src.split('\n');
+  const de = linhas.findIndex((l) => new RegExp('^(async )?function ' + nome + '\\b').test(l));
+  if (de < 0) throw new Error('função ' + nome + ' não existe mais: ajuste a allowlist');
+  let ate = linhas.length;
+  for (let i = de + 1; i < linhas.length; i++) {
+    if (/^(async function|function|const|let|var|class) /.test(linhas[i])) {
+      ate = i;
+      break;
+    }
+  }
+  return [de + 1, ate];
+}
 
 const arquivos = () =>
   fs
@@ -69,7 +91,8 @@ describe('atributo style fora do markup do app', () => {
     for (const f of arquivos()) {
       const linhas = ocorrencias(f);
       const permitido = ALLOW[f];
-      const fora = permitido ? linhas.filter((l) => l < permitido.de || l > permitido.ate) : linhas;
+      const faixas = permitido ? permitido.funcoes.map((n) => faixaDaFuncao(read(f), n)) : [];
+      const fora = linhas.filter((l) => !faixas.some(([de, ate]) => l >= de && l <= ate));
       expect(
         fora,
         `${f} linhas ${fora.join(',')}: use classe (css/utilidades.css) ou data-sty`

@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+
+const { norm } = createRequire(import.meta.url)('./_fonte.cjs');
 
 // ── A caixa de entradas de e-mail (066), os oito pontos de articulação ──────
 // Duas camadas aqui: comportamento de verdade (js/emails-triagem.js num
@@ -206,8 +209,11 @@ describe('o robô grava a entrada sem reprocessar para sempre', () => {
   );
 
   it('ignorado_ia herda a equipe do cliente — senão a caixa da mam/bt fica vazia', () => {
-    expect(robo).toContain('naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team })');
-    expect(robo).toContain('naCaixa(e, { motivo: "sem_cliente" })');
+    const f = norm(robo);
+    expect(f).toContain(
+      norm('naCaixa(e, { motivo: "ignorado_ia", clientId: c.id, team: c.team })')
+    );
+    expect(f).toContain(norm('naCaixa(e, { motivo: "sem_cliente" })'));
   });
 
   it('a chave de dedupe não volta no erro da caixa: era reprocessamento para sempre', () => {

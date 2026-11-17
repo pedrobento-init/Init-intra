@@ -101,7 +101,9 @@ describe('a auto-resposta não some: vai para a caixa de triagem', () => {
     const robo = ler('../supabase/functions/robo/index.ts');
     const detecta = robo.indexOf('if (respostaAutomatica(e))');
     expect(detecta).toBeGreaterThan(-1);
-    expect(robo.slice(detecta, detecta + 300)).toContain('"auto_resposta"');
+    // O bloco do `if` vai até o `continue`: o motivo tem de estar dentro dele.
+    const bloco = robo.slice(detecta, robo.indexOf('continue;', detecta));
+    expect(bloco).toMatch(/motivo:\s*["']auto_resposta["']/);
     // Depois da conversa seria tarde: a auto-resposta já teria virado nota.
     expect(detecta).toBeLessThan(robo.indexOf('await chamadoDaConversa(db, conversaDoEmail(e)'));
   });

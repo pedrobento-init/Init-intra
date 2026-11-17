@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const { norm } = createRequire(import.meta.url)('./_fonte.cjs');
 import {
   TEXTO_MAX,
   assuntoDaMensagem,
@@ -216,15 +219,17 @@ describe('contrato do whatsapp-responder', () => {
   });
 
   it('o webhook procura o chamado aberto pela mesma chave', () => {
-    expect(webhook).toContain('.eq("email_thread_id", conversa)');
-    expect(webhook).toContain('conversaDoTelefone(m.telefone)');
+    const w = norm(webhook);
+    expect(w).toContain(norm('.eq("email_thread_id", conversa)'));
+    expect(w).toContain(norm('conversaDoTelefone(m.telefone)'));
   });
 
   // A 082 é do portal; banco que ainda não a rodou não pode perder mensagem
   // por causa de duas colunas que ele nem conhece.
   it('banco sem a 082 ainda recebe a mensagem: o insert repete sem direcao/media', () => {
-    expect(webhook).toContain('"42703"');
-    expect(webhook).toContain('"PGRST204"');
-    expect(webhook).toContain('const { direcao: _direcao, media: _media, ...semPortal } = linha;');
+    const w = norm(webhook);
+    expect(w).toContain(norm('"42703"'));
+    expect(w).toContain(norm('"PGRST204"'));
+    expect(w).toContain(norm('const { direcao: _direcao, media: _media, ...semPortal } = linha;'));
   });
 });

@@ -42,7 +42,9 @@ describe('functions no padrão @supabase/server', () => {
   it('agenda-ics valida o token antes de tocar no admin', () => {
     const src = fonte('agenda-ics');
     const corpo = src.slice(src.indexOf('async function handle'));
-    expect(corpo.indexOf('searchParams.get("t")')).toBeGreaterThan(-1);
-    expect(corpo.indexOf('searchParams.get("t")')).toBeLessThan(corpo.indexOf('ctx.supabaseAdmin'));
+    // Aspas simples ou duplas: o prettier pode trocar uma pela outra.
+    const leitura = corpo.search(/searchParams\.get\(\s*["']t["']\s*\)/);
+    expect(leitura).toBeGreaterThan(-1);
+    expect(leitura).toBeLessThan(corpo.indexOf('ctx.supabaseAdmin'));
   });
 });

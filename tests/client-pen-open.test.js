@@ -1,5 +1,6 @@
 import { createRequire as __partsReq } from 'node:module';
 const { requireParts, partsSource } = __partsReq(import.meta.url)('./_parts.cjs');
+const { norm } = __partsReq(import.meta.url)('./_fonte.cjs');
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -122,7 +123,7 @@ describe('contrato da tabela e do retorno à aba', () => {
     // Enter/Espaço vêm de graça da delegação em js/actions.js (TR[role=button] não é INPUT).
     expect(clientsSrc).toContain('class="cli-pen-row" tabindex="0"');
     expect(clientsSrc).toContain('data-action="clientPenRow"');
-    expect(clientsSrc).toContain("${p.deadline?formatDate(p.deadline):'—'}");
+    expect(norm(clientsSrc)).toContain(norm("${p.deadline ? formatDate(p.deadline) : '—'}"));
   });
 
   it('closeModal devolve à aba só se o modal seguir fechado (Editar preservado)', () => {

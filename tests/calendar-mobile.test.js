@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+
+const { fonte, norm: normaliza } = createRequire(import.meta.url)('./_fonte.cjs');
 
 // ── Calendário mobile: título curto, filtros em menu, botões lado a lado,
 // grade mensal vira lista ────────────────────────────────────────────────────
@@ -269,22 +272,25 @@ describe('contrato do markup (filtros em menu + botões lado a lado)', () => {
     expect(src).toContain('data-action="calOpenPendenciaForm"');
     expect(src).toContain('data-action="calOpenVisitForm"');
     expect(src).toContain('data-action="calExportICS"');
-    expect(src).toContain(
-      'calOpenPendenciaForm: () => { closeCalFilters(); openPendenciaForm(); }'
-    );
-    expect(src).toContain('calOpenVisitForm: () => { closeCalFilters(); openVisitForm(); }');
-    expect(src).toContain('calExportICS: () => { closeCalFilters(); exportCalendarICS(); }');
+    const f = fonte('js/calendar.js');
+    for (const [acao, fn] of [
+      ['calOpenPendenciaForm', 'openPendenciaForm'],
+      ['calOpenVisitForm', 'openVisitForm'],
+      ['calExportICS', 'exportCalendarICS'],
+    ]) {
+      expect(f).toContain(normaliza(`${acao}: () => { closeCalFilters(); ${fn}(); }`));
+    }
   });
 });
 
 describe('contrato mobile no CSS', () => {
   const css = fs.readFileSync('css/styles.css', 'utf8');
-  const norm = css.replace(/\s+/g, ' ');
-  const mobile = norm.split('@media screen and (max-width: 768px)')[1] || '';
+  const norm = fonte('css/styles.css');
+  const mobile = norm.split(normaliza('@media screen and (max-width: 768px)'))[1] || '';
 
   it('dropdown de filtros ancorado no nav (desktop e mobile)', () => {
     expect(norm).toMatch(/\.cal-filters\s*\{[^}]*position:\s*absolute/);
-    expect(norm).toMatch(/\.cal-filters\[data-open="1"\]\s*\{\s*display:\s*flex/);
+    expect(norm).toMatch(/\.cal-filters\[data-open="1"\]\{display:flex/);
     expect(norm).toContain('.cal-menu-actions');
     expect(norm).not.toContain('.cal-new-btns');
   });
@@ -297,8 +303,8 @@ describe('contrato mobile no CSS', () => {
   });
 
   it('base do dropdown vem ANTES do bloco mobile (cascata não inverte)', () => {
-    const baseIdx = norm.indexOf('.ag-filter-group { position:relative');
-    const mobileIdx = norm.indexOf('@media screen and (max-width: 768px)');
+    const baseIdx = norm.indexOf(normaliza('.ag-filter-group { position:relative'));
+    const mobileIdx = norm.indexOf(normaliza('@media screen and (max-width: 768px)'));
     expect(baseIdx).toBeGreaterThan(-1);
     expect(mobileIdx).toBeGreaterThan(-1);
     expect(baseIdx).toBeLessThan(mobileIdx);

@@ -9,9 +9,9 @@ describe('PERF-01 — colunas explícitas', () => {
   it('audit_logs seleciona só o que o mapRow consome', () => {
     const src = read('storage.js');
     expect(src).toMatch(
-      /from\('audit_logs'\)\.select\('id,operator_name,action,type,target_id,details,timestamp'\)/
+      /from\('audit_logs'\)\s*\.select\('id,operator_name,action,type,target_id,details,timestamp'\)/
     );
-    expect(src).not.toMatch(/from\('audit_logs'\)\.select\('\*'\)/);
+    expect(src).not.toMatch(/from\('audit_logs'\)\s*\.select\('\*'\)/);
   });
   it('checklist.js não faz select("*") nos três pulls', () => {
     const src = read('checklist.js');

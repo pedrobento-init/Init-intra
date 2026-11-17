@@ -65,6 +65,6 @@ describe('contrato da landing (pontos de atenção)', () => {
   });
 
   it('modal do relatório indica o mês', () => {
-    expect(src).toContain("openModal('Relatório — ' + _getMesAnoLabel(m.mesAno || '')");
+    expect(src).toMatch(/openModal\(\s*'Relatório — ' \+ _getMesAnoLabel\(m\.mesAno \|\| ''\)/);
   });
 });

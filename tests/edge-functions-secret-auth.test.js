@@ -283,7 +283,7 @@ describe('robo — x-agenda-secret e as nove ações', () => {
       'pastas',
       'pastas-resultado',
     ]) {
-      expect(src).toContain(`case "${acao}":`);
+      expect(src).toMatch(new RegExp(`case ["']${acao}["']:`));
     }
   });
 });

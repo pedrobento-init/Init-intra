@@ -29,7 +29,7 @@ describe('pendencia-responder: o destinatário nunca vem do app', () => {
   });
 
   it('o endereço sai do chamado, lido com a chave de serviço', () => {
-    expect(src).toMatch(/supabaseAdmin[\s\S]*?from\("pendencias"\)/);
+    expect(src).toMatch(/supabaseAdmin[\s\S]*?from\(["']pendencias["']\)/);
     expect(src).toMatch(/solicitante_email/);
     expect(src).toMatch(/const\s+destino\s*=\s*String\(pen\.solicitante_email/);
     expect(src).toMatch(/to:\s*destino\b/);
@@ -42,8 +42,8 @@ describe('pendencia-responder: o destinatário nunca vem do app', () => {
 
 describe('pendencia-responder: quem pode chamar', () => {
   it('exige operador ativo logado, como a send-email', () => {
-    expect(src).toMatch(/withSupabase\(\s*\{\s*auth:\s*"user"\s*\}/);
-    expect(src).toMatch(/from\("operators"\)/);
+    expect(src).toMatch(/withSupabase\(\s*\{\s*auth:\s*["']user["']\s*\}/);
+    expect(src).toMatch(/from\(["']operators["']\)/);
     expect(src).toContain('unauthorized');
   });
 });

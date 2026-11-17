@@ -133,7 +133,7 @@ describe('delete/update remotos do cliente têm filtro', () => {
 
   it('migração de status legado só atualiza no servidor os ids locais', () => {
     const st = fs.readFileSync('js/storage.js', 'utf8');
-    expect(st).toMatch(/update\(\{ status: 'resolvido'[^)]*\)\.in\('id', idsByTo\.resolvido\)/);
-    expect(st).toMatch(/update\(\{ status: 'cancelado'[^)]*\)\.in\('id', idsByTo\.cancelado\)/);
+    expect(st).toMatch(/update\(\{ status: 'resolvido'[^)]*\)\s*\.in\('id', idsByTo\.resolvido\)/);
+    expect(st).toMatch(/update\(\{ status: 'cancelado'[^)]*\)\s*\.in\('id', idsByTo\.cancelado\)/);
   });
 });
