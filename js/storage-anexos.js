@@ -323,7 +323,7 @@ function renderAttachmentList(type, itemId, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   if (!atts.length) {
-    container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Nenhum anexo.</p>';
+    container.innerHTML = '<p class="u-b4b3d2">Nenhum anexo.</p>';
     return;
   }
   // FASE 2: 1× por container, migra base64→Storage em fundo e re-renderiza
@@ -425,7 +425,7 @@ function renderClientDocumentsList(clientId, containerId) {
   var docs = getClientDocuments(clientId);
   var container = document.getElementById(containerId);
   if (!container) return;
-  if (!docs.length) { container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Nenhum documento permanente.</p>'; return; }
+  if (!docs.length) { container.innerHTML = '<p class="u-b4b3d2">Nenhum documento permanente.</p>'; return; }
   container.innerHTML = docs.map(function(a){
     var isImage = a.mimeType && a.mimeType.startsWith('image/');
     var sizeKB = (a.size / 1024).toFixed(1);

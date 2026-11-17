@@ -140,11 +140,11 @@ function renderFila() {
 
   const nowHtml = m.now.length
     ? '<ul class="fila-list">' + m.now.map((p) => _filaPenRow(p, s.today)).join('') + '</ul>'
-    : '<div class="empty-state" style="padding:28px 12px"><p>Nada urgente com você agora. 🎉</p><button class="btn btn-secondary btn-sm" data-action="nav" data-arg="pendencias">Ver todas as pendências</button></div>';
+    : '<div class="empty-state u-d6cf01"><p>Nada urgente com você agora. 🎉</p><button class="btn btn-secondary btn-sm" data-action="nav" data-arg="pendencias">Ver todas as pendências</button></div>';
 
   const visitsHtml = m.visits.length
     ? '<ul class="fila-list">' + m.visits.map((v) => '<li class="fila-row" tabindex="0" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">' +
-        '<span class="fila-dot" style="--c:var(--ds-cyan)" aria-hidden="true"></span>' +
+        '<span class="fila-dot u-08d904" aria-hidden="true"></span>' +
         '<span class="fila-main"><span class="fila-title">' + escapeHtml(v.clientName || '—') + '</span>' +
         '<span class="fila-meta">' + escapeHtml(v.motivo || '') + '</span></span>' +
         '<span class="fila-due">' + escapeHtml(v.allDay || !v.time ? 'Dia inteiro' : (typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : v.time)) + '</span></li>').join('') + '</ul>'

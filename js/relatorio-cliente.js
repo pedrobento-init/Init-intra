@@ -284,8 +284,8 @@ function openClientReport(clientId) {
   const def = new Date().getDate() <= 10 ? opts[1].ym : opts[0].ym;
   openModal('Relatório mensal — ' + escapeHtml(c.name), `
     <div class="rpt-bar">
-      <label class="form-label" for="rptMonth" style="margin:0">Mês</label>
-      <select class="form-select" id="rptMonth" style="width:auto" data-change="loadClientReport" data-arg="${escapeHtml(clientId)}">
+      <label class="form-label u-116966" for="rptMonth">Mês</label>
+      <select class="form-select u-30e741" id="rptMonth" data-change="loadClientReport" data-arg="${escapeHtml(clientId)}">
         ${opts.map((o) => `<option value="${o.ym}"${o.ym === def ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
       </select>
       <button type="button" class="btn btn-primary btn-sm" id="rptPrintBtn" data-action="printClientReport" disabled>Imprimir / salvar PDF</button>

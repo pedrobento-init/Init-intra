@@ -171,7 +171,7 @@ if (typeof registerActions === 'function') {
 function abrirConfiguracoes() {
   if (typeof openModal !== 'function') return;
   openModal('Configurações',
-    '<p style="color:var(--text-muted);margin:0 0 12px">Status do robô de triagem (últimas rodadas). Sem Supabase conectado, nada aparece aqui.</p>'
+    '<p class="u-be71c9">Status do robô de triagem (últimas rodadas). Sem Supabase conectado, nada aparece aqui.</p>'
     + '<div id="roboStatus"></div>');
   renderRoboExecucoes();
 }

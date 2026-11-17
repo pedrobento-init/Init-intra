@@ -107,7 +107,7 @@ function openPendenciaDetailModal(id) {
         <div class="pen-desc-block pen-cmd-desc"><div class="pen-section-label">Descrição · Contexto</div><div class="pen-desc">${_penRichDesc(_penDesc.corpo)||'—'}</div>
         ${_penDesc.depois ? `<div class="pen-desc pen-desc-depois">${_penRichDesc(_penDesc.depois)}</div>` : ''}
         ${_emailInteiro ? `<details class="pen-email-full"><summary>Ver o e-mail inteiro (${_emailInteiro.length.toLocaleString('pt-BR')} caracteres)</summary><div class="pen-email-corpo">${_penRichDesc(_emailInteiro)}</div></details>` : ''}
-        ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div style="margin-top:10px"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
+        ${p.linkUtil && safeUrl(p.linkUtil) !== '#' ?`<div class="u-d2c171"><a href="${safeUrl(p.linkUtil)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="${escapeHtml(p.linkUtil)}">🔗 Abrir link útil</a></div>`:''}
         </div>
         ${typeof kbPendenciaPanelHtml === 'function' ? kbPendenciaPanelHtml(p) : ''}
 
@@ -148,9 +148,9 @@ function openPendenciaDetailModal(id) {
 
         <div class="chd-card pen-cmd-drop" id="penDropzone">
           <div class="section-header pen-sec-head">
-            <span class="section-title">📎 Anexos <span class="pen-count" id="penAttCounter"${_attCount?'':' style="display:none"'}>${_attCount||''}</span></span>
-            <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Anexar arquivo (máx 2MB)">+ Anexar
-              <input type="file" id="penFileInputSide" style="display:none" data-change="chdAnexo" data-id="${_eid}" />
+            <span class="section-title">📎 Anexos <span class="pen-count u-6b99de" id="penAttCounter"${_attCount?'':''}>${_attCount||''}</span></span>
+            <label class="btn btn-secondary btn-sm u-3b6a3a" title="Anexar arquivo (máx 2MB)">+ Anexar
+              <input type="file" id="penFileInputSide" class="u-6b99de" data-change="chdAnexo" data-id="${_eid}" />
             </label>
           </div>
           <div class="pen-cmd-drop-hint">Arraste e solte aqui <span>· Máx 2MB por arquivo · cole print com Ctrl+V na resposta</span></div>
@@ -531,7 +531,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
       <div class="form-group"><label class="form-label">Assunto *</label>
         <input class="form-input" name="assunto" maxlength="120" placeholder="Título/resumo da pendência..." value="${escapeHtml(p.assunto||'')}" required /></div>
       <div class="form-group"><label class="form-label">Descrição da Pendência *</label>
-        <textarea class="form-textarea" name="descricao" rows="4" placeholder="Descreva em detalhes o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" class="template-suggestion" style="display:none"></div></div>
+        <textarea class="form-textarea" name="descricao" rows="4" placeholder="Descreva em detalhes o que precisa ser feito..." required>${escapeHtml(p.descricao||'')}</textarea><div id="templateSuggestion" class="template-suggestion u-6b99de"></div></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Responsável</label>
           <select class="form-select" name="responsible">

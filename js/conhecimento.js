@@ -257,9 +257,9 @@ function openKbArticleForm(id, pre) {
       <div class="form-group"><label class="form-label">Título *</label><input class="form-input" name="title" value="${escapeHtml(a.title || '')}" placeholder="Ex.: Impressora HP some da rede depois de atualizar o Windows" required /></div>
       <div class="form-group"><label class="form-label">Categoria</label><input class="form-input" name="category" value="${escapeHtml(a.category || '')}" placeholder="Rede, Impressora, E-mail, Backup…" /></div>
       <div class="form-group"><label class="form-label">Sintoma, causa e solução</label><textarea class="form-textarea" name="content" rows="12" placeholder="Sintoma:&#10;Causa:&#10;Solução (passo a passo):">${escapeHtml(a.content || '')}</textarea></div>
-      <p class="kb-hint" style="margin:-6px 0 12px">Fica visível para toda a sua equipe, não só para um cliente.</p>
+      <p class="kb-hint u-bc2300">Fica visível para toda a sua equipe, não só para um cliente.</p>
       <div class="form-actions">
-        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" style="margin-right:auto" data-action="kbDelete" data-arg="${escapeHtml(id)}">Excluir</button>` : ''}
+        ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger u-471df9" data-action="kbDelete" data-arg="${escapeHtml(id)}">Excluir</button>` : ''}
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar</button>
       </div>
