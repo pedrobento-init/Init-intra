@@ -311,23 +311,23 @@ function _atendBuildResumoHtml(resumo){
     {label:'Expediente', value: _atendFmtHora(resumo.total_horas_expediente ?? resumo.total_horas_expediente), color:'var(--ov-text)'},
     {label:'Fora Exp.', value: _atendFmtHora(resumo.total_horas_fora_expediente ?? resumo.total_horas_fora_expediente), color:'var(--ov-amber)'}
   ];
-  return '<div class="stats-grid" style="margin-bottom:16px">'+items.map(function(it){
-    return '<div class="stat-card" style="padding:14px 16px; gap:10px"><div><div class="stat-value" style="font-size:20px;color:'+it.color+'">'+escapeHtml(String(it.value))+'</div><div class="stat-label">'+escapeHtml(it.label)+'</div></div></div>';
+  return '<div class="stats-grid u-87c136">'+items.map(function(it){
+    return '<div class="stat-card u-9dd319"><div><div class="stat-value" style="font-size:20px;color:'+it.color+'">'+escapeHtml(String(it.value))+'</div><div class="stat-label">'+escapeHtml(it.label)+'</div></div></div>';
   }).join('')+'</div>';
 }
 function _atendTableHtml(lista, hideCliente){
-  if(!lista || !lista.length) return '<div class="empty-state" style="padding:24px"><p>Nenhum atendimento encontrado no período</p><p style="font-size:12px;color:var(--ov-muted)">Ajuste os filtros ou tente outro período.</p></div>';
-  return '<div class="table-wrapper"><table><thead><tr><th>Código</th><th>Assunto</th>'+(hideCliente?'':'<th>Cliente</th>')+'<th>Técnico</th><th>Data Inicial</th><th>Data Final</th><th style="text-align:right">Horas</th><th>Status</th></tr></thead><tbody>'+
+  if(!lista || !lista.length) return '<div class="empty-state u-ddaf9e"><p>Nenhum atendimento encontrado no período</p><p class="u-8ff086">Ajuste os filtros ou tente outro período.</p></div>';
+  return '<div class="table-wrapper"><table><thead><tr><th>Código</th><th>Assunto</th>'+(hideCliente?'':'<th>Cliente</th>')+'<th>Técnico</th><th>Data Inicial</th><th>Data Final</th><th class="u-54c2af">Horas</th><th>Status</th></tr></thead><tbody>'+
     lista.map(function(r){
       var st=r.status || {text:r.status};
       return '<tr>'+
         '<td><strong>'+escapeHtml(String(r.codigo||'—'))+'</strong></td>'+
-        '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.assunto||'')+'">'+escapeHtml(r.assunto||'—')+'</td>'+
+        '<td class="u-de3130" title="'+escapeHtml(r.assunto||'')+'">'+escapeHtml(r.assunto||'—')+'</td>'+
         (hideCliente?'':'<td>'+escapeHtml(r.nome_fantasia|| r.nome||'—')+'</td>')+
         '<td>'+escapeHtml(r.tecnico||'—')+'</td>'+
         '<td>'+_atendFmtDate(r.data_inicial)+'</td>'+
         '<td>'+_atendFmtDate(r.data_final)+'</td>'+
-        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+escapeHtml(r.total_horas_atendimento||'00:00')+'</td>'+
+        '<td class="u-0c3b65">'+escapeHtml(r.total_horas_atendimento||'00:00')+'</td>'+
         '<td>'+_atendStatusTag(st)+'</td>'+
       '</tr>';
     }).join('')+'</tbody></table></div>';
@@ -340,19 +340,19 @@ function _atendPagerHtml(paginate, perPage, currentPage, total){
   total = Number(meta.total || total || 0);
   if(!total) return '';
   var cur=currentPage;
-  return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line);margin-top:12px;flex-wrap:wrap;gap:8px">'+
-    '<div style="font-size:12px;color:var(--ov-muted)">Página '+cur+' de '+last+' · '+from+'–'+to+' de '+total+'</div>'+
-    '<div style="display:flex;gap:6px;align-items:center">'+
-      '<select class="form-select" style="width:90px;font-size:12px;padding:4px 8px" data-change="_atendChangePerPage"><option value="50" '+(perPage==50?'selected':'')+'>50</option><option value="100" '+(perPage==100?'selected':'')+'>100</option><option value="200" '+(perPage==200?'selected':'')+'>200</option></select>'+
+  return '<div class="u-77bf62">'+
+    '<div class="u-8ff086">Página '+cur+' de '+last+' · '+from+'–'+to+' de '+total+'</div>'+
+    '<div class="u-25b528">'+
+      '<select class="form-select u-72a382" data-change="_atendChangePerPage"><option value="50" '+(perPage==50?'selected':'')+'>50</option><option value="100" '+(perPage==100?'selected':'')+'>100</option><option value="200" '+(perPage==200?'selected':'')+'>200</option></select>'+
       '<button class="btn btn-sm btn-secondary" '+(cur<=1?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur-1)+'">‹ Anterior</button>'+
-      '<span style="font-size:13px;padding:4px 8px">'+cur+' / '+last+'</span>'+
+      '<span class="u-d9c024">'+cur+' / '+last+'</span>'+
       '<button class="btn btn-sm btn-secondary" '+(cur>=last?'disabled':'')+' data-action="_atendGotoPage" data-arg="'+(cur+1)+'">Próxima ›</button>'+
     '</div>'+
   '</div>';
 }
 function _atendSkeleton(){
-  return '<div class="stats-grid" style="margin-bottom:16px">'+Array(6).fill(0).map(function(){return '<div class="card" style="padding:16px"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text short"></div></div>';}).join('')+'</div>'+
-    '<div class="skeleton-row"><div class="skeleton skeleton-text" style="width:100%"></div></div>'.repeat(4);
+  return '<div class="stats-grid u-87c136">'+Array(6).fill(0).map(function(){return '<div class="card u-287f77"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text short"></div></div>';}).join('')+'</div>'+
+    '<div class="skeleton-row"><div class="skeleton skeleton-text u-046678"></div></div>'.repeat(4);
 }
 function _atendToggleMore(prefix){
   var panel=document.getElementById(prefix+'MorePanel');
@@ -388,7 +388,7 @@ function _atendDoFetchAndRender(isGlobal){
   // valida datas
   var listEl=document.getElementById(prefix+'List');
   var resumoEl=document.getElementById(prefix+'Resumo');
-  if(listEl) listEl.innerHTML='<p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando…</p>';
+  if(listEl) listEl.innerHTML='<p class="u-b4b3d2">Carregando…</p>';
   if(resumoEl) resumoEl.innerHTML=_atendSkeleton();
   // sincroniza seletor global antes do fetch
   if(isGlobal){
@@ -421,7 +421,7 @@ function _atendDoFetchAndRender(isGlobal){
     if(isStale()) return;
     var msg=(e && e.message) ? e.message : 'Falha ao consultar';
     if(resumoEl) resumoEl.innerHTML='';
-    if(listEl) listEl.innerHTML='<div class="empty-state" style="padding:24px"><p style="color:var(--red)">'+escapeHtml(msg)+'</p><p style="font-size:12px;color:var(--text-muted)">Verifique o token do cliente e o período.</p></div>';
+    if(listEl) listEl.innerHTML='<div class="empty-state u-ddaf9e"><p class="u-45e7ae">'+escapeHtml(msg)+'</p><p class="u-865c33">Verifique o token do cliente e o período.</p></div>';
     if(typeof showToast==='function') showToast(msg,'error');
   });
 }
@@ -485,28 +485,28 @@ if(typeof window!=='undefined'){
 function getMilvusAtendimentosClientHtml(range){
   var r=range || _monthRangeISO();
   return '<div id="atendResumo">'+_atendSkeleton()+'</div>'+
-    '<div class="search-bar" style="flex-wrap:wrap;gap:8px;align-items:center">'+
-      '<input type="date" class="form-input" id="atendDataInicial" value="'+r.start+'" style="width:150px" />'+
+    '<div class="search-bar u-a57454">'+
+      '<input type="date" class="form-input u-7c07cd" id="atendDataInicial" value="'+r.start+'" />'+
       // [UI] Tokens ov-* (mesmo padrão visual do Dashboard) nos filtros do cliente
-      '<span style="font-size:12px;color:var(--ov-muted)">até</span>'+
-      '<input type="date" class="form-input" id="atendDataFinal" value="'+r.end+'" style="width:150px" />'+
-      '<div class="search-input-wrap" style="flex:1;min-width:140px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" data-input="atendCodigoClear" /></div>'+
+      '<span class="u-8ff086">até</span>'+
+      '<input type="date" class="form-input u-7c07cd" id="atendDataFinal" value="'+r.end+'" />'+
+      '<div class="search-input-wrap u-aae040"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="atendCodigo" placeholder="Código ticket" data-input="atendCodigoClear" /></div>'+
       '<button class="btn btn-primary btn-sm" data-action="_atendApplyFilters" data-arg="false">Buscar</button>'+
       '<button class="btn btn-secondary btn-sm" id="atendMoreBtn" data-action="_atendToggleMore" data-arg="atend" aria-expanded="false">Mais filtros</button>'+
-      '<div style="position:relative">'+
+      '<div class="u-d461c9">'+
         '<button class="btn btn-primary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button>'+
-        '<div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px">'+
+        '<div id="atendExportMenu" data-open="0" class="u-861305">'+
           '<button class="op-kebab-item" data-action="atendExportCsv">CSV</button>'+
           '<button class="op-kebab-item" data-action="atendExportXls">XLS</button>'+
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div id="atendMorePanel" data-open="0" style="display:none;flex-wrap:wrap;gap:8px;padding:10px;background:var(--ov-raised);border:1px solid var(--ov-line);border-radius:8px;margin-bottom:12px">'+
-      '<input class="form-input" id="atendTecnico" placeholder="Técnico" style="width:160px" />'+
-      '<input class="form-input" id="atendNomeMesa" placeholder="Mesa" style="width:140px" />'+
-      '<select class="form-select" id="atendIsExterno" style="width:130px"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-      '<select class="form-select" id="atendIsComercial" style="width:130px"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-      '<input class="form-input" id="atendMotivoPausa" placeholder="Motivo pausa" style="width:150px" />'+
+    '<div id="atendMorePanel" data-open="0" class="u-8d33a2">'+
+      '<input class="form-input u-28c0f6" id="atendTecnico" placeholder="Técnico" />'+
+      '<input class="form-input u-830eb9" id="atendNomeMesa" placeholder="Mesa" />'+
+      '<select class="form-select u-c6fffd" id="atendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
+      '<select class="form-select u-c6fffd" id="atendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
+      '<input class="form-input u-7c07cd" id="atendMotivoPausa" placeholder="Motivo pausa" />'+
     '</div>'+
     '<div id="atendList"></div>';
 }
@@ -535,7 +535,7 @@ function renderRelatorios(){
     var _team = typeof getCurrentTeam==='function' ? String(getCurrentTeam()||'').toLowerCase().trim() : String((typeof getSession==='function'&&getSession()?.team)||'init').toLowerCase().trim();
     if (_team !== 'init') {
       document.getElementById('pageTitle').textContent='Atendimentos Milvus';
-      document.getElementById('contentArea').innerHTML='<div class="empty-state" style="padding:40px"><p>Acesso restrito ao time Init.</p></div>';
+      document.getElementById('contentArea').innerHTML='<div class="empty-state u-a19bf6"><p>Acesso restrito ao time Init.</p></div>';
       if (typeof showToast==='function') showToast('Atendimentos Milvus disponível apenas para o time Init.', 'error');
       return;
     }
@@ -552,20 +552,20 @@ function renderRelatorios(){
     '<div class="ov-wrap">'+
       '<div class="search-bar page-toolbar">'+
         '<div class="search-input-wrap pt-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="form-input" id="gAtendCodigo" placeholder="Código ticket" /></div>'+
-        '<select class="form-select pt-filter pt-full" id="gAtendClient" style="width:220px" data-change="atendClientChange"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
-        '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input" id="gAtendDataInicial" value="'+range.start+'" style="width:150px" aria-label="Data inicial" />'+
-        '<span style="font-size:12px;color:var(--ov-muted)">até</span>'+
-        '<input type="date" class="form-input" id="gAtendDataFinal" value="'+range.end+'" style="width:150px" aria-label="Data final" /></div>'+
+        '<select class="form-select pt-filter pt-full u-0fac91" id="gAtendClient" data-change="atendClientChange"><option value="">Todos clientes (sem token)</option>'+clients.map(function(c){return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>';}).join('')+'</select>'+
+        '<div class="filter-date-wrap pt-filter pt-full"><input type="date" class="form-input u-7c07cd" id="gAtendDataInicial" value="'+range.start+'" aria-label="Data inicial" />'+
+        '<span class="u-8ff086">até</span>'+
+        '<input type="date" class="form-input u-7c07cd" id="gAtendDataFinal" value="'+range.end+'" aria-label="Data final" /></div>'+
         '<button class="btn btn-primary btn-sm pt-filter" data-action="_atendApplyFilters" data-arg="true">Buscar</button>'+
         '<button class="btn btn-secondary btn-sm pt-filter" id="gAtendMoreBtn" data-action="_atendToggleMore" data-arg="gAtend" aria-expanded="false">Mais filtros</button>'+
-        '<div class="pt-actions"><div style="position:relative"><button class="btn btn-secondary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button><div id="atendExportMenu" data-open="0" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:120px;background:var(--ov-panel);border:1px solid var(--ov-line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px"><button class="op-kebab-item" data-action="atendExportCsv">CSV</button><button class="op-kebab-item" data-action="atendExportXls">XLS</button></div></div></div>'+
+        '<div class="pt-actions"><div class="u-d461c9"><button class="btn btn-secondary btn-sm" id="atendExportBtn" data-action="_atendToggleExport">Exportar ▾</button><div id="atendExportMenu" data-open="0" class="u-861305"><button class="op-kebab-item" data-action="atendExportCsv">CSV</button><button class="op-kebab-item" data-action="atendExportXls">XLS</button></div></div></div>'+
       '</div>'+
-      '<div id="gAtendMorePanel" class="ov-more" data-open="0" style="display:none;flex-wrap:wrap;gap:8px;padding:10px">'+
-        '<input class="form-input" id="gAtendTecnico" placeholder="Técnico" style="width:160px" />'+
-        '<input class="form-input" id="gAtendNomeMesa" placeholder="Mesa" style="width:140px" />'+
-        '<select class="form-select" id="gAtendIsExterno" style="width:130px"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-        '<select class="form-select" id="gAtendIsComercial" style="width:130px"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
-        '<input class="form-input" id="gAtendMotivoPausa" placeholder="Motivo pausa" style="width:150px" />'+
+      '<div id="gAtendMorePanel" class="ov-more u-4ae79f" data-open="0">'+
+        '<input class="form-input u-28c0f6" id="gAtendTecnico" placeholder="Técnico" />'+
+        '<input class="form-input u-830eb9" id="gAtendNomeMesa" placeholder="Mesa" />'+
+        '<select class="form-select u-c6fffd" id="gAtendIsExterno"><option value="">Externo?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
+        '<select class="form-select u-c6fffd" id="gAtendIsComercial"><option value="">Comercial?</option><option value="true">Sim</option><option value="false">Não</option></select>'+
+        '<input class="form-input u-7c07cd" id="gAtendMotivoPausa" placeholder="Motivo pausa" />'+
       '</div>'+
       '<div id="gAtendResumo">'+_atendSkeleton()+'</div>'+
       '<div id="gAtendList"></div>'+

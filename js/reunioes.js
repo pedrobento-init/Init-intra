@@ -60,7 +60,7 @@ function renderReuniao() {
     var _t = typeof getCurrentTeam==='function' ? String(getCurrentTeam()||'').toLowerCase().trim() : 'init';
     if (_t !== 'init') {
       document.getElementById('pageTitle').textContent='Reunião Mensal';
-      document.getElementById('contentArea').innerHTML='<div class="empty-state" style="padding:40px"><p>Acesso restrito ao time Init.</p></div>';
+      document.getElementById('contentArea').innerHTML='<div class="empty-state u-a19bf6"><p>Acesso restrito ao time Init.</p></div>';
       if (typeof showToast==='function') showToast('Reunião disponível apenas para o time Init.', 'error');
       return;
     }
@@ -94,45 +94,45 @@ function _renderLanding(mesAno, label, existingMeeting) {
 
   const content = document.getElementById('contentArea');
   content.innerHTML = `
-    <div class="card" style="max-width:600px;margin:40px auto;text-align:center;padding:40px">
-      <div style="font-size:48px;margin-bottom:16px">👥</div>
-      <h2 style="margin:0 0 8px;font-size:20px">Reunião Mensal</h2>
-      <p style="font-size:16px;color:var(--text-muted);margin:0 0 24px">${label}</p>
+    <div class="card u-6a14d8">
+      <div class="u-259247">👥</div>
+      <h2 class="u-dec9a9">Reunião Mensal</h2>
+      <p class="u-a9ef84">${label}</p>
 
       ${existingMeeting && existingMeeting.status === 'encerrada'
-        ? `<div style="padding:12px 16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:20px;border:1px solid var(--border)">
-            <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">Esta reunião já foi encerrada</div>
-            <div style="font-size:12px">${_formatDateTimeShort(existingMeeting.endedAt)} — ${existingMeeting.relatorio ? 'Relatório disponível' : 'Sem relatório'}</div>
+        ? `<div class="u-db9dbe">
+            <div class="u-862bee">Esta reunião já foi encerrada</div>
+            <div class="u-6cb285">${_formatDateTimeShort(existingMeeting.endedAt)} — ${existingMeeting.relatorio ? 'Relatório disponível' : 'Sem relatório'}</div>
           </div>`
         : ''}
 
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px">
-        <div class="stat-card" style="min-width:120px">
-          <div class="stat-value" style="font-size:28px;color:var(--accent)">${pendenciaCount}</div>
+      <div class="u-97edc3">
+        <div class="stat-card u-651945">
+          <div class="stat-value u-4901c7">${pendenciaCount}</div>
           <div class="stat-label">Pendências abertas</div>
         </div>
-        <div class="stat-card" style="min-width:120px">
-          <div class="stat-value" style="font-size:28px">${baseClients.length}</div>
+        <div class="stat-card u-651945">
+          <div class="stat-value u-a2600b">${baseClients.length}</div>
           <div class="stat-label">Clientes</div>
         </div>
         ${baseClients.length > 0 ? `
-          <div class="stat-card" style="min-width:120px">
-            <div class="stat-value" style="font-size:28px">${clientesComPend}</div>
+          <div class="stat-card u-651945">
+            <div class="stat-value u-a2600b">${clientesComPend}</div>
             <div class="stat-label">Com pendência</div>
           </div>
         ` : ''}
       </div>
 
       ${baseClients.length === 0
-        ? `<div style="padding:20px;background:var(--bg-secondary);border-radius:8px;margin-bottom:20px">
-            <p style="color:var(--text-muted);margin:0">Nenhum cliente cadastrado.</p>
+        ? `<div class="u-6028f5">
+            <p class="u-d746c5">Nenhum cliente cadastrado.</p>
           </div>`
-        : `<button class="btn btn-primary" style="padding:12px 32px;font-size:15px" data-action="startReuniao" data-arg="${escapeHtml(mesAno)}">
+        : `<button class="btn btn-primary u-967b9c" data-action="startReuniao" data-arg="${escapeHtml(mesAno)}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             ${existingMeeting && existingMeeting.status === 'encerrada' ? 'Reabrir' : 'Iniciar'} Reunião de ${label}
           </button>`}
 
-      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+      <div class="u-97dc71">
         ${prevMeeting
           ? `<button class="btn btn-secondary" data-action="showMeetingReport" data-arg="${escapeHtml(prevMeeting.id)}">📄 Ver Relatório Anterior</button>` : ''}
         <button class="btn btn-secondary" data-action="openMeetingCompareModal">📊 Comparar meses</button>
@@ -222,7 +222,7 @@ function _getStreakBadgeHtml(clientId) {
   try {
     const reunioes = getMyReunioes().filter(r => r.status === 'encerrada').sort((a,b) => (b.mesAno||'').localeCompare(a.mesAno||''));
     const streak = getConsecutiveMeetingStreak(clientId, reunioes, getMyPendencias());
-    if (streak >= 2) return `<span class="tag" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;margin-left:6px">🔁 ${streak} meses seguidos</span>`;
+    if (streak >= 2) return `<span class="tag u-5cd023">🔁 ${streak} meses seguidos</span>`;
   } catch(_) {}
   return '';
 }
@@ -252,40 +252,40 @@ function renderMeetingFlow() {
     : _meetingEmptyClientHtml(group);
 
   content.innerHTML = `
-    <div style="max-width:800px;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div class="u-b52906">
+      <div class="u-fb0da8">
         <div>
-          <h2 style="margin:0;font-size:18px">Reunião ${label}</h2>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+          <h2 class="u-535157">Reunião ${label}</h2>
+          <div class="u-bd72d7">
             Iniciada ${_formatDateTimeShort(_meetingState.startedAt)}
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-size:13px;color:var(--text-muted)">${_meetingState.notes.length} notas · ${_meetingState.resolvedIds.length} resolvidas</span>
+        <div class="u-01ef7f">
+          <span class="u-58b17f">${_meetingState.notes.length} notas · ${_meetingState.resolvedIds.length} resolvidas</span>
           <button class="btn btn-secondary btn-sm" data-action="enterPresentationMode">🖥️ Modo Apresentação</button>
           <button class="btn btn-danger btn-sm" data-action="endReuniao">Encerrar Reunião</button>
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="u-4e8041">
         <button class="btn btn-secondary btn-sm" data-action="openMeetingCompareModal">📊 Comparar meses</button>
-        <span style="font-size:12px;color:var(--text-muted);align-self:center">Fila ordenada por SLA (vencidas primeiro)</span>
+        <span class="u-f00580">Fila ordenada por SLA (vencidas primeiro)</span>
       </div>
-      <div style="background:var(--bg-secondary);border-radius:8px;padding:4px;margin-bottom:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:13px;font-weight:600">
+      <div class="u-1e4a83">
+        <div class="u-490594">
           <span>Cliente ${index + 1} de ${clients.length} (${comPendCount} com pendência)</span>
-          <span style="display:flex;align-items:center;gap:8px">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}${_getStreakBadgeHtml(group.clientId)}</span>
+          <span class="u-015a5e">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}${_getStreakBadgeHtml(group.clientId)}</span>
         </div>
-        <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div class="u-d53f32">
           <div style="height:100%;width:${Math.round(progress)}%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px" id="meetingPenCards">
+      <div class="u-c342b1" id="meetingPenCards">
         ${cardsHtml}
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="u-13313b">
         <button class="btn btn-secondary" ${index === 0 ? 'disabled' : ''} data-action="prevMeetingClient">
           ← Anterior
         </button>
@@ -371,29 +371,29 @@ function _meetingInlineFormInnerHtml(cid) {
   const opNames = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
   const currentUser = typeof getUser === 'function' ? getUser().name : '';
   return `
-        <input class="form-input" id="meeting-new-assunto-${cid}" maxlength="120" placeholder="Assunto (título)..." style="margin-bottom:8px" />
+        <input class="form-input u-fdf33f" id="meeting-new-assunto-${cid}" maxlength="120" placeholder="Assunto (título)..." />
         <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Descrição detalhada..."></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
+        <div class="u-67b198">
+          <select class="form-select u-aae040" id="meeting-new-tipo-${cid}">
             ${(() => { var _t = (typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Gestão','Outro']); try { if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isPendenciaGestao === 'function') _t = _t.filter(function(x){ return !isPendenciaGestao({ tipo: x }); }); } catch (_) {} return _t; })().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
           </select>
-          <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
+          <select class="form-select u-aae040" id="meeting-new-resp-${cid}">
             ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}
           </select>
-          <button class="btn btn-secondary btn-sm" data-action="meetingUseTemplate" data-arg="${cid}" style="white-space:nowrap">📋 Usar modelo</button>
-          <button class="btn btn-primary btn-sm" data-action="meetingCreateInlinePendencia" data-arg="${cid}" style="white-space:nowrap">+ Adicionar</button>
+          <button class="btn btn-secondary btn-sm u-86abda" data-action="meetingUseTemplate" data-arg="${cid}">📋 Usar modelo</button>
+          <button class="btn btn-primary btn-sm u-86abda" data-action="meetingCreateInlinePendencia" data-arg="${cid}">+ Adicionar</button>
         </div>`;
 }
 
 function _meetingEmptyClientHtml(group) {
   const cid = escapeHtml(group.clientId);
   return `
-    <div class="card" style="text-align:center;padding:24px">
-      <div style="font-size:32px;margin-bottom:8px">✅</div>
-      <div style="font-weight:600;margin-bottom:4px">Sem pendências no momento</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Nenhuma pendência aberta para ${escapeHtml(group.clientName)}</div>
-      <div style="text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para este cliente</div>
+    <div class="card u-3d1fcd">
+      <div class="u-0c31f0">✅</div>
+      <div class="u-a27006">Sem pendências no momento</div>
+      <div class="u-57a63a">Nenhuma pendência aberta para ${escapeHtml(group.clientName)}</div>
+      <div class="u-feca31">
+        <div class="u-d302d2">Nova pendência para este cliente</div>
         ${_meetingInlineFormInnerHtml(cid)}
       </div>
     </div>`;
@@ -402,10 +402,10 @@ function _meetingEmptyClientHtml(group) {
 function _meetingNewPendenciaFooterHtml(group) {
   const cid = escapeHtml(group.clientId);
   return `
-    <div class="card" style="padding:12px">
-      <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" data-action="toggleMeetingInlineForm" data-arg="${cid}">+ Nova pendência para este cliente</button>
-      <div id="meeting-inline-form-${cid}" style="display:none;margin-top:12px;text-align:left;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-secondary)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px">Nova pendência para ${escapeHtml(group.clientName)}</div>
+    <div class="card u-cc781b">
+      <button class="btn btn-secondary btn-sm u-4a2700" data-action="toggleMeetingInlineForm" data-arg="${cid}">+ Nova pendência para este cliente</button>
+      <div id="meeting-inline-form-${cid}" class="u-c499dc">
+        <div class="u-d302d2">Nova pendência para ${escapeHtml(group.clientName)}</div>
         ${_meetingInlineFormInnerHtml(cid)}
       </div>
     </div>`;
@@ -414,7 +414,7 @@ function _meetingNewPendenciaFooterHtml(group) {
 function toggleMeetingInlineForm(clientId) {
   const el = document.getElementById('meeting-inline-form-' + clientId);
   if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  el.style.display = getComputedStyle(el).display === 'none' ? 'block' : 'none';
   if (el.style.display === 'block') {
     const ai = document.getElementById('meeting-new-assunto-' + clientId);
     if (ai) ai.focus();
@@ -489,10 +489,10 @@ function _meetingPenCard(p) {
     <div class="card" id="meeting-card-${escapeHtml(p.id)}" style="border-left:4px solid ${
       isReviewed ? '#16a34a' : isResolved ? '#0ea5e9' : (STATUS_PEN_MAP[p.status]?.dot || '#94a3b8')
     }">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(getPendenciaTitulo(p))}</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-muted)">
+      <div class="u-82fba0">
+        <div class="u-59eddc">
+          <div class="u-ca7d3c">${escapeHtml(getPendenciaTitulo(p))}</div>
+          <div class="u-310d79">
             ${priorityTag(p.priority)}
             <span>Resp: ${escapeHtml(p.responsible || '—')}</span>
             ${onLeaveBadge}
@@ -500,7 +500,7 @@ function _meetingPenCard(p) {
             ${p.deadline ? `<span>Prazo: ${formatDate(parseDeadline(p.deadline))}</span>` : ''}
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
+        <div class="u-b71a03">
           <button class="btn btn-sm ${isReviewed ? 'btn-primary' : 'btn-secondary'}" data-action="meetingToggleReviewed" data-arg="${escapeHtml(p.id)}" title="Marcar como revisada">
             ${isReviewed ? '✓ Revisada' : 'Revisar'}
           </button>
@@ -515,8 +515,8 @@ function _meetingPenCard(p) {
       <div class="meet-done" id="meeting-done-${escapeHtml(p.id)}">Concluída por <strong>${escapeHtml(p.completedBy || '—')}</strong>${p.completedAt ? ` em ${escapeHtml(_fmtMeetingDateTime(p.completedAt))}` : ''} <button type="button" class="btn btn-sm btn-secondary" data-action="openCorrectCompletion" data-arg="${escapeHtml(p.id)}" aria-label="Corrigir quem concluiu">Corrigir</button></div>` : ''}
       ${_meetingPenHistoryHtml(p.id)}
 
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <select class="form-select" id="meeting-status-${escapeHtml(p.id)}" style="width:160px;font-size:12px">
+      <div class="u-866cd5">
+        <select class="form-select u-47978e" id="meeting-status-${escapeHtml(p.id)}">
           ${Object.entries(STATUS_PEN_MAP).map(([k, v]) =>
             `<option value="${k}" ${p.status === k ? 'selected' : ''}>${escapeHtml(v.label)}</option>`
           ).join('')}
@@ -524,26 +524,26 @@ function _meetingPenCard(p) {
         <button class="btn btn-sm btn-primary" data-action="meetingChangePenStatus" data-arg="${escapeHtml(p.id)}">Atualizar</button>
       </div>
 
-      <div style="margin-bottom:8px">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
-          ${plural((p.notes || []).length, 'nota', 'notas')}${isReviewed ? ' · <span style="color:#16a34a">Revisada</span>' : ''}
+      <div class="u-fdf33f">
+        <div class="u-bf992a">
+          ${plural((p.notes || []).length, 'nota', 'notas')}${isReviewed ? ' · <span class="u-723892">Revisada</span>' : ''}
         </div>
         ${(p.notes || []).length ? `
-          <div style="max-height:100px;overflow-y:auto;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg-secondary)">
+          <div class="u-6c5831">
             ${p.notes.slice(-3).map(n => `
-              <div style="margin-bottom:6px">
+              <div class="u-4e420a">
                 <strong>${escapeHtml(n.author || '—')}</strong>
-                <span style="color:var(--text-muted);font-size:11px">${_formatDateTimeShort(n.createdAt)}</span>
-                <div style="margin-top:2px">${escapeHtml(n.text || '').substring(0, 200)}${(n.text || '').length > 200 ? '...' : ''}</div>
+                <span class="u-5694e6">${_formatDateTimeShort(n.createdAt)}</span>
+                <div class="u-7a21c6">${escapeHtml(n.text || '').substring(0, 200)}${(n.text || '').length > 200 ? '...' : ''}</div>
               </div>
             `).join('')}
-            ${p.notes.length > 3 ? `<div style="color:var(--text-muted);font-size:11px">... e mais ${plural(p.notes.length - 3, 'nota', 'notas')}</div>` : ''}
+            ${p.notes.length > 3 ? `<div class="u-5694e6">... e mais ${plural(p.notes.length - 3, 'nota', 'notas')}</div>` : ''}
           </div>
         ` : ''}
       </div>
 
-      <form style="display:flex;gap:6px" data-submit="meetingAddPenNote" data-arg="${escapeHtml(p.id)}">
-        <input class="form-input" id="meeting-note-${escapeHtml(p.id)}" placeholder="Nota da reunião..." style="flex:1;font-size:12px" />
+      <form class="u-49cd09" data-submit="meetingAddPenNote" data-arg="${escapeHtml(p.id)}">
+        <input class="form-input u-5a95af" id="meeting-note-${escapeHtml(p.id)}" placeholder="Nota da reunião..." />
         <button type="submit" class="btn btn-sm btn-secondary">📝 Nota</button>
       </form>
     </div>`;
@@ -573,27 +573,27 @@ function _renderMeetingComplete() {
   const remainingCount = remaining.length;
 
   content.innerHTML = `
-    <div class="card" style="max-width:600px;margin:40px auto;text-align:center;padding:40px">
-      <div style="font-size:48px;margin-bottom:16px">✅</div>
-      <h2 style="margin:0 0 8px;font-size:20px">Todos os clientes revisados!</h2>
-      <p style="color:var(--text-muted);margin:0 0 20px">${label}</p>
+    <div class="card u-6a14d8">
+      <div class="u-259247">✅</div>
+      <h2 class="u-dec9a9">Todos os clientes revisados!</h2>
+      <p class="u-a35cc4">${label}</p>
 
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px">
-        <div class="stat-card" style="min-width:100px">
-          <div class="stat-value" style="font-size:24px;color:#16a34a">${_meetingState.resolvedIds.length}</div>
+      <div class="u-97edc3">
+        <div class="stat-card u-e79a03">
+          <div class="stat-value u-e97574">${_meetingState.resolvedIds.length}</div>
           <div class="stat-label">Resolvidas</div>
         </div>
-        <div class="stat-card" style="min-width:100px">
-          <div class="stat-value" style="font-size:24px;color:#f59e0b">${remainingCount}</div>
+        <div class="stat-card u-e79a03">
+          <div class="stat-value u-6d48be">${remainingCount}</div>
           <div class="stat-label">Abertas</div>
         </div>
-        <div class="stat-card" style="min-width:100px">
-          <div class="stat-value" style="font-size:24px;color:var(--accent)">${_meetingState.notes.length}</div>
+        <div class="stat-card u-e79a03">
+          <div class="stat-value u-1a2f51">${_meetingState.notes.length}</div>
           <div class="stat-label">Notas</div>
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;justify-content:center">
+      <div class="u-931053">
         <button class="btn btn-secondary" data-action="renderMeetingFlow">← Voltar ao Carrossel</button>
         <button class="btn btn-danger" data-action="endReuniao">Encerrar Reunião</button>
       </div>
@@ -732,15 +732,15 @@ function meetingUseTemplate(clientId) {
   const g = _meetingState?.clients[_meetingState.index];
   const clientName = g ? g.clientName : clientId;
   openModal(`Usar modelo — ${escapeHtml(clientName)}`, `
-    <div style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+    <div class="u-36e4e3">
       ${templates.map(t => `
-        <button class="card" style="text-align:left;padding:10px;cursor:pointer" data-action="meetingApplyTemplate" data-client="${escapeHtml(clientId)}" data-template="${escapeHtml(t.id)}">
-          <div style="font-weight:600;font-size:13px">${escapeHtml(t.title)}</div>
-          ${t.category ? `<span class="tag tag-blue" style="font-size:10px">${escapeHtml(t.category)}</span>` : ''}
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;max-height:40px;overflow:hidden">${escapeHtml((t.content||'').slice(0,120))}</div>
+        <button class="card u-31f934" data-action="meetingApplyTemplate" data-client="${escapeHtml(clientId)}" data-template="${escapeHtml(t.id)}">
+          <div class="u-160b06">${escapeHtml(t.title)}</div>
+          ${t.category ? `<span class="tag tag-blue u-0d5be0">${escapeHtml(t.category)}</span>` : ''}
+          <div class="u-3c10e2">${escapeHtml((t.content||'').slice(0,120))}</div>
         </button>`).join('')}
     </div>
-    <div class="form-actions" style="margin-top:12px"><button class="btn btn-secondary" data-action="meetingCloseModalAndRender">Voltar</button></div>
+    <div class="form-actions u-56f435"><button class="btn btn-secondary" data-action="meetingCloseModalAndRender">Voltar</button></div>
   `);
 }
 
@@ -764,12 +764,12 @@ function openMeetingCompareModal() {
   if (reunioes.length < 2) { showToast('É preciso ter pelo menos 2 reuniões encerradas para comparar.', 'warning'); return; }
   const opts = reunioes.map(r => `<option value="${escapeHtml(r.mesAno)}">${escapeHtml(_getMesAnoLabel(r.mesAno))} — ${escapeHtml(r.id)}</option>`).join('');
   openModal('Comparativo mês a mês', `
-    <div style="display:flex;gap:12px;margin-bottom:12px">
-      <div class="form-group" style="flex:1"><label class="form-label">Mês A</label><select class="form-select" id="compareMesA">${opts}</select></div>
-      <div class="form-group" style="flex:1"><label class="form-label">Mês B</label><select class="form-select" id="compareMesB">${opts}</select></div>
+    <div class="u-266909">
+      <div class="form-group u-97445a"><label class="form-label">Mês A</label><select class="form-select" id="compareMesA">${opts}</select></div>
+      <div class="form-group u-97445a"><label class="form-label">Mês B</label><select class="form-select" id="compareMesB">${opts}</select></div>
     </div>
     <button class="btn btn-primary" data-action="renderMeetingCompare">Comparar</button>
-    <div id="meetingCompareResult" style="margin-top:16px"></div>
+    <div id="meetingCompareResult" class="u-1b0f49"></div>
   `);
   // Default: two most recent
   setTimeout(() => {
@@ -789,17 +789,17 @@ function renderMeetingCompare() {
   const pendencias = getMyPendencias();
   const rows = typeof compareMeetings === 'function' ? compareMeetings(mesA, mesB, pendencias, clients) : [];
   const el = document.getElementById('meetingCompareResult');
-  if (!rows.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Nenhum cliente com pendência vinculada a essas reuniões.</p>'; return; }
+  if (!rows.length) { el.innerHTML = '<p class="u-aad8e6">Nenhum cliente com pendência vinculada a essas reuniões.</p>'; return; }
   el.innerHTML = `
     <div class="table-wrapper"><table><thead><tr><th>Cliente</th><th>${escapeHtml(_getMesAnoLabel(mesA))}</th><th>${escapeHtml(_getMesAnoLabel(mesB))}</th><th>Δ</th></tr></thead>
     <tbody>${rows.map(r => `
       <tr>
         <td>${escapeHtml(r.clientName)}</td>
-        <td>${r.abertasA} abertas / ${r.fechadasA} fechadas <span style="font-size:11px;color:var(--text-muted)">(${r.totalReviewedA} vistas)</span></td>
-        <td>${r.abertasB} abertas / ${r.fechadasB} fechadas <span style="font-size:11px;color:var(--text-muted)">(${r.totalReviewedB} vistas)</span></td>
+        <td>${r.abertasA} abertas / ${r.fechadasA} fechadas <span class="u-749148">(${r.totalReviewedA} vistas)</span></td>
+        <td>${r.abertasB} abertas / ${r.fechadasB} fechadas <span class="u-749148">(${r.totalReviewedB} vistas)</span></td>
         <td style="font-weight:700;color:${r.deltaAbertas>0?'#dc2626':r.deltaAbertas<0?'#16a34a':'var(--text-muted)'}">${r.deltaAbertas>0?'+':''}${r.deltaAbertas}</td>
       </tr>`).join('')}</tbody></table></div>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Base: pendências com reviewedInMeeting == REU-mês. Δ = abertas B - abertas A.</p>
+    <p class="u-8a0402">Base: pendências com reviewedInMeeting == REU-mês. Δ = abertas B - abertas A.</p>
   `;
 }
 
@@ -871,8 +871,8 @@ function showMeetingReport(meetingId) {
   if (!m || !m.relatorio) { showToast('Relatório não encontrado.', 'error'); return; }
 
   openModal('Relatório — ' + _getMesAnoLabel(m.mesAno || ''), `
-    <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:500px;overflow-y:auto;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">${escapeHtml(m.relatorio)}</div>
-    <div class="form-actions" style="margin-top:16px">
+    <div class="u-4b7bca">${escapeHtml(m.relatorio)}</div>
+    <div class="form-actions u-1b0f49">
       <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
       <button class="btn btn-primary" data-action="meetingCopyReport">Copiar Relatório</button>
     </div>
