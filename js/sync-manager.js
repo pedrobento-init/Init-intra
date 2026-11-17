@@ -100,6 +100,17 @@ var SyncManager = (function () {
         : null;
     } catch (_) { meta = null; }
     if (!meta || typeof dbGet !== 'function' || typeof dbSet !== 'function') return;
+    // O await da outbox vem ANTES de ler a lista (e da supressão de pendência): entre dbGet e dbSet não pode
+    // haver ponto de suspensão, senão uma escrita local concorrente (SYNC-03)
+    // seria sobrescrita pela lista velha.
+    var enq = false;
+    if (event !== 'DELETE' && row && row.id) {
+      try {
+        enq = (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.has === 'function')
+          ? await Outbox.has(row.id)
+          : ((typeof outboxHas === 'function') ? await outboxHas(row.id) : false);
+      } catch (_) { enq = false; }
+    }
     var prevSuppress = false;
     try { prevSuppress = (typeof window !== 'undefined' && window._suppressPendingSync) || false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
     try {
@@ -129,12 +140,6 @@ var SyncManager = (function () {
         } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager'); }
         var idx = -1;
         for (var i = 0; i < list.length; i++) { if (list[i] && list[i].id === mapped.id) { idx = i; break; } }
-        var enq = false;
-        try {
-          enq = (typeof Outbox !== 'undefined' && Outbox && typeof Outbox.has === 'function')
-            ? await Outbox.has(mapped.id)
-            : ((typeof outboxHas === 'function') ? await outboxHas(mapped.id) : false);
-        } catch (_) { enq = false; }
         if (idx !== -1) {
           var loc = list[idx];
           if (shouldApplyRemote(loc, mapped, enq)) {

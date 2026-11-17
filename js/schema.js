@@ -449,6 +449,35 @@ function _mergeRecords(local, remote, localKeyFromRemote) {
   return { merged, conflicts, conflictDetails };
 }
 
+// SYNC-03: o sync lê o local, passa por awaits (push, rede) e só então grava a
+// lista inteira. Edição do usuário ou evento realtime (applyRemote) nesse meio
+// tempo era sobrescrita pelo dbSet do merge. Reconcilia o resultado do merge
+// com o que está no local AGORA: o que mudou desde o snapshot vence se for mais
+// novo (LWW por updatedAt); o que o usuário apagou nesse intervalo não volta.
+function _reconcileConcurrentEdits(final, snapshot, current) {
+  const stamp = (r) => { const t = new Date((r && r.updatedAt) || 0).getTime(); return Number.isNaN(t) ? 0 : t; };
+  const snapById = new Map((snapshot || []).filter(r => r && r.id).map(r => [r.id, r]));
+  const curById = new Map((current || []).filter(r => r && r.id).map(r => [r.id, r]));
+  const out = [];
+  const idxById = new Map();
+  for (const r of (final || [])) {
+    if (r && r.id && snapById.has(r.id) && !curById.has(r.id)) continue; // apagado durante o sync
+    if (r && r.id) idxById.set(r.id, out.length);
+    out.push(r);
+  }
+  for (const c of curById.values()) {
+    const s = snapById.get(c.id);
+    if (s && s.updatedAt === c.updatedAt) continue; // não mudou desde o snapshot
+    if (idxById.has(c.id)) {
+      const i = idxById.get(c.id);
+      if (stamp(c) >= stamp(out[i])) out[i] = c;
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
 // ── Sync parcial (P-9) — planejamento puro e testável ───────────────────────
 // Entrada: locais + "leves" do servidor ({id, updated_at}). Sai quais ids
 // precisam da linha completa (novos no servidor ou com updated_at diferente
@@ -567,5 +596,5 @@ function _retainFailedPush(merged, failedRecs) {
 // Export para testes (Node/Vitest). Em browser, `module` não existe e os
 // identificadores acima ficam disponíveis no escopo global dos scripts.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _keepLocalEdits, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
+  module.exports = { ENTITIES, SYNC_ENTITIES, _valuesDiffer, _mapFromRemote, _mapToRemote, _mergeRecords, _reconcileConcurrentEdits, _keepLocalEdits, _needsPush, TOMBSTONE_TTL_MS, _pruneTombstones, _filterRemoteByTombstones, _classifyLocalOnly, _retainFailedPush, _planDeltaPull, _shouldFullSync, FULL_SYNC_EVERY_MS };
 }

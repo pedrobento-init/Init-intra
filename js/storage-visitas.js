@@ -264,7 +264,9 @@ function saveVisit(data) {
       ...(_fullV.operatorId ? { operator_id: _fullV.operatorId } : {}),
       created_at: _fullV.createdAt,
       updated_at: now
-    }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    }).then(res => { if (res.error) { console.error('❌ Supabase visita:', String(res.error.message || res.error)); markSyncPushFailed(); _outboxFail('visits', 'upsert', _fullV, res.error); } }).catch(() => { markSyncPushFailed(); _outboxFail('visits', 'upsert', _fullV, null, true); });
+  } else {
+    _outboxOffline('visits', 'upsert', _fullV);
   }
 
   // Integração Milvus (fire-and-forget, só em criações): com rede, tenta
@@ -293,7 +295,10 @@ function deleteVisit(id) {
   addLog('Excluiu', 'Visita', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir visita:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    _outboxDropTarget(id);
+    supabaseClient.from('visits').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir visita:', res.error); markSyncPushFailed(); _outboxFail('visits', 'delete', { id }, res.error); } }).catch(() => { markSyncPushFailed(); _outboxFail('visits', 'delete', { id }, null, true); });
+  } else {
+    _outboxOffline('visits', 'delete', { id });
   }
 }
 
@@ -337,11 +342,14 @@ function saveReuniao(data) {
       created_at: data.createdAt || now,
       updated_at: now
     }).then(res => {
-      if (res.error) { console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); }
+      if (res.error) { console.warn('⚠️ Supabase reunião (sync pulado — verifique schema):', res.error.message); markSyncPushFailed(); _outboxFail('reunioes', 'upsert', data, res.error); }
     }).catch(err => {
       console.warn('⚠️ Erro de rede Supabase reunião:', err.message);
       markSyncPushFailed();
+      _outboxFail('reunioes', 'upsert', data, null, true);
     });
+  } else {
+    _outboxOffline('reunioes', 'upsert', data);
   }
 
   return data;
@@ -358,7 +366,10 @@ function deleteReuniao(id) {
   addLog('Excluiu', 'Reunião', id, desc);
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir reunião:', res.error); markSyncPushFailed(); } }).catch(() => markSyncPushFailed());
+    _outboxDropTarget(id);
+    supabaseClient.from('reunioes').delete().eq('id', id).then(res => { if (res.error) { console.error('❌ Supabase excluir reunião:', res.error); markSyncPushFailed(); _outboxFail('reunioes', 'delete', { id }, res.error); } }).catch(() => { markSyncPushFailed(); _outboxFail('reunioes', 'delete', { id }, null, true); });
+  } else {
+    _outboxOffline('reunioes', 'delete', { id });
   }
 }
 
@@ -442,9 +453,11 @@ function saveEquipamento(data) {
         team: data.team || 'init',
         created_at: data.createdAt || now,
         updated_at: now
-      }).then(res => { if (res.error) { console.warn('⚠️ Supabase equipamento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
+      }).then(res => { if (res.error) { console.warn('⚠️ Supabase equipamento:', res.error.message); markSyncPushFailed(); _outboxFail('equipamentos', 'upsert', data, res.error); } })
+        .catch(() => { markSyncPushFailed(); _outboxFail('equipamentos', 'upsert', data, null, true); });
     } catch (_) { /* tabela pode não existir ainda — sync genérico cobre quando existir */ }
+  } else {
+    _outboxOffline('equipamentos', 'upsert', data);
   }
 
   return data;
@@ -462,10 +475,13 @@ function deleteEquipamento(id) {
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
     try {
+      _outboxDropTarget(id);
       supabaseClient.from('equipamentos').delete().eq('id', id)
-        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir equipamento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
+        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir equipamento:', res.error.message); markSyncPushFailed(); _outboxFail('equipamentos', 'delete', { id }, res.error); } })
+        .catch(() => { markSyncPushFailed(); _outboxFail('equipamentos', 'delete', { id }, null, true); });
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+  } else {
+    _outboxOffline('equipamentos', 'delete', { id });
   }
 }
 
@@ -479,12 +495,12 @@ function getMyVencimentos() {
 }
 function getVencimentoById(id) { return getVencimentos().find(v => v.id === id) || null; }
 function _pushVencimento(data) {
-  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || typeof window === 'undefined' || !window._supabaseAuthActive) return;
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected() || typeof window === 'undefined' || !window._supabaseAuthActive) { _outboxOffline('vencimentos', 'upsert', data); return; }
   try {
     const e = ENTITIES.find(x => x.table === 'vencimentos');
     supabaseClient.from('vencimentos').upsert(_mapToRemote(data, e.fields, e.optionalFields))
-      .then(res => { if (res.error) { console.warn('⚠️ Supabase vencimento:', res.error.message); markSyncPushFailed(); } })
-      .catch(() => markSyncPushFailed());
+      .then(res => { if (res.error) { console.warn('⚠️ Supabase vencimento:', res.error.message); markSyncPushFailed(); _outboxFail('vencimentos', 'upsert', data, res.error); } })
+      .catch(() => { markSyncPushFailed(); _outboxFail('vencimentos', 'upsert', data, null, true); });
   } catch (_) { /* tabela pode não existir ainda — o sync genérico cobre */ }
 }
 /** @param {{ silent?: boolean }} [opts] silent: sem log (marcação interna de aviso enviado) */
@@ -526,10 +542,13 @@ function deleteVencimento(id) {
   if (typeof addLog === 'function') addLog('Excluiu', 'Vencimento', id, cur ? cur.descricao : '');
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && typeof window !== 'undefined' && window._supabaseAuthActive) {
     try {
+      _outboxDropTarget(id);
       supabaseClient.from('vencimentos').delete().eq('id', id)
-        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir vencimento:', res.error.message); markSyncPushFailed(); } })
-        .catch(() => markSyncPushFailed());
+        .then(res => { if (res.error) { console.warn('⚠️ Supabase excluir vencimento:', res.error.message); markSyncPushFailed(); _outboxFail('vencimentos', 'delete', { id }, res.error); } })
+        .catch(() => { markSyncPushFailed(); _outboxFail('vencimentos', 'delete', { id }, null, true); });
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage-visitas'); }
+  } else {
+    _outboxOffline('vencimentos', 'delete', { id });
   }
   return true;
 }
