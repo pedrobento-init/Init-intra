@@ -63,7 +63,7 @@ function _refreshTemplateCategories() {
       }).join('');
     if (cur && cats.indexOf(cur) === -1) sel.value = '';
     renderTemplatesGrid();
-  } catch (_) { try { renderTemplatesGrid(); } catch (_) {} }
+  } catch (_) { try { renderTemplatesGrid(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'templates'); } }
 }
 
 function renderTemplatesGrid() {

@@ -1084,7 +1084,7 @@ function _refreshClientsInPlace(){
     var all=typeof getMyClients==='function'?getMyClients(): (typeof getClients==='function'?getClients():[]);
     _filteredClients = q ? all.filter(function(c){ return (c.name||'').toLowerCase().indexOf(q)!==-1 || (c.segment||'').toLowerCase().indexOf(q)!==-1; }) : all;
     preserveScrollAround(function(){ renderClientGrid(); });
-  }catch(_){ try{ renderClientGrid(); }catch(_){} }
+  }catch(_){ try{ renderClientGrid(); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'clients-form'); } }
 }
 (function(){
   if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
@@ -1109,8 +1109,8 @@ function _refreshClientsInPlace(){
       if(!tabName || !clientId || typeof renderClientTab!=='function') return;
       var sc=tab.scrollTop;
       renderClientTab(tabName, clientId);
-      try{ tab.scrollTop=sc; }catch(_){}
-    }catch(_){}
+      try{ tab.scrollTop=sc; }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'clients-form'); }
+    }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'clients-form'); }
   });
 })();
 

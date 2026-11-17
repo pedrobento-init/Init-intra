@@ -246,7 +246,7 @@ function copyKbDoc(kind, id) {
   const d = kbDocs().find((x) => x.kind === kind && x.id === id);
   if (!d) return;
   const text = d.title + '\n\n' + d.body;
-  try { navigator.clipboard.writeText(text).then(() => showToast('Copiado.', 'success')); } catch (_) {}
+  try { navigator.clipboard.writeText(text).then(() => showToast('Copiado.', 'success')); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'conhecimento'); }
 }
 
 /** @param {object} [pre] valores iniciais (título/categoria/conteúdo) */
@@ -292,7 +292,7 @@ function kbFromPendencia(penId) {
 function kbPendenciaPanelHtml(p) {
   if (!p) return '';
   let related = [];
-  try { related = kbRelated(kbDocs(), [p.assunto, p.descricao].join(' '), { excludeId: p.id, limit: 3 }); } catch (_) {}
+  try { related = kbRelated(kbDocs(), [p.assunto, p.descricao].join(' '), { excludeId: p.id, limit: 3 }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'conhecimento'); }
   const resolved = ['concluido', 'resolvido'].includes(p.status);
   if (!related.length && !resolved) return '';
   return '<div class="kb-pen">' +
@@ -306,7 +306,7 @@ function kbPendenciaPanelHtml(p) {
 if (typeof window !== 'undefined' && typeof onDataChanged === 'function' && !window._kbAutoRefresh) {
   window._kbAutoRefresh = true;
   ['procedimentos', 'templates', 'pendencias'].forEach((n) => onDataChanged(n, function () {
-    try { if ((window.location.hash || '').replace('#', '') === 'conhecimento') _kbPaint(); } catch (_) {}
+    try { if ((window.location.hash || '').replace('#', '') === 'conhecimento') _kbPaint(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'conhecimento'); }
   }));
 }
 

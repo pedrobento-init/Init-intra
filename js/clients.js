@@ -24,8 +24,8 @@ function buildClientNarrative(clientId) {
     try{
       var concluidas = allPens.filter(function(p){ return ['concluido','resolvido'].includes(p.status); });
       avg = _calcAvgProxy(concluidas);
-    }catch(_){}
-    var health=null; try{ health=_getHealthForClientProxy(_getPendenciasList(), clientId, today); }catch(_){}
+    }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'clients'); }
+    var health=null; try{ health=_getHealthForClientProxy(_getPendenciasList(), clientId, today); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'clients'); }
     var desde = firstDate ? _formatDateProxy(firstDate) : '—';
     var mediaText = avg!=null ? avg.toFixed(1)+'h' : 'sem média';
     var statusText = health ? health.emoji+' '+health.label : '—';
@@ -279,7 +279,7 @@ function viewClient(id) {
     const _t = document.getElementById('modalTitle');
     const _sub = cfUpdatedMeta(c);
     if (_t) _t.innerHTML = `<span class="cf-title-main">${escapeHtml(c.name)}</span>${_sub ? `<span class="cf-title-sub">${_sub}</span>` : ''}`;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients'); }
   renderClientTab('ficha', id);
 }
 

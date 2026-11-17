@@ -182,7 +182,7 @@ function cfClientSince(c, pens) {
       const d = formatDate(min.createdAt);
       if (d && d !== '—') return d;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
   if (c.createdAt) {
     const d = formatDate(c.createdAt);
     if (d && d !== '—') return d;
@@ -449,7 +449,7 @@ function cfStartEdit(wrap, field, clientId) {
   wrap.classList.add('is-editing');
   txt.replaceWith(input);
   input.focus();
-  try { if (input.select) input.select(); } catch (_) {}
+  try { if (input.select) input.select(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
 
   let done = false;
   const finish = (save, refocus) => {
@@ -684,7 +684,7 @@ function copyClientSummary(clientId) {
 function cfUpdatedMeta(c) {
   if (!c) return '';
   let when = '';
-  try { if (c.updatedAt) when = formatDate(c.updatedAt); } catch (_) {}
+  try { if (c.updatedAt) when = formatDate(c.updatedAt); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
   if (!when || when === '—') return '';
   return 'Atualizada em ' + when + (c.updatedBy ? ' por ' + escapeHtml(c.updatedBy) : '');
 }
@@ -821,13 +821,13 @@ function renderClientTab(tab, id) {
     const clientName = client ? client.name : '';
     const pensIds = new Set(_getPendenciasList().filter(p => {
       if (p.clientId !== id) return false;
-      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
       return true;
     }).map(p => p.id));
     const visitIds = new Set(getVisits().filter(v => v.clientId === id).map(v => v.id));
     const logs = (function(){
       var _l = typeof getLogs === 'function' ? getLogs() : [];
-      try { if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l); } catch (_) {}
+      try { if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
       return _l;
     })();
     const filtered = logs.filter(l => {
@@ -851,7 +851,7 @@ function renderClientTab(tab, id) {
   } else {
     const pens = _getPendenciasList().filter(p => {
       if (p.clientId !== id) return false;
-      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
+      try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-ficha'); }
       return true;
     });
     el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" data-action="clientNewPendencia" data-arg="${escapeHtml(id)}">+ Nova Pendência</button></div>

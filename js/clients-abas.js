@@ -12,7 +12,7 @@ let _clientPenOrigin = null;
 function openClientPenRow(e, clientId, penId) {
   try {
     if (e && e.target && e.target.closest && e.target.closest('button,select,a,input,textarea,label')) return;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   openClientPendencia(clientId, penId);
 }
 
@@ -97,7 +97,7 @@ async function confirmMilvusClientsImport() {
       // A grade atrás do modal estava ficando stale: reconstrói o filtro e os badges.
       if (typeof _refreshClientsInPlace === 'function') _refreshClientsInPlace();
       if (typeof updateBadges === 'function') updateBadges();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   } catch (e) {
     setMsg('<span style="color:var(--danger,#dc2626)">Falha na importação. Tente novamente.</span>');
   } finally {
@@ -118,7 +118,7 @@ function _fmtTicketDate(iso) {
   if (!iso) return '—';
   try {
     if (typeof formatDateTime === 'function') return formatDateTime(iso);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   try { return new Date(iso).toLocaleString('pt-BR'); } catch (_) { return '—'; }
 }
 
@@ -126,7 +126,7 @@ function renderClientMilvusTicketsTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   let lastSync = null;
-  try { lastSync = typeof getMilvusTicketsLastSyncAt === 'function' ? getMilvusTicketsLastSyncAt(clientId) : null; } catch (_) {}
+  try { lastSync = typeof getMilvusTicketsLastSyncAt === 'function' ? getMilvusTicketsLastSyncAt(clientId) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   const lastTxt = lastSync
     ? _fmtTicketDate(lastSync)
     : 'nunca';
@@ -147,12 +147,12 @@ function renderClientMilvusTicketsTab(clientId) {
   loadClientMilvusTicketsUI(clientId);
   try {
     if (typeof renderMilvusAtendimentosInline === 'function') renderMilvusAtendimentosInline(clientId, 'chamadosAtendSection');
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   try {
     if (typeof shouldAutoSyncMilvusTickets === 'function' && shouldAutoSyncMilvusTickets(lastSync, Date.now())) {
       syncClientMilvusTicketsUI(clientId, { silent: true });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
 }
 
 async function loadClientMilvusTicketsUI(clientId) {
@@ -209,7 +209,7 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
       const last = typeof getMilvusTicketsLastSyncAt === 'function' ? getMilvusTicketsLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusTicketsLastSync');
       if (last && lastEl) lastEl.textContent = _fmtTicketDate(last);
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
     await loadClientMilvusTicketsUI(clientId);
   } catch (e) {
     // Erro discreto; mantém os já sincronizados (não apaga nada).
@@ -254,7 +254,7 @@ function renderClientInventoryTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   let lastSync = null;
-  try { lastSync = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null; } catch (_) {}
+  try { lastSync = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
   const lastTxt = lastSync
     ? (typeof formatDateTime === 'function' ? formatDateTime(lastSync) : new Date(lastSync).toLocaleString('pt-BR'))
     : 'nunca';
@@ -307,7 +307,7 @@ async function syncClientInventoryUI(clientId) {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
       if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
     await loadClientInventoryUI(clientId);
   } catch (e) {
     // Mensagem amigável; sem token ou detalhe sensível.
@@ -332,7 +332,7 @@ async function importClientInventoryUI(clientId, input) {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
       if (last && lastEl) lastEl.textContent = typeof formatDateTime === 'function' ? formatDateTime(last) : new Date(last).toLocaleString('pt-BR');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'clients-abas'); }
     await loadClientInventoryUI(clientId);
   } catch (e) {
     setMsg(`<span style="color:var(--danger,#dc2626)">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`);

@@ -51,7 +51,7 @@ function getEquipPendenciaId(e) {
   if (!os) return null;
   try {
     if (typeof getPendenciaById === 'function' && getPendenciaById(os)) return os;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   return null;
 }
 
@@ -126,13 +126,13 @@ function _equipBaseList() {
     if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) {
       return getEquipamentosByTeam(_selectedTeam);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   try {
     if (typeof getMyEquipamentos === 'function') return getMyEquipamentos();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   try {
     if (typeof getEquipamentos === 'function') return getEquipamentos();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   return [];
 }
 
@@ -141,13 +141,13 @@ function _equipClients() {
     if (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam) {
       return getClientsByTeam(_selectedTeam);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   try {
     if (typeof getMyClients === 'function') return getMyClients();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   try {
     if (typeof getClients === 'function') return getClients();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   return [];
 }
 
@@ -174,13 +174,13 @@ function _migrateEquipLocalAliases() {
           e.updatedAt = e.updatedAt || now;
           changed = true;
         }
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     }
   }
   if (changed) {
     try {
       if (typeof dbSet !== 'undefined' && typeof DB !== 'undefined') dbSet(DB.EQUIPAMENTOS, list);
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   }
 }
 
@@ -194,12 +194,12 @@ function renderEquipamentos() {
   if (typeof window !== 'undefined') window._topbarAction = () => openEquipForm();
 
   let saved = {};
-  try { saved = loadFilterState('equipamentos', {}); } catch (_) {}
+  try { saved = loadFilterState('equipamentos', {}); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   _equipTab = normEquipStatus(saved.status || '');
 
   // Migração local one-shot: 'em_uso' → 'entregue' + resgata vínculo legado
   // (id de pendência guardado em osVinculada) para o campo pendenciaId.
-  try { _migrateEquipLocalAliases(); } catch (_) {}
+  try { _migrateEquipLocalAliases(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   _equipFilter = {
     client: saved.client || '',
     tipo: saved.tipo || '',
@@ -295,12 +295,12 @@ function saveEquipFilters() {
       to: _equipFilter.to || '',
       onlyWithOS: !!_equipFilter.onlyWithOS,
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
 }
 
 function setEquipTab(status) {
   _equipTab = status || '';
-  try { saveEquipFilters(); } catch (_) {}
+  try { saveEquipFilters(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   renderEquipView();
 }
 
@@ -340,7 +340,7 @@ if (typeof window !== 'undefined' && !window._equipMoreFiltersBound && typeof do
       panel.dataset.open = '0';
       panel.style.display = 'none';
       btn.setAttribute('aria-expanded', 'false');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   });
 }
 
@@ -373,7 +373,7 @@ function renderEquipView(resetPage) {
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     renderEquipTable(area);
     _equipUpdateMoreFiltersBadge();
   };
@@ -442,7 +442,7 @@ function equipClientCell(e) {
   try {
     const c = (typeof getClientById === 'function') ? getClientById(e.clientId) : null;
     if (c && c.color) color = c.color;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   return `<span class="client-tag"><span class="client-dot" style="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
 }
 
@@ -459,7 +459,7 @@ function equipOSCell(e) {
         const p = getPendenciaById(penId);
         if (p && typeof penDisplayNumber === 'function') penLabel = penDisplayNumber(p);
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     const shown = osText || penLabel || penId;
     const title = penLabel && osText && penLabel !== osText ? `Pendência ${penLabel}` : 'Abrir pendência vinculada';
     return `<a href="#" class="os-link" title="${esc(title)}" data-action="goToEquipOS" data-arg="${esc(penId)}">${esc(shown)} 🔗</a>`;
@@ -470,7 +470,7 @@ function equipOSCell(e) {
 // Rótulo amigável da pendência vinculada (para o form/menu).
 function _equipPenLabel(p) {
   let num = p.id;
-  try { if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p); } catch (_) {}
+  try { if (typeof penDisplayNumber === 'function') num = penDisplayNumber(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const title = (p.assunto || p.descricao || '').toString().slice(0, 40);
   return `${num} · ${p.clientName || ''} · ${title}`;
 }
@@ -536,7 +536,7 @@ function renderEquipTable(area) {
 // ── Menu ⋮ ──────────────────────────────────────────────────────────────────
 function toggleEquipMenu(e, id) {
   if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-  try { closeEquipMenu(); } catch (_) {}
+  try { closeEquipMenu(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const btn = e && e.currentTarget ? e.currentTarget : null;
   const rect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { bottom: 0, right: 0 };
   const menu = document.createElement('div');
@@ -565,7 +565,7 @@ function goToEquipOS(osId) {
   if (!osId) return;
   try {
     if (typeof navigateTo === 'function') navigateTo('pendencias');
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   let tries = 0;
   const tick = () => {
     tries++;
@@ -575,7 +575,7 @@ function goToEquipOS(osId) {
         openPendenciaDetail(osId);
         return;
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     if (tries < 25) setTimeout(tick, 120);
     else if (typeof showToast === 'function') showToast('OS não encontrada (pode ter sido excluída).', 'warning');
   };
@@ -686,7 +686,7 @@ function submitEquipForm(e, id) {
     try {
       const c = (typeof getClientById === 'function') ? getClientById(clientSel) : null;
       if (c) clientName = c.name;
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   }
   const rawValor = document.getElementById('eqValor')?.value;
   const rawStatus = normEquipStatus(document.getElementById('eqStatus')?.value || 'estoque') || 'estoque';
@@ -714,16 +714,16 @@ function submitEquipForm(e, id) {
   if (typeof closeModal === 'function') closeModal();
   if (typeof showToast === 'function') showToast(id ? 'Equipamento atualizado!' : 'Equipamento cadastrado!', 'success');
   renderEquipView(false);
-  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); } }
 }
 
 function deleteEquipFlow(id) {
   let eq = null;
-  try { eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null; } catch (_) {}
+  try { eq = (typeof getEquipamentoById === 'function') ? getEquipamentoById(id) : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const name = (eq && eq.nome) || 'este equipamento';
   const doDelete = () => {
     let snapshot = null;
-    try { snapshot = eq ? { ...eq } : null; } catch (_) {}
+    try { snapshot = eq ? { ...eq } : null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     try {
       if (typeof deleteEquipamento === 'function') deleteEquipamento(id);
     } catch (err) {
@@ -731,7 +731,7 @@ function deleteEquipFlow(id) {
       return;
     }
     renderEquipView(false);
-    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); } }
     if (snapshot && typeof showUndoToast === 'function') {
       showUndoToast(`"${snapshot.nome}" excluído.`, () => {
         try {
@@ -747,7 +747,7 @@ function deleteEquipFlow(id) {
             }
           }
           renderEquipView(false);
-        } catch (_) {}
+        } catch (_e) { console.error('[equipamentos] desfazer exclusão falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); if (typeof showToast === 'function') showToast('Não foi possível desfazer a exclusão.', 'error'); }
       });
     } else if (typeof showToast === 'function') {
       showToast('Equipamento excluído.', 'success');
@@ -776,7 +776,7 @@ function equipOSExportLabel(e) {
         const p = getPendenciaById(penId);
         if (p) return penDisplayNumber(p);
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
     return penId;
   }
   return '';
@@ -795,7 +795,7 @@ function buildEquipAcertoSheet(list, dateLabel) {
   let titleDate = stamp;
   try {
     if (/^\d{4}-\d{2}-\d{2}$/.test(stamp) && typeof formatDate === 'function') titleDate = formatDate(stamp);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const title = `Equipamentos — Acerto (${titleDate})`;
   const header = ['Ordem de Serviço', 'Cliente', 'Serviço a ser feito', 'Saída', 'Valor', 'Devolvido', 'Observações'];
   const arr = list || [];
@@ -847,7 +847,7 @@ function applyAcertoDesign(ws, meta) {
   ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 40 }];
   ws['!rows'] = [{ hpt: 26 }, { hpt: 20 }];
   ws['!autofilter'] = { ref: `A${HEADER + 1}:G${LAST + 1}` };
-  try { ws['!views'] = [{ state: 'frozen', ySplit: HEADER + 1 }]; } catch (_) {}
+  try { ws['!views'] = [{ state: 'frozen', ySplit: HEADER + 1 }]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
 
   // Título
   const t = _acertoCell(ws, TITLE, 0);
@@ -888,7 +888,7 @@ async function exportEquipamentosPlanilha() {
       if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const list = (_filteredEquips && _filteredEquips.length) ? _filteredEquips : getFilteredEquipamentos();
   if (!list.length) {
     if (typeof showToast === 'function') showToast('Nada para exportar com os filtros atuais.', 'warning');
@@ -937,7 +937,7 @@ function exportEquipamentosCSV() {
       if (typeof showToast === 'function') showToast('Exportação restrita a administradores/supervisores.', 'error');
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
   const list = _filteredEquips && _filteredEquips.length ? _filteredEquips : getFilteredEquipamentos();
   const headers = ['Nome', 'Nº Série', 'Tipo', 'Cliente', 'OS', 'Pendência vinculada', 'Status', 'Valor', 'Aquisição', 'Atualizado em'];
   const rows = list.map(eq => [
