@@ -583,7 +583,7 @@ function _bindPenBoardDrag() {
     document.querySelectorAll('.kanban-col').forEach(function(c) { c.classList.remove('drag-over'); });
     var id = ev.dataTransfer ? ev.dataTransfer.getData('penId') : '';
     var alvo = el.getAttribute('data-pen-id');
-    var colId = el.getAttribute('data-pen-col') || '';
+    colId = el.getAttribute('data-pen-col') || '';
     var p = getPendenciaById(id);
     if (!p) return;
     if (p.status !== colId) { penMoveTo(id, colId); return; } // veio de outra coluna

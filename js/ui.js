@@ -1229,7 +1229,7 @@ document.addEventListener('keydown', e => {
   // Alt + N -> Criar Novo Item (conforme aba atual)
   if (e.altKey && e.key.toLowerCase() === 'n') {
     e.preventDefault();
-    var page = window.location.hash.replace('#', '') || 'dashboard';
+    page = window.location.hash.replace('#', '') || 'dashboard';
     if (page === 'clientes' && typeof openClientForm === 'function') openClientForm();
     else if (page === 'pendencias' && typeof openPendenciaForm === 'function') openPendenciaForm();
     else if (page === 'calendario' && typeof openPendenciaForm === 'function') openPendenciaForm();
