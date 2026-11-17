@@ -732,7 +732,7 @@ function updateUserUI() {
   const initials = u.initials || (u.name ? u.name.substring(0,2).toUpperCase() : 'TI');
   const avatar   = document.getElementById('user-avatar');
   avatar.textContent = initials;
-  if (u.color) avatar.style.background = u.color;
+  if (u.color) avatar.style.setProperty('background', u.color, 'important'); // a classe de css/utilidades.css usa !important
   const roleEl = document.getElementById('user-role-display');
   if (roleEl) roleEl.textContent = u.role || 'Técnico';
 }
@@ -1524,3 +1524,11 @@ if (typeof registerActions === 'function') {
     auditLoadMore: () => { _auditState.shown += AUDIT_PAGE; if (typeof _renderAuditList === 'function') _renderAuditList(); },
   });
 }
+
+// Estado inicial "escondido" dos elementos do index.html. O markup os esconde por
+// classe (css/utilidades.css, sem atributo style por causa do CSP); o resto do app
+// lê e escreve `el.style.display`, então o estado inline precisa existir também.
+['globalSearchModal', 'teamSelectorWrap', 'sidebarMoreBtn', 'installAppBtn', 'topbarActionBtn', 'sidebarOverlay', 'modalOverlay', 'userModalOverlay', 'cropModalOverlay', 'notifModalOverlay', 'loginOverlay', 'ckProcOverlay'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el && !el.style.display) el.style.display = 'none';
+});

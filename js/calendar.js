@@ -282,14 +282,14 @@ function renderCalendar() {
       </div>
     </div>
     <div class="legend ag-legend" id="calLegend">
-      <div class="legend-item"><span class="swatch" style="background:#0ea5e9"></span>Visita</div>
+      <div class="legend-item"><span class="swatch u-f7eaa9"></span>Visita</div>
       <div class="legend-div"></div>
-      <div class="legend-item"><span class="swatch" style="background:#991b1b"></span>Crítica</div>
-      <div class="legend-item"><span class="swatch" style="background:#dc2626"></span>Alta</div>
-      <div class="legend-item"><span class="swatch" style="background:#d97706"></span>Média</div>
-      <div class="legend-item"><span class="swatch" style="background:#16a34a"></span>Baixa</div>
+      <div class="legend-item"><span class="swatch u-abf768"></span>Crítica</div>
+      <div class="legend-item"><span class="swatch u-cafe7c"></span>Alta</div>
+      <div class="legend-item"><span class="swatch u-a68719"></span>Média</div>
+      <div class="legend-item"><span class="swatch u-78bf16"></span>Baixa</div>
       <div class="legend-div"></div>
-      <div class="legend-item"><span class="swatch" style="background:#b3122a"></span>Vencida</div>
+      <div class="legend-item"><span class="swatch u-6386bc"></span>Vencida</div>
     </div>
     <div class="ag-layout">
       <div class="card ag-cal-card">
@@ -492,15 +492,15 @@ function openPendenciaQuickCard(id) {
   const descCurta = desc.length > 280 ? desc.slice(0, 280) + '…' : desc;
   openModal(`${num ? num + ' – ' : ''}${escapeHtml(getPendenciaTitulo(p))}`, `
     <div class="ticket-info-grid">
-      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c, 22)}<span>${escapeHtml(p.clientName)}</span></div>` : escapeHtml(p.clientName || '—')}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div class="u-b88d18">${clientAvatar(c, 22)}<span>${escapeHtml(p.clientName)}</span></div>` : escapeHtml(p.clientName || '—')}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Responsável</div><div class="ticket-info-value">${escapeHtml(p.responsible || '—')}</div></div>
-      <div class="ticket-info-item"><div class="ticket-info-label">Prazo</div><div class="ticket-info-value">${p.deadline ? escapeHtml(formatDate(parseDeadline(p.deadline))) : 'Sem prazo'}${ev.overdue ? ' <span style="color:#dc2626;font-weight:600">⚠ Vencida</span>' : ''}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Prazo</div><div class="ticket-info-value">${p.deadline ? escapeHtml(formatDate(parseDeadline(p.deadline))) : 'Sem prazo'}${ev.overdue ? ' <span class="u-687895">⚠ Vencida</span>' : ''}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Status</div><div class="ticket-info-value">${statusTag(p.status)}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Prioridade</div><div class="ticket-info-value">${priorityTag(p.priority)}</div></div>
     </div>
-    ${descCurta ? `<div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Descrição</label><div class="timeline-text">${escapeHtml(descCurta)}</div></div>` : ''}
-    ${typeof timerWidget === 'function' ? `<div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Cronômetro</label><div>${timerWidget(p, 'pendencia')}</div></div>` : ''}
-    <div class="form-group" style="margin-top:var(--space-5)"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    ${descCurta ? `<div class="form-group u-c45c36"><label class="form-label">Descrição</label><div class="timeline-text">${escapeHtml(descCurta)}</div></div>` : ''}
+    ${typeof timerWidget === 'function' ? `<div class="form-group u-c45c36"><label class="form-label">Cronômetro</label><div>${timerWidget(p, 'pendencia')}</div></div>` : ''}
+    <div class="form-group u-c45c36"><div class="u-58703f">
       <button class="btn btn-primary btn-sm" data-action="penQuickOpen" data-arg="${escapeHtml(id)}">Abrir chamado</button>
       <button class="btn btn-secondary btn-sm" data-action="closeModal">Fechar</button>
     </div></div>
@@ -682,7 +682,7 @@ function renderAgendaSide() {
   if (overdue.length) {
     html += '<div class="card ag-card"><h2 class="ag-card-danger">Vencidas <span class="count">— resolver primeiro</span></h2><ul class="plist">' +
       overdue.map(function (o) {
-        return '<li role="button" tabindex="0" data-action="openPendenciaQuickCard" data-arg="' + esc(o.id) + '"><div class="pbar" style="background:#b3122a"></div>' +
+        return '<li role="button" tabindex="0" data-action="openPendenciaQuickCard" data-arg="' + esc(o.id) + '"><div class="pbar u-6386bc"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }
@@ -695,13 +695,13 @@ function renderAgendaSide() {
         return '<li role="button" tabindex="0" data-action="' + fn + '" data-arg="' + esc(o.id) + '"><div class="pbar" style="background:' + o.dot + '"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul>'
-      : '<div class="empty-state" style="padding:12px 4px 4px"><p>Nada nos próximos 7 dias 🎉</p></div>') +
+      : '<div class="empty-state u-a95dc7"><p>Nada nos próximos 7 dias 🎉</p></div>') +
     '</div>';
   var rec = agRecurringGroups(visits, monthKey);
   if (rec.length) {
     html += '<div class="card ag-card"><h2>Visitas recorrentes</h2><ul class="plist">' +
       rec.map(function (g) {
-        return '<li role="button" tabindex="0" data-action="openVisitDetail" data-arg="' + esc(g.visitId) + '"><div class="pbar" style="background:#0ea5e9"></div>' +
+        return '<li role="button" tabindex="0" data-action="openVisitDetail" data-arg="' + esc(g.visitId) + '"><div class="pbar u-f7eaa9"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(g.clientName) + '</div><div class="tmeta">' + esc(g.meta) + '</div></div></li>';
       }).join('') + '</ul></div>';
   }

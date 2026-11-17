@@ -116,7 +116,7 @@ function openVisitFiltersSheet() {
         <option value="">Todos os operadores</option>
         ${opNames.map(n => `<option ${_visitFilter.operator === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
       </select></div>
-    <div class="grid-2" style="grid-template-columns:1fr 1fr">
+    <div class="grid-2 u-33e95e">
       <div class="form-group"><label class="form-label" for="fVisitFrom">De</label>
         <input type="date" class="form-input" id="fVisitFrom" value="${escapeHtml(_visitFilter.from)}" /></div>
       <div class="form-group"><label class="form-label" for="fVisitTo">Até</label>
@@ -243,7 +243,7 @@ function visitCardHtml(v) {
   const avName = v.clientName || '—';
   const avatar = c
     ? clientAvatar(c, 32)
-    : '<span class="vis-av" style="--c:#555">' + escapeHtml(visitInitials(avName)) + '</span>';
+    : '<span class="vis-av u-76591b">' + escapeHtml(visitInitials(avName)) + '</span>';
   const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : formatVisitTimeRange(v);
   return '<button type="button" class="vis-card" style="--st:' + m.color + '" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">'
     + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
@@ -334,7 +334,7 @@ function renderVisitTable(area) {
   + (totalPages > 1 ? `
     <div class="vis-pager">
       <div>Mostrando ${startIdx+1}–${Math.min(startIdx+VISIT_PAGE_SIZE, visits.length)} de ${visits.length}</div>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div class="u-25b528">
         <button class="btn btn-sm btn-secondary" ${_visitPage===1?'disabled':''} data-action="visitPrevPage">← Anterior</button>
         <span>${_visitPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_visitPage===totalPages?'disabled':''} data-action="visitNextPage">Próxima →</button>
@@ -374,9 +374,9 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
       <div class="form-row">
         <div class="form-group"><label class="form-label">Data *</label>
           <input type="date" class="form-input" name="date" value="${escapeHtml(v.date || preDate || localDateISO())}" required /></div>
-        <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--bg-base)">
-            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} data-change="toggleVisitAllDayFields" style="width:16px;height:16px;accent-color:var(--accent)" />
+        <div class="form-group u-203914">
+          <label class="u-ead5fa">
+            <input type="checkbox" id="visitAllDay" name="allDay" ${allDay ? 'checked' : ''} data-change="toggleVisitAllDayFields" class="u-9cf325" />
             Dia inteiro
           </label>
         </div>
@@ -393,15 +393,15 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
         <textarea class="form-textarea" name="observacoes" rows="2" placeholder="Orientações prévias, localização, contato local...">${escapeHtml(v.observacoes || '')}</textarea></div>
       ${typeof levarFormHtml === 'function' ? levarFormHtml(v) : ''}
 
-      <div class="form-group" style="margin-top:var(--space-5);padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
-        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);font-weight:700">
+      <div class="form-group u-64a97f">
+        <label class="form-label u-1d8672">
           <span>Relatório de Atendimento (O que foi feito na visita)</span>
-          <span style="font-size:11px;font-weight:400;color:var(--text-muted)">Preenchimento após/durante a visita</span>
+          <span class="u-d80dec">Preenchimento após/durante a visita</span>
         </label>
         <textarea class="form-textarea" name="relatorio" rows="4" placeholder="Descreva em detalhes o serviço realizado, equipamentos testados, soluções aplicadas ou observações de conclusão...">${escapeHtml(v.relatorio || '')}</textarea>
       </div>
 
-      <div class="form-row" style="margin-top:var(--space-5)">
+      <div class="form-row u-c45c36">
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" name="status">
             ${Object.entries(VISIT_STATUS_MAP).map(([k,m]) => `<option value="${k}" ${(v.status||'agendada')===k?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
@@ -512,7 +512,7 @@ function openVisitDetail(id) {
 
   openModal(escapeHtml(visitDisplayTitle(v)), `
     <div class="ticket-info-grid">
-      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div style="display:flex;align-items:center;gap:6px">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
+      <div class="ticket-info-item"><div class="ticket-info-label">Cliente</div><div class="ticket-info-value">${c ? `<div class="u-b88d18">${clientAvatar(c,22)}<span>${escapeHtml(v.clientName)}</span></div>` : escapeHtml(v.clientName)||'—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Operador</div><div class="ticket-info-value">${escapeHtml(v.operator)||'—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Data</div><div class="ticket-info-value">${v.date ? formatDate(v.date) : '—'}</div></div>
       <div class="ticket-info-item"><div class="ticket-info-label">Horário</div><div class="ticket-info-value">${escapeHtml(formatVisitTimeRange(v))}</div></div>
@@ -553,9 +553,9 @@ function openVisitDetail(id) {
     ${v.observacoes ? `<div class="form-group"><label class="form-label">Observações prévias</label><div class="timeline-text">${escapeHtml(v.observacoes)}</div></div>` : ''}
     ${typeof levarDetalheHtml === 'function' ? levarDetalheHtml(v) : ''}
 
-    <div class="form-group" style="margin-top:var(--space-5)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <label class="form-label" style="margin:0;font-weight:700;display:flex;align-items:center;gap:6px;font-size:13px;color:#16a34a">
+    <div class="form-group u-c45c36">
+      <div class="u-3daa03">
+        <label class="form-label u-381792">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Relatório de Atendimento (O que foi feito)
         </label>
@@ -566,7 +566,7 @@ function openVisitDetail(id) {
       <div class="timeline-text" style="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
         ${hasReport
           ? escapeHtml(v.relatorio).replace(/\n/g, '<br>')
-          : '<em style="color:var(--text-muted)">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'}
+          : '<em class="u-5872de">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'}
       </div>
     </div>
 
@@ -576,16 +576,16 @@ function openVisitDetail(id) {
 
     ${(() => {
       const linked = typeof getPendencias === 'function' ? getPendencias().filter(p => p.visitId === v.id) : [];
-      if (!linked.length) return `<div style="margin-top:var(--space-5);padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:12px;color:var(--text-muted)">Nenhuma pendência vinculada a esta visita.</div>`;
-      return `<div style="margin-top:var(--space-5)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Pendências geradas desta visita (${linked.length})</div><div style="display:flex;flex-direction:column;gap:6px">${linked.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)"><div><div style="font-size:13px;font-weight:500">${escapeHtml(getPendenciaTitulo(p))}</div><div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" data-action="openPendenciaFromVisit" data-arg="${escapeHtml(p.id)}">Abrir</button></div>`).join('')}</div></div>`;
+      if (!linked.length) return `<div class="u-509c2d">Nenhuma pendência vinculada a esta visita.</div>`;
+      return `<div class="u-c45c36"><div class="u-da812b">Pendências geradas desta visita (${linked.length})</div><div class="u-14b4b5">${linked.map(p => `<div class="u-d3f3d1"><div><div class="u-c4f362">${escapeHtml(getPendenciaTitulo(p))}</div><div class="u-749148">${escapeHtml(p.responsible||'—')} · ${statusTag(p.status)}</div></div><button class="btn btn-sm btn-secondary" data-action="openPendenciaFromVisit" data-arg="${escapeHtml(p.id)}">Abrir</button></div>`).join('')}</div></div>`;
     })()}
-    <div class="form-group" style="margin-top:var(--space-5)"><label class="form-label">Alterar status</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="chgVisitStatus" style="width:180px">
+    <div class="form-group u-c45c36"><label class="form-label">Alterar status</label>
+      <div class="u-58703f">
+        <select class="form-select u-54f91a" id="chgVisitStatus">
           ${Object.entries(VISIT_STATUS_MAP).map(([k,mm]) => `<option value="${k}" ${v.status===k?'selected':''}>${escapeHtml(mm.label)}</option>`).join('')}
         </select>
         <button class="btn btn-primary btn-sm" data-action="changeVisitStatus" data-arg="${escapeHtml(id)}">Atualizar Status</button>
-        ${v.status !== 'concluida' ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" data-action="openConcludeVisitModal" data-arg="${escapeHtml(id)}">✅ Concluir com Relatório</button>` : ''}
+        ${v.status !== 'concluida' ? `<button class="btn btn-sm u-0968f6" data-action="openConcludeVisitModal" data-arg="${escapeHtml(id)}">✅ Concluir com Relatório</button>` : ''}
 ${typeof printVisitReport === 'function' ? `<button type="button" class="btn btn-secondary btn-sm" data-action="visitPrint" data-arg="${escapeHtml(id)}" title="Relatório da visita com a assinatura (imprimir ou salvar em PDF)">🖨 Relatório</button>` : ''}
                 <button class="btn btn-secondary btn-sm" data-action="visitEditAll" data-arg="${escapeHtml(id)}">✎ Editar Tudo</button>
         <button class="btn btn-sm btn-danger" data-action="visitDeleteFromDetail" data-arg="${escapeHtml(id)}" title="Excluir visita">Excluir</button>
@@ -630,12 +630,12 @@ function openConcludeVisitModal(id) {
 
   openModal('Concluir Visita — Relatório de Atendimento', `
     <form data-submit="submitConcludeVisit" data-arg="${escapeHtml(id)}">
-      <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;font-size:13px;border-left:3px solid #16a34a">
+      <div class="u-2e0f03">
         <strong>Cliente:</strong> ${escapeHtml(v.clientName||'—')}<br>
         <strong>Motivo:</strong> ${escapeHtml(v.motivo||'—')}
       </div>
       <div class="form-group">
-        <label class="form-label" style="font-weight:700;color:#16a34a">
+        <label class="form-label u-f40695">
           O que foi feito no atendimento? *
         </label>
         <textarea class="form-textarea" id="concludeRelatorio" name="relatorio" rows="5" placeholder="Descreva os serviços executados, soluções aplicadas, testes realizados, peças trocadas..." required>${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('concludeRelatorio', v.id) : ''}
@@ -645,14 +645,14 @@ function openConcludeVisitModal(id) {
         ${signaturePadHtml('concludeSig', v.assinaturaNome || '')}
       </div>` : ''}
       <div class="form-group">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)">
-          <input type="checkbox" id="concludeCreatePendencia" style="width:16px;height:16px;accent-color:var(--accent)" />
+        <label class="u-3bd1f7">
+          <input type="checkbox" id="concludeCreatePendencia" class="u-9cf325" />
           Criar pendência de acompanhamento vinculada a esta visita
         </label>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" data-action="openVisit" data-arg="${escapeHtml(id)}">Voltar</button>
-        <button type="submit" class="btn" style="background:#16a34a;color:#fff;border:none">
+        <button type="submit" class="btn u-0968f6">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Salvar Relatório e Concluir Visita
         </button>
@@ -725,7 +725,7 @@ function openEditVisitReportModal(id) {
   openModal('Relatório de Atendimento', `
     <form data-submit="submitEditVisitReport" data-arg="${escapeHtml(id)}">
       <div class="form-group">
-        <label class="form-label" style="font-weight:700">Relatório (O que foi feito na visita)</label>
+        <label class="form-label u-e3ec02">Relatório (O que foi feito na visita)</label>
         <textarea class="form-textarea" id="editVisitReportText" name="relatorio" rows="6" placeholder="Descreva em detalhes as atividades realizadas...">${escapeHtml(v.relatorio || '')}</textarea>${typeof iaReportButtonHtml === 'function' ? iaReportButtonHtml('editVisitReportText', id) : ''}
       </div>
       <div class="form-actions">
@@ -776,7 +776,7 @@ function openVisitMonthReportModal() {
   const def = window._visitReportDefaultMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   openModal('Relatório mensal de visitas', `
     <form data-submit="visitMonthReportNoop">
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.5">
+      <p class="u-25b390">
         Exporta o relatório do mês com <strong>capa</strong>, <strong>resumo por cliente</strong>, <strong>resumo por técnico</strong> e <strong>detalhe das visitas</strong>
         (horários previstos e reais de chegada/saída, observações, chamado, assinatura do cliente e o que foi feito em cada atendimento).
         O Excel sai formatado (pronto para enviar). O CSV serve para importar no Google Sheets.
@@ -786,16 +786,16 @@ function openVisitMonthReportModal() {
         <input type="month" class="form-input" name="month" id="visitReportMonth" value="${escapeHtml(def)}" required />
       </div>
       <div class="btn-pair-grid">
-        <button type="button" class="btn btn-primary" data-action="exportVisitMonthReport" data-arg="excel" style="justify-content:center">
+        <button type="button" class="btn btn-primary u-03c4bb" data-action="exportVisitMonthReport" data-arg="excel">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
           Excel (.xls)
         </button>
-        <button type="button" class="btn btn-secondary" data-action="exportVisitMonthReport" data-arg="csv" style="justify-content:center">
+        <button type="button" class="btn btn-secondary u-03c4bb" data-action="exportVisitMonthReport" data-arg="csv">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           CSV (Sheets)
         </button>
       </div>
-      <div class="form-actions" style="margin-top:14px">
+      <div class="form-actions u-d6f2af">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Fechar</button>
       </div>
     </form>`);
