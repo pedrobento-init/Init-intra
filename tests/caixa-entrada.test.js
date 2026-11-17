@@ -821,4 +821,108 @@ describe('portal de conversas', () => {
       '<img'
     );
   });
+
+  // O tipo vem de fora. SVG em data: URL carrega script; HTML idem. Fora da
+  // lista, o anexo vira download binário e nunca é exibido.
+  it('mídia fora da lista branca vira download binário', () => {
+    const svg = s._caixaMediaHTML({ nome: 'x.svg', tipo: 'image/svg+xml', dados: 'AAAA' });
+    expect(svg).not.toContain('<img');
+    expect(svg).toContain('data:application/octet-stream;base64,AAAA');
+    const html = s._caixaMediaHTML({ nome: 'x.html', tipo: 'text/html', dados: 'AAAA' });
+    expect(html).toContain('data:application/octet-stream;base64,');
+  });
+
+  it('áudio do WhatsApp com codecs no tipo continua tocando', () => {
+    const h = s._caixaMediaHTML({ nome: 'voz', tipo: 'audio/ogg; codecs=opus', dados: 'AAAA' });
+    expect(h).toContain('<audio');
+    expect(h).toContain('data:audio/ogg;base64,AAAA');
+  });
+
+  it('tipo com parâmetro malicioso não entra na data: URL', () => {
+    const h = s._caixaMediaHTML({ nome: 'f', tipo: 'image/png;x=",text/html', dados: 'AAAA' });
+    expect(h).toContain('data:image/png;base64,AAAA');
+    expect(h).not.toContain('text/html');
+  });
+});
+
+describe('caixaEncerrar', () => {
+  // Encerrar sobrescrevia tudo com 'encerrado': a mensagem que virou chamado e
+  // a descartada perdiam o registro do que foi decidido sobre elas.
+  it('preserva virou_chamado e descartado das mensagens anteriores', () => {
+    lista = [
+      entrada({ id: 'A', threadId: 't1', status: 'virou_chamado', pendenciaId: 'PEN-1' }),
+      entrada({
+        id: 'B',
+        threadId: 't1',
+        status: 'descartado',
+        recebidoEm: '2026-10-26T13:00:00Z',
+      }),
+      entrada({ id: 'C', threadId: 't1', status: 'pendente', recebidoEm: '2026-10-26T14:00:00Z' }),
+    ];
+    s.caixaEncerrar('t1');
+    const por = Object.fromEntries(lista.map((m) => [m.id, m.status]));
+    expect(por).toEqual({ A: 'virou_chamado', B: 'descartado', C: 'encerrado' });
+  });
+
+  it('a conversa sai como encerrada mesmo se a última do cliente virou chamado', () => {
+    lista = [entrada({ id: 'A', threadId: 't1', status: 'virou_chamado', pendenciaId: 'PEN-1' })];
+    s.caixaEncerrar('t1');
+    const [c] = s.caixaAgruparConversas(lista);
+    expect(c.encerrada).toBe(true);
+    expect(c.pendenciaId).toBe('PEN-1');
+  });
+});
+
+describe('caixaEnviarMensagem', () => {
+  function formulario(kind) {
+    const dados = { text: 'Já resolvemos', kind, file: null };
+    s.FormData = class {
+      constructor(f) {
+        this.f = f;
+      }
+      get(k) {
+        return this.f.dados[k];
+      }
+    };
+    return { dados, reset() {}, querySelector: () => null };
+  }
+
+  function falhaComCodigo(code, error) {
+    s.supabaseClient.functions = {
+      invoke: async () => ({
+        data: null,
+        error: {
+          message: 'Edge Function returned a non-2xx status code',
+          context: { json: async () => ({ error, code }) },
+        },
+      }),
+    };
+  }
+
+  // A function devolve 500 depois de o WhatsApp/Gmail já ter entregue. Com o
+  // erro genérico o operador reenviava e o cliente recebia duas vezes.
+  it('history_write na resposta avisa que já foi enviada e não pede reenvio', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    falhaComCodigo('history_write', 'Enviado, mas não foi possível salvar no histórico');
+    await s.caixaEnviarMensagem('t1', formulario('reply'));
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0][1]).toBe('warning');
+    expect(toasts[0][0]).toMatch(/enviada ao cliente.*Não reenvie/);
+  });
+
+  it('history_write na nota interna é erro: nada saiu para o cliente', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    falhaComCodigo('history_write', 'Não foi possível salvar a nota');
+    await s.caixaEnviarMensagem('t1', formulario('internal'));
+    expect(toasts).toEqual([
+      ['Não foi possível concluir: Não foi possível salvar a nota', 'error'],
+    ]);
+  });
+
+  it('erro da function mostra a mensagem do corpo, não o status genérico', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    falhaComCodigo('thread_not_found', 'Conversa não encontrada');
+    await s.caixaEnviarMensagem('t1', formulario('reply'));
+    expect(toasts[0]).toEqual(['Não foi possível concluir: Conversa não encontrada', 'error']);
+  });
 });

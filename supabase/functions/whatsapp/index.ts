@@ -142,11 +142,22 @@ async function anexarNota(db: SupabaseClient, aberto: Aberto, nota: unknown): Pr
 // mensagem: o limite protege a fila, não é controle de acesso.
 async function recentesDoNumero(db: SupabaseClient, telefone: string): Promise<number> {
   const desde = new Date(Date.now() - 60_000).toISOString();
-  const { count, error } = await db
-    .from('emails_triagem')
-    .select('id', { count: 'exact', head: true })
-    .eq('telefone', telefone)
-    .gte('recebido_em', desde);
+  const contar = (soEntrada: boolean) => {
+    let q = db
+      .from('emails_triagem')
+      .select('id', { count: 'exact', head: true })
+      .eq('telefone', telefone);
+    // Só o que o número mandou: resposta nossa e nota interna gravam o mesmo
+    // telefone, e um operador respondendo rápido derrubava a mensagem seguinte
+    // do cliente como se fosse rajada.
+    if (soEntrada) q = q.eq('direcao', 'entrada');
+    return q.gte('recebido_em', desde);
+  };
+  let { count, error } = await contar(true);
+  // Banco sem a 082 não tem `direcao`: o erro seria permanente e desligaria o
+  // limite. Sem a coluna também não há resposta pelo portal, então contar tudo
+  // dá o mesmo número.
+  if (error && colunaDoPortalAusente(error)) ({ count, error } = await contar(false));
   if (error) {
     console.error('whatsapp limite:', error.message);
     return 0;

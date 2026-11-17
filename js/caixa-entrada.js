@@ -756,10 +756,34 @@ function _caixaConversaHTML(c) {
   );
 }
 
+// Só estes tipos viram <img>/<audio>; o resto é baixado como binário. O tipo
+// vem do remetente (WAHA ou anexo do operador): SVG e HTML embutidos em
+// data: URL abririam conteúdo ativo se o navegador deixasse navegar até eles.
+const CAIXA_MIDIA_IMAGEM = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const CAIXA_MIDIA_AUDIO = [
+  'audio/ogg',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/aac',
+  'audio/webm',
+  'audio/wav',
+  'audio/amr',
+];
+
+function _caixaMidiaTipo(bruto) {
+  // WhatsApp manda 'audio/ogg; codecs=opus': o que importa é o tipo base.
+  const base = String(bruto || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
+  if (CAIXA_MIDIA_IMAGEM.includes(base) || CAIXA_MIDIA_AUDIO.includes(base)) return base;
+  return 'application/octet-stream';
+}
+
 function _caixaMediaHTML(media) {
   if (!media || typeof media !== 'object') return '';
   const nome = String(media.nome || media.filename || 'Anexo');
-  const tipo = String(media.tipo || media.mimetype || 'application/octet-stream');
+  const tipo = _caixaMidiaTipo(media.tipo || media.mimetype);
   const url = media.dados
     ? 'data:' + tipo + ';base64,' + String(media.dados).replace(/[^A-Za-z0-9+/=]/g, '')
     : String(media.url || '');
@@ -1170,8 +1194,35 @@ async function caixaEnviarMensagem(id, form) {
         file,
       },
     });
-    if (res.error) throw res.error;
-    if (res.data && res.data.error) throw new Error(res.data.error);
+    let codigo = '';
+    let msg = (res.data && res.data.error) || '';
+    if (res.error) {
+      // Status não-2xx chega como FunctionsHttpError com o corpo ainda no
+      // Response: sem lê-lo, o operador só via "non-2xx status code".
+      try {
+        const ctx = res.error.context;
+        if (ctx && typeof ctx.json === 'function') {
+          const corpo = (await ctx.json()) || {};
+          codigo = corpo.code || '';
+          msg = corpo.error || msg;
+        }
+      } catch (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'conversa-responder');
+      }
+      // A resposta já chegou ao cliente; só o histórico falhou. Tratar como erro
+      // comum levava o operador a reenviar e o cliente recebia duas vezes.
+      if (codigo === 'history_write' && fd.get('kind') !== 'internal') {
+        form.reset();
+        _caixaRascunho = { id: null, texto: '', kind: 'reply' };
+        showToast(
+          'Resposta enviada ao cliente, mas não ficou no histórico. Não reenvie.',
+          'warning'
+        );
+        return;
+      }
+      throw new Error(msg || res.error.message || 'erro de conexão');
+    }
+    if (msg) throw new Error(msg);
     form.reset();
     _caixaRascunho = { id: null, texto: '', kind: 'reply' };
     if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
@@ -1191,10 +1242,18 @@ async function caixaEnviarMensagem(id, form) {
   }
 }
 
+// Encerrar mexe só no que está em aberto. 'virou_chamado' e 'descartado' são
+// decisões já tomadas sobre aquela mensagem e somem do histórico se
+// sobrescritas. A última mensagem do cliente é exceção: é ela que diz se a
+// conversa está encerrada (caixaAgruparConversas), então sempre leva o status.
 function caixaEncerrar(id) {
   const c = _caixaConversaPorId(id);
   if (!c) return;
-  _caixaSalvarConversa(c, { status: 'encerrado' });
+  const ultima = c.ultimaEntrada;
+  c.mensagens.forEach((m) => {
+    const aberta = m.status === 'pendente' || m.status === 'anexado';
+    if (aberta || m === ultima) _emailTriagemSalvar(m.id, { status: 'encerrado' });
+  });
   _emailTriagemRedesenhar();
   showToast('Conversa encerrada. Uma nova mensagem do cliente reabre o atendimento.', 'success');
 }
