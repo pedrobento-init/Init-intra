@@ -205,7 +205,7 @@ function renderVisitStats() {
 
 function visitStatusTag(st) {
   const m = VISIT_STATUS_MAP[st] || { label: st || '—', color: '#94a3b8' };
-  return `<span class="tag" style="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40;font-weight:600">${escapeHtml(m.label)}</span>`;
+  return `<span class="tag" data-sty="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40;font-weight:600">${escapeHtml(m.label)}</span>`;
 }
 
 // ── Número amigável ("Visita #0001") ─────────────────────────────────────
@@ -245,9 +245,9 @@ function visitCardHtml(v) {
     ? clientAvatar(c, 32)
     : '<span class="vis-av u-76591b">' + escapeHtml(visitInitials(avName)) + '</span>';
   const timeLabel = (v.allDay || !v.time) ? 'Dia inteiro' : formatVisitTimeRange(v);
-  return '<button type="button" class="vis-card" style="--st:' + m.color + '" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">'
+  return '<button type="button" class="vis-card" data-sty="--st:' + m.color + '" data-action="openVisit" data-arg="' + escapeHtml(v.id) + '">'
     + '<div class="vis-row"><div class="vis-date">' + escapeHtml(v.date ? formatDate(v.date) : '—') + '<small>' + escapeHtml(formatVisitNumero(v)) + '</small></div>'
-    + '<span class="vis-st" style="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
+    + '<span class="vis-st" data-sty="--st:' + m.color + '">' + escapeHtml(m.label) + '</span></div>'
     + '<div class="vis-cli">' + avatar + '<span>' + escapeHtml(avName) + '</span>'
     + (typeof milvusStatusChipHtml === 'function' ? milvusStatusChipHtml(v) : '') + '</div>'
     + (v.motivo ? '<div class="vis-why">' + escapeHtml(v.motivo) + '</div>' : '')
@@ -381,7 +381,7 @@ function openVisitForm(id = null, preClientId = null, preDate = null, preTime = 
           </label>
         </div>
       </div>
-      <div class="form-row" id="visitTimeFields" style="${allDay ? 'opacity:.45;pointer-events:none' : ''}">
+      <div class="form-row" id="visitTimeFields" data-sty="${allDay ? 'opacity:.45;pointer-events:none' : ''}">
         <div class="form-group"><label class="form-label">Horário de início</label>
           <input type="time" class="form-input" id="visitTimeStart" name="time" value="${escapeHtml(timeStart)}" ${allDay ? 'disabled' : ''} /></div>
         <div class="form-group"><label class="form-label">Horário de fim</label>
@@ -563,7 +563,7 @@ function openVisitDetail(id) {
           ${hasReport ? '✎ Editar Relatório' : '+ Adicionar Relatório'}
         </button>
       </div>
-      <div class="timeline-text" style="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
+      <div class="timeline-text" data-sty="background:var(--bg-secondary);padding:12px 14px;border-radius:8px;border-left:4px solid ${hasReport ? '#16a34a' : '#f59e0b'};line-height:1.6;font-size:13px">
         ${hasReport
           ? escapeHtml(v.relatorio).replace(/\n/g, '<br>')
           : '<em class="u-5872de">Nenhum relatório preenchido ainda. Registre o serviço realizado para concluir o histórico de atendimento.</em>'}

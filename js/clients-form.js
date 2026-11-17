@@ -21,7 +21,7 @@ function openClientForm(id = null) {
           <div class="u-97445a">
             <div class="form-group u-fdf33f"><label class="form-label">Cor do avatar</label>
               <div class="u-6157e8" id="colorPicker">
-                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" data-action="selectColor" data-arg="${col}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
+                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" data-action="selectColor" data-arg="${col}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
               </div>
             </div>
           <div class="form-row">
@@ -34,11 +34,11 @@ function openClientForm(id = null) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Enviar Imagem
               </button>
-              <button type="button" class="logo-crop-btn" id="cropBtn" data-action="openCropModal" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-crop-btn" id="cropBtn" data-action="openCropModal" data-sty="display:${c.logo?'inline-flex':'none'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"/><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"/></svg>
                 Recortar
               </button>
-              <button type="button" class="logo-remove-btn" id="removeLogoBtn" data-action="removeClientLogo" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-remove-btn" id="removeLogoBtn" data-action="removeClientLogo" data-sty="display:${c.logo?'inline-flex':'none'}">
                 ✕
               </button>
             </div>
@@ -1006,7 +1006,7 @@ function renderImportPreview() {
       <tbody>
         ${previewRows.map((row, ri) => `<tr class="u-100841">
           <td class="u-5e1ed2">${ri + 1}</td>
-          ${row.map((c, ci) => `<td style="padding:4px 8px;${ci >= colCount ? 'display:none' : ''}">${escapeHtml(c)}</td>`).join('')}
+          ${row.map((c, ci) => `<td data-sty="padding:4px 8px;${ci >= colCount ? 'display:none' : ''}">${escapeHtml(c)}</td>`).join('')}
           ${Array(Math.max(0, colCount - row.length)).fill('<td class="u-128af4">—</td>').join('')}
         </tr>`).join('')}
         ${validRows.length > 8 ? `<tr><td colspan="${colCount + 1}" class="u-f21811">...e mais ${plural(validRows.length - 8, 'linha', 'linhas')}</td></tr>` : ''}

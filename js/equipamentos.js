@@ -430,7 +430,7 @@ function renderEquipStats() {
 function equipStatusTag(status) {
   const m = getEquipStatusMeta(status);
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${esc(m.label)}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" data-sty="background:${m.dot}"></span>${esc(m.label)}</span>`;
 }
 
 function equipClientCell(e) {
@@ -443,7 +443,7 @@ function equipClientCell(e) {
     const c = (typeof getClientById === 'function') ? getClientById(e.clientId) : null;
     if (c && c.color) color = c.color;
   } catch (_) {}
-  return `<span class="client-tag"><span class="client-dot" style="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
+  return `<span class="client-tag"><span class="client-dot" data-sty="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
 }
 
 function equipOSCell(e) {

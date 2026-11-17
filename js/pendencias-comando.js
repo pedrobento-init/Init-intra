@@ -43,7 +43,7 @@ function cmdRefreshAttCount(penId) {
     var c = document.getElementById('penAttCounter');
     if (c) {
       c.textContent = list.length ? String(list.length) : '';
-      c.style.display = list.length ? '' : 'none';
+      c.classList.toggle('u-6b99de', !list.length);
     }
   } catch (_) {}
 }

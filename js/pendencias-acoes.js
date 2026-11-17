@@ -44,7 +44,7 @@ function openPenQuickMenu(btn, id) {
     '<div class="pqm-label">Mover para</div>' +
     m.statuses.map(function(s) {
       return '<button type="button" role="menuitem" data-action="penQuickMoveTo" data-arg="' + sid + '" data-status="' + escapeHtml(s.id) + '">' +
-        '<span class="pqm-dot" style="--c:' + penColColor(s.id) + '"></span>' + escapeHtml(s.label) + '</button>';
+        '<span class="pqm-dot" data-sty="--c:' + penColColor(s.id) + '"></span>' + escapeHtml(s.label) + '</button>';
     }).join('') +
     '<div class="pqm-label">Atribuir a</div>' +
     '<div class="pqm-scroll">' +

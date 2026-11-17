@@ -44,7 +44,7 @@ function _agEsc(s) {
 }
 // Chip de evento da grade (mock Agenda): ponto + título; vencida ganha selo.
 function agChipHtml(kind, title, dot, overdue) {
-  return '<div class="ag-chip' + (overdue ? ' overdue' : '') + '" style="--dot:' + dot + '"><span>' + _agEsc(title) + '</span></div>';
+  return '<div class="ag-chip' + (overdue ? ' overdue' : '') + '" data-sty="--dot:' + dot + '"><span>' + _agEsc(title) + '</span></div>';
 }
 
 // ── Agenda: view-models puros da sidebar (testáveis, sem DOM/storage) ───────
@@ -692,7 +692,7 @@ function renderAgendaSide() {
       ? '<ul class="plist">' + next7.map(function (o) {
         var fn = o.kind === 'visit' ? 'openVisitDetail' : 'openPendenciaQuickCard';
         var badge = o.kind === 'visit' ? '' : _agPriBadge(o.priority);
-        return '<li role="button" tabindex="0" data-action="' + fn + '" data-arg="' + esc(o.id) + '"><div class="pbar" style="background:' + o.dot + '"></div>' +
+        return '<li role="button" tabindex="0" data-action="' + fn + '" data-arg="' + esc(o.id) + '"><div class="pbar" data-sty="background:' + o.dot + '"></div>' +
           '<div class="ptext"><div class="ttitle">' + esc(o.title) + badge + '</div><div class="tmeta">' + esc(o.meta) + '</div></div></li>';
       }).join('') + '</ul>'
       : '<div class="empty-state u-a95dc7"><p>Nada nos próximos 7 dias 🎉</p></div>') +

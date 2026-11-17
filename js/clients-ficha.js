@@ -648,7 +648,7 @@ function cfHealthHtml(clientId, c) {
   const { filled, total } = cfProgress(c);
   const pct = total ? Math.round((filled / total) * 100) : 0;
   return `
-    <div class="cf-health" data-level="${escapeHtml(level)}" style="--cf-h:${escapeHtml(color)}">
+    <div class="cf-health" data-level="${escapeHtml(level)}" data-sty="--cf-h:${escapeHtml(color)}">
       <span class="cf-health-dot" aria-hidden="true"></span>
       <div class="cf-health-main">
         <span class="cf-health-status">${escapeHtml(emoji)} ${escapeHtml(label)}</span>
@@ -657,7 +657,7 @@ function cfHealthHtml(clientId, c) {
       </div>
       <div class="cf-progress">
         <div class="cf-progress-top"><span>Ficha preenchida</span><b id="cfPct">${pct}%</b></div>
-        <div class="cf-track"><i id="cfFill" style="width:${pct}%"></i></div>
+        <div class="cf-track"><i id="cfFill" data-sty="width:${pct}%"></i></div>
       </div>
     </div>${typeof saudeMotivosHtml === 'function' ? saudeMotivosHtml(health) : ''}`;
 }

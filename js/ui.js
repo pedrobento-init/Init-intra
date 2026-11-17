@@ -459,11 +459,11 @@ function isStalePendencia(p, days = 7) {
 
 function priorityTag(p) {
   const m = PRIORITY_MAP[p] || { label: p, cls: 'tag-gray', dot: '#94a3b8' };
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" data-sty="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
 }
 function statusTag(s) {
   const m = STATUS_PEN_MAP[s] || { label: s, cls: 'tag-gray', dot: '#94a3b8' };
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" data-sty="background:${m.dot}"></span>${escapeHtml(m.label)}</span>`;
 }
 
 // ── Cor canônica por status (fonte única p/ badges) ─────────────────────────
@@ -518,10 +518,10 @@ function clientAvatar(c, size = 40) {
   const shape = c.logoShape || 'circle';
   const shapeClass = shape === 'square' ? 'client-logo-square' : 'client-logo-circle';
   if (c.logo) {
-    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" style="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
+    return `<img src="${escapeHtml(_safeLogoUrl(c.logo))}" class="${shapeClass}" data-sty="width:${size}px;height:${size}px" alt="${escapeHtml(c.name||'')}" />`;
   }
   const borderRadius = shape === 'square' ? '6px' : '50%';
-  return `<div style="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${c.color||'#1a56db'};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
+  return `<div data-sty="width:${size}px;height:${size}px;border-radius:${borderRadius};background:${escapeHtml(c.color||'#1a56db')};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.35)}px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(c.initials||c.name?.substring(0,2).toUpperCase()||'?')}</div>`;
 }
 
 // Sidebar toggle + auto-colapso responsivo (desktop/notebook/split-screen)

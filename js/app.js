@@ -209,7 +209,7 @@ function _dashDeltaBadge(delta) {
   }
   const color = delta.improved ? '#16a34a' : '#dc2626';
   const arrow = delta.direction === 'up' ? '↑' : '↓';
-  return `<span class="dash-delta" style="color:${color}" title="${delta.improved ? 'Melhora' : 'Piora'} vs. período anterior">${arrow}${delta.pct}%</span>`;
+  return `<span class="dash-delta" data-sty="color:${color}" title="${delta.improved ? 'Melhora' : 'Piora'} vs. período anterior">${arrow}${delta.pct}%</span>`;
 }
 // Faixa anterior espelhando getDashDateRange (reaproveita metrics.js quando disponível).
 function _getPreviousDashRange() {
@@ -810,7 +810,7 @@ function renderDashboard() {
         <button type="button" class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" aria-pressed="${_dashPeriod==='month'}" data-action="setDashPeriod" data-arg="month">Mês</button>
         <button type="button" class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" aria-pressed="${_dashPeriod==='quarter'}" data-action="setDashPeriod" data-arg="quarter">Trimestre</button>
         <button type="button" class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" aria-pressed="${_dashPeriod==='custom'}" data-action="setDashPeriod" data-arg="custom">Personalizado</button>
-        <div id="customDateRange" class="custom-date-range ov-custom" style="display:${_dashPeriod==='custom'?'flex':'none'}">
+        <div id="customDateRange" class="custom-date-range ov-custom" data-sty="display:${_dashPeriod==='custom'?'flex':'none'}">
           <input type="date" id="dashCustomStart" value="${_dashCustomStart}" data-change="setDashCustomDates" class="date-input" aria-label="Data inicial" />
           <span class="ov-until">até</span>
           <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" data-change="setDashCustomDates" class="date-input" aria-label="Data final" />
@@ -935,8 +935,8 @@ function renderDashboard() {
                 </div>
                 <div class="ov-when">
                   <small>${(typeof formatVisitNumero === 'function') ? escapeHtml(formatVisitNumero(v)) : ''}</small>
-                  <span><b style="${isToday?'color:var(--ov-cyan)':''}">${formatDate(v.date)}</b>${(v.allDay || v.time || v.timeEnd) ? ' <small>' + escapeHtml(formatVisitTimeRange(v)) + '</small>' : ''}</span>
-                  <span class="ov-pill" style="--c:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'}">${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?escapeHtml(VISIT_STATUS_MAP[v.status].label):escapeHtml(v.status||'—')}</span>
+                  <span><b data-sty="${isToday?'color:var(--ov-cyan)':''}">${formatDate(v.date)}</b>${(v.allDay || v.time || v.timeEnd) ? ' <small>' + escapeHtml(formatVisitTimeRange(v)) + '</small>' : ''}</span>
+                  <span class="ov-pill" data-sty="--c:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'}">${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?escapeHtml(VISIT_STATUS_MAP[v.status].label):escapeHtml(v.status||'—')}</span>
                 </div>
               </li>`;
             }).join('')}
@@ -1001,7 +1001,7 @@ function renderDashboard() {
           return `
           <div class="ov-row" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(r.clientId)}">
             <div class="ov-client"><div class="ov-name">${escapeHtml(r.clientName)}</div><div class="ov-st ov-${_lvl}">${escapeHtml(_lbl)}</div></div>
-            <div class="ov-track ov-${_lvl}" aria-hidden="true"><i style="width:${_pct}%"></i></div>
+            <div class="ov-track ov-${_lvl}" aria-hidden="true"><i data-sty="width:${_pct}%"></i></div>
             <div class="ov-num">${r.health.totalAbertas}</div>
             <div class="ov-num${r.health.vencidas > 0 ? ` ov-${_lvl} is-over` : ''}">${r.health.vencidas}</div>
           </div>`;
@@ -1160,7 +1160,7 @@ function renderDashboard() {
       wlEl.innerHTML = entries.map(([op, secs]) => {
         const h=(secs/3600).toFixed(1);
         const _pct = Math.max(4, Math.round((secs / _max) * 100));
-        return `<div class="ov-hb"><span class="n">${escapeHtml(op)}</span><div class="ov-bt"><i style="--w:${_pct}%"></i></div><span class="ov-v">${h}h</span></div>`;
+        return `<div class="ov-hb"><span class="n">${escapeHtml(op)}</span><div class="ov-bt"><i data-sty="--w:${_pct}%"></i></div><span class="ov-v">${h}h</span></div>`;
       }).join('');
     }
   })();

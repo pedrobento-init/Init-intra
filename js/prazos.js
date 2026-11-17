@@ -169,7 +169,7 @@ function _prazosItemRow(it, today, groupBy) {
   const title = typeof getPendenciaTitulo === 'function' ? getPendenciaTitulo(p) : (p.assunto || '');
   const other = groupBy === 'cliente' ? (p.responsible || 'Sem responsável') : (p.clientName || 'Sem cliente');
   return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
-    '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
+    '<span class="fila-dot" data-sty="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(other) + '</span></span>' +
     _prazosBandLabel(p, it.band, today) + '</li>';
@@ -201,7 +201,7 @@ function _prazosRespostaHtml(pens) {
       : '<span class="fila-due' + (x.st.estado === 'vence_logo' ? ' is-soon' : '') + '">Responder em ' + slaDuracaoCurta(x.st.minutos) + '</span>';
     const meta = (p.clientName || 'Interno') + (p.solicitante ? ' · ' + p.solicitante : '') + ' · ' + (p.responsible || 'Sem responsável');
     return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
-      '<span class="fila-dot" style="--c:' + (typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)') + '" aria-hidden="true"></span>' +
+      '<span class="fila-dot" data-sty="--c:' + (typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)') + '" aria-hidden="true"></span>' +
       '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(title) + '</span>' +
       '<span class="fila-meta">' + escapeHtml(meta) + '</span></span>' + quando + '</li>';
   };
@@ -225,7 +225,7 @@ function _prazosRecorrentesHtml(pens, today) {
     const max = lista.length ? lista[0].total : 1;
     return '<ul class="rc-bars">' + lista.map((x) =>
       '<li><span class="rc-lbl">' + escapeHtml(labelFn(x.value) || x.value) + '</span>' +
-      '<span class="rc-track" aria-hidden="true"><i style="width:' + Math.max(4, Math.round((x.total / max) * 100)) + '%"></i></span>' +
+      '<span class="rc-track" aria-hidden="true"><i data-sty="width:' + Math.max(4, Math.round((x.total / max) * 100)) + '%"></i></span>' +
       '<b>' + x.total + '</b></li>').join('') + '</ul>';
   };
   const item = (it) => '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(it.id) + '">' +

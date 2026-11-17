@@ -222,7 +222,7 @@ function _renderOpGrid() {
     return `
       <div class="op-card ${isActive ? '' : 'op-card--inactive'} u-3b6a3a" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
-          <div class="op-avatar" style="background:${color}">${escapeHtml(initials)}</div>
+          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}</div>
           <div class="u-c87525">
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}
@@ -389,7 +389,7 @@ function openOperadorForm(id = null) {
     <form id="opForm" class="ov-form" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
       ${adminBanner}
       <div class="u-41f38a">
-        <div id="opAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
+        <div id="opAvatarPreview" data-sty="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
           ${esc(op?.initials || (op?.name ? op.name.substring(0,2).toUpperCase() : '?'))}
         </div>
         <div class="u-97445a">
@@ -397,7 +397,7 @@ function openOperadorForm(id = null) {
             <div class="u-6157e8" id="opColorPicker">
               ${OP_COLORS.map(col => {
                 var isSel = selColor===col;
-                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
+                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
               }).join('')}
             </div>
           </div>
@@ -753,8 +753,8 @@ function openOpPendencias(opId) {
           <div class="u-59eddc">
             <div class="u-1a8e72">${escapeHtml(getPendenciaTitulo(p))}</div>
             <div class="u-cdf4b4">
-              <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName || '—')}</span>
-              ${p.deadline ? `· <span style="${isOverdue ? 'color:#dc2626;font-weight:600' : ''}">${formatDate(parseDeadline(p.deadline))}</span>` : ''}
+              <span class="client-badge" data-sty="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName || '—')}</span>
+              ${p.deadline ? `· <span data-sty="${isOverdue ? 'color:#dc2626;font-weight:600' : ''}">${formatDate(parseDeadline(p.deadline))}</span>` : ''}
             </div>
           </div>
           <div class="u-0ddf6f">${statusTag(p.status)} ${priorityTag(p.priority)}</div>
@@ -767,7 +767,7 @@ function openOpPendencias(opId) {
 
   openModal(op.name, `
     <div class="op-detail-header u-e2fe7f">
-      <div style="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
+      <div data-sty="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
       <div class="u-59eddc">
         <div class="u-7a6d8a">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}</div>
         <div class="u-865c33">${escapeHtml(op.role || 'Técnico')}</div>

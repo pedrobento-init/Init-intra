@@ -102,7 +102,7 @@ function _filaPenRow(p, today) {
   const num = typeof penDisplayNumber === 'function' ? penDisplayNumber(p) : '';
   const pri = typeof penPriColor === 'function' ? penPriColor(p.priority) : 'var(--ds-muted)';
   return '<li class="fila-row" tabindex="0" data-action="openPendencia" data-arg="' + escapeHtml(p.id) + '">' +
-    '<span class="fila-dot" style="--c:' + pri + '" aria-hidden="true"></span>' +
+    '<span class="fila-dot" data-sty="--c:' + pri + '" aria-hidden="true"></span>' +
     '<span class="fila-main"><span class="fila-title"><small>' + escapeHtml(num) + '</small>' + escapeHtml(getPendenciaTitulo(p)) + '</span>' +
     '<span class="fila-meta">' + escapeHtml(p.clientName || '—') + '</span></span>' +
     _filaDueLabel(p, today) +

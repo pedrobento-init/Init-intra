@@ -45,7 +45,7 @@ describe('highlightMentions', () => {
   });
   it('envolve @Nome com span estilizado', () => {
     const out = storage.highlightMentions('Oi @Pedro tudo bem');
-    expect(out).toContain('<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@Pedro</span>');
+    expect(out).toContain('<span class="u-3b66ce">@Pedro</span>');
   });
   it('escapa HTML antes de destacar', () => {
     const out = storage.highlightMentions('<script>alert(1)</script> @Pedro');

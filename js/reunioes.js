@@ -277,7 +277,7 @@ function renderMeetingFlow() {
           <span class="u-015a5e">${group.clientObj ? clientAvatar(group.clientObj, 20) : ''}${escapeHtml(group.clientName)}${_getStreakBadgeHtml(group.clientId)}</span>
         </div>
         <div class="u-d53f32">
-          <div style="height:100%;width:${Math.round(progress)}%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
+          <div data-sty="height:100%;width:${Math.round(progress)}%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
         </div>
       </div>
 
@@ -486,7 +486,7 @@ function _meetingPenCard(p) {
   const isDone = _isResolvida(p.status);
 
   return `
-    <div class="card" id="meeting-card-${escapeHtml(p.id)}" style="border-left:4px solid ${
+    <div class="card" id="meeting-card-${escapeHtml(p.id)}" data-sty="border-left:4px solid ${
       isReviewed ? '#16a34a' : isResolved ? '#0ea5e9' : (STATUS_PEN_MAP[p.status]?.dot || '#94a3b8')
     }">
       <div class="u-82fba0">
@@ -797,7 +797,7 @@ function renderMeetingCompare() {
         <td>${escapeHtml(r.clientName)}</td>
         <td>${r.abertasA} abertas / ${r.fechadasA} fechadas <span class="u-749148">(${r.totalReviewedA} vistas)</span></td>
         <td>${r.abertasB} abertas / ${r.fechadasB} fechadas <span class="u-749148">(${r.totalReviewedB} vistas)</span></td>
-        <td style="font-weight:700;color:${r.deltaAbertas>0?'#dc2626':r.deltaAbertas<0?'#16a34a':'var(--text-muted)'}">${r.deltaAbertas>0?'+':''}${r.deltaAbertas}</td>
+        <td data-sty="font-weight:700;color:${r.deltaAbertas>0?'#dc2626':r.deltaAbertas<0?'#16a34a':'var(--text-muted)'}">${r.deltaAbertas>0?'+':''}${r.deltaAbertas}</td>
       </tr>`).join('')}</tbody></table></div>
     <p class="u-8a0402">Base: pendências com reviewedInMeeting == REU-mês. Δ = abertas B - abertas A.</p>
   `;
@@ -871,7 +871,7 @@ function showMeetingReport(meetingId) {
   if (!m || !m.relatorio) { showToast('Relatório não encontrado.', 'error'); return; }
 
   openModal('Relatório — ' + _getMesAnoLabel(m.mesAno || ''), `
-    <div class="u-4b7bca">${escapeHtml(m.relatorio)}</div>
+    <div class="u-4b7bca" data-meeting-report>${escapeHtml(m.relatorio)}</div>
     <div class="form-actions u-1b0f49">
       <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
       <button class="btn btn-primary" data-action="meetingCopyReport">Copiar Relatório</button>
@@ -919,7 +919,7 @@ if (typeof registerActions === 'function') {
     openCorrectCompletion: (_el, id) => { if (typeof openCorrectCompletion === 'function') openCorrectCompletion(id); },
     meetingCloseModalAndRender: () => { closeModal(); renderMeetingFlow(); },
     meetingCopyReport: () => {
-      const box = document.querySelector('.modal-body div[style*=white-space]');
+      const box = document.querySelector('.modal-body div[data-meeting-report]');
       if (box && typeof copyToClipboard === 'function') copyToClipboard(box.textContent);
     },
   });

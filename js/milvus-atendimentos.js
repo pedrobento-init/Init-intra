@@ -312,7 +312,7 @@ function _atendBuildResumoHtml(resumo){
     {label:'Fora Exp.', value: _atendFmtHora(resumo.total_horas_fora_expediente ?? resumo.total_horas_fora_expediente), color:'var(--ov-amber)'}
   ];
   return '<div class="stats-grid u-87c136">'+items.map(function(it){
-    return '<div class="stat-card u-9dd319"><div><div class="stat-value" style="font-size:20px;color:'+it.color+'">'+escapeHtml(String(it.value))+'</div><div class="stat-label">'+escapeHtml(it.label)+'</div></div></div>';
+    return '<div class="stat-card u-9dd319"><div><div class="stat-value" data-sty="font-size:20px;color:'+it.color+'">'+escapeHtml(String(it.value))+'</div><div class="stat-label">'+escapeHtml(it.label)+'</div></div></div>';
   }).join('')+'</div>';
 }
 function _atendTableHtml(lista, hideCliente){

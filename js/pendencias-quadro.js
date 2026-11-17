@@ -193,7 +193,7 @@ function renderPenKanban(area) {
       var sortTitle = sortMode==='prazo' ? 'Ordenado por prazo (clique para mudar)' : sortMode==='prioridade' ? 'Ordenado por prioridade' : sortMode==='manual' ? 'Ordem manual — arraste os cards para reordenar' : 'Ordenado por criação';
       // Coluna vazia fica estreita (só cabeçalho + área para soltar), para
       // as colunas com cards caberem na tela sem rolagem lateral.
-      return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" style="--c:' + penColColor(col.id) + '"' +
+      return '<section class="kanban-col' + (cards.length ? '' : ' is-empty') + '" data-sty="--c:' + penColColor(col.id) + '"' +
         ' aria-label="Coluna ' + escapeHtml(col.label) + ', ' + cards.length + ' pendência' + (cards.length === 1 ? '' : 's') + '"' +
         ' data-col-id="' + escapeHtml(col.id) + '">' +
         '<div class="kanban-col-header">' +
@@ -225,7 +225,7 @@ function renderPenKanban(area) {
       '</div>' +
       // Celular: indicador da coluna visível ao deslizar ("Em Andamento · 2/5").
       '<div class="kb-pager" aria-hidden="true"><span class="kb-pager-label"></span><span class="kb-pager-dots">' +
-        cols.map(function(col) { return '<i style="--c:' + penColColor(col.id) + '"></i>'; }).join('') +
+        cols.map(function(col) { return '<i data-sty="--c:' + penColColor(col.id) + '"></i>'; }).join('') +
       '</span></div>' +
       boardHtml +
     '</div>';
@@ -409,7 +409,7 @@ function penKanbanCard(p) {
     : '<span class="kc-deadline is-empty" title="Sem prazo">' + PEN_ICO_CAL + 'Sem prazo</span>';
 
   return '<article class="kanban-card"' +
-    ' style="border-left:4px solid ' + penColColor(p.status) + '"' +
+    ' data-sty="border-left:4px solid ' + penColColor(p.status) + '"' +
     ' draggable="true"' +
     // Ordem manual (062): só data-*, sem handler inline. Os eventos de arrasto
     // são tratados por delegação em _bindPenBoardDrag() — a catraca de CSP
@@ -439,7 +439,7 @@ function penKanbanCard(p) {
         clientAvatarHtml +
         '<span class="kc-client-name">' + escapeHtml(clientName) + '</span>' +
       '</span>' +
-      '<span class="kb-pill" style="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
+      '<span class="kb-pill" data-sty="--c:' + penPriColor(p.priority) + '">' + escapeHtml(penPriLabel(p.priority)) + '</span>' +
       (p.responsible
         ? '<span class="kc-resp" title="Responsável">' + PEN_ICO_USER + escapeHtml(p.responsible) + '</span>'
         : '<span class="kc-resp kc-resp--empty" title="Sem responsável definido">○ Sem responsável</span>') +

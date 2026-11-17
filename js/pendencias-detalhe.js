@@ -74,7 +74,7 @@ function openPendenciaDetailModal(id) {
   const _emailInteiro = _emailCorpo.length > _penDesc.corpo.length + 40 ? _emailCorpo : '';
   const _eid = escapeHtml(id);
   const _itens = _penFeedItens(p);
-  const _statusHtml = `<span class="pen-cmd-badge" id="cmdStatusBadge" style="--st-dot:${escapeHtml(_stMeta.dot)}"><span class="pen-cmd-dot" aria-hidden="true"></span>${escapeHtml(_stMeta.label)}</span>
+  const _statusHtml = `<span class="pen-cmd-badge" id="cmdStatusBadge" data-sty="--st-dot:${escapeHtml(_stMeta.dot)}"><span class="pen-cmd-dot" aria-hidden="true"></span>${escapeHtml(_stMeta.label)}</span>
       <div class="pen-status-wrap pen-cmd-status-edit">
         <select class="form-select pen-status-select pen-cmd-select" id="chgStatus" title="Alterar status (salva na hora)" aria-label="Status" data-change="chdStatus" data-id="${_eid}">
           ${(STATUS_PEN_MAP[p.status] ? '' : `<option value="${escapeHtml(p.status || '')}" selected disabled>${escapeHtml({ concluido: 'Concluído', fechado: 'Fechado' }[p.status] || p.status || '—')} (antigo)</option>`) + Object.entries(STATUS_PEN_MAP).map(([k,v])=>`<option value="${k}" ${p.status===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
@@ -137,7 +137,7 @@ function openPendenciaDetailModal(id) {
 
         <div class="chd-card" id="penCmdCheckCard">
           <div class="section-header pen-sec-head"><span class="section-title">☑ Checklist</span><span class="pen-count" id="penCheckCounter">${_checkList.length ? _checkDone+'/'+_checkList.length : ''}</span></div>
-          <div class="pen-cmd-progress" title="${_checkDone} de ${_checkList.length} concluídos"><div class="pen-cmd-progress-bar" id="penCheckProgressBar" style="width:${_checkList.length ? Math.round(_checkDone/_checkList.length*100) : 0}%"></div></div>
+          <div class="pen-cmd-progress" title="${_checkDone} de ${_checkList.length} concluídos"><div class="pen-cmd-progress-bar" id="penCheckProgressBar" data-sty="width:${_checkList.length ? Math.round(_checkDone/_checkList.length*100) : 0}%"></div></div>
           <div class="pen-cmd-progress-label" id="penCheckProgressLabel">${_checkList.length ? _checkDone+'/'+_checkList.length+' concluídos' : 'Nenhum item — quebre a entrega em passos'}</div>
           <div id="penChecklist"></div>
           <div class="pen-check-add">
@@ -148,7 +148,7 @@ function openPendenciaDetailModal(id) {
 
         <div class="chd-card pen-cmd-drop" id="penDropzone">
           <div class="section-header pen-sec-head">
-            <span class="section-title">📎 Anexos <span class="pen-count u-6b99de" id="penAttCounter"${_attCount?'':''}>${_attCount||''}</span></span>
+            <span class="section-title">📎 Anexos <span class="pen-count${_attCount?'':' u-6b99de'}" id="penAttCounter">${_attCount||''}</span></span>
             <label class="btn btn-secondary btn-sm u-3b6a3a" title="Anexar arquivo (máx 2MB)">+ Anexar
               <input type="file" id="penFileInputSide" class="u-6b99de" data-change="chdAnexo" data-id="${_eid}" />
             </label>
