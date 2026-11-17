@@ -78,17 +78,17 @@ function penQuickAssign(id, name, opts) {
   // Trocar o dono de um chamado por engano no menu ⋯ é um clique só; o
   // nome anterior precisa ser lido ANTES da gravação para o desfazer.
   var antes = '';
-  try { var atual = getPendenciaById(id); antes = (atual && atual.responsible) || ''; } catch (_) {}
+  try { var atual = getPendenciaById(id); antes = (atual && atual.responsible) || ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   try {
     var res = updatePendenciaAssignee(id, { responsible: name });
-    try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {}
+    try { _optimisticPenUpsert({ ...res.pen }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
     var msg = name ? 'Atribuída a ' + name + '.' : 'Responsável removido.';
     if ((opts && opts.semDesfazer) || typeof showUndoToast !== 'function') showToast(msg, 'success');
     else showUndoToast(msg, function() {
       // Mesma janela de 5s do desfazer do card: sem revalidar, clicar no
       // toast antigo restauraria o nome de antes do último gesto, não deste.
       var depois = null;
-      try { depois = getPendenciaById(id); } catch (_) {}
+      try { depois = getPendenciaById(id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
       if (((depois && depois.responsible) || '') !== (name || '')) {
         showToast('O responsável mudou depois disso — nada a desfazer.', 'info');
         return;
@@ -139,7 +139,7 @@ function getFilteredPendencias() {
   try {
     if (typeof filterGestaoPendencias === 'function') base = filterGestaoPendencias(base);
     else if (typeof canViewPendencia === 'function') base = base.filter(canViewPendencia);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   return base.filter(p => {
     if (q && !p.assunto?.toLowerCase().includes(q) && !p.descricao?.toLowerCase().includes(q) && !p.clientName?.toLowerCase().includes(q) && !p.responsible?.toLowerCase().includes(q)) return false;
     if (cid  && p.clientId   !== cid)  return false;
@@ -166,7 +166,7 @@ function savePenFilters() {
     savedFilterName: document.getElementById('penSavedFilter')?.value||'',
     view: penView
   });
-  try{ _penUpdateMoreFiltersBadge(); }catch(_){}
+  try{ _penUpdateMoreFiltersBadge(); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
 }
 
 function setPenScope(scope) {
@@ -195,8 +195,8 @@ function saveCurrentPenFilter() {
   if (typeof setCacheKV === 'function') setCacheKV('intra_pen_saved_filters', list);
   try {
     if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = filter.name;
-  } catch (_) {}
-  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
+  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
   renderPendencias();
   showToast('Filtro salvo!', 'success');
 }
@@ -216,7 +216,7 @@ function applySavedPenFilter() {
   if (document.getElementById('penStatus')) document.getElementById('penStatus').value = f.status || '';
   if (document.getElementById('penPriority')) document.getElementById('penPriority').value = f.priority || '';
   if (typeof savePenFilters === 'function') savePenFilters();
-  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
+  try { _penUpdateMoreFiltersBadge(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   if (typeof renderPenView === 'function') renderPenView(false);
 }
 
@@ -231,10 +231,10 @@ function clearPenFilters() {
     if (document.getElementById('penStatus')) document.getElementById('penStatus').value = '';
     if (document.getElementById('penPriority')) document.getElementById('penPriority').value = '';
     if (document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = '';
-  } catch (_) {}
-  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_) {} }
-  try { _penUpdateMoreFiltersBadge(); } catch (_) {}
-  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
+  if (typeof savePenFilters === 'function') { try { savePenFilters(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
+  try { _penUpdateMoreFiltersBadge(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
+  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
 }
 
 function deleteSavedPenFilter() {
@@ -255,7 +255,7 @@ function deleteSavedPenFilter() {
         saveFilterState('pendencias', st);
       }
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   renderPendencias();
   showToast('Filtro removido.', 'info');
 }
@@ -266,29 +266,29 @@ function _penRichDesc(text) {
   try {
     if (typeof renderRichText === 'function') return renderRichText(text);
     if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichText === 'function') return globalThis.renderRichText(text);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   return _escapeHtmlFallback(text);
 }
 function _penRichNote(text) {
   try {
     if (typeof renderRichNoteText === 'function') return renderRichNoteText(text);
     if (typeof globalThis !== 'undefined' && typeof globalThis.renderRichNoteText === 'function') return globalThis.renderRichNoteText(text);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   try {
     if (typeof highlightMentions === 'function') return highlightMentions(text);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   return _escapeHtmlFallback(text);
 }
 function _penFriendlyTime(p) {
   var secs = 0;
-  try { secs = (typeof getElapsedSeconds === 'function') ? getElapsedSeconds(p) : 0; } catch (_) {}
+  try { secs = (typeof getElapsedSeconds === 'function') ? getElapsedSeconds(p) : 0; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   var exact = '00:00:00';
-  try { exact = (typeof formatTimer === 'function') ? formatTimer(secs) : exact; } catch (_) {}
+  try { exact = (typeof formatTimer === 'function') ? formatTimer(secs) : exact; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   var friendly = exact;
   try {
     if (typeof formatElapsedFriendly === 'function') friendly = formatElapsedFriendly(secs);
     else if (typeof globalThis !== 'undefined' && typeof globalThis.formatElapsedFriendly === 'function') friendly = globalThis.formatElapsedFriendly(secs);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   return { secs: secs, exact: exact, friendly: friendly };
 }
 // Edição inline: passa pelas MESMAS validações/regras do form
@@ -318,18 +318,18 @@ function quickUpdatePendenciaField(id, field, value) {
   }
   p[field] = value;
   var errors = [];
-  try { errors = (typeof validatePendencia === 'function') ? (validatePendencia(p) || []) : []; } catch (_) {}
+  try { errors = (typeof validatePendencia === 'function') ? (validatePendencia(p) || []) : []; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); }
   if (errors.length) {
     if (typeof showToast === 'function') showToast(errors[0], 'error');
     _penRedesenharDetalhe(id);
     return;
   }
   savePendencia(p);
-  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
   if (typeof showToast === 'function') showToast('Atualizado!', 'success');
   _penRedesenharDetalhe(id);
-  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_) {} }
-  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_) {} }
+  if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) { try { renderPenView(false); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
+  if (typeof refreshCalendar === 'function' && document.getElementById('calendarContainer')) { try { refreshCalendar(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-acoes'); } }
 }
 
 // Ações do menu ⋯ (clique por delegação em js/actions.js).

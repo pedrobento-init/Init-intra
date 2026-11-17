@@ -17,7 +17,7 @@ let _penFilaSort = (function () {
   try {
     const raw = JSON.parse(localStorage.getItem(PEN_FILA_SORT_KEY) || 'null');
     if (raw && typeof raw.col === 'string') return { col: raw.col, dir: raw.dir === 'desc' ? 'desc' : 'asc' };
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-fila'); }
   return { col: 'prazo', dir: 'asc' }; // o que vence primeiro, primeiro
 })();
 
@@ -62,7 +62,7 @@ function penFilaSort(colId) {
   _penFilaSort = (atual.col === colId)
     ? { col: colId, dir: atual.dir === 'asc' ? 'desc' : 'asc' }
     : { col: colId, dir: 'asc' };
-  try { localStorage.setItem(PEN_FILA_SORT_KEY, JSON.stringify(_penFilaSort)); } catch (_) {}
+  try { localStorage.setItem(PEN_FILA_SORT_KEY, JSON.stringify(_penFilaSort)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-fila'); }
   // No servidor a ordem faz parte da consulta: trocar de coluna é refazer a
   // busca pela primeira página, não reordenar as 50 linhas que estão na tela.
   if (_penServerMode && typeof penSortRemoteCol === 'function' && penSortRemoteCol(colId)

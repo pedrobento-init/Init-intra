@@ -209,7 +209,7 @@ function timerActionBtnHTML(item, type = 'pendencia') {
 function _isTimerClosedStatus(status) {
   try {
     if (typeof isPendenciaClosed === 'function') return isPendenciaClosed(status);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
   return ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(status || '');
 }
 
@@ -264,7 +264,7 @@ function toggleTimer(type, id, btnEl) {
   }
 
   // Anti duplo-clique: o botão antigo será substituído pelo full refresh abaixo.
-  if (btnEl && !btnEl.disabled) { try { btnEl.disabled = true; } catch (_) {} }
+  if (btnEl && !btnEl.disabled) { try { btnEl.disabled = true; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); } }
 
   try {
     if (worker && worker === myName) {
@@ -303,13 +303,13 @@ function toggleTimer(type, id, btnEl) {
       showToast(`Você iniciou o trabalho nesta ${updateLabel.toLowerCase()}!`, 'success');
     }
   } finally {
-    try { if (btnEl && btnEl.isConnected) btnEl.disabled = false; } catch (_) {}
+    try { if (btnEl && btnEl.isConnected) btnEl.disabled = false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
   }
 
   _refreshTimerFull(id, type);
-  if (typeof renderFn === 'function') { try { renderFn(); } catch (_) {} }
-  if (typeof updateDashboardBadge === 'function') { try { updateDashboardBadge(); } catch (_) {} }
-  else if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+  if (typeof renderFn === 'function') { try { renderFn(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); } }
+  if (typeof updateDashboardBadge === 'function') { try { updateDashboardBadge(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); } }
+  else if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); } }
 }
 
 /**
@@ -386,7 +386,7 @@ function submitTimerAdjust(id) {
   closeModal();
   showToast('Cronômetro parado — tempo ajustado.', 'success');
   _refreshTimerFull(id, 'pendencia');
-  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_) {} }
+  if (typeof renderPenView === 'function') { try { renderPenView(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); } }
 }
 
 /**
@@ -428,7 +428,7 @@ function _refreshPenWorkBox(workBox, item) {
       } else if (typeof formatElapsedFriendly === 'function') {
         friendly = formatElapsedFriendly(secs);
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
     timeEl.textContent = '⏱ ' + friendly;
   }
 }
@@ -445,7 +445,7 @@ function _refreshTimerFull(id, type) {
   try { item = getPendenciaById(id); } catch (_) { item = null; }
   if (!item) return;
   // 1. Displays (texto do cronômetro)
-  try { _refreshTimerUI(id); } catch (_) {}
+  try { _refreshTimerUI(id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
   // 2. Widgets completos (botão + badge + tempo) nos cards e no modal
   try {
     var widgets = document.querySelectorAll('[data-timer-widget]');
@@ -456,9 +456,9 @@ function _refreshTimerFull(id, type) {
         tmp.innerHTML = timerWidget(item, t);
         var fresh = tmp.firstChild;
         if (fresh) w.replaceWith(fresh);
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
   // 3. Bloco "Trabalhando agora" do modal de detalhe (se aberto para este id)
   try {
     var overlay = document.getElementById('modalOverlay');
@@ -467,11 +467,11 @@ function _refreshTimerFull(id, type) {
       var workBox = document.querySelector('#modalBody .pen-work');
       if (workBox) _refreshPenWorkBox(workBox, item);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
   // 4. Badges da sidebar
   try {
     if (typeof updateBadges === 'function') updateBadges();
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'timer'); }
 }
 
 /**
