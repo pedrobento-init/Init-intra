@@ -1055,6 +1055,11 @@ async function _runSupabaseSync(reason, opts) {
         for (const rec of failedPush) if (rec && rec.id && !ids.has(rec.id)) { final.push(rec); ids.add(rec.id); }
       }
     } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
+    // SYNC-03: houve awaits desde a leitura de `local` — reconcilia com o que
+    // o usuário/realtime gravou nesse intervalo antes de reescrever a lista.
+    try {
+      if (typeof _reconcileConcurrentEdits === 'function') final = _reconcileConcurrentEdits(final, local, dbGet(e.dbKey)) || final;
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'storage'); }
     dbSet(e.dbKey, final);
     // 5. Push de updates — por item (um item com falha não trava os demais).
     // Falha de background NÃO incrementa o contador (ele conta alterações
