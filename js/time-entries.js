@@ -47,7 +47,7 @@ function deleteTimeEntry(id) {
     try {
       supabaseClient.from('time_entries').delete().eq('id', id)
         .then((res) => { if (res.error) markSyncPushFailed(); }).catch(() => markSyncPushFailed());
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'time-entries:delete'); if (typeof markSyncPushFailed === 'function') markSyncPushFailed(); }
   }
 }
 

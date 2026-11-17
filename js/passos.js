@@ -217,7 +217,7 @@ function _pseSync(root, dirty) {
   const n = st.steps.filter((s) => String(s.text || '').trim() || String(s.detail || '').trim()).length;
   const c = root.querySelector('.pse-count');
   if (c) c.textContent = _psCountLabel(n);
-  if (dirty) { try { _modalDirty = true; } catch (_) {} }
+  if (dirty) { try { _modalDirty = true; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); } }
 }
 
 function _pseRender(root, focus) {
@@ -235,8 +235,8 @@ function _pseFocus(root, i, field, at) {
   if (!ta) return;
   ta.focus();
   const pos = at === 'start' ? 0 : ta.value.length;
-  try { ta.setSelectionRange(pos, pos); } catch (_) {}
-  try { li.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+  try { ta.setSelectionRange(pos, pos); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
+  try { li.scrollIntoView({ block: 'nearest' }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
 }
 
 function _pseLoad(root, content) {
@@ -349,7 +349,7 @@ function procEditorMount(root) {
     if (!li || !li.draggable) return;
     dragFrom = Number(li.dataset.i);
     li.classList.add('is-drag');
-    try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(dragFrom)); } catch (_) {}
+    try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(dragFrom)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
   });
   root.addEventListener('dragover', (ev) => {
     if (dragFrom < 0) return;
@@ -442,7 +442,7 @@ function _psrLoadDone(kind, id, sig) {
   try {
     const v = JSON.parse(localStorage.getItem(_psrStoreKey(kind, id)) || 'null');
     if (v && v.sig === sig && Array.isArray(v.done)) return v.done.filter((n) => Number.isInteger(n));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
   return [];
 }
 
@@ -452,7 +452,7 @@ function _psrSaveDone() {
   try {
     if (!s.done.size) localStorage.removeItem(_psrStoreKey(s.kind, s.id));
     else localStorage.setItem(_psrStoreKey(s.kind, s.id), JSON.stringify({ sig: s.sig, done: Array.from(s.done), at: Date.now() }));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
 }
 
 function _psrFind(kind, id) {
@@ -537,7 +537,7 @@ function _psrPaint(scroll) {
   }
   if (scroll && cur >= 0) {
     const li = root.querySelector('.psr-step[data-i="' + cur + '"]');
-    try { if (li) li.scrollIntoView({ block: 'center', behavior: typeof _canAnimate === 'function' && _canAnimate() ? 'smooth' : 'auto' }); } catch (_) {}
+    try { if (li) li.scrollIntoView({ block: 'center', behavior: typeof _canAnimate === 'function' && _canAnimate() ? 'smooth' : 'auto' }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
   }
 }
 
@@ -553,7 +553,7 @@ function _psCopyText(text, msg) {
   const ok = () => { if (typeof showToast === 'function') showToast(msg || 'Copiado!', 'success'); };
   try {
     navigator.clipboard.writeText(text).then(ok, () => { if (typeof showToast === 'function') showToast('Não foi possível copiar.', 'error'); });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'passos'); }
 }
 
 if (typeof registerActions === 'function') {

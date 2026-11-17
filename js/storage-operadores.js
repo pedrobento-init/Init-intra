@@ -55,7 +55,7 @@ function _propagateOperatorRename(opId, oldName, newName) {
       for (const r of list) { if (r && fn(r)) changed = true; }
       if (changed) dbSet(key, list);
     }
-  } catch (_) {
+  } catch (_e) { console.error('[storage-operadores] propagação do renome falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'storage-operadores');
   } finally {
     if (typeof window !== 'undefined') window._suppressPendingSync = prev;
   }

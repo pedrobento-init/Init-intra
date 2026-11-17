@@ -166,7 +166,7 @@ function _dashHiddenKey() { return 'dash_hidden_widgets_' + _dashOperatorKey(); 
 function _getDashHidden() {
   try {
     if (typeof getCacheKV === 'function') return getCacheKV(_dashHiddenKey(), []) || [];
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   return [];
 }
 function _dashIsHidden(id) {
@@ -178,14 +178,14 @@ function toggleDashWidget(id) {
     const cur = _getDashHidden();
     const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
     if (typeof setCacheKV === 'function') setCacheKV(key, next);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   renderDashboard();
 }
 function resetDashWidgets() {
   try {
     if (typeof setCacheKV === 'function') setCacheKV(_dashHiddenKey(), []);
     else if (typeof removeCacheKV === 'function') removeCacheKV(_dashHiddenKey());
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   renderDashboard();
   if (typeof showToast === 'function') showToast('Widgets do Dashboard restaurados.', 'success');
 }
@@ -199,7 +199,7 @@ function dashGoPresentation() {
 function dashGoToPendenciasByOperator(name) {
   try {
     if (typeof saveFilterState === 'function') saveFilterState('pendencias', { resp: name, search: '', client: '', status: '', priority: '' });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   navigateTo('pendencias');
 }
 // Selo de comparativo: verde = melhora, vermelho = piora, cinza = estável/sem base.
@@ -217,7 +217,7 @@ function _getPreviousDashRange() {
     if (typeof getPreviousDashRange === 'function') {
       return getPreviousDashRange(_dashPeriod, _dashCustomStart, _dashCustomEnd, _brasiliaNow());
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   const today = _brasiliaNow();
   const day = 86400000;
   if (_dashPeriod === 'week') {
@@ -246,7 +246,7 @@ function _filterPensByRange(pens, range) {
 function _calcDashStats(pens) {
   try {
     if (typeof calcPeriodStats === 'function') return calcPeriodStats(pens, typeof isPendenciaClosed === 'function' ? isPendenciaClosed : undefined);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   const isClosed = typeof isPendenciaClosed === 'function' ? isPendenciaClosed : (s => ['concluido','resolvido','cancelado','fechado'].includes(s));
   const active = (pens || []).filter(p => !isClosed(p.status));
   const resolved = (pens || []).filter(p => isPendenciaResolvida(p.status)).length;
@@ -261,7 +261,7 @@ function _calcDashStats(pens) {
 function _calcDashDelta(cur, prev, higherIsBetter) {
   try {
     if (typeof calcPeriodDelta === 'function') return calcPeriodDelta(cur, prev, higherIsBetter);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   if (!prev) return { pct: cur ? 100 : 0, direction: cur ? 'up' : 'flat', improved: cur ? higherIsBetter : null };
   const pct = Math.round(((cur - prev) / Math.abs(prev)) * 100);
   const direction = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
@@ -563,8 +563,8 @@ function navigateTo(page) {
   else if (page === 'historico')   renderLogs();
 
   window.location.hash = page;
-  if (typeof renderAlertStrip === 'function') { try { renderAlertStrip(); } catch (_) {} }
-  if (typeof refreshPendingStrip === 'function') { try { refreshPendingStrip(); } catch (_) {} }
+  if (typeof renderAlertStrip === 'function') { try { renderAlertStrip(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); } }
+  if (typeof refreshPendingStrip === 'function') { try { refreshPendingStrip(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); } }
 
   var ca = document.getElementById('contentArea');
   if (ca) {
@@ -694,7 +694,7 @@ function renderDashboard() {
     if (!_nextMeeting?.mesAno) return '—';
     try {
       if (typeof _getMesAnoLabel === 'function') return _getMesAnoLabel(_nextMeeting.mesAno);
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
     return _nextMeeting.mesAno;
   })();
   // Recorrência: streak >= 2 (reaproveita getConsecutiveMeetingStreak)
@@ -1395,14 +1395,14 @@ function updateBadges() {
     var inMaint = equips.filter(function(eq) { return eq && eq.status === 'em_manutencao'; }).length;
     var ebadge = document.getElementById('badge-equipamentos');
     if (ebadge) { ebadge.textContent = inMaint; ebadge.classList.toggle('hidden', inMaint === 0); }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
 
-  try { if (typeof updateVencimentosBadge === 'function') updateVencimentosBadge(); } catch (_) {}
+  try { if (typeof updateVencimentosBadge === 'function') updateVencimentosBadge(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   try {
     var cxbadge = document.getElementById('badge-caixa');
     var cxn = (typeof entradasEmailPendentes === 'function') ? entradasEmailPendentes().length : 0;
     if (cxbadge) { cxbadge.textContent = cxn; cxbadge.classList.toggle('hidden', cxn === 0); }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   // badge-chamados removido (módulo descontinuado na interface)
 }
 
@@ -1465,7 +1465,7 @@ function _startApp() {
   updateBadges();
 
   if (typeof initSupabaseRealtime === 'function') {
-    try { initSupabaseRealtime(); } catch (_) {}
+    try { initSupabaseRealtime(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   }
 
   var isAdmin = typeof isCurrentAdmin === 'function' && isCurrentAdmin();
@@ -1485,14 +1485,14 @@ function _startApp() {
   const homePage = (typeof isTeamAdmin === 'function' && isTeamAdmin()) ? 'dashboard' : 'fila';
   // Números amigáveis antes da primeira pintura (local, sem rede): evita
   // "#----" transitório no boot e garante backfill mesmo se o sync atrasar.
-  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_) {}
+  try { if (typeof maintainVisitNumeros === 'function') maintainVisitNumeros(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   // Rota de item carrega por id: o F5 e o link colado precisam voltar ao mesmo item.
   const _isRota = (h) => typeof penPaginaRotaDe === 'function' && !!penPaginaRotaDe(h);
   navigateTo(pages.includes(hash) || _isRota(hash) ? hash : homePage);
   // Offline-first: a UI já montou a partir do banco local; a sincronização
   // automática roda agora em segundo plano, sem bloquear (toda falha de rede
   // vira fallback local + retry — ver triggerStartupSync em storage.js).
-  try { if (typeof triggerStartupSync === 'function') triggerStartupSync('app-start'); } catch (_) {}
+  try { if (typeof triggerStartupSync === 'function') triggerStartupSync('app-start'); } catch (_e) { console.error('[app] sync de inicialização falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   if (!_appStarted) {
     _appStarted = true;
     window.addEventListener('hashchange', () => {
@@ -1676,7 +1676,7 @@ async function doLogout() {
         (pend.length === 1 ? 'Há 1 alteração que ainda não foi enviada' : 'Há ' + pend.length + ' alterações que ainda não foram enviadas') +
         ' ao servidor.\n\nElas continuam salvas neste aparelho e sobem no próximo acesso, mas não aparecem para a equipe até lá.\n\nSair mesmo assim?')) return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   try {
     await authSignOut();
   } catch (err) {
@@ -1693,7 +1693,7 @@ async function doLogout() {
         localStorage.removeItem(key);
       }
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   showLoginScreen();
 }
 
@@ -1710,7 +1710,7 @@ function _bootOpWithTimeout(promise, fallback) {
         () => fallback
       );
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'app'); }
   return Promise.resolve(promise).then(
     (v) => (v === undefined ? fallback : v),
     () => fallback

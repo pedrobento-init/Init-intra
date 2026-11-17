@@ -18,7 +18,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
                   setTimeout(() => window.location.reload(), 30000);
                   return;
                 }
-              } catch (_) {}
+              } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'sw-register'); }
               window.location.reload();
             }
           });

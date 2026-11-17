@@ -36,7 +36,7 @@ function _penViewSig() {
   var team = '';
   try {
     team = (typeof isTeamAdmin === 'function' && isTeamAdmin() && typeof _selectedTeam !== 'undefined') ? (_selectedTeam || '') : '';
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   return JSON.stringify({
     scope: (typeof penScope !== 'undefined') ? penScope : 'active',
     q: document.getElementById('penSearch')?.value || '',
@@ -97,7 +97,7 @@ function _optimisticPenUpsert(next, opts) {
     }
     var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
     if (area) _penRenderAtual(area);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
 }
 function _optimisticPenRemove(id) {
   try {
@@ -107,10 +107,10 @@ function _optimisticPenRemove(id) {
     if (Array.isArray(_filteredPens)) _filteredPens = _filteredPens.filter(function(x) { return !x || x.id !== id; });
     var area = (typeof document !== 'undefined') ? document.getElementById('penViewArea') : null;
     if (area) _penRenderAtual(area);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
 }
 function _clearOptimisticPenRemove(id) {
-  try { if (id) delete _penOptimisticRemoved[id]; } catch (_) {}
+  try { if (id) delete _penOptimisticRemoved[id]; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
 }
 function _applyOptimisticPens(rows) {
   try {
@@ -134,7 +134,7 @@ function _applyOptimisticPens(rows) {
         var sT = new Date(r.updatedAt || 0).getTime();
         var oT = new Date((o.data && o.data.updatedAt) || 0).getTime();
         if (sT >= oT) { delete _penOptimistic[r.id]; return r; }
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
       return { ...r, ...o.data };
     });
     // Criações ainda não convergidas: injeta na lista para feedback imediato.
@@ -147,7 +147,7 @@ function _applyOptimisticPens(rows) {
         if (now - o.at > _PEN_OPTIMISTIC_TTL_MS) { delete _penOptimistic[id]; return; }
         out.unshift({ ...o.data });
       });
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
     return out;
   } catch (_) { return rows; }
 }
@@ -249,7 +249,7 @@ function renderPenKanban(area) {
       var total = _penServerMode && _penTotal!=null ? _penTotal : pens.length;
       cntEl.textContent = total ? String(total) : '';
     }
-  }catch(_){}
+  }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   } finally {
     _clearPenRenderCache();
   }
@@ -269,7 +269,7 @@ function _updateKanbanPager(board) {
     var lbl = pager.querySelector('.kb-pager-label');
     if (lbl) lbl.textContent = (title ? title.textContent.trim() : '') + (count ? ' (' + count.textContent + ')' : '') + ' · ' + (idx + 1) + '/' + cols.length;
     pager.querySelectorAll('.kb-pager-dots i').forEach(function(d, i) { d.classList.toggle('is-on', i === idx); });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
 }
 
 // Indicador de scroll horizontal: sombra na borda do lado com coluna oculta.
@@ -279,7 +279,7 @@ function _updateKanbanScrollShadows(board) {
     var max = board.scrollWidth - board.clientWidth;
     board.classList.toggle('has-scroll-left', board.scrollLeft > 4);
     board.classList.toggle('has-scroll-right', max > 4 && board.scrollLeft < max - 4);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
 }
 
 // ── Cache por render (FASE 1 — memoização) ─────────────────────────────────
@@ -305,7 +305,7 @@ function _clearPenRenderCache() { _penNumCache = null; _penClientCache = null; }
 function _penRenderClient(clientId) {
   try {
     if (_penClientCache && _penClientCache.has(clientId)) return _penClientCache.get(clientId) || null;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   return (typeof getClientById === 'function') ? getClientById(clientId) : null;
 }
 
@@ -318,7 +318,7 @@ function penDisplayNumber(p) {
     if (p && typeof getPendenciaDisplayNumber === 'function' && typeof getPendencias === 'function') {
       return getPendenciaDisplayNumber(getPendencias(), p.id);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   return '#---';
 }
 
@@ -328,10 +328,10 @@ function penDisplayNumber(p) {
 function penTimerCell(p) {
   var closed = (typeof isPendenciaClosed === 'function') ? isPendenciaClosed(p.status) : false;
   var worker = null;
-  try { if (typeof getCurrentWorker === 'function') worker = getCurrentWorker(p); } catch (_) {}
+  try { if (typeof getCurrentWorker === 'function') worker = getCurrentWorker(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   var running = !!(p && p.timerRunning) || !!worker;
   var secs = 0;
-  try { if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p); } catch (_) {}
+  try { if (typeof getElapsedSeconds === 'function') secs = getElapsedSeconds(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   // Formato curto no card: "8d 21h" em vez de "213:06:51".
   var fmt = (typeof formatTimerCompact === 'function') ? formatTimerCompact(secs)
     : (typeof formatTimer === 'function') ? formatTimer(secs) : '';
@@ -359,7 +359,7 @@ function penTimerCell(p) {
     // só a página/modal do chamado tinha o ⏸, e quem deu play pelo quadro
     // ficava sem como parar.
     var isMe = false;
-    try { if (typeof isCurrentWorker === 'function') isMe = isCurrentWorker(p); } catch (_) {}
+    try { if (typeof isCurrentWorker === 'function') isMe = isCurrentWorker(p); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
     if (isMe) {
       return '<button type="button" class="kb-go kb-pause-btn" data-action="penTimerToggle" data-arg="' + escapeHtml(p.id) + '"' +
         ' title="Pausar trabalho (a pendência vai para Pausado)" aria-label="Pausar cronômetro de ' + escapeHtml(penDisplayNumber(p)) + '">' +
@@ -619,7 +619,7 @@ function penMoveTo(id, colId, opts) {
   try {
     var stop = (typeof timerSessionStopForStatus === 'function') ? timerSessionStopForStatus(p, colId) : null;
     if (stop) timerApplyStopOnStatus(p, next, stop);
-  } catch (_) {}
+  } catch (_e) { console.error('[pendencias-quadro] cronômetro não ajustado ao mover card', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-quadro'); }
   savePendencia(next);
   _optimisticPenUpsert(next); // move o card na hora; o fetch reconcilia depois
   updateBadges();

@@ -81,11 +81,11 @@ const ENTITIES = [
                 if ((window.location.hash.replace('#', '') || '') !== 'dashboard') return;
                 if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderDashboard(); });
                 else renderDashboard();
-              } catch (_) {}
+              } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'schema'); }
             }, 1200);
           }
         }
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'schema'); }
     }
   },
   {

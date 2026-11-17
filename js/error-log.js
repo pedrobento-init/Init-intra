@@ -77,7 +77,7 @@ if (typeof window !== 'undefined' && window.addEventListener) {
     const r = ev && ev.reason;
     _logSilent(r instanceof Error ? r : new Error(String(r && r.message ? r.message : r)), 'promise');
   });
-  window.addEventListener('pagehide', () => { try { flushErrorLog(); } catch (_) {} });
+  window.addEventListener('pagehide', () => { try { flushErrorLog(); } catch (_e) { /* o log de erros não registra a si mesmo */ } });
 }
 
 // ── Admin: "Erros do app" (Histórico) ───────────────────────────────────

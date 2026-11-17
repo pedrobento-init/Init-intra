@@ -405,7 +405,7 @@ function handleFileUpload(type, itemId, inputElement, callback) {
     try {
       const up = await _uploadAttachmentToStorage(type, itemId, attId, file);
       if (up) { url = up.url; path = up.path; }
-    } catch (e) { url = null; }
+    } catch (_e) { url = null; }
     if (!url) {
       try {
         data = await new Promise((resolve, reject) => {
@@ -414,7 +414,7 @@ function handleFileUpload(type, itemId, inputElement, callback) {
           r.onerror = reject;
           r.readAsDataURL(file);
         });
-      } catch (e) { data = null; }
+      } catch (_e) { data = null; }
     }
     const result = addAttachment(type, itemId, {
       id: attId, name: check.name, mimeType: check.mime, size: file.size, data, url, path
@@ -569,9 +569,9 @@ function handleClientDocumentUpload(clientId, inputElement, callback) {
   (async function(){
     var docId = 'DOC-' + Date.now() + '-' + _secureRandStr(4);
     var url=null,path=null,data=null;
-    try { var up = await _uploadAttachmentToStorage('clients', clientId, docId, file); if(up){ url=up.url; path=up.path; } } catch(e){ url=null; }
+    try { var up = await _uploadAttachmentToStorage('clients', clientId, docId, file); if(up){ url=up.url; path=up.path; } } catch(_e){ url=null; }
     if (!url) {
-      try { data = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(r.result); }; r.onerror=reject; r.readAsDataURL(file); }); } catch(e){ data=null; }
+      try { data = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(r.result); }; r.onerror=reject; r.readAsDataURL(file); }); } catch(_e){ data=null; }
     }
     var result = addClientDocument(clientId, { id:docId, name:check.name, mimeType:check.mime, size:file.size, data:data, url:url, path:path });
     if (result && result.error) { if (typeof showToast==='function') showToast(result.error,'error'); }

@@ -67,8 +67,8 @@ async function disablePushOnThisDevice() {
   const sub = await _pushCurrentSubscription();
   if (!sub) return;
   const endpoint = sub.endpoint;
-  try { await sub.unsubscribe(); } catch (_) {}
-  try { if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) await supabaseClient.from('push_subscriptions').delete().eq('endpoint', endpoint); } catch (_) {}
+  try { await sub.unsubscribe(); } catch (_e) { console.warn('[push] unsubscribe local falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'push'); }
+  try { if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) await supabaseClient.from('push_subscriptions').delete().eq('endpoint', endpoint); } catch (_e) { console.warn('[push] remoção remota da inscrição falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'push'); }
 }
 
 /** Best-effort: o servidor confere destinatários e ignora quem enviou. */

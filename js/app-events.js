@@ -59,12 +59,12 @@ function preserveScrollAround(fn){
     var res=fn();
     if(res && typeof res.then==='function'){
       return res.finally(function(){
-        try{ if(ca) ca.scrollTop=top; }catch(_){}
+        try{ if(ca) ca.scrollTop=top; }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'app-events'); }
       });
     }
-    try{ if(ca) ca.scrollTop=top; }catch(_){}
+    try{ if(ca) ca.scrollTop=top; }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'app-events'); }
     return res;
-  }catch(e){ return fn(); }
+  }catch(_e){ return fn(); }
 }
 
 // Expõe globalmente e para testes

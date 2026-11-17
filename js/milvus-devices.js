@@ -148,7 +148,7 @@ function setMilvusLastSyncAt(clientId, iso) {
     const map = raw ? JSON.parse(raw) : {};
     map[clientId] = iso;
     localStorage.setItem(MILVUS_SYNC_AT_KEY, JSON.stringify(map));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
 }
 
 // ── Leitura (RLS do Supabase aplica o isolamento; fallback p/ cache) ──
@@ -168,16 +168,16 @@ async function getClientDevices(clientId) {
             const others = (cached || []).filter((d) => d && d.client_id !== clientId);
             setCacheStore('client_devices', others.concat(data.map(mapMilvusRowToLocal)));
           }
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
         return data.map(mapMilvusRowToLocal);
       }
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
   try {
     if (typeof getCacheStore === 'function') {
       return (getCacheStore('client_devices') || []).filter((d) => d && d.client_id === clientId);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
   return [];
 }
 
@@ -240,7 +240,7 @@ async function syncClientDevices(clientId) {
   try {
     if (data && data.lastSyncAt) setMilvusLastSyncAt(clientId, data.lastSyncAt);
     else setMilvusLastSyncAt(clientId, new Date().toISOString());
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
   return data;
 }
 
@@ -535,7 +535,7 @@ async function exportClientInventory(clientId) {
   }
   try {
     if (typeof addLog === 'function') addLog('Exportou planilha', 'Inventário', clientId, `${sheet.rows.length} dispositivos`);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
 }
 
 // Lê o .xlsx no navegador (SheetJS via CDN) → linhas (objetos por cabeçalho).
@@ -557,11 +557,11 @@ async function readMilvusExportFile(file) {
           if (!hasFantasia) { reject(new Error('Coluna "Nome fantasia do cliente" não encontrada.')); return; }
           if (rows.length > 5000) { reject(new Error('Planilha com linhas demais (máx. 5000).')); return; }
           resolve(rows);
-        } catch (e) { reject(new Error('Não foi possível ler a planilha.')); }
+        } catch (_e) { reject(new Error('Não foi possível ler a planilha.')); }
       };
       reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
       reader.readAsArrayBuffer(file);
-    } catch (e) { reject(new Error('Não foi possível ler o arquivo.')); }
+    } catch (_e) { reject(new Error('Não foi possível ler o arquivo.')); }
   });
 }
 
@@ -611,7 +611,7 @@ async function importClientDevicesFromRows(clientId, sheetRows) {
     if (typeof addLog === 'function') {
       addLog('Importou planilha', 'Inventário', clientId, `${merged.created} novos · ${merged.updated} atualizados`);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-devices'); }
   return { imported: merged.rows.length, created: merged.created, updated: merged.updated, skipped: skipped };
 }
 

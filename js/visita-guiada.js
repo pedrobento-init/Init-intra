@@ -56,7 +56,7 @@ function cwResumo(v, nFotos) {
 }
 
 function _cwGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
-function _cwSet(k, val) { try { if (val === null) localStorage.removeItem(k); else localStorage.setItem(k, String(val)); } catch (_) {} }
+function _cwSet(k, val) { try { if (val === null) localStorage.removeItem(k); else localStorage.setItem(k, String(val)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visita-guiada'); } }
 
 function openVisitaGuiada(id, passo) {
   const v = getVisitById(id);

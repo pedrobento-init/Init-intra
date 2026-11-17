@@ -66,7 +66,7 @@ async function revealClientSecret(clientId, kind, kid, onExpire) {
   const k = _secretKey(clientId, kind, kid);
   const timer = setTimeout(() => {
     _clientSecretMem.delete(k);
-    if (typeof onExpire === 'function') { try { onExpire(clientId); } catch (_) {} }
+    if (typeof onExpire === 'function') { try { onExpire(clientId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'client-secrets'); } }
   }, CLIENT_SECRET_TTL_MS);
   _clientSecretMem.set(k, { v, timer });
   return v;

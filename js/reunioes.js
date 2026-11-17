@@ -64,7 +64,7 @@ function renderReuniao() {
       if (typeof showToast==='function') showToast('Reunião disponível apenas para o time Init.', 'error');
       return;
     }
-  } catch(_){}
+  } catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); }
   document.getElementById('pageTitle').textContent = 'Reunião Mensal';
   const btn = document.getElementById('topbarActionBtn');
   if (btn) btn.style.display = 'none';
@@ -223,7 +223,7 @@ function _getStreakBadgeHtml(clientId) {
     const reunioes = getMyReunioes().filter(r => r.status === 'encerrada').sort((a,b) => (b.mesAno||'').localeCompare(a.mesAno||''));
     const streak = getConsecutiveMeetingStreak(clientId, reunioes, getMyPendencias());
     if (streak >= 2) return `<span class="tag" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;margin-left:6px">🔁 ${streak} meses seguidos</span>`;
-  } catch(_) {}
+  } catch(_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); }
   return '';
 }
 
@@ -375,7 +375,7 @@ function _meetingInlineFormInnerHtml(cid) {
         <textarea class="form-textarea" id="meeting-new-desc-${cid}" rows="2" placeholder="Descrição detalhada..."></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <select class="form-select" id="meeting-new-tipo-${cid}" style="flex:1;min-width:140px">
-            ${(() => { var _t = (typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Gestão','Outro']); try { if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isPendenciaGestao === 'function') _t = _t.filter(function(x){ return !isPendenciaGestao({ tipo: x }); }); } catch (_) {} return _t; })().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
+            ${(() => { var _t = (typeof TIPOS !== 'undefined' ? TIPOS : ['Projeto','Operacional / Interno','Manutenção','Suporte','Gestão','Outro']); try { if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isPendenciaGestao === 'function') _t = _t.filter(function(x){ return !isPendenciaGestao({ tipo: x }); }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); } return _t; })().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
           </select>
           <select class="form-select" id="meeting-new-resp-${cid}" style="flex:1;min-width:140px">
             ${opNames.length ? opNames.map(n => `<option value="${escapeHtml(n)}" ${n===currentUser?'selected':''}>${escapeHtml(n)}</option>`).join('') : `<option value="${escapeHtml(currentUser)}">${escapeHtml(currentUser)}</option>`}
@@ -446,7 +446,7 @@ function _fmtMeetingDateTime(v) {
   try {
     if (!v) return '—';
     if (typeof formatDateTime === 'function') return formatDateTime(v);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); }
   return String(v || '—');
 }
 
@@ -482,7 +482,7 @@ function _meetingPenCard(p) {
   const reassignBtn = `<button class="btn btn-sm btn-secondary" data-action="openReassignPendencia" data-arg="${escapeHtml(p.id)}" aria-label="Reatribuir responsável">Reatribuir</button>`;
   const descView = getMeetingDescView(p);
   let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); }
   const isDone = _isResolvida(p.status);
 
   return `
@@ -642,7 +642,7 @@ function meetingChangePenStatus(penId) {
   _refreshCurrentGroupPens();
   if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderMeetingFlow(); });
   else renderMeetingFlow();
-  try { var _sel2 = document.getElementById('meeting-status-' + penId); if (_sel2) _sel2.focus(); } catch (_) {}
+  try { var _sel2 = document.getElementById('meeting-status-' + penId); if (_sel2) _sel2.focus(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); }
   if (typeof updateBadges === 'function') updateBadges();
 }
 
@@ -666,7 +666,7 @@ function meetingAddPenNote(penId) {
   if (typeof preserveScrollAround === 'function') preserveScrollAround(function() { renderMeetingFlow(); });
   else renderMeetingFlow();
   // Devolve o foco ao campo de nota (fluxo comum: registrar várias em sequência).
-  setTimeout(function() { try { var el = document.getElementById('meeting-note-' + penId); if (el) el.focus(); } catch (_) {} }, 30);
+  setTimeout(function() { try { var el = document.getElementById('meeting-note-' + penId); if (el) el.focus(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); } }, 30);
 }
 
 function meetingCreateInlinePendencia(clientId) {
@@ -700,7 +700,7 @@ function meetingCreateInlinePendencia(clientId) {
     // save já gravou reviewedInMeeting, mas mantemos visível nesta sessão
     g.pens.push(newPen);
     showToast('Pendência criada!', 'success');
-    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); } }
     if (wasEmpty) {
       // Cliente sem pendência virou com pendência — re-render leve do card
       renderMeetingFlow();
@@ -861,7 +861,7 @@ function endReuniao() {
     _meetingState = null;
 
     showToast('Reunião encerrada! Relatório gerado.', 'success');
-    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_) {} }
+    if (typeof updateBadges === 'function') { try { updateBadges(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'reunioes'); } }
     _renderLanding(_getCurrentMesAno(), _getMesAnoLabel(_getCurrentMesAno()), meeting);
   });
 }

@@ -181,7 +181,7 @@ function enqueueMilvusChamado(visitId) {
   try {
     if (!_milvusChamadoCanRun()) return;
     processPendingMilvusChamados('visit:' + (visitId || ''));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 }
 
 // Pós-varredura: a lista/calendário já acompanham via bus 'visitas'
@@ -199,9 +199,9 @@ function _notifyMilvusVisitUI(changedIds) {
     var html = body ? (body.innerHTML || '') : '';
     if (!html) return;
     changedIds.forEach(function(id) {
-      if (id && html.indexOf("'" + id + "'") !== -1) { try { openVisitDetail(id); } catch (_) {} }
+      if (id && html.indexOf("'" + id + "'") !== -1) { try { openVisitDetail(id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); } }
     });
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 }
 
 // Varredura idempotente dos pendentes. Nunca lança; nunca apaga visita;
@@ -232,7 +232,7 @@ async function processPendingMilvusChamados(_reason) {
       // Trava persistida ANTES da rede (crash-safe; stale retoma depois).
       try {
         saveVisit({ ...v, milvusChamadoStatus: 'criando' });
-      } catch (_) {}
+      } catch (_e) { console.error('[milvus-chamado] trava de criação não gravada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 
       let res = null;
       let invokeError = null;
@@ -270,7 +270,7 @@ async function processPendingMilvusChamados(_reason) {
           saveVisit({ ...cur, milvusChamadoStatus: 'pendente', milvusChamadoErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusChamadoTentativas: (Number(cur.milvusChamadoTentativas) || 0) + 1 });
           summary.failed++;
         }
-      } catch (_) {}
+      } catch (_e) { console.error('[milvus-chamado] processamento do chamado falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
     }
   } catch (_) {
     // varredura nunca derruba o chamador
@@ -292,9 +292,9 @@ function retryMilvusChamado(visitId) {
     if (typeof showToast === 'function') showToast('Nova tentativa de criação do chamado enfileirada.', 'info');
     enqueueMilvusChamado(visitId);
     if (typeof openVisitDetail === 'function') {
-      try { openVisitDetail(visitId); } catch (_) {}
+      try { openVisitDetail(visitId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
     }
-  } catch (_) {}
+  } catch (_e) { console.error('[milvus-chamado] nova tentativa do chamado falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); if (typeof showToast === 'function') showToast('Não foi possível enfileirar nova tentativa do chamado.', 'error'); }
 }
 
 // ── ETAPA 2: finalização (relatório concluído → PUT finalizar) ───────────
@@ -311,7 +311,7 @@ function enqueueMilvusFinalizar(visitId) {
   try {
     if (!_milvusChamadoCanRun()) return;
     processPendingMilvusFinalizar('visit:' + (visitId || ''));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 }
 
 // Varredura idempotente das finalizações pendentes. PUT repetir é seguro
@@ -342,7 +342,7 @@ async function processPendingMilvusFinalizar(_reason) {
 
       try {
         saveVisit({ ...vv, milvusFinalizarStatus: 'finalizando' });
-      } catch (_) {}
+      } catch (_e) { console.error('[milvus-chamado] trava de finalização não gravada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 
       let res = null;
       let invokeError = null;
@@ -369,7 +369,7 @@ async function processPendingMilvusFinalizar(_reason) {
           saveVisit({ ...cur, milvusFinalizarStatus: 'pendente', milvusFinalizarErro: String(cls.detail || 'falha temporária').slice(0, 300), milvusFinalizarTentativas: (Number(cur.milvusFinalizarTentativas) || 0) + 1 });
           summary.failed++;
         }
-      } catch (_) {}
+      } catch (_e) { console.error('[milvus-chamado] processamento da finalização falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
     }
   } catch (_) {
     // varredura nunca derruba o chamador
@@ -393,27 +393,27 @@ function retryMilvusFinalizar(visitId) {
     if (typeof showToast === 'function') showToast('Nova tentativa de finalização enfileirada.', 'info');
     enqueueMilvusFinalizar(visitId);
     if (typeof openVisitDetail === 'function') {
-      try { openVisitDetail(visitId); } catch (_) {}
+      try { openVisitDetail(visitId); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
 }
 
 // Gatilhos de reconexão/retorno (a verificação real ocorre no processador).
 // Ambas as etapas (criação e finalização) retomam juntas.
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    try { processPendingMilvusChamados('online'); } catch (_) {}
-    try { processPendingMilvusFinalizar('online'); } catch (_) {}
+    try { processPendingMilvusChamados('online'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
+    try { processPendingMilvusFinalizar('online'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
   });
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('visibilitychange', () => {
     try {
       if (document.visibilityState === 'visible') processPendingMilvusChamados('visibility');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
     try {
       if (document.visibilityState === 'visible') processPendingMilvusFinalizar('visibility');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-chamado'); }
   });
 }
 

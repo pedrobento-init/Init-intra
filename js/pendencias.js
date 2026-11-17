@@ -109,7 +109,7 @@ function penSetView(v) {
   var alvo = v === 'fila' ? 'fila' : 'kanban';
   if (alvo === penView) return;
   penView = alvo;
-  try { localStorage.setItem(PEN_VIEW_KEY, alvo); } catch (_) {}
+  try { localStorage.setItem(PEN_VIEW_KEY, alvo); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias'); }
   if (typeof renderPendencias === 'function') renderPendencias();
 }
 // Sem filtro de origem na tela: pendências que nasceram de e-mail não
@@ -197,7 +197,7 @@ function _getOpNamesFallback(){
     if(typeof globalThis!=='undefined' && typeof globalThis.getOperatorNames==='function') return globalThis.getOperatorNames();
     if(typeof getOperators==='function') return getOperators().map(function(o){return o.name;});
     if(typeof globalThis!=='undefined' && typeof globalThis.getOperators==='function') return globalThis.getOperators().map(function(o){return o.name;});
-  }catch(_){}
+  }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias'); }
   return [];
 }
 function _escapeHtmlFallback(str){
@@ -262,7 +262,7 @@ function _penUpdateMoreFiltersBadge(){
   var badge=document.getElementById('penMoreFiltersBadge');
   // A barra de selos acompanha o badge: todo caminho que mexe em filtro
   // passa por aqui, então os dois nunca saem de sincronia.
-  try { _penRenderFiltrosAtivos(); } catch (_) {}
+  try { _penRenderFiltrosAtivos(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias'); }
   if(!badge) return;
   var n=_penActiveFilterCount();
   badge.textContent=n?String(n):'';
@@ -316,7 +316,7 @@ function _penFiltroTexto(valor, el) {
     if (el && el.tagName === 'SELECT' && el.selectedOptions && el.selectedOptions[0]) {
       return String(el.selectedOptions[0].textContent || '').trim() || valor;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias'); }
   return valor;
 }
 
@@ -462,7 +462,7 @@ function renderPendencias() {
   try{
     var savedName = saved.savedFilterName || '';
     if(savedName && document.getElementById('penSavedFilter')) document.getElementById('penSavedFilter').value = savedName;
-  }catch(_){}
+  }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias'); }
   setTimeout(function(){ _penUpdateMoreFiltersBadge(); }, 30);
   showSkeleton('penViewArea', 6);
   renderPenView();

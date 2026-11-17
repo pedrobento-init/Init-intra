@@ -336,7 +336,7 @@ function _refreshOpStats() {
     vals[0].textContent = ops.length;
     vals[1].textContent = ops.filter(function(o) { return o.active; }).length;
     vals[2].textContent = ops.filter(function(o) { return !o.active; }).length;
-  } catch (_) { try { _updateOpStats(); } catch (_) {} }
+  } catch (_) { try { _updateOpStats(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
 }
 
 // Reaplica busca/filtro atuais à grade preservando a página (filterOperadores
@@ -348,7 +348,7 @@ function _refreshOpListKeepPage() {
     if (typeof filterOperadores === 'function') filterOperadores(); // reseta para 1
     _opPage = pg;
     if (typeof _renderOpGrid === 'function') _renderOpGrid(); // fixa se passou do total
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
 }
 
 // ── Formulário ───────────────────────────────────────────────────────────────
@@ -630,7 +630,7 @@ async function submitOperadorForm(e, id) {
 
     // Anti duplo-submit: a sequência abaixo tem awaits longos (hash + rede).
     var _opSubmitBtn = null;
-    try { _opSubmitBtn = e.target.querySelector('button[type="submit"]'); } catch (_) {}
+    try { _opSubmitBtn = e.target.querySelector('button[type="submit"]'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
     if (_opSubmitBtn) _opSubmitBtn.disabled = true;
     await saveOperator(opData);
 
@@ -708,7 +708,7 @@ async function submitOperadorForm(e, id) {
       showToast(id ? 'Operador atualizado!' : 'Operador cadastrado!', 'success');
     }
   } catch (err) {
-    try { var _b = e.target.querySelector('button[type="submit"]'); if (_b) _b.disabled = false; } catch (_) {}
+    try { var _b = e.target.querySelector('button[type="submit"]'); if (_b) _b.disabled = false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
     showToast('Erro ao salvar operador: ' + err.message, 'error');
   }
 }
@@ -819,7 +819,7 @@ function _refreshOperadoresInPlace(){
     if(q) ops=ops.filter(function(o){ return (o.name||'').toLowerCase().indexOf(q)!==-1 || (o.role||'').toLowerCase().indexOf(q)!==-1; });
     _filteredOps=ops;
     preserveScrollAround(function(){ _renderOpGrid(); });
-  }catch(_){ try{ _renderOpGrid(); }catch(_){} }
+  }catch(_){ try{ _renderOpGrid(); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
 }
 (function(){
   if(typeof window==='undefined' || typeof onDataChanged!=='function') return;
@@ -837,13 +837,13 @@ function _refreshOperadoresInPlace(){
       if (typeof updateUserUI === 'function') updateUserUI();
       if (typeof initTeamSelector === 'function') initTeamSelector();
       if (typeof updateBadges === 'function') updateBadges();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); }
     try {
       var h = ((typeof window !== 'undefined' && window.location && window.location.hash) || '').replace('#', '') || 'dashboard';
       if (typeof navigateTo === 'function') navigateTo(h);
       else if (typeof refreshPage === 'function') refreshPage();
       else window.location.reload();
-    } catch (_) { try { window.location.reload(); } catch (_) {} }
+    } catch (_) { try { window.location.reload(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'operadores'); } }
   });
 })();
 

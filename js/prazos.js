@@ -118,7 +118,7 @@ let _prazosOnlyRisk = false;
 function _prazosLoadGroup() {
   if (_prazosGroupBy) return _prazosGroupBy;
   let v = 'responsavel';
-  try { v = localStorage.getItem(PRAZOS_GROUP_KEY) || v; } catch (_) {}
+  try { v = localStorage.getItem(PRAZOS_GROUP_KEY) || v; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
   _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   return _prazosGroupBy;
 }
@@ -126,7 +126,7 @@ function _prazosLoadGroup() {
 function setPrazosGroup(v) {
   _prazosGroupBy = ['cliente', 'recorrentes'].includes(v) ? v : 'responsavel';
   _prazosOpen = new Set();
-  try { localStorage.setItem(PRAZOS_GROUP_KEY, _prazosGroupBy); } catch (_) {}
+  try { localStorage.setItem(PRAZOS_GROUP_KEY, _prazosGroupBy); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
   renderPrazos();
 }
 
@@ -327,7 +327,7 @@ function renderPrazos() {
     try {
       if ((window.location.hash || '').replace('#', '') !== 'prazos') return;
       if (typeof preserveScrollAround === 'function') preserveScrollAround(renderPrazos); else renderPrazos();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'prazos'); }
   });
 })();
 

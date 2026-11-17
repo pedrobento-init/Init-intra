@@ -539,7 +539,7 @@ function renderRelatorios(){
       if (typeof showToast==='function') showToast('Atendimentos Milvus disponível apenas para o time Init.', 'error');
       return;
     }
-  } catch(_){}
+  } catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
   document.getElementById('pageTitle').textContent='Atendimentos Milvus';
   var content=document.getElementById('contentArea');
   var range=_monthRangeISO();
@@ -582,7 +582,7 @@ function renderRelatorios(){
     var h=(window.location.hash.replace('#','')||'dashboard');
     // página global (Atendimentos Milvus)
     if(h==='relatorios'){
-      try{ preserveScrollAround(function(){ _atendDoFetchAndRender(true); }); }catch(_){}
+      try{ preserveScrollAround(function(){ _atendDoFetchAndRender(true); }); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
       return;
     }
     // aba cliente dentro do modal (agora seção inline na aba unificada
@@ -591,7 +591,7 @@ function renderRelatorios(){
       if(document.getElementById('atendList')){
         preserveScrollAround(function(){ _atendDoFetchAndRender(false); });
       }
-    }catch(_){}
+    }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-atendimentos'); }
   });
 })();
 

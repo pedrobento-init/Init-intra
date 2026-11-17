@@ -152,7 +152,7 @@ async function authSignIn(email, password) {
 
   try {
     await syncSupabaseToLocal();
-  } catch (_) {}
+  } catch (_e) { console.warn('[auth] sync pós-login falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
 
   _recordLoginSuccess();
   setSession(op.id);
@@ -187,12 +187,12 @@ async function _resolveOperatorForAuth(authUser) {
               .from('operators')
               .update({ auth_user_id: authUser.id, updated_at: new Date().toISOString() })
               .eq('id', byEmail.id);
-          } catch (_) {}
+          } catch (_e) { console.error('[auth] vínculo operador/auth_user não gravado', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
         }
         return _upsertOperatorFromRemote(byEmail);
       }
     }
-  } catch (_) {}
+  } catch (_e) { console.error('[auth] resolver operador remoto falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
   return null;
 }
 
@@ -295,12 +295,12 @@ async function authSignOut() {
         localStorage.removeItem(key);
       }
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
 
   if (typeof isSupabaseConnected === 'function' && isSupabaseConnected()) {
     try {
       await supabaseClient.auth.signOut({ scope: 'global' });
-    } catch (_) {}
+    } catch (_e) { console.error('[auth] signOut remoto falhou', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
   }
 }
 
@@ -316,7 +316,7 @@ async function authGetCurrentUser() {
         const op = getOperatorByAuthId(data.user.id) || getOperatorByEmail(data.user.email);
         return { authUser: data.user, operator: op };
       }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
   }
   return null;
 }
@@ -373,7 +373,7 @@ async function authCreateUser(email, password) {
       adminAccess = cur.session.access_token;
       adminRefresh = cur.session.refresh_token;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
 
   try {
     const { data, error } = await supabaseClient.auth.signUp({
@@ -402,7 +402,7 @@ async function authCreateUser(email, password) {
           refresh_token: adminRefresh
         });
         window._supabaseAuthActive = true;
-      } catch (_) {}
+      } catch (_e) { console.error('[auth] sessão do admin não restaurada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); if (typeof showToast === 'function') showToast('A sessão do administrador não foi restaurada. Entre novamente.', 'error'); }
     }
 
     return {
@@ -417,7 +417,7 @@ async function authCreateUser(email, password) {
           access_token: adminAccess,
           refresh_token: adminRefresh
         });
-      } catch (_) {}
+      } catch (_e) { console.error('[auth] sessão do admin não restaurada', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'auth'); }
     }
     return { ok: false, reason: 'error', message: err.message || String(err) };
   }

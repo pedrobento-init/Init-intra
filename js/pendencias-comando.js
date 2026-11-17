@@ -7,7 +7,7 @@
 function cmdStatusDotFor(status) {
   try {
     if (typeof STATUS_PEN_MAP !== 'undefined' && STATUS_PEN_MAP[status]) return STATUS_PEN_MAP[status].dot;
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
   return '#94a3b8';
 }
 function cmdStatusSync() {
@@ -28,8 +28,8 @@ function cmdStatusSync() {
   if (wrap) wrap.setAttribute('data-status', st);
 }
 function cmdStatusPreview(_sel) {
-  try { cmdStatusSync(); } catch (_) {}
-  try { if (typeof showToast === 'function') showToast('Salvando status…', 'info'); } catch (_) {}
+  try { cmdStatusSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
+  try { if (typeof showToast === 'function') showToast('Salvando status…', 'info'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
 }
 function cmdFocusChecklist() {
   var inp = document.getElementById('newCheckItem');
@@ -45,7 +45,7 @@ function cmdRefreshAttCount(penId) {
       c.textContent = list.length ? String(list.length) : '';
       c.style.display = list.length ? '' : 'none';
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
 }
 function cmdDropFiles(ev, penId) {
   try {
@@ -53,10 +53,10 @@ function cmdDropFiles(ev, penId) {
     if (!files.length) return;
     var input = document.getElementById('penFileInputSide') || document.getElementById('penFileInput');
     for (var i = 0; i < files.length; i++) {
-      try { handleFileUpload('pendencias', penId, { files: [files[i]] }, (function(){ return function(){ renderAttachmentList('pendencias', penId, 'penAttachmentsList'); cmdRefreshAttCount(penId); }; })()); } catch (_) {}
+      try { handleFileUpload('pendencias', penId, { files: [files[i]] }, (function(){ return function(){ renderAttachmentList('pendencias', penId, 'penAttachmentsList'); cmdRefreshAttCount(penId); }; })()); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
     }
     if (input) input.value = '';
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
 }
 
 function renderPenChecklist(id) {
@@ -151,7 +151,7 @@ function openReassignPendencia(penId) {
 }
 
 function submitReassignPendencia(penId, btn) {
-  const enable = () => { try { if (btn) btn.disabled = false; } catch (_) {} };
+  const enable = () => { try { if (btn) btn.disabled = false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); } };
   const pen = getPendenciaById(penId);
   if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); enable(); return; }
   const sel = document.getElementById('reassignSelect');
@@ -165,14 +165,14 @@ function submitReassignPendencia(penId, btn) {
     const res = updatePendenciaAssignee(penId, { responsible: novo });
     closeModal();
     if (typeof showToast === 'function') showToast(novo ? 'Pendência reatribuída para ' + novo + '!' : 'Responsável removido.', 'success');
-    try { _optimisticPenUpsert({ ...res.pen }); } catch (_) {} // reflete na lista na hora
+    try { _optimisticPenUpsert({ ...res.pen }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); } // reflete na lista na hora
   } catch (err) {
     if (typeof showToast === 'function') showToast(err.message || 'Não foi possível reatribuir.', 'error');
     enable();
     return;
   }
   if (typeof renderPenView === 'function' && document.getElementById('penViewArea')) renderPenView(false);
-  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
+  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); } }
   if (typeof updateBadges === 'function') updateBadges();
 }
 
@@ -185,7 +185,7 @@ function _correctCompletionOptions(current) {
       const filtered = ops.filter(o => (o.team || 'init') === team);
       if (filtered.length) ops = filtered;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
   // Quem concluiu é fato passado: lista todos (vale afastado/inativo).
   return `<option value="">— Não informado —</option>` +
     ops.map(o => `<option value="${escapeHtml(o.name)}" ${o.name===current?'selected':''}>${escapeHtml(o.name)}</option>`).join('');
@@ -195,7 +195,7 @@ function openCorrectCompletion(penId) {
   const pen = getPendenciaById(penId);
   if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); return; }
   let _isResolvida = function(s) { return ['concluido', 'resolvido'].indexOf(s || '') !== -1; };
-  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_) {}
+  try { if (typeof isPendenciaResolvida === 'function') _isResolvida = isPendenciaResolvida; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
   if (!_isResolvida(pen.status)) { if (typeof showToast === 'function') showToast('Só é possível informar quem concluiu em pendência concluída.', 'error'); return; }
   const current = pen.completedBy || '';
   let quando = '—';
@@ -216,7 +216,7 @@ function openCorrectCompletion(penId) {
 }
 
 function submitCorrectCompletion(penId, btn) {
-  const enable = () => { try { if (btn) btn.disabled = false; } catch (_) {} };
+  const enable = () => { try { if (btn) btn.disabled = false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); } };
   const pen = getPendenciaById(penId);
   if (!pen) { if (typeof showToast === 'function') showToast('Pendência não encontrada.', 'error'); enable(); return; }
   const sel = document.getElementById('correctCompletedBySelect');
@@ -231,7 +231,7 @@ function submitCorrectCompletion(penId, btn) {
     enable();
     return;
   }
-  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_) {} }
+  if (typeof renderMeetingFlow === 'function' && document.getElementById('contentArea') && typeof _meetingState !== 'undefined' && _meetingState) { try { _refreshCurrentGroupPens(); renderMeetingFlow(); } catch(_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); } }
   if (typeof updateBadges === 'function') updateBadges();
 }
 
@@ -249,7 +249,7 @@ function meetingReassignPen(penId) { return openReassignPendencia(penId); }
       if(document.getElementById('penViewArea') && typeof renderPenView==='function') renderPenView(false);
       // Dashboard visível: números/gráficos acompanham sem navegar e voltar.
       if(h==='dashboard' && typeof renderDashboard==='function' && document.getElementById('contentArea')) renderDashboard();
-    }); }catch(_){}
+    }); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
   });
 })();
 

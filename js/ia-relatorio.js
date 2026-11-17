@@ -37,7 +37,7 @@ async function iaWriteReport(textareaId, visitId, btn) {
     });
     if (error || !data || !data.relatorio) {
       let msg = (data && data.error) || '';
-      try { if (!msg && error && error.context && typeof error.context.json === 'function') msg = (await error.context.json()).error || ''; } catch (_) {}
+      try { if (!msg && error && error.context && typeof error.context.json === 'function') msg = (await error.context.json()).error || ''; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ia-relatorio'); }
       throw new Error(msg || 'Não foi possível gerar o relatório agora.');
     }
     _iaUndo[textareaId] = ta.value;

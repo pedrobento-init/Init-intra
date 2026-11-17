@@ -53,7 +53,7 @@ function openPendenciaDetailModal(id) {
       if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
   const c = getClientById(p.clientId);
   const _worker = (typeof getCurrentWorker === 'function') ? getCurrentWorker(p) : null;
   const _ft = _penFriendlyTime(p);
@@ -167,11 +167,11 @@ function openPendenciaDetailModal(id) {
   setTimeout(() => {
     renderAttachmentList('pendencias', id, 'penAttachmentsList');
     renderPenChecklist(id);
-    try { cmdStatusSync(); } catch (_) {}
+    try { cmdStatusSync(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     try {
       var _feed = document.getElementById('penTimeline');
       if (_feed) _feed.scrollTop = _feed.scrollHeight;
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     var chk = document.getElementById('newCheckItem');
     if (chk && !chk.dataset.chdKeys) {
       chk.dataset.chdKeys = '1';
@@ -209,9 +209,9 @@ function openPendenciaDetailModal(id) {
             (async function(f){
               var attId='ATT-'+Date.now()+'-'+_secureRandStr(4);
               var url=null,path=null,data=null;
-              try{ var up=await _uploadAttachmentToStorage('pendencias', id, attId, f); if(up){ url=up.url; path=up.path; } }catch(_){}
+              try{ var up=await _uploadAttachmentToStorage('pendencias', id, attId, f); if(up){ url=up.url; path=up.path; } }catch(_e){ console.warn('[pendencias-detalhe] upload do anexo colado falhou; usa base64', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
               if(!url){
-                try{ data=await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsDataURL(f); }); }catch(_){}
+                try{ data=await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsDataURL(f); }); }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
               }
               var result=addAttachment('pendencias', id, {id:attId, name:f.name, mimeType:f.type, size:f.size, data:data, url:url, path:path});
               if(result && result.error){ if(typeof showToast==='function') showToast(result.error,'error'); }
@@ -237,7 +237,7 @@ function changePenStatus(id) {
   try {
     var _stop = (typeof timerSessionStopForStatus === 'function') ? timerSessionStopForStatus(p, newStatus) : null;
     if (_stop) timerApplyStopOnStatus(p, next, _stop);
-  } catch (_) {}
+  } catch (_e) { console.error('[pendencias-detalhe] cronômetro não ajustado ao mudar status', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
   savePendencia(next);
   _optimisticPenUpsert(next); // reflete na lista na hora; o fetch reconcilia depois
   updateBadges();
@@ -314,7 +314,7 @@ function _penOrigemHtml(origem) {
     if (Date.parse(origem.recebidoEm) && typeof formatDateTime === 'function') {
       quando = formatDateTime(origem.recebidoEm);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
   return '<div class="pen-origem">'
     + '<div class="pen-origem-head">' + (ehEmail ? '✉' : '💬') + ' Chegou por ' + escapeHtml(origem.canal) + '</div>'
     + '<dl class="pen-origem-lista">'
@@ -461,7 +461,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
       if (typeof showToast === 'function') showToast('Acesso restrito à Gestão.', 'error');
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
   const clients     = isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
   const opNames     = getOperatorNames(isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam ? _selectedTeam : getCurrentTeam());
   const currentResp = p.responsible || getUser().name;
@@ -471,9 +471,9 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
   const _prazoVal = p.deadline || preDate || (_prazoAuto ? slaPrazoSugerido(p.priority || 'media', localDateISO()) : '');
   // Gestão: esconde a opção Gestão de quem não é Gestão (Felipe/Joarli).
   var _canGest = true;
-  try { _canGest = (typeof canViewGestao === 'function') ? canViewGestao() : true; } catch (_) {}
+  try { _canGest = (typeof canViewGestao === 'function') ? canViewGestao() : true; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
   var _tiposVisiveis = Array.isArray(typeof TIPOS !== 'undefined' ? TIPOS : []) ? TIPOS.filter(function(t){
-    try { if (typeof isPendenciaGestao === 'function' && isPendenciaGestao({ tipo: t }) && !_canGest) return false; } catch (_) {}
+    try { if (typeof isPendenciaGestao === 'function' && isPendenciaGestao({ tipo: t }) && !_canGest) return false; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     return true;
   }) : [];
 
@@ -581,7 +581,7 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
       var _f = document.querySelector('#modalBody form');
       if (_f && typeof slaBindPrazoAuto === 'function') slaBindPrazoAuto(_f);
       if (_f && typeof slaBindSolicitante === 'function') slaBindSolicitante(_f, 'penSolicitanteList');
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     var ta=document.querySelector('textarea[name="descricao"]');
     var sug=document.getElementById('templateSuggestion');
     if(!ta||!sug) return;
@@ -654,7 +654,7 @@ function submitPendenciaForm(e, id) {
       var _isGestForm = (typeof isPendenciaGestao === 'function') ? isPendenciaGestao({ tipo: tipoVal }) : false;
       var _canGestForm = (typeof canViewGestao === 'function') ? canViewGestao() : true;
       if (_isGestForm && !_canGestForm) { showToast('Apenas Gestão (Felipe e Joarli) pode usar o tipo Gestão.', 'error'); return; }
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     const data = {
       id: id||null, clientId, clientName: client?.name||'', tipo: tipoVal,
       assunto, descricao, responsible: g('responsible'), status: g('status'),
@@ -676,7 +676,7 @@ function submitPendenciaForm(e, id) {
       try {
         const items = JSON.parse(g('templateChecklist'));
         if (Array.isArray(items) && items.length) data.checklist = items.map(t => ({ text: String(t), done: false }));
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     }
     const errors = validatePendencia(data);
     if (errors.length) { showToast(errors[0], 'error'); return; }
@@ -690,8 +690,8 @@ function submitPendenciaForm(e, id) {
         && _clientPenOrigin.clientId && _clientPenOrigin.penId === id) {
         _backToClient = { clientId: _clientPenOrigin.clientId };
       }
-    } catch (_) {}
-    try { _clientPenReturn = null; _clientPenOrigin = null; } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
+    try { _clientPenReturn = null; _clientPenOrigin = null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     savePendencia(data); // preenche data.id/data.createdAt/data.updatedAt no create
     closeModal();
     if (isNew) {
@@ -722,7 +722,7 @@ function submitPendenciaForm(e, id) {
       try {
         if (typeof viewClient === 'function') viewClient(_backToClient.clientId);
         if (typeof switchClientTab === 'function') switchClientTab('pendencias', _backToClient.clientId);
-      } catch (_) {}
+      } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-detalhe'); }
     }
   } catch (err) { showToast('Erro ao salvar pendência: ' + err.message, 'error'); }
 }

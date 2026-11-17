@@ -97,7 +97,7 @@ function setMilvusTicketsLastSyncAt(clientId, iso) {
     const map = raw ? JSON.parse(raw) : {};
     map[clientId] = iso;
     localStorage.setItem(MILVUS_TICKETS_SYNC_AT_KEY, JSON.stringify(map));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets'); }
 }
 
 function _ticketOpView() {
@@ -132,11 +132,11 @@ async function getClientMilvusTickets(clientId) {
             const others = cached.filter((t) => t && t.client_id !== clientId);
             setCacheStore('client_milvus_tickets', others.concat(data));
           }
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets'); }
         return data;
       }
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets'); }
   try {
     if (typeof getCacheStore === 'function') {
       return (getCacheStore('client_milvus_tickets') || [])
@@ -144,7 +144,7 @@ async function getClientMilvusTickets(clientId) {
         .sort((a, b) => (b.codigo || 0) - (a.codigo || 0))
         .slice(0, MILVUS_TICKETS_KEEP);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets'); }
   return [];
 }
 
@@ -169,7 +169,7 @@ async function syncClientMilvusTickets(clientId) {
   try {
     if (data && data.lastSyncAt) setMilvusTicketsLastSyncAt(clientId, data.lastSyncAt);
     else setMilvusTicketsLastSyncAt(clientId, new Date().toISOString());
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-tickets'); }
   return data;
 }
 

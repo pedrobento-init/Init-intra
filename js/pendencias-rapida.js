@@ -118,7 +118,7 @@ function submitPendenciaRapida(form) {
   closeModal();
   const page = (window.location.hash || '').replace('#', '');
   if (page === 'pendencias' && typeof renderPenView === 'function' && document.getElementById('penViewArea')) {
-    try { _penPage = 0; _penLastSig = ''; _optimisticPenUpsert(data, { isNew: true }); } catch (_) {}
+    try { _penPage = 0; _penLastSig = ''; _optimisticPenUpsert(data, { isNew: true }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-rapida'); }
     renderPenView(true);
   } else if (page === 'fila' && typeof renderFila === 'function') {
     renderFila();

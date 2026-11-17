@@ -220,14 +220,14 @@ function checklistCategoriaOptions(atual) {
 function _ckCache(store) {
   try {
     if (typeof getCacheStore === 'function') return getCacheStore(store) || [];
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return [];
 }
 
 function _ckSetCache(store, rows) {
   try {
     if (typeof setCacheStore === 'function') { setCacheStore(store, rows); return true; }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return false;
 }
 
@@ -244,11 +244,11 @@ function _ckSupabaseReady() {
 }
 
 function _ckToast(msg, type) {
-  try { if (typeof showToast === 'function') showToast(msg, type || 'error'); } catch (_) {}
+  try { if (typeof showToast === 'function') showToast(msg, type || 'error'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
 }
 
 function _ckNewId(prefix) {
-  try { if (typeof nextId === 'function') return nextId(prefix); } catch (_) {}
+  try { if (typeof nextId === 'function') return nextId(prefix); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
@@ -280,7 +280,7 @@ async function _ckPersist(apply, revert, remote, failMsg) {
       _ckPendingReload = false;
       const alvo = _ckReloadFor;
       _ckReloadFor = null;
-      if (alvo) { try { await loadChecklistMarcacoes(alvo); } catch (_) {} }
+      if (alvo) { try { await loadChecklistMarcacoes(alvo); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); } }
     }
   }
 }
@@ -360,7 +360,7 @@ async function loadChecklistModelo() {
       }
       if (res && res.error) console.warn('⚠️ Checklist itens:', res.error.message);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return false;
 }
 
@@ -377,7 +377,7 @@ async function loadChecklists(force) {
       }
       if (res && res.error) console.warn('⚠️ Checklists:', res.error.message);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return false;
 }
 let _ckChecklistsLoaded = false;
@@ -417,7 +417,7 @@ async function loadChecklistMarcacoes(clientId) {
       }
       if (res && res.error) console.warn('⚠️ Checklist marcações:', res.error.message);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return false;
 }
 
@@ -432,7 +432,7 @@ async function loadAllChecklistMarcacoes() {
       _ckAllMarks = res.data.map(r => ({ itemId: r.item_id, clientId: r.client_id }));
       return true;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   return false;
 }
 
@@ -881,7 +881,7 @@ function _ckReopen(clientId) {
   try {
     if (typeof viewClient === 'function') viewClient(clientId);
     if (typeof switchClientTab === 'function') switchClientTab('checklist', clientId);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
 }
 
 // ── Modo GERENCIAR ───────────────────────────────────────────────────────────
@@ -1178,7 +1178,7 @@ function _ckBindDrag(clientId, row) {
   row.addEventListener('dragstart', e => {
     _ckDragId = id;
     row.classList.add('is-drag');
-    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (_) {}
+    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   });
   row.addEventListener('dragend', () => {
     row.classList.remove('is-drag');
@@ -1274,7 +1274,7 @@ if (typeof document !== 'undefined') {
       if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeChecklistProc(); });
       const btn = document.getElementById('ckProcClose');
       if (btn) btn.addEventListener('click', closeChecklistProc);
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'checklist'); }
   });
 }
 

@@ -129,11 +129,11 @@ function _qrAbrirAlvo(alvo) {
   const q = new URLSearchParams(window.location.search);
   const tipo = q.has('disp') ? 'disp' : q.has('equip') ? 'equip' : null;
   if (tipo) {
-    try { sessionStorage.setItem(QR_ALVO_KEY, JSON.stringify({ tipo, id: q.get(tipo) })); } catch (_) {}
-    try { history.replaceState(null, '', window.location.pathname + window.location.hash); } catch (_) {}
+    try { sessionStorage.setItem(QR_ALVO_KEY, JSON.stringify({ tipo, id: q.get(tipo) })); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'etiquetas-qr'); }
+    try { history.replaceState(null, '', window.location.pathname + window.location.hash); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'etiquetas-qr'); }
   }
   let alvo = null;
-  try { alvo = JSON.parse(sessionStorage.getItem(QR_ALVO_KEY) || 'null'); } catch (_) {}
+  try { alvo = JSON.parse(sessionStorage.getItem(QR_ALVO_KEY) || 'null'); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'etiquetas-qr'); }
   if (!alvo || !alvo.id) return;
   let tentativas = 0;
   const t = setInterval(() => {
@@ -142,7 +142,7 @@ function _qrAbrirAlvo(alvo) {
       && typeof supabaseClient !== 'undefined' && typeof navigateTo === 'function';
     if (pronto) {
       clearInterval(t);
-      try { sessionStorage.removeItem(QR_ALVO_KEY); } catch (_) {}
+      try { sessionStorage.removeItem(QR_ALVO_KEY); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'etiquetas-qr'); }
       setTimeout(() => _qrAbrirAlvo(alvo), 600);
     } else if (tentativas > 600) clearInterval(t);  // 5 min sem login: desiste
   }, 500);

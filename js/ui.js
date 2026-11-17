@@ -205,17 +205,17 @@ function closeModal() {
     if (typeof _clientPenReturn !== 'undefined' && _clientPenReturn && _clientPenReturn.clientId) {
       const _ret = _clientPenReturn;
       _clientPenReturn = null;
-      try { if (typeof _clientPenOrigin !== 'undefined') _clientPenOrigin = null; } catch (_) {}
+      try { if (typeof _clientPenOrigin !== 'undefined') _clientPenOrigin = null; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
       setTimeout(() => {
         try {
           if (document.getElementById('modalOverlay').style.display !== 'none') return;
           if (typeof getClientById === 'function' && !getClientById(_ret.clientId)) return;
           if (typeof viewClient === 'function') viewClient(_ret.clientId);
           if (typeof switchClientTab === 'function') switchClientTab('pendencias', _ret.clientId);
-        } catch (_) {}
+        } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
       }, 220);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 
 function showToast(message, type = 'info') {
@@ -272,7 +272,7 @@ function loadFilterState(pageKey, defaults) {
   try {
     var raw = localStorage.getItem('intra_filter_' + pageKey);
     return raw ? JSON.parse(raw) : (defaults || {});
-  } catch (e) { return defaults || {}; }
+  } catch (_e) { return defaults || {}; }
 }
 
 function confirmAction(message, onConfirm) {
@@ -537,13 +537,13 @@ const _sidebarToggleBtn = document.getElementById('sidebarToggle');
 function _getSidebarPref() {
   try {
     if (typeof getCacheKV === 'function') return getCacheKV(SIDEBAR_PREF_KEY, null);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   return null;
 }
 function _setSidebarPref(collapsed) {
   try {
     if (typeof setCacheKV === 'function') setCacheKV(SIDEBAR_PREF_KEY, collapsed === true);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 function setSidebarCollapsed(collapsed, save) {
   const sidebar = document.getElementById('sidebar');
@@ -558,7 +558,7 @@ function _autoSidebarForWidth() {
     if (window.innerWidth <= 768) return; // mobile off-canvas intacto
     if (_getSidebarPref() !== null) return; // preferência manual vence
     setSidebarCollapsed(window.innerWidth <= SIDEBAR_AUTO_BREAKPOINT, false);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 if (_sidebarToggleBtn) {
   _sidebarToggleBtn.addEventListener('click', () => {
@@ -577,14 +577,14 @@ if (typeof window !== 'undefined' && window.matchMedia) {
     } else if (typeof _sbMedia.addListener === 'function') {
       _sbMedia.addListener(_autoSidebarForWidth);
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 if (typeof _initDBPromise !== 'undefined' && _initDBPromise && typeof _initDBPromise.then === 'function') {
   _initDBPromise.then(() => {
     try {
       const pref = _getSidebarPref();
       if (pref !== null && window.innerWidth > 768) setSidebarCollapsed(pref, false);
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   }).catch(() => {});
 }
 
@@ -690,7 +690,7 @@ document.addEventListener('keydown', e => {
       closeChecklistProc();
       return;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   if (document.getElementById('modalOverlay').style.display !== 'none') requestCloseModal();
   if (document.getElementById('userModalOverlay').style.display !== 'none')
     document.getElementById('userModalOverlay').style.display = 'none';
@@ -797,7 +797,7 @@ function openAuditTarget(type, id) {
     if (t === 'pendencia' && getPendenciaById(id)) return openPendenciaDetail(id);
     if (t === 'visita' && getVisitById(id)) return openVisitDetail(id);
     if (t === 'cliente' && getClientById(id)) return viewClient(id);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   showToast('Registro não encontrado (pode ter sido excluído).', 'info');
 }
 
@@ -863,7 +863,7 @@ function _auditLocalLogs() {
   try {
     if (typeof filterGestaoLogs === 'function') logs = filterGestaoLogs(logs);
     else if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') logs = logs.filter((l) => !isGestaoLog(l));
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   return logs;
 }
 
@@ -958,7 +958,7 @@ async function auditFetchRemote(btn) {
     const { data, error } = await q;
     if (error) throw error;
     let rows = (data || []).map((l) => ({ id: l.id, operatorName: l.operator_name, action: l.action, type: l.type, targetId: l.target_id, details: l.details, timestamp: l.timestamp }));
-    try { if (typeof filterGestaoLogs === 'function') rows = filterGestaoLogs(rows); } catch (_) {}
+    try { if (typeof filterGestaoLogs === 'function') rows = filterGestaoLogs(rows); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
     _auditState.remote = rows;
     _auditState.shown = AUDIT_PAGE;
     _renderAuditList();
@@ -1132,7 +1132,7 @@ function _syncTopbarMoreAction(text) {
       const label = item.querySelector('.topbar-more-action-text');
       if (label) label.textContent = text;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 function toggleTopbarMoreMenu(e) {
   if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -1153,7 +1153,7 @@ function closeTopbarMoreMenu() {
     menu.hidden = true;
     menu.dataset.open = '0';
     if (btn) btn.setAttribute('aria-expanded', 'false');
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
 }
 if (typeof window !== 'undefined' && !window._topbarMoreBound && typeof document !== 'undefined' && document.addEventListener) {
   window._topbarMoreBound = true;
@@ -1164,12 +1164,12 @@ if (typeof window !== 'undefined' && !window._topbarMoreBound && typeof document
       if (!menu || menu.hidden) return;
       if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
       closeTopbarMoreMenu();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   });
   document.addEventListener('keydown', function (e) {
     try {
       if (e && e.key === 'Escape') closeTopbarMoreMenu();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   });
 }
 
@@ -1227,7 +1227,7 @@ function exportLogsCSV() {
     try {
       if (typeof filterGestaoLogs === 'function') return filterGestaoLogs(_l);
       if (typeof canViewGestao === 'function' && !canViewGestao() && typeof isGestaoLog === 'function') return _l.filter(l => !isGestaoLog(l));
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
     return _l;
   })();
   const headers = ['Data/Hora', 'Ação', 'Tipo', 'Detalhes', 'Operador'];
@@ -1344,7 +1344,7 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 // ── PWA Install Prompt ─────────────────────────────────────────────────────────
 let _deferredInstall = null;
 function _setInstallBtnVisible(v) {
-  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_) {}
+  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   refreshSidebarMore();
 }
 
@@ -1468,7 +1468,7 @@ function _richMentionNames() {
       var n = getOperatorNames();
       if (n && n.length) return n;
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'ui'); }
   return [];
 }
 function _richApplyMentions(escapedChunk) {
