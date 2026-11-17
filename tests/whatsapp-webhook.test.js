@@ -32,7 +32,7 @@ function evento(extra = {}) {
 
 // `falharInsert` derruba todo insert em emails_triagem, que é como o banco se
 // comporta quando a gravação não acontece. O Proxy troca só o insert do builder.
-async function chamar(payload, { falharInsert = false, fetch } = {}) {
+async function chamar(payload, { falharInsert = false, semDirecao = false, fetch } = {}) {
   const queries = [];
   const base = fakeSupabase({ queries });
   const createClient = (url, key, opts) => {
@@ -40,6 +40,16 @@ async function chamar(payload, { falharInsert = false, fetch } = {}) {
     const from = cliente.from;
     cliente.from = (tabela) => {
       const b = from(tabela);
+      if (semDirecao && tabela === 'emails_triagem') {
+        // Banco sem a 082: filtrar por `direcao` dá 42703, como o Postgres.
+        const eq = b.eq;
+        b.eq = (col, val) => {
+          if (col !== 'direcao') return eq(col, val);
+          eq(col, val);
+          const erro = { code: '42703', message: 'column "direcao" does not exist' };
+          return { gte: () => Promise.resolve({ count: null, error: erro }) };
+        };
+      }
       if (!falharInsert || tabela !== 'emails_triagem') return b;
       return new Proxy(b, {
         get(alvo, prop) {
@@ -121,5 +131,26 @@ describe('whatsapp: mídia e reentrega', () => {
       (q) => q.tabela === 'avisos_enviados' && !q.insert && q.filtros.some(([col]) => col === 'key')
     );
     expect(devolveu).toBeUndefined();
+  });
+
+  // O operador responde e anota pelo mesmo telefone. Contar essas linhas
+  // fazia a mensagem seguinte do cliente cair no limite de rajada.
+  it('o limite por minuto conta só mensagem que o número mandou', async () => {
+    const { queries } = await chamar(evento());
+    const contagem = queries.find(
+      (q) => q.tabela === 'emails_triagem' && q.filtros.some(([col]) => col === 'telefone')
+    );
+    expect(contagem).toBeDefined();
+    expect(contagem.filtros).toContainEqual(['direcao', 'entrada']);
+  });
+
+  // Sem a 082 o filtro falha sempre; devolver 0 desligaria o limite de vez.
+  it('sem a coluna direcao, o limite conta de novo sem o filtro', async () => {
+    const { queries } = await chamar(evento(), { semDirecao: true });
+    const contagens = queries.filter(
+      (q) => q.tabela === 'emails_triagem' && q.filtros.some(([col]) => col === 'telefone')
+    );
+    expect(contagens).toHaveLength(2);
+    expect(contagens[1].filtros.some(([col]) => col === 'direcao')).toBe(false);
   });
 });
