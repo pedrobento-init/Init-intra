@@ -968,21 +968,49 @@ async function auditFetchRemote(btn) {
   }
 }
 
+/**
+ * Apaga o histórico. Ordem importa: papel → remoto → só então o cache local.
+ * Por quê: antes o cache era zerado primeiro e uma falha remota só ia para o
+ * console — o admin via a lista vazia e o histórico voltava no próximo pull.
+ * O papel é checado AQUI (não só na UI/RLS): o filtro do delete remoto cobre
+ * a tabela inteira de propósito, então quem decide quem pode é esta função e,
+ * no servidor, a policy logs_delete (admin). Retorna { ok } ou { ok:false, reason }
+ * com reason = 'forbidden' | 'offline' | 'remote'.
+ */
+async function clearAuditLogs() {
+  if (typeof isCurrentAdmin !== 'function' || !isCurrentAdmin()) return { ok: false, reason: 'forbidden' };
+  const hasRemote = typeof supabaseClient !== 'undefined' && !!supabaseClient;
+  if (hasRemote) {
+    if (!window._supabaseAuthActive) return { ok: false, reason: 'offline' };
+    try {
+      // "id não nulo" = todas as linhas; o PostgREST exige algum filtro no delete.
+      const { error } = await supabaseClient.from('audit_logs').delete().not('id', 'is', null);
+      if (error) { console.warn('⚠️ Falha ao limpar logs remotos:', error.message); return { ok: false, reason: 'remote' }; }
+    } catch (e) {
+      console.warn('⚠️ Rede ao limpar logs:', e && e.message);
+      return { ok: false, reason: 'remote' };
+    }
+  }
+  if (typeof setCacheTable === 'function') setCacheTable('audit_logs', []);
+  else if (typeof dbSet === 'function') dbSet(DB.LOGS, []);
+  return { ok: true };
+}
+
 function clearLogs() {
   if (typeof isCurrentAdmin === 'function' && !isCurrentAdmin()) {
     showToast('Apenas administradores podem limpar o histórico.', 'error');
     return;
   }
   confirmAction('Tem certeza que deseja apagar todo o histórico de atividades? Esta ação não pode ser desfeita.', async () => {
-    if (typeof setCacheTable === 'function') setCacheTable('audit_logs', []);
-    else if (typeof dbSet === 'function') dbSet(DB.LOGS, []);
-    if (typeof isSupabaseConnected === 'function' && isSupabaseConnected() && window._supabaseAuthActive) {
-      try {
-        const { error } = await supabaseClient.from('audit_logs').delete().gte('timestamp', '1970-01-01');
-        if (error) console.warn('⚠️ Falha ao limpar logs remotos:', error.message);
-      } catch (e) {
-        console.warn('⚠️ Rede ao limpar logs:', e.message);
-      }
+    const res = await clearAuditLogs();
+    if (!res.ok) {
+      showToast(
+        res.reason === 'forbidden' ? 'Apenas administradores podem limpar o histórico.'
+          : res.reason === 'offline' ? 'Sem conexão autenticada com o servidor: o histórico não foi apagado.'
+          : 'Não foi possível apagar o histórico no servidor. Nada foi apagado; tente de novo.',
+        'error'
+      );
+      return;
     }
     if (typeof addLog === 'function') {
       addLog('Limpou Histórico', 'Histórico', 'Geral', 'Histórico limpo por admin');

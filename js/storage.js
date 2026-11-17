@@ -547,9 +547,11 @@ function _migrateLegacyPenStatuses() {
     // empatados faz o remoto (legado) vencer o merge e o status antigo volta.
     var now3 = new Date().toISOString();
     var changed = false;
+    var idsByTo = { resolvido: [], cancelado: [] }; // remoto só toca o que é nosso (por id), não a tabela inteira
     for (var i = 0; i < list.length; i++) {
       var to = list[i] && map[list[i].status];
       if (to) {
+        if (list[i].id) idsByTo[to].push(list[i].id);
         list[i] = { ...list[i], status: to, updatedAt: now3 };
         touched++;
         changed = true;
@@ -563,10 +565,10 @@ function _migrateLegacyPenStatuses() {
         && typeof window !== 'undefined' && window._supabaseAuthActive
         && typeof supabaseClient !== 'undefined' && supabaseClient) {
       var now2 = new Date().toISOString();
-      supabaseClient.from('pendencias').update({ status: 'resolvido', updated_at: now2 }).in('status', ['concluido'])
+      if (idsByTo.resolvido.length) supabaseClient.from('pendencias').update({ status: 'resolvido', updated_at: now2 }).in('id', idsByTo.resolvido).in('status', ['concluido'])
         .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ resolvido:', res.error.message); })
         .catch(function() {});
-      supabaseClient.from('pendencias').update({ status: 'cancelado', updated_at: now2 }).in('status', ['fechado'])
+      if (idsByTo.cancelado.length) supabaseClient.from('pendencias').update({ status: 'cancelado', updated_at: now2 }).in('id', idsByTo.cancelado).in('status', ['fechado'])
         .then(function(res) { if (res && res.error) console.warn('⚠️ Migração status p/ cancelado:', res.error.message); })
         .catch(function() {});
     }
