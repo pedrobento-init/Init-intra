@@ -67,14 +67,14 @@ function showSkeleton(containerId, rows = 5) {
   const rowHtml = Array.from({ length: rows }, () =>
     `<div class="skeleton-row">
       <div class="skeleton skeleton-avatar"></div>
-      <div style="flex:1">
+      <div class="u-97445a">
         <div class="skeleton skeleton-text"></div>
         <div class="skeleton skeleton-text short"></div>
       </div>
       <div class="skeleton skeleton-badge"></div>
     </div>`
   ).join('');
-  container.innerHTML = `<div style="padding:16px">${rowHtml}</div>`;
+  container.innerHTML = `<div class="u-287f77">${rowHtml}</div>`;
 }
 
 /**
@@ -258,7 +258,7 @@ function showUndoToast(message, onUndo) {
   t.style.display = 'flex';
   t.style.alignItems = 'center';
   t.style.gap = '8px';
-  t.innerHTML = `<span>${escapeHtml(message)}</span><button class="btn btn-sm btn-secondary" style="margin-left:auto;flex-shrink:0">Desfazer</button>`;
+  t.innerHTML = `<span>${escapeHtml(message)}</span><button class="btn btn-sm btn-secondary u-e1dc02">Desfazer</button>`;
   c.appendChild(t);
   let undone = false;
   const timer = setTimeout(() => { if (!undone) { t.classList.add('removing'); setTimeout(() => t.remove(), 300); } }, 5000);
@@ -282,7 +282,7 @@ function confirmAction(message, onConfirm) {
   const wasOpen   = document.getElementById('modalOverlay').style.display !== 'none';
 
   openModal('Confirmar', `
-    <p style="margin-bottom:20px;color:var(--text-secondary)">${message}</p>
+    <p class="u-13d2c5">${message}</p>
     <div class="form-actions">
       <button class="btn btn-secondary" id="confirmCancelBtn">Cancelar</button>
       <button class="btn btn-danger" id="confirmBtn">Confirmar</button>
@@ -826,11 +826,11 @@ function renderLogs() {
       <select id="logTypeFilter" class="form-select filter-select-sm pt-filter" aria-label="Tipo de registro">${opt(facets.types, 'Todos os tipos')}</select>
       <select id="logActionFilter" class="form-select filter-select-sm pt-filter" aria-label="Ação">${opt(facets.actions, 'Todas as ações')}</select>
       <div class="filter-date-wrap pt-filter">
-        <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
+        <span class="u-cec3b6">De:</span>
         <input type="date" id="logDateFrom" class="form-input filter-date" />
       </div>
       <div class="filter-date-wrap pt-filter">
-        <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">Até:</span>
+        <span class="u-cec3b6">Até:</span>
         <input type="date" id="logDateTo" class="form-input filter-date" />
       </div>
       <div class="pt-actions">
@@ -907,7 +907,7 @@ function _renderAuditList() {
       (_auditState.remote ? ' · inclui registros do servidor' : '');
   }
   if (!list.length) {
-    container.innerHTML = '<div class="empty-state" style="padding:40px"><p>Nenhum registro encontrado com esses filtros.</p></div>';
+    container.innerHTML = '<div class="empty-state u-a19bf6"><p>Nenhum registro encontrado com esses filtros.</p></div>';
     return;
   }
   const page = list.slice(0, _auditState.shown);
@@ -923,11 +923,11 @@ function _renderAuditList() {
     '<div class="log-timeline">' + g.items.map((log) => {
       const cls = actionClass(log);
       return '<div class="log-card">' +
-        '<div class="log-dot ' + cls + '" style="background:currentColor"></div>' +
+        '<div class="log-dot ' + cls + ' u-be5c13"></div>' +
         '<div class="log-header">' +
           '<span class="log-action-label">' + escapeHtml(log.action) + '</span>' +
           '<span class="log-type-badge ' + cls + '">' + escapeHtml(log.type) + '</span>' +
-          '<span style="flex:1"></span>' +
+          '<span class="u-97445a"></span>' +
           '<span class="log-meta">' + escapeHtml(time(log.timestamp)) + '</span>' +
         '</div>' +
         '<div class="log-details">' + escapeHtml(log.details) + '</div>' +
@@ -939,7 +939,7 @@ function _renderAuditList() {
       '</div>';
     }).join('') + '</div></section>').join('') +
     (list.length > page.length
-      ? '<div style="text-align:center;padding:12px"><button type="button" class="btn btn-secondary" data-action="auditLoadMore">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
+      ? '<div class="u-0e7080"><button type="button" class="btn btn-secondary" data-action="auditLoadMore">Carregar mais (' + (list.length - page.length) + ' restantes)</button></div>'
       : '');
 }
 
@@ -1298,14 +1298,14 @@ function renderOverdueBanner(dueTodayCount, dueTomorrowCount) {
   banner.id = 'overdueBanner';
   banner.className = 'overdue-banner';
   banner.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:16px">⏰</span>
+    <div class="u-015a5e">
+      <span class="u-1444c6">⏰</span>
       <span>
         ${dueTodayCount > 0 ? `<strong>${plural(dueTodayCount, 'pendência vence', 'pendências vencem')} hoje</strong>.` : ''}
         ${dueTomorrowCount > 0 ? ` ${plural(dueTomorrowCount, 'pendência', 'pendências')} vencendo amanhã.` : ''}
       </span>
     </div>
-    <button class="btn btn-secondary btn-sm" style="background:rgba(0,0,0,0.05)" data-action="nav" data-arg="pendencias">Ver Pendências →</button>
+    <button class="btn btn-secondary btn-sm u-e94d78" data-action="nav" data-arg="pendencias">Ver Pendências →</button>
   `;
 
   contentArea.insertBefore(banner, contentArea.firstChild);
@@ -1452,7 +1452,7 @@ function _richApplyMentions(escapedChunk) {
       var parts = String(n).toLowerCase().split(/\s+/);
       return parts.some(function (p) { return p === tl; }) || String(n).toLowerCase() === tl;
     });
-    if (isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@' + p1 + '</span>';
+    if (isMention) return '<span class="u-3b66ce">@' + p1 + '</span>';
     return match;
   });
 }

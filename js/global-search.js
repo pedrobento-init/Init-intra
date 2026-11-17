@@ -132,7 +132,7 @@ function _searchActionHtml(a, idx) {
         <div class="search-result-icon search-result-icon--action">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
         </div>
-        <div style="min-width:0;flex:1"><div class="search-result-title">${_snippetEscapeHtml(a.label)}</div></div>
+        <div class="u-19fb48"><div class="search-result-title">${_snippetEscapeHtml(a.label)}</div></div>
         <kbd>↵</kbd>
       </div>`;
 }
@@ -175,7 +175,7 @@ function _renderSearchResults(query) {
     _searchResults = matchActions.map(a => ({ type: 'action', data: a }));
     container.innerHTML = '<div class="search-group-label">Ações rápidas</div>' +
       matchActions.map((a, i) => _searchActionHtml(a, i)).join('') +
-      '<div class="search-empty" style="padding:10px 18px 14px">Ou digite para buscar clientes, pendências e equipamentos.</div>';
+      '<div class="search-empty u-02ec7e">Ou digite para buscar clientes, pendências e equipamentos.</div>';
     return;
   }
 
@@ -253,8 +253,8 @@ function _renderSearchResults(query) {
     const esc = typeof escapeHtml === 'function' ? escapeHtml(raw) : raw;
     let emptyHtml = `<div class="search-empty">Nenhum resultado para "<strong>${esc}</strong>"</div>`;
     if (hasFilters) {
-      const badges = Object.entries(filters).map(function(entry){ const k=entry[0], v=entry[1]; const ek = typeof escapeHtml==='function'?escapeHtml(k):k; const ev=typeof escapeHtml==='function'?escapeHtml(v):v; return '<span class="tag tag-blue" style="font-size:11px">'+ek+':'+ev+'</span>'; }).join(' ');
-      emptyHtml = '<div style="display:flex;gap:6px;padding:6px 18px;flex-wrap:wrap">'+badges+'</div>' + emptyHtml;
+      const badges = Object.entries(filters).map(function(entry){ const k=entry[0], v=entry[1]; const ek = typeof escapeHtml==='function'?escapeHtml(k):k; const ev=typeof escapeHtml==='function'?escapeHtml(v):v; return '<span class="tag tag-blue u-11a508">'+ek+':'+ev+'</span>'; }).join(' ');
+      emptyHtml = '<div class="u-54dc9a">'+badges+'</div>' + emptyHtml;
     }
     container.innerHTML = emptyHtml;
     return;
@@ -263,12 +263,12 @@ function _renderSearchResults(query) {
   let html = '';
 
   if (hasFilters) {
-    html += '<div style="display:flex;gap:6px;padding:6px 18px;flex-wrap:wrap">';
+    html += '<div class="u-54dc9a">';
     Object.entries(filters).forEach(function(entry){
       const k=entry[0], v=entry[1];
       const ek = typeof escapeHtml==='function'?escapeHtml(k):k;
       const ev = typeof escapeHtml==='function'?escapeHtml(v):v;
-      html += '<span class="tag tag-blue" style="font-size:11px">'+ek+':'+ev+'</span>';
+      html += '<span class="tag tag-blue u-11a508">'+ek+':'+ev+'</span>';
     });
     html += '</div>';
   }
@@ -283,10 +283,10 @@ function _renderSearchResults(query) {
     html += `<div class="search-group-label">Clientes</div>`;
     html += matchClients.map((c, i) => `
       <div class="search-result-item" data-idx="${actionOffset + i}" data-action="selectSearchResult" data-arg="${actionOffset + i}" role="button" tabindex="0">
-        <div class="search-result-icon" style="background:#eff6ff">
+        <div class="search-result-icon u-4ff1ea">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
-        <div style="min-width:0;flex:1">
+        <div class="u-19fb48">
           <div class="search-result-title">${escapeHtml(c.name)}</div>
           <div class="search-result-sub">${escapeHtml(c.segment || '—')} · ${escapeHtml(c.cnpj || '—')}</div>
         </div>
@@ -306,15 +306,15 @@ function _renderSearchResults(query) {
         const hit = p.notes.find(n => String(n.text||'').toLowerCase().includes(q));
         if (hit) {
           const snippet = getNoteSnippet(hit.text, remainingText, 60);
-          if (snippet) preview = '<div class="search-result-sub" style="font-size:11px;margin-top:2px;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+snippet+'</div>';
+          if (snippet) preview = '<div class="search-result-sub u-27d2d0">'+snippet+'</div>';
         }
       }
       return `
       <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
-        <div class="search-result-icon" style="background:#fef9ee">
+        <div class="search-result-icon u-514bb9">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
-        <div style="min-width:0;flex:1">
+        <div class="u-19fb48">
           <div class="search-result-title">${escapeHtml(getPendenciaTitulo(p))}</div>
           <div class="search-result-sub">${escapeHtml(p.clientName || '—')} · ${escapeHtml(p.responsible || '—')}</div>
           ${preview}
@@ -330,10 +330,10 @@ function _renderSearchResults(query) {
       const idx = penOffset + i;
       return `
       <div class="search-result-item" data-idx="${idx}" data-action="selectSearchResult" data-arg="${idx}" role="button" tabindex="0">
-        <div class="search-result-icon" style="background:#f5f3ff">
+        <div class="search-result-icon u-c7183d">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </div>
-        <div style="min-width:0;flex:1">
+        <div class="u-19fb48">
           <div class="search-result-title">${escapeHtml(eq.nome || '—')}</div>
           <div class="search-result-sub">${escapeHtml(eq.clientName || '—')} · ${escapeHtml(eq.numeroSerie || eq.tipo || '—')}</div>
         </div>
@@ -347,10 +347,10 @@ function _renderSearchResults(query) {
     html += `<div class="search-group-label">Conhecimento</div>`;
     html += matchKb.map((d, i) => `
       <div class="search-result-item" data-idx="${kbOffset + i}" data-action="selectSearchResult" data-arg="${kbOffset + i}" role="button" tabindex="0">
-        <div class="search-result-icon" style="background:#ecfdf5">
+        <div class="search-result-icon u-6104c8">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         </div>
-        <div style="min-width:0;flex:1">
+        <div class="u-19fb48">
           <div class="search-result-title">${escapeHtml(d.title || '—')}</div>
           <div class="search-result-sub">${escapeHtml([typeof KB_KINDS !== 'undefined' ? KB_KINDS[d.kind] : d.kind, d.clientName].filter(Boolean).join(' · '))}</div>
         </div>
