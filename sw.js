@@ -86,6 +86,7 @@ const STATIC_ASSETS = [
   'js/milvus-token-backfill.js',
   'js/push.js',
   'js/dashboard.js',
+  'js/app-login.js',
   'js/app.js',
   'js/sw-register.js',
   'manifest.json',

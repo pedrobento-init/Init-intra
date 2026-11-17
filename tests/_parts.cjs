@@ -9,7 +9,7 @@ const GROUPS = {
   clients: ['clients.js', 'clients-ficha.js', 'clients-abas.js', 'clients-form.js'],
   pendencias: ['pendencias.js', 'pendencias-quadro.js', 'pendencias-fila.js', 'pendencias-acoes.js', 'pendencias-detalhe.js', 'pendencias-comando.js'],
   pagina: ['pagina-pendencia.js'],
-  app: ['dashboard.js', 'app.js'],
+  app: ['dashboard.js', 'app-login.js', 'app.js'],
 };
 const filesOf = (g) => GROUPS[g].map((f) => path.join(__dirname, '..', 'js', f));
 
