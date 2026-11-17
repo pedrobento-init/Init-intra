@@ -11,6 +11,7 @@
 --      and column_name in ('direcao', 'media');
 --   -- esperado: 2 linhas
 -- REVERTER (apaga as respostas/notas do portal antes):
+--   drop index if exists public.emails_triagem_portal_idx;
 --   delete from public.emails_triagem where direcao in ('saida', 'interna');
 --   alter table public.emails_triagem drop column if exists media;
 --   alter table public.emails_triagem drop column if exists direcao;
