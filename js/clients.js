@@ -190,11 +190,11 @@ function renderClientGrid() {
     });
     const pageClients = sorted.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
     const _pager = totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
-      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
-      <div style="display:flex;gap:6px">
+    <div class="u-048982">
+      <div class="u-8ff086">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
+      <div class="u-49cd09">
         <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} data-action="clientPagePrev">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
+        <span class="u-48936d">${_clientPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} data-action="clientPageNext">Próxima →</button>
       </div>
     </div>
@@ -215,11 +215,11 @@ function renderClientGrid() {
       const dentro = sla.dentroPrazo;
       return `<div class="client-card" role="button" tabindex="0" data-action="openClient" data-arg="${escapeHtml(c.id)}">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
-      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
+      <div class="client-card-name u-fbab0d">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
-        <div style="display:flex;gap:4px">
+        <div class="u-74cac9">
           <button class="btn btn-sm btn-secondary" data-action="clientEdit" data-arg="${escapeHtml(c.id)}" data-stop="1">Editar</button>
           ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" data-action="clientDelete" data-arg="${escapeHtml(c.id)}" data-stop="1">✕</button>` : ''}
         </div>

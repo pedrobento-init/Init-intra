@@ -47,8 +47,8 @@ function _milvusImportStatusTag(st) {
 
 async function openMilvusClientsImportModal() {
   openModal('📥 Importar clientes do Milvus', `
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">Novos entram com equipe <strong>init</strong> e vínculo no mapa Milvus. Existentes (mesmo CNPJ ou nome) são pulados.</p>
-    <div id="milvusImportBody"><p style="color:var(--text-muted);font-size:12px">Consultando clientes no Milvus…</p></div>`);
+    <p class="u-cf2be3">Novos entram com equipe <strong>init</strong> e vínculo no mapa Milvus. Existentes (mesmo CNPJ ou nome) são pulados.</p>
+    <div id="milvusImportBody"><p class="u-2bb516">Consultando clientes no Milvus…</p></div>`);
   try {
     const data = await previewMilvusClientsImport();
     _milvusImportPreview = data.preview || [];
@@ -60,16 +60,16 @@ async function openMilvusClientsImportModal() {
       return;
     }
     body.innerHTML = `
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${t.total} no Milvus · <strong>${t.novos} novos</strong> · ${t.existeCnpj} por CNPJ · ${t.existeNome} por nome</div>
-      <div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th></th><th>Nome</th><th>CNPJ</th><th>Status</th></tr></thead><tbody>
+      <div class="u-430b60">${t.total} no Milvus · <strong>${t.novos} novos</strong> · ${t.existeCnpj} por CNPJ · ${t.existeNome} por nome</div>
+      <div class="table-wrapper u-39b4fb"><table><thead><tr><th></th><th>Nome</th><th>CNPJ</th><th>Status</th></tr></thead><tbody>
       ${_milvusImportPreview.map((p, i) => `<tr>
         <td>${p.status === 'novo' ? `<input type="checkbox" data-mi-idx="${i}" checked />` : ''}</td>
-        <td><strong>${escapeHtml(p.nome)}</strong>${p.razao && p.razao !== p.nome ? `<div style="font-size:11px;color:var(--text-muted)">${escapeHtml(p.razao)}</div>` : ''}</td>
-        <td style="font-size:12px">${escapeHtml(p.cnpj || '—')}</td>
+        <td><strong>${escapeHtml(p.nome)}</strong>${p.razao && p.razao !== p.nome ? `<div class="u-749148">${escapeHtml(p.razao)}</div>` : ''}</td>
+        <td class="u-6cb285">${escapeHtml(p.cnpj || '—')}</td>
         <td>${_milvusImportStatusTag(p.status)}</td>
       </tr>`).join('')}</tbody></table></div>
       <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button><button type="button" class="btn btn-primary" id="milvusImportConfirmBtn" data-action="confirmMilvusClientsImport">Importar selecionados</button></div>
-      <div id="milvusImportMsg" style="font-size:13px;margin-top:8px"></div>`;
+      <div id="milvusImportMsg" class="u-f99aa7"></div>`;
   } catch (e) {
     const body = document.getElementById('milvusImportBody');
     if (body) body.innerHTML = '<div class="empty-state"><p>Não foi possível consultar o Milvus. Tente novamente.</p></div>';
@@ -84,13 +84,13 @@ async function confirmMilvusClientsImport() {
     .map((i) => _milvusImportPreview[i] && _milvusImportPreview[i].status === 'novo' ? _milvusImportPreview[i].milvusId : null)
     .filter((v) => typeof v === 'number');
   if (!onlyIds.length) {
-    setMsg('<span style="color:var(--text-muted)">Nenhum cliente novo selecionado.</span>');
+    setMsg('<span class="u-5872de">Nenhum cliente novo selecionado.</span>');
     return;
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
   try {
     const res = await commitMilvusClientsImport(onlyIds);
-    setMsg(`<span style="color:var(--success,#16a34a)">${plural(res.created, 'cliente importado', 'clientes importados')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`);
+    setMsg(`<span class="u-0ce87a">${plural(res.created, 'cliente importado', 'clientes importados')}${res.skipped && res.skipped.length ? ` · ${plural(res.skipped.length, 'pulado', 'pulados')}` : ''}.</span>`);
     try {
       if (typeof syncSupabaseToLocal === 'function') syncSupabaseToLocal().catch(() => {});
       if (typeof addLog === 'function') addLog('Importou clientes', 'Cliente', 'Milvus', `${plural(res.created, 'novo', 'novos')} do Milvus`);
@@ -99,7 +99,7 @@ async function confirmMilvusClientsImport() {
       if (typeof updateBadges === 'function') updateBadges();
     } catch (_) {}
   } catch (e) {
-    setMsg('<span style="color:var(--danger,#dc2626)">Falha na importação. Tente novamente.</span>');
+    setMsg('<span class="u-5afed3">Falha na importação. Tente novamente.</span>');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Importar selecionados'; }
   }
@@ -131,16 +131,16 @@ function renderClientMilvusTicketsTab(clientId) {
     ? _fmtTicketDate(lastSync)
     : 'nunca';
   el.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+    <div class="u-87a5d6">
       <span class="mtickets-title">📋 Últimos chamados no Milvus</span>
-      <span style="flex:1"></span>
+      <span class="u-97445a"></span>
       <button class="btn btn-secondary btn-sm" id="milvusTicketsSyncBtn" data-action="syncClientMilvusTicketsUI" data-arg="${escapeHtml(clientId)}">↻ Sincronizar</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Última sincronização: <strong id="milvusTicketsLastSync">${escapeHtml(lastTxt)}</strong> · máx. 10 recentes</div>
-    <div id="milvusTicketsMsg" style="font-size:13px;margin-bottom:10px"></div>
-    <div id="milvusTicketsList"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando chamados…</p></div>
-    <hr class="divider" style="margin:16px 0" />
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <div class="u-eb8ca1">Última sincronização: <strong id="milvusTicketsLastSync">${escapeHtml(lastTxt)}</strong> · máx. 10 recentes</div>
+    <div id="milvusTicketsMsg" class="u-10fc37"></div>
+    <div id="milvusTicketsList"><p class="u-b4b3d2">Carregando chamados…</p></div>
+    <hr class="divider u-f63b87" />
+    <div class="u-3c1172">
       <span class="mtickets-title">⏱️ Horas / Atendimentos</span>
     </div>
     <div id="chamadosAtendSection"></div>`;
@@ -169,7 +169,7 @@ async function loadClientMilvusTicketsUI(clientId) {
   } catch (_) { tickets = []; }
   if (isStale()) return;
   if (!tickets.length) {
-    wrap.innerHTML = '<div class="empty-state" style="padding:16px"><p>Nenhum chamado sincronizado.</p><p style="font-size:12px">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
+    wrap.innerHTML = '<div class="empty-state u-287f77"><p>Nenhum chamado sincronizado.</p><p class="u-6cb285">Use Sincronizar para buscar os 10 mais recentes.</p></div>';
     return;
   }
   wrap.innerHTML = `<div class="mticket-list">` + tickets.slice(0, 10).map((t) => `
@@ -196,12 +196,12 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
       ? resolveMilvusTicketsSyncState(res)
       : { kind: res && res.unmapped ? 'unmapped' : 'ok', synced: (res && res.synced) || 0 };
     if (st.kind === 'no-token') {
-      setMsg('<span style="color:var(--text-muted)">Este cliente ainda não possui token configurado no Milvus.</span>');
+      setMsg('<span class="u-5872de">Este cliente ainda não possui token configurado no Milvus.</span>');
     } else if (st.kind === 'unmapped') {
-      setMsg('<span style="color:var(--text-muted)">Cliente não possui mapeamento no Milvus.</span>');
+      setMsg('<span class="u-5872de">Cliente não possui mapeamento no Milvus.</span>');
     } else if (!silent) {
       const s = (res && res.synced) || 0;
-      setMsg(`<span style="color:var(--success,#16a34a)">${plural(s, 'chamado atualizado', 'chamados atualizados')}.</span>`);
+      setMsg(`<span class="u-0ce87a">${plural(s, 'chamado atualizado', 'chamados atualizados')}.</span>`);
     } else {
       setMsg('');
     }
@@ -213,7 +213,7 @@ async function syncClientMilvusTicketsUI(clientId, opts) {
     await loadClientMilvusTicketsUI(clientId);
   } catch (e) {
     // Erro discreto; mantém os já sincronizados (não apaga nada).
-    if (!silent) setMsg('<span style="color:var(--danger,#dc2626)">Não foi possível atualizar os chamados do Milvus.</span>');
+    if (!silent) setMsg('<span class="u-5afed3">Não foi possível atualizar os chamados do Milvus.</span>');
   } finally {
     _milvusTicketsSyncing[clientId] = false;
     if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar'; }
@@ -231,9 +231,9 @@ async function openMilvusTicketDetail(clientId, ticketId) {
   const cat = [t.categoria_primaria, t.categoria_secundaria].filter(Boolean).map(escapeHtml).join(' / ') || '—';
   const log = t.ultima_log && (t.ultima_log.texto || t.ultima_log.data)
     ? `<div class="mticket-log-text">${escapeHtml(t.ultima_log.texto || '')}</div><div class="mticket-meta">${_fmtTicketDate(t.ultima_log.data)}${t.ultima_log.tecnico ? ` · ${escapeHtml(t.ultima_log.tecnico)}` : ''}</div>`
-    : '<span style="color:var(--text-muted);font-size:13px">—</span>';
+    : '<span class="u-aad8e6">—</span>';
   openModal(`#${escapeHtml(String(t.codigo != null ? t.codigo : '—'))} · ${escapeHtml(t.assunto || 'Chamado')}`, `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <div class="u-3c1172">
       ${milvusTicketStatusTag(t.status)}
       ${t.prioridade ? `<span class="tag tag-yellow">${escapeHtml(t.prioridade)}</span>` : ''}
     </div>
@@ -259,18 +259,18 @@ function renderClientInventoryTab(clientId) {
     ? (typeof formatDateTime === 'function' ? formatDateTime(lastSync) : new Date(lastSync).toLocaleString('pt-BR'))
     : 'nunca';
   el.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <div class="u-3c1172">
       <button class="btn btn-primary btn-sm" id="milvusSyncBtn" data-action="syncClientInventoryUI" data-arg="${escapeHtml(clientId)}">↻ Sincronizar inventário</button>
       <button class="btn btn-secondary btn-sm" data-action="exportClientInventory" data-arg="${escapeHtml(clientId)}" title="Exportar inventário (.xlsx)">Exportar planilha</button>
       <button type="button" class="btn btn-secondary btn-sm" data-qr-inventario="${escapeHtml(clientId)}" title="Etiquetas com QR code para colar nos equipamentos">🏷️ Etiquetas QR</button>
-      <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Importar export Excel do Milvus (.xlsx)">
+      <label class="btn btn-secondary btn-sm u-3b6a3a" title="Importar export Excel do Milvus (.xlsx)">
         📥 Importar planilha
-        <input type="file" id="milvusImportFile" accept=".xlsx,.xls" style="display:none" data-change="importClientInventoryUI" data-arg="${escapeHtml(clientId)}" />
+        <input type="file" id="milvusImportFile" accept=".xlsx,.xls" class="u-6b99de" data-change="importClientInventoryUI" data-arg="${escapeHtml(clientId)}" />
       </label>
-      <span style="font-size:12px;color:var(--text-muted)">Última sincronização: <strong id="milvusLastSync">${escapeHtml(lastTxt)}</strong></span>
+      <span class="u-865c33">Última sincronização: <strong id="milvusLastSync">${escapeHtml(lastTxt)}</strong></span>
     </div>
-    <div id="milvusSyncMsg" style="font-size:13px;margin-bottom:10px"></div>
-    <div class="table-wrapper" id="milvusTableWrap"><p style="color:var(--text-muted);font-size:12px;padding:8px 0">Carregando inventário…</p></div>`;
+    <div id="milvusSyncMsg" class="u-10fc37"></div>
+    <div class="table-wrapper" id="milvusTableWrap"><p class="u-b4b3d2">Carregando inventário…</p></div>`;
   loadClientInventoryUI(clientId);
 }
 
@@ -296,13 +296,13 @@ async function syncClientInventoryUI(clientId) {
   const btn = document.getElementById('milvusSyncBtn');
   const msg = document.getElementById('milvusSyncMsg');
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando inventário…'; }
-  if (msg) { msg.innerHTML = '<span style="color:var(--text-muted)">Sincronizando inventário…</span>'; }
+  if (msg) { msg.innerHTML = '<span class="u-5872de">Sincronizando inventário…</span>'; }
   try {
     const res = await syncClientDevices(clientId);
     const fmt = typeof formatMilvusSyncResult === 'function'
       ? formatMilvusSyncResult(res)
       : { line: `${(res && res.synced) || 0} dispositivos sincronizados`, unresolved: 0 };
-    if (msg) msg.innerHTML = `<span style="color:var(--success,#16a34a)">${escapeHtml(fmt.line)}</span>`;
+    if (msg) msg.innerHTML = `<span class="u-0ce87a">${escapeHtml(fmt.line)}</span>`;
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
@@ -311,7 +311,7 @@ async function syncClientInventoryUI(clientId) {
     await loadClientInventoryUI(clientId);
   } catch (e) {
     // Mensagem amigável; sem token ou detalhe sensível.
-    if (msg) msg.innerHTML = '<span style="color:var(--danger,#dc2626)">Não foi possível sincronizar o inventário. Tente novamente.</span>';
+    if (msg) msg.innerHTML = '<span class="u-5afed3">Não foi possível sincronizar o inventário. Tente novamente.</span>';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar inventário'; }
   }
@@ -323,11 +323,11 @@ async function importClientInventoryUI(clientId, input) {
   if (!file) return;
   const setMsg = (html) => { const m = document.getElementById('milvusSyncMsg'); if (m) m.innerHTML = html; };
   try {
-    setMsg('<span style="color:var(--text-muted)">Lendo planilha…</span>');
+    setMsg('<span class="u-5872de">Lendo planilha…</span>');
     const rows = await readMilvusExportFile(file);
-    setMsg(`<span style="color:var(--text-muted)">Importando ${plural(rows.length, 'linha', 'linhas')}…</span>`);
+    setMsg(`<span class="u-5872de">Importando ${plural(rows.length, 'linha', 'linhas')}…</span>`);
     const res = await importClientDevicesFromRows(clientId, rows);
-    setMsg(`<span style="color:var(--success,#16a34a)">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outros clientes, ignorados` : ''}</span>`);
+    setMsg(`<span class="u-0ce87a">${res.imported} dispositivos importados · ${res.created} novos · ${res.updated} atualizados${res.skipped ? ` · ${res.skipped} de outros clientes, ignorados` : ''}</span>`);
     try {
       const last = typeof getMilvusLastSyncAt === 'function' ? getMilvusLastSyncAt(clientId) : null;
       const lastEl = document.getElementById('milvusLastSync');
@@ -335,7 +335,7 @@ async function importClientInventoryUI(clientId, input) {
     } catch (_) {}
     await loadClientInventoryUI(clientId);
   } catch (e) {
-    setMsg(`<span style="color:var(--danger,#dc2626)">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`);
+    setMsg(`<span class="u-5afed3">${escapeHtml((e && e.message) || 'Não foi possível importar a planilha.')}</span>`);
   }
 }
 

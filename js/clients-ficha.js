@@ -728,7 +728,7 @@ function renderClientTab(tab, id) {
   } else if (tab === 'procedimentos') {
     const procs = getProcedures(id);
     const cid = escapeHtml(id);
-    el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
+    el.innerHTML = `<div class="u-7d450d">
         <button type="button" class="btn btn-primary btn-sm" data-action="procNew" data-arg="${cid}">+ Novo Procedimento</button>
       </div>
       ${procs.length ? procs.map(p => {
@@ -736,9 +736,9 @@ function renderClientTab(tab, id) {
         return `
         <div class="proc-card" id="proc-${pid}">
           <div class="proc-card-header" role="button" tabindex="0" data-action="procToggle" data-arg="${pid}">
-            <div style="flex:1;min-width:0">
+            <div class="u-59eddc">
               <div class="proc-card-title">${escapeHtml(p.title)}</div>
-              ${p.category ? `<span class="tag tag-blue" style="margin-top:4px">${escapeHtml(p.category)}</span>` : ''}
+              ${p.category ? `<span class="tag tag-blue u-96ad60">${escapeHtml(p.category)}</span>` : ''}
             </div>
             <div class="proc-actions">
               <button type="button" class="btn btn-sm btn-primary" data-action="psRun" data-kind="proc" data-arg="${pid}" title="Seguir o passo a passo marcando cada etapa">Executar</button>
@@ -752,40 +752,40 @@ function renderClientTab(tab, id) {
       }).join('') : `<div class="empty-state"><p>Nenhum procedimento cadastrado</p></div>`}`;
   } else if (tab === 'documentos') {
     el.innerHTML = `
-      <div class="attachment-section" style="margin-top:0">
-        <div class="section-header" style="margin-bottom:12px">
+      <div class="attachment-section u-d46224">
+        <div class="section-header u-da12f2">
           <span class="section-title">📄 Documentos permanentes (Máx 2MB)</span>
-          <label class="btn btn-primary btn-sm" style="cursor:pointer">
+          <label class="btn btn-primary btn-sm u-3b6a3a">
             + Enviar Documento permanente
-            <input type="file" id="cliDocFileInput" style="display:none" data-change="clientDocumentUpload" data-client="${escapeHtml(id)}" />
+            <input type="file" id="cliDocFileInput" class="u-6b99de" data-change="clientDocumentUpload" data-client="${escapeHtml(id)}" />
           </label>
         </div>
         <div class="attachment-list" id="cliDocumentsList"></div>
       </div>
       <hr class="divider" />
-      <div class="attachment-section" style="margin-top:0">
-        <div class="section-header" style="margin-bottom:12px">
+      <div class="attachment-section u-d46224">
+        <div class="section-header u-da12f2">
           <span class="section-title">📁 Anexos do Cliente (Máx 2MB)</span>
-          <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+          <label class="btn btn-secondary btn-sm u-3b6a3a">
             + Enviar Anexo
-            <input type="file" id="cliFileInput" style="display:none" data-change="clientAttachmentUpload" data-client="${escapeHtml(id)}" />
+            <input type="file" id="cliFileInput" class="u-6b99de" data-change="clientAttachmentUpload" data-client="${escapeHtml(id)}" />
           </label>
         </div>
         <div class="attachment-list" id="cliAttachmentsList"></div>
       </div>
       <hr class="divider" />
-      <div class="attachment-section" style="margin-top:0">
-        <div class="section-header" style="margin-bottom:12px">
+      <div class="attachment-section u-d46224">
+        <div class="section-header u-da12f2">
           <span class="section-title">📊 Planilha de documentação (Google Sheets)</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="cliSheetActions"></div>
+          <div class="u-6157e8" id="cliSheetActions"></div>
         </div>
         <div id="cliSheetBody"></div>
       </div>
       <hr class="divider" />
-      <div class="attachment-section" style="margin-top:0">
-        <div class="section-header" style="margin-bottom:12px">
+      <div class="attachment-section u-d46224">
+        <div class="section-header u-da12f2">
           <span class="section-title">🗂️ Pasta no Drive</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="cliDriveActions"></div>
+          <div class="u-6157e8" id="cliDriveActions"></div>
         </div>
         <div id="cliDriveBody"></div>
       </div>
@@ -793,16 +793,16 @@ function renderClientTab(tab, id) {
     setTimeout(function(){ renderClientDocumentsList(id, 'cliDocumentsList'); renderAttachmentList('clients', id, 'cliAttachmentsList'); renderClientSheetSection(id); renderClientDriveSection(id); }, 20);
   } else if (tab === 'visitas') {
     const visits = getVisitsByClient(id);
-    el.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px">
+    el.innerHTML = `<div class="u-7d450d">
         <button class="btn btn-primary btn-sm" data-action="visitFormForClient" data-arg="${escapeHtml(id)}">+ Registrar Visita</button>
       </div>
       ${visits.length ? `<div class="table-wrapper"><table><thead><tr><th>Data</th><th>Horário</th><th>Motivo</th><th>Operador</th><th>Status</th><th></th></tr></thead><tbody>${visits.map(v => `<tr>
         <td><strong>${formatDate(v.date)}</strong></td>
         <td>${escapeHtml(typeof formatVisitTimeRange === 'function' ? formatVisitTimeRange(v) : (v.time || '—'))}</td>
-        <td>${escapeHtml(v.motivo || '—')}${v.observacoes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(v.observacoes)}</div>` : ''}</td>
+        <td>${escapeHtml(v.motivo || '—')}${v.observacoes ? `<div class="u-cdf4b4">${escapeHtml(v.observacoes)}</div>` : ''}</td>
         <td>${escapeHtml(v.operator || '—')}</td>
         <td>${typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : escapeHtml(v.status)}</td>
-        <td style="text-align:right"><button class="btn btn-sm btn-secondary" data-action="openVisit" data-arg="${escapeHtml(v.id)}">Abrir</button></td>
+        <td class="u-54c2af"><button class="btn btn-sm btn-secondary" data-action="openVisit" data-arg="${escapeHtml(v.id)}">Abrir</button></td>
       </tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma visita registrada para este cliente.</p></div>`}`;
   } else if (tab === 'inventario') {
     renderClientInventoryTab(id);
@@ -839,13 +839,13 @@ function renderClientTab(tab, id) {
       return false;
     }).slice(0, 80);
     if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state" style="padding:20px"><p>Nenhum histórico para este cliente.</p></div>`;
+      el.innerHTML = `<div class="empty-state u-769fed"><p>Nenhum histórico para este cliente.</p></div>`;
     } else {
-      el.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${plural(filtered.length, 'registro', 'registros')}</div>
+      el.innerHTML = `<div class="u-430b60">${plural(filtered.length, 'registro', 'registros')}</div>
         <div class="log-timeline">${filtered.map(log => {
           const actionKey = (log.action || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
           const actionClass = ['criou','ativou','editou','excluiu','desativou','login','backup','limpou'].includes(actionKey.split('-')[0]) ? 'log-action-' + actionKey.split('-')[0] : 'log-action-default';
-          return `<div class="log-card"><div class="log-dot ${actionClass}" style="background:currentColor"></div><div class="log-header"><span class="log-action-label">${escapeHtml(log.action)}</span><span class="log-type-badge ${actionClass}">${escapeHtml(log.type)}</span><span style="flex:1"></span><span class="log-meta">${formatDateTime(log.timestamp)}</span></div><div class="log-details">${escapeHtml(log.details)}</div><div class="log-meta">👤 ${escapeHtml(log.operatorName||'Sistema')}</div></div>`;
+          return `<div class="log-card"><div class="log-dot ${actionClass} u-be5c13"></div><div class="log-header"><span class="log-action-label">${escapeHtml(log.action)}</span><span class="log-type-badge ${actionClass}">${escapeHtml(log.type)}</span><span class="u-97445a"></span><span class="log-meta">${formatDateTime(log.timestamp)}</span></div><div class="log-details">${escapeHtml(log.details)}</div><div class="log-meta">👤 ${escapeHtml(log.operatorName||'Sistema')}</div></div>`;
         }).join('')}</div>`;
     }
   } else {
@@ -854,8 +854,8 @@ function renderClientTab(tab, id) {
       try { if (typeof canViewPendencia === 'function' && !canViewPendencia(p)) return false; } catch (_) {}
       return true;
     });
-    el.innerHTML = `<div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" data-action="clientNewPendencia" data-arg="${escapeHtml(id)}">+ Nova Pendência</button></div>
-      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th><th></th></tr></thead><tbody>${pens.map(p=>`<tr class="cli-pen-row" tabindex="0" data-action="clientPenRow" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}"><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td><td style="text-align:right"><button class="btn btn-sm btn-secondary" data-action="clientPenOpen" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}" data-stop="1" aria-label="Abrir pendência: ${escapeHtml(getPendenciaTitulo(p))}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
+    el.innerHTML = `<div class="u-da12f2"><button class="btn btn-primary btn-sm" data-action="clientNewPendencia" data-arg="${escapeHtml(id)}">+ Nova Pendência</button></div>
+      ${pens.length ? `<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Assunto</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Prazo</th><th></th></tr></thead><tbody>${pens.map(p=>`<tr class="cli-pen-row" tabindex="0" data-action="clientPenRow" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}"><td>${escapeHtml(p.tipo||'—')}</td><td>${escapeHtml(getPendenciaTitulo(p))}</td><td>${escapeHtml(p.responsible||'—')}</td><td>${statusTag(p.status)}</td><td>${priorityTag(p.priority)}</td><td>${p.deadline?formatDate(p.deadline):'—'}</td><td class="u-54c2af"><button class="btn btn-sm btn-secondary" data-action="clientPenOpen" data-arg="${escapeHtml(id)}" data-pen="${escapeHtml(p.id)}" data-stop="1" aria-label="Abrir pendência: ${escapeHtml(getPendenciaTitulo(p))}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><p>Nenhuma pendência</p></div>`}`;
   }
 }
 
