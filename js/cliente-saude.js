@@ -159,14 +159,14 @@ async function renderClientBackupsTab(clientId) {
   const el = document.getElementById('clientTabContent');
   if (!el) return;
   _bkClient = clientId;
-  el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Carregando backups…</p>';
+  el.innerHTML = '<p class="u-aad8e6">Carregando backups…</p>';
   const x = await carregarSaudeExtra(true);
   if (_bkClient !== clientId || !document.getElementById('clientTabContent')) return;
   const mons = (x.monitores || []).filter((m) => m.client_id === clientId);
   const quando = (iso) => iso ? (typeof formatDateTime === 'function' ? formatDateTime(iso) : new Date(iso).toLocaleString('pt-BR')) : '—';
   el.innerHTML = `
     <p class="feed-lead">O robô lê os e-mails com o rótulo <b>Backups</b> no Gmail dele e acha a rotina pelo <b>identificador</b> (um texto que aparece no remetente ou no assunto, ex.: o nome do job). Falha, ou nenhum e-mail dentro do limite de horas, abre uma pendência sozinha.</p>
-    <div style="margin-bottom:12px"><button type="button" class="btn btn-primary btn-sm" data-bk-novo>+ Monitorar um backup</button></div>
+    <div class="u-da12f2"><button type="button" class="btn btn-primary btn-sm" data-bk-novo>+ Monitorar um backup</button></div>
     <div id="bkForm"></div>
     ${mons.length ? mons.map((m) => `
       <div class="bk-card">
@@ -193,7 +193,7 @@ function _bkForm(m) {
         <div class="form-group"><label class="form-label">Alertar sem e-mail após (horas)</label><input class="form-input" type="number" name="max_horas" min="1" max="2160" value="${Number(m.max_horas) || 48}" /></div>
         <div class="form-group"><label class="form-label">Responsável pela pendência</label><select class="form-select" name="responsavel"><option value="">— ninguém (admins veem) —</option>${ops.map((n) => `<option ${n === m.responsavel ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></div>
       </div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px"><input type="checkbox" name="ativo" ${m.ativo !== false ? 'checked' : ''} /> Monitorando</label>
+      <label class="u-ae752a"><input type="checkbox" name="ativo" ${m.ativo !== false ? 'checked' : ''} /> Monitorando</label>
       <div class="form-actions">
         ${m.id && typeof isCurrentAdmin === 'function' && isCurrentAdmin() ? `<button type="button" class="btn btn-danger btn-sm" data-bk-apagar="${escapeHtml(m.id)}">Apagar</button>` : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-bk-cancelar>Cancelar</button>

@@ -59,7 +59,7 @@ async function abrirEtiquetasDispositivos(clientId) {
   if (!devs.length) { showToast('Nenhum dispositivo no inventário deste cliente.', 'info'); return; }
   openModal('Etiquetas QR — ' + (c ? c.name : ''), `
     <p class="feed-lead">Marque os equipamentos e imprima numa folha de etiquetas A4 (3 × 7). Na impressão, escolha <b>Tamanho real / 100%</b> e sem margens extras.</p>
-    <label style="display:flex;gap:8px;font-size:13px;margin-bottom:8px"><input type="checkbox" data-qr-todos checked /> Todos (${devs.length})</label>
+    <label class="u-37b45e"><input type="checkbox" data-qr-todos checked /> Todos (${devs.length})</label>
     <div class="qr-lista">${devs.map((d) => `
       <label class="qr-item"><input type="checkbox" data-qr-disp="${escapeHtml(d.id)}" checked />
         <span><b>${escapeHtml(_dispNome(d))}</b> ${escapeHtml([d.tipo_dispositivo_text, d.numero_serial].filter(Boolean).join(' · '))}</span></label>`).join('')}</div>

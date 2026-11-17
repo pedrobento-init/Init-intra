@@ -826,7 +826,7 @@ function _ckRenderUso(clientId, el) {
     <div class="ck-prog">
       <div class="ck-prog-main">
         <div class="ck-prog-top"><span id="ckProgText">${done} de ${total} itens</span><b id="ckProgPct">${pct}%</b></div>
-        <div class="ck-track"><i id="ckProgFill" class="${pct === 100 ? 'is-done' : ''}" style="width:${pct}%"></i></div>
+        <div class="ck-track"><i id="ckProgFill" class="${pct === 100 ? 'is-done' : ''}" data-sty="width:${pct}%"></i></div>
       </div>
       <button type="button" class="btn btn-secondary btn-sm" data-action="clearChecklistConfirm" data-arg="${cid}">Desmarcar tudo</button>
     </div>

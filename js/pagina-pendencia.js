@@ -454,7 +454,7 @@ function pgpAvatarHtml(nome, tamanho) {
   const t = Number(tamanho);
   const px = t > 0 && t <= 128 ? t : 32;
   const rotulo = escapeHtml(texto || 'Sem nome');
-  return '<span class="pgp-avatar" style="--pgp-avatar-size:' + px + 'px" role="img"'
+  return '<span class="pgp-avatar" data-sty="--pgp-avatar-size:' + px + 'px" role="img"'
     + ' title="' + rotulo + '" aria-label="' + rotulo + '">'
     + escapeHtml(iniciais.toUpperCase()) + '</span>';
 }

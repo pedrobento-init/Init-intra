@@ -150,11 +150,11 @@ function openVencimentoForm(id, preClientId) {
         <div class="form-group"><label class="form-label">Cliente</label><select class="form-select" name="clientId"><option value="">Interno (Init)</option>${clients.map((c) => `<option value="${esc(c.id)}"${v.clientId === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">Responsável</label><select class="form-select" name="responsavel"><option value="">—</option>${ops.map((n) => `<option${v.responsavel === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
       </div>
-      <label class="pz-toggle" style="margin:4px 0 12px"><input type="checkbox" name="renovacaoAuto"${v.renovacaoAuto ? ' checked' : ''}> Renovação automática (só lembrar de conferir)</label>
+      <label class="pz-toggle u-90fbed"><input type="checkbox" name="renovacaoAuto"${v.renovacaoAuto ? ' checked' : ''}> Renovação automática (só lembrar de conferir)</label>
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" name="observacoes" rows="2">${esc(v.observacoes)}</textarea></div>
       ${(v.historico || []).length ? `<div class="venc-hist"><b>Renovações anteriores</b>${v.historico.slice().reverse().map((h) => `<span>Até ${esc(formatDate(h.ate))} · renovado em ${esc(formatDate(String(h.em || '').slice(0, 10)))}${h.por ? ' por ' + esc(h.por) : ''}</span>`).join('')}</div>` : ''}
       <div class="form-actions">
-        ${id ? `<button type="button" class="btn btn-secondary" style="margin-right:auto" data-action="vencToggleClosed" data-arg="${esc(id)}">${v.status === 'encerrado' ? 'Reativar' : 'Encerrar (não renovar)'}</button>` : ''}
+        ${id ? `<button type="button" class="btn btn-secondary u-471df9" data-action="vencToggleClosed" data-arg="${esc(id)}">${v.status === 'encerrado' ? 'Reativar' : 'Encerrar (não renovar)'}</button>` : ''}
         ${id && (typeof canDelete !== 'function' || canDelete()) ? `<button type="button" class="btn btn-danger" data-action="vencDelete" data-arg="${esc(id)}">Excluir</button>` : ''}
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary">Salvar</button>
@@ -200,7 +200,7 @@ function openRenovarVencimento(id) {
   if (!v) return;
   const base = v.dataVencimento || _vencToday();
   openModal('Renovar — ' + escapeHtml(v.descricao || ''), `
-    <p style="margin:0 0 10px;font-size:13px;color:var(--ds-muted)">Vencia em <b>${escapeHtml(formatDate(base))}</b>. Até quando foi renovado?</p>
+    <p class="u-bec09e">Vencia em <b>${escapeHtml(formatDate(base))}</b>. Até quando foi renovado?</p>
     <div class="venc-quick">
       <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 1)}">+1 mês</button>
       <button type="button" class="vis-chip" data-action="vencSetDate" data-arg="${vencAddMonths(base, 3)}">+3 meses</button>

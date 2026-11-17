@@ -223,7 +223,7 @@ if (typeof highlightMentions !== 'function') {
     var esc = _escapeHtmlFallback(text);
     var names=_getOpNamesFallback();
     if(!names.length) return esc;
-    return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function(match,p1){ var tl=p1.toLowerCase(); var isMention=names.some(function(n){ var parts=n.toLowerCase().split(/\s+/); return parts.some(function(p){return p===tl;})||n.toLowerCase()===tl; }); if(isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@'+p1+'</span>'; return match; });
+    return esc.replace(/@([A-Za-zÀ-ÿ0-9_]+)/g, function(match,p1){ var tl=p1.toLowerCase(); var isMention=names.some(function(n){ var parts=n.toLowerCase().split(/\s+/); return parts.some(function(p){return p===tl;})||n.toLowerCase()===tl; }); if(isMention) return '<span class="u-3b66ce">@'+p1+'</span>'; return match; });
   };
 }
 
@@ -409,12 +409,12 @@ function renderPendencias() {
       <button class="btn btn-secondary pen-more-btn pt-filter" id="penMoreFiltersBtn" data-action="togglePenMoreFilters" aria-expanded="false" aria-controls="penMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
-        <span class="pen-more-badge" id="penMoreFiltersBadge" style="display:none"></span>
+        <span class="pen-more-badge u-6b99de" id="penMoreFiltersBadge"></span>
       </button>
       <button class="btn btn-secondary pen-more-btn pt-filter" id="penClearFiltersBtn" data-action="penClearFilters" title="Limpar todos os filtros" aria-label="Limpar filtros">
         ✕ Limpar
       </button>
-      <div class="pen-more-panel" id="penMoreFiltersPanel" data-open="0" style="display:none">
+      <div class="pen-more-panel u-6b99de" id="penMoreFiltersPanel" data-open="0">
         <select class="form-select filter-select-md" id="penResponsible" data-change="penFilterChange">
           <option value="">Todos os responsáveis</option>
           ${opNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
@@ -451,7 +451,7 @@ function renderPendencias() {
       </div>
     </div>
     <div id="penFiltrosAtivos"></div>
-    <div id="penSlaSummary" style="margin-bottom:12px"></div>
+    <div id="penSlaSummary" class="u-da12f2"></div>
     <div id="penViewArea"></div>`;
   if (saved.search) document.getElementById('penSearch').value = saved.search;
   if (saved.client) document.getElementById('penClient').value = saved.client;

@@ -68,7 +68,7 @@ function clientTimelineHtml(clientId) {
       : 'Data não informada';
     const kind = item.tipo === 'visita' ? 'visita' : 'pendencia';
     return '<li class="ov-it" role="button" tabindex="0" data-action="clienteTimelineAbrir" data-kind="' + kind + '" data-arg="' + escapeHtml(item.id) + '">' +
-      '<div style="min-width:0"><div class="ov-mt"><span>' + escapeHtml(rotulos[item.tipo]) + ' · ' + escapeHtml(quando) + '</span></div>' +
+      '<div class="u-3922d3"><div class="ov-mt"><span>' + escapeHtml(rotulos[item.tipo]) + ' · ' + escapeHtml(quando) + '</span></div>' +
       '<div class="ov-tt">' + escapeHtml(item.titulo) + '</div><div class="ov-mt">' + escapeHtml((item.tipo === 'pendencia' || item.tipo === 'visita') ? statusLabel(item) + (item.detalhe !== item.status ? ' · ' + item.detalhe : '') : item.detalhe) + '</div></div></li>';
   }).join('') + '</ul>';
 }

@@ -98,7 +98,7 @@ function visitSignatureSectionHtml(v) {
 function openVisitSignatureModal(id) {
   const v = getVisitById(id);
   if (!v) return;
-  openModal('Assinatura do cliente', '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px">' +
+  openModal('Assinatura do cliente', '<p class="u-a84295">' +
       escapeHtml(v.clientName || '') + ' · ' + escapeHtml(v.motivo || 'Visita') + '</p>' +
     signaturePadHtml('visitSigOnly', '') +
     '<div class="form-actions">' +

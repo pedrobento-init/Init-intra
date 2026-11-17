@@ -500,51 +500,51 @@ function openNotifSettings() {
   const body = document.getElementById('notifModalBody');
 
   body.innerHTML = `
-    <div style="margin-bottom:16px">
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+    <div class="u-87c136">
+      <p class="u-8f2440">
         Configure quais avisos automáticos o sistema envia (e-mail e celular).
       </p>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Pendências</div>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendCreate" ${prefs.onPendenciaCreate ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+    <div class="u-49f14f">
+      <div class="u-241252">Pendências</div>
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendCreate" ${prefs.onPendenciaCreate ? 'checked' : ''} class="u-9cf325">
         <span>Ao criar nova pendência</span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendUpdate" ${prefs.onPendenciaUpdate ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendUpdate" ${prefs.onPendenciaUpdate ? 'checked' : ''} class="u-9cf325">
         <span>Ao atualizar pendência (mudança de status)</span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="pref_pendNote" ${prefs.onPendenciaNote ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent)">
+      <label class="u-2a3e47">
+        <input type="checkbox" id="pref_pendNote" ${prefs.onPendenciaNote ? 'checked' : ''} class="u-9cf325">
         <span>Ao adicionar nota/ata</span>
       </label>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">No celular</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">
+    <div class="u-49f14f">
+      <div class="u-241252">No celular</div>
+      <p class="u-f82f16">
         Os mesmos avisos chegam como notificação no aparelho, mesmo com o app fechado.
       </p>
       <div id="pushSettings"><p class="push-state">Verificando…</p></div>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Lembretes de Prazo</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin:0">
+    <div class="u-49f14f">
+      <div class="u-241252">Lembretes de Prazo</div>
+      <p class="u-9edd1b">
         Enviados automaticamente pelo servidor às 8h: pendências 2 dias antes e no dia do prazo,
         vencimentos 30 e 7 dias antes e no dia. Cada lembrete sai uma vez só.
       </p>
     </div>
 
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--accent-dim2)">Testar envio</div>
+    <div class="u-49f14f">
+      <div class="u-241252">Testar envio</div>
       <button type="button" class="btn btn-secondary" id="notifTestBtn" data-action="sendTestEmail">Enviar e-mail de teste para mim</button>
-      <div id="notifTestResult" style="font-size:12px;margin-top:8px"></div>
+      <div id="notifTestResult" class="u-b0cc7e"></div>
     </div>
 
-    <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+    <div class="u-5067e4">
       <button class="btn btn-secondary" data-action="notifHideModal">Cancelar</button>
       <button class="btn btn-primary" data-action="saveNotifSettings">Salvar</button>
     </div>

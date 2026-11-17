@@ -99,11 +99,11 @@ function _buildOperadoresPage(savedFilters = {}) {
           <span class="op-stat-label">Total</span>
         </div>
         <div class="op-stat">
-          <span class="op-stat-value" style="color:var(--ov-green)">${ativos.length}</span>
+          <span class="op-stat-value u-39617d">${ativos.length}</span>
           <span class="op-stat-label">Ativos</span>
         </div>
         <div class="op-stat">
-          <span class="op-stat-value" style="color:var(--ov-muted)">${inativos.length}</span>
+          <span class="op-stat-value u-1711ed">${inativos.length}</span>
           <span class="op-stat-label">Inativos</span>
         </div>
       </div>
@@ -216,14 +216,14 @@ function _renderOpGrid() {
       kebabItems += `<button class="op-kebab-item op-kebab-item--danger" data-action="opDeleteConfirm" data-arg="${escapeHtml(op.id)}" data-stop="1" title="Excluir">${_opTrashIcon()}<span>Excluir</span></button>`;
     }
     if(kebabItems){
-      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" data-action="toggleOpMenu" data-arg="${escapeHtml(op.id)}" data-stop="1" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu" id="opMenu-${escapeHtml(op.id)}" data-open="0" style="display:none">${kebabItems}</div></div>`;
+      actionsHtml += `<div class="op-kebab-wrap"><button class="btn btn-secondary btn-sm op-kebab-btn" data-action="toggleOpMenu" data-arg="${escapeHtml(op.id)}" data-stop="1" aria-label="Mais ações" aria-expanded="false">${_opKebabIcon()}</button><div class="op-kebab-menu u-6b99de" id="opMenu-${escapeHtml(op.id)}" data-open="0">${kebabItems}</div></div>`;
     }
 
     return `
-      <div class="op-card ${isActive ? '' : 'op-card--inactive'}" style="cursor:pointer" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
+      <div class="op-card ${isActive ? '' : 'op-card--inactive'} u-3b6a3a" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
-          <div class="op-avatar" style="background:${color}">${escapeHtml(initials)}</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}</div>
+          <div class="u-c87525">
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}
             </div>
@@ -242,11 +242,11 @@ function _renderOpGrid() {
         ${actionsHtml ? `<div class="op-card-actions">${actionsHtml}</div>` : ''}
       </div>`;
   }).join('') + (totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
-      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
-      <div style="display:flex;gap:6px">
+    <div class="u-048982">
+      <div class="u-8ff086">Mostrando ${startIdx+1}–${Math.min(startIdx+OP_PAGE_SIZE, ops.length)} de ${ops.length} operadores</div>
+      <div class="u-49cd09">
         <button class="btn btn-sm btn-secondary" ${_opPage===1?'disabled':''} data-action="opPageDelta" data-arg="-1">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_opPage} / ${totalPages}</span>
+        <span class="u-48936d">${_opPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_opPage===totalPages?'disabled':''} data-action="opPageDelta" data-arg="1">Próxima →</button>
       </div>
     </div>
@@ -373,31 +373,31 @@ function openOperadorForm(id = null) {
   const esc = v => escapeHtml(v || '');
 
   const currentPasswordHtml = (isSelf && hasCurrentPassword) ? `
-    <div class="form-row" style="margin-bottom:var(--space-5)">
-      <div class="form-group" style="width:100%">
-        <label class="form-label">Senha atual <span style="font-weight:400;color:var(--text-muted)">(só para trocar a senha)</span></label>
+    <div class="form-row u-e28b04">
+      <div class="form-group u-046678">
+        <label class="form-label">Senha atual <span class="u-fb927a">(só para trocar a senha)</span></label>
         <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
       </div>
     </div>
   ` : '';
 
   const adminBanner = isAdminUser 
-    ? `<div style="padding:8px 12px;background:rgba(26,86,219,0.1);border:1px solid rgba(26,86,219,0.3);border-radius:6px;margin-bottom:var(--space-5);font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
+    ? `<div class="u-d7e9ed">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
     : '';
 
   openModal(id ? 'Editar Operador' : 'Novo Operador', `
     <form id="opForm" class="ov-form" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
       ${adminBanner}
-      <div style="display:flex;align-items:center;gap:20px;margin-bottom:var(--space-6);padding:16px;background:var(--bg-base);border-radius:var(--radius)">
-        <div id="opAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
+      <div class="u-41f38a">
+        <div id="opAvatarPreview" data-sty="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
           ${esc(op?.initials || (op?.name ? op.name.substring(0,2).toUpperCase() : '?'))}
         </div>
-        <div style="flex:1">
-          <div class="form-group" style="margin-bottom:var(--space-2)"><label class="form-label">Cor do avatar</label>
-            <div style="display:flex;gap:6px;flex-wrap:wrap" id="opColorPicker">
+        <div class="u-97445a">
+          <div class="form-group u-d9f228"><label class="form-label">Cor do avatar</label>
+            <div class="u-6157e8" id="opColorPicker">
               ${OP_COLORS.map(col => {
                 var isSel = selColor===col;
-                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
+                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel?'true':'false'}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel?'#0f172a':'transparent'};outline:${isSel?'2px solid #fff':''};outline-offset:${isSel?'-4px':'0'};box-shadow:${isSel?'0 0 0 2px #0f172a':''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}</button>`;
               }).join('')}
             </div>
           </div>
@@ -417,20 +417,20 @@ function openOperadorForm(id = null) {
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group" style="flex:1">
+          <div class="form-group u-97445a">
             <label class="form-label">Cargo / Função</label>
             <input class="form-input" name="role" value="${esc(op?.role || 'Técnico')}" placeholder="Ex: Técnico, Analista..." ${isAdminUser ? '' : 'readonly'} />
           </div>
         </div>
         ${isAdminUser ? `
         <div class="form-row">
-          <div class="form-group" style="flex:1">
+          <div class="form-group u-97445a">
             <label class="form-label">Equipe *</label>
             <select class="form-select" name="team" required>
               ${TEAM_OPTIONS.map(o => `<option value="${o.value}" ${(op?.team||'init')===o.value?'selected':''}>${o.label}</option>`).join('')}
             </select>
           </div>
-          <div class="form-group" style="flex:1">
+          <div class="form-group u-97445a">
             <label class="form-label">Status</label>
             <select class="form-select" name="active">
               <option value="1" ${op?.active !== false ? 'selected' : ''}>Ativo</option>
@@ -438,17 +438,17 @@ function openOperadorForm(id = null) {
             </select>
           </div>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--border)">
-          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
-          <label for="opIsAdmin" class="form-label" style="margin-bottom:0;cursor:pointer;font-weight:600">Perfil Administrador</label>
+        <div class="form-group u-face9f">
+          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin===true ? 'checked' : ''} class="u-fefb41" />
+          <label for="opIsAdmin" class="form-label u-ffe959">Perfil Administrador</label>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:8px 0 0">
-          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
-          <label for="opIsGestao" class="form-label" style="margin-bottom:0;cursor:pointer">Gestão <span style="font-weight:400;color:var(--text-muted)">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
+        <div class="form-group u-e081d8">
+          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao===true ? 'checked' : ''} class="u-fefb41" />
+          <label for="opIsGestao" class="form-label u-7ec31c">Gestão <span class="u-fb927a">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin:8px 0 0">
-          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer" />
-          <label for="opOnLeave" class="form-label" style="margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px">${_opLeaveIcon()} Afastado</label>
+        <div class="form-group u-e081d8">
+          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave===true ? 'checked' : ''} class="u-fefb41" />
+          <label for="opOnLeave" class="form-label u-7cfea5">${_opLeaveIcon()} Afastado</label>
         </div>
         ` : `
         <input type="hidden" name="team" value="${op?.team||'init'}" />
@@ -489,7 +489,7 @@ function openOperadorForm(id = null) {
             <input class="form-input" type="password" name="confirmPwd" id="opConfirmPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Repita a nova senha' : 'Repita a senha'}" ${!id ? 'required' : ''} />
           </div>
         </div>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:-8px">Senha gerenciada pelo sistema de autenticação. Mínimo 8 caracteres.</p>
+        <p class="u-7dd96d">Senha gerenciada pelo sistema de autenticação. Mínimo 8 caracteres.</p>
       </div>
 
       <div class="form-actions">
@@ -740,7 +740,7 @@ function openOpPendencias(opId) {
   const donePens   = allPens.filter(p => isPendenciaClosed(p.status));
 
   const renderPenList = (list) => {
-    if (!list.length) return '<p class="text-muted" style="padding:8px 0;font-size:13px">Nenhuma pendência.</p>';
+    if (!list.length) return '<p class="text-muted u-c278f3">Nenhuma pendência.</p>';
     return list.map(p => {
       const c = getClientById(p.clientId);
       const color = c?.color || '#2563eb';
@@ -750,14 +750,14 @@ function openOpPendencias(opId) {
              role="button" tabindex="0"
              data-action="opOpenPendenciaDelayed" data-arg="${escapeHtml(p.id)}">
           ${c ? clientAvatar(c, 28) : ''}
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(getPendenciaTitulo(p))}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
-              <span class="client-badge" style="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName || '—')}</span>
-              ${p.deadline ? `· <span style="${isOverdue ? 'color:#dc2626;font-weight:600' : ''}">${formatDate(parseDeadline(p.deadline))}</span>` : ''}
+          <div class="u-59eddc">
+            <div class="u-1a8e72">${escapeHtml(getPendenciaTitulo(p))}</div>
+            <div class="u-cdf4b4">
+              <span class="client-badge" data-sty="background:${escapeHtml(color)}20;color:${escapeHtml(color)};border:1px solid ${escapeHtml(color)}40">${escapeHtml(p.clientName || '—')}</span>
+              ${p.deadline ? `· <span data-sty="${isOverdue ? 'color:#dc2626;font-weight:600' : ''}">${formatDate(parseDeadline(p.deadline))}</span>` : ''}
             </div>
           </div>
-          <div style="display:flex;gap:4px;flex-shrink:0">${statusTag(p.status)} ${priorityTag(p.priority)}</div>
+          <div class="u-0ddf6f">${statusTag(p.status)} ${priorityTag(p.priority)}</div>
         </div>`;
     }).join('');
   };
@@ -766,38 +766,38 @@ function openOpPendencias(opId) {
   const initials = op.initials || op.name.substring(0, 2).toUpperCase();
 
   openModal(op.name, `
-    <div class="op-detail-header" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-base);border-radius:var(--radius);margin-bottom:20px">
-      <div style="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(op.role || 'Técnico')}</div>
+    <div class="op-detail-header u-e2fe7f">
+      <div data-sty="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
+      <div class="u-59eddc">
+        <div class="u-7a6d8a">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}</div>
+        <div class="u-865c33">${escapeHtml(op.role || 'Técnico')}</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <div style="text-align:center;padding:8px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm)">
-          <div style="font-size:18px;font-weight:700;color:var(--accent)">${activePens.length}</div>
-          <div style="font-size:10px;color:var(--text-muted)">Ativos</div>
+      <div class="u-3de8f9">
+        <div class="u-84703d">
+          <div class="u-d56d52">${activePens.length}</div>
+          <div class="u-808b6c">Ativos</div>
         </div>
-        <div style="text-align:center;padding:8px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm)">
-          <div style="font-size:18px;font-weight:700;color:var(--green)">${donePens.length}</div>
-          <div style="font-size:10px;color:var(--text-muted)">Concluídos</div>
+        <div class="u-84703d">
+          <div class="u-e07a88">${donePens.length}</div>
+          <div class="u-808b6c">Concluídos</div>
         </div>
       </div>
     </div>
 
-    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+    <div class="u-5329cf">
       📌 Pendências Ativas (${activePens.length})
     </div>
     ${renderPenList(activePens)}
 
     ${donePens.length ? `
     <hr class="divider"/>
-    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+    <div class="u-c7d537">
       ✅ Concluídas (${donePens.length})
     </div>
     ${renderPenList(donePens)}
     ` : ''}
 
-    <div class="form-actions" style="margin-top:16px">
+    <div class="form-actions u-1b0f49">
       <button class="btn btn-secondary" data-action="closeModal">Fechar</button>
       <button class="btn btn-primary" data-action="opNewPendenciaDelayed">+ Nova Pendência</button>
     </div>

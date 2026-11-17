@@ -199,7 +199,7 @@ function timerActionBtnHTML(item, type = 'pendencia') {
   }
 
   // Outro operador trabalhando — mostrar bloqueado/desabilitado
-  return `<button class="timer-btn" disabled title="${escapeHtml(worker)} já está trabalhando neste item" style="opacity:.5;cursor:not-allowed">🔒</button>`;
+  return `<button class="timer-btn u-71f920" disabled title="${escapeHtml(worker)} já está trabalhando neste item">🔒</button>`;
 }
 
 /**
@@ -223,11 +223,11 @@ function timerWidget(item, type = 'pendencia') {
   try { _wid = (typeof escapeHtml === 'function') ? escapeHtml(item && item.id) : String((item && item.id) || ''); } catch (_) { _wid = String((item && item.id) || ''); }
   if (item && _isTimerClosedStatus(item.status)) {
     const secs = getElapsedSeconds(item);
-    return `<span class="timer-widget" data-timer-widget="${_wid}" title="Tempo total trabalhado (chamado finalizado)"><span style="font-size:11px;color:var(--text-muted)">⏱ ${formatTimer(secs)}</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}" title="Tempo total trabalhado (chamado finalizado)"><span class="u-749148">⏱ ${formatTimer(secs)}</span></span>`;
   }
   const worker = getCurrentWorker(item);
   if (!worker) {
-    return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} <span style="font-size:11px;color:var(--text-muted)" title="Ninguém trabalhando agora">Ninguém</span></span>`;
+    return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} <span class="u-749148" title="Ninguém trabalhando agora">Ninguém</span></span>`;
   }
   return `<span class="timer-widget" data-timer-widget="${_wid}">${timerActionBtnHTML(item, type)} ${workerBadgeHTML(item)} ${timerDisplayHTML(item)}</span>`;
 }
@@ -340,7 +340,7 @@ function openTimerAdjust(id) {
   const started = item.timerStartedAt ? new Date(item.timerStartedAt) : null;
   const startedTxt = started ? started.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   openModal('Parar e ajustar tempo', `
-    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+    <p class="u-4ded6d">
       O cronômetro de <strong>${escapeHtml(getCurrentWorker(item))}</strong> está ligado desde
       <strong>${escapeHtml(startedTxt)}</strong> (${escapeHtml(formatDurationWords(session))}).
       Informe quanto tempo foi realmente trabalhado nesta sessão — só isso entra no total.
@@ -351,7 +351,7 @@ function openTimerAdjust(id) {
       <div class="form-group"><label class="form-label" for="timerAdjM">Minutos</label>
         <input type="number" class="form-input" id="timerAdjM" min="0" max="59" step="5" value="${Math.min(sm, 55)}" /></div>
     </div>
-    <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
+    <p class="u-6025e9">Total antes desta sessão: ${escapeHtml(formatDurationWords(Number(item.timerTotalSeconds) || 0))}. A pendência vai para Pausado.</p>
     <div class="form-actions">
       <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
       <button type="button" class="btn btn-primary" data-action="submitTimerAdjust" data-arg="${escapeHtml(id)}">Parar e salvar</button>

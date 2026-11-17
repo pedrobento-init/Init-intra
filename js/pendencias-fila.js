@@ -111,7 +111,7 @@ function _penFilaLinha(p) {
     + '<td class="pf-cliente">' + escapeHtml(p.clientName || '—') + '</td>'
     + '<td class="pf-solic">' + escapeHtml(p.solicitante || '—') + '</td>'
     + '<td class="pf-resp">' + escapeHtml(p.responsible || '—') + '</td>'
-    + '<td class="pf-status"><span class="pf-chip" style="--c:' + (st ? st.dot : 'var(--text-muted)') + '">'
+    + '<td class="pf-status"><span class="pf-chip" data-sty="--c:' + (st ? st.dot : 'var(--text-muted)') + '">'
       + escapeHtml(st ? st.label : p.status || '—') + '</span></td>'
     + '<td class="pf-pri">' + (typeof priorityTag === 'function' ? priorityTag(p.priority) : escapeHtml(p.priority || '')) + '</td>'
     + '<td class="pf-prazo">' + _penFilaPrazo(p) + '</td>'

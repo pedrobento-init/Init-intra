@@ -65,7 +65,7 @@ function renderClients() {
           <button type="button" class="cl-view-btn${_clientView === 'lista' ? ' is-on' : ''}" aria-pressed="${_clientView === 'lista'}" data-action="clientView" data-arg="lista" title="Lista"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Lista</button>
           <button type="button" class="cl-view-btn${_clientView === 'cartoes' ? ' is-on' : ''}" aria-pressed="${_clientView === 'cartoes'}" data-action="clientView" data-arg="cartoes" title="Cartões"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Cartões</button>
         </div>
-        <button class="btn btn-secondary" data-action="openImportClientsModal" title="Importar clientes de Word/CSV" style="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
+        <button class="btn btn-secondary" data-action="openImportClientsModal" title="Importar clientes de Word/CSV" data-sty="${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? '' : 'display:none'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar</button>
         ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-secondary" data-action="openMilvusClientsImportModal" title="Importar clientes do Milvus (cria o mapeamento junto)"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Milvus</button>` : ''}
         </div>
       </div>
@@ -149,7 +149,7 @@ function _renderClientTable(grid, pageClients, statsById) {
     return '<tr class="cl-row" tabindex="0" data-action="openClient" data-arg="' + escapeHtml(c.id) + '">' +
       '<td><div class="cl-name">' + clientAvatar(c, 30) + '<div><div class="cl-title">' + escapeHtml(c.name) + '</div>' +
         (c.segment ? '<div class="cl-seg">' + escapeHtml(c.segment) + '</div>' : '') + '</div></div></td>' +
-      '<td>' + (h ? '<span class="cl-health" style="--c:var(--st-' + lvl + ')"><i aria-hidden="true"></i>' + escapeHtml(h.label) + '</span>' : '—') + '</td>' +
+      '<td>' + (h ? '<span class="cl-health" data-sty="--c:var(--st-' + lvl + ')"><i aria-hidden="true"></i>' + escapeHtml(h.label) + '</span>' : '—') + '</td>' +
       '<td class="cl-num">' + st.abertas + '</td>' +
       '<td class="cl-num' + (st.vencidas ? ' is-over' : '') + '">' + st.vencidas + '</td>' +
       '<td class="cl-acts"><button class="btn btn-sm btn-secondary" data-action="clientEdit" data-arg="' + escapeHtml(c.id) + '">Editar</button></td>' +
@@ -190,11 +190,11 @@ function renderClientGrid() {
     });
     const pageClients = sorted.slice(startIdx, startIdx + CLIENT_PAGE_SIZE);
     const _pager = totalPages > 1 ? `
-    <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--ov-line)">
-      <div style="font-size:12px;color:var(--ov-muted)">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
-      <div style="display:flex;gap:6px">
+    <div class="u-048982">
+      <div class="u-8ff086">Mostrando ${startIdx+1}–${Math.min(startIdx+CLIENT_PAGE_SIZE, clients.length)} de ${clients.length} clientes</div>
+      <div class="u-49cd09">
         <button class="btn btn-sm btn-secondary" ${_clientPage===1?'disabled':''} data-action="clientPagePrev">← Anterior</button>
-        <span style="font-size:13px;padding:4px 8px;display:flex;align-items:center">${_clientPage} / ${totalPages}</span>
+        <span class="u-48936d">${_clientPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_clientPage===totalPages?'disabled':''} data-action="clientPageNext">Próxima →</button>
       </div>
     </div>
@@ -215,11 +215,11 @@ function renderClientGrid() {
       const dentro = sla.dentroPrazo;
       return `<div class="client-card" role="button" tabindex="0" data-action="openClient" data-arg="${escapeHtml(c.id)}">
       <div class="client-card-logo">${clientAvatar(c, 64)}</div>
-      <div class="client-card-name" style="display:flex;align-items:center;gap:6px;justify-content:center">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" style="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
+      <div class="client-card-name u-fbab0d">${escapeHtml(c.name)} ${health ? `<span title="${health.motivos && health.motivos.length ? escapeHtml(health.label + ' (' + health.nota + '/100): ' + health.motivos.join('; ')) : `${escapeHtml(health.label)} - ${plural(health.totalAbertas, 'aberta', 'abertas')}, ${plural(health.vencidas, 'vencida', 'vencidas')}, média ${health.avgHours ? health.avgHours.toFixed(1)+'h' : '—'}`}" class="health-dot" data-sty="--c:${health.level === 'red' ? 'var(--st-danger)' : health.level === 'yellow' ? 'var(--st-warn)' : 'var(--st-ok)'}" role="img" aria-label="${escapeHtml(health.label)}"></span>` : ''}</div>
       <div class="client-card-seg">${escapeHtml(c.segment || '')}</div>
       <div class="client-card-footer">
         ${pending > 0 ? `<span class="tag ${vencidas?'tag-red':'tag-yellow'}" title="${pending} aberta${pending>1?'s':''} · ${vencidas} vencida${vencidas===1?'':'s'} · ${dentro} no prazo">${pending} pendência${pending>1?'s':''}${vencidas?` · ${vencidas} vencida${vencidas>1?'s':''}`:''}</span>` : `<span class="tag tag-green">Em dia</span>`}
-        <div style="display:flex;gap:4px">
+        <div class="u-74cac9">
           <button class="btn btn-sm btn-secondary" data-action="clientEdit" data-arg="${escapeHtml(c.id)}" data-stop="1">Editar</button>
           ${(typeof isCurrentAdmin === 'function' && isCurrentAdmin()) ? `<button class="btn btn-sm btn-danger" data-action="clientDelete" data-arg="${escapeHtml(c.id)}" data-stop="1">✕</button>` : ''}
         </div>

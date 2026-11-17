@@ -43,7 +43,7 @@ function cmdRefreshAttCount(penId) {
     var c = document.getElementById('penAttCounter');
     if (c) {
       c.textContent = list.length ? String(list.length) : '';
-      c.style.display = list.length ? '' : 'none';
+      c.classList.toggle('u-6b99de', !list.length);
     }
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'pendencias-comando'); }
 }
@@ -135,7 +135,7 @@ function openReassignPendencia(penId) {
     if (filtered.length) options = filtered;
   }
   openModal('Reatribuir pendência', `
-    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : ''}</p>
+    <p class="u-8bf00c">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Responsável atual: <strong>${escapeHtml(current || '—')}</strong> ${typeof isOperatorOnLeave === 'function' && isOperatorOnLeave(current) ? '<span class="tag badge-afastado">🏖️ Afastado</span>' : ''}</p>
     <div class="form-group">
       <label class="form-label" for="reassignSelect">Novo responsável</label>
       <select class="form-select" id="reassignSelect" aria-label="Novo responsável">
@@ -201,7 +201,7 @@ function openCorrectCompletion(penId) {
   let quando = '—';
   try { quando = (typeof formatDateTime === 'function' ? formatDateTime(pen.completedAt) : String(pen.completedAt || '—')); } catch (_) { quando = String(pen.completedAt || '—'); }
   openModal('Corrigir quem concluiu', `
-    <p style="font-size:13px;margin-bottom:12px">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Concluída em: <strong>${escapeHtml(quando)}</strong></p>
+    <p class="u-8bf00c">Pendência: <strong>${escapeHtml(getPendenciaTitulo(pen) || pen.id)}</strong><br>Concluída em: <strong>${escapeHtml(quando)}</strong></p>
     <div class="form-group">
       <label class="form-label" for="correctCompletedBySelect">Quem concluiu</label>
       <select class="form-select" id="correctCompletedBySelect" aria-label="Quem concluiu">

@@ -810,7 +810,7 @@ function highlightMentions(text) {
       var parts = n.toLowerCase().split(/\s+/);
       return parts.some(function(part){ return part === tokLower; }) || n.toLowerCase() === tokLower;
     });
-    if (isMention) return '<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:4px;font-weight:600">@' + p1 + '</span>';
+    if (isMention) return '<span class="u-3b66ce">@' + p1 + '</span>';
     return match;
   });
 }

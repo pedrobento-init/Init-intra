@@ -89,7 +89,7 @@ function renderTemplatesGrid() {
   }
 
   if (!templates.length) {
-    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Nenhum modelo de procedimento encontrado.</p><button type="button" class="btn btn-primary btn-sm" data-action="tplNew">+ Novo Modelo</button></div>`;
+    container.innerHTML = `<div class="empty-state u-068a8d"><p>Nenhum modelo de procedimento encontrado.</p><button type="button" class="btn btn-primary btn-sm" data-action="tplNew">+ Novo Modelo</button></div>`;
     return;
   }
 
@@ -215,32 +215,32 @@ function openApplyTemplateModal(templateId) {
 
   openModal(`Aplicar Modelo: ${tpl.title || ''}`, `
     <form class="ov-form" data-submit="tplApplySave" data-arg="${escapeHtml(templateId)}">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+      <p class="u-f0aa70">
         Selecione os clientes que receberão uma cópia deste procedimento:
       </p>
 
-      <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg-base);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer">
+      <div class="u-a15c71">
+        <label class="u-a667d3">
           <input type="checkbox" id="selectAllClientsBtn" data-change="tplApplyAll" />
           Selecionar Todos os Clientes
         </label>
-        <span style="font-size:12px;color:var(--text-muted)" id="selectedClientsCount">0 selecionados</span>
+        <span class="u-865c33" id="selectedClientsCount">0 selecionados</span>
       </div>
 
-      <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:6px">
+      <div class="u-31cf09">
         ${clients.map(c => `
-          <label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:4px;cursor:pointer;background:var(--bg-surface);transition:background 0.15s" class="client-apply-row">
+          <label class="client-apply-row u-1be03c">
             <input type="checkbox" name="client_ids" value="${escapeHtml(c.id)}" data-change="tplApplyCount" />
-            <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <div class="u-ceee53">
               ${clientAvatar(c, 24)}
-              <span style="font-size:13px;font-weight:500;color:var(--text-primary)">${escapeHtml(c.name)}</span>
-              ${c.segment ? `<span class="tag tag-blue" style="font-size:10px;padding:1px 6px">${escapeHtml(c.segment)}</span>` : ''}
+              <span class="u-95f0f6">${escapeHtml(c.name)}</span>
+              ${c.segment ? `<span class="tag tag-blue u-688d26">${escapeHtml(c.segment)}</span>` : ''}
             </div>
           </label>
         `).join('')}
       </div>
 
-      <div class="form-actions" style="margin-top:16px">
+      <div class="form-actions u-1b0f49">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Aplicar aos Clientes Selecionados</button>
       </div>

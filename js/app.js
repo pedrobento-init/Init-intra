@@ -209,7 +209,7 @@ function _dashDeltaBadge(delta) {
   }
   const color = delta.improved ? '#16a34a' : '#dc2626';
   const arrow = delta.direction === 'up' ? '↑' : '↓';
-  return `<span class="dash-delta" style="color:${color}" title="${delta.improved ? 'Melhora' : 'Piora'} vs. período anterior">${arrow}${delta.pct}%</span>`;
+  return `<span class="dash-delta" data-sty="color:${color}" title="${delta.improved ? 'Melhora' : 'Piora'} vs. período anterior">${arrow}${delta.pct}%</span>`;
 }
 // Faixa anterior espelhando getDashDateRange (reaproveita metrics.js quando disponível).
 function _getPreviousDashRange() {
@@ -810,7 +810,7 @@ function renderDashboard() {
         <button type="button" class="period-btn${_dashPeriod==='month'?' active':''}" data-period="month" aria-pressed="${_dashPeriod==='month'}" data-action="setDashPeriod" data-arg="month">Mês</button>
         <button type="button" class="period-btn${_dashPeriod==='quarter'?' active':''}" data-period="quarter" aria-pressed="${_dashPeriod==='quarter'}" data-action="setDashPeriod" data-arg="quarter">Trimestre</button>
         <button type="button" class="period-btn${_dashPeriod==='custom'?' active':''}" data-period="custom" aria-pressed="${_dashPeriod==='custom'}" data-action="setDashPeriod" data-arg="custom">Personalizado</button>
-        <div id="customDateRange" class="custom-date-range ov-custom" style="display:${_dashPeriod==='custom'?'flex':'none'}">
+        <div id="customDateRange" class="custom-date-range ov-custom" data-sty="display:${_dashPeriod==='custom'?'flex':'none'}">
           <input type="date" id="dashCustomStart" value="${_dashCustomStart}" data-change="setDashCustomDates" class="date-input" aria-label="Data inicial" />
           <span class="ov-until">até</span>
           <input type="date" id="dashCustomEnd" value="${_dashCustomEnd}" data-change="setDashCustomDates" class="date-input" aria-label="Data final" />
@@ -872,7 +872,7 @@ function renderDashboard() {
         const vstTag = typeof visitStatusTag === 'function' ? visitStatusTag(v.status) : '';
         return `<li class="ov-it" role="button" tabindex="0" data-action="openVisitDetail" data-arg="${escapeHtml(v.id)}">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
-          <div style="min-width:0">
+          <div class="u-3922d3">
             <div class="ov-tt">${escapeHtml(v.clientName)||'—'}</div>
             <div class="ov-mt"><span>${escapeHtml(v.motivo)||'Visita'}</span><span>${timeLabel}</span></div>
           </div>
@@ -887,13 +887,13 @@ function renderDashboard() {
         const stTag = typeof statusTag === 'function' ? statusTag(p.status) : '';
         return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenPen" data-arg="${escapeHtml(p.id)}">
           ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
-          <div style="min-width:0">
+          <div class="u-3922d3">
             <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
             <div class="ov-mt"><span>${escapeHtml(p.clientName)||'—'}</span>${priTag}${p.deadline ? `<span>${escapeHtml(formatDate(parseDeadline(p.deadline)))}</span>` : ''}${isOverdue ? `<span class="ov-warn"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>Vencida</span>` : ''}${isStale && !isOverdue ? '<span>Parada</span>' : ''}</div>
           </div>
           <div>${stTag}</div>
         </li>`;
-      }).join('') + `</ul>` + (myQueue.length>Math.max(0,8-myTodayVisits.length)?`<div style="text-align:center;margin-top:8px"><button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="navigateTo" data-arg="pendencias">Ver todas (${myQueue.length})<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>`:'') : `<p class="ov-empty">Nenhum item urgente.</p>`}
+      }).join('') + `</ul>` + (myQueue.length>Math.max(0,8-myTodayVisits.length)?`<div class="u-ee028e"><button type="button" class="btn btn-secondary btn-sm ov-btn" data-action="navigateTo" data-arg="pendencias">Ver todas (${myQueue.length})<svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>`:'') : `<p class="ov-empty">Nenhum item urgente.</p>`}
     </section>` : ''}
 
     <div class="ov-g-day">
@@ -909,7 +909,7 @@ function renderDashboard() {
                const isOverdue = p.deadline && p.deadline < localDateISO() && !_isClosedR(p.status);
               return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenPen" data-arg="${escapeHtml(p.id)}">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(p.clientName))}</span>`}
-                <div style="min-width:0">
+                <div class="u-3922d3">
                   <div class="ov-tt">${escapeHtml(getPendenciaTitulo(p))}</div>
                   <div class="ov-mt"><span>${escapeHtml(p.clientName)||'—'}</span><span>${escapeHtml(p.responsible)||'—'}</span>${isOverdue ? `<span class="ov-warn"><svg class="ov-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17.5v.01"/></svg>Vencida</span>` : ''}</div>
                 </div>
@@ -929,14 +929,14 @@ function renderDashboard() {
               const isToday = v.date === today;
               return `<li class="ov-it" role="button" tabindex="0" data-action="dashOpenVisit" data-arg="${escapeHtml(v.id)}">
                 ${c ? clientAvatar(c, 34) : `<span class="ov-av" aria-hidden="true">${escapeHtml(_ovInitials(v.clientName))}</span>`}
-                <div style="min-width:0">
+                <div class="u-3922d3">
                   <div class="ov-tt">${escapeHtml(v.motivo)||'(sem motivo)'}</div>
                   <div class="ov-mt"><span>${escapeHtml(v.clientName)||'—'}</span><span>${escapeHtml(v.operator)||'—'}</span></div>
                 </div>
                 <div class="ov-when">
                   <small>${(typeof formatVisitNumero === 'function') ? escapeHtml(formatVisitNumero(v)) : ''}</small>
-                  <span><b style="${isToday?'color:var(--ov-cyan)':''}">${formatDate(v.date)}</b>${(v.allDay || v.time || v.timeEnd) ? ' <small>' + escapeHtml(formatVisitTimeRange(v)) + '</small>' : ''}</span>
-                  <span class="ov-pill" style="--c:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'}">${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?escapeHtml(VISIT_STATUS_MAP[v.status].label):escapeHtml(v.status||'—')}</span>
+                  <span><b data-sty="${isToday?'color:var(--ov-cyan)':''}">${formatDate(v.date)}</b>${(v.allDay || v.time || v.timeEnd) ? ' <small>' + escapeHtml(formatVisitTimeRange(v)) + '</small>' : ''}</span>
+                  <span class="ov-pill" data-sty="--c:${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?VISIT_STATUS_MAP[v.status].color:'#94a3b8'}">${(typeof VISIT_STATUS_MAP!=='undefined'&&VISIT_STATUS_MAP[v.status])?escapeHtml(VISIT_STATUS_MAP[v.status].label):escapeHtml(v.status||'—')}</span>
                 </div>
               </li>`;
             }).join('')}
@@ -976,13 +976,13 @@ function renderDashboard() {
     </section>` : ''}
 
     ${(_dashCanManage && !_dashIsHidden('afastados') && _onLeaveWithCount.length) ? `
-    <div class="card dash-widget" style="margin-bottom:18px;border-left:4px solid #d97706">
+    <div class="card dash-widget u-d740d3">
       ${_dashHideBtn('afastados')}
       <div class="section-header"><span class="section-title">Operadores afastados</span></div>
-      <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="u-be2653">
         ${_onLeaveWithCount.map(o => `
-          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--bg-secondary)">
-            <span style="font-size:13px;flex:1"><strong>${escapeHtml(o.name)}</strong> está afastado — ${plural(o.count, 'pendência aguardando', 'pendências aguardando')} reatribuição</span>
+          <div class="u-652f8e">
+            <span class="u-b2c58d"><strong>${escapeHtml(o.name)}</strong> está afastado — ${plural(o.count, 'pendência aguardando', 'pendências aguardando')} reatribuição</span>
             <button class="btn btn-secondary btn-sm" data-action="dashGoToPendenciasByOperator" data-arg="${escapeHtml(o.name)}">Ver pendências →</button>
           </div>`).join('')}
       </div>
@@ -1001,7 +1001,7 @@ function renderDashboard() {
           return `
           <div class="ov-row" role="button" tabindex="0" data-action="viewClient" data-arg="${escapeHtml(r.clientId)}">
             <div class="ov-client"><div class="ov-name">${escapeHtml(r.clientName)}</div><div class="ov-st ov-${_lvl}">${escapeHtml(_lbl)}</div></div>
-            <div class="ov-track ov-${_lvl}" aria-hidden="true"><i style="width:${_pct}%"></i></div>
+            <div class="ov-track ov-${_lvl}" aria-hidden="true"><i data-sty="width:${_pct}%"></i></div>
             <div class="ov-num">${r.health.totalAbertas}</div>
             <div class="ov-num${r.health.vencidas > 0 ? ` ov-${_lvl} is-over` : ''}">${r.health.vencidas}</div>
           </div>`;
@@ -1048,7 +1048,7 @@ function renderDashboard() {
       <div class="ov-col"><div class="ov-n">${_visitMetrics.recurrentClients}</div><div class="ov-l">clientes com reincidência</div></div>
     </div></section>` : ''}
     
-    ${!_dashIsHidden('stats') ? `<section class="dash-widget ov-kpis" aria-label="Resumo de indicadores" style="position:relative">${_dashHideBtn('stats')}` : '<div style="display:none"><div>'}
+    ${!_dashIsHidden('stats') ? `<section class="dash-widget ov-kpis u-d461c9" aria-label="Resumo de indicadores">${_dashHideBtn('stats')}` : '<div class="u-6b99de"><div>'}
       <div class="ov-k" role="button" tabindex="0" data-action="navigateTo" data-arg="clientes">
         <b class="stat-value">${clients.length}</b><span>Clientes${_dashPeriod!=='all'?' (período)':''}</span>
       </div>
@@ -1095,40 +1095,40 @@ function renderDashboard() {
     <section class="card dash-widget ov-panel" aria-labelledby="ov-op">
       ${_dashHideBtn('workload')}
       <div class="ov-ph"><h2 class="ov-h2" id="ov-op">Carga por operador</h2>
-        <select id="workloadPeriod" class="form-select ov-sel" style="width:160px" aria-label="Período da carga por operador" data-change="setWorkloadPeriod">
+        <select id="workloadPeriod" class="form-select ov-sel u-28c0f6" aria-label="Período da carga por operador" data-change="setWorkloadPeriod">
           <option value="all" ${(_dashWorkloadPeriod||'all')==='all'?'selected':''}>Todo período</option>
           <option value="week" ${(_dashWorkloadPeriod||'all')==='week'?'selected':''}>Semana atual</option>
           <option value="month" ${(_dashWorkloadPeriod||'all')==='month'?'selected':''}>Mês atual</option>
         </select>
       </div>
-      <div class="ov-sub" style="margin-top:-6px">Horas em pendências</div>
-      <div id="workloadList" style="padding:12px 0 0"></div>
+      <div class="ov-sub u-543571">Horas em pendências</div>
+      <div id="workloadList" class="u-d04a6e"></div>
     </section>` : ''}
     </div>
     ${!_dashIsHidden('charts') ? `
-    <div class="dash-widget" style="position:relative">
+    <div class="dash-widget u-d461c9">
       ${_dashHideBtn('charts')}
       <div class="ov-g ov-g-b">
-      <section class="card dash-widget ov-panel" aria-labelledby="ov-pri" style="display:flex;flex-direction:column">
+      <section class="card dash-widget ov-panel u-7ecbcd" aria-labelledby="ov-pri">
         <div class="ov-ph"><h2 class="ov-h2" id="ov-pri">Distribuição por prioridade</h2></div>
         <div class="ov-cv"><canvas id="chartPriority"></canvas></div>
       </section>
-      ${_dashCanManage ? `<section class="card dash-widget ov-panel" aria-labelledby="ov-car" style="display:flex;flex-direction:column">
+      ${_dashCanManage ? `<section class="card dash-widget ov-panel u-7ecbcd" aria-labelledby="ov-car">
         <div class="ov-ph"><h2 class="ov-h2" id="ov-car">Carga de trabalho por técnico</h2></div>
         <div class="ov-cv"><canvas id="chartWorkload"></canvas></div>
       </section>` : ''}
       </div>
-      <div class="ov-g ov-g-c" style="margin-top:16px">
-      <section class="card dash-widget ov-panel" aria-labelledby="ov-ev6" style="display:flex;flex-direction:column">
+      <div class="ov-g ov-g-c u-1b0f49">
+      <section class="card dash-widget ov-panel u-7ecbcd" aria-labelledby="ov-ev6">
         <div class="ov-ph"><h2 class="ov-h2" id="ov-ev6">Evolução dos últimos 6 meses</h2></div>
         <div class="ov-cv"><canvas id="chartEvolution"></canvas></div>
       </section>
-      ${_dashCanManage ? `<section class="card dash-widget ov-panel" aria-labelledby="ov-rk" style="display:flex;flex-direction:column">
+      ${_dashCanManage ? `<section class="card dash-widget ov-panel u-7ecbcd" aria-labelledby="ov-rk">
         <div class="ov-ph"><h2 class="ov-h2" id="ov-rk">Ranking de produtividade</h2><span class="ov-sub">Resolvidos</span></div>
         <div class="ov-cv"><canvas id="chartRanking"></canvas></div>
       </section>` : ''}
       </div>
-    </div>` : '<div class="dashboard-charts-grid" style="display:none"><div class="card"><canvas id="chartPriority"></canvas></div><div class="card"><canvas id="chartWorkload"></canvas></div><div class="card"><canvas id="chartEvolution"></canvas></div><div class="card"><canvas id="chartRanking"></canvas></div></div>'}
+    </div>` : '<div class="dashboard-charts-grid u-6b99de"><div class="card"><canvas id="chartPriority"></canvas></div><div class="card"><canvas id="chartWorkload"></canvas></div><div class="card"><canvas id="chartEvolution"></canvas></div><div class="card"><canvas id="chartRanking"></canvas></div></div>'}
 
     </div>`;
 
@@ -1160,7 +1160,7 @@ function renderDashboard() {
       wlEl.innerHTML = entries.map(([op, secs]) => {
         const h=(secs/3600).toFixed(1);
         const _pct = Math.max(4, Math.round((secs / _max) * 100));
-        return `<div class="ov-hb"><span class="n">${escapeHtml(op)}</span><div class="ov-bt"><i style="--w:${_pct}%"></i></div><span class="ov-v">${h}h</span></div>`;
+        return `<div class="ov-hb"><span class="n">${escapeHtml(op)}</span><div class="ov-bt"><i data-sty="--w:${_pct}%"></i></div><span class="ov-v">${h}h</span></div>`;
       }).join('');
     }
   })();
@@ -1426,17 +1426,17 @@ function openHoursReport() {
     opMap[ok] = (opMap[ok] || 0) + h;
   });
   const fmt = h => h.toFixed(1) + 'h';
-  const rows = map => Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td style="text-align:right;font-weight:600">${fmt(v)}</td></tr>`).join('') || '<tr><td colspan="2" style="color:var(--text-muted)">Sem registros</td></tr>';
+  const rows = map => Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td class="u-f3535d">${fmt(v)}</td></tr>`).join('') || '<tr><td colspan="2" class="u-5872de">Sem registros</td></tr>';
   openModal('Horas trabalhadas', `
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">Total acumulado: <strong style="color:var(--text-primary)">${fmt(total)}</strong> (timers de pendências)</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="hours-report-grid">
+    <p class="u-fce332">Total acumulado: <strong class="u-3c6f5e">${fmt(total)}</strong> (timers de pendências)</p>
+    <div class="hours-report-grid u-911b26">
       <div>
-        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700">Por cliente</h4>
-        <div class="table-wrapper"><table><thead><tr><th>Cliente</th><th style="text-align:right">Horas</th></tr></thead><tbody>${rows(clientMap)}</tbody></table></div>
+        <h4 class="u-ccbf48">Por cliente</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Cliente</th><th class="u-54c2af">Horas</th></tr></thead><tbody>${rows(clientMap)}</tbody></table></div>
       </div>
       <div>
-        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700">Por operador</h4>
-        <div class="table-wrapper"><table><thead><tr><th>Operador</th><th style="text-align:right">Horas</th></tr></thead><tbody>${rows(opMap)}</tbody></table></div>
+        <h4 class="u-ccbf48">Por operador</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Operador</th><th class="u-54c2af">Horas</th></tr></thead><tbody>${rows(opMap)}</tbody></table></div>
       </div>
     </div>
   `, 'lg');
@@ -1537,7 +1537,7 @@ function showLoginScreen() {
 
     <div class="login-form-wrap">
       <div class="login-card">
-        ${!serverOk ? `<div class="login-error" style="margin-bottom:12px;text-align:center">Serviço de autenticação indisponível.<br><span style="font-size:11px;opacity:0.8">Verifique sua conexão ou contate o suporte.</span></div>` : ''}
+        ${!serverOk ? `<div class="login-error u-8062c3">Serviço de autenticação indisponível.<br><span class="u-08bfba">Verifique sua conexão ou contate o suporte.</span></div>` : ''}
 
         <div class="login-field">
           <label class="login-label">E-mail</label>
@@ -1622,7 +1622,7 @@ async function doLogin() {
 
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Autenticando...';
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="u-9cb0f7"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Autenticando...';
   }
   if (errEl) errEl.textContent = '';
 
@@ -1803,7 +1803,7 @@ function generateMonthlyReport() {
     '<header class="rpt-head"><div><div class="rpt-brand">Init Intra · Relatório mensal</div><h1>Visão geral da equipe</h1>' +
     '<div class="rpt-period">' + monthNames[now.getMonth()] + ' de ' + now.getFullYear() + '</div></div>' +
     '<div class="rpt-gen">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</div></header>' +
-    '<section class="rpt-kpis" style="grid-template-columns:repeat(3,1fr)">' +
+    '<section class="rpt-kpis u-155a49">' +
       '<div class="rpt-kpi"><b>' + clients.length + '</b><span>Clientes</span></div>' +
       '<div class="rpt-kpi"><b>' + resolvedPens.length + '</b><span>Pendências resolvidas no mês</span></div>' +
       '<div class="rpt-kpi"><b>' + activeOps.length + '</b><span>Técnicos ativos</span></div>' +

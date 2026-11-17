@@ -16,12 +16,12 @@ function openClientForm(id = null) {
     <form id="cliForm" class="ov-form" data-submit="submitClientForm" data-arg="${esc(id || '')}">
       <div class="form-section">
         <div class="form-section-title">Ícone do Cliente</div>
-        <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:12px">
+        <div class="u-0511d5">
           <div id="logoPreview">${clientAvatar(c, 60)}</div>
-          <div style="flex:1">
-            <div class="form-group" style="margin-bottom:8px"><label class="form-label">Cor do avatar</label>
-              <div style="display:flex;gap:6px;flex-wrap:wrap" id="colorPicker">
-                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" data-action="selectColor" data-arg="${col}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
+          <div class="u-97445a">
+            <div class="form-group u-fdf33f"><label class="form-label">Cor do avatar</label>
+              <div class="u-6157e8" id="colorPicker">
+                ${COLORS.map(col=>`<div role="button" tabindex="0" aria-label="Cor ${col}" data-action="selectColor" data-arg="${col}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${(c.color||COLORS[0])===col?'#0f172a':'transparent'}" data-color="${col}"></div>`).join('')}
               </div>
             </div>
           <div class="form-row">
@@ -29,22 +29,22 @@ function openClientForm(id = null) {
               <div class="form-group"><label class="form-label">URL da Logo (opcional)</label><input class="form-input" name="logo" id="logoUrlInput" value="${esc(c.logo && !c.logo.startsWith('data:') ? c.logo : '')}" placeholder="https://..." data-input="onLogoUrlChange" /></div>
             </div>
             <div class="logo-upload-zone">
-              <input type="file" id="logoFileInput" accept="image/*" style="display:none" data-change="onLogoFileSelected" />
+              <input type="file" id="logoFileInput" accept="image/*" class="u-6b99de" data-change="onLogoFileSelected" />
               <button type="button" class="logo-upload-btn" data-action="logoFilePick">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Enviar Imagem
               </button>
-              <button type="button" class="logo-crop-btn" id="cropBtn" data-action="openCropModal" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-crop-btn" id="cropBtn" data-action="openCropModal" data-sty="display:${c.logo?'inline-flex':'none'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"/><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"/></svg>
                 Recortar
               </button>
-              <button type="button" class="logo-remove-btn" id="removeLogoBtn" data-action="removeClientLogo" style="display:${c.logo?'inline-flex':'none'}">
+              <button type="button" class="logo-remove-btn" id="removeLogoBtn" data-action="removeClientLogo" data-sty="display:${c.logo?'inline-flex':'none'}">
                 ✕
               </button>
             </div>
-            <div class="form-group" style="margin-top:8px">
+            <div class="form-group u-8a77e5">
               <label class="form-label">Formato da Logo</label>
-              <div style="display:flex;gap:8px" id="shapePicker">
+              <div class="u-a76d59" id="shapePicker">
                 <div class="logo-shape-option ${(c.logoShape||'circle')==='circle'?'selected':''}" role="button" tabindex="0" data-action="selectLogoShape" data-arg="circle" data-shape="circle">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
                   Redondo
@@ -221,11 +221,11 @@ async function autoFillClientByCnpj(button) {
 let _licIdx = 10;
 function licRow(l={}, i=0) {
   const esc = v => escapeHtml(v || '');
-  return `<div class="form-row" id="lr${i}" style="align-items:end;margin-bottom:8px">
-    <div class="form-group" style="margin-bottom:0"><label class="form-label">Software</label><input class="form-input" name="ls_${i}" value="${esc(l.software)}" /></div>
-    <div class="form-group" style="margin-bottom:0"><label class="form-label">Chave</label><input class="form-input" name="lk_${i}" value="${esc(l.key)}"${l.hasKey && !l.key ? ' placeholder="Guardada — preencha para trocar"' : ''} autocomplete="off" /><input type="hidden" name="lid_${i}" value="${esc(l.kid)}" /><input type="hidden" name="lh_${i}" value="${l.hasKey ? '1' : ''}" /></div>
-    <div class="form-group" style="margin-bottom:0"><label class="form-label">Validade</label><input type="date" class="form-input" name="le_${i}" value="${esc(l.expiry)}" /></div>
-    <button type="button" class="btn btn-danger btn-sm" style="flex-shrink:0" data-action="licRowRemove" data-arg="${i}">✕</button>
+  return `<div class="form-row u-b8b1e2" id="lr${i}">
+    <div class="form-group u-ef0b7a"><label class="form-label">Software</label><input class="form-input" name="ls_${i}" value="${esc(l.software)}" /></div>
+    <div class="form-group u-ef0b7a"><label class="form-label">Chave</label><input class="form-input" name="lk_${i}" value="${esc(l.key)}"${l.hasKey && !l.key ? ' placeholder="Guardada — preencha para trocar"' : ''} autocomplete="off" /><input type="hidden" name="lid_${i}" value="${esc(l.kid)}" /><input type="hidden" name="lh_${i}" value="${l.hasKey ? '1' : ''}" /></div>
+    <div class="form-group u-ef0b7a"><label class="form-label">Validade</label><input type="date" class="form-input" name="le_${i}" value="${esc(l.expiry)}" /></div>
+    <button type="button" class="btn btn-danger btn-sm u-6ee066" data-action="licRowRemove" data-arg="${i}">✕</button>
   </div>`;
 }
 function addLicRow() {
@@ -503,27 +503,27 @@ let _importHasHeader = true;
 
 function openImportClientsModal() {
   openModal('Importar Clientes', `
-    <div style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">1. Envie ou cole os dados</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-        <label class="btn btn-secondary" style="cursor:pointer">
+    <div class="u-87c136">
+      <div class="u-581076">1. Envie ou cole os dados</div>
+      <div class="u-cd6f75">
+        <label class="btn btn-secondary u-3b6a3a">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Escolher arquivo (.docx, .csv, .txt)
-          <input type="file" id="importFileInput" accept=".docx,.csv,.txt" style="display:none" data-change="handleImportFile" />
+          <input type="file" id="importFileInput" accept=".docx,.csv,.txt" class="u-6b99de" data-change="handleImportFile" />
         </label>
-        <span style="font-size:12px;color:var(--text-muted);display:flex;align-items:center">ou</span>
+        <span class="u-737d59">ou</span>
         <button class="btn btn-secondary" data-action="importPasteShow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Colar texto</button>
       </div>
-      <textarea id="importPasteArea" class="form-textarea" rows="6" placeholder="Cole aqui os dados copiados do Word ou Excel...&#10;Exemplo:&#10;Nome | CNPJ | Segmento&#10;Padaria Central | 12.345.678/0001-90 | Alimentação" style="display:none;margin-bottom:8px" data-input="handleImportPaste"></textarea>
+      <textarea id="importPasteArea" class="form-textarea u-92fa2f" rows="6" placeholder="Cole aqui os dados copiados do Word ou Excel...&#10;Exemplo:&#10;Nome | CNPJ | Segmento&#10;Padaria Central | 12.345.678/0001-90 | Alimentação" data-input="handleImportPaste"></textarea>
     </div>
-    <div id="importPreviewWrap" style="display:none">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">2. Preview e mapeamento de colunas</div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px;cursor:pointer">
+    <div id="importPreviewWrap" class="u-6b99de">
+      <div class="u-581076">2. Preview e mapeamento de colunas</div>
+      <label class="u-c3c332">
         <input type="checkbox" id="importHasHeader" checked data-change="importHasHeaderToggle" />
         Primeira linha é cabeçalho
       </label>
-      <div id="importPreviewTable" style="max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:12px"></div>
-      <div id="importStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
+      <div id="importPreviewTable" class="u-849a32"></div>
+      <div id="importStats" class="u-b8b1bc"></div>
+      <div class="u-309cf4">
         <button class="btn btn-secondary" data-action="closeModal">Cancelar</button>
         <button class="btn btn-primary" id="importBtn" data-action="executeClientImport"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar Clientes</button>
       </div>
@@ -770,9 +770,9 @@ function openDriveFolderPrompt(clientId) {
   const cur = c ? String(c.driveFolderUrl || '') : '';
   openModal('📁 Vincular pasta do Drive', `
     <div class="form-group"><label class="form-label">Link da pasta</label><input class="form-input" id="driveLinkInput" value="${escapeHtml(cur)}" placeholder="https://drive.google.com/drive/folders/..." /></div>
-    <p style="font-size:12px;color:var(--text-muted)">Abra a pasta no Google Drive e copie o endereço da barra do navegador. Quem não tem acesso à pasta no Drive continua sem acesso — o vínculo aqui não compartilha nada. Para desvincular, apague o campo e salve.</p>
+    <p class="u-865c33">Abra a pasta no Google Drive e copie o endereço da barra do navegador. Quem não tem acesso à pasta no Drive continua sem acesso — o vínculo aqui não compartilha nada. Para desvincular, apague o campo e salve.</p>
     <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="driveCancel" data-arg="${escapeHtml(clientId)}">Cancelar</button><button type="button" class="btn btn-primary" data-action="driveSave" data-arg="${escapeHtml(clientId)}">Salvar</button></div>
-    <div id="driveLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
+    <div id="driveLinkMsg" class="u-f99aa7"></div>`);
 }
 
 function submitDriveFolderLink(clientId) {
@@ -781,7 +781,7 @@ function submitDriveFolderLink(clientId) {
   const r = saveDriveFolderLink(clientId, raw);
   if (!r.ok) {
     const m = document.getElementById('driveLinkMsg');
-    if (m) m.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(r.error)}</span>`;
+    if (m) m.innerHTML = `<span class="u-5afed3">${escapeHtml(r.error)}</span>`;
     return;
   }
   // Volta para a ficha em vez de redesenhar a seção: este prompt substituiu o
@@ -823,8 +823,8 @@ function renderClientSheetSection(clientId) {
     ? 'Planilha publicada na web (somente leitura, sem login). Para editar, use o botão abaixo.'
     : 'A planilha precisa estar compartilhada como “Qualquer pessoa com o link pode visualizar” para carregar aqui. Se aparecer a tela de login do Google, ajuste o compartilhamento na planilha.';
   body.innerHTML = `
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${hint}</div>
-    <iframe src="${escapeHtml(embed)}" style="width:100%;height:600px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface)" loading="lazy" title="Planilha de documentação"></iframe>`;
+    <div class="u-8494ee">${hint}</div>
+    <iframe src="${escapeHtml(embed)}" class="u-6235fa" loading="lazy" title="Planilha de documentação"></iframe>`;
 }
 
 function openSheetLinkModal(clientId) {
@@ -837,9 +837,9 @@ function openSheetLinkModal(clientId) {
   const safeId = escapeHtml(clientId);
   openModal('📊 Vincular planilha de documentação', `
     <div class="form-group"><label class="form-label">Link do Google Sheets</label><input class="form-input" id="sheetLinkInput" value="${escapeHtml(cur)}" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-    <p style="font-size:12px;color:var(--text-muted)">Cole o link de <strong>compartilhamento</strong> (…/spreadsheets/d/…) ou o de <strong>Publicar na web</strong> (…/spreadsheets/d/e/…/pubhtml). No primeiro caso, compartilhe no Google como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
+    <p class="u-865c33">Cole o link de <strong>compartilhamento</strong> (…/spreadsheets/d/…) ou o de <strong>Publicar na web</strong> (…/spreadsheets/d/e/…/pubhtml). No primeiro caso, compartilhe no Google como “Qualquer pessoa com o link pode visualizar”. Para desvincular, apague o campo e salve.</p>
     <div class="form-actions"><button type="button" class="btn btn-secondary" data-action="sheetLinkCancel" data-arg="${safeId}">Cancelar</button><button type="button" class="btn btn-primary" data-action="saveSheetLink" data-arg="${safeId}">Salvar</button></div>
-    <div id="sheetLinkMsg" style="font-size:13px;margin-top:8px"></div>`);
+    <div id="sheetLinkMsg" class="u-f99aa7"></div>`);
 }
 
 function saveSheetLink(clientId) {
@@ -851,7 +851,7 @@ function saveSheetLink(clientId) {
   const raw = input ? String(input.value || '').trim() : '';
   const setMsg = (html) => { const m = document.getElementById('sheetLinkMsg'); if (m) m.innerHTML = html; };
   if (raw && !parseGoogleSheetId(raw)) {
-    setMsg('<span style="color:var(--danger,#dc2626)">Link inválido. Cole uma URL do Google Sheets (docs.google.com/spreadsheets/...).</span>');
+    setMsg('<span class="u-5afed3">Link inválido. Cole uma URL do Google Sheets (docs.google.com/spreadsheets/...).</span>');
     return;
   }
   try {
@@ -958,7 +958,7 @@ function renderImportPreview() {
 
   // Build column mapping dropdowns
   const mapHtml = headerRow.map((h, i) => `
-    <select class="form-select" id="importCol_${i}" style="font-size:11px;padding:2px 6px;max-width:140px" data-change="updateImportMapping">
+    <select class="form-select u-de4aa1" id="importCol_${i}" data-change="updateImportMapping">
       ${CLIENT_IMPORT_FIELDS.map(f => `<option value="${f.key}">${f.label}</option>`).join('')}
     </select>
   `).join('');
@@ -996,20 +996,20 @@ function renderImportPreview() {
   const previewRows = validRows.slice(0, 8);
   const colCount = headerRow.length;
   tableDiv.innerHTML = `
-    <table style="font-size:12px;width:100%;border-collapse:collapse">
+    <table class="u-558cc3">
       <thead>
-        <tr style="background:var(--bg-base)">
-          <th style="padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;text-transform:uppercase;color:var(--text-muted);position:sticky;top:0;background:var(--bg-base)">#</th>
-          ${headerRow.map((h, i) => `<th style="padding:6px 8px;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--bg-base)"><div style="margin-bottom:4px;font-weight:600">${escapeHtml(h)}</div>${mapHtml.split('</select>')[i] + '</select>'}</th>`).join('')}
+        <tr class="u-386bb9">
+          <th class="u-c1e333">#</th>
+          ${headerRow.map((h, i) => `<th class="u-a26733"><div class="u-dac383">${escapeHtml(h)}</div>${mapHtml.split('</select>')[i] + '</select>'}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
-        ${previewRows.map((row, ri) => `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:4px 8px;color:var(--text-muted);font-size:11px">${ri + 1}</td>
-          ${row.map((c, ci) => `<td style="padding:4px 8px;${ci >= colCount ? 'display:none' : ''}">${escapeHtml(c)}</td>`).join('')}
-          ${Array(Math.max(0, colCount - row.length)).fill('<td style="padding:4px 8px;color:var(--text-muted)">—</td>').join('')}
+        ${previewRows.map((row, ri) => `<tr class="u-100841">
+          <td class="u-5e1ed2">${ri + 1}</td>
+          ${row.map((c, ci) => `<td data-sty="padding:4px 8px;${ci >= colCount ? 'display:none' : ''}">${escapeHtml(c)}</td>`).join('')}
+          ${Array(Math.max(0, colCount - row.length)).fill('<td class="u-128af4">—</td>').join('')}
         </tr>`).join('')}
-        ${validRows.length > 8 ? `<tr><td colspan="${colCount + 1}" style="padding:8px;text-align:center;color:var(--text-muted);font-size:11px">...e mais ${plural(validRows.length - 8, 'linha', 'linhas')}</td></tr>` : ''}
+        ${validRows.length > 8 ? `<tr><td colspan="${colCount + 1}" class="u-f21811">...e mais ${plural(validRows.length - 8, 'linha', 'linhas')}</td></tr>` : ''}
       </tbody>
     </table>
   `;

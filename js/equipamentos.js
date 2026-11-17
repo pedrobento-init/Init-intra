@@ -228,18 +228,18 @@ function renderEquipamentos() {
       <button class="btn btn-secondary pt-filter pt-full" id="equipMoreFiltersBtn" data-action="eqToggleMoreFilters" aria-expanded="false" aria-controls="equipMoreFiltersPanel" title="Mais filtros">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         Mais filtros
-        <span class="pen-more-badge" id="equipMoreFiltersBadge" style="display:none"></span>
+        <span class="pen-more-badge u-6b99de" id="equipMoreFiltersBadge"></span>
       </button>
-      <div class="pen-more-panel" id="equipMoreFiltersPanel" data-open="0" style="display:none">
+      <div class="pen-more-panel u-6b99de" id="equipMoreFiltersPanel" data-open="0">
         <div class="filter-date-wrap">
-          <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">De:</span>
+          <span class="u-cec3b6">De:</span>
           <input type="date" id="equipFrom" class="form-input filter-date" data-change="eqFiltersChangeBadge" />
         </div>
         <div class="filter-date-wrap">
-          <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">Até:</span>
+          <span class="u-cec3b6">Até:</span>
           <input type="date" id="equipTo" class="form-input filter-date" data-change="eqFiltersChangeBadge" />
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);white-space:nowrap">
+        <label class="u-65cced">
           <input type="checkbox" id="equipOnlyOS" data-change="eqFiltersChangeBadge" /> Somente com OS
         </label>
       </div>
@@ -388,40 +388,40 @@ function renderEquipStats() {
   const b = stats.byStatus;
   wrap.innerHTML = `
     <div class="stat-card">
-      <div class="stat-icon" style="background:#eff6ff">
+      <div class="stat-icon u-4ff1ea">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       </div>
       <div><div class="stat-value">${stats.total}</div><div class="stat-label">Total de equipamentos</div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon" style="background:#ecfdf5">
+      <div class="stat-icon u-6104c8">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="16 8 10 16 7 13"/></svg>
       </div>
-      <div><div class="stat-value" style="color:#16a34a">${b.entregue}</div><div class="stat-label">Entregues</div></div>
+      <div><div class="stat-value u-723892">${b.entregue}</div><div class="stat-label">Entregues</div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon" style="background:#fff7ed">
+      <div class="stat-icon u-b63ec4">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       </div>
-      <div><div class="stat-value" style="color:#d97706">${b.em_manutencao}</div><div class="stat-label">Em manutenção</div></div>
+      <div><div class="stat-value u-488b9b">${b.em_manutencao}</div><div class="stat-label">Em manutenção</div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon" style="background:#eff6ff">
+      <div class="stat-icon u-4ff1ea">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
       </div>
-      <div><div class="stat-value" style="color:#1a56db">${b.estoque || 0}</div><div class="stat-label">Em estoque</div></div>
+      <div><div class="stat-value u-19ae88">${b.estoque || 0}</div><div class="stat-label">Em estoque</div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon" style="background:#fef2f2">
+      <div class="stat-icon u-60cd62">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </div>
-      <div><div class="stat-value" style="color:#dc2626">${b.baixado}</div><div class="stat-label">Baixados</div></div>
+      <div><div class="stat-value u-205655">${b.baixado}</div><div class="stat-label">Baixados</div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon" style="background:#f5f3ff">
+      <div class="stat-icon u-c7183d">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
-      <div><div class="stat-value" style="font-size:20px">${formatEquipValor(stats.totalValor)}</div><div class="stat-label">Valor total em ativos</div></div>
+      <div><div class="stat-value u-b9199e">${formatEquipValor(stats.totalValor)}</div><div class="stat-label">Valor total em ativos</div></div>
     </div>`;
   const countEl = document.getElementById('equipScopeCount');
   if (countEl) countEl.innerHTML = equipSummaryLine(stats);
@@ -430,27 +430,27 @@ function renderEquipStats() {
 function equipStatusTag(status) {
   const m = getEquipStatusMeta(status);
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-  return `<span class="tag ${m.cls}"><span class="priority-dot" style="background:${m.dot}"></span>${esc(m.label)}</span>`;
+  return `<span class="tag ${m.cls}"><span class="priority-dot" data-sty="background:${m.dot}"></span>${esc(m.label)}</span>`;
 }
 
 function equipClientCell(e) {
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
   if (!e.clientId) {
-    return `<span class="client-tag"><span class="client-dot" style="background:#4aa3ff"></span>${esc(e.clientName || 'Estoque Initnet')}</span>`;
+    return `<span class="client-tag"><span class="client-dot u-3ada6f"></span>${esc(e.clientName || 'Estoque Initnet')}</span>`;
   }
   let color = '#1a56db';
   try {
     const c = (typeof getClientById === 'function') ? getClientById(e.clientId) : null;
     if (c && c.color) color = c.color;
   } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'equipamentos'); }
-  return `<span class="client-tag"><span class="client-dot" style="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
+  return `<span class="client-tag"><span class="client-dot" data-sty="background:${esc(color)}"></span>${esc(e.clientName || '—')}</span>`;
 }
 
 function equipOSCell(e) {
   const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
   const osText = e && e.osVinculada ? String(e.osVinculada).trim() : '';
   const penId = getEquipPendenciaId(e);
-  if (!osText && !penId) return '<span style="color:var(--text-muted)">—</span>';
+  if (!osText && !penId) return '<span class="u-5872de">—</span>';
   // Com pendência vinculada, o texto da OS vira link para o card.
   if (penId) {
     let penLabel = '';
@@ -491,9 +491,9 @@ function renderEquipTable(area) {
   const fmtDate = (typeof formatDate === 'function') ? formatDate : (v => String(v || '—'));
   const list = _filteredEquips || [];
   if (!list.length) {
-    wrap.innerHTML = `<div class="empty-state" style="padding:40px;text-align:center">
+    wrap.innerHTML = `<div class="empty-state u-553466">
       <p>Nenhum equipamento encontrado.</p>
-      <p style="color:var(--text-muted);font-size:12.5px">Ajuste os filtros ou cadastre um novo equipamento.</p>
+      <p class="u-acfdc5">Ajuste os filtros ou cadastre um novo equipamento.</p>
       <br><button class="btn btn-primary btn-sm" data-action="openEquipForm">+ Novo Equipamento</button></div>`;
     return;
   }
@@ -506,7 +506,7 @@ function renderEquipTable(area) {
     <div class="table-wrapper"><table aria-label="Equipamentos">
       <thead><tr>
         <th>Equipamento</th><th>OS vinculada</th><th>Cliente</th><th>Status</th>
-        <th style="text-align:right">Valor</th><th>Última atualização</th><th style="width:40px"></th>
+        <th class="u-54c2af">Valor</th><th>Última atualização</th><th class="u-d6db40"></th>
       </tr></thead>
       <tbody>
         ${page.map(e => `
@@ -516,16 +516,16 @@ function renderEquipTable(area) {
             <td>${equipOSCell(e)}</td>
             <td>${equipClientCell(e)}</td>
             <td>${equipStatusTag(e.status)}</td>
-            <td class="value" style="text-align:right;font-weight:600">${esc(formatEquipValor(e.valor))}</td>
-            <td style="white-space:nowrap">${esc(e.updatedAt ? fmtDate(e.updatedAt) : '—')}</td>
+            <td class="value u-f3535d">${esc(formatEquipValor(e.valor))}</td>
+            <td class="u-86abda">${esc(e.updatedAt ? fmtDate(e.updatedAt) : '—')}</td>
             <td class="row-menu"><button class="btn-icon" title="Ações" aria-label="Ações do equipamento" data-action="toggleEquipMenu" data-stop="1" data-arg="${esc(e.id)}">⋮</button></td>
           </tr>`).join('')}
       </tbody>
     </table></div>
     ${totalPages > 1 ? `
-    <div class="vis-pager" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12.5px;color:var(--text-muted)">
+    <div class="vis-pager u-8453e0">
       <div>Mostrando ${startIdx + 1}–${Math.min(startIdx + EQUIP_PAGE_SIZE, list.length)} de ${list.length}</div>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div class="u-25b528">
         <button class="btn btn-sm btn-secondary" ${_equipPage === 1 ? 'disabled' : ''} data-action="eqPrevPage">← Anterior</button>
         <span>${_equipPage} / ${totalPages}</span>
         <button class="btn btn-sm btn-secondary" ${_equipPage === totalPages ? 'disabled' : ''} data-action="eqNextPage">Próxima →</button>
@@ -591,7 +591,7 @@ function openEquipLinkModal(id) {
   const cur = getEquipPendenciaId(eq);
   openModal('Vincular pendência', `
     <form data-submit="submitEquipLink" data-arg="${esc(eq.id)}">
-      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Equipamento: <strong style="color:var(--text-primary)">${esc(eq.nome || '—')}</strong>${eq.osVinculada ? ` · OS <strong style="color:var(--text-primary)">${esc(eq.osVinculada)}</strong>` : ''}</p>
+      <p class="u-fa39c2">Equipamento: <strong class="u-3c6f5e">${esc(eq.nome || '—')}</strong>${eq.osVinculada ? ` · OS <strong class="u-3c6f5e">${esc(eq.osVinculada)}</strong>` : ''}</p>
       <div class="form-group"><label class="form-label" for="eqLinkPen">Pendência</label>
         <select class="form-select" id="eqLinkPen">
           <option value="">— Nenhuma (desvincular) —</option>
@@ -648,7 +648,7 @@ function openEquipForm(id) {
         <div class="form-group"><label class="form-label" for="eqOS">OS vinculada</label>
           <input class="form-input" id="eqOS" maxlength="60" placeholder="Ex: 010, OS-123..." value="${esc(eq?.osVinculada || '')}" /></div>
       </div>
-      <div class="form-group"><label class="form-label" for="eqPendencia">Vincular pendência <span style="text-transform:none;letter-spacing:0;font-weight:400">(menu separado — opcional)</span></label>
+      <div class="form-group"><label class="form-label" for="eqPendencia">Vincular pendência <span class="u-6947ee">(menu separado — opcional)</span></label>
         <select class="form-select" id="eqPendencia">
           <option value="">— Nenhuma —</option>
           ${pens.map(p => `<option value="${esc(p.id)}" ${curPen === p.id ? 'selected' : ''}>${esc(_equipPenLabel(p))}</option>`).join('')}
