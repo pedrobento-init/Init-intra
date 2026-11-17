@@ -48,7 +48,7 @@ function _mstLoad() {
 }
 
 function _mstSave(map) {
-  try { if (typeof localStorage !== 'undefined') localStorage.setItem(MILVUS_STATUS_KEY, JSON.stringify(map)); } catch (_) {}
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(MILVUS_STATUS_KEY, JSON.stringify(map)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-status'); }
 }
 
 function getMilvusStatusEntry(visitId) {
@@ -227,7 +227,7 @@ async function refreshMilvusStatuses(opts) {
     if (r && r.error) {
       // Função ainda não publicada (404): para de tentar por 6 h.
       const st = r.error && r.error.context && r.error.context.status;
-      if (st === 404) { try { localStorage.setItem(MILVUS_STATUS_OFF_KEY, String(Date.now() + 6 * 3600000)); } catch (_) {} }
+      if (st === 404) { try { localStorage.setItem(MILVUS_STATUS_OFF_KEY, String(Date.now() + 6 * 3600000)); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-status'); } }
       return { ok: false, reason: 'edge' };
     }
     const rows = (r && r.data && Array.isArray(r.data.statuses)) ? r.data.statuses : [];
@@ -241,7 +241,7 @@ async function refreshMilvusStatuses(opts) {
       const v = typeof getVisitById === 'function' ? getVisitById(row.visitId) : null;
       const patch = reconcileFinalizeFromMilvus(v, fresh[row.visitId]);
       if (patch && typeof saveVisit === 'function') {
-        try { saveVisit({ ...v, ...patch }); changed.add(v.id); } catch (_) {}
+        try { saveVisit({ ...v, ...patch }); changed.add(v.id); } catch (_e) { console.error('[milvus-status] visita não atualizada a partir do Milvus', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-status'); }
       }
     }
     _mstSave(fresh);
@@ -275,7 +275,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     try {
       const h = (window.location.hash || '').replace('#', '');
       if (document.visibilityState === 'visible' && (h === 'visitas' || h === 'calendario')) scheduleMilvusStatusRefresh();
-    } catch (_) {}
+    } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'milvus-status'); }
   });
 }
 

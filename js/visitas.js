@@ -97,7 +97,7 @@ function updateVisitFilterDot() {
     if (!btn) return;
     const on = !!(_visitFilter.client || _visitFilter.operator || _visitFilter.from || _visitFilter.to);
     btn.classList.toggle('on', on);
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visitas'); }
 }
 
 // Bottom-sheet de filtros (rascunho; aplica ao confirmar).
@@ -599,7 +599,7 @@ ${typeof printVisitReport === 'function' ? `<button type="button" class="btn btn
       const e = typeof getMilvusStatusEntry === 'function' ? getMilvusStatusEntry(id) : null;
       if (!e || Date.now() - new Date(e.checkedAt || 0).getTime() > 120000) scheduleMilvusStatusRefresh({ force: [id] });
     }
-  } catch (_) {}
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visitas'); }
 }
 
 function changeVisitStatus(id) {
@@ -1214,7 +1214,7 @@ function _exportVisitMonthExcel(data) {
         if(typeof refreshCalendar==='function' && document.getElementById('calendarContainer')) refreshCalendar();
       };
       if(typeof preserveScrollAround==='function') preserveScrollAround(run); else run();
-    }catch(_){}
+    }catch(_e){ if (typeof _logSilent === 'function') _logSilent(_e, 'visitas'); }
   });
 })();
 
