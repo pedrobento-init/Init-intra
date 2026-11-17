@@ -1,0 +1,21 @@
+/* Utilitárias geradas na migração de style="..." inline (SEC-07).
+   Uma classe por conjunto de declarações; o nome é o hash do conteúdo (u-<sha1:6>).
+   !important reproduz a precedência que o atributo style tinha sobre as regras de
+   componente; display fica sem ele (e com seletor dobrado) para que
+   el.style.display = 'none' continue escondendo o elemento. Carregado por último. */
+.u-046678{width:100%!important}
+.u-12edec{padding:8px 12px!important;border-bottom:1px solid var(--sidebar-border)!important}
+.u-12edec.u-12edec{display:none}
+.u-1f7582{background:#1a56db!important}
+.u-287f77{padding:16px!important}
+.u-6b99de.u-6b99de{display:none}
+.u-765d57{max-width:560px!important}
+.u-7f3487{position:fixed!important;inset:0!important;z-index:500!important;background:linear-gradient(135deg,#0f172a 0%,#1e2a3a 50%,#1a2332 100%)!important;overflow-y:auto!important}
+.u-7f3487.u-7f3487{display:none}
+.u-95fd83{align-items:center!important;gap:12px!important}
+.u-95fd83.u-95fd83{display:flex}
+.u-a1fa25{width:100%!important;font-size:12px!important}
+.u-a76d59{gap:8px!important}
+.u-a76d59.u-a76d59{display:flex}
+.u-cb6198{min-height:100vh!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;padding:40px 20px!important}
+.u-cb6198.u-cb6198{display:flex}

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/pagina-pendencia.css" />
   <link rel="stylesheet" href="css/pagina-projeto.css" />
   <link rel="stylesheet" href="css/pagina-chamado.css" />
+  <link rel="stylesheet" href="css/utilidades.css" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1a56db" />
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
@@ -23,7 +24,7 @@
   <a href="#contentArea" class="skip-link" data-action="focusContent">Pular para o conteúdo</a>
 
   <!-- Busca Global Modal (Sprint 7) -->
-  <div id="globalSearchModal" class="global-search-modal" style="display:none" data-action="closeSearchOverlay">
+  <div id="globalSearchModal" class="global-search-modal u-6b99de" data-action="closeSearchOverlay">
     <div class="global-search-box" role="dialog" aria-modal="true" aria-label="Busca global">
       <div class="global-search-input-row">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -54,8 +55,8 @@
         </button>
       </div>
 
-      <div id="teamSelectorWrap" style="display:none;padding:8px 12px;border-bottom:1px solid var(--sidebar-border)">
-        <select id="teamSelector" class="form-select" style="width:100%;font-size:12px" data-change="teamChange">
+      <div id="teamSelectorWrap" class="u-12edec">
+        <select id="teamSelector" class="form-select u-a1fa25" data-change="teamChange">
           <option value="">Todas as equipes</option>
         </select>
       </div>
@@ -134,12 +135,12 @@
       <div class="sidebar-footer">
         <!-- Exportar / Importar / Instalar ficam num único item "Mais opções"
              (popover) para não ocupar três linhas do rodapé da sidebar. -->
-        <button class="btn-more" id="sidebarMoreBtn" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false" aria-controls="sidebarMoreMenu" style="display:none">
+        <button class="btn-more u-6b99de" id="sidebarMoreBtn" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false" aria-controls="sidebarMoreMenu">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
           <span>Mais opções</span>
         </button>
         <div class="current-user" id="userQuickBtn" title="Meu perfil" role="button" tabindex="0" aria-label="Meu perfil">
-          <div class="avatar" id="user-avatar" style="background:#1a56db">TI</div>
+          <div class="avatar u-1f7582" id="user-avatar">TI</div>
           <div class="user-info">
             <span class="user-name" id="user-name-display">Suporte TI</span>
             <span class="user-role" id="user-role-display">Técnico</span>
@@ -164,7 +165,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span>Importar dados</span>
       </button>
-      <button class="sidebar-more-item" id="installAppBtn" type="button" role="menuitem" data-more-action="promptInstall" title="Instalar o app no dispositivo" style="display:none">
+      <button class="sidebar-more-item u-6b99de" id="installAppBtn" type="button" role="menuitem" data-more-action="promptInstall" title="Instalar o app no dispositivo">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>Instalar app</span>
       </button>
@@ -182,7 +183,7 @@
           </button>
           <h1 class="page-title" id="pageTitle">Dashboard</h1>
         </div>
-        <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
+        <div class="topbar-right u-95fd83">
           <!-- Busca Global -->
           <div class="global-search-wrap" id="globalSearchWrap">
             <button class="global-search-trigger" id="globalSearchTrigger" data-action="openSearch" title="Buscar (Ctrl+K)">
@@ -204,7 +205,7 @@
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
           </button>
-          <button class="btn btn-primary btn-sm" id="topbarActionBtn" style="display:none" data-action="topbarAction" aria-label="Criar novo registro">
+          <button class="btn btn-primary btn-sm u-6b99de" id="topbarActionBtn" data-action="topbarAction" aria-label="Criar novo registro">
             <svg class="topbar-action-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span class="topbar-action-text">Novo</span>
           </button>
@@ -258,10 +259,10 @@
   </nav>
 
   <!-- Overlay para menu mobile -->
-  <div class="sidebar-overlay" id="sidebarOverlay" style="display:none"></div>
+  <div class="sidebar-overlay u-6b99de" id="sidebarOverlay"></div>
 
   <!-- Modal principal -->
-  <div class="modal-overlay" id="modalOverlay" style="display:none">
+  <div class="modal-overlay u-6b99de" id="modalOverlay">
     <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="modalTitle"></h2>
@@ -272,7 +273,7 @@
   </div>
 
   <!-- Modal usuário -->
-  <div class="modal-overlay" id="userModalOverlay" style="display:none">
+  <div class="modal-overlay u-6b99de" id="userModalOverlay">
     <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="userModalTitle">Meu Perfil</h2>
@@ -281,7 +282,7 @@
       <div class="modal-body">
         <div class="form-group"><label class="form-label" for="userNameInput">Seu nome</label><input type="text" class="form-input" id="userNameInput" autocomplete="name" placeholder="Ex: João Silva" /></div>
         <div class="form-group"><label class="form-label" for="userInitialsInput">Iniciais (avatar)</label><input autocomplete="off" type="text" class="form-input" id="userInitialsInput" maxlength="2" placeholder="Ex: JS" /></div>
-        <button class="btn btn-primary" style="width:100%" data-action="saveUserConfig">Salvar</button>
+        <button class="btn btn-primary u-046678" data-action="saveUserConfig">Salvar</button>
       </div>
     </div>
   </div>
@@ -289,19 +290,19 @@
   <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
   <!-- Modal de recorte de imagem -->
-  <div class="modal-overlay" id="cropModalOverlay" style="display:none">
-    <div class="modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
+  <div class="modal-overlay u-6b99de" id="cropModalOverlay">
+    <div class="modal u-765d57" role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="cropModalTitle">Recortar Logo</h2>
         <button class="modal-close" data-action="closeCrop" aria-label="Fechar recorte de imagem">&times;</button>
       </div>
-      <div class="modal-body" style="padding:16px">
+      <div class="modal-body u-287f77">
         <div class="crop-container" id="cropContainer">
           <img id="cropImage" alt="Imagem a recortar" />
           <div id="cropSelection" class="crop-selection" hidden></div>
         </div>
         <div class="crop-actions">
-          <div style="display:flex;gap:8px">
+          <div class="u-a76d59">
             <button type="button" class="btn btn-secondary" data-action="closeCrop" aria-label="Cancelar recorte">Cancelar</button>
             <button type="button" class="btn btn-primary" data-action="applyCrop" aria-label="Aplicar recorte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><path d="M6 21V9m0 0h12M18 3v12m0 0H6"/></svg> Aplicar Recorte</button>
           </div>
@@ -311,7 +312,7 @@
   </div>
 
   <!-- Modal de Configurações de Notificação -->
-  <div class="modal-overlay" id="notifModalOverlay" style="display:none">
+  <div class="modal-overlay u-6b99de" id="notifModalOverlay">
     <div class="modal sm" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="notifModalTitle">Configurar notificações</h2>
@@ -322,13 +323,13 @@
   </div>
 
   <!-- Overlay de Login -->
-  <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:500;background:linear-gradient(135deg,#0f172a 0%,#1e2a3a 50%,#1a2332 100%);overflow-y:auto">
-    <div id="loginContent" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px"></div>
+  <div id="loginOverlay" class="u-7f3487">
+    <div id="loginContent" class="u-cb6198"></div>
   </div>
 
   <!-- Modal filho do Checklist: "Ver procedimento" (fica DEPOIS do #modalOverlay
        principal para vencer no z-index e abrir por cima dele) -->
-  <div class="modal-overlay" id="ckProcOverlay" style="display:none">
+  <div class="modal-overlay u-6b99de" id="ckProcOverlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ckProcTitle">
       <div class="modal-header">
         <h2 class="modal-title">Procedimento — <span id="ckProcTitle"></span></h2>

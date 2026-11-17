@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   'css/pagina-pendencia.css',
   'css/pagina-projeto.css',
   'css/pagina-chamado.css',
+  'css/utilidades.css',
   'js/schema.js',
   'js/error-log.js',
   'js/lazy-libs.js',

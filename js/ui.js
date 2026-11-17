@@ -1316,7 +1316,7 @@ window.addEventListener('load', () => setTimeout(checkOverdueAlerts, 1500));
 // ── PWA Install Prompt ─────────────────────────────────────────────────────────
 let _deferredInstall = null;
 function _setInstallBtnVisible(v) {
-  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? '' : 'none'; } catch (_) {}
+  try { const b = document.getElementById('installAppBtn'); if (b) b.style.display = v ? 'flex' : 'none'; } catch (_) {}
   refreshSidebarMore();
 }
 
@@ -1336,8 +1336,8 @@ function refreshSidebarMore() {
   const btn = document.getElementById('sidebarMoreBtn');
   const menu = document.getElementById('sidebarMoreMenu');
   if (!btn || !menu) return;
-  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(el => el.style.display !== 'none');
-  btn.style.display = any ? '' : 'none';
+  const any = Array.from(menu.querySelectorAll('.sidebar-more-item')).some(el => getComputedStyle(el).display !== 'none');
+  btn.style.display = any ? 'flex' : 'none';
   if (!any) closeSidebarMore();
 }
 
