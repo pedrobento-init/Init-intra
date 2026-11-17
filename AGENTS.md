@@ -38,7 +38,7 @@ roda `lint`, `typecheck`, `test`, o E2E (job separado) e `node tools/build-asset
 
 ## As armadilhas que custam caro
 
-**`js/` é modo script, não módulo.** Os 69 arquivos são carregados por `<script>`
+**`js/` é modo script, não módulo.** Os 80 arquivos (fora o `config.example.js`) são carregados por `<script>`
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,
@@ -71,7 +71,10 @@ existe. `tests/edge-functions-guard.test.js` tranca isso e o `verify_jwt` do
 **Migrations são aplicadas à mão** no SQL Editor, em ordem numérica. Cada arquivo
 traz no cabeçalho o que muda, como verificar e como reverter —
 mantenha esse padrão. `supabase migration list` **não** reflete o banco: a
-tabela de controle do CLI só conhece as primeiras.
+tabela de controle do CLI só conhece as primeiras. Para ver o estado real
+(RLS, policies, grants, buckets, funções), rode `tools/check-schema.sql` no SQL
+Editor — só `SELECT`, sem efeito colateral. O prefixo `011` aparece em dois
+arquivos: a ordem está no cabeçalho de ambos, e o prefixo **não** se renomeia.
 
 **Windows gera CRLF.** Teste que compara texto de arquivo normaliza a quebra de
 linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
@@ -90,7 +93,7 @@ linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
 - Um `it()` por comportamento. Prefira caso-limite e regra de negócio (escopo de
   team, RLS, estados de pendência) a asserção trivial.
 - Antes de escrever, leia um ou dois testes do mesmo domínio e espelhe o estilo.
-  São 95 arquivos; o estilo já está decidido.
+  São ~140 arquivos (~1.860 testes); o estilo já está decidido.
 - Teste novo não quebra teste existente: rode `npm test` até verde.
 
 ## Idioma e escrita
@@ -126,5 +129,6 @@ termina, commita antes de passar a bola — o git é a única coordenação que 
 | [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                 |
 
 Agentes especializados ficam em `.claude/agents/` (Claude Code) e
-`.opencode/agent/` (opencode). Eles herdam este arquivo — contêm só o que é
-próprio do papel.
+`.opencode/agent/` (opencode): `revisor-seguranca` (XSS, RLS, escopo de team) e
+`escritor-testes` (estilo de `tests/`). Eles herdam este arquivo — contêm só o
+que é próprio do papel; o conteúdo dos dois lados deve andar junto.

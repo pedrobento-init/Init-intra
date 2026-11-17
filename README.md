@@ -102,10 +102,10 @@ index.html            Entrada da SPA (sem handlers inline)
 sw.js                 Service worker
 css/styles.css        Estilos
 js/                   Um arquivo por tela/módulo (storage*, sync*, pendencias*, visitas, clients*, milvus-*, ...)
-tools/                Build (build-config.js gera js/config.js; build-assets.js monta build/)
-supabase/migrations/  Migrations SQL numeradas (aplicar em ordem no SQL Editor)
-supabase/functions/   Edge Functions (Deno)
-tests/                Testes unitários (Vitest)
+tools/                Build (build-config.js gera js/config.js; build-assets.js monta build/) e check-schema.sql (conferência read-only do banco)
+supabase/migrations/  Migrations SQL numeradas, 001 a 082 (aplicar em ordem no SQL Editor; o prefixo 011 existe em dois arquivos, ordem no cabeçalho)
+supabase/functions/   Edge Functions (Deno, 22)
+tests/                Testes unitários (Vitest, ~140 arquivos)
 e2e/                  Testes de navegador (Playwright)
 .github/workflows/    CI: lint, testes e validação do build em cada PR
 ```
@@ -122,6 +122,8 @@ e2e/                  Testes de navegador (Playwright)
 | `google-agenda`        | Ponte com o robô Apps Script que mantém as visitas na agenda Google do técnico, nos dois sentidos (migration 057). Instalação em [GOOGLE-AGENDA.md](GOOGLE-AGENDA.md).                                                                                                                                                                                                                                                  |
 | `ia-relatorio`         | Texto de relatório com IA.                                                                                                                                                                                                                                                                                                                                                                                              |
 | `ia-levar`             | Sugere o que levar para a visita (IA).                                                                                                                                                                                                                                                                                                                                                                                  |
+| `pendencia-responder`  | Responde por e-mail ao solicitante de um chamado, na mesma conversa. O destinatário sai do chamado, nunca do app. Só operador ativo logado. |
+| `relatorio-visitas-mensal` | Relatório das visitas do mês anterior para a Gestão, no dia 1 às 08:00 de Brasília, pelo `pg_cron` (migration 080). |
 | `update-user-password` | Admin troca a senha de um usuário.                                                                                                                                                                                                                                                                                                                                                                                      |
 | `milvus-*`             | Integração com o Milvus (chamados, atendimentos, dispositivos, clientes).                                                                                                                                                                                                                                                                                                                                               |
 | `whatsapp`             | Webhook de entrada do WhatsApp (WAHA, atrás de um adaptador em `whatsapp/provedor.ts`). Mensagem de número com chamado aberto vira nota nele; o resto cai na caixa de entrada com canal `whatsapp` (migration 075). A 077 casa o cliente pelo telefone com índice e anexa a nota num UPDATE só; sem ela, o webhook volta ao caminho antigo. Limite de 30 mensagens por número por minuto. Autentica por token na query. |
@@ -144,7 +146,7 @@ Sem `js/config.js`, o app roda em modo local com dados de demonstração.
 ## Deploy
 
 - **Site**: a Vercel roda `npm run build` (variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`).
-- **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar.
+- **Banco**: migrations em `supabase/migrations/`, aplicadas em ordem no SQL Editor. Cada arquivo explica no cabeçalho o que muda e como verificar. Para conferir o que o banco realmente tem (RLS, policies, grants, buckets), rode `tools/check-schema.sql` no SQL Editor: só leitura.
 - **Edge Functions**: `supabase functions deploy <nome>`. Secrets com `supabase secrets set` (ex.: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `AVISOS_CRON_SECRET`).
   - **Portal da caixa de entrada**: rode a migration 082 (colunas `direcao` e `media`, status `encerrado`) antes de publicar `conversa-responder`. A function usa os mesmos secrets do WhatsApp (`WAHA_*`) e do Gmail (`GMAIL_*`); sem eles, a resposta por aquele canal devolve erro de configuração e o histórico não é gravado.
   - **WhatsApp (WAHA)**: n8n, PostgreSQL e WAHA sobem com `docker compose up -d`; o passo a passo completo está em [WHATSAPP.md](WHATSAPP.md). Resumo: `WAHA_BASE_URL`, `WAHA_API_KEY` e `WAHA_SESSION` (envio, no `whatsapp-responder` e no `conversa-responder`) e `WHATSAPP_WEBHOOK_TOKEN` (entrada). O webhook do evento `message` aponta para `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`. Para testar sem celular: `WHATSAPP_WEBHOOK_TOKEN=... node tools/whatsapp-simular.js --url <url da function> --texto "oi"` (`--mostrar` só imprime o payload).
