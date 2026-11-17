@@ -114,7 +114,7 @@ function initSupabaseRealtime() {
     if (!supabaseClient || !window._supabaseAuthActive) return;
 
     if (_realtimeChannel) {
-        try { supabaseClient.removeChannel(_realtimeChannel); } catch (e) {}
+        try { supabaseClient.removeChannel(_realtimeChannel); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'supabase-config'); }
         _realtimeChannel = null;
     }
 

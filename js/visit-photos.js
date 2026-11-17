@@ -26,8 +26,8 @@ function _vpQueue() {
   try { return (typeof getCacheKV === 'function' ? getCacheKV(VISIT_PHOTO_QUEUE_KEY, []) : []) || []; } catch (_) { return []; }
 }
 function _vpSaveQueue(q) {
-  try { if (typeof setCacheKV === 'function') setCacheKV(VISIT_PHOTO_QUEUE_KEY, q); } catch (_) {}
-  try { if (typeof refreshPendingStrip === 'function') refreshPendingStrip(); } catch (_) {}
+  try { if (typeof setCacheKV === 'function') setCacheKV(VISIT_PHOTO_QUEUE_KEY, q); } catch (_e) { console.error('[visit-photos] fila de fotos não persistida', _e); if (typeof _logSilent === 'function') _logSilent(_e, 'visit-photos'); }
+  try { if (typeof refreshPendingStrip === 'function') refreshPendingStrip(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visit-photos'); }
 }
 function _vpOnline() {
   return !(typeof navigator !== 'undefined' && navigator.onLine === false)
@@ -45,7 +45,7 @@ async function compressVisitPhoto(file) {
   const canvas = document.createElement('canvas');
   canvas.width = size.w; canvas.height = size.h;
   canvas.getContext('2d').drawImage(bmp, 0, 0, size.w, size.h);
-  try { if (bmp.close) bmp.close(); } catch (_) {}
+  try { if (bmp.close) bmp.close(); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visit-photos'); }
   return canvas.toDataURL('image/jpeg', VISIT_PHOTO_QUALITY);
 }
 
@@ -91,7 +91,7 @@ async function flushVisitPhotos() {
       } catch (_) { break; } // tenta de novo no próximo `online`
     }
   } finally { _vpFlushing = false; }
-  if (sent) { try { if (typeof emitDataChanged === 'function') emitDataChanged('visitas', { photos: sent }); } catch (_) {} }
+  if (sent) { try { if (typeof emitDataChanged === 'function') emitDataChanged('visitas', { photos: sent }); } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'visit-photos'); } }
   return { sent };
 }
 
