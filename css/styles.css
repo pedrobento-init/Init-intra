@@ -17064,3 +17064,527 @@ body.dark-theme .pen-board .kanban-col.drag-over {
 .opd-pendencia-delay-card:hover {
   border-color: var(--accent, #1a56db);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PORTAL E PRESENÇA (js/presenca.js, _dashPortalHtml em js/dashboard.js)
+   Ponto de status: verde = online, âmbar = ausente (aba escondida ou sem
+   interação há 5 min), cinza = fora. Mesma linguagem do design system.
+   ══════════════════════════════════════════════════════════════════════ */
+.pres-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ds-panel);
+  background: var(--ds-line-strong);
+  flex: none;
+}
+.pres-dot--online {
+  background: var(--ds-green);
+}
+.pres-dot--ausente {
+  background: var(--ds-amber);
+}
+.pres-dot--offline {
+  background: var(--ds-line-strong);
+}
+.pres-dot--pulse {
+  position: relative;
+  border: 0;
+  width: 8px;
+  height: 8px;
+}
+.pres-dot--pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--ds-green);
+  opacity: 0;
+  animation: pres-pulse 2.4s ease-out infinite;
+}
+@keyframes pres-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pres-dot--pulse::after {
+    animation: none;
+  }
+}
+
+/* Avatar genérico com ponto no canto */
+.pres-av {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+  background: var(--ds-accent);
+}
+.pres-av .pres-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+}
+.pres-av--stack {
+  width: 28px;
+  height: 28px;
+  font-size: 10.5px;
+  box-shadow: 0 0 0 2px var(--ds-panel);
+}
+.pres-av--stack + .pres-av--stack {
+  margin-left: -6px;
+}
+/* Na pilha o ponto poluía; ausente fica esmaecido e o painel detalha. */
+.pres-av--stack .pres-dot {
+  display: none;
+}
+.pres-av--stack.pres-av--ausente {
+  opacity: 0.5;
+}
+
+/* Topo: pilha de avatares + contador, abre o painel */
+.pres-wrap {
+  position: relative;
+}
+.pres-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 4px;
+  border-radius: 999px;
+  border: 1px solid var(--ds-line);
+  background: var(--ds-panel);
+  color: var(--ds-text-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition);
+}
+.pres-stack[hidden] {
+  display: none;
+}
+.pres-stack:hover,
+.pres-stack[aria-expanded='true'] {
+  background: var(--ds-raised);
+  border-color: var(--ds-line-strong);
+}
+.pres-avs {
+  display: inline-flex;
+  align-items: center;
+}
+.pres-mais {
+  margin-left: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--ds-raised);
+  color: var(--ds-text-2);
+  box-shadow: 0 0 0 2px var(--ds-panel);
+}
+.pres-cont b {
+  color: var(--ds-green);
+  font-weight: 800;
+}
+.pres-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 300;
+  width: 300px;
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  background: var(--ds-panel);
+  border: 1px solid var(--ds-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  padding: 8px;
+}
+.pres-panel[hidden] {
+  display: none;
+}
+.pres-panel-head {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ds-muted);
+  padding: 8px 10px 6px;
+}
+.pres-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pres-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+}
+.pres-item:hover {
+  background: var(--ds-raised);
+}
+.pres-item-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pres-item-nome {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ds-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pres-item-sub {
+  font-size: 12px;
+  color: var(--ds-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pres-voce {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ds-accent);
+  background: var(--accent-dim);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.pres-vazio {
+  margin: 0;
+  padding: 10px;
+  color: var(--ds-muted);
+  font-size: 13px;
+}
+@media (max-width: 768px) {
+  .pres-cont {
+    display: none;
+  }
+  .pres-stack {
+    padding: 0 4px;
+  }
+  .pres-avs .pres-av--stack:nth-child(n + 3),
+  .pres-mais {
+    display: none;
+  }
+  .pres-panel {
+    position: fixed;
+    top: calc(var(--topbar-h) + 6px);
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
+
+/* Cartão do usuário na sidebar e cards de Operadores */
+.avatar-wrap {
+  position: relative;
+  flex: none;
+}
+.avatar-wrap .pres-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  border-color: var(--sidebar-bg);
+}
+.user-pres {
+  color: var(--ds-green);
+}
+.op-avatar {
+  position: relative;
+}
+.op-avatar .pres-dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 14px;
+  height: 14px;
+  border-width: 3px;
+}
+
+/* Portal (topo do Dashboard) */
+.portal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.portal-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+.portal-hero-txt {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 18px;
+  padding: 26px 28px;
+  color: #fff;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(76, 123, 255, 0.55) 0%, transparent 55%),
+    radial-gradient(90% 120% at 0% 100%, rgba(14, 134, 176, 0.45) 0%, transparent 60%),
+    linear-gradient(135deg, #14203b 0%, #1d2f5c 100%);
+  box-shadow: 0 12px 32px rgba(20, 32, 59, 0.22);
+}
+.portal-hero-txt::after {
+  /* malha discreta, ecoa a marca Initnet sem imagem externa */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 16px 16px;
+  mask-image: linear-gradient(90deg, transparent 30%, #000 100%);
+  pointer-events: none;
+}
+.portal-hero-txt > * {
+  position: relative;
+  z-index: 1;
+}
+.portal-data {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.portal-ola {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.portal-frase {
+  margin: 8px 0 0;
+  font-size: 14.5px;
+  color: rgba(255, 255, 255, 0.86);
+  max-width: 56ch;
+}
+.portal-hero-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.portal-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #fff;
+  color: #14203b;
+  transition:
+    transform var(--transition),
+    background var(--transition);
+}
+.portal-cta:hover {
+  transform: translateY(-1px);
+}
+.portal-cta--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+.portal-cta--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.portal-cta:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.portal-kbd {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.portal-equipe {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ds-panel);
+  border: 1px solid var(--ds-line);
+  border-radius: 18px;
+  padding: 16px 12px 10px;
+}
+.portal-equipe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px 8px;
+}
+.portal-equipe-t {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+.portal-equipe-n {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ds-green);
+  background: var(--green-dim);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.portal-equipe-body {
+  overflow-y: auto;
+  max-height: 210px;
+}
+.portal-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.portal-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  text-align: left;
+  font: inherit;
+  color: var(--ds-text);
+  background: var(--ds-panel);
+  border: 1px solid var(--ds-line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+}
+.portal-tile:hover {
+  border-color: var(--ds-line-strong);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+.portal-tile-ico {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--ds-accent);
+  background: var(--accent-dim);
+}
+.portal-tile-ico svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.portal-tile-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.portal-tile-nome {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-tile-meta {
+  font-size: 12.5px;
+  color: var(--ds-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-tile--accent .portal-tile-ico {
+  color: var(--ds-on-accent);
+  background: var(--ds-accent);
+}
+.portal-tile--red .portal-tile-ico {
+  color: var(--ds-red);
+  background: var(--red-dim);
+}
+.portal-tile--red .portal-tile-meta {
+  color: var(--ds-red);
+  font-weight: 600;
+}
+.portal-tile--green .portal-tile-ico {
+  color: var(--ds-green);
+  background: var(--green-dim);
+}
+@media (max-width: 1100px) {
+  .portal-hero {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  .portal-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .portal-hero-txt {
+    padding: 20px;
+    border-radius: 16px;
+  }
+  .portal-ola {
+    font-size: 23px;
+  }
+  .portal-tile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  .portal-hero-acts .portal-cta--ghost {
+    display: none;
+  }
+}

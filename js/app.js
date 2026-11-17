@@ -716,6 +716,7 @@ function refreshPage() {
   ) {
     authOnStateChange((event, supabaseSession) => {
       if (event === 'SIGNED_OUT') {
+        if (typeof pararPresenca === 'function') pararPresenca();
         clearSession();
         window._supabaseAuthActive = false;
         showLoginScreen();

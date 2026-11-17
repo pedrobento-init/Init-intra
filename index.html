@@ -493,10 +493,16 @@
             tabindex="0"
             aria-label="Meu perfil"
           >
-            <div class="avatar u-1f7582" id="user-avatar">TI</div>
+            <div class="avatar-wrap">
+              <div class="avatar u-1f7582" id="user-avatar">TI</div>
+              <i class="pres-dot pres-dot--online" id="userPresDot" aria-hidden="true"></i>
+            </div>
             <div class="user-info">
               <span class="user-name" id="user-name-display">Suporte TI</span>
-              <span class="user-role" id="user-role-display">Técnico</span>
+              <span class="user-role"
+                ><span id="user-role-display">Técnico</span> ·
+                <span class="user-pres" id="userPresLabel">Online</span></span
+              >
             </div>
           </div>
           <button
@@ -662,6 +668,30 @@
                 Buscar…
                 <span class="kbd">Ctrl+K</span>
               </button>
+            </div>
+            <!-- Equipe online (presence do Realtime, js/presenca.js) -->
+            <div class="pres-wrap" id="presWrap">
+              <button
+                type="button"
+                class="pres-stack"
+                id="presStack"
+                data-action="presToggle"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="presPanel"
+                title="Equipe online"
+                hidden
+              ></button>
+              <div
+                class="pres-panel"
+                id="presPanel"
+                role="dialog"
+                aria-label="Equipe online"
+                hidden
+              >
+                <div class="pres-panel-head">Equipe online</div>
+                <div id="presPanelBody"></div>
+              </div>
             </div>
             <!-- Único indicador de sincronização (substitui banner/dot/spinner) -->
             <button
@@ -1079,6 +1109,7 @@
     <script defer src="js/sla.js"></script>
     <script defer src="js/pendencias-rapida.js"></script>
     <script defer src="js/operadores.js"></script>
+    <script defer src="js/presenca.js"></script>
     <script defer src="js/notifications.js"></script>
     <script defer src="js/push.js"></script>
     <script defer src="js/calendar.js"></script>

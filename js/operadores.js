@@ -262,7 +262,7 @@ function _renderOpGrid() {
         return `
       <div class="op-card ${isActive ? '' : 'op-card--inactive'} u-3b6a3a" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
-          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}</div>
+          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}${isActive ? `<i class="pres-dot pres-dot--${typeof presencaStatusDe === 'function' ? presencaStatusDe(op.id) : 'offline'}" data-pres-op="${escapeHtml(op.id)}" aria-hidden="true"></i>` : ''}</div>
           <div class="u-c87525">
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}

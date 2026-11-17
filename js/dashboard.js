@@ -269,6 +269,107 @@ function _calcDashDelta(cur, prev, higherIsBetter) {
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
+// ── Cabeçalho de portal: saudação, atalhos dos módulos e equipe online ──────
+// Fica acima da Visão geral para a Intra abrir como um portal (onde estou,
+// para onde vou, quem está comigo), sem tirar nada do painel de gestão.
+const _DASH_PORTAL_ICO = {
+  fila: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="M16 16l2 2 4-4"/>',
+  pendencias: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>',
+  caixa:
+    '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  calendario: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  visitas:
+    '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  clientes:
+    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  prazos: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  conhecimento:
+    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M8 7h8M8 11h6"/>',
+};
+
+function _dashPortalHtml(c) {
+  const agora = new Date();
+  const primeiroNome =
+    String(c.nome || '')
+      .trim()
+      .split(/\s+/)[0] || '';
+  const saudacao =
+    typeof presencaSaudacao === 'function' ? presencaSaudacao(agora.getHours()) : 'Olá';
+  let data = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  data = data.charAt(0).toUpperCase() + data.slice(1);
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const resumo = [];
+  if (c.fila) resumo.push(plural(c.fila, 'item na sua fila', 'itens na sua fila'));
+  if (c.visitasHoje) resumo.push(plural(c.visitasHoje, 'visita hoje', 'visitas hoje'));
+  if (c.vencidas) resumo.push(plural(c.vencidas, 'pendência vencida', 'pendências vencidas'));
+  const frase = resumo.length
+    ? `Você tem ${resumo.join(', ').replace(/, ([^,]*)$/, ' e $1')}.`
+    : 'Nada urgente com você agora. Bom trabalho!';
+
+  const tiles = [
+    {
+      page: 'fila',
+      nome: 'Minha fila',
+      meta: plural(c.fila, 'item hoje', 'itens hoje'),
+      tom: c.fila ? 'accent' : '',
+    },
+    {
+      page: 'pendencias',
+      nome: 'Pendências',
+      meta: plural(c.minhasAtivas, 'ativa com você', 'ativas com você'),
+    },
+    { page: 'caixa', nome: 'Caixa de entrada', meta: 'E-mails e mensagens' },
+    {
+      page: 'calendario',
+      nome: 'Agenda',
+      meta: plural(c.visitasHoje, 'visita hoje', 'visitas hoje'),
+    },
+    { page: 'visitas', nome: 'Visitas', meta: 'Roteiro e registros' },
+    { page: 'clientes', nome: 'Clientes', meta: plural(c.clientes, 'cadastrado', 'cadastrados') },
+    {
+      page: 'prazos',
+      nome: 'Prazos e SLA',
+      meta: c.vencidas ? plural(c.vencidas, 'vencida', 'vencidas') : 'Tudo em dia',
+      tom: c.vencidas ? 'red' : 'green',
+    },
+    { page: 'conhecimento', nome: 'Conhecimento', meta: 'Base e modelos' },
+  ];
+
+  return `
+    <section class="portal" aria-label="Início">
+      <div class="portal-hero">
+        <div class="portal-hero-txt">
+          <p class="portal-data">${escapeHtml(data)}${c.equipe ? ` · Equipe ${escapeHtml(c.equipe.charAt(0).toUpperCase() + c.equipe.slice(1))}` : ''}</p>
+          <h1 class="portal-ola">${escapeHtml(saudacao)}${primeiroNome ? `, ${escapeHtml(primeiroNome)}` : ''}</h1>
+          <p class="portal-frase">${escapeHtml(frase)}</p>
+          <div class="portal-hero-acts">
+            <button type="button" class="portal-cta" data-action="nav" data-arg="fila">Abrir minha fila</button>
+            <button type="button" class="portal-cta portal-cta--ghost" data-action="openSearch">Buscar na Intra <span class="portal-kbd">Ctrl K</span></button>
+          </div>
+        </div>
+        <aside class="portal-equipe" aria-labelledby="portalEquipeT">
+          <div class="portal-equipe-head">
+            <h2 class="portal-equipe-t" id="portalEquipeT"><i class="pres-dot pres-dot--online pres-dot--pulse" aria-hidden="true"></i>Equipe online</h2>
+            <span class="portal-equipe-n" id="dashPresencaCont"></span>
+          </div>
+          <div class="portal-equipe-body" id="dashPresenca"></div>
+        </aside>
+      </div>
+      <nav class="portal-tiles" aria-label="Atalhos">
+        ${tiles
+          .map(
+            (
+              t
+            ) => `<button type="button" class="portal-tile${t.tom ? ' portal-tile--' + t.tom : ''}" data-action="nav" data-arg="${t.page}">
+          <span class="portal-tile-ico"><svg viewBox="0 0 24 24" aria-hidden="true">${_DASH_PORTAL_ICO[t.page]}</svg></span>
+          <span class="portal-tile-txt"><span class="portal-tile-nome">${t.nome}</span><span class="portal-tile-meta">${escapeHtml(t.meta)}</span></span>
+        </button>`
+          )
+          .join('')}
+      </nav>
+    </section>`;
+}
+
 function renderDashboard() {
   const allClients =
     isTeamAdmin() && _selectedTeam ? getClientsByTeam(_selectedTeam) : getMyClients();
@@ -674,10 +775,31 @@ function renderDashboard() {
   const _visitMetrics =
     typeof buildVisitMetrics === 'function' ? buildVisitMetrics(visits, today.slice(0, 7)) : null;
 
+  const _portal = _dashPortalHtml({
+    nome: currentUser,
+    equipe: session && session.team ? session.team : '',
+    fila: myQueue.length + myTodayVisits.length,
+    visitasHoje: myTodayVisits.length,
+    vencidas: allPens.filter(
+      (p) =>
+        !isPendenciaClosed(p.status) &&
+        p.deadline &&
+        p.deadline < today &&
+        isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser)
+    ).length,
+    minhasAtivas: allPens.filter(
+      (p) =>
+        !isPendenciaClosed(p.status) &&
+        isSameOperator(p.responsibleId, p.responsible, session && session.opId, currentUser)
+    ).length,
+    clientes: allClients.length,
+  });
+
   document.getElementById('contentArea').innerHTML = `
     <div class="ov-wrap">
+    ${_portal}
     <header class="ov-head">
-      <h1 class="ov-h1">Visão geral</h1>
+      <h2 class="ov-h1">Visão geral</h2>
       <div class="dash-sync-status ov-sync" title="Fonte dos dados do dashboard">
         <span class="dash-sync-dot ov-dot ${_ovIsOnline ? 'is-online' : ''}"></span>
         <span>${_ovIsOnline ? 'Dados sincronizados' : 'Dados locais'}</span>
@@ -1257,6 +1379,7 @@ function renderDashboard() {
     });
   }
 
+  if (typeof presencaRepintar === 'function') presencaRepintar();
   setTimeout(() => renderCharts(pens, visits), 50);
   animateDashboardCounters();
 }
