@@ -19,7 +19,9 @@ test('prazos: KPIs, agrupar por cliente e abrir a pendência pela lista', async 
   await group.locator('.pz-head').click();
   await expect(group).toHaveClass(/is-open/);
   await group.locator('.fila-row', { hasText: 'E2E vencida' }).click();
-  await expect(page.locator('#modalOverlay')).toBeVisible();
+  // A pendência abre na página própria (#chamados/<id> ou #projetos/<id>).
+  await expect(page).toHaveURL(/#(chamados|projetos)\/PEN-/);
+  await expect(page.locator('#contentArea')).toContainText('E2E vencida');
 });
 
 test('relatório mensal do cliente: prévia com visita e horas do mês', async ({ page }) => {

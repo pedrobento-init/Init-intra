@@ -18,7 +18,34 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Type-check (gradual, só arquivos com // @ts-check)
+        run: npm run typecheck
       - name: Testes
         run: npm test
       - name: Build (validação, sem publicar)
         run: node tools/build-assets.js --check
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Instala o Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Testes E2E
+        run: npm run test:e2e -- --trace off
+      - name: Relatório em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-resultados
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

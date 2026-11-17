@@ -54,10 +54,11 @@ test.describe('Pendências', () => {
     await expect(running).toBeVisible();
     await expect(running.locator('.kb-timer[data-running="true"]')).toBeVisible();
 
-    // Pausar pelo detalhe → vai para Pausado
+    // Pausar pela página da pendência (o card abre #chamados/<id> ou #projetos/<id>) → Pausado
     await running.click();
-    await page.locator('#modalBody').getByRole('button', { name: /Pausar/ }).first().click();
-    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/#(chamados|projetos)\/PEN-/);
+    await page.locator('#chgStatus').selectOption({ label: 'Pausado' });
+    await page.evaluate(() => navigateTo('pendencias'));
     await expect(penColumn(page, 'Pausado')).toContainText('Verificação mensal de backup');
   });
 

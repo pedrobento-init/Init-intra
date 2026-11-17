@@ -28,17 +28,23 @@ test('abertura rápida: cria pendência de suporte com solicitante, canal, categ
   expect(saved.firstResponseDue).toBeTruthy();
   expect(saved.firstResponseAt).toBeFalsy();
 
-  // Detalhe mostra os dados; a 1ª nota registra a 1ª resposta.
+  // Canal externo (WhatsApp) abre a página do chamado, não mais o modal.
   await card.click();
-  const body = page.locator('#modalBody');
-  await expect(body).toContainText('Marta');
-  await expect(body).toContainText('WhatsApp');
-  await expect(body).toContainText('Impressora');
-  await body.locator('#newNoteText').fill('Falei com a Marta, vou passar lá.');
-  await body.getByRole('button', { name: 'Responder', exact: true }).click();
-  await expect(body).toContainText(/Respondida em .* por /);
+  await expect(page).toHaveURL(/#chamados\/PEN-/);
+  const pagina = page.locator('#contentArea');
+  await expect(pagina).toContainText('Marta');
+  await expect(pagina).toContainText('WhatsApp');
+  await expect(pagina).toContainText('Impressora');
+  await expect(pagina).toContainText('No prazo');
+
+  // Chamado: só a resposta a quem pediu conta como 1ª resposta. Anotação
+  // interna (a que este chamado sem contato permite) não queima o SLA.
+  await pagina.locator('#chamadoNotaTexto').fill('Falei com a Marta, vou passar lá.');
+  await pagina.getByRole('button', { name: 'Salvar anotação' }).click();
+  await expect(pagina).toContainText('Falei com a Marta, vou passar lá.');
   const depois = await page.evaluate(() => getPendencias().find((p) => p.assunto === 'E2E — impressora do caixa'));
-  expect(depois.firstResponseAt).toBeTruthy();
+  expect(depois.notes.length).toBe(1);
+  expect(depois.firstResponseAt).toBeFalsy();
 });
 
 test('formulário completo: prazo sugerido acompanha a prioridade até a pessoa escolher a data', async ({ page }) => {
@@ -85,5 +91,6 @@ test('Prazos: 1ª resposta atrasada e problemas recorrentes por cliente e catego
   await expect(item).toContainText('3x em 90 dias');
   await expect(area).toContainText('Quem mais pede');
   await item.locator('.fila-row').first().click();
-  await expect(page.locator('#modalTitle')).toContainText('Impressora');
+  await expect(page).toHaveURL(/#(chamados|projetos)\/E2E-I/);
+  await expect(page.locator('#contentArea')).toContainText('Impressora');
 });
