@@ -1,14 +1,17 @@
-const CACHE_NAME = 'init-intra-v58';
+const CACHE_NAME = 'init-intra-v59';
 const CDN_CACHE_NAME = 'init-intra-cdn-v52';
 const MAX_CDN_ENTRIES = 40;
 
 const STATIC_ASSETS = [
   '/',
   'index.html',
+  'css/fonts.css',
   'css/styles.css',
   'css/pagina-pendencia.css',
   'css/pagina-projeto.css',
   'css/pagina-chamado.css',
+  'fonts/manrope-latin.woff2',
+  'fonts/manrope-latin-ext.woff2',
   'js/schema.js',
   'js/error-log.js',
   'js/lazy-libs.js',

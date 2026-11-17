@@ -208,7 +208,8 @@ describe('contrato do template e do CSS', () => {
       expect(css).toContain(sel);
     }
     const html = fs.readFileSync('index.html', 'utf8');
-    expect(html).toContain('family=Manrope');
+    expect(html).toContain('css/fonts.css');
+    expect(fs.readFileSync('css/fonts.css', 'utf8')).toContain("font-family: 'Manrope'");
     expect(html).not.toContain('Schibsted+Grotesk');
     expect(html).not.toContain('family=Inter');
     expect(css).toContain('font-family: var(--font-sans)');

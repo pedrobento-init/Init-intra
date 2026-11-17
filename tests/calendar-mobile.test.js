@@ -282,8 +282,10 @@ describe('contrato mobile no CSS', () => {
     expect(norm).toMatch(/\.fc-timegrid-event-short \.ag-chip span\s*\{[^}]*white-space:\s*nowrap/);
   });
 
-  it('index.html carrega Manrope (títulos da Agenda)', () => {
-    expect(fs.readFileSync('index.html', 'utf8')).toContain('family=Manrope');
+  it('index.html carrega Manrope auto-hospedada (títulos da Agenda)', () => {
+    const html = fs.readFileSync('index.html', 'utf8');
+    expect(html).toContain('css/fonts.css');
+    expect(fs.readFileSync('css/fonts.css', 'utf8')).toContain("font-family: 'Manrope'");
   });
 
 });

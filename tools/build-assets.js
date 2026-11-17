@@ -20,6 +20,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const OUT_DIR = 'build';
+const FONTS_DIR = 'fonts';
 // Arquivos da raiz servidos como estão (ícones, logo, manifesto do PWA).
 const STATIC_FILES = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'logo-initnet.svg', 'logo-initnet.jpg'];
 
@@ -98,12 +99,28 @@ async function buildAssets(rootDir, opts) {
   const dry = !!(opts && opts.check);
   const out = path.join(root, OUT_DIR);
   const warnings = [];
-  const manifest = { js: {}, css: {} };
+  const manifest = { js: {}, css: {}, fonts: {} };
   const files = {}; // caminho em build/ → conteúdo
 
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const scripts = parseLocalScripts(indexHtml);
   const cssFiles = parseLocalCss(indexHtml);
+
+  // 0. Fontes auto-hospedadas: fonts/*.woff2 → assets/fonts/<base>.<hash>.woff2
+  // (cache imutável) + a licença OFL copiada como está.
+  const fontsDir = path.join(root, FONTS_DIR);
+  if (fs.existsSync(fontsDir)) {
+    for (const name of fs.readdirSync(fontsDir).sort()) {
+      const buf = fs.readFileSync(path.join(fontsDir, name));
+      if (/\.woff2$/.test(name)) {
+        const outRel = 'assets/fonts/' + name.replace(/\.woff2$/, '') + '.' + shortHash(buf) + '.woff2';
+        manifest.fonts[FONTS_DIR + '/' + name] = outRel;
+        files[outRel] = buf;
+      } else if (/^OFL.*\.txt$/.test(name)) {
+        files['assets/fonts/' + name] = buf;
+      }
+    }
+  }
 
   // 1. JS → assets/js/<base>.<hash>.min.js
   for (const rel of scripts) {
@@ -120,7 +137,9 @@ async function buildAssets(rootDir, opts) {
   for (const rel of cssFiles) {
     const abs = path.join(root, rel);
     if (!fs.existsSync(abs)) { warnings.push('ausente (link mantido): ' + rel); continue; }
-    const src = minifyCss(fs.readFileSync(abs, 'utf8'));
+    let src = minifyCss(fs.readFileSync(abs, 'utf8'));
+    // url(../fonts/x.woff2) → ../fonts/x.<hash>.woff2 (assets/css/ e assets/fonts/ são irmãos).
+    for (const [fRel, fOut] of Object.entries(manifest.fonts)) src = src.split('../' + fRel).join('../' + fOut.replace(/^assets\//, ''));
     const outRel = 'assets/css/' + path.basename(rel, '.css') + '.' + shortHash(src) + '.min.css';
     manifest.css[rel] = outRel;
     files[outRel] = src;
@@ -130,6 +149,8 @@ async function buildAssets(rootDir, opts) {
   let outIndex = indexHtml;
   for (const [rel, hashed] of Object.entries(manifest.js)) outIndex = outIndex.split('src="' + rel + '"').join('src="' + hashed + '"');
   for (const [rel, hashed] of Object.entries(manifest.css)) outIndex = outIndex.split('href="' + rel + '"').join('href="' + hashed + '"');
+  // preload das fontes críticas
+  for (const [rel, hashed] of Object.entries(manifest.fonts)) outIndex = outIndex.split('href="' + rel + '"').join('href="' + hashed + '"');
   files['index.html'] = outIndex;
 
   // 4. sw.js: STATIC_ASSETS → assets do build + CACHE_NAME com hash do build
@@ -137,9 +158,24 @@ async function buildAssets(rootDir, opts) {
   const hashedAssets = ['/', 'index.html']
     .concat(Object.values(manifest.css))
     .concat(Object.values(manifest.js))
+    .concat(Object.values(manifest.fonts))
     .concat(staticPresent.filter((f) => f !== 'logo-initnet.jpg' && f !== 'icon-512.png'));
-  const buildTag = shortHash(hashedAssets.join('\n'));
   const swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  // Tag = conteúdo de tudo que o SW serve: o nome com hash já cobre js/css/fontes,
+  // mas ícones/manifest/index.html não têm hash no nome, então entram pelo
+  // conteúdo (e o próprio sw.js, p/ mudança de lógica). Ordem fixa → determinístico;
+  // CRLF normalizado p/ o mesmo checkout dar a mesma tag no Windows e no CI.
+  const tagHash = crypto.createHash('sha256');
+  const tagInputs = { 'sw.js': swSrc };
+  for (const [rel, content] of Object.entries(files)) tagInputs[rel] = content;
+  for (const f of staticPresent) tagInputs[f] = fs.readFileSync(path.join(root, f));
+  for (const rel of Object.keys(tagInputs).sort()) {
+    const c = tagInputs[rel];
+    const bin = Buffer.isBuffer(c) ? c : Buffer.from(String(c).replace(/\r\n/g, '\n'));
+    tagHash.update(rel + '\0').update(bin).update('\0');
+  }
+  tagHash.update(hashedAssets.join('\n'));
+  const buildTag = tagHash.digest('hex').slice(0, 8);
   const outSw = swSrc
     .replace(/const CACHE_NAME = '[^']*';/, "const CACHE_NAME = 'init-intra-" + buildTag + "';")
     .replace(/const CDN_CACHE_NAME = '[^']*';/, "const CDN_CACHE_NAME = 'init-intra-cdn-" + buildTag + "';")
