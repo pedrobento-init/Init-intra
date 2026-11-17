@@ -19,6 +19,36 @@ const DB = {
   LOGS: 'intra_logs',
 };
 
+// Atalhos usados pelos saves de storage-pendencias/storage-visitas. Vivem aqui
+// (storage.js carrega antes de outbox.js) e delegam ao outbox só se ele existir:
+// enfileirar é melhor-esforço e nunca pode derrubar o save/delete que já deu
+// certo local — nem mesmo se outbox.js falhar ao carregar.
+// `_outboxOffline`: sem conexão no momento da escrita. `_outboxFail`: o envio
+// falhou (só enfileira se a causa for conectividade). `_outboxDropTarget`: o
+// delete foi direto ao servidor, então uma entrada pendente do mesmo id não pode
+// recriar o registro no próximo drain (SYNC-10).
+function _outboxSwallow(p) {
+  if (p && typeof p.catch === 'function') p.catch(function (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); });
+}
+function _outboxOffline(entity, op, record) {
+  try {
+    if (typeof outboxQueueUpsert !== 'function') return;
+    _outboxSwallow(op === 'delete' ? outboxQueueDelete(entity, record && record.id) : outboxQueueUpsert(entity, record));
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+function _outboxFail(entity, op, record, err, thrown) {
+  try {
+    if (typeof outboxQueueIfTransient !== 'function') return;
+    _outboxSwallow(outboxQueueIfTransient(entity, op, record, err, thrown));
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+function _outboxDropTarget(id) {
+  try {
+    if (typeof outboxRemoveTarget !== 'function') return;
+    _outboxSwallow(outboxRemoveTarget(id));
+  } catch (_e) { if (typeof _logSilent === 'function') _logSilent(_e, 'outbox'); }
+}
+
 // ── FILA DE SINCRONIZAÇÃO VISÍVEL ───────────────────────────────────────────
 // Contador em memória (NÃO persistido): 1 por registro criado/editado
 // localmente enquanto o push está indisponível. Boot sempre começa em 0.

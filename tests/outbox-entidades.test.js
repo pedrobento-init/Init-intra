@@ -136,29 +136,44 @@ describe('Outbox — falha permanente visível e resolvível (SYNC-09)', () => {
 });
 
 describe('Atalhos de enfileiramento dos saves (_outboxOffline/_outboxFail/_outboxDropTarget)', () => {
+  // Os atalhos moram em storage.js e enxergam o outbox como globais, igual ao navegador.
+  let shims;
+  beforeEach(() => {
+    for (const k of ['outboxQueueUpsert', 'outboxQueueDelete', 'outboxQueueIfTransient', 'outboxRemoveTarget']) globalThis[k] = outbox[k];
+    globalThis._isConnectivityError = (e) => !!e && e.status === 0;
+    shims = require('./_storage.cjs').requireStorage();
+  });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
   it('_outboxOffline enfileira upsert e delete sem lançar', async () => {
-    outbox._outboxOffline('visits', 'upsert', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
-    outbox._outboxOffline('visits', 'delete', { id: 'V2' });
-    await new Promise((r) => setTimeout(r, 0));
+    shims._outboxOffline('visits', 'upsert', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
+    shims._outboxOffline('visits', 'delete', { id: 'V2' });
+    await tick();
     expect(table.all().map((r) => [r.entity, r.op, r.targetId])).toEqual([['visits', 'upsert', 'V1'], ['visits', 'delete', 'V2']]);
   });
   it('_outboxFail só enfileira falha de conectividade, não 4xx/RLS', async () => {
-    outbox._outboxFail('visits', 'upsert', { id: 'V1' }, { status: 403, message: 'rls' });
-    outbox._outboxFail('visits', 'upsert', { id: 'V2' }, null, true);
-    await new Promise((r) => setTimeout(r, 0));
+    shims._outboxFail('visits', 'upsert', { id: 'V1' }, { status: 403, message: 'rls' });
+    shims._outboxFail('visits', 'upsert', { id: 'V2' }, null, true);
+    await tick();
     expect(table.all().map((r) => r.targetId)).toEqual(['V2']);
   });
   it('_outboxDropTarget remove a entrada pendente do id (delete direto não é desfeito pelo drain)', async () => {
     await outbox.outboxQueueUpsert('visits', { id: 'V1', updatedAt: '2026-01-01T00:00:00.000Z' });
-    outbox._outboxDropTarget('V1');
-    await new Promise((r) => setTimeout(r, 0));
+    shims._outboxDropTarget('V1');
+    await tick();
     expect(table.all()).toHaveLength(0);
   });
-  it('sem backend configurado, nenhum atalho lança nem enfileira', async () => {
+  it('sem backend configurado nada é enfileirado e nada lança', async () => {
     globalThis.isSupabaseConnected = () => false;
-    expect(() => outbox._outboxOffline('visits', 'upsert', { id: 'V1' })).not.toThrow();
-    expect(() => outbox._outboxFail('visits', 'delete', { id: 'V1' }, null, true)).not.toThrow();
-    await new Promise((r) => setTimeout(r, 0));
+    expect(() => shims._outboxOffline('visits', 'upsert', { id: 'V1' })).not.toThrow();
+    expect(() => shims._outboxFail('visits', 'delete', { id: 'V1' }, null, true)).not.toThrow();
+    await tick();
     expect(table.all()).toHaveLength(0);
+  });
+  it('sem outbox.js carregado os atalhos são no-op (o save local não quebra)', () => {
+    for (const k of ['outboxQueueUpsert', 'outboxQueueDelete', 'outboxQueueIfTransient', 'outboxRemoveTarget']) delete globalThis[k];
+    expect(() => shims._outboxOffline('visits', 'upsert', { id: 'V1' })).not.toThrow();
+    expect(() => shims._outboxFail('visits', 'upsert', { id: 'V1' }, null, true)).not.toThrow();
+    expect(() => shims._outboxDropTarget('V1')).not.toThrow();
   });
 });
