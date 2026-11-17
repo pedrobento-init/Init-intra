@@ -31,11 +31,12 @@ export default [
       // vars: 'local' — funções/consts de topo são globais usados por outros
       // scripts e por onclick="..." no HTML; o ESLint não enxerga esse uso e
       // acusava ~800 falsos positivos. Variáveis locais seguem verificadas.
-      'no-unused-vars': ['warn', { vars: 'local', args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      'no-unused-vars': ['warn', { vars: 'local', args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'all', caughtErrorsIgnorePattern: '^_' }],
       'no-prototype-builtins': 'off',
       'no-useless-escape': 'off',
-      // Padrões intencionais existentes: catch (_) {} e corpos vazios.
-      'no-empty': 'off',
+      // catch vazio engolia falha em silêncio: use _logSilent (js/error-log.js)
+      // ou comente por que ignorar. Variável de catch não usada: prefixe com _.
+      'no-empty': ['error', { allowEmptyCatch: false }],
       'no-redeclare': 'off'
     }
   },
@@ -50,7 +51,7 @@ export default [
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-      'no-empty': 'off'
+      'no-empty': ['error', { allowEmptyCatch: false }]
     }
   }
 ];
