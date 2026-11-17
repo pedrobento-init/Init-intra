@@ -105,7 +105,7 @@ js/                   Um arquivo por tela/módulo (storage*, sync*, pendencias*,
 tools/                Build (build-config.js gera js/config.js; build-assets.js monta build/) e check-schema.sql (conferência read-only do banco)
 supabase/migrations/  Migrations SQL numeradas, 001 a 082 (aplicar em ordem no SQL Editor; o prefixo 011 existe em dois arquivos, ordem no cabeçalho)
 supabase/functions/   Edge Functions (Deno, 22)
-tests/                Testes unitários (Vitest, ~140 arquivos)
+tests/                Testes unitários (Vitest, ~150 arquivos)
 e2e/                  Testes de navegador (Playwright)
 .github/workflows/    CI: lint, testes e validação do build em cada PR
 ```

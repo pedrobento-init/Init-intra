@@ -23,7 +23,12 @@ npm test                               # vitest run
 npm run test:e2e                       # playwright
 npm run lint                           # eslint js tools --max-warnings 0
 npm run typecheck                      # tsc: só arquivos com // @ts-check
+npm run format:check                   # prettier --check .
 ```
+
+**Formatação.** O repositório inteiro é formatado com prettier. Antes de commitar, rode
+`npx prettier --write <arquivos>` nos arquivos que você tocou; o CI falha em
+`format:check`.
 
 **Type-check gradual.** `tsconfig.json` tem `allowJs` e `checkJs: false`: o tsc só
 confere os arquivos de `js/` que começam com `// @ts-check` (hoje `app-events.js`,
@@ -34,11 +39,11 @@ arquivo usa e o tsc não acha entra em `js/globals.d.ts` (arquivo só de tipos: 
 funções de arquivos que terminam em `module.exports`, que o tsc trata como módulo.
 
 Sem `js/config.js`, o app roda em modo local com dados de demonstração. O CI
-roda `lint`, `typecheck`, `test`, o E2E (job separado) e `node tools/build-assets.js --check` em cada PR.
+roda `lint`, `format:check`, `typecheck`, `test`, o E2E (job separado) e `node tools/build-assets.js --check` em cada PR.
 
 ## As armadilhas que custam caro
 
-**`js/` é modo script, não módulo.** Os 80 arquivos (fora o `config.example.js`) são carregados por `<script>`
+**`js/` é modo script, não módulo.** Os 83 arquivos (fora o `config.example.js`) são carregados por `<script>`
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,
@@ -88,12 +93,16 @@ linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
   `tests/_storage.cjs` (`requireStorage()` carrega a fonte de `js/storage.js`),
   `tests/_parts.cjs` (utilitários de UI) e `createRequire(import.meta.url)` para
   CJS.
+- Teste que lê código-fonte como texto (contrato de Edge Function, CSS, SQL) não pode
+  depender da formatação: use `tests/_fonte.cjs` (`fonte()` lê e `norm()` normaliza
+  CRLF, aspas, espaços e vírgula final — passe o trecho esperado por `norm()` também)
+  ou regex com `\s*` e `["']`. Prefira testar comportamento quando for simples.
 - Query do Supabase se mocka com o padrão `mockQ()` — builder que registra as
   chamadas encadeáveis. Referência: `tests/pagination.test.js`.
 - Um `it()` por comportamento. Prefira caso-limite e regra de negócio (escopo de
   team, RLS, estados de pendência) a asserção trivial.
 - Antes de escrever, leia um ou dois testes do mesmo domínio e espelhe o estilo.
-  São ~140 arquivos (~1.860 testes); o estilo já está decidido.
+  São 149 arquivos (~1.950 testes); o estilo já está decidido.
 - Teste novo não quebra teste existente: rode `npm test` até verde.
 
 ## Idioma e escrita
@@ -110,6 +119,10 @@ nisso, siga o tom dos arquivos vizinhos.
 problema que existia antes e por que a solução é essa; invariante que o teste
 protege merece uma linha dizendo isso. Trabalho entra por PR, não por push
 direto na `main`.
+
+Commit de formatação em massa (prettier no repo todo) entra em
+`.git-blame-ignore-revs`, para o `git blame` não apontar para ele. Uma vez por
+clone: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## Dois agentes no mesmo diretório
 

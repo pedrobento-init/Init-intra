@@ -18,6 +18,8 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Formatação (prettier)
+        run: npm run format:check
       - name: Type-check (gradual, só arquivos com // @ts-check)
         run: npm run typecheck
       - name: Testes
