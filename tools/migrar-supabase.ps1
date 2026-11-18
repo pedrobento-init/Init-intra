@@ -11,6 +11,9 @@
                        Recusa um projeto novo que já tenha tabelas (use -Forcar
                        só se tiver certeza). Nunca escreve no projeto antigo.
     conferir           Compara a contagem de linhas dos dois lados.
+    comparar           Roda tools/check-schema.sql (só SELECT) nos DOIS bancos e
+                       mostra as diferenças de RLS, policies, grants, buckets e
+                       funções. Os dois bancos são abertos em modo somente leitura.
 
   O que vai: esquema public (tabelas, funções, triggers, RLS, grants), usuários
   (auth.users e auth.identities), a lista de buckets e as tabelas da publicação
@@ -28,10 +31,11 @@
   .\tools\migrar-supabase.ps1                      # só exporta
   .\tools\migrar-supabase.ps1 -Etapa importar
   .\tools\migrar-supabase.ps1 -Etapa conferir
+  .\tools\migrar-supabase.ps1 -Etapa comparar
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('exportar', 'importar', 'conferir')]
+  [ValidateSet('exportar', 'importar', 'conferir', 'comparar')]
   [string]$Etapa = 'exportar',
   [string]$Pasta = (Join-Path (Split-Path $PSScriptRoot -Parent) 'migracao'),
   [switch]$Forcar
@@ -197,6 +201,35 @@ try {
 
       Write-Host ''
       Write-Host 'Importacao concluida. Rode agora: .\tools\migrar-supabase.ps1 -Etapa conferir' -ForegroundColor Green
+    }
+
+    'comparar' {
+      Ler-Url 'projeto ANTIGO' 'OLD_DB_URL'
+      Ler-Url 'projeto NOVO' 'NEW_DB_URL'
+      Copy-Item -Path (Join-Path $PSScriptRoot 'check-schema.sql') -Destination (Join-Path $Pasta 'check-schema.sql') -Force
+      # Belt and braces: o arquivo só tem SELECT (tests/check-schema.test.js), e
+      # a sessão ainda abre em somente leitura.
+      $env:PGOPTIONS = '-c default_transaction_read_only=on'
+      Write-Host 'Rodando check-schema.sql nos dois projetos (somente leitura)...' -ForegroundColor Cyan
+      Docker-Pg 'psql "$OLD_DB_URL" --csv -f /out/check-schema.sql > /out/schema-antigo.csv' @('OLD_DB_URL', 'PGOPTIONS') | Out-Null
+      Docker-Pg 'psql "$NEW_DB_URL" --csv -f /out/check-schema.sql > /out/schema-novo.csv' @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
+
+      $antigo = @(Get-Content (Join-Path $Pasta 'schema-antigo.csv'))
+      $novo = @(Get-Content (Join-Path $Pasta 'schema-novo.csv'))
+      $diferencas = @(Compare-Object -ReferenceObject $antigo -DifferenceObject $novo)
+      if ($diferencas.Count -eq 0) {
+        Write-Host "Os dois projetos batem em tudo ($($antigo.Count) linhas)." -ForegroundColor Green
+      } else {
+        Write-Host "$($diferencas.Count) linha(s) diferente(s). '<=' so no ANTIGO, '=>' so no NOVO:" -ForegroundColor Yellow
+        $diferencas | Select-Object -First 60 | ForEach-Object {
+          Write-Host ('{0} {1}' -f $_.SideIndicator, $_.InputObject)
+        }
+        if ($diferencas.Count -gt 60) { Write-Host "... e mais $($diferencas.Count - 60). Veja os dois arquivos em $Pasta." }
+        Write-Host ''
+        Write-Host 'Esperado: diferem as policies do storage.objects (bloco 6), que nao vao no dump.' -ForegroundColor Yellow
+        exit 2
+      }
     }
 
     'conferir' {

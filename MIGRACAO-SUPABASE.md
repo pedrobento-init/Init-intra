@@ -211,8 +211,11 @@ Escolha um horário de pouco uso e avise a equipe.
    - Webhook do WAHA: `https://<REF_NOVO>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`
      e o secret `WAHA_BASE_URL` no projeto novo.
    - Robôs e integrações externas que apontavam para o endereço antigo.
-5. Rode `tools/check-schema.sql` no SQL Editor **dos dois projetos** e compare
-   (RLS, policies, grants, buckets, funções). Esse é o teste mais importante.
+5. Compare o estado dos dois bancos: `.\tools\migrar-supabase.ps1 -Etapa comparar`
+   roda o `tools/check-schema.sql` (só SELECT, em modo somente leitura) nos dois
+   projetos e lista as linhas diferentes de RLS, policies, grants, buckets e
+   funções. Diferem de propósito as policies do `storage.objects`, que o dump
+   não leva (seção 2.1). Esse é o teste mais importante.
 6. Teste de ponta a ponta com um número de teste: mensagem entra na Caixa,
    responder chega no celular, login funciona, anexo abre.
 

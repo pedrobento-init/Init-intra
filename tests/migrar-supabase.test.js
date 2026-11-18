@@ -56,6 +56,18 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(codigo).toMatch(/grep -v -E '[^']*\| DEFAULT ACL '/);
   });
 
+  it('comparar abre os dois bancos em somente leitura e só roda o check-schema.sql', () => {
+    expect(codigo).toMatch(/default_transaction_read_only=on/);
+    const roda = codigo.split('\n').filter((l) => l.includes('/out/check-schema.sql >'));
+    expect(roda).toHaveLength(2);
+    for (const l of roda) expect(l).toMatch(/psql "\$(OLD|NEW)_DB_URL" --csv -f/);
+    const sql = fs.readFileSync('tools/check-schema.sql', 'utf8');
+    const semComentario = sql.replace(/--[^\n]*/g, '');
+    expect(semComentario).not.toMatch(
+      /\b(insert|update|delete|drop|alter|create|grant|truncate)\b/i
+    );
+  });
+
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
     expect(codigo).toMatch(/\[string\]\$Etapa = 'exportar'/);
   });
