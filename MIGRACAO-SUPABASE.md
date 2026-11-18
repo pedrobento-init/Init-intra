@@ -106,10 +106,91 @@ SMTP e templates de e-mail. Copie-os à mão (Authentication → URL Configurati
 Providers). As senhas dos usuários migram junto; as **sessões abertas** não, e
 todo mundo precisa entrar de novo depois da virada.
 
-### 2.4 Agendamentos
+### 2.4 Vault e agendamentos (pg_cron)
 
-Se o projeto antigo usa `pg_cron`, anote `select * from cron.job` e recrie no
-novo. Robôs externos (Apps Script, n8n, Make) que chamam as funções precisam do
+**Nada disto vai no dump** (vivem nos schemas `vault` e `cron`), e o banco usa os
+dois. Habilite `pg_cron` e `pg_net` no projeto novo (Database → Extensions)
+**antes** de começar.
+
+**Segredos do Vault.** O projeto antigo guarda três, por nome:
+
+| Nome                 | Para quê                                                                                                                                        | Valor no projeto novo                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `client_secrets_key` | Chave que cifra a tabela `client_secrets` (migration 043). **Tem de ser a mesma**: com outra, os segredos copiados no dump ficam indecifráveis. | O mesmo valor do antigo                                                  |
+| `avisos_cron_secret` | Cabeçalho `x-cron-secret` dos agendamentos. Tem de bater com o secret `AVISOS_CRON_SECRET` das Edge Functions.                                  | O mesmo valor do antigo                                                  |
+| `project_url`        | Base da URL que os agendamentos chamam.                                                                                                         | **O endereço novo**: `https://<REF_NOVO>.supabase.co` (sem barra no fim) |
+
+Leia os dois primeiros no SQL Editor do projeto **antigo** e copie direto de lá
+para o do projeto **novo**. Nunca cole esses valores em chat nem em arquivo
+versionado:
+
+```sql
+select name, decrypted_secret from vault.decrypted_secrets
+ where name in ('client_secrets_key', 'avisos_cron_secret') order by name;
+```
+
+No SQL Editor do projeto **novo**:
+
+```sql
+select vault.create_secret('<VALOR_DA_CHAVE>',  'client_secrets_key');
+select vault.create_secret('<VALOR_DO_SEGREDO>', 'avisos_cron_secret');
+select vault.create_secret('https://<REF_NOVO>.supabase.co', 'project_url');
+```
+
+Confira que a leitura funciona, sem imprimir o valor:
+
+```sql
+select name, length(decrypted_secret) as tamanho from vault.decrypted_secrets order by name;
+```
+
+**Agendamentos.** O projeto antigo tem quatro, e os comandos leem o Vault pelo
+nome, então só `project_url` muda. Depois de importar o esquema (a função
+`public.chamados_sem_interacao()` vem no dump), crie-os no projeto **novo**:
+
+```sql
+select cron.schedule('avisos-prazo', '0 11 * * *', $job$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/avisos-prazo',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'avisos_cron_secret')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+$job$);
+
+select cron.schedule('avisos-enviados-limpeza', '30 11 * * 0',
+  $job$ delete from public.avisos_enviados where sent_at < now() - interval '90 days' $job$);
+
+select cron.schedule('chamados-sem-interacao', '17 * * * *',
+  $job$ select public.chamados_sem_interacao() $job$);
+
+select cron.schedule('relatorio-visitas-mensal', '0 11 1 * *', $job$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/relatorio-visitas-mensal',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'avisos_cron_secret')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+$job$);
+```
+
+Estes quatro são os de hoje (`cron.job` do projeto antigo). Eles repetem as
+migrations `051`, `078` e `080`; se uma delas mudar, ajuste aqui também. Confira
+com `select jobname, schedule, active from cron.job order by jobname;`.
+
+**Desligue os do projeto antigo na virada**, ou o aviso de prazo e o relatório
+mensal saem duas vezes (um de cada projeto):
+
+```sql
+select cron.unschedule(jobname) from cron.job;
+```
+
+Robôs externos (Apps Script, n8n, Make) que chamam as funções também precisam do
 endereço novo.
 
 ## 3. Virada
