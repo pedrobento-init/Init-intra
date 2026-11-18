@@ -124,6 +124,38 @@ Commit de formatação em massa (prettier no repo todo) entra em
 `.git-blame-ignore-revs`, para o `git blame` não apontar para ele. Uma vez por
 clone: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
+## Versões e releases
+
+Versão em SemVer, **`0.x.y` até a 1.0.0** (a 1.0.0 só quando o projeto estiver
+pronto). Quem decide o número é o `release-please`
+(`.github/workflows/release-please.yml`), lendo os commits da `main`:
+
+- `feat` sobe o número do meio (0.9.0 → 0.10.0); `fix` sobe o último
+  (0.9.0 → 0.9.1). São os dois que abrem ou atualizam o PR de release.
+- Mudança que quebra algo leva `!` depois do tipo (`feat(api)!: ...`). Antes
+  da 1.0 isso também sobe só o número do meio.
+- `refactor`, `perf` e `docs` aparecem no CHANGELOG quando houver release, mas
+  sozinhos não abrem um. `chore`, `style`, `test`, `build` e `ci` ficam fora do
+  CHANGELOG. (Comportamento padrão do release-please: conferir no primeiro PR de
+  release e ajustar aqui se for diferente.)
+
+**Título do PR = mensagem do commit** (o merge é por squash), então segue
+`tipo(escopo): resumo no imperativo`, em português. O workflow
+`pr-titulo.yml` recusa título fora do padrão. Escopo em minúsculas
+(`chamado`, `operadores`, `modal`).
+
+**Fluxo:** os PRs entram na `main` como sempre. O release-please mantém aberto
+um PR `chore(main): release X.Y.Z` com a versão nova e o `CHANGELOG.md`;
+**mergear esse PR é o que cria a tag `vX.Y.Z` e a release.** Não edite
+`package.json`, `package-lock.json` nem `CHANGELOG.md` à mão para subir
+versão. A Vercel publica a partir da `main`, então a tag marca o que já está
+no ar: ela não dispara deploy.
+
+**Migrations não rodam sozinhas.** Antes de mergear o PR de release, liste as
+novas desde a última tag e confirme que estão aplicadas no banco:
+`git diff --name-only vANTERIOR..origin/main -- supabase/migrations`. O
+template de PR tem uma seção para isso.
+
 ## Dois agentes no mesmo diretório
 
 Claude Code e opencode rodam como processos separados, **sem lock entre eles**.
