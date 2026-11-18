@@ -1112,6 +1112,32 @@ describe('foto de perfil do contato', () => {
     const tudo = elementos.caixaLista.innerHTML + elementos.caixaConversa.innerHTML;
     expect(tudo.match(/class="cx-av-img"/g).length).toBeGreaterThanOrEqual(3);
   });
+
+  // A URL do WhatsApp é assinada e vence; vencida, o navegador desenhava o
+  // ícone de imagem quebrada por cima das iniciais.
+  describe('validade da URL do WhatsApp', () => {
+    // oe = 0x6A000000 = 1778384896 s ≈ 2026-05-10.
+    const URL_OE =
+      'https://pps.whatsapp.net/v/t61/foto.jpg?ccb=11-4&oh=01_abc&oe=6A000000&_nc_cat=1';
+    const ANTES = Date.UTC(2026, 4, 1);
+    const DEPOIS = Date.UTC(2026, 10, 18);
+
+    it('URL ainda válida vira <img>', () => {
+      expect(s.caixaFotoHTML({ fotoUrl: URL_OE }, ANTES)).toContain('cx-av-img');
+    });
+
+    it('URL vencida não vira <img>: ficam as iniciais', () => {
+      expect(s.caixaFotoHTML({ fotoUrl: URL_OE }, DEPOIS)).toBe('');
+    });
+
+    it('URL sem oe não é tratada como vencida', () => {
+      expect(s.caixaFotoVencida('https://x.test/a.jpg', DEPOIS)).toBe(false);
+    });
+
+    it('oe como último parâmetro também conta', () => {
+      expect(s.caixaFotoVencida('https://x.test/a.jpg?oh=1&oe=6A000000', DEPOIS)).toBe(true);
+    });
+  });
 });
 
 describe('mensagem do atendimento automático', () => {
