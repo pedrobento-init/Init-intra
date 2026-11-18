@@ -591,6 +591,7 @@ const ENTITIES = [
       citacao: 'citacao',
       reacao_contato: 'reacaoContato',
       reacao_equipe: 'reacaoEquipe',
+      departamento: 'departamento', // 087
       created_at: 'createdAt',
       updated_at: 'updatedAt',
     },
@@ -610,7 +611,8 @@ const ENTITIES = [
       'citacao',
       'reacao_contato',
       'reacao_equipe',
-    ], // 075, 082, 085, 086
+      'departamento',
+    ], // 075, 082, 085, 086, 087
     onChange: () => {
       // A caixa mora na tela #caixa: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.

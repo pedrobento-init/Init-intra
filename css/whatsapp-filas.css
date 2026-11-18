@@ -1,0 +1,82 @@
+/* Filas do WhatsApp na Caixa de entrada (js/whatsapp-filas.js). Arquivo
+   próprio para não disputar o styles.css com quem mexe na Caixa. Usa as
+   variáveis --cx-* da Caixa; o modal fica fora de .cx, então lá vão com
+   valor de reserva. */
+
+.wfila-barra {
+  display: grid;
+  gap: 8px;
+}
+.wfila-barra.wfila-oculta {
+  display: none;
+}
+.wfila-deps {
+  flex-wrap: wrap;
+}
+.wfila-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.wfila-n {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--cx-amb);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.wfila-pegar {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+.wfila-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cx-green);
+}
+.wfila-status.wfila-pausa .wfila-dot {
+  background: var(--cx-mut);
+}
+.wfila-tabela {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.wfila-tabela table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wfila-tabela th,
+.wfila-tabela td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--cx-bd, #dbe1ee);
+  text-align: left;
+  white-space: nowrap;
+}
+.wfila-tabela .wfila-c {
+  text-align: center;
+}
+.wfila-op {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.wfila-online {
+  font-size: 11px;
+  color: var(--cx-mut, #5f6b87);
+}
+.wfila-online.on {
+  color: var(--cx-green, #128c4a);
+  font-weight: 600;
+}
+.wfila-lim {
+  width: 80px;
+}
