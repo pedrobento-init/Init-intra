@@ -17977,13 +17977,6 @@ body.dark-theme .pen-board .kanban-col.drag-over {
   color: var(--text-muted);
   margin-top: 4px;
 }
-.opf-actions {
-  position: sticky;
-  bottom: 0;
-  background: var(--bg-surface);
-  margin: 0;
-  padding: 12px 0 2px;
-}
 @media (max-width: 560px) {
   .opf-hero-row {
     flex-direction: column;
@@ -17995,5 +17988,32 @@ body.dark-theme .pen-board .kanban-col.drag-over {
   }
   .opf .form-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Rodapé de ação (Cancelar / Salvar) fixo, rente à borda do modal ──
+   O .modal-body tem padding embaixo, e o sticky respeita esse padding: a barra
+   parava 24px (80px no celular) acima da borda e o conteúdo rolava visível
+   por baixo dela. Sem o padding de baixo e com a barra levando o próprio
+   respiro, ela encosta na borda. Fica de fora o que já resolve o rodapé por
+   conta própria (cw-modal e xl). */
+.modal:not(.cw-modal):not(.xl) .modal-body:has(.form-actions) {
+  padding-bottom: 0;
+}
+.modal:not(.cw-modal):not(.xl) .modal-body .form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: var(--bg-surface);
+  margin: 6px calc(-1 * var(--space-6)) 0;
+  padding: 14px var(--space-6) 16px;
+}
+@media (max-width: 768px) {
+  .modal:not(.cw-modal):not(.xl) .modal-body:has(.form-actions) {
+    padding-bottom: 0 !important;
+  }
+  .modal:not(.cw-modal):not(.xl) .modal-body .form-actions {
+    margin-bottom: 0 !important;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
   }
 }
