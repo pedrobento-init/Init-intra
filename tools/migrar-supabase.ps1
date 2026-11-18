@@ -248,7 +248,8 @@ try {
       if (($d1 + $d2) -eq 0) {
         Write-Host 'Tudo bate.' -ForegroundColor Green
       } else {
-        Write-Host 'Esperado: diferem as policies do storage.objects (bloco 6) ate rodar a etapa permissoes.' -ForegroundColor Yellow
+        Write-Host 'Confira cada diferenca: so vale se voce souber explicar (ex.: migration aplicada de um lado so).' -ForegroundColor Yellow
+        Write-Host 'Se faltam as policies do storage.objects ou permissoes de anon/authenticated, rode a etapa permissoes.' -ForegroundColor Yellow
         exit 2
       }
     }
