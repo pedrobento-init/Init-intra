@@ -51,8 +51,12 @@ function Ler-Url([string]$rotulo, [string]$variavel) {
     $segura = Read-Host -AsSecureString "Cole a string de conexao ($rotulo)"
     $valor = [Net.NetworkCredential]::new('', $segura).Password
   }
+  # Colar traz espaço e aspas de brinde: tira antes de validar.
+  $valor = $valor.Trim().Trim('"', "'").Trim()
   if ($valor -notmatch '^postgres(ql)?://') {
-    Falhar "A string de conexao ($rotulo) deve comecar com postgresql://"
+    $inicio = if ($valor.Length -gt 0) { $valor.Substring(0, [Math]::Min(12, $valor.Length)) } else { '(vazio)' }
+    Falhar ("A string de conexao ($rotulo) deve comecar com postgresql:// e o que chegou comeca com '$inicio'. " +
+      'Copie a string da aba Session pooler (botao Connect), nao a URL https:// nem o comando psql.')
   }
   Set-Item -Path "Env:$variavel" -Value $valor
 }
