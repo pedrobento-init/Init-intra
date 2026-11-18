@@ -7201,6 +7201,19 @@ body.dark-theme .cx {
   background: var(--cx-nota);
   font-size: 13px;
 }
+/* Mensagem já mostrada, ainda sem confirmação do servidor. */
+.cx-enviando {
+  opacity: 0.7;
+}
+.cx-enviando-st {
+  display: block;
+  font-size: 11px;
+  color: var(--cx-mut);
+  text-align: right;
+}
+.cx-timeline {
+  overflow-anchor: auto;
+}
 /* Selo do que o atendimento automático mandou: discreto, sem competir com o texto. */
 .cx-bubble-bot-tag {
   display: block;

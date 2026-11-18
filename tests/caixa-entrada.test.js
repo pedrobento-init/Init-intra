@@ -943,6 +943,121 @@ describe('caixaEnviarMensagem', () => {
     await s.caixaEnviarMensagem('t1', formulario('reply'));
     expect(toasts[0]).toEqual(['Não foi possível concluir: Conversa não encontrada', 'error']);
   });
+
+  // Esperar a function para só então mostrar deixava a tela parada e o
+  // operador mandava de novo achando que não tinha ido.
+  it('mostra a mensagem na conversa antes de o servidor responder', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    s._caixaSelecionada = 't1';
+    let liberar;
+    s.supabaseClient.functions = {
+      invoke: () => new Promise((r) => (liberar = () => r({ data: { success: true } }))),
+    };
+    const envio = s.caixaEnviarMensagem('t1', formulario('reply'));
+    expect(elementos.caixaConversa.innerHTML).toContain('cx-enviando');
+    expect(elementos.caixaConversa.innerHTML).toContain('Já resolvemos');
+    await new Promise((r) => setTimeout(r, 0));
+    liberar();
+    await envio;
+    expect(elementos.caixaConversa.innerHTML).not.toContain('cx-enviando');
+  });
+
+  it('a falha devolve o texto ao rascunho para não ter de redigitar', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    falhaComCodigo('thread_not_found', 'Conversa não encontrada');
+    await s.caixaEnviarMensagem('t1', formulario('reply'));
+    expect(s._caixaRascunho).toMatchObject({ id: 't1', texto: 'Já resolvemos' });
+    expect(s._caixaEnviando).toHaveLength(0);
+  });
+
+  it('a falha não sobrescreve o que a pessoa já começou a escrever', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    falhaComCodigo('thread_not_found', 'Conversa não encontrada');
+    const envio = s.caixaEnviarMensagem('t1', formulario('reply'));
+    acoes.caixaRascunho(null, 'outra mensagem');
+    s._caixaRascunho.id = 't1';
+    await envio;
+    expect(s._caixaRascunho.texto).toBe('outra mensagem');
+  });
+
+  it('duas mensagens seguidas saem na ordem em que foram escritas', async () => {
+    lista = [entrada({ id: 'E1', threadId: 't1' })];
+    const ordem = [];
+    const pendentes = [];
+    s.supabaseClient.functions = {
+      invoke: (_fn, { body }) => {
+        ordem.push(body.text);
+        return new Promise((r) => pendentes.push(() => r({ data: { success: true } })));
+      },
+    };
+    const f1 = formulario('reply');
+    f1.dados.text = 'primeira';
+    const f2 = formulario('reply');
+    f2.dados.text = 'segunda';
+    const e1 = s.caixaEnviarMensagem('t1', f1);
+    const e2 = s.caixaEnviarMensagem('t1', f2);
+    await Promise.resolve();
+    // A segunda espera a primeira terminar.
+    expect(ordem).toEqual(['primeira']);
+    pendentes[0]();
+    await e1;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ordem).toEqual(['primeira', 'segunda']);
+    pendentes[1]();
+    await e2;
+  });
+});
+
+describe('caixaEnvioJaChegou', () => {
+  const item = { texto: 'Oi', kind: 'reply', desde: '2026-10-26T12:00:00.000Z' };
+
+  it('a resposta gravada pelo servidor substitui a otimista', () => {
+    const c = {
+      mensagens: [entrada({ direcao: 'saida', corpo: 'Oi', recebidoEm: '2026-10-26T12:00:05Z' })],
+    };
+    expect(s.caixaEnvioJaChegou(c, item)).toBe(true);
+  });
+
+  it('mesma frase mandada há horas não esconde a nova', () => {
+    const c = {
+      mensagens: [entrada({ direcao: 'saida', corpo: 'Oi', recebidoEm: '2026-10-26T08:00:00Z' })],
+    };
+    expect(s.caixaEnvioJaChegou(c, item)).toBe(false);
+  });
+
+  it('o cliente dizendo o mesmo texto não conta como a resposta', () => {
+    const c = {
+      mensagens: [entrada({ direcao: 'entrada', corpo: 'Oi', recebidoEm: '2026-10-26T12:00:05Z' })],
+    };
+    expect(s.caixaEnvioJaChegou(c, item)).toBe(false);
+  });
+});
+
+describe('caixaTeclaEnvia', () => {
+  const tecla = (over) => Object.assign({ key: 'Enter' }, over);
+
+  it('no WhatsApp, Enter envia', () => {
+    expect(s.caixaTeclaEnvia(tecla(), 'whatsapp')).toBe(true);
+  });
+
+  it('no WhatsApp, Shift+Enter quebra a linha', () => {
+    expect(s.caixaTeclaEnvia(tecla({ shiftKey: true }), 'whatsapp')).toBe(false);
+  });
+
+  it('no e-mail, Enter é parágrafo e só Ctrl/Cmd+Enter envia', () => {
+    expect(s.caixaTeclaEnvia(tecla(), 'email')).toBe(false);
+    expect(s.caixaTeclaEnvia(tecla({ ctrlKey: true }), 'email')).toBe(true);
+    expect(s.caixaTeclaEnvia(tecla({ metaKey: true }), 'email')).toBe(true);
+  });
+
+  it('Enter que confirma acento ou IME não envia', () => {
+    expect(s.caixaTeclaEnvia(tecla({ isComposing: true }), 'whatsapp')).toBe(false);
+    expect(s.caixaTeclaEnvia(tecla({ keyCode: 229 }), 'whatsapp')).toBe(false);
+  });
+
+  it('outras teclas não enviam', () => {
+    expect(s.caixaTeclaEnvia({ key: 'a' }, 'whatsapp')).toBe(false);
+  });
 });
 
 describe('foto de perfil do contato', () => {

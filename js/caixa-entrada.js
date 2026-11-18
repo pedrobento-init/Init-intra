@@ -23,6 +23,17 @@ var _caixaCanal = 'todos';
 // nova; sem guardar o texto, o que a pessoa estava escrevendo sumia no meio da
 // frase. Fica por conversa: trocar de thread não leva o texto para outra.
 var _caixaRascunho = { id: null, texto: '', kind: 'reply' };
+// Mensagens que a pessoa já mandou e o servidor ainda não confirmou. Aparecem na
+// conversa na hora, como no WhatsApp: esperar a Edge Function e o sync para só
+// então limpar o campo deixava a tela parada e convidava a mandar de novo.
+var _caixaEnviando = [];
+var _caixaEnvioSeq = 0;
+// Envios saem um depois do outro: em paralelo, duas mensagens digitadas em
+// sequência podiam chegar ao cliente na ordem trocada.
+var _caixaFilaEnvio = Promise.resolve();
+// Depois de enviar, o campo volta a ter foco mesmo que o envio tenha sido pelo
+// botão: quem está numa conversa continua escrevendo.
+var _caixaFocarComposer = false;
 
 // Nome com que o webhook do WhatsApp grava o que o atendimento automático mandou
 // (supabase/functions/whatsapp/index.ts, AUTOR_BOT): os dois lados têm de bater.
@@ -705,6 +716,8 @@ function _caixaConversaHTML(c) {
   const composer =
     '<form class="cx-composer" data-submit="caixaEnviarMensagem" data-arg="' +
     id +
+    '" data-canal="' +
+    (whats ? 'whatsapp' : 'email') +
     '">' +
     '<div class="cx-comp-top">' +
     linhaInfo +
@@ -722,7 +735,7 @@ function _caixaConversaHTML(c) {
     '<textarea class="cx-tx" name="text" id="newNoteText" rows="' +
     (whats ? 1 : 4) +
     '" data-input="caixaRascunho" placeholder="' +
-    (whats ? 'Escreva uma mensagem' : 'Escreva a resposta') +
+    (whats ? 'Escreva uma mensagem' : 'Escreva a resposta (Ctrl+Enter envia)') +
     '">' +
     escapeHtml(rasc.texto) +
     '</textarea>' +
@@ -760,6 +773,7 @@ function _caixaConversaHTML(c) {
     '"><div class="cx-conv-main"><div class="cx-timeline">' +
     (whats ? '' : '<h2 class="cx-subj">' + escapeHtml(u.assunto || '(sem assunto)') + '</h2>') +
     timeline +
+    _caixaEnviandoHTML(c) +
     '</div>' +
     composer +
     '</div>' +
@@ -1018,6 +1032,7 @@ function renderCaixaEntrada() {
   // continua aberta, para o técnico ver o resultado do que acabou de fazer.
   const conv = document.getElementById('caixaConversa');
   const naoLidas = visiveis.filter((c) => caixaNaoLida(c, lidas)).length;
+  const antes = _caixaCapturarConversa(conv);
   conv.innerHTML = sel
     ? _caixaConversaHTML(sel)
     : '<div class="cx-empty"><div class="cx-empty-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg></div>' +
@@ -1027,6 +1042,7 @@ function renderCaixaEntrada() {
         ? naoLidas + (naoLidas > 1 ? ' mensagens não lidas.' : ' mensagem não lida.')
         : 'Tudo lido neste filtro.') +
       '</p></div>';
+  _caixaRestaurarConversa(conv, antes, sel);
   const tela = document.getElementById('caixaTela');
   if (tela) tela.classList.toggle('cx-aberta', !!sel);
 }
@@ -1193,6 +1209,167 @@ function caixaDescartar(id) {
   });
 }
 
+// ── Composer fluido: envio otimista, rolagem e foco ──────────────────────────
+
+// A mensagem otimista some quando a de verdade chega pelo sync. Sem isto as
+// duas apareciam juntas entre o sync e o fim do envio. A folga de 2 minutos
+// cobre relógio do servidor diferente do da máquina.
+function caixaEnvioJaChegou(c, item) {
+  const desde = new Date(new Date(item.desde).getTime() - 2 * 60 * 1000).toISOString();
+  const direcao = item.kind === 'internal' ? 'interna' : 'saida';
+  return (c.mensagens || []).some(
+    (m) =>
+      (m.direcao || 'entrada') === direcao &&
+      String(m.corpo || '').trim() === item.texto &&
+      _caixaData(m) >= desde
+  );
+}
+
+function _caixaEnviandoHTML(c) {
+  const itens = _caixaEnviando.filter((it) => it.conv === c.id && !caixaEnvioJaChegou(c, it));
+  if (!itens.length) return '';
+  const whats = c.canal === 'whatsapp';
+  return itens
+    .map((it) => {
+      const nota = it.kind === 'internal';
+      const corpo =
+        (it.texto ? '<div class="cx-corpo">' + escapeHtml(it.texto) + '</div>' : '') +
+        (it.arquivo ? '<div class="cx-corpo">📎 ' + escapeHtml(it.arquivo) + '</div>' : '');
+      const status = '<small class="cx-enviando-st">Enviando…</small>';
+      if (whats) {
+        return (
+          '<div class="cx-bubble cx-enviando ' +
+          (nota ? 'cx-bubble-nota' : 'cx-bubble-out') +
+          '">' +
+          corpo +
+          status +
+          '</div>'
+        );
+      }
+      return (
+        '<article class="cx-em cx-enviando ' +
+        (nota ? 'cx-em-nota' : 'cx-em-out') +
+        '"><div class="cx-em-eb">' +
+        corpo +
+        '</div>' +
+        status +
+        '</article>'
+      );
+    })
+    .join('');
+}
+
+// Antes de trocar o HTML da conversa: em que ponto a pessoa estava lendo e se
+// estava escrevendo. Sem isto todo redesenho (sync, realtime, envio) jogava a
+// conversa para o topo e tirava o foco do campo.
+function _caixaCapturarConversa(conv) {
+  if (!conv || typeof conv.querySelector !== 'function') return null;
+  const tl = conv.querySelector('.cx-timeline');
+  const tx = conv.querySelector('.cx-tx');
+  const ativo = typeof document !== 'undefined' ? document.activeElement : null;
+  return {
+    id: (conv.dataset && conv.dataset.cxConv) || null,
+    // Perto do fim conta como no fim: é quem está acompanhando a conversa.
+    noFim: !tl || tl.scrollHeight - tl.scrollTop - tl.clientHeight < 60,
+    topo: tl ? tl.scrollTop : 0,
+    foco: !!tx && ativo === tx,
+    inicio: tx && typeof tx.selectionStart === 'number' ? tx.selectionStart : null,
+    fim: tx && typeof tx.selectionEnd === 'number' ? tx.selectionEnd : null,
+  };
+}
+
+function _caixaRolarFim(tl) {
+  tl.scrollTop = tl.scrollHeight;
+}
+
+function _caixaRestaurarConversa(conv, antes, sel) {
+  if (!conv || typeof conv.querySelector !== 'function') return;
+  if (conv.dataset) conv.dataset.cxConv = sel ? sel.id : '';
+  if (!sel) return;
+  const mesma = !!antes && antes.id === sel.id;
+  const tl = conv.querySelector('.cx-timeline');
+  if (tl) {
+    if (mesma && !antes.noFim) {
+      tl.scrollTop = antes.topo;
+    } else {
+      // Conversa aberta agora ou acompanhada no fim: a última mensagem fica à
+      // vista. Imagem decodifica depois e empurra o fim para baixo, então rola
+      // de novo quando cada uma terminar de carregar.
+      _caixaRolarFim(tl);
+      tl.querySelectorAll('img').forEach((img) => {
+        if (!img.complete) img.addEventListener('load', () => _caixaRolarFim(tl), { once: true });
+      });
+    }
+  }
+  const tx = conv.querySelector('.cx-tx');
+  if (!tx) return;
+  _caixaAjustarAltura(tx);
+  const focar = _caixaFocarComposer || (mesma && antes.foco);
+  _caixaFocarComposer = false;
+  if (!focar) return;
+  tx.focus({ preventScroll: true });
+  if (mesma && antes.foco && antes.inicio !== null) {
+    try {
+      tx.setSelectionRange(antes.inicio, antes.fim);
+    } catch (_e) {
+      /* campo sem cursor */
+    }
+  }
+}
+
+// O campo cresce com o texto até o max-height do CSS, como no WhatsApp; com
+// rows fixo a mensagem longa virava uma linha com barra de rolagem.
+function _caixaAjustarAltura(tx) {
+  if (!tx || !tx.style || typeof tx.scrollHeight !== 'number') return;
+  tx.style.height = 'auto';
+  tx.style.height = tx.scrollHeight + 2 + 'px';
+}
+
+/**
+ * Pura: a tecla envia a mensagem? No WhatsApp é Enter (Shift+Enter quebra a
+ * linha), como no app; no e-mail, onde parágrafo é a regra, só Ctrl/Cmd+Enter.
+ * Durante composição de IME (acento, teclado asiático) o Enter confirma o
+ * caractere e não pode enviar.
+ */
+function caixaTeclaEnvia(ev, canal) {
+  if (!ev || ev.key !== 'Enter' || ev.isComposing || ev.keyCode === 229) return false;
+  if (ev.altKey) return false;
+  if (canal === 'whatsapp') return !ev.shiftKey;
+  return !!(ev.ctrlKey || ev.metaKey) && !ev.shiftKey;
+}
+
+function _caixaTeclaComposer(ev) {
+  const tx = ev.target;
+  if (!tx || !tx.classList || !tx.classList.contains('cx-tx')) return;
+  const form = tx.closest ? tx.closest('.cx-composer') : null;
+  if (!form || !caixaTeclaEnvia(ev, form.dataset.canal)) return;
+  ev.preventDefault();
+  // Segurar o Enter não pode virar uma rajada de envios iguais.
+  if (ev.repeat) return;
+  if (typeof form.requestSubmit === 'function') form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', _caixaTeclaComposer);
+}
+
+function _caixaLimparComposer(form) {
+  if (!form || typeof form.querySelector !== 'function') return;
+  const tx = form.querySelector('textarea[name="text"]');
+  if (tx) {
+    tx.value = '';
+    _caixaAjustarAltura(tx);
+  }
+  const arq = form.querySelector('input[type="file"]');
+  if (arq) arq.value = '';
+}
+
+/**
+ * Envia a resposta ou nota da conversa. O campo limpa e a mensagem aparece na
+ * hora (otimista); o servidor confirma em segundo plano, na fila. Se falhar, o
+ * texto volta para o campo para a pessoa não ter de redigitar.
+ */
 async function caixaEnviarMensagem(id, form) {
   const c = _caixaConversaPorId(id);
   if (!c || !window._supabaseAuthActive) {
@@ -1202,19 +1379,43 @@ async function caixaEnviarMensagem(id, form) {
   const fd = new FormData(form);
   const texto = String(fd.get('text') || '').trim();
   const arquivo = fd.get('file');
-  if (!texto && !(arquivo && arquivo.size)) {
+  const temArquivo = !!(arquivo && arquivo.size);
+  if (!texto && !temArquivo) {
     showToast('Escreva uma mensagem ou escolha um arquivo.', 'error');
     return;
   }
-  if (arquivo && arquivo.size > 5 * 1024 * 1024) {
+  if (temArquivo && arquivo.size > 5 * 1024 * 1024) {
     showToast('O arquivo deve ter no máximo 5 MB.', 'error');
     return;
   }
-  const botao = form.querySelector('[type="submit"]');
-  if (botao) botao.disabled = true;
+  const kind = fd.get('kind') === 'internal' ? 'internal' : 'reply';
+  const item = {
+    seq: ++_caixaEnvioSeq,
+    conv: c.id,
+    texto,
+    kind,
+    arquivo: temArquivo ? String(arquivo.name || 'Anexo') : '',
+    desde: new Date().toISOString(),
+  };
+  _caixaEnviando.push(item);
+  _caixaLimparComposer(form);
+  // O tipo fica: quem está escrevendo notas internas segue nelas.
+  _caixaRascunho = { id: null, texto: '', kind };
+  if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
+  _caixaFocarComposer = true;
+  _emailTriagemRedesenhar();
+  const envio = _caixaFilaEnvio.then(() =>
+    _caixaEnviarAoServidor(c, item, temArquivo ? arquivo : null)
+  );
+  _caixaFilaEnvio = envio.catch(() => {});
+  return envio;
+}
+
+async function _caixaEnviarAoServidor(c, item, arquivo) {
+  let ok = false;
   try {
     let file = null;
-    if (arquivo && arquivo.size) {
+    if (arquivo) {
       const dados = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
@@ -1224,12 +1425,7 @@ async function caixaEnviarMensagem(id, form) {
       file = { nome: arquivo.name, tipo: arquivo.type || 'application/octet-stream', dados };
     }
     const res = await supabaseClient.functions.invoke('conversa-responder', {
-      body: {
-        thread_id: caixaThreadId(c),
-        text: texto,
-        kind: fd.get('kind') === 'internal' ? 'internal' : 'reply',
-        file,
-      },
+      body: { thread_id: caixaThreadId(c), text: item.texto, kind: item.kind, file },
     });
     let codigo = '';
     let msg = (res.data && res.data.error) || '';
@@ -1248,9 +1444,8 @@ async function caixaEnviarMensagem(id, form) {
       }
       // A resposta já chegou ao cliente; só o histórico falhou. Tratar como erro
       // comum levava o operador a reenviar e o cliente recebia duas vezes.
-      if (codigo === 'history_write' && fd.get('kind') !== 'internal') {
-        form.reset();
-        _caixaRascunho = { id: null, texto: '', kind: 'reply' };
+      if (codigo === 'history_write' && item.kind !== 'internal') {
+        ok = true;
         showToast(
           'Resposta enviada ao cliente, mas não ficou no histórico. Não reenvie.',
           'warning'
@@ -1260,22 +1455,28 @@ async function caixaEnviarMensagem(id, form) {
       throw new Error(msg || res.error.message || 'erro de conexão');
     }
     if (msg) throw new Error(msg);
-    form.reset();
-    _caixaRascunho = { id: null, texto: '', kind: 'reply' };
-    if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
-    showToast(
-      fd.get('kind') === 'internal' ? 'Nota interna salva.' : 'Resposta enviada.',
-      'success'
-    );
-    if (typeof syncSupabaseToLocal === 'function') await syncSupabaseToLocal();
-    renderCaixaEntrada();
+    ok = true;
   } catch (err) {
     showToast(
       'Não foi possível concluir: ' + String((err && err.message) || 'erro de conexão'),
       'error'
     );
+    // Devolve o texto ao campo, mas só se a pessoa não começou outra mensagem
+    // nesta conversa: sobrescrever o que ela está digitando seria pior.
+    const livre = !_caixaRascunho.texto || _caixaRascunho.id !== c.id;
+    if (item.texto && livre) _caixaRascunho = { id: c.id, texto: item.texto, kind: item.kind };
   } finally {
-    if (botao) botao.disabled = false;
+    // Com sucesso, o sync traz a mensagem de verdade antes de a otimista sair:
+    // assim ela não some e reaparece. Na falha, sai já.
+    if (ok && typeof syncSupabaseToLocal === 'function') {
+      try {
+        await syncSupabaseToLocal();
+      } catch (_e) {
+        /* o próximo sync traz */
+      }
+    }
+    _caixaEnviando = _caixaEnviando.filter((x) => x !== item);
+    _emailTriagemRedesenhar();
   }
 }
 
@@ -1352,7 +1553,8 @@ registerActions({
     caixaEnviarMensagem(id, el);
   },
   // Guardar a cada tecla é o que sobrevive ao redesenho disparado pelo sync.
-  caixaRascunho: (_el, texto) => {
+  caixaRascunho: (el, texto) => {
+    _caixaAjustarAltura(el);
     _caixaRascunho = {
       id: _caixaSelecionada,
       texto: String(texto || ''),
