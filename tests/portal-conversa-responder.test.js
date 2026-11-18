@@ -242,6 +242,32 @@ describe('conversa-responder: citação, reação e visto (086)', () => {
     expect(up.filtros).toEqual(expect.arrayContaining([['team', 'init']]));
   });
 
+  // message_id é gravável pela equipe: sem amarrar ao chat do contato, daria
+  // para o número da empresa reagir em mensagem de outra conversa.
+  it('reação em mensagem cujo id é de outro chat é recusada', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats({ message_id: 'false_5521999999999@c.us_X9' })],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'reaction', alvo: 'e1', emoji: '👍' },
+    });
+    expect(res.status).toBe(422);
+    expect(waha.chamadas).toEqual([]);
+  });
+
+  it('visto e reação exigem a prova de contato, como a resposta', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats()],
+      contatos: [],
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'seen' },
+    });
+    expect(res.status).toBe(422);
+    expect(waha.chamadas).toEqual([]);
+  });
+
   it('reação que não é emoji é recusada antes de qualquer envio', async () => {
     const waha = wahaOk();
     const { res } = await chamar({

@@ -18,7 +18,14 @@
 // e-mail, não um relay aberto — e é dívida registrada, não detalhe.
 import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 import nodemailer from 'npm:nodemailer@6.9.16';
-import { emojiValido, enviarReacao, enviarTexto, marcarVisto } from '../whatsapp/provedor.ts';
+import {
+  emojiValido,
+  enviarReacao,
+  enviarTexto,
+  idDoChat,
+  idSerializado,
+  marcarVisto,
+} from '../whatsapp/provedor.ts';
 
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 const TEXTO_MAX = 20000;
@@ -153,6 +160,24 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       if (!alvo) return json({ error: 'Mensagem não encontrada', code: 'target_not_found' }, 404);
     }
 
+    // Visto e reação também falam com o número pela sessão compartilhada do
+    // WAHA: valem a mesma prova de contato (076) que a resposta exige.
+    if (visto || reacao) {
+      const foneContato = String(ultima.telefone || '').replace(/\D/g, '');
+      const { data: contatoOk } = foneContato
+        ? await ctx.supabaseAdmin
+            .from('whatsapp_conversas')
+            .select('telefone')
+            .eq('telefone', foneContato)
+            .maybeSingle()
+        : { data: null };
+      if (!contatoOk)
+        return json(
+          { error: 'Este número nunca escreveu para a empresa', code: 'not_whatsapp_contact' },
+          422
+        );
+    }
+
     if (visto) {
       // Melhor esforço: sem WAHA o operador continua atendendo, só o cliente
       // não vê o azul. Por isso 200 mesmo quando não saiu.
@@ -164,7 +189,16 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     }
 
     if (reacao) {
-      if (!alvo || !alvo.message_id || alvo.direcao === 'interna')
+      // message_id é coluna que a RLS deixa a equipe gravar: sem amarrar o id
+      // ao chat deste contato, daria para reagir em mensagem de outra conversa
+      // da sessão. Id curto (sem o chat) não tem como ser conferido: recusa.
+      const fone = String(ultima.telefone || '').replace(/\D/g, '');
+      if (
+        !alvo ||
+        !alvo.message_id ||
+        alvo.direcao === 'interna' ||
+        !idDoChat(alvo.message_id, fone)
+      )
         return json(
           { error: 'Essa mensagem não aceita reação', code: 'target_not_reactable' },
           422
@@ -249,7 +283,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
           if (!resp.ok)
             return json({ error: 'Não foi possível enviar a mídia', code: 'provider_error' }, 502);
           const envio = await resp.json().catch(() => ({}));
-          providerId = typeof envio.id === 'string' ? envio.id : null;
+          providerId = idSerializado(envio.id) || idSerializado(envio.key) || null;
         } catch {
           return json({ error: 'WAHA inacessível', code: 'provider_unreachable' }, 502);
         }

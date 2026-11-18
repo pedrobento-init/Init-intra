@@ -5,6 +5,8 @@ import {
   enviarTexto,
   eventosDeStatus,
   idCurto,
+  idDoChat,
+  idSerializado,
   marcarVisto,
   mensagensDoWebhook,
 } from '../supabase/functions/whatsapp/provedor.ts';
@@ -230,6 +232,17 @@ describe('conversa rica: citação, recibo e reação (086)', () => {
     expect(emojiValido('<b>')).toBe(false);
     expect(emojiValido('ok')).toBe(false);
     expect(emojiValido('❤️')).toBe(true);
+  });
+
+  it('id só vale se trouxer o chat do mesmo telefone', () => {
+    expect(idDoChat('false_5511987654321@c.us_Q', '+55 11 98765-4321')).toBe(true);
+    expect(idDoChat('false_5521999999999@c.us_Q', '5511987654321')).toBe(false);
+    expect(idDoChat('Q', '5511987654321')).toBe(false);
+  });
+
+  it('id com caractere fora do alfabeto do WhatsApp é descartado', () => {
+    expect(idSerializado('a",b')).toBe('');
+    expect(idSerializado({ _serialized: 'true_1@c.us_X' })).toBe('true_1@c.us_X');
   });
 
   it('id curto é o final do id serializado', () => {

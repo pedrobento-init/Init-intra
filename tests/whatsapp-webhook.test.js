@@ -159,10 +159,10 @@ describe('whatsapp: mídia e reentrega', () => {
 });
 
 describe('whatsapp: recibo e reação (086)', () => {
-  it('recibo de leitura atualiza só a nossa mensagem, pelo id do WAHA', async () => {
+  it('recibo de leitura atualiza só a nossa mensagem, presa ao telefone do chat', async () => {
     const { res, dados, queries } = await chamar({
       event: 'message.ack',
-      payload: { id: 'true_5511@c.us_A1', fromMe: true, ack: 3 },
+      payload: { id: 'true_5511987654321@c.us_A1', fromMe: true, ack: 3 },
     });
     expect(res.status).toBe(200);
     expect(dados).toMatchObject({ ok: true, recibos: 1 });
@@ -171,7 +171,8 @@ describe('whatsapp: recibo e reação (086)', () => {
     expect(up.filtros).toEqual(
       expect.arrayContaining([
         ['direcao', 'saida'],
-        ['message_id', ['true_5511@c.us_A1', 'A1'], 'in'],
+        ['telefone', '5511987654321'],
+        ['message_id', ['true_5511987654321@c.us_A1', 'A1'], 'in'],
         ['or', 'ack.is.null,ack.lt.3', 'or'],
       ])
     );
@@ -188,6 +189,26 @@ describe('whatsapp: recibo e reação (086)', () => {
     });
     const up = queries.find((q) => q.patch && 'reacao_contato' in q.patch);
     expect(up.patch.reacao_contato).toBe('👍');
+  });
+
+  // A stanza sozinha não amarra a conversa: sem o chat no id, casar pelo final
+  // deixaria um evento de um contato mexer na linha de outra conversa.
+  it('id sem o chat (LID) só casa pelo id inteiro, nunca pelo final', async () => {
+    const { queries } = await chamar({
+      event: 'message.reaction',
+      payload: { from: '123@lid', reaction: { text: '👍', messageId: 'false_123@lid_A1' } },
+    });
+    const up = queries.find((q) => q.patch && 'reacao_contato' in q.patch);
+    expect(up.filtros).toContainEqual(['message_id', 'false_123@lid_A1']);
+    expect(up.filtros.some(([, v]) => Array.isArray(v))).toBe(false);
+  });
+
+  it('id com aspas ou vírgula não chega ao filtro', async () => {
+    const { queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'x",message_id.neq.0', fromMe: true, ack: 3 },
+    });
+    expect(queries.some((q) => q.patch && 'ack' in q.patch)).toBe(false);
   });
 
   it('evento de status não grava mensagem nem usa a chave de dedupe', async () => {

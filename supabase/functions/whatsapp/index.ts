@@ -69,6 +69,7 @@ import {
 } from './bot.ts';
 import {
   enviarTexto,
+  chatDoId,
   eventosDeStatus,
   fotoDoContato,
   idCurto,
@@ -435,10 +436,20 @@ async function fotoAtual(
   return nova;
 }
 
-// Recibos e reações. Cada um é um UPDATE pelo message_id; o id pode estar
-// gravado inteiro ou só o final, por isso o `in`. Sem linha (mensagem mandada
-// pelo celular, fora do Intra) o update não acha nada, e está tudo certo.
-// Nunca lança: recibo perdido é só um ✓ a menos na tela.
+// Recibos e reações. Cada um é um UPDATE pelo message_id. Quando o id traz o
+// chat ("true_5511...@c.us_STANZA"), o update fica preso ao telefone desse
+// chat e aí aceita também a linha gravada só com o final do id (engines que
+// devolvem key.id). Sem o chat no id (LID, id curto), só o id inteiro casa: a
+// stanza sozinha não amarra a conversa, e quem gera o evento pode ser o
+// aparelho do contato. Sem linha (mensagem mandada pelo celular, fora do
+// Intra) o update não acha nada, e está tudo certo. Nunca lança: recibo
+// perdido é só um ✓ a menos na tela.
+// deno-lint-ignore no-explicit-any
+function doChat(q: any, id: string): any {
+  const fone = chatDoId(id);
+  return fone ? q.eq('telefone', fone).in('message_id', [id, idCurto(id)]) : q.eq('message_id', id);
+}
+
 async function aplicarStatus(
   db: SupabaseClient,
   payload: unknown
@@ -451,23 +462,26 @@ async function aplicarStatus(
     // Só avança: o trigger da 086 garante isso, e o filtro evita mexer no
     // updated_at (e redesenhar a tela de todo mundo) com recibo repetido.
     const teto = r.ack === -1 ? 2 : r.ack;
-    const { error } = await db
-      .from('emails_triagem')
-      .update({ ack: r.ack, updated_at: agora })
-      .eq('canal', 'whatsapp')
-      .eq('direcao', 'saida')
-      .in('message_id', [r.id, idCurto(r.id)])
-      .or(`ack.is.null,ack.lt.${teto}`);
+    const { error } = await doChat(
+      db
+        .from('emails_triagem')
+        .update({ ack: r.ack, updated_at: agora })
+        .eq('canal', 'whatsapp')
+        .eq('direcao', 'saida'),
+      r.id
+    ).or(`ack.is.null,ack.lt.${teto}`);
     if (error) console.warn('whatsapp recibo (migration 086?):', error.message);
     else nRecibos++;
   }
   for (const x of reacoes) {
     const coluna = x.deMim ? 'reacao_equipe' : 'reacao_contato';
-    const { error } = await db
-      .from('emails_triagem')
-      .update({ [coluna]: x.emoji || null, updated_at: agora })
-      .eq('canal', 'whatsapp')
-      .in('message_id', [x.alvo, idCurto(x.alvo)]);
+    const { error } = await doChat(
+      db
+        .from('emails_triagem')
+        .update({ [coluna]: x.emoji || null, updated_at: agora })
+        .eq('canal', 'whatsapp'),
+      x.alvo
+    );
     if (error) console.warn('whatsapp reação (migration 086?):', error.message);
     else nReacoes++;
   }

@@ -82,11 +82,11 @@ function citacaoDe(p: Record<string, unknown>): { id: string; texto: string } | 
   const r = p.replyTo as Record<string, unknown> | undefined;
   const dados = p._data as Record<string, unknown> | undefined;
   const q = dados?.quotedMsg as Record<string, unknown> | undefined;
-  const id = String(r?.id ?? dados?.quotedStanzaID ?? '').trim();
+  const id = idSerializado(String(r?.id ?? dados?.quotedStanzaID ?? ''));
   const texto = String(r?.body ?? q?.body ?? '')
     .trim()
     .slice(0, CITACAO_MAX);
-  if (!id || id.length > 200) return null;
+  if (!id) return null;
   return { id, texto };
 }
 
@@ -134,14 +134,33 @@ export function eventosDeStatus(payload: unknown): { recibos: Recibo[]; reacoes:
 
 // O id da mensagem vem como texto ("true_5511...@c.us_3EB0...") ou, em alguns
 // engines, como objeto com `_serialized`.
+// Só o alfabeto de um id do WhatsApp: o valor vai para filtro do PostgREST e
+// para o corpo do WAHA, e aspas ou vírgulas ali não têm o que fazer.
+const ID_RE = /^[\w.@:+-]{1,200}$/;
+
 export function idSerializado(v: unknown): string {
-  if (typeof v === 'string') return v.trim().slice(0, 200);
-  if (v && typeof v === 'object') {
+  let s = '';
+  if (typeof v === 'string') s = v;
+  else if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    if (typeof o._serialized === 'string') return o._serialized.trim().slice(0, 200);
-    if (typeof o.id === 'string') return o.id.trim().slice(0, 200);
+    if (typeof o._serialized === 'string') s = o._serialized;
+    else if (typeof o.id === 'string') s = o.id;
   }
-  return '';
+  s = s.trim();
+  return ID_RE.test(s) ? s : '';
+}
+
+// Dígitos do chat dentro do id serializado ("true_5511...@c.us_STANZA");
+// '' quando o id não traz o chat (id curto, LID ou grupo).
+export function chatDoId(id: string): string {
+  const m = /^(?:true|false)_(\d{8,20})@c\.us_/.exec(String(id || ''));
+  return m ? m[1] : '';
+}
+
+// O id pertence à conversa deste telefone? Exige o chat no próprio id.
+export function idDoChat(id: string, telefone: string): boolean {
+  const fone = String(telefone || '').replace(/\D/g, '');
+  return !!fone && chatDoId(id) === fone;
 }
 
 // Final do id serializado: é como o WAHA às vezes cita a mensagem.
