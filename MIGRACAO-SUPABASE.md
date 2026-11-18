@@ -245,9 +245,11 @@ Escolha um horário de pouco uso e avise a equipe.
 
 1. **Pare as escritas:** desligue o webhook do WAHA ou pare o contêiner
    (`docker compose stop waha`) e peça para ninguém usar o Intra.
-2. Rode **exportar de novo** (para pegar o que mudou desde o ensaio), esvazie ou
-   recrie o projeto novo, **importar** e **conferir**. Só siga se o `conferir`
-   mostrar tudo `OK`.
+2. Rode **exportar de novo** (para pegar o que mudou desde o ensaio), depois
+   **`-Etapa recarregar`** (esvazia os dados e os usuários do projeto novo e carrega
+   os frescos, sem tocar no esquema nem nas permissões) e **conferir**. Se o projeto
+   novo estiver vazio de verdade (nunca importado), use `importar` e `permissoes`
+   em vez de `recarregar`. Só siga se o `conferir` mostrar tudo `OK`.
 3. Storage, funções e secrets (seção 2).
 4. **Troque os endereços** (e a chave pública, ver abaixo), nesta ordem:
    - Vercel → Settings → Environment Variables: `SUPABASE_URL` e

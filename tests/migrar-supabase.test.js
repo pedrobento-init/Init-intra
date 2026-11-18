@@ -87,6 +87,27 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(ruins).toEqual([]);
   });
 
+  it('recarregar só escreve no projeto NOVO, pede APAGAR e não mexe no esquema', () => {
+    const bloco = codigo.slice(codigo.indexOf("'recarregar' {"), codigo.indexOf("'permissoes' {"));
+    expect(bloco).toMatch(/-ne 'APAGAR'/);
+    expect(bloco).not.toContain('OLD_DB_URL');
+    expect(bloco).toMatch(/--data-only/);
+    // só os itens de DADOS do dump de public (nada de CREATE/ALTER do esquema)
+    expect(bloco).toMatch(/grep -E ' \(TABLE DATA\|SEQUENCE SET\) '/);
+    expect(bloco).toMatch(/--single-transaction/);
+  });
+
+  it('o SQL de limpeza só mexe em dados de public e em auth.users', () => {
+    const sql = fs.readFileSync('tools/migracao-limpar-dados.sql', 'utf8').replace(/\r\n/g, '\n');
+    const semComentario = sql.replace(/--[^\n]*/g, '');
+    expect(semComentario).toMatch(/truncate table/);
+    expect(semComentario).toMatch(/delete from auth\.users/);
+    expect(semComentario).toMatch(/schemaname = 'public'/);
+    expect(semComentario).not.toMatch(/\bdrop\b/i);
+    expect(semComentario).not.toMatch(/\b(storage|vault|cron)\b/i);
+    expect(semComentario).not.toMatch(/\bdelete from (?!auth\.users)/i);
+  });
+
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
     expect(codigo).toMatch(/\[string\]\$Etapa = 'exportar'/);
   });

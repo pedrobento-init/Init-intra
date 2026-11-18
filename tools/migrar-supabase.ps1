@@ -14,6 +14,11 @@
     comparar           Roda tools/check-schema.sql e a lista de permissões efetivas
                        (só SELECT) nos DOIS bancos e mostra o que difere. Os dois
                        bancos são abertos em modo somente leitura.
+    recarregar         Na VIRADA: o projeto NOVO já tem dados (do ensaio). Esvazia
+                       as tabelas de public e os usuários (auth) do NOVO e carrega
+                       de novo os dados frescos exportados do antigo. Não toca no
+                       esquema, nas permissões, no Storage, no Vault nem no cron.
+                       Pede que você digite APAGAR. Só escreve no NOVO.
     permissoes         Copia do ANTIGO para o NOVO as permissões de anon e
                        authenticated (tabelas, sequências e funções) e recria as
                        policies do storage.objects. O dump não as leva, e todo
@@ -37,12 +42,13 @@
   .\tools\migrar-supabase.ps1                      # só exporta
   .\tools\migrar-supabase.ps1 -Etapa importar
   .\tools\migrar-supabase.ps1 -Etapa conferir
+  .\tools\migrar-supabase.ps1 -Etapa recarregar
   .\tools\migrar-supabase.ps1 -Etapa permissoes
   .\tools\migrar-supabase.ps1 -Etapa comparar
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('exportar', 'importar', 'conferir', 'comparar', 'permissoes')]
+  [ValidateSet('exportar', 'importar', 'conferir', 'comparar', 'permissoes', 'recarregar')]
   [string]$Etapa = 'exportar',
   [string]$Pasta = (Join-Path (Split-Path $PSScriptRoot -Parent) 'migracao'),
   [switch]$Forcar
@@ -252,6 +258,35 @@ try {
         Write-Host 'Se faltam as policies do storage.objects ou permissoes de anon/authenticated, rode a etapa permissoes.' -ForegroundColor Yellow
         exit 2
       }
+    }
+
+    'recarregar' {
+      foreach ($arq in 'public.dump', 'auth.dump') {
+        if (-not (Test-Path (Join-Path $Pasta $arq))) {
+          Falhar "Falta $arq. Rode primeiro, com as escritas paradas: .\tools\migrar-supabase.ps1 -Etapa exportar"
+        }
+      }
+      Ler-Url 'projeto NOVO' 'NEW_DB_URL'
+      $hostNovo = Host-De 'NEW_DB_URL'
+      Copy-Item -Path (Join-Path $PSScriptRoot 'migracao-limpar-dados.sql') -Destination (Join-Path $Pasta 'migracao-limpar-dados.sql') -Force
+      Write-Host "ATENCAO: isto APAGA todos os dados de public e todos os usuarios (auth) de $hostNovo" -ForegroundColor Red
+      Write-Host "e carrega de novo o que esta em $Pasta (exportado do antigo)." -ForegroundColor Red
+      Write-Host 'Nao toca no esquema, nas permissoes, no Storage, no Vault nem no cron.' -ForegroundColor Yellow
+      $resposta = Read-Host 'Digite APAGAR para continuar'
+      if ($resposta -ne 'APAGAR') { Falhar 'Cancelado.' }
+
+      Write-Host 'Esvaziando os dados do projeto novo...' -ForegroundColor Cyan
+      Docker-Pg 'psql "$NEW_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -q -f /out/migracao-limpar-dados.sql' @('NEW_DB_URL') | Out-Null
+
+      # Só dados: o esquema já está no projeto novo (e as permissões, copiadas).
+      $env:PGOPTIONS = '-c session_replication_role=replica'
+      $comuns = 'pg_restore --dbname="$NEW_DB_URL" --single-transaction --exit-on-error --no-owner'
+      Write-Host 'Carregando usuarios...' -ForegroundColor Cyan
+      Docker-Pg "$comuns --data-only /out/auth.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      Write-Host 'Carregando os dados de public...' -ForegroundColor Cyan
+      Docker-Pg "pg_restore -l /out/public.dump | grep -E ' (TABLE DATA|SEQUENCE SET) ' > /tmp/toc && $comuns --data-only -L /tmp/toc /out/public.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
+      Write-Host 'Recarregado. Rode agora: .\tools\migrar-supabase.ps1 -Etapa conferir' -ForegroundColor Green
     }
 
     'permissoes' {
