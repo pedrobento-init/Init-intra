@@ -12,6 +12,11 @@ node_modules/
 .whatsapp-webhook-token
 *.local
 
+# Migração entre projetos Supabase (tools/migrar-supabase.ps1): os dumps têm
+# usuários e clientes reais, e o arquivo de secrets tem as chaves. Nunca commitar.
+migracao/
+.env.migracao
+
 # Supabase credentials — never commit this file
 js/config.js
 
