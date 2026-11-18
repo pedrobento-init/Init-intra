@@ -18009,6 +18009,12 @@ body.dark-theme .pen-board .kanban-col.drag-over {
   padding: 14px var(--space-6) 16px;
 }
 @media (max-width: 768px) {
+  /* Folha de baixo (celular): com 92vh fixo, modal curto deixava a barra no
+     meio da tela. Com altura do conteúdo (até 92vh, que segue valendo como
+     teto) a folha encosta embaixo e a barra vai junto. */
+  .modal:not(.cw-modal):not(.xl):has(.form-actions) {
+    height: auto !important;
+  }
   .modal:not(.cw-modal):not(.xl) .modal-body:has(.form-actions) {
     padding-bottom: 0 !important;
   }
