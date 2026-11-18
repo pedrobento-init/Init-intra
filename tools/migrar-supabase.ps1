@@ -102,9 +102,9 @@ function Comparar-Consulta([string]$arquivoSql, [string]$nome, [string]$titulo) 
   $novo = @(Get-Content (Join-Path $Pasta "$nome-novo.csv"))
   $diferencas = @(Compare-Object -ReferenceObject $antigo -DifferenceObject $novo)
   if ($diferencas.Count -eq 0) {
-    Write-Host "$titulo: os dois projetos batem ($($antigo.Count) linhas)." -ForegroundColor Green
+    Write-Host "${titulo}: os dois projetos batem ($($antigo.Count) linhas)." -ForegroundColor Green
   } else {
-    Write-Host "$titulo: $($diferencas.Count) linha(s) diferente(s). '<=' so no ANTIGO, '=>' so no NOVO:" -ForegroundColor Yellow
+    Write-Host "${titulo}: $($diferencas.Count) linha(s) diferente(s). '<=' so no ANTIGO, '=>' so no NOVO:" -ForegroundColor Yellow
     $diferencas | Select-Object -First 60 | ForEach-Object {
       Write-Host ('{0} {1}' -f $_.SideIndicator, $_.InputObject)
     }

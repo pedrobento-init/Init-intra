@@ -78,6 +78,15 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(bloco).toMatch(/revoke all on all functions in schema public from public/);
   });
 
+  it('nenhuma string com aspas duplas tem $variavel: (o PowerShell lê como escopo e não faz o parse)', () => {
+    // "$titulo: ..." é erro de sintaxe; tem de ser "${titulo}: ...". Não há
+    // PowerShell no CI, então o que dá para travar é este padrão conhecido.
+    const ruins = codigo
+      .split('\n')
+      .filter((l) => /"[^"]*\$[A-Za-z_]\w*:[^"]*"/.test(l.replace(/'[^']*'/g, "''")));
+    expect(ruins).toEqual([]);
+  });
+
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
     expect(codigo).toMatch(/\[string\]\$Etapa = 'exportar'/);
   });
