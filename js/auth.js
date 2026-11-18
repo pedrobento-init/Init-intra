@@ -272,6 +272,7 @@ function _upsertOperatorFromRemote(remote, _localFallback) {
     name: remote.name,
     initials: remote.initials,
     color: remote.color,
+    ...(remote.photo ? { photo: remote.photo } : {}),
     role: remote.role,
     phone: remote.phone,
     email: remote.email,

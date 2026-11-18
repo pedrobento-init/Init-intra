@@ -12,6 +12,7 @@ function getUser() {
       initials: session.initials,
       color: session.color,
       role: session.role,
+      photo: session.photo || '',
     };
   if (typeof getCacheTable === 'function') {
     const entry = getCacheTable('user_profile');
@@ -204,6 +205,8 @@ async function saveOperator(data) {
         active: savedOp.active !== false,
         team: savedOp.team || 'init',
         on_leave: savedOp.onLeave === true,
+        // Coluna da migration 084: só vai quando há foto ou ela foi removida.
+        ...(savedOp.photo || savedOp.photo === null ? { photo: savedOp.photo || null } : {}),
         created_at: savedOp.createdAt || now,
         updated_at: now,
       })
