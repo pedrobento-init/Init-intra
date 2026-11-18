@@ -262,7 +262,7 @@ function _renderOpGrid() {
         return `
       <div class="op-card ${isActive ? '' : 'op-card--inactive'} u-3b6a3a" role="button" tabindex="0" data-action="openOpPendencias" data-arg="${escapeHtml(op.id)}">
         <div class="op-card-header">
-          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${escapeHtml(initials)}${isActive ? `<i class="pres-dot pres-dot--${typeof presencaStatusDe === 'function' ? presencaStatusDe(op.id) : 'offline'}" data-pres-op="${escapeHtml(op.id)}" aria-hidden="true"></i>` : ''}</div>
+          <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${opAvatarFoto(op) || escapeHtml(initials)}${isActive ? `<i class="pres-dot pres-dot--${typeof presencaStatusDe === 'function' ? presencaStatusDe(op.id) : 'offline'}" data-pres-op="${escapeHtml(op.id)}" aria-hidden="true"></i>` : ''}</div>
           <div class="u-c87525">
             <div class="op-card-badge ${isActive ? 'op-badge-active' : 'op-badge-inactive'}">
               ${isActive ? 'Ativo' : 'Inativo'}
@@ -425,7 +425,67 @@ function _refreshOpListKeepPage() {
   }
 }
 
+// ── Foto do operador ─────────────────────────────────────────────────────────
+// A foto vive como data URL na própria linha (coluna photo, migration 084),
+// reduzida a 256x256 antes de guardar. O valor só vira <img> se passar neste
+// filtro: data URL raster. SVG fica de fora, pois pode carregar script.
+const OP_FOTO_LADO = 256;
+const OP_FOTO_MAX_ORIGEM = 8 * 1024 * 1024;
+const OP_FOTO_MAX_CHARS = 150000; // mesmo teto do CHECK da migration 084
+
+function opFotoSegura(v) {
+  const s = String(v || '');
+  if (s.length > OP_FOTO_MAX_CHARS) return '';
+  return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s) ? s : '';
+}
+
+// Recorte quadrado centralizado: { sx, sy, lado } na imagem de origem.
+function opFotoRecorte(largura, altura) {
+  const lado = Math.min(largura, altura);
+  return { sx: Math.floor((largura - lado) / 2), sy: Math.floor((altura - lado) / 2), lado };
+}
+
+function opAvatarFoto(op) {
+  const foto = opFotoSegura(op && op.photo);
+  return foto
+    ? `<img class="op-avatar-img" src="${escapeHtml(foto)}" alt="" draggable="false" />`
+    : '';
+}
+
 // ── Formulário ───────────────────────────────────────────────────────────────
+const _OP_ICO = {
+  camera:
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  user: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  phone:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  mail: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>',
+  shield:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  lock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  note: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>',
+  eye: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  trash:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>',
+};
+
+function _opSecao(icone, titulo, descricao, corpo) {
+  return `<section class="opf-card">
+    <div class="opf-card-head"><span class="opf-card-ico">${icone}</span>
+      <div><div class="opf-card-title">${titulo}</div>${descricao ? `<div class="opf-card-sub">${descricao}</div>` : ''}</div>
+    </div>
+    <div class="opf-card-body">${corpo}</div>
+  </section>`;
+}
+
+function _opSwitch(name, id, marcado, titulo, descricao) {
+  return `<label class="opf-toggle" for="${id}">
+    <input type="checkbox" name="${name}" id="${id}" ${marcado ? 'checked' : ''} data-change="updateOpPreview" />
+    <span class="opf-switch" aria-hidden="true"></span>
+    <span class="opf-toggle-txt"><b>${titulo}</b><small>${descricao}</small></span>
+  </label>`;
+}
+
 function openOperadorForm(id = null) {
   const session = getSession();
   const isAdminUser = isCurrentAdmin();
@@ -450,174 +510,341 @@ function openOperadorForm(id = null) {
     window._supabaseAuthActive
   );
   const esc = (v) => escapeHtml(v || '');
+  const foto = opFotoSegura(op?.photo);
 
   const currentPasswordHtml =
     isSelf && hasCurrentPassword
       ? `
-    <div class="form-row u-e28b04">
-      <div class="form-group u-046678">
-        <label class="form-label">Senha atual <span class="u-fb927a">(só para trocar a senha)</span></label>
-        <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
-      </div>
-    </div>
-  `
+    <div class="form-group">
+      <label class="form-label">Senha atual <span class="opf-opt">(só para trocar a senha)</span></label>
+      <input class="form-input" type="password" name="currentPwd" id="opCurrentPwd" autocomplete="current-password" placeholder="Necessária se for definir uma senha nova" />
+    </div>`
       : '';
 
   const adminBanner = isAdminUser
-    ? `<div class="u-d7e9ed">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
+    ? `<div class="opf-banner">${_opKeyIcon()} Modo Administrador — você pode editar todos os campos</div>`
     : '';
+
+  const dados = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="opNameInput">Nome *</label>
+        <input class="form-input" name="name" id="opNameInput" value="${esc(op?.name)}" required placeholder="Ex: Pedro Bento" data-input="updateOpPreview" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="opInitialsInput">Iniciais</label>
+        <input class="form-input" name="initials" id="opInitialsInput" maxlength="3" value="${esc(op?.initials)}" placeholder="Ex: PB" data-input="updateOpPreview" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="opRoleInput">Cargo / Função</label>
+        <input class="form-input" name="role" id="opRoleInput" value="${esc(op?.role || 'Técnico')}" placeholder="Ex: Técnico, Analista..." data-input="updateOpPreview" ${isAdminUser ? '' : 'readonly'} />
+      </div>
+      ${
+        isAdminUser
+          ? `<div class="form-group">
+        <label class="form-label" for="opTeamSelect">Equipe *</label>
+        <select class="form-select" name="team" id="opTeamSelect" required data-change="updateOpPreview">
+          ${TEAM_OPTIONS.map((o) => `<option value="${o.value}" ${(op?.team || 'init') === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+      </div>`
+          : `<div class="form-group">
+        <label class="form-label">Equipe</label>
+        <div class="opf-readonly">${esc((TEAM_OPTIONS.find((o) => o.value === (op?.team || 'init')) || {}).label || op?.team || 'init')}</div>
+        <input type="hidden" name="team" value="${esc(op?.team || 'init')}" />
+      </div>`
+      }
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cor do avatar <span class="opf-opt">(aparece quando não há foto)</span></label>
+      <div class="opf-colors" id="opColorPicker">
+        ${OP_COLORS.map((col) => {
+          const sel = selColor === col;
+          return `<button type="button" class="opf-color${sel ? ' is-sel' : ''}" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${sel ? 'true' : 'false'}" data-sty="background:${col}" data-color="${col}"></button>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  const contato = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="opPhoneInput">Telefone / WhatsApp</label>
+        <div class="opf-field"><span class="opf-field-ico">${_OP_ICO.phone}</span>
+          <input class="form-input" name="phone" id="opPhoneInput" value="${esc(op?.phone)}" placeholder="(11) 99999-9999" autocomplete="tel" /></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="opEmailInput">E-mail</label>
+        <div class="opf-field"><span class="opf-field-ico">${_OP_ICO.mail}</span>
+          <input class="form-input" type="email" name="email" id="opEmailInput" value="${esc(op?.email)}" placeholder="nome@initnet.com.br" autocomplete="email" /></div>
+      </div>
+    </div>`;
+
+  const permissoes = isAdminUser
+    ? `<div class="opf-toggles">
+        ${_opSwitch('isAdmin', 'opIsAdmin', op && op.isAdmin === true, 'Administrador', 'Acesso total: cria operadores, edita qualquer perfil e vê todas as equipes.')}
+        ${_opSwitch('isGestao', 'opIsGestao', op && op.isGestao === true, 'Gestão', 'Vê e cria pendências do tipo Gestão (nem administrador vê sem isso).')}
+        ${_opSwitch('onLeave', 'opOnLeave', op && op.onLeave === true, 'Afastado', 'Férias, licença ou atestado: aparece como afastado nas atribuições.')}
+      </div>
+      <div class="form-group opf-status">
+        <label class="form-label" for="opStatusSelect">Situação do cadastro</label>
+        <select class="form-select" name="active" id="opStatusSelect" data-change="updateOpPreview">
+          <option value="1" ${op?.active !== false ? 'selected' : ''}>Ativo — pode entrar e receber atribuições</option>
+          <option value="0" ${op?.active === false ? 'selected' : ''}>Inativo — sem acesso, histórico preservado</option>
+        </select>
+      </div>`
+    : `<input type="hidden" name="active" value="${op?.active !== false ? '1' : '0'}" />
+       <input type="hidden" name="isAdmin" value="${op?.isAdmin ? '1' : '0'}" />
+       <p class="opf-note">Perfil e permissões são definidos por um administrador.</p>`;
+
+  const senha = `
+    ${currentPasswordHtml}
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="opNewPwd">Nova senha</label>
+        <div class="opf-field opf-field--pwd">
+          <input class="form-input" type="password" name="newPwd" id="opNewPwd" minlength="8" autocomplete="new-password" data-input="opPwdMeter" placeholder="${id ? 'Deixe vazio para não alterar' : 'Mín. 8 caracteres'}" ${!id ? 'required' : ''} />
+          <button type="button" class="opf-eye" data-action="opTogglePwd" aria-label="Mostrar ou ocultar a senha">${_OP_ICO.eye}</button>
+        </div>
+        <div class="opf-meter" id="opPwdMeter" data-level="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="opf-meter-txt" id="opPwdMeterTxt"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="opConfirmPwd">Confirmar senha</label>
+        <input class="form-input" type="password" name="confirmPwd" id="opConfirmPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Repita a nova senha' : 'Repita a senha'}" ${!id ? 'required' : ''} />
+      </div>
+    </div>
+    <p class="opf-note">Senha gerenciada pelo sistema de autenticação. Mínimo de 8 caracteres.</p>`;
+
+  const notas = `<textarea class="form-textarea" name="notes" id="opNotesInput" rows="3" maxlength="500" data-input="updateOpPreview" placeholder="Especialidades, turnos, ramal, contato de emergência...">${esc(op?.notes)}</textarea>
+    <div class="opf-count"><span id="opNotesCount">0</span>/500</div>`;
 
   openModal(
     id ? 'Editar Operador' : 'Novo Operador',
     `
-    <form id="opForm" class="ov-form" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
+    <form id="opForm" class="ov-form opf" data-submit="submitOperadorForm" data-arg="${escapeHtml(id || '')}">
       ${adminBanner}
-      <div class="u-41f38a">
-        <div id="opAvatarPreview" data-sty="width:64px;height:64px;border-radius:50%;background:${selColor};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;transition:background .2s">
-          ${esc(op?.initials || (op?.name ? op.name.substring(0, 2).toUpperCase() : '?'))}
-        </div>
-        <div class="u-97445a">
-          <div class="form-group u-d9f228"><label class="form-label">Cor do avatar</label>
-            <div class="u-6157e8" id="opColorPicker">
-              ${OP_COLORS.map((col) => {
-                var isSel = selColor === col;
-                return `<button type="button" data-action="selectOpColor" data-arg="${escapeHtml(col)}" aria-label="Cor ${col}" aria-pressed="${isSel ? 'true' : 'false'}" data-sty="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${isSel ? '#0f172a' : 'transparent'};outline:${isSel ? '2px solid #fff' : ''};outline-offset:${isSel ? '-4px' : '0'};box-shadow:${isSel ? '0 0 0 2px #0f172a' : ''};display:flex;align-items:center;justify-content:center;transition:all .15s" data-color="${col}">${isSel ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</button>`;
-              }).join('')}
-            </div>
+      <header class="opf-hero">
+        <div class="opf-cover" id="opCover" data-sty="--opf-cor:${selColor}"></div>
+        <div class="opf-hero-row">
+          <div class="opf-photo">
+            <div id="opAvatarPreview" class="opf-avatar" data-sty="background:${selColor}">${
+              foto
+                ? `<img class="op-avatar-img" src="${escapeHtml(foto)}" alt="" draggable="false" />`
+                : esc(op?.initials || (op?.name ? op.name.substring(0, 2).toUpperCase() : '?'))
+            }</div>
+            <button type="button" class="opf-photo-btn" data-action="opPhotoPick" aria-label="Escolher foto do operador" title="Escolher foto">${_OP_ICO.camera}</button>
+            <input type="file" id="opPhotoInput" class="opf-file" accept="image/jpeg,image/png,image/webp" data-change="opPhotoSelected" tabindex="-1" />
+          </div>
+          <div class="opf-hero-info">
+            <div class="opf-hero-name" id="opHeroName">${esc(op?.name) || 'Novo operador'}</div>
+            <div class="opf-hero-role" id="opHeroRole">${esc(op?.role || 'Técnico')}</div>
+            <div class="opf-chips" id="opHeroChips"></div>
           </div>
         </div>
-      </div>
+        <div class="opf-photo-actions">
+          <button type="button" class="btn btn-secondary btn-sm" data-action="opPhotoPick">${_OP_ICO.camera} <span id="opPhotoPickTxt">${foto ? 'Trocar foto' : 'Enviar foto'}</span></button>
+          <button type="button" class="btn btn-secondary btn-sm opf-photo-rm" id="opPhotoRm" data-action="opPhotoRemove" ${foto ? '' : 'hidden'}>${_OP_ICO.trash} Remover</button>
+          <span class="opf-opt">JPG, PNG ou WebP · recortada em quadrado</span>
+        </div>
+      </header>
 
-      <div class="form-section">
-        <div class="form-section-title">Dados Pessoais</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nome *</label>
-            <input class="form-input" name="name" id="opNameInput" value="${esc(op?.name)}" required placeholder="Ex: Pedro" data-input="updateOpPreview" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Iniciais</label>
-            <input class="form-input" name="initials" id="opInitialsInput" maxlength="3" value="${esc(op?.initials)}" placeholder="Ex: PE" data-input="updateOpPreview" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group u-97445a">
-            <label class="form-label">Cargo / Função</label>
-            <input class="form-input" name="role" value="${esc(op?.role || 'Técnico')}" placeholder="Ex: Técnico, Analista..." ${isAdminUser ? '' : 'readonly'} />
-          </div>
-        </div>
-        ${
-          isAdminUser
-            ? `
-        <div class="form-row">
-          <div class="form-group u-97445a">
-            <label class="form-label">Equipe *</label>
-            <select class="form-select" name="team" required>
-              ${TEAM_OPTIONS.map((o) => `<option value="${o.value}" ${(op?.team || 'init') === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group u-97445a">
-            <label class="form-label">Status</label>
-            <select class="form-select" name="active">
-              <option value="1" ${op?.active !== false ? 'selected' : ''}>Ativo</option>
-              <option value="0" ${op?.active === false ? 'selected' : ''}>Inativo</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group u-face9f">
-          <input type="checkbox" name="isAdmin" id="opIsAdmin" ${op && op.isAdmin === true ? 'checked' : ''} class="u-fefb41" />
-          <label for="opIsAdmin" class="form-label u-ffe959">Perfil Administrador</label>
-        </div>
-        <div class="form-group u-e081d8">
-          <input type="checkbox" name="isGestao" id="opIsGestao" ${op && op.isGestao === true ? 'checked' : ''} class="u-fefb41" />
-          <label for="opIsGestao" class="form-label u-7ec31c">Gestão <span class="u-fb927a">— vê e cria pendências do tipo Gestão (nem admin vê sem isso)</span></label>
-        </div>
-        <div class="form-group u-e081d8">
-          <input type="checkbox" name="onLeave" id="opOnLeave" ${op && op.onLeave === true ? 'checked' : ''} class="u-fefb41" />
-          <label for="opOnLeave" class="form-label u-7cfea5">${_opLeaveIcon()} Afastado</label>
-        </div>
-        `
-            : `
-        <input type="hidden" name="team" value="${op?.team || 'init'}" />
-        <input type="hidden" name="active" value="${op?.active !== false ? '1' : '0'}" />
-        <input type="hidden" name="isAdmin" value="${op?.isAdmin ? '1' : '0'}" />
-        `
-        }
-      </div>
+      ${_opSecao(_OP_ICO.user, 'Dados pessoais', 'Como a pessoa aparece nas atribuições e no histórico.', dados)}
+      ${_opSecao(_OP_ICO.phone, 'Contato', 'Usado para avisos e para falar com o operador.', contato)}
+      ${_opSecao(_OP_ICO.shield, 'Perfil e permissões', isAdminUser ? 'O que o operador pode fazer no portal.' : '', permissoes)}
+      ${_opSecao(_OP_ICO.note, 'Observações', 'Visível apenas para quem edita operadores.', notas)}
+      ${_opSecao(_OP_ICO.lock, 'Senha de acesso', id ? 'Deixe em branco para manter a senha atual.' : 'Defina a senha do primeiro acesso.', senha)}
 
-      <div class="form-section">
-        <div class="form-section-title">Contato</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Telefone / WhatsApp</label>
-            <input class="form-input" name="phone" value="${esc(op?.phone)}" placeholder="(11) 99999-9999" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">E-mail</label>
-            <input class="form-input" type="email" name="email" value="${esc(op?.email)}" placeholder="nome@initnet.com.br" />
-          </div>
-        </div>
-      </div>
-
-      <div class="form-section">
-        <div class="form-section-title">Observações</div>
-        <textarea class="form-textarea" name="notes" rows="2" placeholder="Especialidades, turnos, etc...">${esc(op?.notes)}</textarea>
-      </div>
-
-      <div class="form-section">
-        <div class="form-section-title">Senha de Acesso</div>
-        ${currentPasswordHtml}
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nova senha</label>
-            <input class="form-input" type="password" name="newPwd" id="opNewPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Deixe vazio para não alterar' : 'Mín. 8 caracteres'}" ${!id ? 'required' : ''} />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Confirmar senha</label>
-            <input class="form-input" type="password" name="confirmPwd" id="opConfirmPwd" minlength="8" autocomplete="new-password" placeholder="${id ? 'Repita a nova senha' : 'Repita a senha'}" ${!id ? 'required' : ''} />
-          </div>
-        </div>
-        <p class="u-7dd96d">Senha gerenciada pelo sistema de autenticação. Mínimo 8 caracteres.</p>
-      </div>
-
-      <div class="form-actions">
+      <div class="form-actions opf-actions">
         <button type="button" class="btn btn-secondary" data-action="closeModal">Cancelar</button>
-        <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar</button>
+        <button type="submit" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> ${id ? 'Salvar alterações' : 'Cadastrar operador'}</button>
       </div>
     </form>`,
-    'sm'
+    'opf-modal'
   );
 
   window._selectedOpColor = selColor;
+  window._opPhotoData = foto; // foto atual do formulário ('' = sem foto)
+  window._opPhotoChanged = false; // só vai no save se mexeram (não zera a de quem não tocou)
+  updateOpPreview();
 }
 
 function selectOpColor(col) {
   window._selectedOpColor = col;
-  document.querySelectorAll('#opColorPicker button').forEach(function (btn) {
-    var isSel = btn.dataset.color === col;
-    btn.style.border = isSel ? '2px solid #0f172a' : '2px solid transparent';
-    btn.style.outline = isSel ? '2px solid #fff' : '';
-    btn.style.outlineOffset = isSel ? '-4px' : '0';
-    btn.style.boxShadow = isSel ? '0 0 0 2px #0f172a' : '';
+  document.querySelectorAll('#opColorPicker .opf-color').forEach(function (btn) {
+    const isSel = btn.dataset.color === col;
+    btn.classList.toggle('is-sel', isSel);
     btn.setAttribute('aria-pressed', isSel ? 'true' : 'false');
-    btn.innerHTML = isSel
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
-      : '';
   });
   updateOpPreview();
 }
 
+function _opChip(texto, tom) {
+  return `<span class="opf-chip opf-chip--${tom}">${texto}</span>`;
+}
+
 function updateOpPreview() {
-  const name = document.getElementById('opNameInput')?.value || '';
-  const initials =
-    document.getElementById('opInitialsInput')?.value ||
-    (name ? name.substring(0, 2).toUpperCase() : '?');
+  const form = document.getElementById('opForm');
+  if (!form) return;
+  const val = (id) => (document.getElementById(id) ? document.getElementById(id).value : '');
+  const name = val('opNameInput').trim();
+  const initials = (
+    val('opInitialsInput').trim() || (name ? name.substring(0, 2) : '?')
+  ).toUpperCase();
   const color = window._selectedOpColor || OP_COLORS[0];
+  const foto = window._opPhotoData || '';
+
   const preview = document.getElementById('opAvatarPreview');
   if (preview) {
     preview.style.background = color;
-    preview.textContent = initials;
+    if (foto) {
+      let img = preview.querySelector('img');
+      if (!img) {
+        preview.textContent = '';
+        img = document.createElement('img');
+        img.className = 'op-avatar-img';
+        img.alt = '';
+        img.draggable = false;
+        preview.appendChild(img);
+      }
+      if (img.getAttribute('src') !== foto) img.setAttribute('src', foto);
+    } else {
+      preview.textContent = initials;
+    }
   }
+  const cover = document.getElementById('opCover');
+  if (cover) cover.style.setProperty('--opf-cor', color);
+
+  const nomeEl = document.getElementById('opHeroName');
+  if (nomeEl) nomeEl.textContent = name || 'Novo operador';
+  const cargoEl = document.getElementById('opHeroRole');
+  if (cargoEl) cargoEl.textContent = val('opRoleInput').trim() || 'Técnico';
+
+  const pickTxt = document.getElementById('opPhotoPickTxt');
+  if (pickTxt) pickTxt.textContent = foto ? 'Trocar foto' : 'Enviar foto';
+  const rm = document.getElementById('opPhotoRm');
+  if (rm) rm.hidden = !foto;
+
+  const chips = document.getElementById('opHeroChips');
+  if (chips) {
+    const marcado = (id) => !!(document.getElementById(id) && document.getElementById(id).checked);
+    const fixo = (n) => {
+      const el = form.elements[n];
+      return el && el.type === 'hidden' ? el.value : null;
+    };
+    const status = document.getElementById('opStatusSelect');
+    const ativo = status ? status.value !== '0' : fixo('active') !== '0';
+    const admin = document.getElementById('opIsAdmin')
+      ? marcado('opIsAdmin')
+      : fixo('isAdmin') === '1';
+    const teamSel = document.getElementById('opTeamSelect');
+    const equipe = teamSel ? teamSel.options[teamSel.selectedIndex].textContent : '';
+    chips.innerHTML =
+      _opChip(ativo ? 'Ativo' : 'Inativo', ativo ? 'ok' : 'off') +
+      (admin ? _opChip('Administrador', 'adm') : '') +
+      (marcado('opIsGestao') ? _opChip('Gestão', 'ges') : '') +
+      (marcado('opOnLeave') ? _opChip('Afastado', 'afa') : '') +
+      (equipe ? _opChip(escapeHtml(equipe), 'eq') : '');
+  }
+
+  const cont = document.getElementById('opNotesCount');
+  if (cont) cont.textContent = String(val('opNotesInput').length);
+}
+
+function opPhotoPick() {
+  const i = document.getElementById('opPhotoInput');
+  if (i) i.click();
+}
+
+function opPhotoRemove() {
+  window._opPhotoData = '';
+  window._opPhotoChanged = true;
+  const i = document.getElementById('opPhotoInput');
+  if (i) i.value = '';
+  const prev = document.getElementById('opAvatarPreview');
+  if (prev) prev.textContent = '';
+  updateOpPreview();
+}
+
+// Lê o arquivo, recorta no centro e reduz para OP_FOTO_LADO. Devolve o data URL
+// JPEG. Separado do evento para dar para testar com um canvas falso.
+function opFotoReduzir(img, doc) {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const r = opFotoRecorte(w, h);
+  const canvas = (doc || document).createElement('canvas');
+  canvas.width = OP_FOTO_LADO;
+  canvas.height = OP_FOTO_LADO;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; // PNG transparente vira JPEG sem fundo preto
+  ctx.fillRect(0, 0, OP_FOTO_LADO, OP_FOTO_LADO);
+  ctx.drawImage(img, r.sx, r.sy, r.lado, r.lado, 0, 0, OP_FOTO_LADO, OP_FOTO_LADO);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+function opPhotoSelected(ev) {
+  const input = ev && ev.target;
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  input.value = ''; // permite escolher o mesmo arquivo de novo
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    showToast('Use uma imagem JPG, PNG ou WebP.', 'error');
+    return;
+  }
+  if (file.size > OP_FOTO_MAX_ORIGEM) {
+    showToast('A imagem passa de 8 MB. Escolha uma menor.', 'error');
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    try {
+      const data = opFotoSegura(opFotoReduzir(img));
+      if (!data) throw new Error('foto reduzida fora do formato');
+      window._opPhotoData = data;
+      window._opPhotoChanged = true;
+      updateOpPreview();
+    } catch (_e) {
+      if (typeof _logSilent === 'function') _logSilent(_e, 'operadores');
+      showToast('Não foi possível processar esta imagem.', 'error');
+    }
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    showToast('Não foi possível ler esta imagem.', 'error');
+  };
+  img.src = url;
+}
+
+function opTogglePwd() {
+  const campos = ['opNewPwd', 'opConfirmPwd', 'opCurrentPwd']
+    .map((i) => document.getElementById(i))
+    .filter(Boolean);
+  const mostrar = campos.length && campos[0].type === 'password';
+  campos.forEach((c) => {
+    c.type = mostrar ? 'text' : 'password';
+  });
+}
+
+// Nível 0–4 da senha nova: só orienta, a regra de verdade é o mínimo de 8.
+function opForcaSenha(s) {
+  const v = String(s || '');
+  if (!v) return 0;
+  let n = 0;
+  if (v.length >= 8) n++;
+  if (v.length >= 12) n++;
+  if (/[a-z]/.test(v) && /[A-Z]/.test(v)) n++;
+  if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) n++;
+  return v.length < 8 ? Math.min(n, 1) : Math.max(n, 1);
+}
+
+function opPwdMeter() {
+  const nivel = opForcaSenha((document.getElementById('opNewPwd') || {}).value);
+  const m = document.getElementById('opPwdMeter');
+  if (m) m.dataset.level = String(nivel);
+  const t = document.getElementById('opPwdMeterTxt');
+  if (t) t.textContent = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'][nivel];
 }
 
 async function submitOperadorForm(e, id) {
@@ -742,6 +969,9 @@ async function submitOperadorForm(e, id) {
       onLeave: onLeaveVal,
       team: g('team') || 'init',
     };
+    // Só entra se mexeram na foto: a chave ausente preserva a que já existe no
+    // merge do saveOperator (undefined sobrescreveria). '' = removida → null.
+    if (window._opPhotoChanged === true) opData.photo = opFotoSegura(window._opPhotoData) || null;
 
     const opErrors = validateOperator(opData);
     if (opErrors.length) {
@@ -909,7 +1139,7 @@ function openOpPendencias(opId) {
     op.name,
     `
     <div class="op-detail-header u-e2fe7f">
-      <div data-sty="width:52px;height:52px;border-radius:50%;background:${escapeHtml(color)};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${escapeHtml(initials)}</div>
+      <div class="op-avatar" data-sty="background:${escapeHtml(color)}">${opAvatarFoto(op) || escapeHtml(initials)}</div>
       <div class="u-59eddc">
         <div class="u-7a6d8a">${escapeHtml(op.name)} ${op.onLeave ? `<span class="tag badge-afastado">${_opLeaveIcon()} Afastado</span>` : ''}</div>
         <div class="u-865c33">${escapeHtml(op.role || 'Técnico')}</div>
@@ -1051,6 +1281,11 @@ if (typeof registerActions === 'function') {
     updateOpPreview: () => {
       if (typeof updateOpPreview === 'function') updateOpPreview();
     },
+    opPhotoPick: () => opPhotoPick(),
+    opPhotoRemove: () => opPhotoRemove(),
+    opPhotoSelected: (_el, _v, ev) => opPhotoSelected(ev),
+    opTogglePwd: () => opTogglePwd(),
+    opPwdMeter: () => opPwdMeter(),
     submitOperadorForm: (el, id, ev) => {
       if (typeof submitOperadorForm === 'function') submitOperadorForm(ev, id || '');
     },

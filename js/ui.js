@@ -920,6 +920,15 @@ function updateUserUI() {
   const initials = u.initials || (u.name ? u.name.substring(0, 2).toUpperCase() : 'TI');
   const avatar = document.getElementById('user-avatar');
   avatar.textContent = initials;
+  const foto = typeof opFotoSegura === 'function' ? opFotoSegura(u.photo) : '';
+  if (foto) {
+    const img = document.createElement('img');
+    img.className = 'op-avatar-img';
+    img.alt = '';
+    img.setAttribute('src', foto);
+    avatar.textContent = '';
+    avatar.appendChild(img);
+  }
   if (u.color) avatar.style.setProperty('background', u.color, 'important'); // a classe de css/utilidades.css usa !important
   const roleEl = document.getElementById('user-role-display');
   if (roleEl) roleEl.textContent = u.role || 'Técnico';

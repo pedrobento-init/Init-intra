@@ -532,6 +532,7 @@ function setSession(opId) {
     name: op.name,
     initials: op.initials || op.name.substring(0, 2).toUpperCase(),
     color: op.color || '#1a56db',
+    photo: op.photo || '',
     role: op.role || 'Técnico',
     isAdmin: op.isAdmin === true,
     isGestao: typeof isGestaoOperator === 'function' ? isGestaoOperator(op) : false,

@@ -219,6 +219,9 @@ const ENTITIES = [
       team: o.team || 'init',
       auth_user_id: o.auth_user_id || null,
       on_leave: o.onLeave === true,
+      // Só vai quando há foto (ou foi removida: null). Banco sem a migration 084
+      // recusaria o upsert inteiro por causa de uma coluna desconhecida.
+      ...(o.photo || o.photo === null ? { photo: o.photo || null } : {}),
       created_at: o.createdAt || new Date().toISOString(),
       updated_at: o.updatedAt || new Date().toISOString(),
     }),
@@ -227,6 +230,7 @@ const ENTITIES = [
       name: r.name,
       initials: r.initials,
       color: r.color,
+      ...(r.photo ? { photo: r.photo } : {}),
       role: r.role,
       phone: r.phone,
       email: r.email,
