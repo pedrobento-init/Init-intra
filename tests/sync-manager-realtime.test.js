@@ -130,3 +130,70 @@ describe('SyncManager — applyRemote e o onMerged do pull (SYNC-11)', () => {
     expect(captured[0].numero).toBe(9);
   });
 });
+
+describe('SyncManager — reconectar não entra em recursão (removeChannel dispara CLOSED)', () => {
+  // A biblioteca real chama o callback do canal removido com 'CLOSED' de forma
+  // síncrona. Com `_channel` ainda apontando para ele, o callback derrubava o
+  // canal de novo, que disparava CLOSED de novo, até "Maximum call stack size
+  // exceeded": a reconexão quebrava e a tela ficava sem canal vivo.
+  function bibliotecaReal() {
+    const callbacks = new Map();
+    const estado = { criados: 0, removidos: 0, canais: [] };
+    const cliente = {
+      channel() {
+        estado.criados++;
+        const ch = {
+          on() {
+            return ch;
+          },
+          subscribe(cb) {
+            callbacks.set(ch, cb);
+            return ch;
+          },
+        };
+        estado.canais.push(ch);
+        return ch;
+      },
+      removeChannel(ch) {
+        estado.removidos++;
+        const cb = callbacks.get(ch);
+        if (cb) cb('CLOSED');
+      },
+    };
+    return { cliente, estado, callbacks };
+  }
+
+  it('connect() com canal aberto remove o velho uma vez e deixa um canal novo', () => {
+    const original = globalThis.supabaseClient;
+    const { cliente, estado } = bibliotecaReal();
+    globalThis.supabaseClient = cliente;
+    try {
+      SyncManager.disconnect();
+      SyncManager.connect();
+      SyncManager.connect();
+      expect(estado.criados).toBe(2);
+      // Sem a trava, isto passa de milhares (cada remoção chamava outra).
+      expect(estado.removidos).toBeLessThan(5);
+    } finally {
+      globalThis.supabaseClient = original;
+    }
+  });
+
+  it('o CLOSED tardio de um canal antigo não derruba o canal novo', () => {
+    const original = globalThis.supabaseClient;
+    const { cliente, estado, callbacks } = bibliotecaReal();
+    globalThis.supabaseClient = cliente;
+    try {
+      SyncManager.disconnect();
+      SyncManager.connect();
+      SyncManager.connect();
+      const antigo = estado.canais[0];
+      callbacks.get(antigo)('CLOSED'); // evento atrasado do canal que já foi trocado
+      const vc = (listeners['doc:visibilitychange'] || [])[0];
+      vc(); // se o canal novo tivesse sido derrubado, isto abriria um terceiro
+      expect(estado.criados).toBe(2);
+    } finally {
+      globalThis.supabaseClient = original;
+    }
+  });
+});
