@@ -1198,3 +1198,82 @@ describe('mensagem do atendimento automático', () => {
     expect(tela).toMatch(/const CAIXA_AUTOR_BOT\s*=\s*['"]Atendimento automático['"]/);
   });
 });
+
+describe('fala do WhatsApp com avatar', () => {
+  const msg = (over) =>
+    Object.assign(
+      { direcao: 'entrada', de: 'Márcia', recebidoEm: '2026-10-26T10:00:00.000Z' },
+      over
+    );
+
+  it('fala seguida da mesma pessoa em poucos minutos continua o bloco', () => {
+    expect(s.caixaMsgContinua(msg(), msg({ recebidoEm: '2026-10-26T10:04:00.000Z' }))).toBe(true);
+  });
+
+  it('intervalo longo abre um bloco novo, com avatar e nome de novo', () => {
+    expect(s.caixaMsgContinua(msg(), msg({ recebidoEm: '2026-10-26T10:30:00.000Z' }))).toBe(false);
+  });
+
+  it('dois colegas respondendo em sequência não se fundem num bloco só', () => {
+    const a = msg({ direcao: 'saida', de: 'Ana' });
+    const b = msg({ direcao: 'saida', de: 'Bruno', recebidoEm: '2026-10-26T10:01:00.000Z' });
+    expect(s.caixaMsgContinua(a, b)).toBe(false);
+  });
+
+  it('o contato trocando o nome do perfil no meio continua sendo a mesma pessoa', () => {
+    const b = msg({ de: '5511987654321', recebidoEm: '2026-10-26T10:01:00.000Z' });
+    expect(s.caixaMsgContinua(msg(), b)).toBe(true);
+  });
+
+  it('tira o "Nome: " que vai para o cliente, já que o nome está no topo da bolha', () => {
+    expect(s.caixaCorpoSemAtendente('Ana: Olá', 'Ana')).toBe('Olá');
+  });
+
+  it('não corta texto que só começa parecido com o nome', () => {
+    expect(s.caixaCorpoSemAtendente('Anatel: prazo', 'Ana')).toBe('Anatel: prazo');
+  });
+
+  it('a resposta do colega aparece com o avatar dele e sem o prefixo repetido', () => {
+    lista = [
+      entrada({
+        id: 'W1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Márcia',
+        corpo: 'oi',
+      }),
+      entrada({
+        id: 'op:1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Ana',
+        direcao: 'saida',
+        status: 'anexado',
+        corpo: 'Ana: Olá',
+        recebidoEm: '2026-10-26T12:05:00.000Z',
+      }),
+    ];
+    s.renderCaixaEntrada();
+    acoes.caixaSelecionar(null, s.caixaAgruparConversas(lista)[0].id);
+    const html = elementos.caixaConversa.innerHTML;
+    expect(html).toContain('class="cx-msg cx-msg-out"');
+    expect(html).toContain('class="cx-bubble-autor">Ana</b>');
+    expect(html).not.toContain('Ana: Olá');
+  });
+
+  it('foto do operador só entra se for data URL raster', () => {
+    s.getOperators = () => [{ name: 'Ana', photo: 'data:image/svg+xml;base64,PHN2Zz4=' }];
+    s.opFotoSegura = (v) => (/^data:image\/(jpeg|png|webp);base64,/.test(v) ? v : '');
+    const html = s.caixaAvatarMsgHTML({}, { direcao: 'saida', de: 'Ana' }, 'Ana');
+    expect(html).not.toContain('<img');
+  });
+
+  it('foto válida do operador vira <img> no avatar da fala', () => {
+    s.getOperators = () => [{ name: 'Ana', photo: 'data:image/png;base64,iVBORw0KGgo=' }];
+    s.opFotoSegura = (v) => (/^data:image\/(jpeg|png|webp);base64,/.test(v) ? v : '');
+    const html = s.caixaAvatarMsgHTML({}, { direcao: 'saida', de: 'Ana' }, 'Ana');
+    expect(html).toContain('<img class="cx-av-img" src="data:image/png;base64,iVBORw0KGgo="');
+  });
+});

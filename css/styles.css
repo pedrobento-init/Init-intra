@@ -7195,11 +7195,68 @@ body.dark-theme .cx {
   border-top-right-radius: 4px;
 }
 .cx-bubble-nota {
-  align-self: center;
-  max-width: 88%;
+  align-self: flex-end;
   border: 1px dashed var(--cx-amb);
+  border-top-right-radius: 4px;
   background: var(--cx-nota);
   font-size: 13px;
+}
+/* Linha da fala: avatar ao lado da bolha, como na página do chamado. O contato
+   fica à esquerda; a equipe (resposta e nota) à direita, com o avatar por fora. */
+.cx-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 78%;
+  align-self: flex-start;
+}
+.cx-msg-out,
+.cx-msg-nota {
+  flex-direction: row-reverse;
+  align-self: flex-end;
+}
+/* Continuação do mesmo bloco: cola na fala anterior, sem repetir avatar. */
+.cx-msg-cont {
+  margin-top: -5px;
+}
+.cx-msg .cx-bubble {
+  max-width: none;
+  min-width: 0;
+}
+.cx-av-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+.cx-av-vazio {
+  flex: none;
+  width: 32px;
+}
+.cx-av-eq {
+  background: var(--cx-av-cor, var(--cx-ac));
+  color: #fff;
+}
+.cx-av-bot {
+  background: var(--cx-s1);
+  border: 1px solid var(--cx-bd);
+  color: var(--cx-ac);
+}
+.cx-bubble-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-bottom: 3px;
+  white-space: normal;
+}
+.cx-bubble-autor {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cx-bubble-hora {
+  font-size: 11px;
+  color: var(--cx-mut);
+  font-variant-numeric: tabular-nums;
 }
 /* Mensagem já mostrada, ainda sem confirmação do servidor. */
 .cx-enviando {
@@ -7216,20 +7273,16 @@ body.dark-theme .cx {
 }
 /* Selo do que o atendimento automático mandou: discreto, sem competir com o texto. */
 .cx-bubble-bot-tag {
-  display: block;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--cx-mut);
-  margin-bottom: 4px;
 }
 .cx-bubble-nota-tag {
-  display: block;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--cx-amb);
-  margin-bottom: 4px;
 }
 
 /* E-mail: assunto + cartões de mensagem; mais antigos dobrados até clicar. */
@@ -7586,6 +7639,9 @@ body.dark-theme .cx {
   }
   .cx-bubble {
     max-width: 88%;
+  }
+  .cx-msg {
+    max-width: 94%;
   }
 }
 @media (min-width: 901px) and (max-width: 1180px) {

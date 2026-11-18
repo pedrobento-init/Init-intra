@@ -546,32 +546,8 @@ function _caixaConversaHTML(c) {
       const direcao = m.direcao || 'entrada';
       const autor = autorDe(m);
       if (whats) {
-        const cls =
-          direcao === 'interna'
-            ? 'cx-bubble-nota'
-            : direcao === 'saida'
-              ? 'cx-bubble-out'
-              : 'cx-bubble-in';
-        // Nota interna leva o autor; mensagem do robô também, para quem atende
-        // saber que aquilo foi o atendimento automático e não um colega.
-        const nota =
-          direcao === 'interna'
-            ? '<b class="cx-bubble-nota-tag">' + escapeHtml(autor) + '</b>'
-            : direcao === 'saida' && m.de === CAIXA_AUTOR_BOT
-              ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
-              : '';
-        return (
-          sep +
-          '<div class="cx-bubble ' +
-          cls +
-          '">' +
-          nota +
-          _caixaCorpoHTML(m.corpo, c.canal) +
-          _caixaMediaHTML(m.media) +
-          '<small>' +
-          hora(m) +
-          '</small></div>'
-        );
+        const continua = caixaMsgContinua(c.mensagens[i - 1], m) && !sep;
+        return sep + _caixaMsgWhatsHTML(c, m, continua);
       }
       const ultimaMsg = i === c.mensagens.length - 1;
       const expandida = ultimaMsg || !!expMap[i];
@@ -779,6 +755,130 @@ function _caixaConversaHTML(c) {
     '</div>' +
     lado +
     '</div>'
+  );
+}
+
+// ---- Mensagem do WhatsApp: avatar ao lado da bolha -------------------------
+// Como na página do chamado: cada fala tem o rosto de quem falou — a foto do
+// contato à esquerda, a do colega à direita. Quem atende bate o olho e sabe
+// quem disse o quê sem ler o nome de cada bolha.
+
+// Falas seguidas da mesma pessoa, no mesmo dia e com pouco intervalo, viram um
+// bloco só: repetir avatar e nome em cada "ok" / "obrigado" só faz ruído.
+const CAIXA_GRUPO_MS = 10 * 60 * 1000;
+
+function caixaMsgContinua(anterior, m) {
+  if (!anterior || !m) return false;
+  if ((anterior.direcao || 'entrada') !== (m.direcao || 'entrada')) return false;
+  // Na entrada o "de" pode variar (nome do perfil ou número): é a mesma pessoa.
+  if ((m.direcao || 'entrada') !== 'entrada' && String(anterior.de || '') !== String(m.de || ''))
+    return false;
+  const a = new Date(anterior.recebidoEm).getTime();
+  const b = new Date(m.recebidoEm).getTime();
+  if (isNaN(a) || isNaN(b)) return false;
+  return b - a >= 0 && b - a <= CAIXA_GRUPO_MS;
+}
+
+// A resposta só guarda o nome de quem atendeu (conversa-responder grava "de"
+// com op.name), então é pelo nome que se acha a foto.
+function _caixaOperadorPorNome(nome) {
+  const n = String(nome || '')
+    .trim()
+    .toLowerCase();
+  if (!n || typeof getOperators !== 'function') return null;
+  return (
+    (getOperators() || []).find(
+      (o) =>
+        String((o && o.name) || '')
+          .trim()
+          .toLowerCase() === n
+    ) || null
+  );
+}
+
+// O WhatsApp leva "Nome: texto" para o cliente saber quem respondeu, e o
+// histórico grava igual. Com o nome no topo da bolha, o prefixo só repetiria.
+function caixaCorpoSemAtendente(corpo, de) {
+  const n = String(de || '').trim();
+  const s = String(corpo || '');
+  return n && s.startsWith(n + ': ') ? s.slice(n.length + 2) : s;
+}
+
+const _CAIXA_ICO_BOT =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13v2M15 13v2"/></svg>';
+
+function caixaAvatarMsgHTML(c, m, nome) {
+  const direcao = (m && m.direcao) || 'entrada';
+  if (direcao === 'entrada') {
+    return (
+      '<span class="cx-av cx-av-sm" aria-hidden="true">' +
+      escapeHtml(_caixaIniciais(nome)) +
+      caixaFotoHTML(c) +
+      '</span>'
+    );
+  }
+  if (m.de === CAIXA_AUTOR_BOT) {
+    return (
+      '<span class="cx-av cx-av-sm cx-av-bot" aria-hidden="true">' + _CAIXA_ICO_BOT + '</span>'
+    );
+  }
+  const op = _caixaOperadorPorNome(m.de);
+  // opFotoSegura só deixa passar data URL raster: SVG poderia carregar script.
+  const foto = op && typeof opFotoSegura === 'function' ? opFotoSegura(op.photo) : '';
+  const corBruta =
+    (op && op.color) || (typeof getOpAvatarColor === 'function' ? getOpAvatarColor(nome) : '');
+  const cor = /^#[0-9a-f]{3,8}$/i.test(String(corBruta || '')) ? corBruta : '';
+  return (
+    '<span class="cx-av cx-av-sm cx-av-eq"' +
+    (cor ? ' data-sty="--cx-av-cor:' + escapeHtml(cor) + '"' : '') +
+    ' aria-hidden="true">' +
+    escapeHtml(_caixaIniciais(nome)) +
+    (foto
+      ? '<img class="cx-av-img" src="' + escapeHtml(foto) + '" alt="" draggable="false" />'
+      : '') +
+    '</span>'
+  );
+}
+
+function _caixaMsgWhatsHTML(c, m, continua) {
+  const direcao = m.direcao || 'entrada';
+  const bot = direcao === 'saida' && m.de === CAIXA_AUTOR_BOT;
+  const lado = direcao === 'interna' ? 'nota' : direcao === 'saida' ? 'out' : 'in';
+  const nome =
+    direcao === 'entrada'
+      ? _caixaNomeDe(m, c.canal)
+      : String(m.de || '').trim() || (direcao === 'interna' ? 'Equipe' : 'Você');
+  const hora = escapeHtml(_caixaHora(m.recebidoEm) || formatDateTime(m.recebidoEm));
+  const corpo = direcao === 'saida' && !bot ? caixaCorpoSemAtendente(m.corpo, m.de) : m.corpo;
+  // O selo do robô continua no lugar do nome: quem atende precisa saber que
+  // aquilo foi o atendimento automático e não um colega.
+  const autor = bot
+    ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
+    : '<b class="cx-bubble-autor">' + escapeHtml(nome) + '</b>';
+  const topo = continua
+    ? ''
+    : '<div class="cx-bubble-topo">' +
+      autor +
+      (direcao === 'interna' ? '<span class="cx-bubble-nota-tag">Nota interna</span>' : '') +
+      '<span class="cx-bubble-hora">' +
+      hora +
+      '</span></div>';
+  return (
+    '<div class="cx-msg cx-msg-' +
+    lado +
+    (continua ? ' cx-msg-cont' : '') +
+    '">' +
+    (continua
+      ? '<span class="cx-av-vazio" aria-hidden="true"></span>'
+      : caixaAvatarMsgHTML(c, m, nome)) +
+    '<div class="cx-bubble cx-bubble-' +
+    lado +
+    '">' +
+    topo +
+    _caixaCorpoHTML(corpo, c.canal) +
+    _caixaMediaHTML(m.media) +
+    (continua ? '<small>' + hora + '</small>' : '') +
+    '</div></div>'
   );
 }
 
@@ -1252,6 +1352,7 @@ function _caixaEnviandoHTML(c) {
   const itens = _caixaEnviando.filter((it) => it.conv === c.id && !caixaEnvioJaChegou(c, it));
   if (!itens.length) return '';
   const whats = c.canal === 'whatsapp';
+  const eu = (typeof getUser === 'function' ? getUser() || {} : {}).name || '';
   return itens
     .map((it) => {
       const nota = it.kind === 'internal';
@@ -1260,13 +1361,22 @@ function _caixaEnviandoHTML(c) {
         (it.arquivo ? '<div class="cx-corpo">📎 ' + escapeHtml(it.arquivo) + '</div>' : '');
       const status = '<small class="cx-enviando-st">Enviando…</small>';
       if (whats) {
+        const lado = nota ? 'nota' : 'out';
         return (
-          '<div class="cx-bubble cx-enviando ' +
-          (nota ? 'cx-bubble-nota' : 'cx-bubble-out') +
-          '">' +
+          '<div class="cx-msg cx-msg-' +
+          lado +
+          ' cx-enviando">' +
+          caixaAvatarMsgHTML(c, { direcao: nota ? 'interna' : 'saida', de: eu }, eu || 'Você') +
+          '<div class="cx-bubble cx-bubble-' +
+          lado +
+          '"><div class="cx-bubble-topo"><b class="cx-bubble-autor">' +
+          escapeHtml(eu || 'Você') +
+          '</b>' +
+          (nota ? '<span class="cx-bubble-nota-tag">Nota interna</span>' : '') +
+          '</div>' +
           corpo +
           status +
-          '</div>'
+          '</div></div>'
         );
       }
       return (
