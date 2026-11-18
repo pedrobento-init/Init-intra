@@ -57,6 +57,7 @@ import {
 import {
   aplicarEmail,
   backupAlerta,
+  falhaJaTratada,
   briefingDados,
   briefingHtml,
   briefingTemConteudo,
@@ -441,8 +442,8 @@ async function backups(db: SupabaseClient, input: { mensagens?: unknown }) {
   const agora = new Date();
   const abertas = [...mons.values()].map((m) => m.pendencia_id).filter(Boolean) as string[];
   const { data: pens } = abertas.length
-    ? await db.from('pendencias').select('id, status').in('id', abertas)
-    : { data: [] as { id: string; status: string }[] };
+    ? await db.from('pendencias').select('id, status, created_at').in('id', abertas)
+    : { data: [] as { id: string; status: string; created_at: string | null }[] };
   const fechada = (id: string) => {
     const p = (pens || []).find((x) => x.id === id);
     return !p || ['concluido', 'resolvido', 'cancelado', 'fechado'].includes(String(p.status));
@@ -451,6 +452,14 @@ async function backups(db: SupabaseClient, input: { mensagens?: unknown }) {
   for (const m of mons.values()) {
     const a = backupAlerta(m, agora);
     if (!a || (m.pendencia_id && !fechada(m.pendencia_id))) continue;
+    if (
+      a.tipo === 'falha' &&
+      falhaJaTratada(
+        m,
+        (pens || []).find((x) => x.id === m.pendencia_id)
+      )
+    )
+      continue;
     const pen = pendenciaDoAlerta(m, a, 'PEN-' + crypto.randomUUID(), agora);
     const { error } = await db.from('pendencias').insert(pen);
     if (error) {

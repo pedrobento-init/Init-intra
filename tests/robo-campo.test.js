@@ -4,6 +4,7 @@ import {
   aplicarEmail,
   assuntoLimpo,
   backupAlerta,
+  falhaJaTratada,
   briefingDados,
   briefingHtml,
   briefingTemConteudo,
@@ -256,6 +257,55 @@ describe('backup por e-mail', () => {
     ).toEqual({ tipo: 'silencio', horas: 72 });
     expect(backupAlerta({ ...mons[0], created_at: '2026-10-21T00:00:00Z' }, agora)).toBeNull();
     expect(backupAlerta({ ...mons[2], ultimo_status: 'falha' }, agora)).toBeNull();
+  });
+  it('so_erro: rotina que só manda e-mail quando falha NÃO alerta por silêncio (Iperius semanal)', () => {
+    const agora = new Date('2026-10-21T12:00:00Z');
+    const iperius = { ...mons[0], nome: 'Iperius - Semanal', so_erro: true, max_horas: 48 };
+    // 97 h calado: era o alerta "Backup sem notícia há 97 h" de um backup saudável
+    expect(
+      backupAlerta({ ...iperius, ultimo_status: 'ok', ultimo_em: '2026-10-17T11:00:00Z' }, agora)
+    ).toBeNull();
+    // nunca mandou nada e foi criado há dias: também é normal
+    expect(backupAlerta({ ...iperius, created_at: '2026-10-01T00:00:00Z' }, agora)).toBeNull();
+    // a falha continua valendo
+    expect(
+      backupAlerta({ ...iperius, ultimo_status: 'falha', ultimo_em: '2026-10-21T08:00:00Z' }, agora)
+    ).toEqual({ tipo: 'falha' });
+    // sem a marca, o comportamento de antes se mantém
+    expect(
+      backupAlerta(
+        { ...iperius, so_erro: false, ultimo_status: 'ok', ultimo_em: '2026-10-17T11:00:00Z' },
+        agora
+      )
+    ).toEqual({ tipo: 'silencio', horas: 97 });
+  });
+  it('so_erro: a falha vira uma pendência só — fechar a pendência não faz o robô abrir outra', () => {
+    const m = {
+      ...mons[0],
+      so_erro: true,
+      ultimo_status: 'falha',
+      ultimo_em: '2026-10-20T08:00:00Z',
+      pendencia_id: 'PEN-1',
+    };
+    // pendência aberta DEPOIS do e-mail de falha, mesmo fechada: já foi tratada
+    expect(falhaJaTratada(m, { created_at: '2026-10-20T09:00:00Z' })).toBe(true);
+    // pendência apagada à mão: também tratada, não reabre
+    expect(falhaJaTratada(m, undefined)).toBe(true);
+    // falha NOVA, mais recente que a pendência antiga: abre outra
+    expect(
+      falhaJaTratada(
+        { ...m, ultimo_em: '2026-10-27T08:00:00Z' },
+        { created_at: '2026-10-20T09:00:00Z' }
+      )
+    ).toBe(false);
+    // nunca abriu pendência para essa falha
+    expect(falhaJaTratada({ ...m, pendencia_id: null }, undefined)).toBe(false);
+    // só vale para monitor so_erro: o comportamento dos demais não muda
+    expect(falhaJaTratada({ ...m, so_erro: false }, { created_at: '2026-10-20T09:00:00Z' })).toBe(
+      false
+    );
+    // data ilegível: na dúvida, não abre pendência em loop
+    expect(falhaJaTratada(m, { created_at: 'lixo' })).toBe(true);
   });
   it('pendência automática com os valores válidos da 056', () => {
     const p = pendenciaDoAlerta(
