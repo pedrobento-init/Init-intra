@@ -87,3 +87,29 @@ test('central operacional exibe alerta e abre a pendência', async ({ page }) =>
   await expect(page).toHaveURL(/#projetos\/PEN-1$/);
   await expect(page.locator('#contentArea')).toContainText('Cabeamento estruturado');
 });
+
+test('central operacional: Meus/Equipe e filtro por categoria', async ({ page }) => {
+  await loginLocal(page, { hash: 'dashboard' });
+  const central = page.locator('section[aria-labelledby="ov-central"]');
+  const meus = central.getByRole('button', { name: /^Meus/ });
+  const equipe = central.getByRole('button', { name: /^Equipe/ });
+  await expect(meus).toHaveAttribute('aria-pressed', 'true');
+
+  // O cartão "Prazos" filtra a lista e só ele fica ativo.
+  const prazos = central.getByRole('button', { name: /Prazos/ });
+  await prazos.click();
+  const prazosDepois = central.getByRole('button', { name: /Prazos/ });
+  await expect(prazosDepois).toHaveAttribute('aria-pressed', 'true');
+  await expect(central.locator('.ov-it').first()).toContainText('Pendência');
+
+  // Equipe nunca mostra menos que Meus, e a escolha não zera a lista.
+  await equipe.click();
+  await expect(central.getByRole('button', { name: /^Equipe/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  const n = (txt) => Number((txt.match(/(\d+)\s*$/) || [])[1]);
+  const nMeus = n(await central.getByRole('button', { name: /^Meus/ }).innerText());
+  const nEquipe = n(await central.getByRole('button', { name: /^Equipe/ }).innerText());
+  expect(nEquipe).toBeGreaterThanOrEqual(nMeus);
+});

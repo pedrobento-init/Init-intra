@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { buildOperationalCenter, buildVisitMetrics } = require('../js/operacional.js');
+const {
+  buildOperationalCenter,
+  buildVisitMetrics,
+  operationalCenterIsMine,
+  operationalCenterView,
+  OPERATIONAL_GROUPS,
+} = require('../js/operacional.js');
 const { visitDurationMinutes } = require('../js/relatorio-cliente.js');
 globalThis.visitDurationMinutes = visitDurationMinutes;
 
@@ -175,6 +181,134 @@ describe('indicadores de visitas', () => {
       topOperator: ['Ana', 2],
       topClient: ['A', 2],
       recurrentClients: 1,
+    });
+  });
+});
+
+describe('central operacional: escopo, categorias e filtro', () => {
+  const now = new Date(2026, 10, 3, 12, 0);
+  const pen = (id, extra) => ({
+    id,
+    status: 'aberto',
+    deadline: '2026-11-02',
+    clientName: 'C' + id,
+    ...extra,
+  });
+
+  it('não corta em 30: o contador mostra todos os alertas', () => {
+    const pens = Array.from({ length: 45 }, (_, i) => pen('p' + i, { responsible: 'Ana' }));
+    expect(buildOperationalCenter([], pens, {}, now)).toHaveLength(45);
+  });
+
+  it('cada alerta sai com categoria, gravidade e responsável', () => {
+    const [prazo] = buildOperationalCenter(
+      [],
+      [pen('p1', { responsible: 'Ana', responsibleId: 'OP-1' })],
+      {},
+      now
+    );
+    expect(prazo).toMatchObject({ group: 'prazos', sev: 0, owner: 'Ana', ownerId: 'OP-1' });
+
+    const [relatorio] = buildOperationalCenter(
+      [{ id: 'v1', status: 'concluida', relatorio: '', operator: 'Bia', operatorId: 'OP-2' }],
+      [],
+      {},
+      now
+    );
+    expect(relatorio).toMatchObject({ group: 'visitas', owner: 'Bia', ownerId: 'OP-2' });
+  });
+
+  it('todo tipo de alerta cai numa das categorias dos cartões', () => {
+    const ids = OPERATIONAL_GROUPS.map((g) => g.id);
+    const itens = buildOperationalCenter(
+      [
+        { id: 'v1', clientId: 'c1', status: 'concluida', relatorio: '' },
+        {
+          id: 'v2',
+          clientId: 'c2',
+          status: 'em_andamento',
+          checkinAt: new Date(2026, 10, 3, 6, 0).toISOString(),
+        },
+      ],
+      [
+        pen('p1'),
+        pen('p2', { deadline: '2026-11-03T20:00:00', updatedAt: '2026-10-01T00:00:00Z' }),
+      ],
+      {},
+      now
+    );
+    expect(itens.length).toBeGreaterThan(3);
+    for (const i of itens) expect(ids).toContain(i.group);
+  });
+
+  describe('operationalCenterIsMine', () => {
+    it('compara por id quando os dois lados têm id', () => {
+      expect(operationalCenterIsMine({ ownerId: 'OP-1', owner: 'Ana' }, { opId: 'OP-1' })).toBe(
+        true
+      );
+      // Mesmo nome, id diferente: é outra pessoa.
+      expect(
+        operationalCenterIsMine({ ownerId: 'OP-9', owner: 'Ana' }, { opId: 'OP-1', name: 'Ana' })
+      ).toBe(false);
+    });
+
+    it('sem id, compara pelo nome', () => {
+      expect(operationalCenterIsMine({ owner: 'Ana' }, { name: 'Ana' })).toBe(true);
+      expect(operationalCenterIsMine({ owner: 'Bia' }, { name: 'Ana' })).toBe(false);
+    });
+
+    it('sem responsável não é de ninguém (aparece só na equipe)', () => {
+      expect(operationalCenterIsMine({ owner: '', ownerId: '' }, { opId: 'OP-1', name: '' })).toBe(
+        false
+      );
+    });
+
+    it('conflito de agenda é dos dois operadores', () => {
+      const item = { owner: 'Ana', owner2: 'Bia' };
+      expect(operationalCenterIsMine(item, { name: 'Bia' })).toBe(true);
+      expect(operationalCenterIsMine(item, { name: 'Ana' })).toBe(true);
+      expect(operationalCenterIsMine(item, { name: 'Caio' })).toBe(false);
+    });
+  });
+
+  describe('operationalCenterView', () => {
+    const itens = [
+      { group: 'prazos', owner: 'Ana' },
+      { group: 'prazos', owner: 'Ana' },
+      { group: 'visitas', owner: 'Ana' },
+      { group: 'prazos', owner: 'Bia' },
+      { group: 'respostas', owner: 'Bia' },
+    ];
+    const ana = { name: 'Ana' };
+
+    it('Meus mostra só os do operador; Equipe mostra todos', () => {
+      const meus = operationalCenterView(itens, { escopo: 'meus', grupo: 'todos' }, ana);
+      expect(meus.scoped).toHaveLength(3);
+      expect([meus.mine, meus.team]).toEqual([3, 5]);
+      const equipe = operationalCenterView(itens, { escopo: 'equipe', grupo: 'todos' }, ana);
+      expect(equipe.scoped).toHaveLength(5);
+    });
+
+    it('os contadores por categoria seguem o escopo, não o total', () => {
+      const v = operationalCenterView(itens, { escopo: 'meus', grupo: 'todos' }, ana);
+      expect(v.counts).toEqual({ todos: 3, prazos: 2, respostas: 0, visitas: 1, acompanhar: 0 });
+    });
+
+    it('o filtro de categoria restringe a lista exibida', () => {
+      const v = operationalCenterView(itens, { escopo: 'equipe', grupo: 'prazos' }, ana);
+      expect(v.shown).toHaveLength(3);
+      expect(v.shown.every((i) => i.group === 'prazos')).toBe(true);
+    });
+
+    it('categoria sem item no escopo atual volta para todos (não deixa a lista vazia)', () => {
+      // Estava filtrando "respostas" na Equipe e trocou para Meus, onde não há nenhuma.
+      const v = operationalCenterView(itens, { escopo: 'meus', grupo: 'respostas' }, ana);
+      expect(v.grupo).toBe('todos');
+      expect(v.shown).toHaveLength(3);
+    });
+
+    it('escopo desconhecido cai em Meus', () => {
+      expect(operationalCenterView(itens, { escopo: 'x' }, ana).escopo).toBe('meus');
     });
   });
 });

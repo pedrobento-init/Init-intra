@@ -1,5 +1,33 @@
 // Central operacional: problemas que pedem ação e indicadores das visitas.
 
+// Teto de segurança do cálculo (não da tela): a lista rola por dentro.
+const OPERATIONAL_MAX_ITEMS = 300;
+
+// Categorias dos cartões de resumo, na ordem em que aparecem.
+const OPERATIONAL_GROUPS = [
+  { id: 'prazos', label: 'Prazos' },
+  { id: 'respostas', label: 'Respostas' },
+  { id: 'visitas', label: 'Visitas' },
+  { id: 'acompanhar', label: 'Acompanhar' },
+];
+const OPERATIONAL_GROUP_BY_KIND = {
+  prazo: 'prazos',
+  prazo_proximo: 'prazos',
+  resposta_solicitante: 'respostas',
+  milvus: 'visitas',
+  relatorio: 'visitas',
+  atraso: 'visitas',
+  andamento: 'visitas',
+  conflito: 'visitas',
+  deslocamento: 'visitas',
+  parada: 'acompanhar',
+  reincidencia: 'acompanhar',
+};
+
+// Estado da tela (só em memória: ao recarregar volta para "Meus" / "Todos").
+let _opcState = { escopo: 'meus', grupo: 'todos' };
+let _opcItems = [];
+
 function buildOperationalCenter(visits, pendencias, statusCache, now) {
   const at = now instanceof Date ? now : new Date(now || Date.now());
   const today =
@@ -61,6 +89,8 @@ function buildOperationalCenter(visits, pendencias, statusCache, now) {
         visitId: v.id,
         title: 'Operadores no mesmo cliente e horário',
         detail: v.clientName + ' · ' + (v.operator || '—') + ' e ' + (other.operator || '—'),
+        owner2: other.operator || '',
+        owner2Id: other.operatorId || '',
       });
     }
   }
@@ -100,7 +130,9 @@ function buildOperationalCenter(visits, pendencias, statusCache, now) {
       .trim();
   for (const p of pendencias || []) {
     if (!p || closed.has(p.status)) continue;
-    const detail = p.clientName || p.assunto;
+    // Cliente + assunto: numa lista longa, só o cliente repetia a mesma linha
+    // dezenas de vezes e não dava para saber qual pendência era qual.
+    const detail = [p.clientName, p.assunto].filter(Boolean).join(' · ');
     if (p.deadline && String(p.deadline).slice(0, 10) < today) {
       items.push({ kind: 'prazo', pendenciaId: p.id, title: 'Pendência vencida', detail });
     } else if (p.deadline) {
@@ -192,13 +224,28 @@ function buildOperationalCenter(visits, pendencias, statusCache, now) {
     parada: 2,
     reincidencia: 2,
   };
+  const visitById = new Map((visits || []).filter(Boolean).map((v) => [v.id, v]));
+  const penById = new Map((pendencias || []).filter(Boolean).map((p) => [p.id, p]));
+  // Categoria, gravidade e responsável vão no item para a tela filtrar sem
+  // reabrir os registros. Sem o corte antigo de 30: ele escondia alerta em
+  // silêncio e o contador mentia; quem limita agora é a altura da lista.
+  const decorate = (item) => {
+    const rec = item.visitId ? visitById.get(item.visitId) : penById.get(item.pendenciaId);
+    return {
+      ...item,
+      group: OPERATIONAL_GROUP_BY_KIND[item.kind] || 'acompanhar',
+      sev: severity[item.kind] ?? 2,
+      owner: (rec && (item.visitId ? rec.operator : rec.responsible)) || '',
+      ownerId: (rec && (item.visitId ? rec.operatorId : rec.responsibleId)) || '',
+    };
+  };
   return items
     .map((item, index) => ({ item, index }))
     .sort(
       (a, b) => (severity[a.item.kind] ?? 2) - (severity[b.item.kind] ?? 2) || a.index - b.index
     )
-    .slice(0, 30)
-    .map((entry) => entry.item);
+    .slice(0, OPERATIONAL_MAX_ITEMS)
+    .map((entry) => decorate(entry.item));
 }
 
 function buildVisitMetrics(visits, ym) {
@@ -229,43 +276,160 @@ function buildVisitMetrics(visits, ym) {
   };
 }
 
+// O alerta é "meu" quando o responsável sou eu (por id; sem id, pelo nome).
+// Conflito de agenda envolve dois operadores: vale para os dois.
+function operationalCenterIsMine(item, who) {
+  const w = who || {};
+  const same = (id, name) => {
+    if (id && w.opId) return id === w.opId;
+    const n = String(name || '').trim();
+    return n !== '' && n === String(w.name || '').trim();
+  };
+  return same(item.ownerId, item.owner) || same(item.owner2Id, item.owner2);
+}
+
+// Tudo que a tela precisa, sem DOM: separa por escopo, conta por categoria e
+// aplica o filtro. Categoria sem item no escopo atual volta para "todos".
+function operationalCenterView(items, state, who) {
+  const all = items || [];
+  const mine = all.filter((i) => operationalCenterIsMine(i, who));
+  const escopo = state && state.escopo === 'equipe' ? 'equipe' : 'meus';
+  const scoped = escopo === 'meus' ? mine : all;
+  const counts = { todos: scoped.length };
+  for (const g of OPERATIONAL_GROUPS) counts[g.id] = scoped.filter((i) => i.group === g.id).length;
+  const grupo = state && counts[state.grupo] ? state.grupo : 'todos';
+  const shown = grupo === 'todos' ? scoped : scoped.filter((i) => i.group === grupo);
+  return { escopo, grupo, mine: mine.length, team: all.length, scoped, counts, shown };
+}
+
+function _opcGroupLabel(id) {
+  const g = OPERATIONAL_GROUPS.find((x) => x.id === id);
+  return g ? g.label : id;
+}
+
+function _opcWho() {
+  const s = typeof getSession === 'function' ? getSession() : null;
+  if (s) return { opId: s.opId, name: s.name };
+  const u = typeof getUser === 'function' ? getUser() : null;
+  return { opId: '', name: (u && u.name) || '' };
+}
+
 function operationalCenterHtml(items) {
+  _opcItems = items || [];
+  const v = operationalCenterView(_opcItems, _opcState, _opcWho());
+  const plural = (n) => n + ' ' + (n === 1 ? 'alerta' : 'alertas');
+  const seg = (id, label, n) =>
+    '<button type="button" class="opc-seg-btn" aria-pressed="' +
+    (v.escopo === id) +
+    '" data-action="operacionalEscopo" data-arg="' +
+    id +
+    '">' +
+    label +
+    ' <b>' +
+    n +
+    '</b></button>';
+  const card = (id, label) =>
+    '<button type="button" class="opc-card' +
+    (v.grupo === id ? ' is-on' : '') +
+    '" aria-pressed="' +
+    (v.grupo === id) +
+    '"' +
+    (v.counts[id] ? '' : ' disabled') +
+    ' data-action="operacionalGrupo" data-arg="' +
+    id +
+    '"><span class="opc-n">' +
+    v.counts[id] +
+    '</span><span class="opc-l">' +
+    label +
+    '</span></button>';
+  const row = (item) =>
+    '<li class="ov-it" role="button" tabindex="0" data-action="operacionalAbrir" data-kind="' +
+    (item.visitId ? 'visita' : 'pendencia') +
+    '" data-arg="' +
+    escapeHtml(item.visitId || item.pendenciaId) +
+    '">' +
+    '<div class="u-3922d3"><div class="ov-tt"><i class="opc-dot opc-dot--s' +
+    (item.sev ?? 2) +
+    '" aria-hidden="true"></i>' +
+    escapeHtml(item.title) +
+    '</div><div class="ov-mt"><span>' +
+    escapeHtml(item.detail || '') +
+    '</span>' +
+    (v.escopo === 'equipe' && item.owner
+      ? '<span class="opc-own">Resp.: ' + escapeHtml(item.owner) + '</span>'
+      : '') +
+    '</div></div><span class="ov-warn">Revisar</span></li>';
+
+  let corpo;
+  if (!_opcItems.length) {
+    corpo = '<p class="ov-empty">Nenhum problema operacional encontrado.</p>';
+  } else if (!v.scoped.length) {
+    corpo =
+      '<p class="ov-empty">Nenhum alerta seu. Há ' +
+      plural(v.team) +
+      ' na equipe. <button type="button" class="link-btn" data-action="operacionalEscopo" data-arg="equipe">Ver a equipe</button></p>';
+  } else {
+    corpo =
+      '<ul class="ov-ls ov-operational-list opc-list">' +
+      v.shown.map(row).join('') +
+      '</ul>' +
+      '<div class="opc-foot">' +
+      plural(v.shown.length) +
+      (v.grupo === 'todos' ? '' : ' em ' + _opcGroupLabel(v.grupo)) +
+      '</div>';
+  }
   return (
-    '<section class="card dash-widget ov-panel" aria-labelledby="ov-central">' +
+    '<section class="card dash-widget ov-panel opc" aria-labelledby="ov-central">' +
     '<div class="ov-ph"><h2 class="ov-h2" id="ov-central">Central operacional</h2><span class="ov-sub">' +
-    items.length +
-    ' ' +
-    (items.length === 1 ? 'alerta' : 'alertas') +
+    plural(v.scoped.length) +
     '</span></div>' +
-    (items.length
-      ? '<ul class="ov-ls ov-operational-list">' +
-        items
-          .map((item) => {
-            return (
-              '<li class="ov-it" role="button" tabindex="0" data-action="operacionalAbrir" data-kind="' +
-              (item.visitId ? 'visita' : 'pendencia') +
-              '" data-arg="' +
-              escapeHtml(item.visitId || item.pendenciaId) +
-              '">' +
-              '<div class="u-3922d3"><div class="ov-tt">' +
-              escapeHtml(item.title) +
-              '</div><div class="ov-mt"><span>' +
-              escapeHtml(item.detail || '') +
-              '</span></div></div><span class="ov-warn">Revisar</span></li>'
-            );
-          })
-          .join('') +
-        '</ul>'
-      : '<p class="ov-empty">Nenhum problema operacional encontrado.</p>') +
+    (_opcItems.length
+      ? '<div class="opc-seg" role="group" aria-label="Escopo">' +
+        seg('meus', 'Meus', v.mine) +
+        seg('equipe', 'Equipe', v.team) +
+        '</div>' +
+        '<div class="opc-cards" role="group" aria-label="Categorias">' +
+        card('todos', 'Todos') +
+        OPERATIONAL_GROUPS.map((g) => card(g.id, g.label)).join('') +
+        '</div>'
+      : '') +
+    corpo +
     '</section>'
   );
+}
+
+// Redesenha só a Central (sem refazer o dashboard) e devolve o foco ao botão
+// clicado, que o outerHTML destrói.
+function _opcRedraw(focusAction, focusArg) {
+  const el = document.querySelector('section[aria-labelledby="ov-central"]');
+  if (!el) return;
+  el.outerHTML = operationalCenterHtml(_opcItems);
+  const novo = document.querySelector(
+    '[data-action="' + focusAction + '"][data-arg="' + focusArg + '"]'
+  );
+  if (novo && typeof novo.focus === 'function') novo.focus();
 }
 
 if (typeof registerActions === 'function')
   registerActions({
     operacionalAbrir: (el, id) =>
       el.dataset.kind === 'visita' ? openVisitDetail(id) : openPendenciaDetail(id),
+    operacionalEscopo: (_el, escopo) => {
+      _opcState = { escopo: escopo === 'equipe' ? 'equipe' : 'meus', grupo: 'todos' };
+      _opcRedraw('operacionalEscopo', _opcState.escopo);
+    },
+    operacionalGrupo: (_el, grupo) => {
+      // Clicar na categoria já ativa volta para "todos".
+      _opcState = { ..._opcState, grupo: _opcState.grupo === grupo ? 'todos' : grupo };
+      _opcRedraw('operacionalGrupo', _opcState.grupo === 'todos' ? 'todos' : grupo);
+    },
   });
 
 if (typeof module !== 'undefined' && module.exports)
-  module.exports = { buildOperationalCenter, buildVisitMetrics };
+  module.exports = {
+    buildOperationalCenter,
+    buildVisitMetrics,
+    operationalCenterIsMine,
+    operationalCenterView,
+    OPERATIONAL_GROUPS,
+  };
