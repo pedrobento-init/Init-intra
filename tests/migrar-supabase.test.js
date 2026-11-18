@@ -52,6 +52,10 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(codigo).toMatch(/\$buckets -gt 0/);
   });
 
+  it('não restaura DEFAULT ACL: o papel postgres não pode alterá-los (permission denied)', () => {
+    expect(codigo).toMatch(/grep -v -E '[^']*\| DEFAULT ACL '/);
+  });
+
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
     expect(codigo).toMatch(/\[string\]\$Etapa = 'exportar'/);
   });

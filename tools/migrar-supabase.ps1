@@ -170,8 +170,12 @@ try {
         Docker-Pg "$comuns --data-only /out/storage-buckets.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
       }
       Write-Host 'Importando o esquema public e os dados...' -ForegroundColor Cyan
-      # O schema public ja existe no projeto novo: tira só a linha que o cria.
-      Docker-Pg "pg_restore -l /out/public.dump | grep -v -E ' SCHEMA - public( |`$)' > /tmp/toc && $comuns -L /tmp/toc /out/public.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      # Do que vai ser restaurado, saem duas coisas:
+      #  - a linha que cria o schema public (ele já existe no projeto novo);
+      #  - os DEFAULT ACL: são ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin,
+      #    que o papel postgres não pode executar (permission denied) e que todo
+      #    projeto Supabase novo já traz de fábrica.
+      Docker-Pg "pg_restore -l /out/public.dump | grep -v -E ' SCHEMA - public( |`$)| DEFAULT ACL ' > /tmp/toc && $comuns -L /tmp/toc /out/public.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
       Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
 
       $publicacao = Join-Path $Pasta 'publicacao.txt'
