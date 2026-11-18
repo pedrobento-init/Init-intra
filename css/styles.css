@@ -6944,6 +6944,15 @@ body.dark-theme .cx {
   font-weight: 600;
   color: var(--cx-tx);
 }
+/* Foto de perfil por cima das iniciais: se não carregar, as iniciais aparecem. */
+.cx-av-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .cx-av-md {
   width: 46px;
   height: 46px;

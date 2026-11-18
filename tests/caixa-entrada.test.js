@@ -944,3 +944,57 @@ describe('caixaEnviarMensagem', () => {
     expect(toasts[0]).toEqual(['Não foi possível concluir: Conversa não encontrada', 'error']);
   });
 });
+
+describe('foto de perfil do contato', () => {
+  const FOTO = 'https://pps.whatsapp.net/v/foto.jpg?oh=1&oe=2';
+
+  it('a conversa usa a foto da mensagem mais recente que tem uma', () => {
+    const c = s.caixaAgruparConversas([
+      entrada({
+        id: 'A',
+        recebidoEm: '2026-10-26T10:00:00.000Z',
+        fotoUrl: 'https://x.test/velha.jpg',
+      }),
+      entrada({ id: 'B', recebidoEm: '2026-10-26T11:00:00.000Z', fotoUrl: FOTO }),
+      entrada({ id: 'C', recebidoEm: '2026-10-26T12:00:00.000Z' }),
+    ]);
+    expect(c[0].fotoUrl).toBe(FOTO);
+  });
+
+  it('desenha a imagem por cima das iniciais, com a URL escapada', () => {
+    const html = s.caixaFotoHTML({ fotoUrl: FOTO });
+    expect(html).toContain('class="cx-av-img"');
+    expect(html).toContain('src="https://pps.whatsapp.net/v/foto.jpg?oh=1&amp;oe=2"');
+    expect(html).toContain('referrerpolicy="no-referrer"');
+  });
+
+  it.each([
+    ['sem foto', undefined],
+    ['http puro', 'http://x.test/a.jpg'],
+    ['javascript:', 'javascript:alert(1)'],
+    ['data:', 'data:image/svg+xml;base64,PHN2Zz4='],
+    ['aspas que fecham o atributo', 'https://x.test/a.jpg" onerror="alert(1)'],
+    ['espaço', 'https://x.test/a b.jpg'],
+    ['grande demais', 'https://x.test/' + 'a'.repeat(1001)],
+  ])('%s não vira <img>: cai nas iniciais', (_nome, url) => {
+    expect(s.caixaFotoHTML({ fotoUrl: url })).toBe('');
+  });
+
+  it('a foto aparece na lista, no topo da conversa e no painel de quem pediu', () => {
+    lista = [
+      entrada({
+        id: 'W1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Márcia',
+        fotoUrl: FOTO,
+        recebidoEm: '2026-10-26T10:00:00.000Z',
+      }),
+    ];
+    s.renderCaixaEntrada();
+    acoes.caixaSelecionar(null, s.caixaAgruparConversas(lista)[0].id);
+    const tudo = elementos.caixaLista.innerHTML + elementos.caixaConversa.innerHTML;
+    expect(tudo.match(/class="cx-av-img"/g).length).toBeGreaterThanOrEqual(3);
+  });
+});

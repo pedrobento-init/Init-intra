@@ -103,8 +103,11 @@ describe('whatsapp: mídia e reentrega', () => {
       }
     );
     expect(res.status).toBe(200);
-    expect(buscadas).toHaveLength(1);
-    expect(new URL(buscadas[0]).origin).toBe('https://waha.interno');
+    // A busca da foto de perfil (contacts/profile-picture) também passa pela
+    // WAHA; o que este teste trava é o download do ANEXO.
+    const anexos = buscadas.filter((u) => !u.includes('/api/contacts/profile-picture'));
+    expect(anexos).toHaveLength(1);
+    expect(new URL(anexos[0]).origin).toBe('https://waha.interno');
   });
 
   // Sem chamado aberto, a caixa é o único destino da mensagem. Se o insert

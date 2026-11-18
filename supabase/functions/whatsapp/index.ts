@@ -12,6 +12,17 @@
 //     a fila. Com cliente casado pelo telefone a linha já vem com a equipe e o
 //     cliente; sem, vai como sem_cliente na equipe padrão.
 //
+// ATENDIMENTO AUTOMÁTICO (bot.ts) — com WHATSAPP_BOT_ATIVO=1, a mensagem de um
+// número SEM chamado aberto recebe o menu de departamentos; a escolha atribui a
+// conversa (equipe + nota com o protocolo) e o que não dá para ler vai para um
+// humano depois de duas tentativas. Número com chamado aberto nunca recebe o
+// menu: já é atendimento em curso. A resposta só sai DEPOIS de a mensagem estar
+// gravada na caixa, e falha de envio só vai para o log.
+//
+// FOTO — a foto de perfil do contato (WAHA) é guardada em whatsapp_conversas e
+// copiada para a linha da caixa, e renovada a cada 24h (a URL do CDN expira).
+// Sem a migration 085 nada disso roda e a mensagem entra normalmente.
+//
 // AUTENTICAÇÃO — auth "none" + token na query, e verify_jwt = false no
 // config.toml. O WAHA não manda JWT do Supabase; o webhook usa o token na URL
 // cadastrada no painel (…/whatsapp?token=…). O token é comparado em tempo
@@ -44,7 +55,15 @@ import {
   PEN_FECHADOS,
   tempoConstante,
 } from './mensagem.ts';
-import { mensagensDoWebhook } from './provedor.ts';
+import {
+  decidirBot,
+  EQUIPE_DO_SETOR,
+  ESTADO_VAZIO,
+  type EstadoBot,
+  gerarProtocolo,
+  notaDaAtribuicao,
+} from './bot.ts';
+import { enviarTexto, fotoDoContato, mensagensDoWebhook } from './provedor.ts';
 
 type ClienteFone = {
   id: string;
@@ -242,7 +261,7 @@ async function baixarMidia(m: MensagemWhats) {
 function colunaDoPortalAusente(error: { code?: string; message?: string }): boolean {
   if (error.code === '42703' || error.code === 'PGRST204') return true;
   const msg = error.message || '';
-  return /(direcao|media)/.test(msg) && /does not exist|schema cache/i.test(msg);
+  return /(direcao|media|foto_url)/.test(msg) && /does not exist|schema cache/i.test(msg);
 }
 
 async function guardarNaCaixa(
@@ -254,7 +273,8 @@ async function guardarNaCaixa(
     pendenciaId?: string | null;
     clientId?: string | null;
     team?: string | null;
-  }
+  },
+  extra: { foto_url?: string | null; atribuicao_nota?: string | null } = {}
 ): Promise<boolean> {
   const linha = {
     ...entradaDaCaixa(entradaDe(m), opcoes, 'ETR-' + crypto.randomUUID()),
@@ -262,19 +282,96 @@ async function guardarNaCaixa(
     telefone: m.telefone,
     direcao: 'entrada',
     media: await baixarMidia(m),
+    ...(extra.foto_url ? { foto_url: extra.foto_url } : {}),
+    ...(extra.atribuicao_nota ? { atribuicao_nota: extra.atribuicao_nota } : {}),
   };
-  const { error } = await db.from('emails_triagem').insert(linha);
+  let { error } = await db.from('emails_triagem').insert(linha);
   if (!error || error.code === '23505') return true;
+  // Só a 085 falta: tira a foto e mantém direcao/media, que são da 082.
+  if (linha.foto_url && /foto_url/.test(error.message || '')) {
+    const { foto_url: _foto, ...semFoto } = linha;
+    console.warn(`whatsapp caixa ${m.id}: migration 085 não aplicada, gravando sem foto`);
+    ({ error } = await db.from('emails_triagem').insert(semFoto));
+    if (!error || error.code === '23505') return true;
+  }
   if (colunaDoPortalAusente(error)) {
     console.warn(`whatsapp caixa ${m.id}: migration 082 não aplicada, gravando sem direcao/media`);
     const { direcao: _direcao, media: _media, ...semPortal } = linha;
-    const { error: erroAntigo } = await db.from('emails_triagem').insert(semPortal);
+    let { error: erroAntigo } = await db.from('emails_triagem').insert(semPortal);
     if (!erroAntigo || erroAntigo.code === '23505') return true;
+    // Banco antigo de verdade, sem 082 nem 085: a foto também fica de fora.
+    if (semPortal.foto_url && /foto_url/.test(erroAntigo.message || '')) {
+      const { foto_url: _foto, ...semNada } = semPortal;
+      ({ error: erroAntigo } = await db.from('emails_triagem').insert(semNada));
+      if (!erroAntigo || erroAntigo.code === '23505') return true;
+    }
     console.error(`whatsapp caixa ${m.id} (a mensagem NÃO apareceu na caixa):`, erroAntigo.message);
     return false;
   }
   console.error(`whatsapp caixa ${m.id} (a mensagem NÃO apareceu na caixa):`, error.message);
   return false;
+}
+
+type LinhaConversa = {
+  ultima_em: string | null;
+  bot_etapa: string | null;
+  bot_setor: string | null;
+  bot_tentativas: number | null;
+  bot_protocolo: string | null;
+  foto_url: string | null;
+  foto_em: string | null;
+};
+
+const FOTO_VALIDADE_MS = 24 * 60 * 60 * 1000;
+
+// Lê o estado do número ANTES do upsert de ultima_em: é essa data antiga que
+// diz se a conversa é nova. `ok: false` = banco sem a 085; o bot e a foto
+// ficam desligados para a mensagem, que entra na caixa do mesmo jeito.
+async function lerConversa(
+  db: SupabaseClient,
+  telefone: string
+): Promise<{ ok: boolean; linha: LinhaConversa | null }> {
+  const { data, error } = await db
+    .from('whatsapp_conversas')
+    .select('ultima_em, bot_etapa, bot_setor, bot_tentativas, bot_protocolo, foto_url, foto_em')
+    .eq('telefone', telefone)
+    .maybeSingle();
+  if (error) {
+    console.warn('whatsapp: estado do bot indisponível (migration 085?):', error.message);
+    return { ok: false, linha: null };
+  }
+  return { ok: true, linha: (data as LinhaConversa | null) || null };
+}
+
+function estadoDe(l: LinhaConversa | null): EstadoBot {
+  if (!l || !l.bot_etapa) return ESTADO_VAZIO;
+  return {
+    etapa: l.bot_etapa === 'atribuido' ? 'atribuido' : 'aguardando_setor',
+    setor: (l.bot_setor as EstadoBot['setor']) || null,
+    tentativas: Number(l.bot_tentativas) || 0,
+    protocolo: l.bot_protocolo || null,
+  };
+}
+
+// Renova a foto no máximo uma vez por dia por número. Devolve a URL a usar
+// (a nova, ou a que já estava guardada se a WAHA não respondeu).
+async function fotoAtual(
+  db: SupabaseClient,
+  telefone: string,
+  linha: LinhaConversa | null,
+  cred: { baseUrl: string; apiKey: string; session: string }
+): Promise<string | null> {
+  const guardada = linha?.foto_url || null;
+  if (!cred.baseUrl || !cred.apiKey) return guardada;
+  const em = linha?.foto_em ? Date.parse(linha.foto_em) : NaN;
+  if (Number.isFinite(em) && Date.now() - em < FOTO_VALIDADE_MS) return guardada;
+  const nova = (await fotoDoContato(telefone, cred)) || null;
+  const { error } = await db
+    .from('whatsapp_conversas')
+    .update({ foto_url: nova, foto_em: new Date().toISOString() })
+    .eq('telefone', telefone);
+  if (error) console.warn('whatsapp foto:', error.message);
+  return nova;
 }
 
 async function handle(req: Request, ctx: SupabaseContext) {
@@ -303,7 +400,8 @@ async function handle(req: Request, ctx: SupabaseContext) {
     let notas = 0,
       caixa = 0,
       semCliente = 0,
-      limitadas = 0;
+      limitadas = 0,
+      bot = 0;
     const cache: { todos: ClienteFone[] | null } = { todos: null };
     for (const m of msgs) {
       const key = 'whatsapp:' + m.id;
@@ -323,6 +421,13 @@ async function handle(req: Request, ctx: SupabaseContext) {
         continue;
       }
 
+      const credWaha = {
+        baseUrl: Deno.env.get('WAHA_BASE_URL') || '',
+        apiKey: Deno.env.get('WAHA_API_KEY') || '',
+        session: Deno.env.get('WAHA_SESSION') || 'default',
+      };
+      const estadoLido = await lerConversa(db, m.telefone);
+
       // Prova, gravada só pelo servidor, de que este número falou com a empresa:
       // o whatsapp-responder recusa enviar para quem não está aqui (076). Falha
       // não segura a mensagem — o pior caso é a resposta ser recusada depois.
@@ -334,18 +439,27 @@ async function handle(req: Request, ctx: SupabaseContext) {
         );
       if (erroConversa) console.error(`whatsapp conversa ${m.id}:`, erroConversa.message);
 
+      const foto = estadoLido.ok
+        ? await fotoAtual(db, m.telefone, estadoLido.linha, credWaha)
+        : null;
+
       const aberto = await chamadoDaConversa(db, conversaDoTelefone(m.telefone));
       if (aberto) {
         const anexo = await anexarNota(db, aberto, notaDoSolicitante(entradaDe(m)));
         if (anexo.ok) {
           notas++;
           if (
-            await guardarNaCaixa(db, m, {
-              status: 'anexado',
-              pendenciaId: aberto.id,
-              clientId: aberto.client_id,
-              team: aberto.team || 'init',
-            })
+            await guardarNaCaixa(
+              db,
+              m,
+              {
+                status: 'anexado',
+                pendenciaId: aberto.id,
+                clientId: aberto.client_id,
+                team: aberto.team || 'init',
+              },
+              { foto_url: foto }
+            )
           )
             caixa++;
           continue;
@@ -359,12 +473,42 @@ async function handle(req: Request, ctx: SupabaseContext) {
 
       const c = await clienteDaMensagem(db, m.telefone, cache);
       if (!c) semCliente++;
+      const opcoesCaixa = c
+        ? { motivo: null, status: 'pendente', clientId: c.id, team: c.team || 'init' }
+        : { motivo: 'sem_cliente', status: 'pendente', team: 'init' };
+
+      // Atendimento automático: só com o secret ligado, só com o estado do
+      // número legível e só com como responder (credenciais da WAHA).
+      const agora = new Date();
+      const botLigado =
+        Deno.env.get('WHATSAPP_BOT_ATIVO') === '1' &&
+        estadoLido.ok &&
+        !!credWaha.baseUrl &&
+        !!credWaha.apiKey;
+      const decisao = botLigado
+        ? decidirBot(
+            estadoDe(estadoLido.linha),
+            m.texto,
+            agora,
+            estadoLido.linha?.ultima_em || null,
+            gerarProtocolo(agora)
+          )
+        : null;
+      const atrib = decisao?.atribuicao || null;
+      // Suporte de cliente conhecido segue a equipe dele; os demais
+      // departamentos têm a equipe definida em EQUIPE_DO_SETOR.
+      const equipe = atrib?.setor
+        ? atrib.setor === 'suporte' && c?.team
+          ? c.team
+          : EQUIPE_DO_SETOR[atrib.setor]
+        : opcoesCaixa.team;
+      const nota = atrib ? notaDaAtribuicao(atrib.setor, atrib.protocolo) : null;
+
       const ok = await guardarNaCaixa(
         db,
         m,
-        c
-          ? { motivo: null, status: 'pendente', clientId: c.id, team: c.team || 'init' }
-          : { motivo: 'sem_cliente', status: 'pendente', team: 'init' }
+        atrib ? { ...opcoesCaixa, team: equipe } : opcoesCaixa,
+        { foto_url: foto, atribuicao_nota: nota }
       );
       if (!ok) {
         // Sem chamado, a caixa é o único lugar onde a mensagem existiria.
@@ -373,9 +517,62 @@ async function handle(req: Request, ctx: SupabaseContext) {
         await db.from('avisos_enviados').delete().eq('key', key);
         throw new Error('whatsapp: mensagem ' + m.id + ' não entrou na caixa');
       }
+
+      if (decisao && (decisao.respostas.length || decisao.proximo)) {
+        // As mensagens que o cliente mandou antes de escolher (o "oi") ficaram
+        // na equipe padrão: acompanham a atribuição. updated_at é obrigatório,
+        // é por ele que o app dos operadores percebe a mudança.
+        if (atrib && equipe !== opcoesCaixa.team) {
+          const { error: erroMover } = await db
+            .from('emails_triagem')
+            .update({ team: equipe, atribuicao_nota: nota, updated_at: agora.toISOString() })
+            .eq('canal', 'whatsapp')
+            .eq('telefone', m.telefone)
+            .eq('direcao', 'entrada')
+            .eq('status', 'pendente')
+            .eq('team', opcoesCaixa.team);
+          if (erroMover) console.error(`whatsapp atribuição ${m.id}:`, erroMover.message);
+        } else if (atrib) {
+          const { error: erroNota } = await db
+            .from('emails_triagem')
+            .update({ atribuicao_nota: nota, updated_at: agora.toISOString() })
+            .eq('canal', 'whatsapp')
+            .eq('telefone', m.telefone)
+            .eq('direcao', 'entrada')
+            .eq('status', 'pendente')
+            .eq('team', opcoesCaixa.team);
+          if (erroNota) console.error(`whatsapp atribuição ${m.id}:`, erroNota.message);
+        }
+        let enviou = !decisao.respostas.length;
+        for (const texto of decisao.respostas) {
+          const envio = await enviarTexto(m.telefone, texto, credWaha);
+          if (!envio.ok) {
+            console.error(`whatsapp bot ${m.id}: envio falhou (${envio.erro})`);
+            break;
+          }
+          enviou = true;
+        }
+        // Sem envio e sem atribuição, o estado não avança: a próxima mensagem
+        // do cliente tenta mandar o menu de novo.
+        if (decisao.proximo && (enviou || atrib)) {
+          const e = decisao.proximo;
+          const { error: erroEstado } = await db
+            .from('whatsapp_conversas')
+            .update({
+              bot_etapa: e.etapa,
+              bot_setor: e.setor,
+              bot_tentativas: e.tentativas,
+              bot_protocolo: e.protocolo,
+              bot_em: agora.toISOString(),
+            })
+            .eq('telefone', m.telefone);
+          if (erroEstado) console.error(`whatsapp bot estado ${m.id}:`, erroEstado.message);
+        }
+        bot++;
+      }
       caixa++;
     }
-    return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas });
+    return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas, bot });
   } catch (err) {
     // 500 faz a WAHA reentregar; a chave de dedupe impede processar duas vezes
     // o que já passou.

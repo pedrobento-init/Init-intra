@@ -108,3 +108,36 @@ export async function enviarTexto(
   const id = typeof corpo.id === 'string' ? corpo.id.trim() : '';
   return id ? { ok: true, id } : { ok: true };
 }
+
+// URL da foto de perfil do contato, ou '' quando não há. Muita gente deixa a
+// foto visível só para contatos: a WAHA devolve null nesse caso, e a tela cai
+// nas iniciais. A URL vem do CDN do WhatsApp e expira em dias, por isso o
+// webhook renova de tempos em tempos em vez de guardar para sempre.
+//
+// Não lança e só aceita https: a URL vai parar num <img src> de quem atende.
+export async function fotoDoContato(
+  telefone: string,
+  cred: CredenciaisWaha,
+  fetchFn: FetchFn = fetch
+): Promise<string> {
+  const baseUrl = String(cred.baseUrl || '')
+    .trim()
+    .replace(/\/+$/, '');
+  const apiKey = String(cred.apiKey || '').trim();
+  const session = String(cred.session || 'default').trim() || 'default';
+  const digitos = String(telefone || '').replace(/\D/g, '');
+  if (!baseUrl || !apiKey || !digitos) return '';
+  const query = new URLSearchParams({ contactId: `${digitos}@c.us`, session });
+  try {
+    const resp = await fetchFn(`${baseUrl}/api/contacts/profile-picture?${query}`, {
+      headers: { 'X-Api-Key': apiKey },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return '';
+    const corpo = ((await resp.json()) || {}) as Record<string, unknown>;
+    const url = typeof corpo.profilePictureURL === 'string' ? corpo.profilePictureURL.trim() : '';
+    return /^https:\/\/[^\s"'<>]+$/.test(url) && url.length <= 1000 ? url : '';
+  } catch {
+    return '';
+  }
+}
