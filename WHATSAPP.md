@@ -243,6 +243,80 @@ WAHA e telefone comprido e estranho na Caixa.
 `textoDirecionando`, `TEXTO_FORA_DO_HORARIO`). Mexeu no texto, mantenha os três
 números do menu na ordem: o teste `tests/whatsapp-bot.test.js` trava isso.
 
+## 12. Filas e rodízio (migration 087)
+
+Com volume, "quem clica em Assumir primeiro" vira disputa (dois respondendo o
+mesmo cliente) ou abandono (cada um achando que o outro pegou). A 087 transforma
+a Caixa em fila: a conversa espera no departamento até alguém pegar, ou o
+rodízio entrega sozinho.
+
+**Aplicar.** No SQL Editor, depois da 085: `supabase/migrations/087_whatsapp_filas.sql`
+(confira com o `VERIFICAR` do cabeçalho). Depois, publique de novo a function
+`whatsapp`. Sem a migration nada quebra: o webhook grava a mensagem como antes e
+deixa no log `migration 087 não aplicada`; na Caixa, o "Pegar próximo" avisa que
+falta a migration.
+
+**Na fila** é a conversa com mensagem do cliente pendente e **ninguém
+responsável no ciclo aberto**. Encerrar ou descartar fecha o ciclo: se o mesmo
+número escrever de novo, a conversa volta para a fila em vez de cair em quem
+atendeu da última vez (que pode estar de folga ou ter saído). Enquanto o ciclo
+está aberto, as mensagens novas herdam o responsável.
+
+**Na Caixa** (com WhatsApp ou Todos os canais escolhidos):
+
+- chips por departamento (Suporte, Comercial, Poiesis, Sem departamento), com o
+  número de conversas **na fila** de cada um; o departamento vem da escolha no
+  menu do atendimento automático (seção 11);
+- **Na fila**: mostra só as conversas sem responsável;
+- **Pegar próximo**: a conversa mais antiga da fila vai para você. Com um
+  departamento escolhido, pega daquela fila; em "Todos", dos departamentos que
+  você atende mais as sem departamento. Quem decide é a função
+  `whatsapp_pegar_proximo`, no banco, com trava por conversa: dois cliques ao
+  mesmo tempo nunca pegam a mesma. O limite de simultâneos **não** vale aqui —
+  pegar é decisão de quem clicou;
+- **Disponível / Em pausa**: em pausa, o rodízio não manda conversa nova para
+  você (vale para este aparelho);
+- **Configurar filas** (só admin): veja abaixo.
+
+**Rodízio (opcional, por equipe).** Vem **desligado**. Em _Configurar filas_, o
+admin liga o rodízio, define o limite de atendimentos simultâneos (padrão 5) e
+marca quem atende e de quais departamentos (nenhum marcado = todos; limite
+próprio vazio = o da equipe). Quem não foi marcado nunca recebe conversa
+automaticamente, mesmo online. Com o rodízio ligado, quando uma conversa entra na
+fila (depois de o cliente escolher o departamento, nunca no meio do menu), o
+webhook entrega a quem:
+
+1. está **online**: o app manda um sinal por minuto enquanto a aba está ativa;
+   sem sinal há mais de 3 minutos, ausente (5 min sem mexer) ou em pausa, não
+   conta;
+2. atende o **departamento** da conversa (conversa sem departamento vale para
+   qualquer atendente da equipe);
+3. está **abaixo do limite** de atendimentos abertos;
+4. tem **menos atendimentos abertos**; empate vai para quem recebeu conversa há
+   mais tempo.
+
+Ninguém assim: a conversa **fica na fila** para alguém pegar. A regra está em
+`supabase/functions/whatsapp/filas.ts` (testada em `tests/whatsapp-filas.test.js`);
+a leitura e a gravação, em `distribuicao.ts`.
+
+**Onde fica cada coisa no banco.**
+
+| O quê                              | Onde                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| Departamento da conversa           | `emails_triagem.departamento`                                         |
+| Rodízio ligado e limite da equipe  | `whatsapp_filas_config` (uma linha por equipe; só admin grava)        |
+| Quem atende, departamentos, limite | `whatsapp_atendentes` (só admin grava a configuração)                 |
+| Sinal de vida do operador          | `whatsapp_atendentes.visto_em`, gravado por `whatsapp_atendente_ping` |
+
+**Quando não distribui.**
+
+| Sintoma                                 | Causa provável                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------- |
+| Log "migration 087 não aplicada"        | Rode a 087 e publique a function de novo.                                     |
+| Conversa fica na fila com gente online  | Rodízio desligado, ninguém marcado em _Configurar filas_, ou todos no limite. |
+| Operador online não aparece como online | Aba sem foco por mais de 5 min (ausente), em pausa, ou sem login no Supabase. |
+| Conversa nova caiu em quem já atendia   | O ciclo anterior não foi encerrado: a mensagem herda o responsável.           |
+
 ## Quando algo não funciona
 
 Os logs ficam no painel do Supabase: **Edge Functions → whatsapp** (ou

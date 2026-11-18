@@ -150,8 +150,12 @@ describe('whatsapp: mídia e reentrega', () => {
   // Sem a 082 o filtro falha sempre; devolver 0 desligaria o limite de vez.
   it('sem a coluna direcao, o limite conta de novo sem o filtro', async () => {
     const { queries } = await chamar(evento(), { semDirecao: true });
+    // Só as contagens do limite: as leituras das filas (087) filtram por canal.
     const contagens = queries.filter(
-      (q) => q.tabela === 'emails_triagem' && q.filtros.some(([col]) => col === 'telefone')
+      (q) =>
+        q.tabela === 'emails_triagem' &&
+        q.filtros.some(([col]) => col === 'telefone') &&
+        !q.filtros.some(([col]) => col === 'canal')
     );
     expect(contagens).toHaveLength(2);
     expect(contagens[1].filtros.some(([col]) => col === 'direcao')).toBe(false);

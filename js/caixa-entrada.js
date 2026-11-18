@@ -144,6 +144,7 @@ function caixaAgruparConversas(lista) {
         clientId: ultimoCom('clientId'),
         pendenciaId: ultimoCom('pendenciaId'),
         fotoUrl: ultimoCom('fotoUrl'),
+        departamento: ultimoCom('departamento'), // 087, js/whatsapp-filas.js
       };
     })
     .sort((a, b) => _caixaData(b.ultima).localeCompare(_caixaData(a.ultima)));
@@ -1071,7 +1072,10 @@ function renderCaixaEntrada() {
   const todas = _caixaConversas();
   // A contagem por situação respeita o canal: "Aguardando (3)" com WhatsApp
   // escolhido tem que ser 3 conversas de WhatsApp.
-  const doCanal = caixaFiltrarCanal(todas, _caixaCanal);
+  const doCanalTodos = caixaFiltrarCanal(todas, _caixaCanal);
+  // Filas por departamento (js/whatsapp-filas.js): a barra conta antes do recorte.
+  if (typeof wfilaRenderBarra === 'function') wfilaRenderBarra(doCanalTodos);
+  const doCanal = typeof wfilaFiltrar === 'function' ? wfilaFiltrar(doCanalTodos) : doCanalTodos;
   const visiveis = caixaFiltrar(doCanal, _caixaFiltro, _caixaBusca, usuario);
   // Toolbar não é remontada (perderia o foco da busca), então só as contagens
   // e os estados ativo/inativo das chips e abas são atualizados.

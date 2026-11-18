@@ -64,6 +64,7 @@ import {
   notaDaAtribuicao,
 } from './bot.ts';
 import { enviarTexto, fotoDoContato, mensagensDoWebhook, telefoneDoLid } from './provedor.ts';
+import { aplicarFilas } from './distribuicao.ts';
 
 type ClienteFone = {
   id: string;
@@ -645,6 +646,15 @@ async function handle(req: Request, ctx: SupabaseContext) {
         }
         bot++;
       }
+      // Filas (087, distribuicao.ts): departamento da conversa, responsável que
+      // já atende e rodízio. Nunca derruba a mensagem, que já está na caixa.
+      await aplicarFilas(db, {
+        telefone: m.telefone,
+        team: atrib ? equipe : opcoesCaixa.team,
+        estado: estadoDe(estadoLido.linha),
+        decisao,
+        agora,
+      });
       caixa++;
     }
     return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas, bot });
