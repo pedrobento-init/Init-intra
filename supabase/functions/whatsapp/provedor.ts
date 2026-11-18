@@ -49,6 +49,10 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
           }
         : null;
     if (!texto && !media) continue;
+    // "...@lid" é um identificador interno do WhatsApp, NÃO um telefone: tirar
+    // os dígitos dele dava um número que não existe (o envio para
+    // "<dígitos>@c.us" falhava com "No LID for user" e o cliente nunca casava).
+    const ehLid = origem.endsWith('@lid');
     const telefone = origem.replace(/\D/g, '');
     if (!telefone) continue;
     const id = String(p.id ?? '').trim();
@@ -58,7 +62,8 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
       .trim()
       .slice(0, NOME_MAX);
     out.push({
-      telefone,
+      telefone: ehLid ? '' : telefone,
+      ...(ehLid ? { lid: origem } : {}),
       nome,
       texto,
       id,
@@ -137,6 +142,38 @@ export async function fotoDoContato(
     const corpo = ((await resp.json()) || {}) as Record<string, unknown>;
     const url = typeof corpo.profilePictureURL === 'string' ? corpo.profilePictureURL.trim() : '';
     return /^https:\/\/[^\s"'<>]+$/.test(url) && url.length <= 1000 ? url : '';
+  } catch {
+    return '';
+  }
+}
+
+// Telefone (só dígitos) de um LID, pela própria WAHA: GET /api/<sessão>/lids/<lid>
+// devolve {"lid": "...@lid", "pn": "5511987654321@c.us"}. '' quando a WAHA não
+// conhece o número (contato que esconde o telefone) ou está fora do ar.
+//
+// Não lança. Só aceita pn no formato de telefone (@c.us, 8 a 15 dígitos): o
+// valor vira a chave da conversa e o destino das respostas.
+export async function telefoneDoLid(
+  lid: string,
+  cred: CredenciaisWaha,
+  fetchFn: FetchFn = fetch
+): Promise<string> {
+  const baseUrl = String(cred.baseUrl || '')
+    .trim()
+    .replace(/\/+$/, '');
+  const apiKey = String(cred.apiKey || '').trim();
+  const session = String(cred.session || 'default').trim() || 'default';
+  if (!baseUrl || !apiKey || !/^\d{5,25}@lid$/.test(String(lid || ''))) return '';
+  try {
+    const resp = await fetchFn(
+      `${baseUrl}/api/${encodeURIComponent(session)}/lids/${encodeURIComponent(lid)}`,
+      { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(8000) }
+    );
+    if (!resp.ok) return '';
+    const corpo = ((await resp.json()) || {}) as Record<string, unknown>;
+    const pn = typeof corpo.pn === 'string' ? corpo.pn.trim() : '';
+    const achou = /^(\d{8,15})@c\.us$/.exec(pn);
+    return achou ? achou[1] : '';
   } catch {
     return '';
   }

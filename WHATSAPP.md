@@ -229,6 +229,16 @@ linha da caixa; renova a cada 24 h porque a URL do CDN do WhatsApp expira. Quem
 deixou a foto visível só para contatos fica sem foto e a tela mostra as
 iniciais, como antes. Só URL `https` é aceita.
 
+**Remetente por LID.** O WhatsApp novo identifica quem escreve por um ID interno
+(`189721758162980@lid`), e não pelo telefone. O webhook converte para o telefone
+pela própria WAHA (`GET /api/<sessão>/lids/<lid>` devolve `{"lid", "pn"}`)
+antes de gravar, então a Caixa mostra o número real, o cliente casa pelo
+telefone e as respostas saem para `<telefone>@c.us`. Quando a WAHA não conhece o
+telefone (contato que o esconde), a mensagem entra na Caixa com o ID no lugar do
+número, **sem resposta automática**, e o envio pelo Intra para essa conversa não
+funciona. Sintoma de versão sem essa conversão: `No LID for user` nos logs do
+WAHA e telefone comprido e estranho na Caixa.
+
 **O que o robô diz** está em `bot.ts` (`TEXTO_BOAS_VINDAS`,
 `textoDirecionando`, `TEXTO_FORA_DO_HORARIO`). Mexeu no texto, mantenha os três
 números do menu na ordem: o teste `tests/whatsapp-bot.test.js` trava isso.

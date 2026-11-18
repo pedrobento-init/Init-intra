@@ -63,7 +63,7 @@ import {
   gerarProtocolo,
   notaDaAtribuicao,
 } from './bot.ts';
-import { enviarTexto, fotoDoContato, mensagensDoWebhook } from './provedor.ts';
+import { enviarTexto, fotoDoContato, mensagensDoWebhook, telefoneDoLid } from './provedor.ts';
 
 type ClienteFone = {
   id: string;
@@ -403,12 +403,33 @@ async function handle(req: Request, ctx: SupabaseContext) {
       limitadas = 0,
       bot = 0;
     const cache: { todos: ClienteFone[] | null } = { todos: null };
+    const credWaha = {
+      baseUrl: Deno.env.get('WAHA_BASE_URL') || '',
+      apiKey: Deno.env.get('WAHA_API_KEY') || '',
+      session: Deno.env.get('WAHA_SESSION') || 'default',
+    };
     for (const m of msgs) {
       const key = 'whatsapp:' + m.id;
       const { error: erroChave } = await db.from('avisos_enviados').insert({ key });
       if (erroChave) {
         if (erroChave.code === '23505') continue;
         throw new Error('avisos_enviados: ' + erroChave.message);
+      }
+
+      // O remetente pode vir como LID (ID interno do WhatsApp, "...@lid"): vira
+      // telefone antes de o número servir de chave de conversa, de limite e de
+      // casamento com cliente. Sem conversão (contato que esconde o telefone), a
+      // mensagem entra na caixa mesmo assim, só que sem resposta automática,
+      // porque não há telefone para quem responder.
+      let telefoneConfirmado = true;
+      if (m.lid) {
+        const fone = await telefoneDoLid(m.lid, credWaha);
+        if (fone) m.telefone = fone;
+        else {
+          m.telefone = m.lid.replace(/\D/g, '');
+          telefoneConfirmado = false;
+          console.warn(`whatsapp ${m.id}: LID sem telefone conhecido, entra na caixa sem robô`);
+        }
       }
 
       // Depois da chave de dedupe: reentrega da mesma mensagem não conta duas
@@ -421,11 +442,6 @@ async function handle(req: Request, ctx: SupabaseContext) {
         continue;
       }
 
-      const credWaha = {
-        baseUrl: Deno.env.get('WAHA_BASE_URL') || '',
-        apiKey: Deno.env.get('WAHA_API_KEY') || '',
-        session: Deno.env.get('WAHA_SESSION') || 'default',
-      };
       const estadoLido = await lerConversa(db, m.telefone);
 
       // Prova, gravada só pelo servidor, de que este número falou com a empresa:
@@ -483,6 +499,7 @@ async function handle(req: Request, ctx: SupabaseContext) {
       const botLigado =
         Deno.env.get('WHATSAPP_BOT_ATIVO') === '1' &&
         estadoLido.ok &&
+        telefoneConfirmado &&
         !!credWaha.baseUrl &&
         !!credWaha.apiKey;
       const decisao = botLigado
