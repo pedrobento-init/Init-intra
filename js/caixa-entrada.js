@@ -1146,12 +1146,23 @@ function caixaAbrirChamado(id) {
 function caixaDescartar(id) {
   const c = _caixaConversaPorId(id);
   if (!c) return;
-  const ids = c.mensagens.filter((m) => m.status === 'pendente').map((m) => m.id);
-  if (!ids.length) return;
-  ids.forEach((mid) => _emailTriagemSalvar(mid, { status: 'descartado', pendenciaId: null }));
+  // Mesma regra do caixaEncerrar: só o que está em aberto ('pendente' ou
+  // 'anexado') muda, mais a última mensagem do cliente, que é a que define o
+  // estado da conversa. Filtrar só 'pendente' fazia o botão não fazer nada em
+  // conversa com chamado aberto (mensagens 'anexado') ou já encerrada.
+  const ultima = c.ultimaEntrada;
+  const alvos = c.mensagens
+    .filter((m) => m.status === 'pendente' || m.status === 'anexado' || m === ultima)
+    .filter((m) => m.status !== 'descartado' && m.status !== 'virou_chamado')
+    .map((m) => ({ id: m.id, status: m.status }));
+  if (!alvos.length) {
+    showToast('Não há mensagem em aberto para descartar nesta conversa.', 'error');
+    return;
+  }
+  alvos.forEach((a) => _emailTriagemSalvar(a.id, { status: 'descartado' }));
   _emailTriagemRedesenhar();
   showUndoToast('Conversa descartada.', () => {
-    ids.forEach((mid) => _emailTriagemSalvar(mid, { status: 'pendente', pendenciaId: null }));
+    alvos.forEach((a) => _emailTriagemSalvar(a.id, { status: a.status }));
     _emailTriagemRedesenhar();
   });
 }

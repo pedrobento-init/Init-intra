@@ -301,15 +301,33 @@ describe('payload do Supabase', () => {
 });
 
 describe('descartar', () => {
-  it('descarta as pendentes do thread e o desfazer devolve para pendente', () => {
+  it('descarta o que está em aberto (pendente e anexado) e o desfazer devolve cada status', () => {
     lista = [
       entrada({ id: 'A' }),
       entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' }),
     ];
     s.caixaDescartar('thread-9');
-    expect(lista.map((e) => e.status)).toEqual(['descartado', 'anexado']);
+    expect(lista.map((e) => e.status)).toEqual(['descartado', 'descartado']);
     undoCb();
     expect(lista.map((e) => e.status)).toEqual(['pendente', 'anexado']);
+  });
+
+  it('conversa só com mensagens anexadas a chamado também é descartada', () => {
+    // Era o caso em que o botão não fazia nada: não havia 'pendente'.
+    lista = [entrada({ id: 'A', status: 'anexado' })];
+    s.caixaDescartar('thread-9');
+    expect(lista[0].status).toBe('descartado');
+    undoCb();
+    expect(lista[0].status).toBe('anexado');
+  });
+
+  it('não sobrescreve virou_chamado de mensagem antiga', () => {
+    lista = [
+      entrada({ id: 'A', status: 'virou_chamado' }),
+      entrada({ id: 'B', status: 'anexado', recebidoEm: '2026-10-26T13:00:00.000Z' }),
+    ];
+    s.caixaDescartar('thread-9');
+    expect(lista.map((e) => e.status)).toEqual(['virou_chamado', 'descartado']);
   });
 });
 
