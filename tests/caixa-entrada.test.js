@@ -998,3 +998,62 @@ describe('foto de perfil do contato', () => {
     expect(tudo.match(/class="cx-av-img"/g).length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('mensagem do atendimento automático', () => {
+  function conversaDoBot() {
+    lista = [
+      entrada({
+        id: 'W1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Márcia',
+        corpo: 'oi',
+        recebidoEm: '2026-10-26T10:00:00.000Z',
+      }),
+      entrada({
+        id: 'bot:1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Atendimento automático',
+        direcao: 'saida',
+        status: 'anexado',
+        corpo: '1 - Suporte Técnico\n2 - Comercial',
+        recebidoEm: '2026-10-26T10:00:05.000Z',
+      }),
+      entrada({
+        id: 'op:1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Ana',
+        direcao: 'saida',
+        status: 'anexado',
+        corpo: 'Ana: Olá',
+        recebidoEm: '2026-10-26T10:05:00.000Z',
+      }),
+    ];
+    s.renderCaixaEntrada();
+    acoes.caixaSelecionar(null, s.caixaAgruparConversas(lista)[0].id);
+    return elementos.caixaConversa.innerHTML;
+  }
+
+  it('o menu do robô aparece na conversa com o selo de atendimento automático', () => {
+    const html = conversaDoBot();
+    expect(html).toContain('1 - Suporte Técnico');
+    expect(html).toContain('class="cx-bubble-bot-tag">Atendimento automático</b>');
+  });
+
+  it('resposta de um colega não leva o selo do robô', () => {
+    const html = conversaDoBot();
+    expect(html.match(/cx-bubble-bot-tag/g)).toHaveLength(1);
+  });
+
+  it('o nome do robô é o mesmo nos dois lados (webhook e tela)', () => {
+    const webhook = fs.readFileSync('supabase/functions/whatsapp/index.ts', 'utf8');
+    const tela = fs.readFileSync('js/caixa-entrada.js', 'utf8');
+    expect(webhook).toMatch(/const AUTOR_BOT\s*=\s*['"]Atendimento automático['"]/);
+    expect(tela).toMatch(/const CAIXA_AUTOR_BOT\s*=\s*['"]Atendimento automático['"]/);
+  });
+});

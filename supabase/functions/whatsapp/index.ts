@@ -312,6 +312,48 @@ async function guardarNaCaixa(
   return false;
 }
 
+// Autor das mensagens que o robô manda. A Caixa reconhece este nome para
+// marcar o balão; é também o filtro de quem acompanha a conversa na atribuição.
+const AUTOR_BOT = 'Atendimento automático';
+
+// Grava na conversa o que o robô acabou de mandar. Sem isso quem atende vê só
+// o "1" do cliente e não sabe a que ele estava respondendo. Mesmo formato da
+// resposta do operador (conversa-responder): direcao 'saida', status 'anexado'.
+// Falha só vai para o log: a mensagem já saiu para o cliente.
+async function registrarMensagemDoBot(
+  db: SupabaseClient,
+  m: MensagemWhats,
+  texto: string,
+  extra: { team: string; clientId: string | null; providerId?: string; ordem: number }
+): Promise<void> {
+  const id = 'bot:' + crypto.randomUUID();
+  // +ordem ms: duas mensagens do robô no mesmo instante mantêm a ordem de envio.
+  const agora = new Date(Date.now() + extra.ordem).toISOString();
+  const { error } = await db.from('emails_triagem').insert({
+    id,
+    email_id: id,
+    thread_id: conversaDoTelefone(m.telefone),
+    message_id: extra.providerId || null,
+    de: AUTOR_BOT,
+    assunto: AUTOR_BOT,
+    corpo: texto,
+    recebido_em: agora,
+    motivo: null,
+    status: 'anexado',
+    pendencia_id: null,
+    team: extra.team,
+    tratado_por: AUTOR_BOT,
+    tratado_em: agora,
+    client_id: extra.clientId,
+    canal: 'whatsapp',
+    telefone: m.telefone,
+    direcao: 'saida',
+    created_at: agora,
+    updated_at: agora,
+  });
+  if (error) console.error(`whatsapp bot histórico ${m.id}:`, error.message);
+}
+
 type LinhaConversa = {
   ultima_em: string | null;
   bot_etapa: string | null;
@@ -549,6 +591,16 @@ async function handle(req: Request, ctx: SupabaseContext) {
             .eq('status', 'pendente')
             .eq('team', opcoesCaixa.team);
           if (erroMover) console.error(`whatsapp atribuição ${m.id}:`, erroMover.message);
+          // O menu que o robô mandou antes da escolha fica com a conversa.
+          const { error: erroBot } = await db
+            .from('emails_triagem')
+            .update({ team: equipe, updated_at: agora.toISOString() })
+            .eq('canal', 'whatsapp')
+            .eq('telefone', m.telefone)
+            .eq('direcao', 'saida')
+            .eq('de', AUTOR_BOT)
+            .eq('team', opcoesCaixa.team);
+          if (erroBot) console.error(`whatsapp atribuição bot ${m.id}:`, erroBot.message);
         } else if (atrib) {
           const { error: erroNota } = await db
             .from('emails_triagem')
@@ -561,13 +613,19 @@ async function handle(req: Request, ctx: SupabaseContext) {
           if (erroNota) console.error(`whatsapp atribuição ${m.id}:`, erroNota.message);
         }
         let enviou = !decisao.respostas.length;
-        for (const texto of decisao.respostas) {
+        for (const [ordem, texto] of decisao.respostas.entries()) {
           const envio = await enviarTexto(m.telefone, texto, credWaha);
           if (!envio.ok) {
             console.error(`whatsapp bot ${m.id}: envio falhou (${envio.erro})`);
             break;
           }
           enviou = true;
+          await registrarMensagemDoBot(db, m, texto, {
+            team: atrib ? equipe : opcoesCaixa.team,
+            clientId: c ? c.id : null,
+            providerId: envio.id,
+            ordem: ordem + 1,
+          });
         }
         // Sem envio e sem atribuição, o estado não avança: a próxima mensagem
         // do cliente tenta mandar o menu de novo.

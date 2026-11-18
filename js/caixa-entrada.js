@@ -24,6 +24,10 @@ var _caixaCanal = 'todos';
 // frase. Fica por conversa: trocar de thread não leva o texto para outra.
 var _caixaRascunho = { id: null, texto: '', kind: 'reply' };
 
+// Nome com que o webhook do WhatsApp grava o que o atendimento automático mandou
+// (supabase/functions/whatsapp/index.ts, AUTOR_BOT): os dois lados têm de bater.
+const CAIXA_AUTOR_BOT = 'Atendimento automático';
+
 const CAIXA_CANAIS = {
   todos: 'Todos os canais',
   email: 'E-mail',
@@ -537,10 +541,14 @@ function _caixaConversaHTML(c) {
             : direcao === 'saida'
               ? 'cx-bubble-out'
               : 'cx-bubble-in';
+        // Nota interna leva o autor; mensagem do robô também, para quem atende
+        // saber que aquilo foi o atendimento automático e não um colega.
         const nota =
           direcao === 'interna'
             ? '<b class="cx-bubble-nota-tag">' + escapeHtml(autor) + '</b>'
-            : '';
+            : direcao === 'saida' && m.de === CAIXA_AUTOR_BOT
+              ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
+              : '';
         return (
           sep +
           '<div class="cx-bubble ' +

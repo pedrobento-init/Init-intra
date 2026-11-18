@@ -7201,6 +7201,15 @@ body.dark-theme .cx {
   background: var(--cx-nota);
   font-size: 13px;
 }
+/* Selo do que o atendimento automático mandou: discreto, sem competir com o texto. */
+.cx-bubble-bot-tag {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cx-mut);
+  margin-bottom: 4px;
+}
 .cx-bubble-nota-tag {
   display: block;
   font-size: 10px;

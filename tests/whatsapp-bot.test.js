@@ -319,6 +319,31 @@ describe('webhook com o atendimento automático', () => {
     expect(estado.patch).toMatchObject({ bot_etapa: 'aguardando_setor', bot_tentativas: 0 });
   });
 
+  it('o que o robô mandou fica na conversa, para quem atende ver a que o cliente respondeu', async () => {
+    const { queries } = await chamar(evento('oi'), { env: { ...ENV, WHATSAPP_BOT_ATIVO: '1' } });
+    const inseridas = queries.filter((q) => q.tabela === 'emails_triagem' && q.insert);
+    const bot = inseridas.map((q) => q.insert).find((l) => l.direcao === 'saida');
+    expect(bot).toMatchObject({
+      canal: 'whatsapp',
+      telefone: '5511987654321',
+      thread_id: 'whatsapp:5511987654321',
+      de: 'Atendimento automático',
+      corpo: TEXTO_BOAS_VINDAS,
+      status: 'anexado',
+    });
+    expect(bot.email_id).toBe(bot.id);
+    // a mensagem do cliente entra ANTES da resposta do robô
+    expect(inseridas[0].insert.direcao).toBe('entrada');
+  });
+
+  it('robô desligado não grava mensagem nenhuma de saída', async () => {
+    const { queries } = await chamar(evento('oi'));
+    const saidas = queries.filter(
+      (q) => q.tabela === 'emails_triagem' && q.insert?.direcao === 'saida'
+    );
+    expect(saidas).toEqual([]);
+  });
+
   it('a linha da caixa leva a foto de perfil do contato', async () => {
     const { queries } = await chamar(evento('oi'));
     const linha = queries.find((q) => q.tabela === 'emails_triagem' && q.insert)?.insert;
