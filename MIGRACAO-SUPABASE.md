@@ -56,6 +56,28 @@ tabelas e roda numa transação única: se algo falhar, nada fica pela metade.
 Se o ensaio der certo, **apague o projeto de ensaio ou esvazie-o** antes da
 virada real, e repita tudo no dia.
 
+## 1.1 Permissões (obrigatório depois do importar)
+
+O dump **não** reproduz as permissões de `anon` e `authenticated`. Todo projeto
+Supabase novo dá `ALL` (inclusive `TRUNCATE`, que ignora o RLS) a esses dois
+papéis em toda tabela criada, e as migrations deste projeto tiraram isso no
+banco antigo. Sem corrigir, o projeto novo fica **mais aberto** que o antigo.
+Foi o que o `comparar` achou no ensaio.
+
+```powershell
+.\tools\migrar-supabase.ps1 -Etapa permissoes
+```
+
+Lê as permissões do projeto antigo (somente leitura) e, depois de você digitar
+`MIGRAR`, aplica no novo numa transação só: tira tudo de `anon` e `authenticated`
+em tabelas, sequências e funções (e o `EXECUTE` de `PUBLIC` nas funções) e devolve
+exatamente o que o antigo permitia. Também recria as **policies do
+`storage.objects`**, que o dump não leva. Repetir é seguro.
+
+Depois, `-Etapa comparar` tem de dizer que as permissões batem. As únicas
+diferenças aceitáveis são as que você sabe explicar (por exemplo, uma migration
+aplicada só de um lado).
+
 ## 2. O que o script não faz (e você precisa fazer)
 
 ### 2.1 Storage
@@ -63,9 +85,8 @@ virada real, e repita tudo no dia.
 Os dumps não trazem os arquivos. Os buckets são recriados pela importação, mas
 vazios. Copie os arquivos dos buckets (anexos) do projeto antigo para o novo
 (painel → Storage, ou com `supabase storage cp`, que baixa de um projeto e
-sobe no outro) e confira a contagem de arquivos. Confira também as **policies do Storage**
-(`select * from pg_policies where schemaname = 'storage'` nos dois lados): elas
-ficam no schema `storage`, que o dump não leva.
+sobe no outro) e confira a contagem de arquivos. As **policies do Storage** ficam no schema `storage`, que o dump não leva:
+a etapa `permissoes` (seção 1.1) as recria.
 
 ### 2.2 Edge Functions
 

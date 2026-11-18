@@ -11,9 +11,15 @@
                        Recusa um projeto novo que já tenha tabelas (use -Forcar
                        só se tiver certeza). Nunca escreve no projeto antigo.
     conferir           Compara a contagem de linhas dos dois lados.
-    comparar           Roda tools/check-schema.sql (só SELECT) nos DOIS bancos e
-                       mostra as diferenças de RLS, policies, grants, buckets e
-                       funções. Os dois bancos são abertos em modo somente leitura.
+    comparar           Roda tools/check-schema.sql e a lista de permissões efetivas
+                       (só SELECT) nos DOIS bancos e mostra o que difere. Os dois
+                       bancos são abertos em modo somente leitura.
+    permissoes         Copia do ANTIGO para o NOVO as permissões de anon e
+                       authenticated (tabelas, sequências e funções) e recria as
+                       policies do storage.objects. O dump não as leva, e todo
+                       projeto novo vem com ALL para anon/authenticated. Lê o
+                       antigo (somente leitura) e escreve no novo, depois de
+                       você digitar MIGRAR.
 
   O que vai: esquema public (tabelas, funções, triggers, RLS, grants), usuários
   (auth.users e auth.identities), a lista de buckets e as tabelas da publicação
@@ -31,11 +37,12 @@
   .\tools\migrar-supabase.ps1                      # só exporta
   .\tools\migrar-supabase.ps1 -Etapa importar
   .\tools\migrar-supabase.ps1 -Etapa conferir
+  .\tools\migrar-supabase.ps1 -Etapa permissoes
   .\tools\migrar-supabase.ps1 -Etapa comparar
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('exportar', 'importar', 'conferir', 'comparar')]
+  [ValidateSet('exportar', 'importar', 'conferir', 'comparar', 'permissoes')]
   [string]$Etapa = 'exportar',
   [string]$Pasta = (Join-Path (Split-Path $PSScriptRoot -Parent) 'migracao'),
   [switch]$Forcar
@@ -80,6 +87,30 @@ function Docker-Pg([string]$comando, [string[]]$variaveis = @()) {
   $saida = & docker @argumentos
   if ($LASTEXITCODE -ne 0) { Falhar "Falhou: $comando" }
   return $saida
+}
+
+# Roda um .sql da pasta tools nos dois bancos (somente leitura) e mostra o que
+# difere entre os resultados. Devolve quantas linhas diferem.
+function Comparar-Consulta([string]$arquivoSql, [string]$nome, [string]$titulo) {
+  Copy-Item -Path (Join-Path $PSScriptRoot $arquivoSql) -Destination (Join-Path $Pasta $arquivoSql) -Force
+  $cmd = 'psql "$BANCO" --csv -f /out/ARQUIVO > /out/SAIDA'.Replace('ARQUIVO', $arquivoSql)
+  $cmdAntigo = $cmd.Replace('$BANCO', '$OLD_DB_URL').Replace('SAIDA', ($nome + '-antigo.csv'))
+  $cmdNovo = $cmd.Replace('$BANCO', '$NEW_DB_URL').Replace('SAIDA', ($nome + '-novo.csv'))
+  Docker-Pg $cmdAntigo @('OLD_DB_URL', 'PGOPTIONS') | Out-Null
+  Docker-Pg $cmdNovo @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+  $antigo = @(Get-Content (Join-Path $Pasta "$nome-antigo.csv"))
+  $novo = @(Get-Content (Join-Path $Pasta "$nome-novo.csv"))
+  $diferencas = @(Compare-Object -ReferenceObject $antigo -DifferenceObject $novo)
+  if ($diferencas.Count -eq 0) {
+    Write-Host "$titulo: os dois projetos batem ($($antigo.Count) linhas)." -ForegroundColor Green
+  } else {
+    Write-Host "$titulo: $($diferencas.Count) linha(s) diferente(s). '<=' so no ANTIGO, '=>' so no NOVO:" -ForegroundColor Yellow
+    $diferencas | Select-Object -First 60 | ForEach-Object {
+      Write-Host ('{0} {1}' -f $_.SideIndicator, $_.InputObject)
+    }
+    if ($diferencas.Count -gt 60) { Write-Host "... e mais $($diferencas.Count - 60). Veja os arquivos $nome-*.csv em $Pasta." }
+  }
+  return $diferencas.Count
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -206,30 +237,57 @@ try {
     'comparar' {
       Ler-Url 'projeto ANTIGO' 'OLD_DB_URL'
       Ler-Url 'projeto NOVO' 'NEW_DB_URL'
-      Copy-Item -Path (Join-Path $PSScriptRoot 'check-schema.sql') -Destination (Join-Path $Pasta 'check-schema.sql') -Force
-      # Belt and braces: o arquivo só tem SELECT (tests/check-schema.test.js), e
-      # a sessão ainda abre em somente leitura.
+      # Os arquivos só têm SELECT (testes), e a sessão ainda abre em somente leitura.
       $env:PGOPTIONS = '-c default_transaction_read_only=on'
-      Write-Host 'Rodando check-schema.sql nos dois projetos (somente leitura)...' -ForegroundColor Cyan
-      Docker-Pg 'psql "$OLD_DB_URL" --csv -f /out/check-schema.sql > /out/schema-antigo.csv' @('OLD_DB_URL', 'PGOPTIONS') | Out-Null
-      Docker-Pg 'psql "$NEW_DB_URL" --csv -f /out/check-schema.sql > /out/schema-novo.csv' @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      Write-Host 'Comparando os dois projetos (somente leitura)...' -ForegroundColor Cyan
+      $d1 = Comparar-Consulta 'check-schema.sql' 'schema' 'RLS, policies, grants, buckets e funcoes'
+      Write-Host ''
+      $d2 = Comparar-Consulta 'migracao-permissoes-efetivas.sql' 'permissoes' 'Permissoes de anon e authenticated'
       Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
-
-      $antigo = @(Get-Content (Join-Path $Pasta 'schema-antigo.csv'))
-      $novo = @(Get-Content (Join-Path $Pasta 'schema-novo.csv'))
-      $diferencas = @(Compare-Object -ReferenceObject $antigo -DifferenceObject $novo)
-      if ($diferencas.Count -eq 0) {
-        Write-Host "Os dois projetos batem em tudo ($($antigo.Count) linhas)." -ForegroundColor Green
+      Write-Host ''
+      if (($d1 + $d2) -eq 0) {
+        Write-Host 'Tudo bate.' -ForegroundColor Green
       } else {
-        Write-Host "$($diferencas.Count) linha(s) diferente(s). '<=' so no ANTIGO, '=>' so no NOVO:" -ForegroundColor Yellow
-        $diferencas | Select-Object -First 60 | ForEach-Object {
-          Write-Host ('{0} {1}' -f $_.SideIndicator, $_.InputObject)
-        }
-        if ($diferencas.Count -gt 60) { Write-Host "... e mais $($diferencas.Count - 60). Veja os dois arquivos em $Pasta." }
-        Write-Host ''
-        Write-Host 'Esperado: diferem as policies do storage.objects (bloco 6), que nao vao no dump.' -ForegroundColor Yellow
+        Write-Host 'Esperado: diferem as policies do storage.objects (bloco 6) ate rodar a etapa permissoes.' -ForegroundColor Yellow
         exit 2
       }
+    }
+
+    'permissoes' {
+      Ler-Url 'projeto ANTIGO' 'OLD_DB_URL'
+      Ler-Url 'projeto NOVO' 'NEW_DB_URL'
+      foreach ($arq in 'migracao-gerar-permissoes.sql', 'migracao-gerar-politicas-storage.sql') {
+        Copy-Item -Path (Join-Path $PSScriptRoot $arq) -Destination (Join-Path $Pasta $arq) -Force
+      }
+      Write-Host "Lendo as permissoes de $(Host-De 'OLD_DB_URL') (somente leitura)..." -ForegroundColor Cyan
+      $env:PGOPTIONS = '-c default_transaction_read_only=on'
+      Docker-Pg 'psql "$OLD_DB_URL" -At -f /out/migracao-gerar-permissoes.sql > /out/permissoes-grants.sql' @('OLD_DB_URL', 'PGOPTIONS') | Out-Null
+      Docker-Pg 'psql "$OLD_DB_URL" -At -f /out/migracao-gerar-politicas-storage.sql > /out/permissoes-storage.sql' @('OLD_DB_URL', 'PGOPTIONS') | Out-Null
+      Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
+
+      $nGrants = @(Get-Content (Join-Path $Pasta 'permissoes-grants.sql')).Count
+      $nStorage = @(Get-Content (Join-Path $Pasta 'permissoes-storage.sql') | Where-Object { $_ -match '^drop policy' }).Count
+      if ($nGrants -eq 0) { Falhar 'Nao veio nenhum GRANT do projeto antigo. Nada foi aplicado.' }
+      Write-Host "Vou aplicar $nGrants GRANT(s) e recriar $nStorage policy(ies) do storage em $(Host-De 'NEW_DB_URL')." -ForegroundColor Yellow
+      Write-Host 'Antes, tira TODA permissao de anon e authenticated em public (tabelas, sequencias e funcoes) e o EXECUTE de PUBLIC nas funcoes.' -ForegroundColor Yellow
+
+      $resposta = Read-Host 'Isto ESCREVE no projeto NOVO. Digite MIGRAR para continuar'
+      if ($resposta -ne 'MIGRAR') { Falhar 'Cancelado.' }
+
+      $revoga = @(
+        'revoke all on all tables in schema public from anon, authenticated;',
+        'revoke all on all sequences in schema public from anon, authenticated;',
+        'revoke all on all functions in schema public from anon, authenticated;',
+        # O Postgres dá EXECUTE a PUBLIC em toda função nova, e anon/authenticated o
+        # herdam: sem tirar de PUBLIC, uma função fechada no antigo ficaria aberta no
+        # novo. O que o antigo permitia volta nos GRANTs abaixo, papel por papel.
+        'revoke all on all functions in schema public from public;'
+      )
+      $aplicar = $revoga + (Get-Content (Join-Path $Pasta 'permissoes-grants.sql')) + (Get-Content (Join-Path $Pasta 'permissoes-storage.sql'))
+      Set-Content -Path (Join-Path $Pasta 'permissoes-aplicar.sql') -Value $aplicar -Encoding utf8
+      # Uma transação: se algo falhar, o projeto novo fica como estava.
+      Docker-Pg 'psql "$NEW_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -q -f /out/permissoes-aplicar.sql' @('NEW_DB_URL') | Out-Null
+      Write-Host 'Permissoes aplicadas. Rode agora: .\tools\migrar-supabase.ps1 -Etapa comparar' -ForegroundColor Green
     }
 
     'conferir' {

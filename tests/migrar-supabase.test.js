@@ -56,16 +56,26 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(codigo).toMatch(/grep -v -E '[^']*\| DEFAULT ACL '/);
   });
 
-  it('comparar abre os dois bancos em somente leitura e só roda o check-schema.sql', () => {
+  it('comparar e permissoes leem o banco antigo em somente leitura', () => {
     expect(codigo).toMatch(/default_transaction_read_only=on/);
-    const roda = codigo.split('\n').filter((l) => l.includes('/out/check-schema.sql >'));
-    expect(roda).toHaveLength(2);
-    for (const l of roda) expect(l).toMatch(/psql "\$(OLD|NEW)_DB_URL" --csv -f/);
-    const sql = fs.readFileSync('tools/check-schema.sql', 'utf8');
-    const semComentario = sql.replace(/--[^\n]*/g, '');
-    expect(semComentario).not.toMatch(
-      /\b(insert|update|delete|drop|alter|create|grant|truncate)\b/i
-    );
+    // o PGOPTIONS de somente leitura é definido antes de qualquer psql no antigo
+    const leitura = codigo.indexOf("$env:PGOPTIONS = '-c default_transaction_read_only=on'");
+    const primeiroPsqlAntigo = codigo.indexOf('psql "$OLD_DB_URL" -At -f /out/migracao-gerar');
+    expect(leitura).toBeGreaterThan(-1);
+    expect(primeiroPsqlAntigo).toBeGreaterThan(leitura);
+    expect(codigo).toMatch(/Comparar-Consulta 'check-schema\.sql'/);
+    expect(codigo).toMatch(/Comparar-Consulta 'migracao-permissoes-efetivas\.sql'/);
+  });
+
+  it('permissoes só escreve no projeto NOVO, numa transação, e depois de digitar MIGRAR', () => {
+    const bloco = codigo.slice(codigo.indexOf("'permissoes' {"), codigo.indexOf("'conferir' {"));
+    expect(bloco).toMatch(/-ne 'MIGRAR'/);
+    const escreve = bloco.split('\n').filter((l) => /--single-transaction/.test(l));
+    expect(escreve).toHaveLength(1);
+    expect(escreve[0]).toContain('NEW_DB_URL');
+    expect(escreve[0]).not.toContain('OLD_DB_URL');
+    expect(bloco).toMatch(/revoke all on all tables in schema public from anon, authenticated/);
+    expect(bloco).toMatch(/revoke all on all functions in schema public from public/);
   });
 
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
@@ -88,5 +98,33 @@ describe('dados da migração fora do Git', () => {
   it('a pasta dos dumps e o arquivo de secrets estão no .gitignore', () => {
     expect(ignorado).toContain('migracao/');
     expect(ignorado).toContain('.env.migracao');
+  });
+});
+
+describe('consultas SQL da migração (tools/migracao-*.sql)', () => {
+  const arquivos = [
+    'tools/migracao-permissoes-efetivas.sql',
+    'tools/migracao-gerar-permissoes.sql',
+    'tools/migracao-gerar-politicas-storage.sql',
+  ];
+
+  it.each(arquivos)('%s é uma única consulta SELECT: gera ou lista, nunca executa', (arq) => {
+    const sql = fs.readFileSync(arq, 'utf8').replace(/\r\n/g, '\n');
+    const semComentario = sql.replace(/--[^\n]*/g, '').trim();
+    expect(semComentario).toMatch(/^select\b/i);
+    // um único ';', no fim (os que aparecem dentro de format() estão em string)
+    const semStrings = semComentario.replace(/'(?:[^']|'')*'/g, "''");
+    expect(semStrings.match(/;/g)).toHaveLength(1);
+    expect(semStrings.trimEnd().endsWith(';')).toBe(true);
+    expect(semStrings).not.toMatch(
+      /\b(insert|update|delete|truncate|alter|create|grant|revoke)\b/i
+    );
+  });
+
+  it('o script copia os três arquivos que usa para a pasta montada no contêiner', () => {
+    for (const arq of arquivos) {
+      const nome = arq.split('/').pop();
+      expect(script).toContain(nome);
+    }
   });
 });
