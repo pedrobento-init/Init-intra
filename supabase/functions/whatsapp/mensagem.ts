@@ -19,8 +19,12 @@ import {
 
 // O que o canal precisa de uma mensagem recebida, já sem o formato do provedor.
 // telefone: só dígitos, com país (ex.: 5511987654321). quando: ISO.
+// lid: o WhatsApp novo identifica quem escreve por um ID interno ("...@lid") em
+// vez do telefone. Mensagem assim sai do adaptador com telefone vazio e o `lid`
+// preenchido; o webhook converte para o telefone antes de usar o número.
 export type MensagemWhats = {
   telefone: string;
+  lid?: string;
   nome: string;
   texto: string;
   id: string;

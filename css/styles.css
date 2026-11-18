@@ -6768,9 +6768,10 @@ body.dark-theme .vis-chip[aria-pressed='true'] {
   --cx-in: #f0f2f9;
   --cx-nota: #fdf6e3;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 12px;
-  height: min(880px, calc(100dvh - 150px));
+  /* Ocupa a tela toda: sem teto de 880px, a conversa ganha altura em monitor grande. */
+  height: calc(100dvh - 120px);
   min-height: 520px;
   color: var(--cx-tx);
 }
@@ -6942,6 +6943,15 @@ body.dark-theme .cx {
   font-size: 13px;
   font-weight: 600;
   color: var(--cx-tx);
+}
+/* Foto de perfil por cima das iniciais: se não carregar, as iniciais aparecem. */
+.cx-av-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 .cx-av-md {
   width: 46px;
@@ -7119,7 +7129,7 @@ body.dark-theme .cx {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 250px;
 }
 .cx-conv-main {
   min-height: 0;
@@ -7135,10 +7145,10 @@ body.dark-theme .cx {
 .cx-timeline {
   flex: 1;
   overflow-y: auto;
-  padding: 14px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .cx-dia {
   display: flex;
@@ -7157,10 +7167,10 @@ body.dark-theme .cx {
 
 /* WhatsApp: bolhas leves; entrada à esquerda, nossa à direita; interna tracejada. */
 .cx-bubble {
-  max-width: 74%;
-  padding: 8px 11px 6px;
-  border-radius: 12px;
-  font-size: 14px;
+  max-width: 78%;
+  padding: 10px 14px 7px;
+  border-radius: 14px;
+  font-size: 15.5px;
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
@@ -7190,6 +7200,15 @@ body.dark-theme .cx {
   border: 1px dashed var(--cx-amb);
   background: var(--cx-nota);
   font-size: 13px;
+}
+/* Selo do que o atendimento automático mandou: discreto, sem competir com o texto. */
+.cx-bubble-bot-tag {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cx-mut);
+  margin-bottom: 4px;
 }
 .cx-bubble-nota-tag {
   display: block;
@@ -7296,9 +7315,9 @@ body.dark-theme .cx {
 .cx-tx {
   flex: 1;
   resize: none;
-  min-height: 42px;
+  min-height: 48px;
   max-height: 180px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--cx-s2);
   color: var(--cx-tx);
   border: 1px solid var(--cx-bd);
@@ -7306,6 +7325,7 @@ body.dark-theme .cx {
   font: inherit;
   line-height: 1.4;
   outline: none;
+  font-size: 15px;
 }
 .cx-tx::placeholder {
   color: var(--cx-mut);

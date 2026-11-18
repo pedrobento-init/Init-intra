@@ -64,6 +64,9 @@ var SYNC_FALLBACK_MIN_MS = 60000;
 
 var SyncManager = (function () {
   var _channel = null;
+  // Geração do canal: cada troca ou queda incrementa. O callback de um canal
+  // antigo não pode derrubar nem reagendar o canal novo (ver _dropDeadChannel).
+  var _gen = 0;
   var _retryN = 0;
   var _status = 'idle'; // idle|connecting|live|error|offline
   var _listeners = [];
@@ -253,23 +256,35 @@ var SyncManager = (function () {
   // Remove e esquece o canal atual. O `removeChannel` é best-effort (o canal
   // pode já estar morto); o que importa é `_channel` voltar a null para o
   // `visibilitychange`/`pageshow` reconectarem.
+  //
+  // ORDEM IMPORTA: `_channel` vira null ANTES de removeChannel. A biblioteca
+  // dispara o callback do canal removido com 'CLOSED' de forma síncrona; se
+  // `_channel` ainda apontasse para ele, o callback chamaria _dropDeadChannel
+  // de novo, que chamaria removeChannel de novo, e assim até estourar a pilha
+  // ("Maximum call stack size exceeded"). A reconexão quebrava e a tela ficava
+  // sem canal vivo até recarregar a página.
   function _dropDeadChannel() {
+    var morto = _channel;
+    _channel = null;
+    _gen++;
     try {
-      if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel);
+      if (morto && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(morto);
     } catch (_e) {
       if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
     }
-    _channel = null;
   }
 
   function connect() {
     if (!_canConnect()) return;
+    // Mesma regra do _dropDeadChannel: solta a referência antes de remover.
+    var velho = _channel;
+    _channel = null;
+    var gen = ++_gen;
     try {
-      if (_channel) supabaseClient.removeChannel(_channel);
+      if (velho) supabaseClient.removeChannel(velho);
     } catch (_e) {
       if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
     }
-    _channel = null;
     _emit('connecting');
     var teamFilter = _syncTeamFilter();
     var ch = null;
@@ -293,6 +308,9 @@ var SyncManager = (function () {
         });
       });
       _channel = ch.subscribe(function (st) {
+        // Evento de um canal que já foi trocado ou derrubado: ignora, senão o
+        // 'CLOSED' do canal velho derrubaria o novo.
+        if (gen !== _gen) return;
         if (st === 'SUBSCRIBED') {
           _retryN = 0;
           _emit('live');
@@ -347,12 +365,14 @@ var SyncManager = (function () {
   }
 
   function disconnect() {
+    var atual = _channel;
+    _channel = null;
+    _gen++;
     try {
-      if (_channel && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(_channel);
+      if (atual && typeof supabaseClient !== 'undefined') supabaseClient.removeChannel(atual);
     } catch (_e) {
       if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
     }
-    _channel = null;
   }
 
   if (typeof window !== 'undefined') {

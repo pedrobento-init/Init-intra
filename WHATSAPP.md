@@ -57,7 +57,7 @@ por cabeçalho `X-Api-Key`, com o valor de `WAHA_API_KEY`. Por exemplo, o envio 
 texto é `POST /api/sendText` com `{ "session": "default", "chatId":
 "5511987654321@c.us", "text": "oi" }`.
 
-## 3. Banco: migrations 075, 076, 077 e 082
+## 3. Banco: migrations 075, 076, 077, 082 e 085
 
 No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
 
@@ -70,7 +70,10 @@ No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
    responder e anotar direto na caixa (`direcao`, `media` e o status
    `encerrado`). Sem ela o webhook ainda grava a mensagem, mas o portal não
    responde.
-5. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
+5. Cole e rode `supabase/migrations/085_whatsapp_bot_foto.sql`. É a do
+   atendimento automático (estado do robô por número) e da foto de perfil do
+   contato. Sem ela o webhook segue gravando a mensagem, só sem robô e sem foto.
+6. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
 
 ```sql
 select column_name from information_schema.columns
@@ -177,6 +180,68 @@ padrão (`init`).
 8. Responda do celular: a mensagem vira nota do solicitante no mesmo chamado.
 9. Conclua o chamado e mande outra mensagem: ela volta para a caixa como pedido
    novo.
+
+## 11. Atendimento automático e foto do contato
+
+O webhook pode responder sozinho **só com o menu de departamentos** e atribuir a
+conversa conforme a escolha. Ele nunca responde pergunta, só encaminha. A
+regra mora em `supabase/functions/whatsapp/bot.ts`.
+
+**Como funciona**
+
+1. Número **sem chamado aberto** manda a primeira mensagem: recebe o texto de
+   boas-vindas com `1 - Suporte Técnico`, `2 - Comercial` e
+   `3 - Atendimento Poiesis`. Número com chamado aberto nunca recebe o menu.
+2. A escolha é tolerante: aceita `2`, `2.`, `opção 2`, `dois`, `comercial`,
+   `vendas`, `poiesis`. O que é ambíguo (`22`, `12`, `1 e 2`) **não** é
+   adivinhado: o robô pergunta de novo uma vez e, na segunda resposta ilegível,
+   passa para um humano (conversa sem departamento, com a nota dizendo isso).
+   Quem já abre a conversa com `2` ou `comercial` pula o menu.
+3. Escolhido o departamento, o robô responde "Estamos direcionando seu
+   atendimento…" com o **protocolo** (`AAAAMMDD-NNNN`, data de Brasília mais
+   quatro dígitos) e a conversa entra na caixa com a nota
+   `Escolheu "Comercial" no atendimento automático · protocolo …`. As mensagens
+   que o número mandou antes de escolher (o "oi") ganham a mesma equipe e nota.
+4. Fora do expediente (segunda a sexta, 08h30–12h e 13h–17h30, horário de
+   Brasília) a confirmação vem seguida do aviso de horário.
+5. Depois de **12 horas sem mensagem** do número, a conversa é nova e o menu
+   volta.
+
+**Equipes.** Hoje os três departamentos caem na equipe `init`; o departamento
+escolhido fica na nota. Quando Comercial e Poiesis tiverem equipe própria, troque
+`EQUIPE_DO_SETOR` em `bot.ts` (suporte de cliente já cadastrado segue a equipe
+do cliente).
+
+**Ligar.** O robô vem **desligado**. Depois da migration 085, as `WAHA_*` já
+configuradas e o deploy da function:
+
+```bash
+supabase secrets set WHATSAPP_BOT_ATIVO=1
+```
+
+Para desligar, `supabase secrets unset WHATSAPP_BOT_ATIVO`. Teste primeiro com o
+número de teste (seção 10): **cada mensagem que o robô manda é uma mensagem a
+mais saindo do número da empresa**, e a WAHA é API não oficial.
+
+**Foto de perfil.** O webhook busca a foto do contato na WAHA
+(`/api/contacts/profile-picture`), guarda em `whatsapp_conversas` e copia para a
+linha da caixa; renova a cada 24 h porque a URL do CDN do WhatsApp expira. Quem
+deixou a foto visível só para contatos fica sem foto e a tela mostra as
+iniciais, como antes. Só URL `https` é aceita.
+
+**Remetente por LID.** O WhatsApp novo identifica quem escreve por um ID interno
+(`189721758162980@lid`), e não pelo telefone. O webhook converte para o telefone
+pela própria WAHA (`GET /api/<sessão>/lids/<lid>` devolve `{"lid", "pn"}`)
+antes de gravar, então a Caixa mostra o número real, o cliente casa pelo
+telefone e as respostas saem para `<telefone>@c.us`. Quando a WAHA não conhece o
+telefone (contato que o esconde), a mensagem entra na Caixa com o ID no lugar do
+número, **sem resposta automática**, e o envio pelo Intra para essa conversa não
+funciona. Sintoma de versão sem essa conversão: `No LID for user` nos logs do
+WAHA e telefone comprido e estranho na Caixa.
+
+**O que o robô diz** está em `bot.ts` (`TEXTO_BOAS_VINDAS`,
+`textoDirecionando`, `TEXTO_FORA_DO_HORARIO`). Mexeu no texto, mantenha os três
+números do menu na ordem: o teste `tests/whatsapp-bot.test.js` trava isso.
 
 ## Quando algo não funciona
 

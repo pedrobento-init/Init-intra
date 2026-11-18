@@ -219,7 +219,10 @@ describe('webhook com a 077', () => {
     const dedupe = w.indexOf(norm('from("avisos_enviados").insert'));
     // O prettier pode envolver o await em parênteses: `(await f(...)) >= N`.
     const limite = w.search(/recentesDoNumero\(db,m\.telefone\)\)? ?>= ?LIMITE_POR_MINUTO/);
-    const conversa = w.indexOf(norm('from("whatsapp_conversas")'));
+    // As funções auxiliares (lerConversa, fotoAtual) ficam acima do handle e
+    // também citam a tabela: o que vale é o primeiro uso DENTRO do laço.
+    const dentro = w.slice(w.indexOf(norm('async function handle')));
+    const conversa = w.length - dentro.length + dentro.indexOf(norm('lerConversa(db, m.telefone)'));
     expect(dedupe).toBeGreaterThan(-1);
     expect(limite).toBeGreaterThan(dedupe);
     expect(conversa).toBeGreaterThan(limite);

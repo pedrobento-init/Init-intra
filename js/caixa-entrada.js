@@ -24,6 +24,10 @@ var _caixaCanal = 'todos';
 // frase. Fica por conversa: trocar de thread não leva o texto para outra.
 var _caixaRascunho = { id: null, texto: '', kind: 'reply' };
 
+// Nome com que o webhook do WhatsApp grava o que o atendimento automático mandou
+// (supabase/functions/whatsapp/index.ts, AUTOR_BOT): os dois lados têm de bater.
+const CAIXA_AUTOR_BOT = 'Atendimento automático';
+
 const CAIXA_CANAIS = {
   todos: 'Todos os canais',
   email: 'E-mail',
@@ -128,6 +132,7 @@ function caixaAgruparConversas(lista) {
         atribuidoA: ultimoCom('atribuidoA'),
         clientId: ultimoCom('clientId'),
         pendenciaId: ultimoCom('pendenciaId'),
+        fotoUrl: ultimoCom('fotoUrl'),
       };
     })
     .sort((a, b) => _caixaData(b.ultima).localeCompare(_caixaData(a.ultima)));
@@ -450,6 +455,7 @@ function _caixaItemHTML(c, lidas) {
     '">' +
     '<span class="cx-av" aria-hidden="true">' +
     escapeHtml(_caixaIniciais(nome)) +
+    caixaFotoHTML(c) +
     _cxBadgeCanal(c.canal) +
     '</span>' +
     '<span class="cx-cm">' +
@@ -535,10 +541,14 @@ function _caixaConversaHTML(c) {
             : direcao === 'saida'
               ? 'cx-bubble-out'
               : 'cx-bubble-in';
+        // Nota interna leva o autor; mensagem do robô também, para quem atende
+        // saber que aquilo foi o atendimento automático e não um colega.
         const nota =
           direcao === 'interna'
             ? '<b class="cx-bubble-nota-tag">' + escapeHtml(autor) + '</b>'
-            : '';
+            : direcao === 'saida' && m.de === CAIXA_AUTOR_BOT
+              ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
+              : '';
         return (
           sep +
           '<div class="cx-bubble ' +
@@ -591,6 +601,7 @@ function _caixaConversaHTML(c) {
     '<aside class="cx-lado">' +
     '<section><h3>Quem pediu</h3><div class="cx-pessoa"><span class="cx-av cx-av-md" aria-hidden="true">' +
     escapeHtml(_caixaIniciais(nome)) +
+    caixaFotoHTML(c) +
     '</span><div><b>' +
     escapeHtml(nome) +
     '</b>' +
@@ -722,6 +733,7 @@ function _caixaConversaHTML(c) {
     '<button type="button" class="btn cx-btn cx-voltar" data-action="caixaVoltar" aria-label="Voltar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>' +
     '<span class="cx-av cx-av-lg" aria-hidden="true">' +
     escapeHtml(_caixaIniciais(nome)) +
+    caixaFotoHTML(c) +
     _cxBadgeCanal(c.canal) +
     '</span>' +
     '<div class="cx-conv-id"><b>' +
@@ -816,6 +828,20 @@ function _caixaMediaHTML(media) {
 function _caixaEmailDe(de) {
   const m = /<([^>]+)>/.exec(de || '');
   return m ? m[1] : de || '';
+}
+
+// Foto de perfil do contato (WhatsApp). A URL é gravada pelo webhook, mas só
+// https entra no <img>: ela vai para o atributo src de quem atende. Se a
+// imagem não carregar (a URL do CDN expira), o <img> sem alt não desenha nada
+// e as iniciais que ficam por baixo seguem visíveis.
+function caixaFotoHTML(conversa) {
+  const url = String((conversa && conversa.fotoUrl) || '').trim();
+  if (!/^https:\/\/[^\s"'<>]+$/.test(url) || url.length > 1000) return '';
+  return (
+    '<img class="cx-av-img" src="' +
+    escapeHtml(url) +
+    '" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false" />'
+  );
 }
 
 function _caixaIniciais(nome) {
