@@ -560,6 +560,8 @@ const ENTITIES = [
     hasTeam: true,
     sync: true,
     realtime: true,
+    // A Caixa mostra todas as equipes para admin; ver syncFiltroEquipe.
+    realtimeTodasEquipes: true,
     optional: true, // migration 066: banco sem a tabela não quebra o sync
     fields: {
       id: 'id',

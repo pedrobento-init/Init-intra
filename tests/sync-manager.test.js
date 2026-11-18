@@ -92,3 +92,28 @@ describe('Outbox — construção da entrada', () => {
     expect(e.targetId).toBe('');
   });
 });
+
+// Admin com equipe escolhida no seletor vê a Caixa inteira, mas o canal ao
+// vivo escutava só aquela equipe: WhatsApp de número desconhecido (team
+// 'init') só aparecia ao recarregar.
+describe('syncFiltroEquipe — filtro do canal ao vivo', () => {
+  const { syncFiltroEquipe } = syncMgr;
+  const caixa = { table: 'emails_triagem', hasTeam: true, realtimeTodasEquipes: true };
+  const comum = { table: 'pendencias', hasTeam: true };
+
+  it('admin escuta a Caixa de todas as equipes, mesmo com uma escolhida', () => {
+    expect(syncFiltroEquipe(caixa, 'suporte', true)).toBe(null);
+  });
+
+  it('admin continua filtrando as outras entidades pela equipe escolhida', () => {
+    expect(syncFiltroEquipe(comum, 'suporte', true)).toBe('suporte');
+  });
+
+  it('quem não é admin segue preso à própria equipe, inclusive na Caixa', () => {
+    expect(syncFiltroEquipe(caixa, 'suporte', false)).toBe('suporte');
+  });
+
+  it('entidade sem coluna team nunca leva filtro', () => {
+    expect(syncFiltroEquipe({ table: 'x', hasTeam: false }, 'suporte', false)).toBe(null);
+  });
+});
