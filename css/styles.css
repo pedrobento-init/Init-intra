@@ -17688,6 +17688,8 @@ body.dark-theme .pen-board .kanban-col.drag-over {
 }
 .opf-hero-info {
   min-width: 0;
+  align-self: flex-start;
+  margin-top: 44px; /* começa logo abaixo da capa (o avatar sobe 40px sobre ela) */
   padding-bottom: 6px;
 }
 .opf-hero-name {
@@ -17803,6 +17805,9 @@ body.dark-theme .pen-board .kanban-col.drag-over {
   padding: 16px;
 }
 .opf-card-body .form-group:last-child {
+  margin-bottom: 0;
+}
+.opf-card-body > .form-row:last-child > .form-group {
   margin-bottom: 0;
 }
 .opf-colors {
@@ -17984,6 +17989,9 @@ body.dark-theme .pen-board .kanban-col.drag-over {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+  .opf-hero-info {
+    margin-top: 0;
   }
   .opf .form-row {
     grid-template-columns: 1fr;
