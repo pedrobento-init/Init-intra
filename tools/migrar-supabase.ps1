@@ -153,10 +153,22 @@ try {
       # buckets e esquema. replica = não dispara triggers nem checa FK na carga.
       $env:PGOPTIONS = '-c session_replication_role=replica'
       $comuns = 'pg_restore --dbname="$NEW_DB_URL" --single-transaction --exit-on-error --no-owner'
-      Write-Host 'Importando usuarios...' -ForegroundColor Cyan
-      Docker-Pg "$comuns --data-only /out/auth.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
-      Write-Host 'Importando buckets...' -ForegroundColor Cyan
-      Docker-Pg "$comuns --data-only /out/storage-buckets.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      # Cada passo é uma transação própria: se o esquema falhar, usuários e
+      # buckets já ficaram. Repetir sem esta checagem bateria em chave duplicada.
+      $usuarios = [int](Docker-Pg 'psql "$NEW_DB_URL" -At -c "select count(*) from auth.users"' @('NEW_DB_URL') | Select-Object -Last 1)
+      if ($usuarios -gt 0) {
+        Write-Host "Usuarios: o projeto novo ja tem $usuarios, pulando (importados numa tentativa anterior)." -ForegroundColor Yellow
+      } else {
+        Write-Host 'Importando usuarios...' -ForegroundColor Cyan
+        Docker-Pg "$comuns --data-only /out/auth.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      }
+      $buckets = [int](Docker-Pg 'psql "$NEW_DB_URL" -At -c "select count(*) from storage.buckets"' @('NEW_DB_URL') | Select-Object -Last 1)
+      if ($buckets -gt 0) {
+        Write-Host "Buckets: o projeto novo ja tem $buckets, pulando (importados numa tentativa anterior)." -ForegroundColor Yellow
+      } else {
+        Write-Host 'Importando buckets...' -ForegroundColor Cyan
+        Docker-Pg "$comuns --data-only /out/storage-buckets.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null
+      }
       Write-Host 'Importando o esquema public e os dados...' -ForegroundColor Cyan
       # O schema public ja existe no projeto novo: tira só a linha que o cria.
       Docker-Pg "pg_restore -l /out/public.dump | grep -v -E ' SCHEMA - public( |`$)' > /tmp/toc && $comuns -L /tmp/toc /out/public.dump" @('NEW_DB_URL', 'PGOPTIONS') | Out-Null

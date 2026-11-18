@@ -45,6 +45,13 @@ describe('tools/migrar-supabase.ps1', () => {
     expect(codigo).toMatch(/\$tabelas -gt 0 -and -not \$Forcar/);
   });
 
+  it('repetir a importação não duplica usuários nem buckets já copiados', () => {
+    expect(codigo).toMatch(/select count\(\*\) from auth\.users/);
+    expect(codigo).toMatch(/select count\(\*\) from storage\.buckets/);
+    expect(codigo).toMatch(/\$usuarios -gt 0/);
+    expect(codigo).toMatch(/\$buckets -gt 0/);
+  });
+
   it('o padrão é só exportar (a etapa que não escreve em banco nenhum)', () => {
     expect(codigo).toMatch(/\[string\]\$Etapa = 'exportar'/);
   });
