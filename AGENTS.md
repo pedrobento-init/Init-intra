@@ -140,6 +140,7 @@ termina, commita antes de passar a bola — o git é a única coordenação que 
 | [WHATSAPP.md](WHATSAPP.md)                           | configurar o WAHA e testar o canal com um número de teste    |
 | [AUDITORIA.md](AUDITORIA.md)                         | achados de auditoria e o que já foi fechado                  |
 | [PENDENCIA-CRITICA-RLS.md](PENDENCIA-CRITICA-RLS.md) | histórico do problema de RLS                                 |
+| [INTEGRACAO-TEAMVIEWER.md](INTEGRACAO-TEAMVIEWER.md) | ideias, perguntas em aberto e custo da integração            |
 
 Agentes especializados ficam em `.claude/agents/` (Claude Code) e
 `.opencode/agent/` (opencode): `revisor-seguranca` (XSS, RLS, escopo de team) e
