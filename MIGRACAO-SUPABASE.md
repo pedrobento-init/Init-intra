@@ -214,6 +214,31 @@ select cron.unschedule(jobname) from cron.job;
 Robôs externos (Apps Script, n8n, Make) que chamam as funções também precisam do
 endereço novo.
 
+### 2.5 Chave pública do projeto novo (`sb_publishable_...`)
+
+Projetos Supabase criados recentemente podem vir com as chaves antigas (`anon` e
+`service_role`, as que começam com `eyJ`) **desativadas**: uma `eyJ...` válida
+responde `401 Invalid API key`. Se for o caso do projeto novo, use a chave
+**publishable** (`sb_publishable_...`, Settings → API Keys → aba _Publishable
+and secret API keys_) em todo lugar que hoje recebe a `anon`:
+
+- `js/config.js` local e a variável `SUPABASE_ANON_KEY` da Vercel (o app só
+  repassa o texto ao `createClient`; o formato novo é aceito);
+- qualquer robô, Apps Script, n8n ou Make que chame o Supabase com a `anon`.
+
+**Nunca** use a `sb_secret_...` no navegador. Teste cada chamador externo: uma
+Edge Function com `verify_jwt = true` espera o JWT de um usuário logado, e a
+chave publishable não é um JWT. As que se autenticam por segredo próprio já
+estão com `verify_jwt = false` no `supabase/config.toml`.
+
+Para conferir se o projeto aceita a chave, sem abrir o navegador:
+
+```powershell
+$t = Get-Content js\config.js -Raw; $null = $t -match "anonKey:\s*'([^']+)'"; $k = $Matches[1]; try { (Invoke-WebRequest -Uri 'https://<REF_NOVO>.supabase.co/auth/v1/settings' -Headers @{ apikey = $k } -UseBasicParsing).StatusCode } catch { $_.ErrorDetails.Message }
+```
+
+`200` = aceita. Um erro de texto diz o motivo.
+
 ## 3. Virada
 
 Escolha um horário de pouco uso e avise a equipe.
@@ -224,7 +249,7 @@ Escolha um horário de pouco uso e avise a equipe.
    recrie o projeto novo, **importar** e **conferir**. Só siga se o `conferir`
    mostrar tudo `OK`.
 3. Storage, funções e secrets (seção 2).
-4. **Troque os endereços**, nesta ordem:
+4. **Troque os endereços** (e a chave pública, ver abaixo), nesta ordem:
    - Vercel → Settings → Environment Variables: `SUPABASE_URL` e
      `SUPABASE_ANON_KEY` (o `tools/build-config.js` as lê no deploy) e faça
      um redeploy.
