@@ -1,0 +1,22 @@
+name: Release
+
+# A cada push na main, lê os commits (tipo(escopo): resumo) e mantém aberto um
+# PR de release com a próxima versão e o CHANGELOG. Mergear esse PR cria a tag
+# vX.Y.Z e a release no GitHub. Regras em AGENTS.md, seção "Versões e releases".
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

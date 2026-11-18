@@ -4,3 +4,4 @@ js/config.example.js
 package-lock.json
 .claude/worktrees
 build
+CHANGELOG.md
