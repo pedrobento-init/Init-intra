@@ -19,6 +19,10 @@
 // menu: já é atendimento em curso. A resposta só sai DEPOIS de a mensagem estar
 // gravada na caixa, e falha de envio só vai para o log.
 //
+// RECIBO E REAÇÃO (086) — os eventos message.ack e message.reaction do WAHA
+// atualizam a linha da mensagem (achada pelo message_id): ✓/✓✓/lida na nossa
+// resposta e o emoji de cada lado. Sem a 086 são ignorados, com aviso no log.
+//
 // FOTO — a foto de perfil do contato (WAHA) é guardada em whatsapp_conversas e
 // copiada para a linha da caixa, e renovada a cada 24h (a URL do CDN expira).
 // Sem a migration 085 nada disso roda e a mensagem entra normalmente.
@@ -63,7 +67,14 @@ import {
   gerarProtocolo,
   notaDaAtribuicao,
 } from './bot.ts';
-import { enviarTexto, fotoDoContato, mensagensDoWebhook, telefoneDoLid } from './provedor.ts';
+import {
+  enviarTexto,
+  eventosDeStatus,
+  fotoDoContato,
+  idCurto,
+  mensagensDoWebhook,
+  telefoneDoLid,
+} from './provedor.ts';
 
 type ClienteFone = {
   id: string;
@@ -276,7 +287,7 @@ async function guardarNaCaixa(
   },
   extra: { foto_url?: string | null; atribuicao_nota?: string | null } = {}
 ): Promise<boolean> {
-  const linha = {
+  const comCitacao = {
     ...entradaDaCaixa(entradaDe(m), opcoes, 'ETR-' + crypto.randomUUID()),
     canal: 'whatsapp',
     telefone: m.telefone,
@@ -284,9 +295,17 @@ async function guardarNaCaixa(
     media: await baixarMidia(m),
     ...(extra.foto_url ? { foto_url: extra.foto_url } : {}),
     ...(extra.atribuicao_nota ? { atribuicao_nota: extra.atribuicao_nota } : {}),
+    ...(m.citacao ? { citacao: m.citacao } : {}),
   };
-  let { error } = await db.from('emails_triagem').insert(linha);
+  let { error } = await db.from('emails_triagem').insert(comCitacao);
   if (!error || error.code === '23505') return true;
+  // Só a 086 falta: a mensagem entra sem a citação.
+  const { citacao: _citacao, ...linha } = comCitacao;
+  if (m.citacao && /citacao/.test(error.message || '')) {
+    console.warn(`whatsapp caixa ${m.id}: migration 086 não aplicada, gravando sem citação`);
+    ({ error } = await db.from('emails_triagem').insert(linha));
+    if (!error || error.code === '23505') return true;
+  }
   // Só a 085 falta: tira a foto e mantém direcao/media, que são da 082.
   if (linha.foto_url && /foto_url/.test(error.message || '')) {
     const { foto_url: _foto, ...semFoto } = linha;
@@ -416,6 +435,45 @@ async function fotoAtual(
   return nova;
 }
 
+// Recibos e reações. Cada um é um UPDATE pelo message_id; o id pode estar
+// gravado inteiro ou só o final, por isso o `in`. Sem linha (mensagem mandada
+// pelo celular, fora do Intra) o update não acha nada, e está tudo certo.
+// Nunca lança: recibo perdido é só um ✓ a menos na tela.
+async function aplicarStatus(
+  db: SupabaseClient,
+  payload: unknown
+): Promise<{ recibos: number; reacoes: number }> {
+  const { recibos, reacoes } = eventosDeStatus(payload);
+  let nRecibos = 0,
+    nReacoes = 0;
+  const agora = new Date().toISOString();
+  for (const r of recibos) {
+    // Só avança: o trigger da 086 garante isso, e o filtro evita mexer no
+    // updated_at (e redesenhar a tela de todo mundo) com recibo repetido.
+    const teto = r.ack === -1 ? 2 : r.ack;
+    const { error } = await db
+      .from('emails_triagem')
+      .update({ ack: r.ack, updated_at: agora })
+      .eq('canal', 'whatsapp')
+      .eq('direcao', 'saida')
+      .in('message_id', [r.id, idCurto(r.id)])
+      .or(`ack.is.null,ack.lt.${teto}`);
+    if (error) console.warn('whatsapp recibo (migration 086?):', error.message);
+    else nRecibos++;
+  }
+  for (const x of reacoes) {
+    const coluna = x.deMim ? 'reacao_equipe' : 'reacao_contato';
+    const { error } = await db
+      .from('emails_triagem')
+      .update({ [coluna]: x.emoji || null, updated_at: agora })
+      .eq('canal', 'whatsapp')
+      .in('message_id', [x.alvo, idCurto(x.alvo)]);
+    if (error) console.warn('whatsapp reação (migration 086?):', error.message);
+    else nReacoes++;
+  }
+  return { recibos: nRecibos, reacoes: nReacoes };
+}
+
 async function handle(req: Request, ctx: SupabaseContext) {
   if (req.method !== 'POST') return json({ ok: false }, 405);
   const esperado = Deno.env.get('WHATSAPP_WEBHOOK_TOKEN') || '';
@@ -429,10 +487,13 @@ async function handle(req: Request, ctx: SupabaseContext) {
   } catch {
     return json({ ok: false, error: 'invalid_json' }, 400);
   }
-  // Evento que não é mensagem de texto (status, entrega, presença) responde 200
-  // vazio: erro faria a WAHA reentregar algo que nunca vai ser tratado.
+  // Evento que não é mensagem (recibo, reação, presença) responde 200: erro
+  // faria a WAHA reentregar algo que não tem como dar certo depois.
   const todas = mensagensDoWebhook(payload);
-  if (!todas.length) return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0 });
+  if (!todas.length) {
+    const status = await aplicarStatus(ctx.supabaseAdmin, payload);
+    return json({ ok: true, notas: 0, caixa: 0, sem_cliente: 0, limitadas: 0, ...status });
+  }
   if (todas.length > LOTE_MAX)
     console.warn(`whatsapp: lote de ${todas.length} mensagens, tratando só ${LOTE_MAX}`);
   const msgs = todas.slice(0, LOTE_MAX);

@@ -57,7 +57,7 @@ por cabeçalho `X-Api-Key`, com o valor de `WAHA_API_KEY`. Por exemplo, o envio 
 texto é `POST /api/sendText` com `{ "session": "default", "chatId":
 "5511987654321@c.us", "text": "oi" }`.
 
-## 3. Banco: migrations 075, 076, 077, 082 e 085
+## 3. Banco: migrations 075, 076, 077, 082, 085 e 086
 
 No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
 
@@ -73,7 +73,10 @@ No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
 5. Cole e rode `supabase/migrations/085_whatsapp_bot_foto.sql`. É a do
    atendimento automático (estado do robô por número) e da foto de perfil do
    contato. Sem ela o webhook segue gravando a mensagem, só sem robô e sem foto.
-6. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
+6. Cole e rode `supabase/migrations/086_whatsapp_conversa_rica.sql`. É a dos
+   recibos de entrega/leitura, da resposta citando e das reações (seção 12).
+   Sem ela tudo continua funcionando, só sem esses recursos.
+7. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
 
 ```sql
 select column_name from information_schema.columns
@@ -149,7 +152,9 @@ Esperado: `{"ok":true,"notas":0,"caixa":1,"sem_cliente":1}` e a mensagem na
 Na configuração da sessão `default`, cadastre um webhook:
 
 - **URL:** `https://<ref>.supabase.co/functions/v1/whatsapp?token=<WHATSAPP_WEBHOOK_TOKEN>`
-- **Eventos:** somente `message`
+- **Eventos:** `message`, `message.ack` e `message.reaction` (os dois últimos
+  são os recibos ✓✓ e as reações; precisam da migration 086 — sem ela o
+  webhook responde 200 e ignora)
 - **Tentativas:** 15, com intervalo inicial de 2 segundos
 
 Não assine `message.any`: ele inclui as mensagens enviadas pelo próprio número. O
@@ -242,6 +247,31 @@ WAHA e telefone comprido e estranho na Caixa.
 **O que o robô diz** está em `bot.ts` (`TEXTO_BOAS_VINDAS`,
 `textoDirecionando`, `TEXTO_FORA_DO_HORARIO`). Mexeu no texto, mantenha os três
 números do menu na ordem: o teste `tests/whatsapp-bot.test.js` trava isso.
+
+## 12. Conversa rica: recibos, citação, reações, emojis, áudio e busca
+
+Com a migration 086 aplicada e os eventos `message.ack` e `message.reaction`
+assinados no webhook (seção 8), a conversa na **Caixa de entrada** mostra:
+
+- **Recibo** em cada resposta da equipe: relógio (enviando), ✓ (no servidor),
+  ✓✓ cinza (entregue), ✓✓ azul (lida) e **!** vermelho (não entregue). Mensagem
+  antiga, de antes da 086, fica sem recibo: a tela não inventa ✓.
+- **Visto para o cliente**: abrir uma conversa não lida manda o "visto" ao
+  WhatsApp (`/api/sendSeen`), e o cliente vê o ✓✓ azul do lado dele.
+- **Responder citando**: passe o mouse na mensagem e use a seta. A resposta sai
+  como "responder" no WhatsApp (`reply_to`) e a citação aparece na bolha. Quando
+  o **cliente** responde citando, a citação também aparece.
+- **Reações**: o rostinho ao lado da mensagem abre 👍 ❤️ 😂 😮 😢 🙏; clicar de
+  novo na mesma tira a reação. A reação do cliente aparece embaixo da bolha.
+- **Emojis** no composer e **gravação de áudio** pelo microfone (até 5 min). O
+  Chrome grava em WebM e o envio pede ao WAHA para converter para nota de voz
+  (`sendVoice` com `convert: true`); se a sua versão do WAHA não converter, o
+  áudio chega como arquivo. O site precisa de permissão de microfone
+  (`Permissions-Policy: microphone=(self)` no `vercel.json`).
+- **Busca na conversa** (lupa no cabeçalho), com anterior/próxima.
+
+Teste rápido: mande uma mensagem pelo Intra e veja o ✓✓ ficar azul quando o
+celular abrir a conversa; reaja no celular com 👍 e veja a reação no Intra.
 
 ## Quando algo não funciona
 

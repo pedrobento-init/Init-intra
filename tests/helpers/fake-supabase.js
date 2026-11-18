@@ -57,6 +57,11 @@ function builder(linhas, tabela = '', queries = null) {
       return api;
     },
     not: () => api,
+    // Só registra: o filtro em texto do PostgREST não é reimplementado aqui.
+    or: (expr) => {
+      if (registro) registro.filtros.push(['or', expr, 'or']);
+      return api;
+    },
     is: (col, val) => {
       if (registro) registro.filtros.push([col, val, 'is']);
       out = out.filter((r) => r[col] == val);

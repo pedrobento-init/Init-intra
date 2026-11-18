@@ -157,3 +157,44 @@ describe('whatsapp: mídia e reentrega', () => {
     expect(contagens[1].filtros.some(([col]) => col === 'direcao')).toBe(false);
   });
 });
+
+describe('whatsapp: recibo e reação (086)', () => {
+  it('recibo de leitura atualiza só a nossa mensagem, pelo id do WAHA', async () => {
+    const { res, dados, queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'true_5511@c.us_A1', fromMe: true, ack: 3 },
+    });
+    expect(res.status).toBe(200);
+    expect(dados).toMatchObject({ ok: true, recibos: 1 });
+    const up = queries.find((q) => q.patch && 'ack' in q.patch);
+    expect(up.patch.ack).toBe(3);
+    expect(up.filtros).toEqual(
+      expect.arrayContaining([
+        ['direcao', 'saida'],
+        ['message_id', ['true_5511@c.us_A1', 'A1'], 'in'],
+        ['or', 'ack.is.null,ack.lt.3', 'or'],
+      ])
+    );
+  });
+
+  it('reação do contato vai para reacao_contato', async () => {
+    const { queries } = await chamar({
+      event: 'message.reaction',
+      payload: {
+        from: '5511@c.us',
+        fromMe: false,
+        reaction: { text: '👍', messageId: 'true_5511@c.us_A1' },
+      },
+    });
+    const up = queries.find((q) => q.patch && 'reacao_contato' in q.patch);
+    expect(up.patch.reacao_contato).toBe('👍');
+  });
+
+  it('evento de status não grava mensagem nem usa a chave de dedupe', async () => {
+    const { queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'true_5511@c.us_A1', fromMe: true, ack: 2 },
+    });
+    expect(queries.some((q) => q.insert)).toBe(false);
+  });
+});

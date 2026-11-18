@@ -1277,3 +1277,135 @@ describe('fala do WhatsApp com avatar', () => {
     expect(html).toContain('<img class="cx-av-img" src="data:image/png;base64,iVBORw0KGgo="');
   });
 });
+
+describe('conversa rica do WhatsApp (086)', () => {
+  it('recibo: entregue em cinza, lida em azul', () => {
+    expect(s.caixaAckHTML(2)).toContain('aria-label="Entregue"');
+    expect(s.caixaAckHTML(2)).not.toContain('cx-ack-lida');
+    expect(s.caixaAckHTML(3)).toContain('cx-ack-lida');
+  });
+
+  it('sem recibo gravado não inventa ✓', () => {
+    expect(s.caixaAckHTML(null)).toBe('');
+    expect(s.caixaAckHTML(undefined)).toBe('');
+    expect(s.caixaAckHTML(9)).toBe('');
+  });
+
+  it('erro de envio aparece como alerta', () => {
+    expect(s.caixaAckHTML(-1)).toContain('Não foi entregue');
+  });
+
+  it('citação acha a mensagem pelo id inteiro ou só pelo final', () => {
+    const msgs = [{ id: 'a', messageId: 'false_5511@c.us_3EB0' }];
+    expect(s.caixaMensagemCitada(msgs, 'false_5511@c.us_3EB0')).toBe(msgs[0]);
+    expect(s.caixaMensagemCitada(msgs, '3EB0')).toBe(msgs[0]);
+    expect(s.caixaMensagemCitada(msgs, 'outro')).toBeNull();
+  });
+
+  it('citação de mensagem que não está na conversa usa o texto gravado, escapado', () => {
+    const html = s.caixaCitacaoHTML(
+      { mensagens: [], canal: 'whatsapp' },
+      { id: 'x', texto: '<img src=x onerror=alert(1)>', autor: 'Márcia' }
+    );
+    expect(html).toContain('&lt;img');
+    expect(html).not.toContain('<img');
+  });
+
+  it('busca acha todas as ocorrências sem diferenciar maiúsculas', () => {
+    expect(s.caixaOcorrencias('Boleto e BOLETO', 'boleto')).toEqual([
+      [0, 6],
+      [9, 15],
+    ]);
+  });
+
+  it('busca de uma letra só não realça nada', () => {
+    expect(s.caixaOcorrencias('abc', 'a')).toEqual([]);
+  });
+
+  it('emoji entra no ponto do cursor', () => {
+    expect(s.caixaInserirNoTexto('oi tudo', '👋', 2, 2)).toEqual({ texto: 'oi👋 tudo', cursor: 4 });
+  });
+
+  it('emoji sem cursor vai para o fim', () => {
+    expect(s.caixaInserirNoTexto('oi', '👋')).toEqual({ texto: 'oi👋', cursor: 4 });
+  });
+
+  it('gravação prefere OGG (o formato do WhatsApp) quando o navegador grava', () => {
+    expect(s.caixaAudioTipo(() => true)).toBe('audio/ogg;codecs=opus');
+    expect(s.caixaAudioTipo((t) => t.startsWith('audio/webm'))).toBe('audio/webm;codecs=opus');
+    expect(s.caixaAudioTipo(() => false)).toBe('');
+  });
+
+  it('duração da gravação em m:ss', () => {
+    expect(s.caixaDuracao(65000)).toBe('1:05');
+  });
+
+  function conversaRica() {
+    lista = [
+      entrada({
+        id: 'W1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Márcia',
+        corpo: 'Qual o prazo?',
+        messageId: 'false_5511987654321@c.us_Q1',
+        reacaoContato: '👍',
+        recebidoEm: '2026-10-26T10:00:00.000Z',
+      }),
+      entrada({
+        id: 'op:1',
+        threadId: null,
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        de: 'Ana',
+        direcao: 'saida',
+        status: 'anexado',
+        corpo: 'Ana: Amanhã',
+        messageId: 'true_5511987654321@c.us_R1',
+        ack: 3,
+        citacao: { id: 'false_5511987654321@c.us_Q1', texto: 'Qual o prazo?', autor: 'Márcia' },
+        recebidoEm: '2026-10-26T10:30:00.000Z',
+      }),
+    ];
+    s.renderCaixaEntrada();
+    acoes.caixaSelecionar(null, s.caixaAgruparConversas(lista)[0].id);
+    return elementos.caixaConversa.innerHTML;
+  }
+
+  it('a resposta mostra a citação, o recibo de lida e a reação do contato', () => {
+    const html = conversaRica();
+    expect(html).toContain('class="cx-cita"><b>Márcia</b><span>Qual o prazo?</span>');
+    expect(html).toContain('cx-ack-lida');
+    expect(html).toContain('title="Reação do contato">👍</span>');
+  });
+
+  it('responder citando abre a barra de citação no composer', () => {
+    conversaRica();
+    acoes.caixaCitar(null, 'W1');
+    expect(elementos.caixaConversa.innerHTML).toContain('Respondendo a');
+  });
+
+  it('trocar de conversa larga a citação', () => {
+    conversaRica();
+    acoes.caixaCitar(null, 'W1');
+    acoes.caixaVoltar();
+    acoes.caixaSelecionar(null, s.caixaAgruparConversas(lista)[0].id);
+    expect(elementos.caixaConversa.innerHTML).not.toContain('Respondendo a');
+  });
+
+  it('o seletor de reação marca a reação atual da equipe para poder tirar', () => {
+    lista = [];
+    conversaRica();
+    lista[0].reacaoEquipe = '❤️';
+    acoes.caixaReagirMenu(null, 'W1');
+    const html = elementos.caixaConversa.innerHTML;
+    expect(html).toContain('data-arg="W1|"');
+    expect(html).toContain('title="Tirar reação"');
+  });
+
+  it('nota interna não tem responder nem reagir: nunca foi para o cliente', () => {
+    expect(s._caixaMsgInterativa({ direcao: 'interna' })).toBe(false);
+    expect(s._caixaMsgInterativa({ direcao: 'entrada' })).toBe(true);
+  });
+});

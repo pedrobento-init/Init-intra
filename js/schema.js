@@ -587,13 +587,28 @@ const ENTITIES = [
       direcao: 'direcao',
       media: 'media',
       foto_url: 'fotoUrl',
+      ack: 'ack',
+      citacao: 'citacao',
+      reacao_contato: 'reacaoContato',
+      reacao_equipe: 'reacaoEquipe',
       created_at: 'createdAt',
       updated_at: 'updatedAt',
     },
     // 075/082: banco que ainda não rodou a migration não tem as colunas do
     // WhatsApp nem as do portal; a entrada sem canal continua sendo lida como
     // e-mail, e media/direcao vazios não entram no push.
-    optionalFields: ['canal', 'telefone', 'direcao', 'media', 'foto_url'], // 075, 082, 085
+    // 086: recibo, citação e reações são gravados pelo servidor; o app só lê.
+    optionalFields: [
+      'canal',
+      'telefone',
+      'direcao',
+      'media',
+      'foto_url',
+      'ack',
+      'citacao',
+      'reacao_contato',
+      'reacao_equipe',
+    ], // 075, 082, 085, 086
     onChange: () => {
       // A caixa mora na tela #caixa: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.

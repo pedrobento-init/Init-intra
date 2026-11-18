@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { enviarTexto, mensagensDoWebhook } from '../supabase/functions/whatsapp/provedor.ts';
+import {
+  emojiValido,
+  enviarReacao,
+  enviarTexto,
+  eventosDeStatus,
+  idCurto,
+  marcarVisto,
+  mensagensDoWebhook,
+} from '../supabase/functions/whatsapp/provedor.ts';
 
 // Adaptador do WAHA: único lugar que conhece o formato do provedor; os testes
 // de mensagem.ts continuam independentes dele.
@@ -172,5 +180,93 @@ describe('mídia do WAHA', () => {
   it('não aceita URL de mídia fora de HTTP', () => {
     const p = recebida({ body: '', hasMedia: true, media: { url: 'javascript:alert(1)' } });
     expect(mensagensDoWebhook(p)).toEqual([]);
+  });
+});
+
+describe('conversa rica: citação, recibo e reação (086)', () => {
+  it('guarda a mensagem que o contato respondeu citando', () => {
+    const [m] = mensagensDoWebhook(recebida({ replyTo: { id: 'ABC', body: 'Qual o modelo?' } }));
+    expect(m.citacao).toEqual({ id: 'ABC', texto: 'Qual o modelo?' });
+  });
+
+  it('engine antigo do WAHA: a citação vem em _data.quotedMsg', () => {
+    const [m] = mensagensDoWebhook(
+      recebida({ _data: { notifyName: 'Maria', quotedStanzaID: 'XYZ', quotedMsg: { body: 'oi' } } })
+    );
+    expect(m.citacao).toEqual({ id: 'XYZ', texto: 'oi' });
+  });
+
+  it('mensagem sem citação não ganha o campo', () => {
+    expect(mensagensDoWebhook(recebida())[0]).not.toHaveProperty('citacao');
+  });
+
+  it('recibo só conta para mensagem que a empresa mandou', () => {
+    const ack = (fromMe, ack) => ({
+      event: 'message.ack',
+      payload: { id: 'true_5511@c.us_A1', fromMe, ack },
+    });
+    expect(eventosDeStatus([ack(true, 3), ack(false, 3)]).recibos).toEqual([
+      { id: 'true_5511@c.us_A1', ack: 3 },
+    ]);
+  });
+
+  it('recibo fora da faixa do WAHA é ignorado', () => {
+    const r = eventosDeStatus({ event: 'message.ack', payload: { id: 'X', fromMe: true, ack: 9 } });
+    expect(r.recibos).toEqual([]);
+  });
+
+  it('reação do contato e reação tirada (texto vazio)', () => {
+    const reacao = (text, fromMe = false) => ({
+      event: 'message.reaction',
+      payload: { from: '5511@c.us', fromMe, reaction: { text, messageId: 'true_5511@c.us_A1' } },
+    });
+    expect(eventosDeStatus([reacao('👍'), reacao('', true)]).reacoes).toEqual([
+      { alvo: 'true_5511@c.us_A1', emoji: '👍', deMim: false },
+      { alvo: 'true_5511@c.us_A1', emoji: '', deMim: true },
+    ]);
+  });
+
+  it('reação que não é emoji não passa (vai parar na tela)', () => {
+    expect(emojiValido('<b>')).toBe(false);
+    expect(emojiValido('ok')).toBe(false);
+    expect(emojiValido('❤️')).toBe(true);
+  });
+
+  it('id curto é o final do id serializado', () => {
+    expect(idCurto('true_5511@c.us_3EB0ABC')).toBe('3EB0ABC');
+  });
+
+  it('id do envio vindo como objeto (_serialized) também é guardado', async () => {
+    const r = await enviarTexto(
+      '5511987654321',
+      'oi',
+      cred,
+      fetchFalso(okJson({ id: { _serialized: 'true_x@c.us_Z' } })).fn
+    );
+    expect(r).toEqual({ ok: true, id: 'true_x@c.us_Z' });
+  });
+
+  it('responder citando manda reply_to para o WAHA', async () => {
+    const f = fetchFalso(okJson({ id: 'W1' }));
+    await enviarTexto('5511987654321', 'oi', cred, f.fn, { replyTo: 'false_x@c.us_Q' });
+    expect(JSON.parse(f.chamadas[0].init.body).reply_to).toBe('false_x@c.us_Q');
+  });
+
+  it('reação sai por PUT /api/reaction com o id da mensagem', async () => {
+    const f = fetchFalso(okJson({}));
+    expect(await enviarReacao('false_x@c.us_Q', '👍', cred, f.fn)).toEqual({ ok: true });
+    expect(f.chamadas[0].url).toBe('https://waha.exemplo.com/api/reaction');
+    expect(f.chamadas[0].init.method).toBe('PUT');
+    expect(JSON.parse(f.chamadas[0].init.body)).toMatchObject({
+      messageId: 'false_x@c.us_Q',
+      reaction: '👍',
+    });
+  });
+
+  it('marcar visto usa o chatId do telefone', async () => {
+    const f = fetchFalso(okJson({}));
+    await marcarVisto('+55 11 98765-4321', cred, f.fn);
+    expect(f.chamadas[0].url).toBe('https://waha.exemplo.com/api/sendSeen');
+    expect(JSON.parse(f.chamadas[0].init.body).chatId).toBe('5511987654321@c.us');
   });
 });

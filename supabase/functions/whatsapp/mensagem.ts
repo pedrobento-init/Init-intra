@@ -30,6 +30,9 @@ export type MensagemWhats = {
   id: string;
   quando: string;
   media?: { nome: string; tipo: string; url: string } | null;
+  // A mensagem que o contato respondeu citando (086). id é o do provedor, que
+  // pode vir curto (só o final do id serializado): a tela casa pelo sufixo.
+  citacao?: { id: string; texto: string } | null;
 };
 
 // Teto do texto que sai para o WhatsApp. O limite do protocolo é maior, mas
