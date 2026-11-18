@@ -157,7 +157,13 @@ function initSupabaseRealtime() {
   Object.keys(_RT_TABLE_META).forEach((table) => {
     const meta = _RT_TABLE_META[table];
     const opts = { event: '*', schema: 'public', table };
-    if (teamFilter && meta.hasTeam) opts.filter = `team=eq.${teamFilter}`;
+    const filtro =
+      typeof syncFiltroEquipe === 'function'
+        ? syncFiltroEquipe(meta, teamFilter, typeof isTeamAdmin === 'function' && isTeamAdmin())
+        : meta.hasTeam
+          ? teamFilter
+          : null;
+    if (filtro) opts.filter = `team=eq.${filtro}`;
     channel = channel.on('postgres_changes', opts, (payload) => {
       _applyRealtimePayload(table, payload);
     });

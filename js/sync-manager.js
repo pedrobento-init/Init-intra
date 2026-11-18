@@ -60,6 +60,19 @@ function _syncTeamFilter() {
   }
 }
 
+// Filtro de equipe do canal ao vivo para UMA entidade. A tela de quem vê todas
+// as equipes (admin) pode mostrar mais do que a equipe escolhida no seletor:
+// a Caixa de entrada lista conversas de todas (filterByTeam devolve tudo para
+// admin), e mensagem de número desconhecido entra como 'init'. Com o canal
+// filtrado pela equipe escolhida, essa mensagem só aparecia ao recarregar.
+// A entidade marcada com `realtimeTodasEquipes` escuta sem filtro para admin;
+// a RLS continua decidindo o que chega, e o applyRemote confere canViewTeam.
+function syncFiltroEquipe(meta, teamFilter, admin) {
+  if (!teamFilter || !meta || !meta.hasTeam) return null;
+  if (admin && meta.realtimeTodasEquipes) return null;
+  return teamFilter;
+}
+
 var SYNC_FALLBACK_MIN_MS = 60000;
 
 var SyncManager = (function () {
@@ -287,6 +300,12 @@ var SyncManager = (function () {
     }
     _emit('connecting');
     var teamFilter = _syncTeamFilter();
+    var admin = false;
+    try {
+      admin = typeof isTeamAdmin === 'function' && !!isTeamAdmin();
+    } catch (_) {
+      admin = false;
+    }
     var ch = null;
     try {
       ch = supabaseClient.channel('public-changes-v2');
@@ -300,7 +319,8 @@ var SyncManager = (function () {
       }
       metas.forEach(function (meta) {
         var opts = { event: '*', schema: 'public', table: meta.table };
-        if (teamFilter && meta.hasTeam) opts.filter = 'team=eq.' + teamFilter;
+        var filtro = syncFiltroEquipe(meta, teamFilter, admin);
+        if (filtro) opts.filter = 'team=eq.' + filtro;
         ch = ch.on('postgres_changes', opts, function (payload) {
           var ev = payload.eventType || payload.event;
           var data = (ev === 'DELETE' ? payload.old : payload.new) || {};
@@ -714,6 +734,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     _syncBackoffDelay,
     shouldApplyRemote,
+    syncFiltroEquipe,
     SyncManager: typeof SyncManager !== 'undefined' ? SyncManager : null,
     subscribeLive: typeof subscribeLive !== 'undefined' ? subscribeLive : null,
     mountSyncStatus: typeof mountSyncStatus !== 'undefined' ? mountSyncStatus : null,

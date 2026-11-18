@@ -845,17 +845,40 @@ function _caixaEmailDe(de) {
 }
 
 // Foto de perfil do contato (WhatsApp). A URL é gravada pelo webhook, mas só
-// https entra no <img>: ela vai para o atributo src de quem atende. Se a
-// imagem não carregar (a URL do CDN expira), o <img> sem alt não desenha nada
-// e as iniciais que ficam por baixo seguem visíveis.
-function caixaFotoHTML(conversa) {
+// https entra no <img>: ela vai para o atributo src de quem atende.
+//
+// A URL do CDN do WhatsApp é assinada e vence (o `oe` é a validade, em segundos
+// hexadecimais), e o webhook só a renova quando o contato manda mensagem de
+// novo. Conversa parada fica com URL vencida: o Chrome desenhava o ícone de
+// imagem quebrada por cima das iniciais, porque o <img> tem tamanho fixo.
+// Vencida, nem entra; se falhar mesmo assim, _caixaFotoFalhou a remove.
+function caixaFotoVencida(url, agora) {
+  const m = /[?&]oe=([0-9A-Fa-f]{6,10})(?:&|$)/.exec(String(url || ''));
+  if (!m) return false;
+  return parseInt(m[1], 16) * 1000 <= (agora == null ? Date.now() : agora);
+}
+
+function caixaFotoHTML(conversa, agora) {
   const url = String((conversa && conversa.fotoUrl) || '').trim();
   if (!/^https:\/\/[^\s"'<>]+$/.test(url) || url.length > 1000) return '';
+  if (caixaFotoVencida(url, agora)) return '';
   return (
     '<img class="cx-av-img" src="' +
     escapeHtml(url) +
     '" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false" />'
   );
+}
+
+// Evento de erro de <img> não sobe na árvore: só na captura dá para ouvir num
+// lugar só (e a CSP não deixa usar onerror inline). Sem a imagem, as iniciais
+// que estão por baixo aparecem.
+function _caixaFotoFalhou(ev) {
+  const img = ev && ev.target;
+  if (img && img.classList && img.classList.contains('cx-av-img')) img.remove();
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('error', _caixaFotoFalhou, true);
 }
 
 function _caixaIniciais(nome) {
