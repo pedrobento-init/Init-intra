@@ -47,6 +47,8 @@ function _startApp() {
     'clientes',
     'pendencias',
     'caixa',
+    'whatsapp-contatos',
+    'whatsapp-painel',
     'calendario',
     'operadores',
     'relatorios',

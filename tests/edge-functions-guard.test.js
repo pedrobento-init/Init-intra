@@ -115,6 +115,15 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
     }
   });
 
+  // Envio ativo de WhatsApp (089): só operador logado dispara, e a function
+  // confere equipe e limite antes de escrever com service role.
+  it('whatsapp-iniciar exige JWT do operador', () => {
+    const f = functions.find((x) => x.name === 'whatsapp-iniciar');
+    expect(f, 'supabase/functions/whatsapp-iniciar/index.ts').toBeTruthy();
+    expect(authMode(f.source)).toBe('jwt');
+    expect(verifyJwtOf('whatsapp-iniciar')).toBe(true);
+  });
+
   it('nenhuma function fica sem forma alguma de autenticar o chamador', () => {
     for (const f of functions) {
       expect(authMode(f.source), `${f.name} não autentica o chamador`).not.toBe('nenhum');

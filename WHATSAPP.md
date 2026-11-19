@@ -243,6 +243,72 @@ WAHA e telefone comprido e estranho na Caixa.
 `textoDirecionando`, `TEXTO_FORA_DO_HORARIO`). Mexeu no texto, mantenha os três
 números do menu na ordem: o teste `tests/whatsapp-bot.test.js` trava isso.
 
+## 15. Etiquetas, contatos, atendimento ativo e painel
+
+**Banco.** Rode `supabase/migrations/089_whatsapp_etiquetas_contatos.sql` no SQL
+Editor, depois da 088, e confira com os `VERIFICAR` do cabeçalho. Ela cria
+`whatsapp_etiquetas`, `whatsapp_conversa_etiquetas` e `whatsapp_contatos` (RLS
+por equipe, no realtime) e `whatsapp_envios_ativos` (sem policy: só o servidor).
+Sem a 089 a Caixa segue igual, só sem etiquetas e nomes editados, e o envio
+ativo recusa tudo com `migration_missing` (503).
+
+**Etiquetas.** Na conversa da Caixa, **Ações → Etiquetas** marca e desmarca as
+etiquetas da equipe e cria novas (nome até 40 caracteres, cor de uma paleta de
+oito). A etiqueta é da **conversa** (telefone normalizado + equipe), não da
+mensagem: continua lá quando o cliente manda a próxima. Aparece no item da
+lista e no cabeçalho, e o seletor ao lado dos chips de canal filtra a lista
+(as contagens das abas seguem o filtro). Editar e apagar: **Contatos do
+WhatsApp → Etiquetas**; apagar tira a etiqueta de todas as conversas.
+
+**Contatos do WhatsApp** (menu lateral) lista quem já escreveu para a empresa,
+por equipe: nome, telefone, cliente vinculado, etiquetas e última conversa, com
+busca e filtro por etiqueta. **Abrir conversa** leva para a Caixa; **Editar
+nome** troca o nome de exibição para a equipe toda (em branco volta ao nome do
+perfil do WhatsApp) — a Caixa passa a mostrar esse nome.
+
+**Iniciar conversa** (atendimento ativo) chama a function `whatsapp-iniciar`:
+
+```bash
+supabase functions deploy whatsapp-iniciar
+```
+
+O servidor só aceita telefone de **cliente cadastrado da equipe** (dono ou
+responsável; admin vale para qualquer equipe) ou de **quem já escreveu** e cuja
+conversa a equipe enxerga na Caixa. Qualquer outro número dá 403
+(`not_allowed_number`) sem tocar na WAHA — a trava da 076 continua valendo.
+Antes de mandar, pergunta à WAHA se o número tem WhatsApp
+(`/api/contacts/check-exists`; 422 `not_on_whatsapp` se não tiver). Limite: **20
+conversas iniciadas por operador e 60 por equipe na última hora** (429
+`rate_limited` / `team_rate_limited`); a tentativa conta mesmo se a WAHA
+falhar. O cliente vê o nome de quem escreveu, como nas respostas. O envio
+**não** entra em `whatsapp_conversas`: até o contato responder, nova mensagem
+ativa passa de novo pela function. Se o contato escreveu nas últimas 24 h, a
+tela manda responder pela conversa em vez de iniciar outra.
+
+> Mensagem que a pessoa não espera é o motivo mais comum de denúncia e bloqueio
+> do número, e a WAHA é API não oficial. Use para retorno de visita e aviso de
+> chamado, nunca para campanha. Os limites ficam em
+> `supabase/functions/whatsapp-iniciar/index.ts` (`LIMITE_OPERADOR_HORA`,
+> `LIMITE_EQUIPE_HORA`).
+
+**Painel de atendimento** (menu lateral) calcula tudo de `emails_triagem`, só
+WhatsApp, respeitando a equipe (admin pode escolher a equipe), com período de
+hoje, 7, 30 ou 90 dias:
+
+- **Agora:** conversas abertas, aguardando resposta (a última fala é do
+  cliente), na fila sem atendente e a maior espera.
+- **No período:** tempo médio de 1ª resposta, tempo médio de atendimento,
+  atendimentos (e quantos a empresa iniciou), sem resposta, conversas por
+  atendente e mensagens recebidas por dia e por hora.
+
+Regras: um atendimento começa na mensagem do cliente e termina ao **encerrar** a
+conversa ou depois de **12 h sem mensagem** (aí o fim é a última mensagem). A 1ª
+resposta é a primeira **saída escrita por gente**: nota interna e atendimento
+automático não contam. Conversa descartada não entra nas médias. A avaliação de
+satisfação aparece quando quem guarda as notas registra a fonte com
+`wpainelRegistrarAvaliacoes(fn)` (em `js/whatsapp-painel.js`); sem ela, o
+bloco não aparece.
+
 ## Quando algo não funciona
 
 Os logs ficam no painel do Supabase: **Edge Functions → whatsapp** (ou
@@ -266,3 +332,6 @@ aparecem com `docker compose logs waha`.
 | Log "migration 077 não aplicada"        | Funciona assim, mas rode a 077 para evitar leitura de todos os clientes.               |
 | Log "passou de 30 mensagens por minuto" | O excesso foi descartado pelo limite do canal.                                         |
 | Envio: `pendencia_closed` (409)         | O chamado está encerrado. Reabra antes de responder.                                   |
+| Envio ativo: `not_allowed_number` (403) | O número não é de cliente da equipe nem escreveu para ela.                             |
+| Envio ativo: `migration_missing` (503)  | A 089 não foi aplicada: sem contagem não há limite, então nada sai.                    |
+| Envio ativo: `rate_limited` (429)       | Passou de 20 conversas iniciadas na última hora (60 por equipe). Espere.               |

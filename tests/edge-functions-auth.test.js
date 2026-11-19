@@ -95,6 +95,13 @@ const FUNCTIONS = [
     equipe: 'nenhum',
     body: { pendencia_id: 'p1', text: 'resposta de teste' },
   },
+  // O 403 da whatsapp-iniciar é sobre o NÚMERO (tests/whatsapp-iniciar.test.js);
+  // aqui o telefone curto faz o admin parar no 400, depois do gate.
+  {
+    nome: 'whatsapp-iniciar',
+    equipe: 'nenhum',
+    body: { telefone: '123', text: 'mensagem de teste' },
+  },
 ];
 
 /** Status da resposta; se estourar DEPOIS do gate, o gate deixou passar. */
@@ -106,7 +113,7 @@ async function status(handler, req) {
   }
 }
 
-describe('Edge Functions: as 16 com JWT estão na lista', () => {
+describe('Edge Functions: as 17 com JWT estão na lista', () => {
   it('a lista cobre todas as functions que exigem usuário', async () => {
     const fs = await import('node:fs');
     const dir = new URL('../supabase/functions/', import.meta.url);

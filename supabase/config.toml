@@ -33,6 +33,9 @@ verify_jwt = true
 verify_jwt = true
 [functions.conversa-responder]
 verify_jwt = true
+# Atendimento ativo: o app chama com o JWT; a function confere equipe e limite.
+[functions.whatsapp-iniciar]
+verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 [functions.send-push]

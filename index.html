@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/pagina-projeto.css" />
     <link rel="stylesheet" href="css/pagina-chamado.css" />
     <link rel="stylesheet" href="css/utilidades.css" />
+    <link rel="stylesheet" href="css/whatsapp.css" />
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#1a56db" />
     <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
@@ -171,6 +172,51 @@
             </svg>
             <span>Caixa de entrada</span>
             <span class="badge hidden" id="badge-caixa">0</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-whatsapp-contatos"
+            title="Contatos do WhatsApp"
+            data-action="nav"
+            data-arg="whatsapp-contatos"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 11.5a4.5 4.5 0 0 1-6.6 4L13 16l.6-2.3A4.5 4.5 0 1 1 22 11.5z" />
+            </svg>
+            <span>Contatos do WhatsApp</span>
+          </a>
+          <a
+            class="nav-item"
+            id="nav-whatsapp-painel"
+            title="Painel de atendimento"
+            data-action="nav"
+            data-arg="whatsapp-painel"
+            tabindex="0"
+            role="link"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 3v18h18" />
+              <path d="M7 15v2M11 11v6M15 7v10M19 12v5" />
+            </svg>
+            <span>Painel de atendimento</span>
           </a>
           <a
             class="nav-item"
@@ -1105,6 +1151,9 @@
     <script defer src="js/emails-triagem.js"></script>
     <script defer src="js/respostas-prontas.js"></script>
     <script defer src="js/caixa-entrada.js"></script>
+    <script defer src="js/whatsapp-etiquetas.js"></script>
+    <script defer src="js/whatsapp-contatos.js"></script>
+    <script defer src="js/whatsapp-painel.js"></script>
     <script defer src="js/robo-execucoes.js"></script>
     <script defer src="js/sla.js"></script>
     <script defer src="js/pendencias-rapida.js"></script>
