@@ -75,6 +75,27 @@ function syncFiltroEquipe(meta, teamFilter, admin) {
 
 var SYNC_FALLBACK_MIN_MS = 60000;
 
+// Recuperação do que o canal ao vivo perdeu (Caixa de entrada). O realtime não
+// repete o que aconteceu enquanto o socket estava fora (aba dormindo, troca de
+// rede, token renovado): a mensagem só aparecia ao recarregar. Esta busca pega
+// as linhas mudadas desde a última que o aparelho viu.
+var SYNC_CATCHUP_MIN_MS = 15000;
+var SYNC_CATCHUP_SOBREPOSICAO_MS = 120000;
+var SYNC_CATCHUP_JANELA_VAZIA_MS = 3600000;
+var SYNC_CATCHUP_LIMITE = 200;
+
+// Pura e testável: a partir de quando buscar. O maior updatedAt local menos uma
+// sobreposição (relógios e commits fora de ordem); sem nada local, a última hora.
+function _syncCatchUpDesde(lista, agoraMs) {
+  var maior = 0;
+  for (var i = 0; i < (lista || []).length; i++) {
+    var t = new Date((lista[i] && (lista[i].updatedAt || lista[i].updated_at)) || 0).getTime();
+    if (!Number.isNaN(t) && t > maior) maior = t;
+  }
+  var base = maior ? maior - SYNC_CATCHUP_SOBREPOSICAO_MS : agoraMs - SYNC_CATCHUP_JANELA_VAZIA_MS;
+  return new Date(Math.max(0, base)).toISOString();
+}
+
 var SyncManager = (function () {
   var _channel = null;
   // Geração do canal: cada troca ou queda incrementa. O callback de um canal
@@ -256,6 +277,54 @@ var SyncManager = (function () {
     }
   }
 
+  var _catchUpBusy = false;
+  var _lastCatchUpAt = 0;
+
+  // Busca as linhas de `table` mudadas desde a última local e aplica pelo mesmo
+  // caminho do realtime (applyRemote: LWW, equipe, outbox). Limitada no tempo e
+  // em uma consulta por vez; a RLS decide o que o operador enxerga.
+  function catchUp(table) {
+    if (_catchUpBusy || !_canConnect()) return Promise.resolve(0);
+    var agora = Date.now();
+    if (agora - _lastCatchUpAt < SYNC_CATCHUP_MIN_MS) return Promise.resolve(0);
+    var meta = null;
+    try {
+      meta =
+        typeof ENTITIES !== 'undefined'
+          ? ENTITIES.find(function (e) {
+              return e.table === table;
+            })
+          : null;
+    } catch (_) {
+      meta = null;
+    }
+    if (!meta || typeof dbGet !== 'function') return Promise.resolve(0);
+    _lastCatchUpAt = agora;
+    _catchUpBusy = true;
+    var desde = _syncCatchUpDesde(dbGet(meta.dbKey) || [], agora);
+    return Promise.resolve(
+      supabaseClient
+        .from(table)
+        .select('*')
+        .gt('updated_at', desde)
+        .order('updated_at', { ascending: true })
+        .limit(SYNC_CATCHUP_LIMITE)
+    )
+      .then(async function (res) {
+        var rows = (res && !res.error && res.data) || [];
+        for (var i = 0; i < rows.length; i++) await applyRemote(table, 'UPDATE', rows[i]);
+        return rows.length;
+      })
+      .catch(function (_e) {
+        if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        return 0;
+      })
+      .then(function (n) {
+        _catchUpBusy = false;
+        return n;
+      });
+  }
+
   function _canConnect() {
     try {
       if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return false;
@@ -334,6 +403,8 @@ var SyncManager = (function () {
         if (st === 'SUBSCRIBED') {
           _retryN = 0;
           _emit('live');
+          // O que chegou com o socket fora não é repetido: busca o que faltou.
+          catchUp('emails_triagem');
         } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
           _emit('error');
           // Canal morto (ex.: erro com a aba oculta): solta a referência.
@@ -408,10 +479,25 @@ var SyncManager = (function () {
         if (document.visibilityState !== 'visible') return;
         try {
           if (_canConnect() && !_channel) connect();
+          // Canal que parece vivo mas ficou parado com a aba em segundo plano.
+          else catchUp('emails_triagem');
         } catch (_e) {
           if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
         }
       });
+      // Rede de segurança da Caixa: com ela aberta e visível, confere a cada 30 s
+      // se o canal ao vivo não deixou nada para trás.
+      setInterval(function () {
+        try {
+          if (
+            document.visibilityState === 'visible' &&
+            (window.location.hash.replace('#', '') || '') === 'caixa'
+          )
+            catchUp('emails_triagem');
+        } catch (_e) {
+          if (typeof _logSilent === 'function') _logSilent(_e, 'sync-manager');
+        }
+      }, 30000);
       window.addEventListener('pageshow', function (e) {
         if (e && e.persisted) {
           try {
@@ -427,6 +513,7 @@ var SyncManager = (function () {
   return {
     connect: connect,
     disconnect: disconnect,
+    catchUp: catchUp,
     onStatus: onStatus,
     getStatus: function () {
       return _status;
@@ -735,6 +822,7 @@ if (typeof module !== 'undefined' && module.exports) {
     _syncBackoffDelay,
     shouldApplyRemote,
     syncFiltroEquipe,
+    _syncCatchUpDesde,
     SyncManager: typeof SyncManager !== 'undefined' ? SyncManager : null,
     subscribeLive: typeof subscribeLive !== 'undefined' ? subscribeLive : null,
     mountSyncStatus: typeof mountSyncStatus !== 'undefined' ? mountSyncStatus : null,
