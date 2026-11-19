@@ -15,13 +15,8 @@ function openPendenciaRapida(preClientId) {
     .slice()
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
   const me = (typeof getUser === 'function' && getUser().name) || '';
-  const team =
-    typeof isTeamAdmin === 'function' &&
-    isTeamAdmin() &&
-    typeof _selectedTeam !== 'undefined' &&
-    _selectedTeam
-      ? _selectedTeam
-      : getCurrentTeam();
+  // Admin atribui a qualquer equipe: sem filtro de team.
+  const team = typeof isTeamAdmin === 'function' && isTeamAdmin() ? undefined : getCurrentTeam();
   const ops = typeof getOperatorNames === 'function' ? getOperatorNames(team) : [];
   const opNames = ops.length ? ops : [me];
   openModal(

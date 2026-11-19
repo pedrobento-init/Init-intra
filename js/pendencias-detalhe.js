@@ -688,12 +688,11 @@ function openPendenciaForm(id = null, preClientId = null, preDate = null, pre = 
     isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
       ? getClientsByTeam(_selectedTeam)
       : getMyClients();
-  const opNames = getOperatorNames(
-    isTeamAdmin() && typeof _selectedTeam !== 'undefined' && _selectedTeam
-      ? _selectedTeam
-      : getCurrentTeam()
-  );
+  // Admin atribui a qualquer equipe: sem filtro de team na lista de responsáveis.
+  const opNames = getOperatorNames(isTeamAdmin() ? undefined : getCurrentTeam());
   const currentResp = p.responsible || getUser().name;
+  // Responsável atual fora da lista (outra equipe/inativo) não pode sumir do select.
+  if (p.responsible && !opNames.includes(p.responsible)) opNames.push(p.responsible);
   // Prazo pelo SLA da prioridade (só em pendência nova sem data escolhida).
   const _slaOn = typeof slaPrazoSugerido === 'function';
   const _prazoAuto = !id && !p.deadline && !preDate && _slaOn;
