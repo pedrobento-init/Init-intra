@@ -154,6 +154,10 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Hosts externos que o SW pode buscar e guardar: os mesmos do connect-src do
+// CSP. Mudou lá, muda aqui (tests/sw-cache.test.js confere os dois).
+const SW_HOSTS_CACHEAVEIS = /^(cdn\.jsdelivr\.net|[a-z0-9-]+\.supabase\.co|brasilapi\.com\.br)$/;
+
 function purgeOldestCDNEntries() {
   caches.open(CDN_CACHE_NAME).then((cache) => {
     cache.keys().then((keys) => {
@@ -195,6 +199,14 @@ self.addEventListener('fetch', (event) => {
 
   const isSameOrigin = url.origin === self.location.origin;
 
+  // Fora da origem, só os hosts que o connect-src do CSP (vercel.json) libera.
+  // fetch() feito AQUI obedece ao connect-src, não ao img-src: interceptar a
+  // foto do contato do WhatsApp (pps.whatsapp.net) fazia o fetch ser barrado,
+  // e o respondWith recebia undefined ("Failed to convert value to
+  // 'Response'") — a foto nunca carregava. Sem interceptar, o navegador busca
+  // a imagem direto, como manda o img-src.
+  if (!isSameOrigin && !SW_HOSTS_CACHEAVEIS.test(url.hostname)) return;
+
   if (isSameOrigin) {
     event.respondWith(
       fetch(request)
@@ -205,9 +217,10 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          return caches.match(request);
-        })
+        .catch(() =>
+          // Sem rede e sem cópia: erro de rede de verdade, nunca undefined.
+          caches.match(request).then((cached) => cached || Response.error())
+        )
     );
   } else {
     event.respondWith(
@@ -223,7 +236,7 @@ self.addEventListener('fetch', (event) => {
             }
             return networkResponse;
           })
-          .catch(() => cachedResponse);
+          .catch(() => cachedResponse || Response.error());
 
         return cachedResponse || fetchPromise;
       })
