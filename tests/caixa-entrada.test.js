@@ -1409,3 +1409,24 @@ describe('conversa rica do WhatsApp (086)', () => {
     expect(s._caixaMsgInterativa({ direcao: 'entrada' })).toBe(true);
   });
 });
+
+describe('item da lista: linha de assunto', () => {
+  const itemDe = (e) => s._caixaItemHTML(s.caixaAgruparConversas([e])[0], {});
+
+  it('e-mail mostra o assunto', () => {
+    expect(itemDe(entrada())).toContain('cx-assunto');
+  });
+
+  it('WhatsApp não mostra o assunto: ele é a primeira linha da própria mensagem', () => {
+    const html = itemDe(
+      entrada({
+        canal: 'whatsapp',
+        telefone: '5511987654321',
+        assunto: 'Ó, pegou minha foto',
+        corpo: 'Ó, pegou minha foto',
+      })
+    );
+    expect(html).not.toContain('cx-assunto');
+    expect(html.match(/Ó, pegou minha foto/g)).toHaveLength(1);
+  });
+});
