@@ -272,11 +272,13 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
         const envio = await enviarTexto(telefone, textoEnvio, { baseUrl, apiKey, session }, fetch, {
           replyTo: alvo?.message_id || null,
         });
-        if (!envio.ok)
+        if (!envio.ok) {
+          console.error(`conversa-responder: envio pelo WhatsApp falhou (${envio.erro})`);
           return json(
             { error: 'Não foi possível enviar pelo WhatsApp', code: 'provider_error' },
             502
           );
+        }
         providerId = envio.id || null;
       } else {
         const endpoint = midia.tipo.startsWith('image/')
