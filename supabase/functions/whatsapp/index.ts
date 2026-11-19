@@ -66,6 +66,7 @@ import {
   type EstadoBot,
   gerarProtocolo,
   notaDaAtribuicao,
+  SILENCIO_NOVA_CONVERSA_MS,
 } from './bot.ts';
 import {
   enviarTexto,
@@ -224,6 +225,33 @@ async function chamadoDaConversa(db: SupabaseClient, conversa: string): Promise<
     return null;
   }
   return ((data || []) as Aberto[]).find((p) => !PEN_FECHADOS.includes(String(p.status))) || null;
+}
+
+// Conversa que a equipe puxou (whatsapp-iniciar) ou já respondeu na janela do
+// bot é atendimento em curso, mesmo sem chamado aberto: o menu de departamentos
+// aqui roteia quem está falando com um humano e tira a conversa de quem a
+// iniciou. A resposta do próprio bot não conta.
+async function equipeFalouRecente(
+  db: SupabaseClient,
+  conversa: string,
+  agora: Date
+): Promise<boolean> {
+  if (!conversa) return false;
+  const desde = new Date(agora.getTime() - SILENCIO_NOVA_CONVERSA_MS).toISOString();
+  const { data, error } = await db
+    .from('emails_triagem')
+    .select('id')
+    .eq('canal', 'whatsapp')
+    .eq('thread_id', conversa)
+    .eq('direcao', 'saida')
+    .neq('de', AUTOR_BOT)
+    .gte('recebido_em', desde)
+    .limit(1);
+  if (error) {
+    console.error('whatsapp equipe falou:', error.message);
+    return false;
+  }
+  return (data || []).length > 0;
 }
 
 // A mensagem no formato que os helpers da caixa (robo/campo.ts) já entendem.
@@ -675,7 +703,8 @@ async function handle(req: Request, ctx: SupabaseContext) {
         estadoLido.ok &&
         telefoneConfirmado &&
         !!credWaha.baseUrl &&
-        !!credWaha.apiKey;
+        !!credWaha.apiKey &&
+        !(await equipeFalouRecente(db, conversaDoTelefone(m.telefone), agora));
       const decisao = botLigado
         ? decidirBot(
             estadoDe(estadoLido.linha),

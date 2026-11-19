@@ -267,7 +267,7 @@ function evento(texto, id = 'M1') {
   };
 }
 
-async function chamar(payload, { env = ENV, conversa = null } = {}) {
+async function chamar(payload, { env = ENV, conversa = null, triagem = [] } = {}) {
   const queries = [];
   const enviadas = [];
   const fetch = async (url, init) => {
@@ -283,7 +283,7 @@ async function chamar(payload, { env = ENV, conversa = null } = {}) {
   };
   const createClient = fakeSupabase({
     queries,
-    tabelas: { whatsapp_conversas: conversa ? [conversa] : [] },
+    tabelas: { whatsapp_conversas: conversa ? [conversa] : [], emails_triagem: triagem },
   });
   const { handler } = await loadHandler('whatsapp', { env, createClient, fetch });
   const res = await handler(
@@ -417,5 +417,45 @@ describe('webhook com o atendimento automático', () => {
     });
     expect(dados.caixa).toBe(1);
     expect(enviadas).toEqual([]);
+  });
+
+  // Pedro buscou o contato e mandou a primeira mensagem (whatsapp-iniciar): o
+  // cliente responde "1" e o menu de departamentos não pode tirar a conversa
+  // de quem já está atendendo.
+  const saidaDaEquipe = (extra) => ({
+    canal: 'whatsapp',
+    thread_id: 'whatsapp:5511987654321',
+    direcao: 'saida',
+    de: 'Pedro Bento',
+    recebido_em: new Date().toISOString(),
+    ...extra,
+  });
+
+  it('conversa iniciada pela equipe: o robô fica quieto e a resposta entra na caixa', async () => {
+    const { dados, enviadas } = await chamar(evento('1', 'M5'), {
+      env: { ...ENV, WHATSAPP_BOT_ATIVO: '1' },
+      triagem: [saidaDaEquipe()],
+    });
+    expect(dados.caixa).toBe(1);
+    expect(dados.bot).toBe(0);
+    expect(enviadas).toEqual([]);
+  });
+
+  it('só a resposta do próprio robô não conta como a equipe ter falado', async () => {
+    const { dados, enviadas } = await chamar(evento('oi', 'M6'), {
+      env: { ...ENV, WHATSAPP_BOT_ATIVO: '1' },
+      triagem: [saidaDaEquipe({ de: 'Atendimento automático' })],
+    });
+    expect(dados.bot).toBe(1);
+    expect(enviadas.length).toBeGreaterThan(0);
+  });
+
+  it('fala da equipe fora da janela de 12 h volta a passar pelo menu', async () => {
+    const velha = new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString();
+    const { dados } = await chamar(evento('oi', 'M7'), {
+      env: { ...ENV, WHATSAPP_BOT_ATIVO: '1' },
+      triagem: [saidaDaEquipe({ recebido_em: velha })],
+    });
+    expect(dados.bot).toBe(1);
   });
 });
