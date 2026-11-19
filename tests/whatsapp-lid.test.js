@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { mensagensDoWebhook, telefoneDoLid } from '../supabase/functions/whatsapp/provedor.ts';
+import {
+  chatIdsPara,
+  enviarTexto,
+  mensagensDoWebhook,
+  telefoneDoLid,
+} from '../supabase/functions/whatsapp/provedor.ts';
 import { TEXTO_BOAS_VINDAS } from '../supabase/functions/whatsapp/bot.ts';
 import { loadHandler } from './helpers/edge-harness.js';
 import { fakeSupabase } from './helpers/fake-supabase.js';
@@ -32,6 +37,29 @@ describe('adaptador: remetente @lid', () => {
     expect(m.lid).toBeUndefined();
   });
 
+  // O engine NOWEB manda o telefone em key.remoteJidAlt (ou senderPn); o GOWS,
+  // em Info.SenderAlt. Lendo daqui, a conversa nasce com o número certo mesmo
+  // quando a consulta /lids do WAHA falha.
+  it.each([
+    ['NOWEB remoteJidAlt', { key: { remoteJid: LID, remoteJidAlt: `${FONE}@s.whatsapp.net` } }],
+    ['NOWEB senderPn', { key: { remoteJid: LID, senderPn: `${FONE}@s.whatsapp.net` } }],
+    ['GOWS SenderAlt', { Info: { Sender: LID, SenderAlt: `${FONE}:12@s.whatsapp.net` } }],
+  ])('LID com telefone no próprio evento (%s) já sai com o número', (_n, _data) => {
+    const ev = evento(LID);
+    ev.payload._data = _data;
+    const [m] = mensagensDoWebhook(ev);
+    expect(m.telefone).toBe(FONE);
+    expect(m.lid).toBeUndefined();
+  });
+
+  it('campo alternativo que é outro LID não vira telefone', () => {
+    const ev = evento(LID);
+    ev.payload._data = { key: { remoteJidAlt: '123456789012345@lid' } };
+    const [m] = mensagensDoWebhook(ev);
+    expect(m.telefone).toBe('');
+    expect(m.lid).toBe(LID);
+  });
+
   it('grupo continua ignorado', () => {
     expect(mensagensDoWebhook(evento('120363000000000000@g.us'))).toEqual([]);
   });
@@ -53,6 +81,15 @@ describe('telefoneDoLid', () => {
     expect(fone).toBe(FONE);
     expect(visto.u).toBe(`https://waha.interno/api/default/lids/${encodeURIComponent(LID)}`);
     expect(visto.init.headers['X-Api-Key']).toBe('k');
+  });
+
+  it('aceita o pn no formato novo (@s.whatsapp.net)', async () => {
+    const fone = await telefoneDoLid(
+      LID,
+      cred,
+      resposta({ lid: LID, pn: `${FONE}@s.whatsapp.net` })
+    );
+    expect(fone).toBe(FONE);
   });
 
   it.each([
@@ -155,5 +192,43 @@ describe('webhook com remetente @lid', () => {
     expect(dados.caixa).toBe(1);
     expect(queries.some((q) => q.tabela === 'emails_triagem' && q.insert)).toBe(true);
     expect(enviadas).toEqual([]);
+  });
+});
+
+// Conversa gravada antes da correção tem o LID como "telefone": responder para
+// "<dígitos>@c.us" dá 502 ("No LID for user"). O envio tenta "@lid" em seguida.
+describe('envio para conversa gravada com o LID', () => {
+  const cred = { baseUrl: 'https://waha.interno', apiKey: 'k', session: 'default' };
+  const LID_DIGITOS = LID.replace(/\D/g, '');
+
+  it('telefone normal tenta só @c.us', () => {
+    expect(chatIdsPara(FONE)).toEqual([`${FONE}@c.us`]);
+  });
+
+  it('dígitos de LID tentam @c.us e depois @lid', () => {
+    expect(chatIdsPara(LID_DIGITOS)).toEqual([`${LID_DIGITOS}@c.us`, `${LID_DIGITOS}@lid`]);
+  });
+
+  it('@c.us recusado: reenvia para @lid e devolve o id', async () => {
+    const tentativas = [];
+    const envio = await enviarTexto(LID_DIGITOS, 'oi', cred, async (_u, init) => {
+      const { chatId } = JSON.parse(init.body);
+      tentativas.push(chatId);
+      return chatId.endsWith('@lid')
+        ? new Response(JSON.stringify({ id: 'true_x@lid_A1' }))
+        : new Response('{"error":"No LID for user"}', { status: 500 });
+    });
+    expect(tentativas).toEqual([`${LID_DIGITOS}@c.us`, `${LID_DIGITOS}@lid`]);
+    expect(envio).toEqual({ ok: true, id: 'true_x@lid_A1' });
+  });
+
+  it('telefone normal recusado não tenta @lid', async () => {
+    let n = 0;
+    const envio = await enviarTexto(FONE, 'oi', cred, async () => {
+      n++;
+      return new Response('{}', { status: 500 });
+    });
+    expect(n).toBe(1);
+    expect(envio.ok).toBe(false);
   });
 });

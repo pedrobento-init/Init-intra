@@ -52,8 +52,14 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
     // "...@lid" é um identificador interno do WhatsApp, NÃO um telefone: tirar
     // os dígitos dele dava um número que não existe (o envio para
     // "<dígitos>@c.us" falhava com "No LID for user" e o cliente nunca casava).
-    const ehLid = origem.endsWith('@lid');
-    const telefone = origem.replace(/\D/g, '');
+    // Antes de desistir do número, o próprio evento: o WAHA manda o telefone
+    // num campo alternativo conforme o engine (NOWEB: key.remoteJidAlt /
+    // senderPn; GOWS: Info.SenderAlt). Sem ler isso, todo contato com LID
+    // dependia só da consulta /lids, e quando ela falhava o LID virava o
+    // "telefone" da conversa.
+    const alternativo = origem.endsWith('@lid') ? telefoneAlternativo(p) : '';
+    const ehLid = origem.endsWith('@lid') && !alternativo;
+    const telefone = alternativo || origem.replace(/\D/g, '');
     if (!telefone) continue;
     const id = String(p.id ?? '').trim();
     if (!id) continue;
@@ -74,6 +80,37 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
     });
   }
   return out;
+}
+
+// JID de telefone: "5511987654321@c.us", "...@s.whatsapp.net" ou com o
+// sufixo de aparelho ("5511987654321:12@s.whatsapp.net"). LID nunca casa.
+const JID_TELEFONE = /^(\d{8,15})(?::\d+)?@(c\.us|s\.whatsapp\.net)$/;
+
+export function telefoneDoJid(valor: unknown): string {
+  const achou = JID_TELEFONE.exec(String(valor ?? '').trim());
+  return achou ? achou[1] : '';
+}
+
+// Onde cada engine do WAHA põe o telefone de quem escreve com LID.
+function telefoneAlternativo(p: Record<string, unknown>): string {
+  const dados = (p._data || {}) as Record<string, unknown>;
+  const key = (dados.key || {}) as Record<string, unknown>;
+  const info = (dados.Info || {}) as Record<string, unknown>;
+  const candidatos = [
+    key.remoteJidAlt,
+    key.senderPn,
+    key.participantAlt,
+    key.participantPn,
+    info.SenderAlt,
+    info.ChatAlt,
+    dados.senderPn,
+    p.senderPn,
+  ];
+  for (const c of candidatos) {
+    const fone = telefoneDoJid(c);
+    if (fone) return fone;
+  }
+  return '';
 }
 
 // Mensagem citada. O WAHA novo manda `replyTo: {id, body}`; o engine WEBJS
@@ -229,6 +266,16 @@ export async function marcarVisto(
 
 // Envia texto pelo WAHA. Não lança: devolve {ok:false, erro} para a function
 // decidir o código HTTP. A chave vai só no cabeçalho e nunca em log ou URL.
+// Destinos a tentar, em ordem. Conversa gravada antes da correção do LID tem
+// como "telefone" os dígitos do LID (14+ dígitos, mais que um celular
+// brasileiro com DDI): para ela, "@c.us" falha ("No LID for user") e o WAHA
+// aceita o mesmo número como "@lid". Telefone normal tenta só "@c.us".
+export function chatIdsPara(telefone: string): string[] {
+  const d = String(telefone || '').replace(/\D/g, '');
+  if (!d) return [];
+  return d.length >= 14 ? [`${d}@c.us`, `${d}@lid`] : [`${d}@c.us`];
+}
+
 export async function enviarTexto(
   telefone: string,
   texto: string,
@@ -242,23 +289,29 @@ export async function enviarTexto(
   const apiKey = String(cred.apiKey || '').trim();
   const session = String(cred.session || 'default').trim() || 'default';
   if (!baseUrl || !apiKey) return { ok: false, erro: 'credenciais' };
-  let resp: Response;
-  try {
-    resp = await fetchFn(`${baseUrl}/api/sendText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
-      body: JSON.stringify({
-        session,
-        chatId: `${String(telefone || '').replace(/\D/g, '')}@c.us`,
-        text: texto,
-        ...(opcoes.replyTo ? { reply_to: opcoes.replyTo } : {}),
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-  } catch {
-    return { ok: false, erro: 'inalcancavel' };
+  const destinos = chatIdsPara(telefone);
+  if (!destinos.length) return { ok: false, erro: 'destino' };
+  let resp: Response | null = null;
+  for (const chatId of destinos) {
+    try {
+      resp = await fetchFn(`${baseUrl}/api/sendText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        body: JSON.stringify({
+          session,
+          chatId,
+          text: texto,
+          ...(opcoes.replyTo ? { reply_to: opcoes.replyTo } : {}),
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      // Rede caiu: tentar outro destino só dobraria o tempo de espera.
+      return { ok: false, erro: 'inalcancavel' };
+    }
+    if (resp.ok) break;
   }
-  if (!resp.ok) return { ok: false, erro: `provedor ${resp.status}` };
+  if (!resp || !resp.ok) return { ok: false, erro: `provedor ${resp ? resp.status : 0}` };
   let corpo: Record<string, unknown> = {};
   try {
     corpo = (await resp.json()) || {};
@@ -325,12 +378,18 @@ export async function telefoneDoLid(
       `${baseUrl}/api/${encodeURIComponent(session)}/lids/${encodeURIComponent(lid)}`,
       { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(8000) }
     );
-    if (!resp.ok) return '';
+    if (!resp.ok) {
+      // Sem o status no log não dá para separar "WAHA não conhece este LID"
+      // (404) de rota/chave erradas (401/404 em tudo) quando o LID volta a
+      // aparecer como telefone.
+      console.warn(`whatsapp lid: /lids respondeu HTTP ${resp.status}`);
+      return '';
+    }
     const corpo = ((await resp.json()) || {}) as Record<string, unknown>;
-    const pn = typeof corpo.pn === 'string' ? corpo.pn.trim() : '';
-    const achou = /^(\d{8,15})@c\.us$/.exec(pn);
-    return achou ? achou[1] : '';
-  } catch {
+    // O pn vem como "...@c.us" ou, em versões novas, "...@s.whatsapp.net".
+    return telefoneDoJid(corpo.pn) || telefoneDoJid(corpo.phoneNumber);
+  } catch (e) {
+    console.warn(`whatsapp lid: consulta falhou (${(e as Error)?.name ?? 'erro'})`);
     return '';
   }
 }
