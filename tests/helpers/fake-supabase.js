@@ -53,6 +53,11 @@ function builder(linhas, tabela = '', queries = null) {
       out = out.filter((r) => r[col] === val);
       return api;
     },
+    neq: (col, val) => {
+      if (registro) registro.filtros.push([col, val, 'neq']);
+      out = out.filter((r) => r[col] !== val);
+      return api;
+    },
     in: (col, vals) => {
       if (registro) registro.filtros.push([col, vals, 'in']);
       out = out.filter((r) => vals.includes(r[col]));
@@ -69,7 +74,11 @@ function builder(linhas, tabela = '', queries = null) {
       out = out.filter((r) => r[col] == val);
       return api;
     },
-    gte: () => api,
+    gte: (col, val) => {
+      if (registro) registro.filtros.push([col, val, 'gte']);
+      out = out.filter((r) => r[col] === undefined || String(r[col]) >= String(val));
+      return api;
+    },
     lte: () => api,
     order: () => api,
     limit: (n) => {

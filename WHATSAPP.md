@@ -383,7 +383,10 @@ já respondeu nem para quem tem chamado aberto.
 **Encerramento e pesquisa de satisfação.** Encerrar uma conversa de WhatsApp na
 Caixa chama a function `conversa-encerrar`, que encerra também no servidor (só
 na equipe da conversa) e manda o texto de encerramento e, se ligada, a
-pesquisa: **CSAT de 1 a 5** (nota do atendimento, não NPS, que mede a empresa e
+pesquisa. Nos textos, `{protocolo}` vira o protocolo que o robô deu à conversa
+(sem protocolo, a linha que o cita sai). O padrão do encerramento já traz
+`Protocolo: {protocolo}`; as duas mensagens vêm **desligadas** por padrão, e
+quando nada sai o toast da Caixa diz o motivo. A pesquisa: **CSAT de 1 a 5** (nota do atendimento, não NPS, que mede a empresa e
 pede 0 a 10 — difícil de responder num chat). A **primeira** mensagem depois do
 encerramento, dentro do prazo configurado (24 h por padrão), é lida como nota:
 aceita `5`, `nota 4`, `4/5`, `cinco`, `⭐⭐⭐`. Com nota, ela é gravada em

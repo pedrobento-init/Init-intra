@@ -53,7 +53,9 @@ export const TEXTOS_PADRAO = {
     'responderemos assim que voltarmos.',
   saudacao: 'Olá! Recebemos sua mensagem e em instantes alguém da nossa equipe vai atender você.',
   encerramento:
-    'Seu atendimento foi encerrado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem.',
+    'Seu atendimento foi encerrado. Obrigado pelo contato!\n' +
+    'Protocolo: {protocolo}\n' +
+    'Se precisar, é só mandar uma nova mensagem.',
   pesquisa:
     'Como você avalia este atendimento? Responda com uma nota de 1 (muito insatisfeito) ' +
     'a 5 (muito satisfeito).',
@@ -472,14 +474,41 @@ export function semAvisoFixoDoBot(respostas: string[], cfg: ConfigAutomacao): st
  */
 export function mensagensDeEncerramento(
   cfg: ConfigAutomacao,
-  motivo: 'equipe' | 'inatividade'
+  motivo: 'equipe' | 'inatividade',
+  protocolo: string | null = null
 ): { textos: string[]; pesquisa: boolean } {
   if (motivo === 'inatividade')
-    return { textos: cfg.inatividadeAtiva ? [cfg.textoInatividade] : [], pesquisa: false };
+    return {
+      textos: cfg.inatividadeAtiva ? [comProtocolo(cfg.textoInatividade, protocolo)] : [],
+      pesquisa: false,
+    };
   const textos: string[] = [];
-  if (cfg.encerramentoAtivo) textos.push(cfg.textoEncerramento);
-  if (cfg.pesquisaAtiva) textos.push(cfg.textoPesquisa);
+  if (cfg.encerramentoAtivo) textos.push(comProtocolo(cfg.textoEncerramento, protocolo));
+  if (cfg.pesquisaAtiva) textos.push(comProtocolo(cfg.textoPesquisa, protocolo));
   return { textos, pesquisa: cfg.pesquisaAtiva };
+}
+
+/**
+ * Por que nada saiu no encerramento. A equipe clica em "Encerrar" e não vê
+ * mensagem nenhuma: sem o motivo, "desligado nas configurações" e "o número
+ * nunca escreveu para a equipe" parecem o mesmo defeito.
+ */
+export type MotivoSemEnvio =
+  'sem_conversa' | 'outra_equipe' | 'desativado' | 'sem_credencial' | 'falhou';
+
+/**
+ * Troca {protocolo} pelo protocolo que o robô deu à conversa. Sem protocolo
+ * (conversa que a equipe puxou, sem passar pelo menu), a linha que o cita sai
+ * inteira em vez de mandar "Protocolo: " vazio ou a chave crua para o cliente.
+ */
+export function comProtocolo(texto: string, protocolo: string | null): string {
+  const p = String(protocolo || '').trim();
+  if (p) return texto.split('{protocolo}').join(p);
+  return texto
+    .split('\n')
+    .filter((l) => !l.includes('{protocolo}'))
+    .join('\n')
+    .trim();
 }
 
 /**

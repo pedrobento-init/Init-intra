@@ -500,7 +500,9 @@ function _caixaItemHTML(c, lidas) {
     '">' +
     escapeHtml(espera) +
     '</span></span>' +
-    (u.assunto
+    // No WhatsApp o "assunto" é só a primeira linha da mensagem (webhook), e a
+    // prévia logo abaixo repete o mesmo texto: só e-mail tem assunto de verdade.
+    (u.assunto && c.canal !== 'whatsapp'
       ? '<span class="cx-assunto">' + escapeHtml(u.assunto || '(sem assunto)') + '</span>'
       : '') +
     (previa ? '<span class="cx-previa">' + escapeHtml(previa) + '</span>' : '') +

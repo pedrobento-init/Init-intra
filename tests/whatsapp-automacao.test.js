@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AUTOR_AUTOMACAO,
   configDaLinha,
+  comProtocolo,
   configDesligada,
   conversasParadas,
   decidirEntrada,
@@ -425,5 +426,33 @@ describe('conversasParadas', () => {
   it('a equipe da conversa é a da resposta da equipe', () => {
     const r = conversasParadas([l({ team: 'mam' }), operador({ team: 'mam' })]);
     expect(r[0].team).toBe('mam');
+  });
+});
+
+describe('protocolo no encerramento', () => {
+  it('troca {protocolo} pelo protocolo que o robô deu à conversa', () => {
+    expect(comProtocolo('Protocolo {protocolo} encerrado.', '20261118-8019')).toBe(
+      'Protocolo 20261118-8019 encerrado.'
+    );
+  });
+
+  it('sem protocolo, a linha que o cita sai inteira, nunca a chave crua', () => {
+    const texto = 'Encerrado!\nProtocolo: {protocolo}\nAté mais.';
+    expect(comProtocolo(texto, null)).toBe('Encerrado!\nAté mais.');
+    expect(comProtocolo(texto, '  ')).not.toContain('{protocolo}');
+  });
+
+  it('o texto padrão de encerramento cita o protocolo, e a pesquisa vai depois', () => {
+    const cfg = configDaLinha({ encerramento_ativo: true, pesquisa_ativa: true });
+    const { textos } = mensagensDeEncerramento(cfg, 'equipe', '20261118-8019');
+    expect(textos[0]).toContain('Protocolo: 20261118-8019');
+    expect(textos[1]).toBe(TEXTOS_PADRAO.pesquisa);
+  });
+
+  it('conversa sem protocolo recebe o encerramento sem a linha dele', () => {
+    const cfg = configDaLinha({ encerramento_ativo: true });
+    const { textos } = mensagensDeEncerramento(cfg, 'equipe', null);
+    expect(textos[0]).not.toContain('Protocolo');
+    expect(textos[0]).toContain('Seu atendimento foi encerrado.');
   });
 });

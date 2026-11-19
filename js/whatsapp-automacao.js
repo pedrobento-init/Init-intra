@@ -30,7 +30,7 @@ const WAUTO_TEXTOS_PADRAO = {
   texto_saudacao:
     'Olá! Recebemos sua mensagem e em instantes alguém da nossa equipe vai atender você.',
   texto_encerramento:
-    'Seu atendimento foi encerrado. Obrigado pelo contato! Se precisar, é só mandar uma nova mensagem.',
+    'Seu atendimento foi encerrado. Obrigado pelo contato!\nProtocolo: {protocolo}\nSe precisar, é só mandar uma nova mensagem.',
   texto_pesquisa:
     'Como você avalia este atendimento? Responda com uma nota de 1 (muito insatisfeito) a 5 (muito satisfeito).',
   texto_agradecimento: 'Obrigado pela sua avaliação!',
@@ -316,6 +316,16 @@ function wautoAvaliacaoHTML(c) {
  * de novo (mesmo valor, com o escopo de equipe) e manda o que a equipe
  * configurou. Offline não chama: a conversa encerra igual, só sem mensagem.
  */
+const _WAUTO_SEM_ENVIO = {
+  desativado:
+    'Conversa encerrada. A mensagem de encerramento e a pesquisa estão desligadas nas configurações da automação.',
+  sem_conversa: 'Conversa encerrada, mas este número não tem registro de conversa no WhatsApp.',
+  outra_equipe:
+    'Conversa encerrada, mas este número nunca escreveu para a sua equipe: nada foi enviado.',
+  sem_credencial: 'Conversa encerrada, mas o WhatsApp não está configurado no servidor.',
+  falhou: 'Conversa encerrada, mas o envio da mensagem ao cliente falhou.',
+};
+
 function wautoAvisarEncerramento(c) {
   if (!c || c.canal !== 'whatsapp' || !_wautoOnline()) return null;
   const thread = typeof caixaThreadId === 'function' ? caixaThreadId(c) : '';
@@ -332,6 +342,10 @@ function wautoAvisarEncerramento(c) {
               : 'Mensagem de encerramento enviada.',
             'success'
           );
+        // Nada saiu: diz por quê, senão "desligado nas configurações" e "o
+        // envio falhou" parecem o mesmo defeito para quem clicou em Encerrar.
+        else if (d.motivo && _WAUTO_SEM_ENVIO[d.motivo])
+          showToast(_WAUTO_SEM_ENVIO[d.motivo], 'info');
         return d;
       }
       let msg = res.error.message || '';
