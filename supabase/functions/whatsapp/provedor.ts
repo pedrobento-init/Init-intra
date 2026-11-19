@@ -266,6 +266,16 @@ export async function marcarVisto(
 
 // Envia texto pelo WAHA. Não lança: devolve {ok:false, erro} para a function
 // decidir o código HTTP. A chave vai só no cabeçalho e nunca em log ou URL.
+// Destinos a tentar, em ordem. Conversa gravada antes da correção do LID tem
+// como "telefone" os dígitos do LID (14+ dígitos, mais que um celular
+// brasileiro com DDI): para ela, "@c.us" falha ("No LID for user") e o WAHA
+// aceita o mesmo número como "@lid". Telefone normal tenta só "@c.us".
+export function chatIdsPara(telefone: string): string[] {
+  const d = String(telefone || '').replace(/\D/g, '');
+  if (!d) return [];
+  return d.length >= 14 ? [`${d}@c.us`, `${d}@lid`] : [`${d}@c.us`];
+}
+
 export async function enviarTexto(
   telefone: string,
   texto: string,
@@ -279,23 +289,29 @@ export async function enviarTexto(
   const apiKey = String(cred.apiKey || '').trim();
   const session = String(cred.session || 'default').trim() || 'default';
   if (!baseUrl || !apiKey) return { ok: false, erro: 'credenciais' };
-  let resp: Response;
-  try {
-    resp = await fetchFn(`${baseUrl}/api/sendText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
-      body: JSON.stringify({
-        session,
-        chatId: `${String(telefone || '').replace(/\D/g, '')}@c.us`,
-        text: texto,
-        ...(opcoes.replyTo ? { reply_to: opcoes.replyTo } : {}),
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-  } catch {
-    return { ok: false, erro: 'inalcancavel' };
+  const destinos = chatIdsPara(telefone);
+  if (!destinos.length) return { ok: false, erro: 'destino' };
+  let resp: Response | null = null;
+  for (const chatId of destinos) {
+    try {
+      resp = await fetchFn(`${baseUrl}/api/sendText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        body: JSON.stringify({
+          session,
+          chatId,
+          text: texto,
+          ...(opcoes.replyTo ? { reply_to: opcoes.replyTo } : {}),
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      // Rede caiu: tentar outro destino só dobraria o tempo de espera.
+      return { ok: false, erro: 'inalcancavel' };
+    }
+    if (resp.ok) break;
   }
-  if (!resp.ok) return { ok: false, erro: `provedor ${resp.status}` };
+  if (!resp || !resp.ok) return { ok: false, erro: `provedor ${resp ? resp.status : 0}` };
   let corpo: Record<string, unknown> = {};
   try {
     corpo = (await resp.json()) || {};

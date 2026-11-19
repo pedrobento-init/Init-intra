@@ -19,6 +19,7 @@
 import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import {
+  chatIdsPara,
   emojiValido,
   enviarReacao,
   enviarTexto,
@@ -285,19 +286,24 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
             : 'sendFile';
         const payload: Record<string, unknown> = {
           session,
-          chatId: telefone + '@c.us',
           file: { mimetype: midia.tipo, filename: midia.nome, data: midia.dados },
         };
         if (endpoint === 'sendVoice') payload.convert = true;
         else payload.caption = prefixoAtendente(op.name || '', texto);
         try {
-          const resp = await fetch(`${baseUrl}/api/${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(30000),
-          });
-          if (!resp.ok)
+          // Mesma regra do texto (chatIdsPara): conversa gravada com o LID
+          // tenta "@lid" quando "@c.us" é recusado.
+          let resp: Response | null = null;
+          for (const chatId of chatIdsPara(telefone)) {
+            resp = await fetch(`${baseUrl}/api/${endpoint}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+              body: JSON.stringify({ ...payload, chatId }),
+              signal: AbortSignal.timeout(30000),
+            });
+            if (resp.ok) break;
+          }
+          if (!resp || !resp.ok)
             return json({ error: 'Não foi possível enviar a mídia', code: 'provider_error' }, 502);
           const envio = await resp.json().catch(() => ({}));
           providerId = idSerializado(envio.id) || idSerializado(envio.key) || null;
