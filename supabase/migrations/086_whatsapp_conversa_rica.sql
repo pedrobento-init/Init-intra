@@ -17,6 +17,14 @@
 --     (um emoji, ou null quando a pessoa tirou a reação).
 --   * índice em message_id (só WhatsApp): é por ele que o recibo e a reação
 --     acham a linha.
+--   * as quatro colunas acima são do SERVIDOR: o trigger
+--     emails_triagem_colunas_servidor desfaz qualquer mudança feita pelo app
+--     (papéis authenticated e anon) — no UPDATE mantém o valor antigo, no
+--     INSERT grava vazio. Só service role (webhook, conversa-responder) grava.
+--     Por que trigger e não REVOKE: authenticated tem UPDATE na tabela
+--     inteira, e o grant de tabela vale por cima do REVOKE de coluna; e um
+--     erro de permissão derrubaria o push inteiro do sync, em vez de só
+--     ignorar a coluna.
 --
 -- Sem a migration o webhook segue gravando as mensagens; só os recibos e as
 -- reações são ignorados (ficam no log como coluna ausente).
@@ -28,14 +36,17 @@
 --    where table_name = 'emails_triagem'
 --      and column_name in ('ack', 'citacao', 'reacao_contato', 'reacao_equipe');
 --   -- esperado: 4 linhas
---   select tgname from pg_trigger where tgname = 'emails_triagem_ack_so_avanca';
---   -- esperado: 1 linha
+--   select tgname from pg_trigger
+--    where tgname in ('emails_triagem_ack_so_avanca', 'emails_triagem_colunas_servidor');
+--   -- esperado: 2 linhas
 --   -- O ack não volta atrás:
 --   --   update emails_triagem set ack = 3 where id = '<id de teste>';
 --   --   update emails_triagem set ack = 2 where id = '<id de teste>';
 --   --   select ack from emails_triagem where id = '<id de teste>';  -- 3
 --
 -- REVERTER (a conversa volta a mostrar só as bolhas, sem ✓ nem reações):
+--   drop trigger if exists emails_triagem_colunas_servidor on public.emails_triagem;
+--   drop function if exists public.emails_triagem_colunas_servidor();
 --   drop trigger if exists emails_triagem_ack_so_avanca on public.emails_triagem;
 --   drop function if exists public.emails_triagem_ack_so_avanca();
 --   drop index if exists public.emails_triagem_whatsapp_message_id_idx;
@@ -101,3 +112,34 @@ drop trigger if exists emails_triagem_ack_so_avanca on public.emails_triagem;
 create trigger emails_triagem_ack_so_avanca
   before update of ack on public.emails_triagem
   for each row execute function public.emails_triagem_ack_so_avanca();
+
+-- Recibo, citação e reações são do servidor. SECURITY INVOKER de propósito:
+-- current_user tem de ser o papel de quem gravou (authenticated pelo
+-- PostgREST, service_role nas Edge Functions), não o dono da função.
+create or replace function public.emails_triagem_colunas_servidor()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if current_user in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      new.ack := null;
+      new.citacao := null;
+      new.reacao_contato := null;
+      new.reacao_equipe := null;
+    else
+      new.ack := old.ack;
+      new.citacao := old.citacao;
+      new.reacao_contato := old.reacao_contato;
+      new.reacao_equipe := old.reacao_equipe;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists emails_triagem_colunas_servidor on public.emails_triagem;
+create trigger emails_triagem_colunas_servidor
+  before insert or update on public.emails_triagem
+  for each row execute function public.emails_triagem_colunas_servidor();

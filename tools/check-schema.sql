@@ -108,7 +108,7 @@ from unnest(array[
   'my_calendar_feed_token', 'my_google_agenda_status',
   'reveal_client_secret', 'op_id_by_name',
   -- 086/087 (WhatsApp): ping é SECURITY DEFINER; as de atribuir são INVOKER
-  'emails_triagem_ack_so_avanca',
+  'emails_triagem_ack_so_avanca', 'emails_triagem_colunas_servidor',
   'whatsapp_atendente_ping', 'whatsapp_atribuir_se_livre', 'whatsapp_pegar_proximo'
 ]) as e(nome)
 left join pg_proc p

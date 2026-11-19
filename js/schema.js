@@ -598,9 +598,8 @@ const ENTITIES = [
     // 075/082: banco que ainda não rodou a migration não tem as colunas do
     // WhatsApp nem as do portal; a entrada sem canal continua sendo lida como
     // e-mail, e media/direcao vazios não entram no push.
-    // 086: recibo, citação e reações são gravados pelo servidor e o app não
-    // os escreve (os updates da caixa são parciais). A RLS de UPDATE por
-    // equipe não impede isso: é convenção do código, não trava do banco.
+    // 086: recibo, citação e reações são do servidor. O app não os escreve, e
+    // o trigger emails_triagem_colunas_servidor desfaz o que vier do app.
     optionalFields: [
       'canal',
       'telefone',
