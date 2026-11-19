@@ -55,11 +55,15 @@ async function chamar({
   operador = OPERADOR,
   clientes = [CLIENTE_INIT, CLIENTE_MAM],
   conversas = [],
+  equipes = [],
   caixa = [],
   envios = [],
   waha = { numberExists: true, chatId: '5511987654321@c.us' },
   envioOk = true,
   semMigration = false,
+  // Outra aba reserva no mesmo instante: a reserva desta e a da outra aparecem
+  // juntas na segunda contagem.
+  corrida = false,
 } = {}) {
   const queries = [];
   const chamadasWaha = [];
@@ -67,6 +71,7 @@ async function chamar({
     operators: [operador],
     clients: clientes,
     whatsapp_conversas: conversas,
+    whatsapp_conversa_equipes: equipes,
     emails_triagem: caixa,
     whatsapp_envios_ativos: envios,
   };
@@ -90,6 +95,22 @@ async function chamar({
       ),
       error: null,
     });
+    if (corrida && key === ENV.SUPABASE_SERVICE_ROLE_KEY) {
+      const from = c.from;
+      c.from = (t) => {
+        const b = from(t);
+        if (t !== 'whatsapp_envios_ativos') return b;
+        const insert = b.insert;
+        b.insert = (v) => {
+          tabelasAdmin.whatsapp_envios_ativos.push(
+            envioRecente({ id: 900 }),
+            envioRecente({ id: 901 })
+          );
+          return insert(v);
+        };
+        return b;
+      };
+    }
     if (semMigration) {
       // Banco sem a 089: o PostgREST responde erro para a tabela que não existe.
       const from = c.from;
@@ -101,6 +122,7 @@ async function chamar({
           eq: () => b,
           gte: () => b,
           insert: () => b,
+          maybeSingle: () => Promise.resolve(erro),
           then: (res, rej) => Promise.resolve(erro).then(res, rej),
         };
         return b;
@@ -173,12 +195,12 @@ describe('whatsapp-iniciar: quem pode receber', () => {
     expect(res.status).toBe(403);
   });
 
-  it('quem já escreveu e a equipe enxerga na caixa recebe no número exato do webhook', async () => {
+  it('quem já escreveu para a equipe recebe no número exato do webhook', async () => {
     const { res, chamadasWaha } = await chamar({
       clientes: [],
       body: { telefone: '(41) 9988-7766', text: 'Retornando' },
       conversas: [{ telefone: '554199887766' }],
-      caixa: [{ id: 'e1', canal: 'whatsapp', telefone: '554199887766', team: 'init' }],
+      equipes: [{ telefone: '554199887766', team: 'init' }],
     });
     expect(res.status).toBe(200);
     // Sem consulta à WAHA: o número já é o que ela entregou no webhook.
@@ -193,7 +215,32 @@ describe('whatsapp-iniciar: quem pode receber', () => {
       clientes: [],
       body: { telefone: '41999887766', text: 'oi' },
       conversas: [{ telefone: '5541999887766' }],
-      caixa: [{ id: 'e1', canal: 'whatsapp', telefone: '5541999887766', team: 'mam' }],
+      equipes: [{ telefone: '5541999887766', team: 'mam' }],
+    });
+    expect(res.status).toBe(403);
+    expect(chamadasWaha).toEqual([]);
+  });
+
+  // A RLS deixa o operador inserir linha da própria equipe em emails_triagem
+  // com qualquer telefone. Se a caixa valesse como prova, uma linha forjada
+  // abria o número de qualquer contato de outra equipe.
+  it('linha forjada na caixa da própria equipe não libera o número', async () => {
+    const { res, chamadasWaha } = await chamar({
+      clientes: [],
+      body: { telefone: '41999887766', text: 'oi' },
+      conversas: [{ telefone: '5541999887766' }],
+      equipes: [{ telefone: '5541999887766', team: 'mam' }],
+      caixa: [{ id: 'forjada', canal: 'whatsapp', telefone: '5541999887766', team: 'init' }],
+    });
+    expect(res.status).toBe(403);
+    expect(chamadasWaha).toEqual([]);
+  });
+
+  // A busca do cliente é pela chave (DDD + 8 últimos), que é frouxa. O número
+  // digitado tem de bater exato com o do cadastro, ou a mensagem ia para outro.
+  it('número parecido com o do cliente, mas diferente, é recusado', async () => {
+    const { res, chamadasWaha } = await chamar({
+      body: { telefone: '11 5 8765 4321', text: 'oi' },
     });
     expect(res.status).toBe(403);
     expect(chamadasWaha).toEqual([]);
@@ -266,9 +313,33 @@ describe('whatsapp-iniciar: limite por hora', () => {
   it('a contagem é do operador e da equipe, não do body', async () => {
     const { queries } = await chamar({ body: { telefone: '11987654321', text: 'oi', team: 'x' } });
     const contagens = queries.filter((q) => q.tabela === 'whatsapp_envios_ativos' && !q.insert);
+    // Conta antes de reservar e de novo depois, já com a reserva.
     expect(contagens.map((q) => q.filtros[0])).toEqual([
       ['operador_id', 'op-1'],
       ['team', 'init'],
+      ['operador_id', 'op-1'],
+      ['team', 'init'],
     ]);
+  });
+
+  // Duas abas no último envio da hora: as duas viam 19 e mandavam as duas.
+  it('corrida no último envio: quem passa do limite depois de reservar desiste e apaga a reserva', async () => {
+    const envios = Array.from({ length: 19 }, (_, i) => envioRecente({ id: i + 1 }));
+    const { res, dados, queries, chamadasWaha } = await chamar({ envios, corrida: true });
+    expect(res.status).toBe(429);
+    expect(dados.code).toBe('rate_limited');
+    expect(chamadasWaha).toEqual([]);
+    expect(
+      queries.some(
+        (q) => q.tabela === 'whatsapp_envios_ativos' && q.filtros.some(([c]) => c === 'id')
+      )
+    ).toBe(true);
+  });
+
+  // Sem isto, perguntar à WAHA "esse número tem WhatsApp?" era de graça.
+  it('a consulta à WAHA também pesa no limite, mesmo sem WhatsApp no número', async () => {
+    const { res, queries } = await chamar({ waha: { numberExists: false } });
+    expect(res.status).toBe(422);
+    expect(queries.some((q) => q.tabela === 'whatsapp_envios_ativos' && q.insert)).toBe(true);
   });
 });

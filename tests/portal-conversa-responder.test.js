@@ -44,6 +44,9 @@ async function chamar({
   body = { thread_id: 't1', text: 'Vamos verificar.' },
   fetchStub,
   contatos = [],
+  // Prova (088) de que o número escreveu para a equipe: por padrão, quem está
+  // em whatsapp_conversas escreveu para a 'init'.
+  equipes = contatos.map((c) => ({ telefone: c.telefone, team: 'init' })),
 } = {}) {
   const queries = [];
   const enviados = [];
@@ -52,7 +55,12 @@ async function chamar({
     createClient: fakeSupabase({
       user: { id: 'user-1' },
       queries,
-      tabelas: { operators: [OPERADOR], emails_triagem: linhas, whatsapp_conversas: contatos },
+      tabelas: {
+        operators: [OPERADOR],
+        emails_triagem: linhas,
+        whatsapp_conversas: contatos,
+        whatsapp_conversa_equipes: equipes,
+      },
     }),
     createTransport: () => ({
       sendMail: async (msg) => {
@@ -79,6 +87,8 @@ describe('conversa-responder: destino e escopo', () => {
   it('WhatsApp só responde para quem já escreveu para a empresa', async () => {
     const { res, enviados } = await chamar({
       linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      // Só a prova da 076 falta: é ela que este teste trava.
+      equipes: [{ telefone: '5511987654321', team: 'init' }],
     });
     expect(res.status).toBe(422);
     expect(enviados).toEqual([]);
@@ -261,6 +271,7 @@ describe('conversa-responder: citação, reação e visto (086)', () => {
     const { res } = await chamar({
       linhas: [whats()],
       contatos: [],
+      equipes: [{ telefone: '5511987654321', team: 'init' }],
       fetchStub: waha.fn,
       body: { thread_id: 'whatsapp:1187654321', kind: 'seen' },
     });
@@ -296,5 +307,35 @@ describe('conversa-responder: citação, reação e visto (086)', () => {
     expect(res.status).toBe(200);
     expect(waha.chamadas[0].url).toBe('https://waha.teste/api/sendSeen');
     expect(queries.some((q) => q.insert || q.patch)).toBe(false);
+  });
+});
+
+describe('conversa-responder: equipe do número (088)', () => {
+  // A linha de entrada é gravável pela equipe (RLS): forjada, ela fazia a
+  // equipe A responder a um contato que só falou com a equipe B.
+  it('linha forjada para número que só escreveu para outra equipe não envia', async () => {
+    const chamadas = [];
+    const { res, dados } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      contatos: [{ telefone: '5511987654321' }],
+      equipes: [{ telefone: '5511987654321', team: 'mam' }],
+      fetchStub: async (url) => {
+        chamadas.push(String(url));
+        return new Response('{}', { status: 200 });
+      },
+    });
+    expect(res.status).toBe(403);
+    expect(dados.code).toBe('not_team_contact');
+    expect(chamadas).toEqual([]);
+  });
+
+  it('nota interna não fala com o número e não passa pela trava', async () => {
+    const { res } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      contatos: [{ telefone: '5511987654321' }],
+      equipes: [],
+      body: { thread_id: 't1', text: 'só para a equipe', kind: 'internal' },
+    });
+    expect(res.status).toBe(200);
   });
 });

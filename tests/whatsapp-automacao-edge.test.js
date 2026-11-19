@@ -20,6 +20,12 @@ const ENV = {
   AVISOS_CRON_SECRET: 'segredo-do-cron',
 };
 const TEL = '5511987654321';
+// Prova (088) de que o número escreveu para a equipe: sem ela, nenhuma
+// mensagem automática sai. Os testes partem do caso normal, em que escreveu.
+const EQUIPES_DO_NUMERO = [
+  { telefone: TEL, team: 'init' },
+  { telefone: TEL, team: 'mam' },
+];
 const minAtras = (n) => new Date(Date.now() - n * 60_000).toISOString();
 const minFrente = (n) => new Date(Date.now() + n * 60_000).toISOString();
 
@@ -42,7 +48,10 @@ const patches = (queries, tabela) =>
 
 // ── Webhook ──────────────────────────────────────────────────────────────────
 
-async function webhook(texto, { conversa = null, automacao = [], env = ENV, id = 'M1' } = {}) {
+async function webhook(
+  texto,
+  { conversa = null, automacao = [], env = ENV, id = 'M1', equipes = EQUIPES_DO_NUMERO } = {}
+) {
   const queries = [];
   const waha = wahaFalsa();
   const createClient = fakeSupabase({
@@ -50,6 +59,7 @@ async function webhook(texto, { conversa = null, automacao = [], env = ENV, id =
     tabelas: {
       whatsapp_conversas: conversa ? [{ telefone: TEL, foto_em: minAtras(1), ...conversa }] : [],
       whatsapp_automacao: automacao,
+      whatsapp_conversa_equipes: equipes,
     },
   });
   const { handler } = await loadHandler('whatsapp', { env, createClient, fetch: waha.fetch });
@@ -225,6 +235,7 @@ async function encerrar({
   automacao = [],
   operador = OPERADOR,
   body = { thread_id: 'whatsapp:' + TEL },
+  equipes = EQUIPES_DO_NUMERO,
 } = {}) {
   const queries = [];
   const waha = wahaFalsa();
@@ -239,6 +250,7 @@ async function encerrar({
         emails_triagem: linhas,
         whatsapp_conversas: conversa ? [conversa] : [],
         whatsapp_automacao: automacao,
+        whatsapp_conversa_equipes: equipes,
       },
     }),
   });
@@ -323,6 +335,21 @@ describe('conversa-encerrar', () => {
     expect(enviadas).toEqual([]);
   });
 
+  // A linha de entrada da caixa é gravável pelo operador (RLS de
+  // emails_triagem): forjando uma, a equipe A mandava encerramento e pesquisa
+  // a um contato que só falou com a equipe B. A prova é a 088, que só o
+  // webhook grava.
+  it('número que nunca escreveu para esta equipe não recebe encerramento nem pesquisa', async () => {
+    const { res, enviadas, queries } = await encerrar({
+      automacao: ligada,
+      equipes: [{ telefone: TEL, team: 'mam' }],
+    });
+    expect(res.status).toBe(200);
+    expect(enviadas).toEqual([]);
+    const est = patches(queries, 'whatsapp_conversas').find((q) => q.patch.encerrada_em);
+    expect(est).toBeUndefined();
+  });
+
   it('conversa de e-mail encerra sem tocar na WAHA', async () => {
     const { res, enviadas } = await encerrar({
       automacao: ligada,
@@ -341,6 +368,7 @@ async function cron({
   linhas = [],
   conversas = [],
   segredo = 'segredo-do-cron',
+  equipes = EQUIPES_DO_NUMERO,
 } = {}) {
   const queries = [];
   const waha = wahaFalsa();
@@ -353,6 +381,7 @@ async function cron({
         whatsapp_automacao: automacao,
         emails_triagem: linhas,
         whatsapp_conversas: conversas,
+        whatsapp_conversa_equipes: equipes,
       },
     }),
   });
@@ -415,6 +444,16 @@ describe('whatsapp-inatividade', () => {
       (q) => q.patch.inatividade_lembrete_em
     );
     expect(marca.filtros).toContainEqual(['telefone', TEL]);
+  });
+
+  it('histórico forjado de outra equipe não faz o cron falar com o número', async () => {
+    const { enviadas } = await cron({
+      automacao: cfg,
+      linhas: historico(25),
+      conversas: [{ telefone: TEL, inatividade_lembrete_em: null }],
+      equipes: [],
+    });
+    expect(enviadas).toEqual([]);
   });
 
   it('lembrete já dado para esta resposta: espera o prazo de encerrar', async () => {

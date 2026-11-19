@@ -12,6 +12,7 @@
 // de whatsapp_conversas não existem. lerEstadoAutomacao devolve ok: false e
 // quem chama pula a automação inteira; configDaEquipe devolve tudo desligado.
 
+import { numeroEscreveuParaEquipe } from './equipes.ts';
 import { enviarTexto, type CredenciaisWaha } from './provedor.ts';
 import {
   AUTOR_AUTOMACAO,
@@ -123,6 +124,15 @@ export async function enviarDaAutomacao(
   textos: string[],
   opcoes: { cred: CredenciaisWaha; team: string; clientId: string | null; status?: string }
 ): Promise<number> {
+  // Toda mensagem automática fala em nome de uma equipe: só sai para número
+  // que de fato escreveu para ela (whatsapp_conversa_equipes, gravada só pelo
+  // webhook). O histórico da caixa não serve de prova: o operador grava ali.
+  if ((await numeroEscreveuParaEquipe(db, telefone, opcoes.team)) !== true) {
+    console.warn(
+      `whatsapp automação ${telefone.slice(-4)}: número não escreveu para a equipe ${opcoes.team}, nada sai`
+    );
+    return 0;
+  }
   let enviadas = 0;
   for (const texto of textos) {
     const envio = await enviarTexto(telefone, texto, opcoes.cred);
@@ -285,6 +295,10 @@ export async function encerrarPelaAutomacao(
 ): Promise<{ enviadas: number; pesquisa: boolean; repetido: boolean }> {
   const lido = await lerEstadoAutomacao(db, p.telefone);
   if (!lido.ok || !lido.existe) return { enviadas: 0, pesquisa: false, repetido: false };
+  // Equipe que o número nunca procurou não mexe no estado dele: encerrada_em e
+  // a pesquisa são por telefone, e valeriam também para a equipe de verdade.
+  if ((await numeroEscreveuParaEquipe(db, p.telefone, p.team)) !== true)
+    return { enviadas: 0, pesquisa: false, repetido: false };
   // Só o clique da equipe pode repetir (dois cliques, ou o status local chegando
   // antes). O cron não: ele só vê conversa ainda em aberto, e a equipe pode ter
   // encerrado e reaberto respondendo de novo, sem mensagem nova do cliente.

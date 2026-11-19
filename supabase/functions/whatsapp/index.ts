@@ -77,6 +77,7 @@ import {
   telefoneDoLid,
 } from './provedor.ts';
 import { aplicarFilas } from './distribuicao.ts';
+import { registrarEquipeDoNumero } from './equipes.ts';
 import {
   agradecerNota as wautoAgradecerNota,
   aposEntrada as wautoAposEntrada,
@@ -284,7 +285,26 @@ function colunaDoPortalAusente(error: { code?: string; message?: string }): bool
   return /(direcao|media|foto_url)/.test(msg) && /does not exist|schema cache/i.test(msg);
 }
 
+// Toda mensagem que entra na caixa registra em que equipe o número escreveu:
+// é a prova que a automação e o envio ativo exigem (equipes.ts).
 async function guardarNaCaixa(
+  db: SupabaseClient,
+  m: MensagemWhats,
+  opcoes: {
+    motivo?: string | null;
+    status?: string;
+    pendenciaId?: string | null;
+    clientId?: string | null;
+    team?: string | null;
+  },
+  extra: { foto_url?: string | null; atribuicao_nota?: string | null } = {}
+): Promise<boolean> {
+  const ok = await gravarNaCaixa(db, m, opcoes, extra);
+  if (ok) await registrarEquipeDoNumero(db, m.telefone, opcoes.team);
+  return ok;
+}
+
+async function gravarNaCaixa(
   db: SupabaseClient,
   m: MensagemWhats,
   opcoes: {
@@ -709,6 +729,9 @@ async function handle(req: Request, ctx: SupabaseContext) {
             .eq('status', 'pendente')
             .eq('team', opcoesCaixa.team);
           if (erroMover) console.error(`whatsapp atribuição ${m.id}:`, erroMover.message);
+          // A conversa mudou de equipe com a escolha do cliente: a nova também
+          // passa a poder falar com ele.
+          else await registrarEquipeDoNumero(db, m.telefone, equipe);
           // O menu que o robô mandou antes da escolha fica com a conversa.
           const { error: erroBot } = await db
             .from('emails_triagem')

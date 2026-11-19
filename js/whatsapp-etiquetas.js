@@ -174,7 +174,12 @@ function _wetqPush(tabela, op, linha) {
   if (!_wetqOnline() || typeof supabaseClient === 'undefined') return;
   const q =
     op === 'delete'
-      ? supabaseClient.from(tabela).delete().eq('id', linha.id)
+      ? // Filtro de equipe explícito, além da RLS (AGENTS.md: delete sem team é bug).
+        supabaseClient
+          .from(tabela)
+          .delete()
+          .eq('id', linha.id)
+          .eq('team', linha.team || 'init')
       : supabaseClient.from(tabela).upsert(linha);
   Promise.resolve(q)
     .then((res) => {

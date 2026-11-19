@@ -26,6 +26,7 @@ import {
   idSerializado,
   marcarVisto,
 } from '../whatsapp/provedor.ts';
+import { numeroEscreveuParaEquipe } from '../whatsapp/equipes.ts';
 
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 const TEXTO_MAX = 20000;
@@ -158,6 +159,22 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
         .maybeSingle();
       alvo = achado || null;
       if (!alvo) return json({ error: 'Mensagem não encontrada', code: 'target_not_found' }, 404);
+    }
+
+    // A linha de entrada que diz "esta equipe atende este número" é gravável
+    // pelo operador (RLS de emails_triagem): forjando uma, a equipe A falava
+    // com contato da equipe B. A prova é a 088, gravada só pelo webhook. Banco
+    // sem a 088 (null) segue como antes, para não parar o atendimento.
+    if (whats && !interna) {
+      const fone = String(ultima.telefone || '').replace(/\D/g, '');
+      if ((await numeroEscreveuParaEquipe(ctx.supabaseAdmin, fone, ultima.team)) === false)
+        return json(
+          {
+            error: 'Este número não escreveu para a sua equipe',
+            code: 'not_team_contact',
+          },
+          403
+        );
     }
 
     // Visto e reação também falam com o número pela sessão compartilhada do

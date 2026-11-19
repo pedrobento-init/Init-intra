@@ -184,7 +184,12 @@ function _wcontPush(op, linha) {
   if (!_wcontOnline() || typeof supabaseClient === 'undefined') return;
   const q =
     op === 'delete'
-      ? supabaseClient.from('whatsapp_contatos').delete().eq('id', linha.id)
+      ? // Filtro de equipe explícito, além da RLS (AGENTS.md: delete sem team é bug).
+        supabaseClient
+          .from('whatsapp_contatos')
+          .delete()
+          .eq('id', linha.id)
+          .eq('team', linha.team || 'init')
       : supabaseClient.from('whatsapp_contatos').upsert(linha);
   Promise.resolve(q)
     .then((res) => {

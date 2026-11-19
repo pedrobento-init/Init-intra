@@ -20,6 +20,13 @@
 --     pesquisa_ate / pesquisa_team / pesquisa_operador (esperando a nota até
 --     quando, de que equipe, quem atendeu) e inatividade_lembrete_em. A tabela
 --     segue sem policy (076): só o service_role lê e grava.
+--   * Tabela nova whatsapp_conversa_equipes (telefone, team): em que equipes o
+--     número já escreveu. Só o webhook grava (service role); sem policy, o app
+--     nem lê. É a prova que toda mensagem automática e o envio ativo (089)
+--     exigem antes de falar com o número em nome de uma equipe: o histórico de
+--     emails_triagem não serve, porque a RLS deixa o operador inserir linha da
+--     própria equipe com qualquer telefone. Backfill com as mensagens de
+--     entrada que o webhook já gravou (id 'ETR-…').
 --   * pg_cron 'whatsapp-inatividade' a cada 5 minutos chamando a function de
 --     mesmo nome (x-cron-secret = avisos_cron_secret do Vault, como a 051 e a
 --     080). Sem equipe com inatividade ligada, a function lê uma tabela e
@@ -47,11 +54,15 @@
 --   -- esperado: 6 linhas
 --   select count(*) from pg_policies where tablename = 'whatsapp_conversas';
 --   -- esperado: 0 (continua fechada para authenticated)
+--   select count(*) from pg_policies where tablename = 'whatsapp_conversa_equipes';
+--   -- esperado: 0 (só service role)
+--   select count(*) from public.whatsapp_conversa_equipes;  -- > 0 se já houve conversa
 --   select jobname, schedule, active from cron.job where jobname = 'whatsapp-inatividade';
 --   -- esperado: */5 * * * *, active = true
 --
 -- REVERTER (o webhook volta a só gravar e a Caixa para de mostrar a nota):
 --   select cron.unschedule('whatsapp-inatividade');
+--   drop table if exists public.whatsapp_conversa_equipes;
 --   drop table if exists public.whatsapp_avaliacoes;
 --   drop table if exists public.whatsapp_automacao;
 --   alter table public.whatsapp_conversas
@@ -174,6 +185,38 @@ alter table public.whatsapp_conversas
   add column if not exists pesquisa_team           text,
   add column if not exists pesquisa_operador       text,
   add column if not exists inatividade_lembrete_em timestamptz;
+
+-- ── Em que equipes o número escreveu (só o servidor) ─────────
+create table if not exists public.whatsapp_conversa_equipes (
+  telefone    text not null,
+  team        text not null,
+  primeira_em timestamptz not null default now(),
+  primary key (telefone, team)
+);
+
+alter table public.whatsapp_conversa_equipes enable row level security;
+revoke all on public.whatsapp_conversa_equipes from anon, authenticated;
+grant select, insert, update, delete on public.whatsapp_conversa_equipes to service_role;
+
+comment on table public.whatsapp_conversa_equipes is
+  'Equipes para as quais o número já escreveu. Grava só o webhook (service_role); prova exigida antes de mensagem automática ou envio ativo.';
+
+-- Backfill: só linhas de entrada criadas pelo webhook (id 'ETR-'). O app não
+-- cria linha com esse prefixo.
+do $$
+begin
+  if to_regclass('public.emails_triagem') is not null then
+    insert into public.whatsapp_conversa_equipes (telefone, team)
+    select distinct regexp_replace(telefone, '\D', '', 'g'), coalesce(nullif(team, ''), 'init')
+      from public.emails_triagem
+     where canal = 'whatsapp'
+       and coalesce(direcao, 'entrada') = 'entrada'
+       and id like 'ETR-%'
+       and coalesce(regexp_replace(telefone, '\D', '', 'g'), '') <> ''
+    on conflict do nothing;
+  end if;
+end;
+$$;
 
 -- ── Cron da inatividade ──────────────────────────────────────
 do $$

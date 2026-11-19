@@ -223,3 +223,18 @@ describe('whatsapp: recibo e reação (086)', () => {
     expect(queries.some((q) => q.insert)).toBe(false);
   });
 });
+
+describe('whatsapp: em que equipe o número escreveu (088)', () => {
+  // É a prova que a automação e o envio ativo exigem. O histórico da caixa não
+  // serve, porque o operador consegue gravar linha ali.
+  it('mensagem que entra na caixa registra a equipe do número', async () => {
+    const { queries } = await chamar(evento());
+    const reg = queries.find((q) => q.tabela === 'whatsapp_conversa_equipes' && q.upsert);
+    expect(reg.upsert).toEqual({ telefone: '5511987654321', team: 'init' });
+  });
+
+  it('mensagem que não entrou na caixa não registra nada', async () => {
+    const { queries } = await chamar(evento(), { falharInsert: true });
+    expect(queries.some((q) => q.tabela === 'whatsapp_conversa_equipes' && q.upsert)).toBe(false);
+  });
+});

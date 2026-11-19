@@ -507,6 +507,7 @@ aparecem com `docker compose logs waha`.
 | Automação: modal diz "migration 088"    | A 088 não foi aplicada; webhook e Caixa seguem sem automação.                                  |
 | Encerrou, mas não saiu mensagem         | Encerramento/pesquisa desligados na equipe, `conversa-encerrar` não publicada ou sem `WAHA_*`. |
 | Inatividade não age                     | Cron sem `AVISOS_CRON_SECRET`/Vault, ou a conversa tem chamado ligado.                         |
+| Portal: `not_team_contact` (403)        | O número nunca escreveu para esta equipe (prova da 088, `whatsapp_conversa_equipes`).          |
 | Envio ativo: `not_allowed_number` (403) | O número não é de cliente da equipe nem escreveu para ela.                                     |
 | Envio ativo: `migration_missing` (503)  | A 089 não foi aplicada: sem contagem não há limite, então nada sai.                            |
 | Envio ativo: `rate_limited` (429)       | Passou de 20 conversas iniciadas na última hora (60 por equipe). Espere.                       |

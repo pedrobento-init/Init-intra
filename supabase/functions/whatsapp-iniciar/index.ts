@@ -188,10 +188,19 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     // (a) cliente cadastrado da equipe. Dois clientes com o mesmo número não
     // impedem o envio (os dois são da equipe), só deixam a conversa sem
     // cliente vinculado, como o webhook faz.
+    //
+    // A busca é pela chave (DDD + 8 últimos dígitos), que é frouxa: "11 5
+    // 8765 4321" casava com o cliente "(11) 98765-4321" e a mensagem ia para
+    // o número digitado. Por isso o telefone digitado tem de bater EXATO com
+    // o do cadastro (alguma das variantes com/sem 55 e nono dígito).
     let doTime: ClienteFone[] = [];
     try {
       doTime = (await clientesDoTelefone(ctx, chave)).filter(
-        (c) => op.is_admin === true || equipe(c.team) === minhaEquipe
+        (c) =>
+          (op.is_admin === true || equipe(c.team) === minhaEquipe) &&
+          [c.owner_phone, c.responsible_phone].some((f) =>
+            variantesTelefone(f).some((v) => variantes.includes(v))
+          )
       );
     } catch (err) {
       console.error('whatsapp-iniciar:', (err as Error).message);
@@ -199,26 +208,28 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     }
     const cliente = clienteDoTelefone(doTime, chave);
 
-    // (b) número que já escreveu E cuja conversa esta equipe enxerga.
+    // (b) número que já escreveu PARA ESTA EQUIPE. A prova é a
+    // whatsapp_conversa_equipes (088), gravada só pelo webhook: o histórico da
+    // caixa não serve, porque a RLS deixa o operador inserir linha da própria
+    // equipe com qualquer telefone. Admin vale para qualquer equipe.
     const { data: prova } = await ctx.supabaseAdmin
       .from('whatsapp_conversas')
       .select('telefone')
       .in('telefone', variantes)
       .limit(1)
       .maybeSingle();
-    let visivel: { team?: string | null; client_id?: string | null } | null = null;
+    let equipeDaProva: string | null = null;
     if (prova) {
-      const { data } = await ctx.supabase
-        .from('emails_triagem')
-        .select('team, client_id')
-        .eq('canal', 'whatsapp')
-        .in('telefone', variantes)
-        .order('recebido_em', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      visivel = data || null;
+      let q = ctx.supabaseAdmin
+        .from('whatsapp_conversa_equipes')
+        .select('team')
+        .eq('telefone', String(prova.telefone).replace(/\D/g, ''));
+      if (op.is_admin !== true) q = q.eq('team', minhaEquipe);
+      const { data: eq, error: eqErr } = await q.limit(1).maybeSingle();
+      if (eqErr) console.warn('whatsapp-iniciar equipes do número (088?):', eqErr.message);
+      equipeDaProva = eq ? equipe(eq.team) : null;
     }
-    if (!doTime.length && !visivel)
+    if (!doTime.length && !equipeDaProva)
       return json(
         {
           error: 'Só dá para iniciar conversa com cliente da sua equipe ou com quem já escreveu',
@@ -228,36 +239,8 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       );
 
     const teamConversa = equipe(
-      (cliente && cliente.team) ||
-        (doTime[0] && doTime[0].team) ||
-        (visivel && visivel.team) ||
-        minhaEquipe
+      (cliente && cliente.team) || (doTime[0] && doTime[0].team) || equipeDaProva || minhaEquipe
     );
-
-    const desde = new Date(Date.now() - HORA_MS).toISOString();
-    const doOperador = await contarEnvios(ctx, 'operador_id', String(op.id), desde);
-    const daEquipe = await contarEnvios(ctx, 'team', teamConversa, desde);
-    if (doOperador === null || daEquipe === null)
-      return json(
-        { error: 'Envio ativo indisponível: falta a migration 089', code: 'migration_missing' },
-        503
-      );
-    if (doOperador >= LIMITE_OPERADOR_HORA)
-      return json(
-        {
-          error: `Limite de ${LIMITE_OPERADOR_HORA} conversas iniciadas por hora atingido`,
-          code: 'rate_limited',
-        },
-        429
-      );
-    if (daEquipe >= LIMITE_EQUIPE_HORA)
-      return json(
-        {
-          error: `A equipe atingiu ${LIMITE_EQUIPE_HORA} conversas iniciadas nesta hora`,
-          code: 'team_rate_limited',
-        },
-        429
-      );
 
     const baseUrl = (Deno.env.get('WAHA_BASE_URL') || '').replace(/\/+$/, '');
     const apiKey = Deno.env.get('WAHA_API_KEY') || '';
@@ -265,11 +248,67 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (!baseUrl || !apiKey)
       return json({ error: 'WhatsApp não configurado', code: 'missing_credentials' }, 500);
 
+    // Limite por hora. Conta, reserva e conta de novo já com a reserva: duas
+    // requisições em paralelo podem acabar as duas recusadas, nunca as duas
+    // aceitas acima do limite. A reserva vem ANTES da consulta à WAHA, para a
+    // pergunta "esse número tem WhatsApp?" também pesar no limite.
+    const desde = new Date(Date.now() - HORA_MS).toISOString();
+    const limite = async (incluiReserva: boolean): Promise<Response | null> => {
+      const doOperador = await contarEnvios(ctx, 'operador_id', String(op.id), desde);
+      const daEquipe = await contarEnvios(ctx, 'team', teamConversa, desde);
+      if (doOperador === null || daEquipe === null)
+        return json(
+          { error: 'Envio ativo indisponível: falta a migration 089', code: 'migration_missing' },
+          503
+        );
+      const folga = incluiReserva ? 1 : 0;
+      if (doOperador >= LIMITE_OPERADOR_HORA + folga)
+        return json(
+          {
+            error: `Limite de ${LIMITE_OPERADOR_HORA} conversas iniciadas por hora atingido`,
+            code: 'rate_limited',
+          },
+          429
+        );
+      if (daEquipe >= LIMITE_EQUIPE_HORA + folga)
+        return json(
+          {
+            error: `A equipe atingiu ${LIMITE_EQUIPE_HORA} conversas iniciadas nesta hora`,
+            code: 'team_rate_limited',
+          },
+          429
+        );
+      return null;
+    };
+    const antes = await limite(false);
+    if (antes) return antes;
+
     // Quem já escreveu tem o número exato que a WAHA conhece; o cadastro do
     // cliente pode estar sem o 55 ou sem o nono dígito, então pergunta.
-    let destino = prova ? String(prova.telefone).replace(/\D/g, '') : '';
+    const candidato = prova
+      ? String(prova.telefone).replace(/\D/g, '')
+      : variantes.find((v) => v.startsWith('55')) || variantes[0];
+    const { data: reserva, error: reservaErr } = await ctx.supabaseAdmin
+      .from('whatsapp_envios_ativos')
+      .insert({ operador_id: String(op.id), team: teamConversa, telefone: candidato })
+      .select('id')
+      .maybeSingle();
+    if (reservaErr) {
+      console.error('whatsapp-iniciar reserva:', reservaErr.message);
+      return json(
+        { error: 'Envio ativo indisponível: falta a migration 089', code: 'migration_missing' },
+        503
+      );
+    }
+    const depois = await limite(true);
+    if (depois) {
+      if (reserva && reserva.id != null)
+        await ctx.supabaseAdmin.from('whatsapp_envios_ativos').delete().eq('id', reserva.id);
+      return depois;
+    }
+
+    let destino = prova ? candidato : '';
     if (!destino) {
-      const candidato = variantes.find((v) => v.startsWith('55')) || variantes[0];
       const achado = await chatIdNaWaha(candidato, { baseUrl, apiKey, session });
       if (!achado.ok) {
         const status = achado.code === 'not_on_whatsapp' ? 422 : 502;
@@ -282,19 +321,6 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       destino = achado.telefone;
     }
 
-    // A tentativa conta antes do envio: duas abas mandando ao mesmo tempo não
-    // furam o limite, e envio que falhou no provedor também pesou no número.
-    const { error: reservaErr } = await ctx.supabaseAdmin
-      .from('whatsapp_envios_ativos')
-      .insert({ operador_id: String(op.id), team: teamConversa, telefone: destino });
-    if (reservaErr) {
-      console.error('whatsapp-iniciar reserva:', reservaErr.message);
-      return json(
-        { error: 'Envio ativo indisponível: falta a migration 089', code: 'migration_missing' },
-        503
-      );
-    }
-
     const textoEnvio = prefixoAtendente(op.name || '', texto);
     const envio = await enviarTexto(destino, textoEnvio, { baseUrl, apiKey, session });
     if (!envio.ok)
@@ -303,7 +329,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     const id = 'ativo:' + crypto.randomUUID();
     const agora = new Date().toISOString();
     const thread = 'whatsapp:' + destino;
-    const clientId = (cliente && cliente.id) || (visivel && visivel.client_id) || null;
+    const clientId = (cliente && cliente.id) || null;
     const { error: insertErr } = await ctx.supabaseAdmin.from('emails_triagem').insert({
       id,
       email_id: id,
