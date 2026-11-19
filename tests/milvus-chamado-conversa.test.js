@@ -57,10 +57,10 @@ function milvus({ lista = [], criar = () => new Response('321', { status: 200 })
   return { fetch, chamadas };
 }
 
-async function carregar({ operador = OPERADOR, cliente = CLIENTE, rede } = {}) {
+async function carregar({ operador = OPERADOR, cliente = CLIENTE, rede, env = ENV } = {}) {
   const m = rede || milvus();
   const { handler } = await loadHandler('milvus-chamado-create', {
-    env: ENV,
+    env,
     createClient: fakeSupabase({
       user: { id: 'user-1' },
       tabelas: { operators: [operador], clients: [cliente], milvus_client_map: [] },
@@ -86,6 +86,43 @@ describe('milvus-chamado-create — ação conversa', () => {
     });
     expect(criar.body.chamado_descricao).toContain('Cliente avisou pelo WhatsApp.');
     expect(criar.body.chamado_descricao).toContain('[ref:CX-abc123def]');
+  });
+
+  it('a categoria do chamado da conversa não é a da visita técnica', async () => {
+    const env = {
+      ...ENV,
+      MILVUS_DEFAULT_CATEGORIA_PRIMARIA: 'Visita técnica',
+      MILVUS_DEFAULT_CATEGORIA_SECUNDARIA: 'Visita agendada',
+      MILVUS_DEFAULT_CATEGORIA_ID: '7',
+      MILVUS_CONVERSA_CATEGORIA_PRIMARIA: 'Suporte',
+      MILVUS_CONVERSA_CATEGORIA_SECUNDARIA: 'Atendimento',
+      MILVUS_CONVERSA_CATEGORIA_ID: '2',
+    };
+    const { handler, chamadas } = await carregar({ env });
+    await handler(reqPost(CORPO, 'jwt-valido'));
+    const criar = chamadas.find((c) => c.url.endsWith('/api/chamado/criar'));
+    expect(criar.body).toMatchObject({
+      chamado_categoria_primaria: 'Suporte',
+      chamado_categoria_secundaria: 'Atendimento',
+      categoria_id: 2,
+    });
+  });
+
+  it('sem categoria própria da conversa, segue o padrão de antes (compatível)', async () => {
+    const env = {
+      ...ENV,
+      MILVUS_DEFAULT_CATEGORIA_PRIMARIA: 'Visita técnica',
+      MILVUS_DEFAULT_CATEGORIA_SECUNDARIA: 'Visita agendada',
+      MILVUS_DEFAULT_CATEGORIA_ID: '7',
+    };
+    const { handler, chamadas } = await carregar({ env });
+    await handler(reqPost(CORPO, 'jwt-valido'));
+    const criar = chamadas.find((c) => c.url.endsWith('/api/chamado/criar'));
+    expect(criar.body).toMatchObject({
+      chamado_categoria_primaria: 'Visita técnica',
+      chamado_categoria_secundaria: 'Visita agendada',
+      categoria_id: 7,
+    });
   });
 
   it('adota o chamado já criado com a mesma ref em vez de abrir outro', async () => {

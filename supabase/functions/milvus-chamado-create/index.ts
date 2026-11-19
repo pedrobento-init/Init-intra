@@ -32,6 +32,10 @@
 //   supabase secrets set MILVUS_DEFAULT_CATEGORIA_PRIMARIA="Backup"
 //   supabase secrets set MILVUS_DEFAULT_CATEGORIA_SECUNDARIA="Verificar"
 //   supabase secrets set MILVUS_DEFAULT_CATEGORIA_ID=1
+//   # Categoria do chamado aberto pela Caixa (conversa), se diferente da acima:
+//   supabase secrets set MILVUS_CONVERSA_CATEGORIA_PRIMARIA="Suporte"
+//   supabase secrets set MILVUS_CONVERSA_CATEGORIA_SECUNDARIA="Atendimento"
+//   supabase secrets set MILVUS_CONVERSA_CATEGORIA_ID=2
 //   supabase functions deploy milvus-chamado-create
 //
 // FLUXO finalizar (visita concluída → chamado finalizado):
@@ -92,6 +96,20 @@ const MILVUS_DEFAULTS = {
   categoria_primaria: Deno.env.get('MILVUS_DEFAULT_CATEGORIA_PRIMARIA') ?? '',
   categoria_secundaria: Deno.env.get('MILVUS_DEFAULT_CATEGORIA_SECUNDARIA') ?? '',
   categoria_id: Number(Deno.env.get('MILVUS_DEFAULT_CATEGORIA_ID') ?? '') || null,
+};
+
+// Chamado avulso da Caixa (ação "conversa"): categoria própria. Os DEFAULT_*
+// acima são os da visita técnica (o chamado nasce como "Visita técnica / Visita
+// agendada"), e um pedido que chega pelo WhatsApp não é isso. Cada campo
+// CONVERSA_* cai no DEFAULT_* correspondente quando não definido, então quem
+// não configurou nada continua exatamente como antes.
+const MILVUS_CONVERSA = {
+  categoria_primaria:
+    Deno.env.get('MILVUS_CONVERSA_CATEGORIA_PRIMARIA') ?? MILVUS_DEFAULTS.categoria_primaria,
+  categoria_secundaria:
+    Deno.env.get('MILVUS_CONVERSA_CATEGORIA_SECUNDARIA') ?? MILVUS_DEFAULTS.categoria_secundaria,
+  categoria_id:
+    Number(Deno.env.get('MILVUS_CONVERSA_CATEGORIA_ID') ?? '') || MILVUS_DEFAULTS.categoria_id,
 };
 
 const CREATE_URL = `${MILVUS_API_URL.replace(/\/$/, '')}/api/chamado/criar`;
@@ -696,9 +714,9 @@ function buildConversaPayload(
     chamado_tecnico: operatorEmail || MILVUS_DEFAULTS.tecnico,
     chamado_mesa: MILVUS_DEFAULTS.mesa,
     chamado_setor: MILVUS_DEFAULTS.setor,
-    chamado_categoria_primaria: MILVUS_DEFAULTS.categoria_primaria,
-    chamado_categoria_secundaria: MILVUS_DEFAULTS.categoria_secundaria,
-    categoria_id: MILVUS_DEFAULTS.categoria_id,
+    chamado_categoria_primaria: MILVUS_CONVERSA.categoria_primaria,
+    chamado_categoria_secundaria: MILVUS_CONVERSA.categoria_secundaria,
+    categoria_id: MILVUS_CONVERSA.categoria_id,
   };
 }
 
