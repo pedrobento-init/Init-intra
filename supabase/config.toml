@@ -33,6 +33,8 @@ verify_jwt = true
 verify_jwt = true
 [functions.conversa-responder]
 verify_jwt = true
+[functions.conversa-encerrar]
+verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 [functions.send-push]
@@ -51,6 +53,9 @@ verify_jwt = false
 [functions.relatorio-visitas-mensal]
 verify_jwt = false
 [functions.agenda-ics]
+verify_jwt = false
+# Lembrete e encerramento por inatividade do WhatsApp, pelo pg_cron (x-cron-secret).
+[functions.whatsapp-inatividade]
 verify_jwt = false
 # O webhook do WAHA (whatsapp) se autentica por token na query (WHATSAPP_WEBHOOK_TOKEN).
 [functions.whatsapp]

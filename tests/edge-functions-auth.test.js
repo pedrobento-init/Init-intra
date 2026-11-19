@@ -68,6 +68,9 @@ const FUNCTIONS = [
     equipe: 'nenhum',
     body: { thread_id: 't1', text: 'resposta de teste' },
   },
+  // Escopo de equipe vem da RLS na leitura do thread (ver
+  // tests/whatsapp-automacao-edge.test.js), não de um 403 próprio.
+  { nome: 'conversa-encerrar', equipe: 'nenhum', body: { thread_id: 't1' } },
   { nome: 'milvus-devices', equipe: 'cliente', body: { clientId: 'c1' } },
   { nome: 'milvus-tickets', equipe: 'cliente', body: { clientId: 'c1' } },
   { nome: 'milvus-chamado-create', equipe: 'cliente', body: { visitId: 'v1' } },
@@ -106,7 +109,7 @@ async function status(handler, req) {
   }
 }
 
-describe('Edge Functions: as 16 com JWT estão na lista', () => {
+describe('Edge Functions: as 17 com JWT estão na lista', () => {
   it('a lista cobre todas as functions que exigem usuário', async () => {
     const fs = await import('node:fs');
     const dir = new URL('../supabase/functions/', import.meta.url);

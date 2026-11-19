@@ -96,7 +96,8 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
   it('quem se autentica por segredo próprio usa verify_jwt = false', () => {
     // robô do Apps Script (x-agenda-secret), cron do banco (x-cron-secret),
     // o feed .ics (token na query, porque app de calendário não manda header)
-    // e o webhook do WAHA (token na query).
+    // o webhook do WAHA (token na query) e o cron de inatividade do WhatsApp
+    // (x-cron-secret, migration 088).
     const proprio = functions.filter((f) =>
       ['secret-header', 'query-token'].includes(authMode(f.source))
     );
@@ -107,6 +108,7 @@ describe('verify_jwt coerente com o modo de autenticação', () => {
       'relatorio-visitas-mensal',
       'robo',
       'whatsapp',
+      'whatsapp-inatividade',
     ]);
     for (const f of proprio) {
       expect(verifyJwtOf(f.name), `${f.name} não valida JWT; verify_jwt deveria ser false`).toBe(

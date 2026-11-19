@@ -57,7 +57,7 @@ por cabeçalho `X-Api-Key`, com o valor de `WAHA_API_KEY`. Por exemplo, o envio 
 texto é `POST /api/sendText` com `{ "session": "default", "chatId":
 "5511987654321@c.us", "text": "oi" }`.
 
-## 3. Banco: migrations 075, 076, 077, 082, 085, 086 e 087
+## 3. Banco: migrations 075, 076, 077, 082, 085, 086, 087 e 088
 
 No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
 
@@ -78,7 +78,11 @@ No **SQL Editor** do Supabase, nesta ordem (não use `supabase db push`):
    Sem ela tudo continua funcionando, só sem esses recursos.
 7. Cole e rode `supabase/migrations/087_whatsapp_filas.sql`: filas por
    departamento, "Pegar próximo" e rodízio (seção 13).
-8. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
+8. Opcional: cole e rode `supabase/migrations/088_whatsapp_automacao.sql`
+   depois de publicar `conversa-encerrar` e `whatsapp-inatividade` (seção 14).
+   É a da automação (horário, saudação, encerramento, pesquisa e
+   inatividade). Sem ela tudo segue igual, só sem automação.
+9. Confira com os `VERIFICAR` do cabeçalho de cada arquivo. O essencial:
 
 ```sql
 select column_name from information_schema.columns
@@ -125,17 +129,20 @@ supabase secrets set WAHA_BASE_URL=https://<endereco-publico-do-waha> WAHA_API_K
 
 Esses valores nunca vão para o Git nem para o `js/config.js`.
 
-## 6. Publicar as três functions
+## 6. Publicar as functions
 
 ```bash
 supabase functions deploy whatsapp
 supabase functions deploy whatsapp-responder
 supabase functions deploy conversa-responder
+supabase functions deploy conversa-encerrar
+supabase functions deploy whatsapp-inatividade
 ```
 
 O `supabase/config.toml` deixa `verify_jwt = false` no `whatsapp` (quem chama é o
-WAHA, sem JWT) e `true` nas outras duas (quem chama é o app, com o login do
-operador).
+WAHA, sem JWT) e no `whatsapp-inatividade` (quem chama é o `pg_cron`, com
+`x-cron-secret`), e `true` nas outras três (quem chama é o app, com o login do
+operador). As duas últimas são da automação (seção 14).
 
 ## 7. Testar a entrada sem celular
 
@@ -349,26 +356,86 @@ a leitura e a gravação, em `distribuicao.ts`.
 | Operador online não aparece como online | Aba sem foco por mais de 5 min (ausente), em pausa, ou sem login no Supabase. |
 | Conversa nova caiu em quem já atendia   | O ciclo anterior não foi encerrado: a mensagem herda o responsável.           |
 
+## 14. Automação: horário, saudação, encerramento, satisfação e inatividade
+
+Configuração **por equipe**, na **Caixa de entrada → Automação do WhatsApp**
+(botão só para admin; a RLS da 088 também só deixa admin gravar). **Tudo vem
+desligado**: equipe sem configuração não recebe mensagem automática nenhuma. A
+regra está em `supabase/functions/whatsapp/automacao.ts`; quem lê o banco e
+envia é `automacao-acoes.ts`. Mensagens automáticas aparecem na conversa como
+"Atendimento automático".
+
+**Horário de atendimento.** Faixas por dia da semana no horário de Brasília
+(`08:30-12:00, 13:00-17:30`; `22:00-02:00` atravessa a meia-noite) e feriados
+(`25/12` todo ano, `20/11/2026` só naquele dia). Fora do horário, a mensagem do
+contato recebe o texto de "fora do expediente" **uma vez por período fechado**:
+três mensagens no sábado recebem um aviso só; quem volta a escrever depois de um
+expediente recebe de novo. Vale também para quem tem chamado aberto. Com o
+horário da equipe ligado, o aviso fixo do menu de departamentos (seção 11) não
+sai, para o cliente não receber dois avisos diferentes.
+
+**Saudação.** Primeira mensagem de conversa nova (número novo, 12 h sem
+mensagem ou conversa encerrada antes). Não sai quando o menu de departamentos
+já respondeu nem para quem tem chamado aberto.
+
+**Encerramento e pesquisa de satisfação.** Encerrar uma conversa de WhatsApp na
+Caixa chama a function `conversa-encerrar`, que encerra também no servidor (só
+na equipe da conversa) e manda o texto de encerramento e, se ligada, a
+pesquisa: **CSAT de 1 a 5** (nota do atendimento, não NPS, que mede a empresa e
+pede 0 a 10 — difícil de responder num chat). A **primeira** mensagem depois do
+encerramento, dentro do prazo configurado (24 h por padrão), é lida como nota:
+aceita `5`, `nota 4`, `4/5`, `cinco`, `⭐⭐⭐`. Com nota, ela é gravada em
+`whatsapp_avaliacoes`, o contato recebe o agradecimento e a conversa continua
+encerrada. O que não é nota (`ainda está sem internet`) encerra a espera e entra
+na Caixa como mensagem normal. A nota aparece no painel lateral da conversa
+(**Satisfação**). Sem conexão, a Caixa encerra só localmente e nada é enviado.
+
+**Inatividade.** Se a última mensagem foi de alguém da equipe e o contato não
+responde em N minutos, sai um lembrete (opcional, uma vez por resposta da
+equipe); em M minutos a conversa é encerrada com o aviso de encerramento por
+inatividade (sem pesquisa). Mensagem do robô e nota interna não contam;
+conversa ligada a chamado nunca é encerrada assim. Quem executa é a function
+`whatsapp-inatividade`, chamada a cada 5 minutos pelo `pg_cron` que a 088
+agenda, com no máximo 40 ações por rodada.
+
+**Ligar.**
+
+1. Publique `conversa-encerrar` e `whatsapp-inatividade` (seção 6).
+2. O cron usa o mesmo segredo dos avisos de prazo: `AVISOS_CRON_SECRET` nos
+   secrets das functions e `avisos_cron_secret`/`project_url` no Vault (já
+   existem se a 051 está no ar). As `WAHA_*` são as da seção 5.
+3. Rode a migration 088 no SQL Editor e confira o `VERIFICAR` do cabeçalho.
+4. Na Caixa, como admin, abra **Automação do WhatsApp**, escolha a equipe,
+   ligue o que quiser e salve. Vale a partir da próxima mensagem (até 30 s de
+   cache).
+
+Teste a cron na mão pelo SQL Editor, como no cabeçalho da 080, trocando a URL
+por `/functions/v1/whatsapp-inatividade`: sem equipe com inatividade ligada a
+resposta é `{"ok":true,"ativo":false}`.
+
 ## Quando algo não funciona
 
 Os logs ficam no painel do Supabase: **Edge Functions → whatsapp** (ou
 `whatsapp-responder`, `conversa-responder`) **→ Logs**. Os logs locais do WAHA
 aparecem com `docker compose logs waha`.
 
-| Sintoma                                 | Causa provável                                                                         |
-| --------------------------------------- | -------------------------------------------------------------------------------------- |
-| Nada chega e não há log                 | URL do webhook errada no WAHA, sessão sem `WORKING` ou evento `message` não assinado.  |
-| Log com 401                             | O `token=` da URL não bate com `WHATSAPP_WEBHOOK_TOKEN`.                               |
-| 200 com `caixa: 0` em mensagem de texto | O payload não é um evento `message` com `payload.body`, `payload.from` e `payload.id`. |
-| Erro `column "canal" does not exist`    | A migration 075 não foi aplicada.                                                      |
-| Erro `column "direcao" does not exist`  | A migration 082 não foi aplicada; a mensagem ainda entra, mas o portal não responde.   |
-| Mensagem cai como "sem cliente"         | O telefone não está cadastrado ou está em dois clientes diferentes.                    |
-| Envio: `missing_credentials` (500)      | Faltou `WAHA_BASE_URL` ou `WAHA_API_KEY` nos secrets.                                  |
-| Envio: `provider_error` (502)           | Chave errada, sessão desconectada ou WAHA recusou o envio.                             |
-| Envio: `provider_unreachable` (502)     | `WAHA_BASE_URL` está inacessível; `localhost` não funciona para a Edge Function.       |
-| Envio: `not_whatsapp_contact` (422)     | A 076 não foi aplicada, ou esse número nunca escreveu para a empresa.                  |
-| Portal: `thread_not_found` (404)        | Linha antiga sem `thread_id` ou conversa de outra equipe; a RLS esconde a mensagem.    |
-| Portal: `missing_credentials` (500)     | Faltou `WAHA_*` (WhatsApp) ou `GMAIL_*` (e-mail) nos secrets.                          |
-| Log "migration 077 não aplicada"        | Funciona assim, mas rode a 077 para evitar leitura de todos os clientes.               |
-| Log "passou de 30 mensagens por minuto" | O excesso foi descartado pelo limite do canal.                                         |
-| Envio: `pendencia_closed` (409)         | O chamado está encerrado. Reabra antes de responder.                                   |
+| Sintoma                                 | Causa provável                                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Nada chega e não há log                 | URL do webhook errada no WAHA, sessão sem `WORKING` ou evento `message` não assinado.          |
+| Log com 401                             | O `token=` da URL não bate com `WHATSAPP_WEBHOOK_TOKEN`.                                       |
+| 200 com `caixa: 0` em mensagem de texto | O payload não é um evento `message` com `payload.body`, `payload.from` e `payload.id`.         |
+| Erro `column "canal" does not exist`    | A migration 075 não foi aplicada.                                                              |
+| Erro `column "direcao" does not exist`  | A migration 082 não foi aplicada; a mensagem ainda entra, mas o portal não responde.           |
+| Mensagem cai como "sem cliente"         | O telefone não está cadastrado ou está em dois clientes diferentes.                            |
+| Envio: `missing_credentials` (500)      | Faltou `WAHA_BASE_URL` ou `WAHA_API_KEY` nos secrets.                                          |
+| Envio: `provider_error` (502)           | Chave errada, sessão desconectada ou WAHA recusou o envio.                                     |
+| Envio: `provider_unreachable` (502)     | `WAHA_BASE_URL` está inacessível; `localhost` não funciona para a Edge Function.               |
+| Envio: `not_whatsapp_contact` (422)     | A 076 não foi aplicada, ou esse número nunca escreveu para a empresa.                          |
+| Portal: `thread_not_found` (404)        | Linha antiga sem `thread_id` ou conversa de outra equipe; a RLS esconde a mensagem.            |
+| Portal: `missing_credentials` (500)     | Faltou `WAHA_*` (WhatsApp) ou `GMAIL_*` (e-mail) nos secrets.                                  |
+| Log "migration 077 não aplicada"        | Funciona assim, mas rode a 077 para evitar leitura de todos os clientes.                       |
+| Log "passou de 30 mensagens por minuto" | O excesso foi descartado pelo limite do canal.                                                 |
+| Envio: `pendencia_closed` (409)         | O chamado está encerrado. Reabra antes de responder.                                           |
+| Automação: modal diz "migration 088"    | A 088 não foi aplicada; webhook e Caixa seguem sem automação.                                  |
+| Encerrou, mas não saiu mensagem         | Encerramento/pesquisa desligados na equipe, `conversa-encerrar` não publicada ou sem `WAHA_*`. |
+| Inatividade não age                     | Cron sem `AVISOS_CRON_SECRET`/Vault, ou a conversa tem chamado ligado.                         |
