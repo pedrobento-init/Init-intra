@@ -7929,6 +7929,13 @@ mark.cx-achado-atual {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.cxp-mv-pen {
+  font-size: 12px;
+  color: var(--cx-ac);
+}
+.cxp-mv-sync {
+  justify-self: start;
+}
 
 /* Estado vazio (nada selecionado). */
 .cx-empty {

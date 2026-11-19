@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
   cxpPendenciasAbertas,
+  cxpChamadosMilvusAbertos,
   cxpPendenciaDados,
   cxpFiltrarTickets,
   cxpCodigoDigitado,
@@ -33,6 +34,20 @@ describe('cxpPendenciasAbertas', () => {
 
   it('sem cliente não lista nada (não mistura pendências internas)', () => {
     expect(cxpPendenciasAbertas(lista, '')).toEqual([]);
+  });
+});
+
+describe('cxpChamadosMilvusAbertos', () => {
+  it('deixa de fora finalizado, cancelado e sem código; o mais novo primeiro', () => {
+    const lista = [
+      { codigo: 10, status: 'Em atendimento' },
+      { codigo: 12, status: 'Finalizado' },
+      { codigo: 11, status: 'A fazer' },
+      { codigo: 13, status: 'Cancelado' },
+      { codigo: null, status: 'Novo' },
+      { codigo: 9, status: '' },
+    ];
+    expect(cxpChamadosMilvusAbertos(lista).map((t) => t.codigo)).toEqual([11, 10, 9]);
   });
 });
 
@@ -154,7 +169,7 @@ const FONTES = [
   'js/caixa-pendencia.js',
 ].map((f) => fs.readFileSync(f, 'utf8'));
 
-let mem, elementos, acoes, salvas, toasts, invocacoes, respostaMilvus, pendencias;
+let mem, elementos, acoes, salvas, toasts, invocacoes, respostaMilvus, pendencias, tickets;
 
 const CONV = 'whatsapp:1187654321';
 
@@ -227,6 +242,13 @@ function carregar() {
     formatDateTime: (s) => String(s || ''),
     STATUS_PEN_MAP: { aberto: { label: 'Aberto' }, pausado: { label: 'Pausado' } },
   };
+  if (tickets) {
+    sandbox.getClientMilvusTickets = async (id) => (id === 'c1' ? tickets : []);
+    sandbox.syncClientMilvusTickets = async () => {
+      tickets = tickets.concat([{ codigo: 26200, assunto: 'Chamado novo', status: 'Novo' }]);
+      return { synced: 1 };
+    };
+  }
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   for (const src of FONTES) vm.runInContext(src, sandbox);
@@ -261,6 +283,7 @@ beforeEach(() => {
     { id: 'PEN-0030', clientId: 'c1', status: 'resolvido', assunto: 'Velha' },
   ];
   respostaMilvus = { success: true, codigo: 26100 };
+  tickets = null;
   s = carregar();
   s._caixaSelecionada = CONV;
 });
@@ -373,5 +396,60 @@ describe('Caixa — painel de detalhes', () => {
     expect(doMilvus()).toHaveLength(2);
     expect(doMilvus()[0][1].ref).toBe(doMilvus()[1][1].ref);
     expect(toasts[0][1]).toBe('error');
+  });
+});
+
+describe('Caixa — chamados abertos no Milvus', () => {
+  const espera = () => new Promise((r) => setTimeout(r, 0));
+
+  beforeEach(() => {
+    tickets = [
+      { codigo: 26030, assunto: 'Backup do servidor', status: 'Em atendimento', tecnico: 'Bruno' },
+      { codigo: 26001, assunto: 'Licença <Office>', status: 'A fazer' },
+      { codigo: 25900, assunto: 'Antigo', status: 'Finalizado' },
+    ];
+    pendencias[0].milvusChamadoCodigo = 26030;
+    s = carregar();
+    s._caixaSelecionada = CONV;
+  });
+
+  it('lista os abertos do cliente junto das pendências, sem abrir formulário', async () => {
+    s.renderCaixaEntrada();
+    expect(painel()).toContain('Carregando chamados');
+    await espera();
+    const h = painel();
+    expect(h).toContain('Chamados abertos no Milvus de MMolaw &lt;b&gt;');
+    expect(h).toContain('#26030 · Em atendimento · Bruno');
+    expect(h).toContain('Licença &lt;Office&gt;');
+    expect(h).not.toContain('Antigo');
+  });
+
+  it('mostra qual pendência já cuida do chamado', async () => {
+    s.renderCaixaEntrada();
+    await espera();
+    expect(painel()).toMatch(/data-arg="PEN-0071">Pendência #71/);
+    expect(painel()).toContain('Sem pendência vinculada');
+  });
+
+  it('redesenhar não dispara uma leitura nova a cada mensagem', async () => {
+    let leituras = 0;
+    const ler = s.getClientMilvusTickets;
+    s.getClientMilvusTickets = (id) => {
+      leituras++;
+      return ler(id);
+    };
+    s.renderCaixaEntrada();
+    s.renderCaixaEntrada();
+    await espera();
+    s.renderCaixaEntrada();
+    expect(leituras).toBe(1);
+  });
+
+  it('"Atualizar do Milvus" sincroniza e relê a lista', async () => {
+    s.renderCaixaEntrada();
+    await espera();
+    await s.cxpMilvusAtualizar('c1');
+    await espera();
+    expect(painel()).toContain('#26200');
   });
 });
