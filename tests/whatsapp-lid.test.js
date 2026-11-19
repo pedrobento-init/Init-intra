@@ -32,6 +32,29 @@ describe('adaptador: remetente @lid', () => {
     expect(m.lid).toBeUndefined();
   });
 
+  // O engine NOWEB manda o telefone em key.remoteJidAlt (ou senderPn); o GOWS,
+  // em Info.SenderAlt. Lendo daqui, a conversa nasce com o número certo mesmo
+  // quando a consulta /lids do WAHA falha.
+  it.each([
+    ['NOWEB remoteJidAlt', { key: { remoteJid: LID, remoteJidAlt: `${FONE}@s.whatsapp.net` } }],
+    ['NOWEB senderPn', { key: { remoteJid: LID, senderPn: `${FONE}@s.whatsapp.net` } }],
+    ['GOWS SenderAlt', { Info: { Sender: LID, SenderAlt: `${FONE}:12@s.whatsapp.net` } }],
+  ])('LID com telefone no próprio evento (%s) já sai com o número', (_n, _data) => {
+    const ev = evento(LID);
+    ev.payload._data = _data;
+    const [m] = mensagensDoWebhook(ev);
+    expect(m.telefone).toBe(FONE);
+    expect(m.lid).toBeUndefined();
+  });
+
+  it('campo alternativo que é outro LID não vira telefone', () => {
+    const ev = evento(LID);
+    ev.payload._data = { key: { remoteJidAlt: '123456789012345@lid' } };
+    const [m] = mensagensDoWebhook(ev);
+    expect(m.telefone).toBe('');
+    expect(m.lid).toBe(LID);
+  });
+
   it('grupo continua ignorado', () => {
     expect(mensagensDoWebhook(evento('120363000000000000@g.us'))).toEqual([]);
   });
@@ -53,6 +76,15 @@ describe('telefoneDoLid', () => {
     expect(fone).toBe(FONE);
     expect(visto.u).toBe(`https://waha.interno/api/default/lids/${encodeURIComponent(LID)}`);
     expect(visto.init.headers['X-Api-Key']).toBe('k');
+  });
+
+  it('aceita o pn no formato novo (@s.whatsapp.net)', async () => {
+    const fone = await telefoneDoLid(
+      LID,
+      cred,
+      resposta({ lid: LID, pn: `${FONE}@s.whatsapp.net` })
+    );
+    expect(fone).toBe(FONE);
   });
 
   it.each([
