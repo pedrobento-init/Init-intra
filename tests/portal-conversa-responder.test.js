@@ -44,6 +44,9 @@ async function chamar({
   body = { thread_id: 't1', text: 'Vamos verificar.' },
   fetchStub,
   contatos = [],
+  // Prova (088) de que o número escreveu para a equipe: por padrão, quem está
+  // em whatsapp_conversas escreveu para a 'init'.
+  equipes = contatos.map((c) => ({ telefone: c.telefone, team: 'init' })),
 } = {}) {
   const queries = [];
   const enviados = [];
@@ -52,7 +55,12 @@ async function chamar({
     createClient: fakeSupabase({
       user: { id: 'user-1' },
       queries,
-      tabelas: { operators: [OPERADOR], emails_triagem: linhas, whatsapp_conversas: contatos },
+      tabelas: {
+        operators: [OPERADOR],
+        emails_triagem: linhas,
+        whatsapp_conversas: contatos,
+        whatsapp_conversa_equipes: equipes,
+      },
     }),
     createTransport: () => ({
       sendMail: async (msg) => {
@@ -79,6 +87,8 @@ describe('conversa-responder: destino e escopo', () => {
   it('WhatsApp só responde para quem já escreveu para a empresa', async () => {
     const { res, enviados } = await chamar({
       linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      // Só a prova da 076 falta: é ela que este teste trava.
+      equipes: [{ telefone: '5511987654321', team: 'init' }],
     });
     expect(res.status).toBe(422);
     expect(enviados).toEqual([]);
@@ -171,5 +181,161 @@ describe('conversa-responder: destino e escopo', () => {
     });
     expect(res.status).toBe(400);
     expect(enviados).toEqual([]);
+  });
+});
+
+describe('conversa-responder: citação, reação e visto (086)', () => {
+  const whats = (over) =>
+    entrada({
+      canal: 'whatsapp',
+      telefone: '5511987654321',
+      de: 'Márcia',
+      thread_id: 'whatsapp:1187654321',
+      message_id: 'false_5511987654321@c.us_Q1',
+      corpo: 'Qual o prazo?',
+      ...over,
+    });
+  const contatos = [{ telefone: '5511987654321' }];
+  const wahaOk = () => {
+    const chamadas = [];
+    const fn = async (url, init) => {
+      chamadas.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+      return new Response(JSON.stringify({ id: 'true_x@c.us_NOVO' }), { status: 200 });
+    };
+    return { fn, chamadas };
+  };
+
+  it('responder citando manda reply_to e grava a citação', async () => {
+    const waha = wahaOk();
+    const { res, queries } = await chamar({
+      linhas: [whats()],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', text: 'Amanhã', reply_to: 'e1' },
+    });
+    expect(res.status).toBe(200);
+    expect(waha.chamadas[0].body.reply_to).toBe('false_5511987654321@c.us_Q1');
+    const ins = queries.find((q) => q.insert && q.insert.direcao === 'saida');
+    expect(ins.insert.citacao).toEqual({
+      id: 'false_5511987654321@c.us_Q1',
+      texto: 'Qual o prazo?',
+      autor: 'Márcia',
+    });
+  });
+
+  // O id citado vem do navegador: sem o filtro de thread e equipe, daria para
+  // citar (e expor o texto de) uma mensagem de outra conversa.
+  it('mensagem citada de outra equipe não é encontrada', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats(), whats({ id: 'outra', team: 'mam', recebido_em: '2026-10-26T09:00:00Z' })],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', text: 'x', reply_to: 'outra' },
+    });
+    expect(res.status).toBe(404);
+    expect(waha.chamadas).toEqual([]);
+  });
+
+  it('reação sai para o WAHA e fica gravada como da equipe', async () => {
+    const waha = wahaOk();
+    const { res, queries } = await chamar({
+      linhas: [whats()],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'reaction', alvo: 'e1', emoji: '👍' },
+    });
+    expect(res.status).toBe(200);
+    expect(waha.chamadas[0].url).toBe('https://waha.teste/api/reaction');
+    const up = queries.find((q) => q.patch && 'reacao_equipe' in q.patch);
+    expect(up.patch.reacao_equipe).toBe('👍');
+    expect(up.filtros).toEqual(expect.arrayContaining([['team', 'init']]));
+  });
+
+  // message_id é gravável pela equipe: sem amarrar ao chat do contato, daria
+  // para o número da empresa reagir em mensagem de outra conversa.
+  it('reação em mensagem cujo id é de outro chat é recusada', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats({ message_id: 'false_5521999999999@c.us_X9' })],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'reaction', alvo: 'e1', emoji: '👍' },
+    });
+    expect(res.status).toBe(422);
+    expect(waha.chamadas).toEqual([]);
+  });
+
+  it('visto e reação exigem a prova de contato, como a resposta', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats()],
+      contatos: [],
+      equipes: [{ telefone: '5511987654321', team: 'init' }],
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'seen' },
+    });
+    expect(res.status).toBe(422);
+    expect(waha.chamadas).toEqual([]);
+  });
+
+  it('reação que não é emoji é recusada antes de qualquer envio', async () => {
+    const waha = wahaOk();
+    const { res } = await chamar({
+      linhas: [whats()],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'reaction', alvo: 'e1', emoji: '<img>' },
+    });
+    expect(res.status).toBe(400);
+    expect(waha.chamadas).toEqual([]);
+  });
+
+  it('reação e visto não existem no e-mail', async () => {
+    const { res } = await chamar({ body: { thread_id: 't1', kind: 'seen' } });
+    expect(res.status).toBe(400);
+  });
+
+  it('visto marca a conversa lida no WAHA sem gravar nada', async () => {
+    const waha = wahaOk();
+    const { res, queries } = await chamar({
+      linhas: [whats()],
+      contatos,
+      fetchStub: waha.fn,
+      body: { thread_id: 'whatsapp:1187654321', kind: 'seen' },
+    });
+    expect(res.status).toBe(200);
+    expect(waha.chamadas[0].url).toBe('https://waha.teste/api/sendSeen');
+    expect(queries.some((q) => q.insert || q.patch)).toBe(false);
+  });
+});
+
+describe('conversa-responder: equipe do número (088)', () => {
+  // A linha de entrada é gravável pela equipe (RLS): forjada, ela fazia a
+  // equipe A responder a um contato que só falou com a equipe B.
+  it('linha forjada para número que só escreveu para outra equipe não envia', async () => {
+    const chamadas = [];
+    const { res, dados } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      contatos: [{ telefone: '5511987654321' }],
+      equipes: [{ telefone: '5511987654321', team: 'mam' }],
+      fetchStub: async (url) => {
+        chamadas.push(String(url));
+        return new Response('{}', { status: 200 });
+      },
+    });
+    expect(res.status).toBe(403);
+    expect(dados.code).toBe('not_team_contact');
+    expect(chamadas).toEqual([]);
+  });
+
+  it('nota interna não fala com o número e não passa pela trava', async () => {
+    const { res } = await chamar({
+      linhas: [entrada({ canal: 'whatsapp', telefone: '5511987654321', de: 'Márcia' })],
+      contatos: [{ telefone: '5511987654321' }],
+      equipes: [],
+      body: { thread_id: 't1', text: 'só para a equipe', kind: 'internal' },
+    });
+    expect(res.status).toBe(200);
   });
 });

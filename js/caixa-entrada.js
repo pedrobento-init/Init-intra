@@ -34,6 +34,16 @@ var _caixaFilaEnvio = Promise.resolve();
 // Depois de enviar, o campo volta a ter foco mesmo que o envio tenha sido pelo
 // botão: quem está numa conversa continua escrevendo.
 var _caixaFocarComposer = false;
+// Conversa rica (086). Tudo isto é estado da tela e não do banco: o sync
+// redesenha a conversa inteira, então o que está aberto mora aqui.
+//   _caixaCitando — mensagem que a próxima resposta vai citar ({conv, id});
+//   _caixaReagindo — id da mensagem com o seletor de reação aberto;
+//   _caixaEmojiAberto — painel de emojis do composer;
+//   _caixaBuscaConversa — busca dentro da conversa aberta ({conv, termo, aberta}).
+var _caixaCitando = null;
+var _caixaReagindo = null;
+var _caixaEmojiAberto = false;
+var _caixaBuscaConversa = { conv: null, termo: '', aberta: false };
 
 // Nome com que o webhook do WhatsApp grava o que o atendimento automático mandou
 // (supabase/functions/whatsapp/index.ts, AUTOR_BOT): os dois lados têm de bater.
@@ -144,6 +154,7 @@ function caixaAgruparConversas(lista) {
         clientId: ultimoCom('clientId'),
         pendenciaId: ultimoCom('pendenciaId'),
         fotoUrl: ultimoCom('fotoUrl'),
+        departamento: ultimoCom('departamento'), // 087, js/whatsapp-filas.js
       };
     })
     .sort((a, b) => _caixaData(b.ultima).localeCompare(_caixaData(a.ultima)));
@@ -156,7 +167,11 @@ function caixaInterlocutor(c) {
   if (!c) return null;
   if (c.ultimaEntrada) return c.ultimaEntrada;
   const entradas = (c.mensagens || []).filter((m) => (m.direcao || 'entrada') === 'entrada');
-  return entradas.length ? entradas[entradas.length - 1] : c.ultima || null;
+  if (entradas.length) return entradas[entradas.length - 1];
+  // Conversa que a empresa começou (whatsapp-iniciar): o "de" da saída é quem
+  // atendeu, não o contato. Sem ele, o nome cai no telefone (ou no nome salvo).
+  if (c.ultima && c.canal === 'whatsapp') return Object.assign({}, c.ultima, { de: '' });
+  return c.ultima || null;
 }
 
 function caixaFiltrar(conversas, filtro, busca, usuario) {
@@ -211,6 +226,9 @@ function caixaClientePorTelefone(telefone, clientes) {
 function _caixaNomeDe(m, canal) {
   if (!m) return '(sem remetente)';
   if (canal !== 'whatsapp') return _emailTriagemNome(m.de) || m.de || '(sem remetente)';
+  // Nome editado em Contatos do WhatsApp (089) vale mais que o do perfil.
+  const salvo = typeof wcontNome === 'function' ? wcontNome(m.telefone, m.team) : '';
+  if (salvo) return salvo;
   const de = String(m.de || '').trim();
   const soNumero = !de || (chamadoTelefoneDigitos(de).length >= 8 && !/[a-zà-ú]/i.test(de));
   if (!soNumero) return de;
@@ -495,6 +513,7 @@ function _caixaItemHTML(c, lidas) {
       ? '<span class="cx-badge">Chamado ' + escapeHtml(_cxChamadoCurto(c.pendenciaId)) + '</span>'
       : '') +
     (c.atribuidoA ? '<span class="cx-meta-com">com ' + escapeHtml(c.atribuidoA) + '</span>' : '') +
+    (typeof wetqConversaChipsHTML === 'function' ? wetqConversaChipsHTML(c, 2) : '') +
     '</span>' +
     '</span></button>'
   );
@@ -546,32 +565,8 @@ function _caixaConversaHTML(c) {
       const direcao = m.direcao || 'entrada';
       const autor = autorDe(m);
       if (whats) {
-        const cls =
-          direcao === 'interna'
-            ? 'cx-bubble-nota'
-            : direcao === 'saida'
-              ? 'cx-bubble-out'
-              : 'cx-bubble-in';
-        // Nota interna leva o autor; mensagem do robô também, para quem atende
-        // saber que aquilo foi o atendimento automático e não um colega.
-        const nota =
-          direcao === 'interna'
-            ? '<b class="cx-bubble-nota-tag">' + escapeHtml(autor) + '</b>'
-            : direcao === 'saida' && m.de === CAIXA_AUTOR_BOT
-              ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
-              : '';
-        return (
-          sep +
-          '<div class="cx-bubble ' +
-          cls +
-          '">' +
-          nota +
-          _caixaCorpoHTML(m.corpo, c.canal) +
-          _caixaMediaHTML(m.media) +
-          '<small>' +
-          hora(m) +
-          '</small></div>'
-        );
+        const continua = caixaMsgContinua(c.mensagens[i - 1], m) && !sep;
+        return sep + _caixaMsgWhatsHTML(c, m, continua);
       }
       const ultimaMsg = i === c.mensagens.length - 1;
       const expandida = ultimaMsg || !!expMap[i];
@@ -671,6 +666,8 @@ function _caixaConversaHTML(c) {
     '</dl>' +
     (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') +
     '</section>' +
+    // Nota da pesquisa de satisfação (whatsapp-automacao.js, migration 088).
+    (typeof wautoAvaliacaoHTML === 'function' ? wautoAvaliacaoHTML(c) : '') +
     '<section class="cx-lado-acoes"><h3>Ações</h3><div class="cx-acoes-ver">' +
     (pen
       ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' +
@@ -689,6 +686,7 @@ function _caixaConversaHTML(c) {
     '">' +
     (cli ? 'Trocar cliente' : 'Vincular cliente') +
     '</button>' +
+    (typeof wetqBotaoHTML === 'function' ? wetqBotaoHTML(c) : '') +
     '<button type="button" class="btn cx-btn" data-action="caixaMarcarNaoLida" data-arg="' +
     id +
     '">Marcar como não lida</button>' +
@@ -730,16 +728,28 @@ function _caixaConversaHTML(c) {
     '>Nota interna</option></select>' +
     '<button type="button" class="btn cx-btn cx-rp" data-action="rpAbrir" aria-controls="rpPainel" aria-expanded="false">Respostas prontas</button></span>' +
     '</div>' +
-    '<div class="cx-comp-row"><label class="btn cx-ic-btn" for="cxArquivo" aria-label="Anexar arquivo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label>' +
-    '<input type="file" id="cxArquivo" name="file" class="cx-filehidden" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
-    '<textarea class="cx-tx" name="text" id="newNoteText" rows="' +
-    (whats ? 1 : 4) +
-    '" data-input="caixaRascunho" placeholder="' +
-    (whats ? 'Escreva uma mensagem' : 'Escreva a resposta (Ctrl+Enter envia)') +
-    '">' +
-    escapeHtml(rasc.texto) +
-    '</textarea>' +
-    '<button type="submit" class="btn cx-btn cx-send" aria-label="Enviar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-11 11"/><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>' +
+    (whats ? _caixaComposerCitaHTML(c) : '') +
+    (whats && _caixaGravacao && _caixaGravacao.conv === c.id
+      ? _caixaGravandoHTML()
+      : '<div class="cx-comp-row"><label class="btn cx-ic-btn" for="cxArquivo" aria-label="Anexar arquivo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label>' +
+        '<input type="file" id="cxArquivo" name="file" class="cx-filehidden" accept="image/*,audio/*,.pdf,.txt,.zip" />' +
+        (whats
+          ? '<button type="button" class="btn cx-ic-btn" data-action="caixaEmojis" aria-label="Emojis" aria-expanded="' +
+            _caixaEmojiAberto +
+            '" aria-controls="cxEmojis"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14a4 4 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button>'
+          : '') +
+        '<textarea class="cx-tx" name="text" id="newNoteText" rows="' +
+        (whats ? 1 : 4) +
+        '" data-input="caixaRascunho" placeholder="' +
+        (whats ? 'Escreva uma mensagem' : 'Escreva a resposta (Ctrl+Enter envia)') +
+        '">' +
+        escapeHtml(rasc.texto) +
+        '</textarea>' +
+        (whats && caixaPodeGravar()
+          ? '<button type="button" class="btn cx-ic-btn cx-mic" data-action="caixaGravar" aria-label="Gravar áudio" title="Gravar áudio"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>'
+          : '') +
+        '<button type="submit" class="btn cx-btn cx-send" aria-label="Enviar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-11 11"/><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>') +
+    (whats && _caixaEmojiAberto ? _caixaEmojisHTML() : '') +
     '<div id="rpPainel" hidden></div></form>';
   return (
     '<div class="cx-conv-topo">' +
@@ -753,8 +763,13 @@ function _caixaConversaHTML(c) {
     escapeHtml(nome) +
     '</b><span>' +
     escapeHtml((cli ? cli.name : '') + (cli ? ' · ' : '') + (whats ? 'WhatsApp' : 'E-mail')) +
-    '</span></div>' +
+    '</span>' +
+    (typeof wetqConversaChipsHTML === 'function' ? wetqConversaChipsHTML(c, 4) : '') +
+    '</div>' +
     '<span class="cx-conv-flex"></span>' +
+    '<button type="button" class="btn cx-btn cx-ic-btn" data-action="caixaBuscarNaConversa" aria-label="Buscar na conversa" title="Buscar na conversa" aria-pressed="' +
+    !!(_caixaBuscaConversa.aberta && _caixaBuscaConversa.conv === c.id) +
+    '"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>' +
     (pen
       ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' +
         escapeHtml(pen.id) +
@@ -768,6 +783,7 @@ function _caixaConversaHTML(c) {
     (_caixaDetalhesAberto ? 'true' : 'false') +
     '" aria-label="Detalhes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>' +
     '</div>' +
+    _caixaBuscaConversaHTML(c) +
     '<div class="cx-conv-grade' +
     (_caixaDetalhesAberto ? '' : ' cx-det-fechado') +
     '"><div class="cx-conv-main"><div class="cx-timeline">' +
@@ -778,6 +794,312 @@ function _caixaConversaHTML(c) {
     composer +
     '</div>' +
     lado +
+    '</div>'
+  );
+}
+
+// ---- Mensagem do WhatsApp: avatar ao lado da bolha -------------------------
+// Como na página do chamado: cada fala tem o rosto de quem falou — a foto do
+// contato à esquerda, a do colega à direita. Quem atende bate o olho e sabe
+// quem disse o quê sem ler o nome de cada bolha.
+
+// Falas seguidas da mesma pessoa, no mesmo dia e com pouco intervalo, viram um
+// bloco só: repetir avatar e nome em cada "ok" / "obrigado" só faz ruído.
+const CAIXA_GRUPO_MS = 10 * 60 * 1000;
+
+function caixaMsgContinua(anterior, m) {
+  if (!anterior || !m) return false;
+  if ((anterior.direcao || 'entrada') !== (m.direcao || 'entrada')) return false;
+  // Na entrada o "de" pode variar (nome do perfil ou número): é a mesma pessoa.
+  if ((m.direcao || 'entrada') !== 'entrada' && String(anterior.de || '') !== String(m.de || ''))
+    return false;
+  const a = new Date(anterior.recebidoEm).getTime();
+  const b = new Date(m.recebidoEm).getTime();
+  if (isNaN(a) || isNaN(b)) return false;
+  return b - a >= 0 && b - a <= CAIXA_GRUPO_MS;
+}
+
+// A resposta só guarda o nome de quem atendeu (conversa-responder grava "de"
+// com op.name), então é pelo nome que se acha a foto.
+function _caixaOperadorPorNome(nome) {
+  const n = String(nome || '')
+    .trim()
+    .toLowerCase();
+  if (!n || typeof getOperators !== 'function') return null;
+  return (
+    (getOperators() || []).find(
+      (o) =>
+        String((o && o.name) || '')
+          .trim()
+          .toLowerCase() === n
+    ) || null
+  );
+}
+
+// O WhatsApp leva "Nome: texto" para o cliente saber quem respondeu, e o
+// histórico grava igual. Com o nome no topo da bolha, o prefixo só repetiria.
+function caixaCorpoSemAtendente(corpo, de) {
+  const n = String(de || '').trim();
+  const s = String(corpo || '');
+  return n && s.startsWith(n + ': ') ? s.slice(n.length + 2) : s;
+}
+
+const _CAIXA_ICO_BOT =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13v2M15 13v2"/></svg>';
+
+function caixaAvatarMsgHTML(c, m, nome) {
+  const direcao = (m && m.direcao) || 'entrada';
+  if (direcao === 'entrada') {
+    return (
+      '<span class="cx-av cx-av-sm" aria-hidden="true">' +
+      escapeHtml(_caixaIniciais(nome)) +
+      caixaFotoHTML(c) +
+      '</span>'
+    );
+  }
+  if (m.de === CAIXA_AUTOR_BOT) {
+    return (
+      '<span class="cx-av cx-av-sm cx-av-bot" aria-hidden="true">' + _CAIXA_ICO_BOT + '</span>'
+    );
+  }
+  const op = _caixaOperadorPorNome(m.de);
+  // opFotoSegura só deixa passar data URL raster: SVG poderia carregar script.
+  const foto = op && typeof opFotoSegura === 'function' ? opFotoSegura(op.photo) : '';
+  const corBruta =
+    (op && op.color) || (typeof getOpAvatarColor === 'function' ? getOpAvatarColor(nome) : '');
+  const cor = /^#[0-9a-f]{3,8}$/i.test(String(corBruta || '')) ? corBruta : '';
+  return (
+    '<span class="cx-av cx-av-sm cx-av-eq"' +
+    (cor ? ' data-sty="--cx-av-cor:' + escapeHtml(cor) + '"' : '') +
+    ' aria-hidden="true">' +
+    escapeHtml(_caixaIniciais(nome)) +
+    (foto
+      ? '<img class="cx-av-img" src="' + escapeHtml(foto) + '" alt="" draggable="false" />'
+      : '') +
+    '</span>'
+  );
+}
+
+// ---- Conversa rica (086): recibo, citação, reações ------------------------
+
+// Recibo da mensagem que nós mandamos, no código do WAHA: -1 erro, 0 pendente,
+// 1 servidor, 2 entregue, 3 lida, 4 ouvida. Sem valor (mensagem antiga, banco
+// sem a 086) não desenha nada: um ✓ inventado diria que chegou sem saber.
+const CAIXA_ACK_ROTULO = {
+  '-1': 'Não foi entregue',
+  0: 'Enviando',
+  1: 'Enviada',
+  2: 'Entregue',
+  3: 'Lida',
+  4: 'Ouvida',
+};
+
+function caixaAckHTML(ack) {
+  if (ack === null || ack === undefined || ack === '') return '';
+  const n = Number(ack);
+  if (!Number.isInteger(n) || n < -1 || n > 4) return '';
+  const rotulo = CAIXA_ACK_ROTULO[n];
+  if (n === -1)
+    return (
+      '<span class="cx-ack cx-ack-erro" role="img" aria-label="' +
+      rotulo +
+      '" title="' +
+      rotulo +
+      '">!</span>'
+    );
+  const svg =
+    n === 0
+      ? '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2 2"/>'
+      : n === 1
+        ? '<path d="M5 12.5l4.5 4.5L19 7.5"/>'
+        : '<path d="M2 12.5l4.5 4.5L16 7.5"/><path d="M11 16l1 1L21.5 7.5"/>';
+  return (
+    '<span class="cx-ack' +
+    (n >= 3 ? ' cx-ack-lida' : '') +
+    '" role="img" aria-label="' +
+    rotulo +
+    '" title="' +
+    rotulo +
+    '"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    svg +
+    '</svg></span>'
+  );
+}
+
+// A citação guarda o id do WAHA, que às vezes vem só com o final (o que vem
+// depois do último "_"). Acha a mensagem na própria conversa para mostrar o
+// autor e o texto atuais; não achou, usa o que ficou gravado na citação.
+function caixaMensagemCitada(mensagens, id) {
+  const alvo = String(id || '');
+  if (!alvo) return null;
+  const curto = (v) => {
+    const t = String(v || '');
+    const i = t.lastIndexOf('_');
+    return i >= 0 ? t.slice(i + 1) : t;
+  };
+  return (
+    (mensagens || []).find(
+      (m) =>
+        m &&
+        (m.id === alvo ||
+          (m.messageId && (m.messageId === alvo || curto(m.messageId) === curto(alvo))))
+    ) || null
+  );
+}
+
+function _caixaAutorDaMsg(c, m) {
+  const direcao = m.direcao || 'entrada';
+  if (direcao === 'entrada') return _caixaNomeDe(m, c.canal);
+  return String(m.de || '').trim() || (direcao === 'interna' ? 'Equipe' : 'Você');
+}
+
+function _caixaTextoDaMsg(m) {
+  const direcao = m.direcao || 'entrada';
+  const corpo =
+    direcao === 'saida' && m.de !== CAIXA_AUTOR_BOT
+      ? caixaCorpoSemAtendente(m.corpo, m.de)
+      : String(m.corpo || '');
+  const previa = caixaPrevia(corpo, 140, 'whatsapp');
+  if (previa) return previa;
+  const media = m.media && typeof m.media === 'object' ? m.media : null;
+  if (!media) return '';
+  const tipo = _caixaMidiaTipo(media.tipo || media.mimetype);
+  return tipo.startsWith('audio/')
+    ? '🎤 Áudio'
+    : tipo.startsWith('image/')
+      ? '📷 Imagem'
+      : '📎 ' + String(media.nome || 'Arquivo');
+}
+
+function caixaCitacaoHTML(c, cit) {
+  if (!cit || typeof cit !== 'object') return '';
+  const alvo = caixaMensagemCitada(c.mensagens, cit.id);
+  const autor = alvo ? _caixaAutorDaMsg(c, alvo) : String(cit.autor || '');
+  const texto = alvo ? _caixaTextoDaMsg(alvo) : caixaPrevia(cit.texto, 140, 'whatsapp');
+  return (
+    '<div class="cx-cita">' +
+    (autor ? '<b>' + escapeHtml(autor) + '</b>' : '') +
+    '<span>' +
+    escapeHtml(texto || 'Mensagem') +
+    '</span></div>'
+  );
+}
+
+function _caixaReacoesHTML(m) {
+  const itens = [
+    [m.reacaoContato, 'do contato'],
+    [m.reacaoEquipe, 'da equipe'],
+  ].filter(([e]) => e && String(e).length <= 16);
+  if (!itens.length) return '';
+  return (
+    '<div class="cx-reacoes">' +
+    itens
+      .map(
+        ([e, quem]) =>
+          '<span class="cx-reacao" title="Reação ' + quem + '">' + escapeHtml(e) + '</span>'
+      )
+      .join('') +
+    '</div>'
+  );
+}
+
+// As seis reações rápidas do WhatsApp.
+const CAIXA_REACOES = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+// Mensagem que dá para responder citando e para reagir: as do contato e as
+// nossas que saíram. Nota interna nunca foi para o cliente.
+function _caixaMsgInterativa(m) {
+  return (m.direcao || 'entrada') !== 'interna';
+}
+
+function _caixaMsgAcoesHTML(m) {
+  if (!_caixaMsgInterativa(m)) return '';
+  const id = escapeHtml(m.id);
+  const reagivel = !!m.messageId;
+  return (
+    '<div class="cx-msg-acoes">' +
+    '<button type="button" class="cx-msg-ac" data-action="caixaCitar" data-arg="' +
+    id +
+    '" aria-label="Responder citando" title="Responder citando"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v6"/></svg></button>' +
+    (reagivel
+      ? '<button type="button" class="cx-msg-ac" data-action="caixaReagirMenu" data-arg="' +
+        id +
+        '" aria-label="Reagir" title="Reagir" aria-expanded="' +
+        (_caixaReagindo === m.id) +
+        '"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14a4 4 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button>'
+      : '') +
+    '</div>'
+  );
+}
+
+function _caixaReagirHTML(m) {
+  if (_caixaReagindo !== m.id || !m.messageId) return '';
+  const atual = m.reacaoEquipe || '';
+  return (
+    '<div class="cx-reagir" role="group" aria-label="Escolha a reação">' +
+    CAIXA_REACOES.map(
+      (e) =>
+        '<button type="button" class="cx-reagir-op' +
+        (e === atual ? ' on' : '') +
+        '" data-action="caixaReagir" data-arg="' +
+        escapeHtml(m.id + '|' + (e === atual ? '' : e)) +
+        '" aria-pressed="' +
+        (e === atual) +
+        '" title="' +
+        (e === atual ? 'Tirar reação' : 'Reagir com ' + e) +
+        '">' +
+        e +
+        '</button>'
+    ).join('') +
+    '</div>'
+  );
+}
+
+function _caixaMsgWhatsHTML(c, m, continua) {
+  const direcao = m.direcao || 'entrada';
+  const bot = direcao === 'saida' && m.de === CAIXA_AUTOR_BOT;
+  const lado = direcao === 'interna' ? 'nota' : direcao === 'saida' ? 'out' : 'in';
+  const nome = _caixaAutorDaMsg(c, m);
+  const hora = escapeHtml(_caixaHora(m.recebidoEm) || formatDateTime(m.recebidoEm));
+  const ack = direcao === 'saida' ? caixaAckHTML(m.ack) : '';
+  const corpo = direcao === 'saida' && !bot ? caixaCorpoSemAtendente(m.corpo, m.de) : m.corpo;
+  // O selo do robô continua no lugar do nome: quem atende precisa saber que
+  // aquilo foi o atendimento automático e não um colega.
+  const autor = bot
+    ? '<b class="cx-bubble-bot-tag">' + escapeHtml(CAIXA_AUTOR_BOT) + '</b>'
+    : '<b class="cx-bubble-autor">' + escapeHtml(nome) + '</b>';
+  const topo = continua
+    ? ''
+    : '<div class="cx-bubble-topo">' +
+      autor +
+      (direcao === 'interna' ? '<span class="cx-bubble-nota-tag">Nota interna</span>' : '') +
+      '<span class="cx-bubble-hora">' +
+      hora +
+      ack +
+      '</span></div>';
+  return (
+    '<div class="cx-msg cx-msg-' +
+    lado +
+    (continua ? ' cx-msg-cont' : '') +
+    '" data-cx-msg="' +
+    escapeHtml(m.id) +
+    '">' +
+    (continua
+      ? '<span class="cx-av-vazio" aria-hidden="true"></span>'
+      : caixaAvatarMsgHTML(c, m, nome)) +
+    '<div class="cx-msg-col"><div class="cx-bubble cx-bubble-' +
+    lado +
+    '">' +
+    topo +
+    caixaCitacaoHTML(c, m.citacao) +
+    _caixaCorpoHTML(corpo, c.canal) +
+    _caixaMediaHTML(m.media) +
+    (continua ? '<small>' + hora + ack + '</small>' : '') +
+    '</div>' +
+    _caixaReacoesHTML(m) +
+    _caixaReagirHTML(m) +
+    '</div>' +
+    _caixaMsgAcoesHTML(m) +
     '</div>'
   );
 }
@@ -963,7 +1285,9 @@ function renderCaixaEntrada() {
       escapeHtml(_caixaBusca) +
       '" data-input="caixaBusca" aria-label="Buscar" /></div>' +
       '<div class="cx-chips" id="caixaCanalChips" role="group" aria-label="Canal"></div>' +
-      '<div class="cx-tabs" id="caixaTabs" role="tablist" aria-label="Situação"></div></div>' +
+      '<div class="cx-tabs" id="caixaTabs" role="tablist" aria-label="Situação"></div>' +
+      (typeof wautoBotaoCaixaHTML === 'function' ? wautoBotaoCaixaHTML() : '') +
+      '</div>' +
       '<div class="cx-cards" id="caixaLista"></div></div>' +
       '<section class="cx-main" id="caixaConversa"></section></div>';
   }
@@ -971,7 +1295,12 @@ function renderCaixaEntrada() {
   const todas = _caixaConversas();
   // A contagem por situação respeita o canal: "Aguardando (3)" com WhatsApp
   // escolhido tem que ser 3 conversas de WhatsApp.
-  const doCanal = caixaFiltrarCanal(todas, _caixaCanal);
+  const doCanalTodos = caixaFiltrarCanal(todas, _caixaCanal);
+  // Filas por departamento (js/whatsapp-filas.js): a barra conta antes do recorte.
+  if (typeof wfilaRenderBarra === 'function') wfilaRenderBarra(doCanalTodos);
+  let doCanal = typeof wfilaFiltrar === 'function' ? wfilaFiltrar(doCanalTodos) : doCanalTodos;
+  // Etiqueta (089) recorta junto com o canal: as contagens seguem o filtro.
+  if (typeof wetqFiltrarConversas === 'function') doCanal = wetqFiltrarConversas(doCanal);
   const visiveis = caixaFiltrar(doCanal, _caixaFiltro, _caixaBusca, usuario);
   // Toolbar não é remontada (perderia o foco da busca), então só as contagens
   // e os estados ativo/inativo das chips e abas são atualizados.
@@ -1009,7 +1338,8 @@ function renderCaixaEntrada() {
     )
     .join('');
   const chipsBox = document.getElementById('caixaCanalChips');
-  if (chipsBox) chipsBox.innerHTML = chipsHtml;
+  if (chipsBox)
+    chipsBox.innerHTML = chipsHtml + (typeof wetqFiltroHTML === 'function' ? wetqFiltroHTML() : '');
   const tabs = Object.keys(CAIXA_FILTROS)
     .map(
       (k) =>
@@ -1031,7 +1361,10 @@ function renderCaixaEntrada() {
   // Abrir a conversa conta como ler; marcar antes de desenhar a lista evita o
   // ponto de não lida piscando no item que acabou de ser clicado.
   const sel = _caixaSelecionada ? todas.find((c) => c.id === _caixaSelecionada) : null;
-  if (sel && caixaNaoLida(sel, _caixaLidas())) _caixaMarcar(sel, true);
+  if (sel && caixaNaoLida(sel, _caixaLidas())) {
+    _caixaMarcar(sel, true);
+    _caixaAvisarVisto(sel);
+  }
   const lidas = _caixaLidas();
   const lista = document.getElementById('caixaLista');
   const vazio = _caixaBusca
@@ -1066,6 +1399,9 @@ function renderCaixaEntrada() {
         : 'Tudo lido neste filtro.') +
       '</p></div>';
   _caixaRestaurarConversa(conv, antes, sel);
+  // O redesenho do sync recria o DOM da conversa: a busca aberta é reaplicada,
+  // sem rolar, para não tirar a pessoa do ponto em que estava lendo.
+  if (sel) caixaRealcarConversa(conv, false);
   const tela = document.getElementById('caixaTela');
   if (tela) tela.classList.toggle('cx-aberta', !!sel);
 }
@@ -1252,6 +1588,7 @@ function _caixaEnviandoHTML(c) {
   const itens = _caixaEnviando.filter((it) => it.conv === c.id && !caixaEnvioJaChegou(c, it));
   if (!itens.length) return '';
   const whats = c.canal === 'whatsapp';
+  const eu = (typeof getUser === 'function' ? getUser() || {} : {}).name || '';
   return itens
     .map((it) => {
       const nota = it.kind === 'internal';
@@ -1260,13 +1597,22 @@ function _caixaEnviandoHTML(c) {
         (it.arquivo ? '<div class="cx-corpo">📎 ' + escapeHtml(it.arquivo) + '</div>' : '');
       const status = '<small class="cx-enviando-st">Enviando…</small>';
       if (whats) {
+        const lado = nota ? 'nota' : 'out';
         return (
-          '<div class="cx-bubble cx-enviando ' +
-          (nota ? 'cx-bubble-nota' : 'cx-bubble-out') +
-          '">' +
+          '<div class="cx-msg cx-msg-' +
+          lado +
+          ' cx-enviando">' +
+          caixaAvatarMsgHTML(c, { direcao: nota ? 'interna' : 'saida', de: eu }, eu || 'Você') +
+          '<div class="cx-bubble cx-bubble-' +
+          lado +
+          '"><div class="cx-bubble-topo"><b class="cx-bubble-autor">' +
+          escapeHtml(eu || 'Você') +
+          '</b>' +
+          (nota ? '<span class="cx-bubble-nota-tag">Nota interna</span>' : '') +
+          '</div>' +
           corpo +
           status +
-          '</div>'
+          '</div></div>'
         );
       }
       return (
@@ -1296,6 +1642,7 @@ function _caixaCapturarConversa(conv) {
     noFim: !tl || tl.scrollHeight - tl.scrollTop - tl.clientHeight < 60,
     topo: tl ? tl.scrollTop : 0,
     foco: !!tx && ativo === tx,
+    buscaFoco: !!ativo && ativo.id === 'cxBuscaConv',
     inicio: tx && typeof tx.selectionStart === 'number' ? tx.selectionStart : null,
     fim: tx && typeof tx.selectionEnd === 'number' ? tx.selectionEnd : null,
   };
@@ -1324,9 +1671,21 @@ function _caixaRestaurarConversa(conv, antes, sel) {
       });
     }
   }
+  // Quem estava digitando na busca da conversa continua nela.
+  const busca = mesma && antes.buscaFoco ? conv.querySelector('#cxBuscaConv') : null;
+  if (busca) {
+    busca.focus({ preventScroll: true });
+    const fim = String(busca.value || '').length;
+    try {
+      busca.setSelectionRange(fim, fim);
+    } catch (_e) {
+      /* type=search sem cursor em alguns navegadores */
+    }
+  }
   const tx = conv.querySelector('.cx-tx');
   if (!tx) return;
   _caixaAjustarAltura(tx);
+  if (busca) return;
   const focar = _caixaFocarComposer || (mesma && antes.foco);
   _caixaFocarComposer = false;
   if (!focar) return;
@@ -1412,24 +1771,55 @@ async function caixaEnviarMensagem(id, form) {
     return;
   }
   const kind = fd.get('kind') === 'internal' ? 'internal' : 'reply';
-  const item = {
-    seq: ++_caixaEnvioSeq,
-    conv: c.id,
-    texto,
-    kind,
-    arquivo: temArquivo ? String(arquivo.name || 'Anexo') : '',
-    desde: new Date().toISOString(),
-  };
-  _caixaEnviando.push(item);
   _caixaLimparComposer(form);
   // O tipo fica: quem está escrevendo notas internas segue nelas.
   _caixaRascunho = { id: null, texto: '', kind };
+  _caixaEmojiAberto = false;
   if (typeof fecharRespostasProntas === 'function') fecharRespostasProntas();
+  return _caixaEnfileirar(
+    c,
+    { texto, kind, arquivo: temArquivo ? String(arquivo.name || 'Anexo') : '' },
+    temArquivo ? arquivo : null
+  );
+}
+
+// Áudio gravado na hora: entra na mesma fila das mensagens, para não chegar
+// ao cliente fora de ordem com o texto digitado antes.
+function caixaEnviarArquivo(c, arquivo, rotulo) {
+  if (!c || !arquivo) return null;
+  if (!window._supabaseAuthActive) {
+    showToast('Conecte-se ao Supabase para responder.', 'error');
+    return null;
+  }
+  if (arquivo.size > 5 * 1024 * 1024) {
+    showToast('O áudio passou de 5 MB. Grave um mais curto.', 'error');
+    _emailTriagemRedesenhar();
+    return null;
+  }
+  return _caixaEnfileirar(
+    c,
+    { texto: '', kind: 'reply', arquivo: rotulo || arquivo.name },
+    arquivo
+  );
+}
+
+function _caixaEnfileirar(c, dados, arquivo) {
+  // A citação vale para a próxima coisa que sair nesta conversa e acaba ali.
+  const citando = _caixaCitando && _caixaCitando.conv === c.id ? _caixaCitando.id : null;
+  if (citando) _caixaCitando = null;
+  const item = {
+    seq: ++_caixaEnvioSeq,
+    conv: c.id,
+    texto: dados.texto,
+    kind: dados.kind,
+    arquivo: dados.arquivo || '',
+    replyTo: citando,
+    desde: new Date().toISOString(),
+  };
+  _caixaEnviando.push(item);
   _caixaFocarComposer = true;
   _emailTriagemRedesenhar();
-  const envio = _caixaFilaEnvio.then(() =>
-    _caixaEnviarAoServidor(c, item, temArquivo ? arquivo : null)
-  );
+  const envio = _caixaFilaEnvio.then(() => _caixaEnviarAoServidor(c, item, arquivo));
   _caixaFilaEnvio = envio.catch(() => {});
   return envio;
 }
@@ -1448,7 +1838,13 @@ async function _caixaEnviarAoServidor(c, item, arquivo) {
       file = { nome: arquivo.name, tipo: arquivo.type || 'application/octet-stream', dados };
     }
     const res = await supabaseClient.functions.invoke('conversa-responder', {
-      body: { thread_id: caixaThreadId(c), text: item.texto, kind: item.kind, file },
+      body: {
+        thread_id: caixaThreadId(c),
+        text: item.texto,
+        kind: item.kind,
+        file,
+        ...(item.replyTo ? { reply_to: item.replyTo } : {}),
+      },
     });
     let codigo = '';
     let msg = (res.data && res.data.error) || '';
@@ -1517,6 +1913,369 @@ function caixaEncerrar(id) {
   });
   _emailTriagemRedesenhar();
   showToast('Conversa encerrada. Uma nova mensagem do cliente reabre o atendimento.', 'success');
+  // No WhatsApp o servidor encerra de novo e manda encerramento/pesquisa, se a
+  // equipe configurou (whatsapp-automacao.js). Offline, fica só o local.
+  if (typeof wautoAvisarEncerramento === 'function') wautoAvisarEncerramento(c);
+}
+
+// ---- Composer e conversa: citação, emojis, áudio, busca, visto (086) --------
+
+function _caixaComposerCitaHTML(c) {
+  if (!_caixaCitando || _caixaCitando.conv !== c.id) return '';
+  const m = (c.mensagens || []).find((x) => x.id === _caixaCitando.id);
+  if (!m) return '';
+  return (
+    '<div class="cx-comp-cita"><span class="cx-comp-cita-rot">Respondendo a</span>' +
+    caixaCitacaoHTML(c, { id: m.id }) +
+    '<button type="button" class="btn cx-ic-btn" data-action="caixaCitarCancelar" aria-label="Cancelar citação"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>'
+  );
+}
+
+const CAIXA_EMOJIS = [
+  '😀',
+  '😃',
+  '😄',
+  '😁',
+  '😊',
+  '🙂',
+  '😉',
+  '😍',
+  '🥰',
+  '😘',
+  '😅',
+  '😂',
+  '🤣',
+  '😇',
+  '🤔',
+  '🤗',
+  '😐',
+  '😕',
+  '😢',
+  '😭',
+  '😮',
+  '😴',
+  '😎',
+  '🙄',
+  '👍',
+  '👎',
+  '👌',
+  '👏',
+  '🙏',
+  '🤝',
+  '💪',
+  '👋',
+  '✌️',
+  '🤞',
+  '☝️',
+  '👀',
+  '❤️',
+  '💙',
+  '💚',
+  '⭐',
+  '✅',
+  '❌',
+  '⚠️',
+  '🔥',
+  '🎉',
+  '📞',
+  '📎',
+  '🕐',
+];
+
+function _caixaEmojisHTML() {
+  return (
+    '<div class="cx-emojis" id="cxEmojis" role="group" aria-label="Emojis">' +
+    CAIXA_EMOJIS.map(
+      (e) =>
+        '<button type="button" class="cx-emoji" data-action="caixaEmojiInserir" data-arg="' +
+        e +
+        '" aria-label="' +
+        e +
+        '">' +
+        e +
+        '</button>'
+    ).join('') +
+    '</div>'
+  );
+}
+
+// Insere no ponto do cursor (ou no fim) e mantém o rascunho em dia: o próximo
+// redesenho do sync tira o texto do rascunho, não do campo.
+function caixaInserirNoTexto(atual, inserir, ini, fim) {
+  const t = String(atual || '');
+  const a = Number.isInteger(ini) && ini >= 0 && ini <= t.length ? ini : t.length;
+  const b = Number.isInteger(fim) && fim >= a && fim <= t.length ? fim : a;
+  return { texto: t.slice(0, a) + inserir + t.slice(b), cursor: a + inserir.length };
+}
+
+// ---- Gravação de áudio --------------------------------------------------------
+// O WhatsApp toca nota de voz em OGG/Opus. O Firefox grava nesse formato; o
+// Chrome só em WebM/Opus, e o envio pede ao WAHA para converter (sendVoice com
+// convert: true, como qualquer áudio anexado).
+var _caixaGravacao = null;
+const CAIXA_AUDIO_MAX_MS = 5 * 60 * 1000;
+const CAIXA_AUDIO_TIPOS = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm'];
+
+function caixaPodeGravar() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.MediaRecorder === 'function' &&
+    typeof navigator !== 'undefined' &&
+    !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function')
+  );
+}
+
+function caixaAudioTipo(suporta) {
+  for (const t of CAIXA_AUDIO_TIPOS) {
+    try {
+      if (suporta(t)) return t;
+    } catch (_e) {
+      /* navegador sem isTypeSupported: tenta o próximo */
+    }
+  }
+  return '';
+}
+
+function caixaDuracao(ms) {
+  const s = Math.max(0, Math.floor(Number(ms) / 1000) || 0);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function _caixaGravandoHTML() {
+  const g = _caixaGravacao;
+  return (
+    '<div class="cx-gravando" role="status"><span class="cx-gravando-ponto" aria-hidden="true"></span>' +
+    '<span>Gravando</span><b id="cxGravTempo" class="cx-gravando-t">' +
+    caixaDuracao(g ? Date.now() - g.inicio : 0) +
+    '</b><span class="cx-conv-flex"></span>' +
+    '<button type="button" class="btn cx-btn" data-action="caixaGravarCancelar">Descartar</button>' +
+    '<button type="button" class="btn cx-btn cx-send" data-action="caixaGravarEnviar" aria-label="Enviar áudio"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-11 11"/><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>'
+  );
+}
+
+async function caixaGravarIniciar() {
+  const c = _caixaConversaPorId(_caixaSelecionada);
+  if (!c || _caixaGravacao || !caixaPodeGravar()) return;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (_e) {
+    showToast('Sem acesso ao microfone. Libere o microfone para este site no navegador.', 'error');
+    return;
+  }
+  const tipo = caixaAudioTipo((t) => window.MediaRecorder.isTypeSupported(t));
+  let rec;
+  try {
+    rec = new window.MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined);
+  } catch (_e) {
+    stream.getTracks().forEach((t) => t.stop());
+    showToast('Este navegador não grava áudio.', 'error');
+    return;
+  }
+  const g = {
+    conv: c.id,
+    inicio: Date.now(),
+    rec,
+    stream,
+    partes: [],
+    tipo: rec.mimeType || tipo || 'audio/webm',
+    enviar: false,
+    timer: null,
+  };
+  rec.ondataavailable = (ev) => {
+    if (ev.data && ev.data.size) g.partes.push(ev.data);
+  };
+  rec.onstop = () => {
+    clearInterval(g.timer);
+    g.stream.getTracks().forEach((t) => t.stop());
+    if (_caixaGravacao === g) _caixaGravacao = null;
+    if (g.enviar && g.partes.length) {
+      const base = g.tipo.split(';')[0];
+      const ext = base === 'audio/ogg' ? 'ogg' : 'webm';
+      const blob = new Blob(g.partes, { type: g.tipo });
+      const arquivo = new File([blob], 'audio-' + Date.now() + '.' + ext, { type: g.tipo });
+      const conv = _caixaConversaPorId(g.conv);
+      if (conv) caixaEnviarArquivo(conv, arquivo, '🎤 Áudio');
+    } else {
+      _emailTriagemRedesenhar();
+    }
+  };
+  g.timer = setInterval(() => {
+    const el = document.getElementById('cxGravTempo');
+    const passou = Date.now() - g.inicio;
+    if (el) el.textContent = caixaDuracao(passou);
+    // Teto de 5 min: além disso o arquivo passa do limite do envio.
+    if (passou >= CAIXA_AUDIO_MAX_MS) caixaGravarParar(true);
+  }, 500);
+  _caixaGravacao = g;
+  rec.start(250);
+  _emailTriagemRedesenhar();
+}
+
+function caixaGravarParar(enviar) {
+  const g = _caixaGravacao;
+  if (!g) return;
+  g.enviar = !!enviar;
+  if (g.rec.state !== 'inactive') g.rec.stop();
+  else g.rec.onstop();
+}
+
+// ---- Busca dentro da conversa -------------------------------------------------
+// Realça direto no DOM (TreeWalker + splitText), sem passar texto por
+// innerHTML: o corpo é mensagem de cliente, a entrada mais hostil do app.
+var _caixaBuscaIdx = 0;
+
+function _caixaBuscaConversaHTML(c) {
+  const b = _caixaBuscaConversa;
+  if (!b.aberta || b.conv !== c.id) return '';
+  return (
+    '<div class="cx-busca-conv" role="search">' +
+    '<input type="search" class="cx-busca-conv-in" id="cxBuscaConv" placeholder="Buscar nesta conversa" value="' +
+    escapeHtml(b.termo) +
+    '" data-input="caixaBuscaConversaTermo" aria-label="Buscar nesta conversa" />' +
+    '<span class="cx-busca-conv-n" id="cxBuscaConvN" aria-live="polite"></span>' +
+    '<button type="button" class="btn cx-ic-btn" data-action="caixaBuscaConversaIr" data-arg="-1" aria-label="Anterior"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>' +
+    '<button type="button" class="btn cx-ic-btn" data-action="caixaBuscaConversaIr" data-arg="1" aria-label="Próxima"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
+    '<button type="button" class="btn cx-ic-btn" data-action="caixaBuscarNaConversa" aria-label="Fechar busca"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
+    '</div>'
+  );
+}
+
+// Posições [início, fim) de cada ocorrência, sem diferenciar maiúsculas.
+// Termo de uma letra só realçaria a conversa inteira: precisa de duas.
+function caixaOcorrencias(texto, termo) {
+  const t = String(texto || '').toLocaleLowerCase('pt-BR');
+  const q = String(termo || '')
+    .trim()
+    .toLocaleLowerCase('pt-BR');
+  const out = [];
+  if (q.length < 2 || t.length !== String(texto || '').length) return out;
+  let i = t.indexOf(q);
+  while (i !== -1) {
+    out.push([i, i + q.length]);
+    i = t.indexOf(q, i + q.length);
+  }
+  return out;
+}
+
+function caixaRealcarConversa(conv, rolar) {
+  if (!conv || typeof conv.querySelectorAll !== 'function') return;
+  conv.querySelectorAll('mark.cx-achado').forEach((mk) => {
+    const pai = mk.parentNode;
+    pai.replaceChild(document.createTextNode(mk.textContent), mk);
+    pai.normalize();
+  });
+  const b = _caixaBuscaConversa;
+  const rot = document.getElementById('cxBuscaConvN');
+  if (!b.aberta || b.conv !== _caixaSelecionada || String(b.termo).trim().length < 2) {
+    if (rot) rot.textContent = '';
+    return;
+  }
+  const marcas = [];
+  conv.querySelectorAll('.cx-timeline .cx-corpo, .cx-timeline .cx-cita span').forEach((bloco) => {
+    const walker = document.createTreeWalker(bloco, NodeFilter.SHOW_TEXT);
+    const nos = [];
+    while (walker.nextNode()) nos.push(walker.currentNode);
+    nos.forEach((no) => {
+      const achados = caixaOcorrencias(no.nodeValue, b.termo);
+      // De trás para frente: dividir no fim não muda as posições do começo.
+      for (let k = achados.length - 1; k >= 0; k--) {
+        const [ini, fim] = achados[k];
+        const meio = no.splitText(ini);
+        meio.splitText(fim - ini);
+        const mk = document.createElement('mark');
+        mk.className = 'cx-achado';
+        meio.parentNode.replaceChild(mk, meio);
+        mk.appendChild(meio);
+        marcas.push(mk);
+      }
+    });
+  });
+  // A ordem de leitura é a do documento, não a de inserção.
+  marcas.sort((a, b2) =>
+    a.compareDocumentPosition(b2) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+  );
+  if (!marcas.length) {
+    if (rot) rot.textContent = 'Nada encontrado';
+    return;
+  }
+  // Começa pela mais recente: é o fim da conversa que a pessoa está lendo.
+  if (_caixaBuscaIdx < 0 || _caixaBuscaIdx >= marcas.length) _caixaBuscaIdx = marcas.length - 1;
+  const atual = marcas[_caixaBuscaIdx];
+  atual.classList.add('cx-achado-atual');
+  if (rot) rot.textContent = _caixaBuscaIdx + 1 + ' de ' + marcas.length;
+  if (rolar && typeof atual.scrollIntoView === 'function')
+    atual.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ---- Visto e reação -----------------------------------------------------------
+// Abrir a conversa marca como lida no celular do cliente (✓✓ azul do lado
+// dele), como qualquer WhatsApp. Uma vez por minuto por conversa no máximo.
+var _caixaVistoEm = {};
+
+function _caixaAvisarVisto(c) {
+  if (!c || c.canal !== 'whatsapp') return;
+  if (typeof isSupabaseConnected !== 'function' || !isSupabaseConnected()) return;
+  if (!window._supabaseAuthActive || typeof supabaseClient === 'undefined') return;
+  const agora = Date.now();
+  if (_caixaVistoEm[c.id] && agora - _caixaVistoEm[c.id] < 60000) return;
+  _caixaVistoEm[c.id] = agora;
+  try {
+    Promise.resolve(
+      supabaseClient.functions.invoke('conversa-responder', {
+        body: { thread_id: caixaThreadId(c), kind: 'seen' },
+      })
+    ).catch(() => {});
+  } catch (_e) {
+    /* melhor esforço: sem o visto, o cliente só não vê o azul */
+  }
+}
+
+async function caixaReagir(id, emoji) {
+  const c = _caixaConversaPorId(_caixaSelecionada);
+  if (!c || !window._supabaseAuthActive) {
+    showToast('Conecte-se ao Supabase para reagir.', 'error');
+    return;
+  }
+  const m = (c.mensagens || []).find((x) => x.id === id);
+  if (!m) return;
+  _caixaReagindo = null;
+  // Otimista, só no cache local: quem grava de verdade é o servidor.
+  const lista = getEmailsTriagem();
+  const linha = lista.find((x) => x && x.id === id);
+  const antes = linha ? linha.reacaoEquipe || null : null;
+  if (linha) {
+    linha.reacaoEquipe = emoji || null;
+    dbSet(DB.EMAILS_TRIAGEM, lista);
+  }
+  _emailTriagemRedesenhar();
+  try {
+    const res = await supabaseClient.functions.invoke('conversa-responder', {
+      body: { thread_id: caixaThreadId(c), kind: 'reaction', alvo: id, emoji: emoji || '' },
+    });
+    if (res.error || (res.data && res.data.error)) throw new Error('falhou');
+  } catch (_e) {
+    const atual = getEmailsTriagem();
+    const l2 = atual.find((x) => x && x.id === id);
+    if (l2) {
+      l2.reacaoEquipe = antes;
+      dbSet(DB.EMAILS_TRIAGEM, atual);
+    }
+    showToast('Não foi possível reagir pelo WhatsApp.', 'error');
+    _emailTriagemRedesenhar();
+  }
+}
+
+// Trocar de conversa larga o que era só daquela: gravação em curso,
+// citação, seletor de reação e busca.
+function _caixaTrocarConversa(id) {
+  if (_caixaGravacao && _caixaGravacao.conv !== id) caixaGravarParar(false);
+  if (_caixaCitando && _caixaCitando.conv !== id) _caixaCitando = null;
+  if (_caixaBuscaConversa.conv !== id)
+    _caixaBuscaConversa = { conv: null, termo: '', aberta: false };
+  _caixaReagindo = null;
+  _caixaEmojiAberto = false;
+  _caixaSelecionada = id;
 }
 
 registerActions({
@@ -1534,12 +2293,80 @@ registerActions({
     renderCaixaEntrada();
   },
   caixaSelecionar: (_el, id) => {
-    _caixaSelecionada = id || null;
+    _caixaTrocarConversa(id || null);
     renderCaixaEntrada();
   },
   caixaVoltar: () => {
-    _caixaSelecionada = null;
+    _caixaTrocarConversa(null);
     renderCaixaEntrada();
+  },
+  caixaCitar: (_el, id) => {
+    _caixaCitando = { conv: _caixaSelecionada, id };
+    _caixaReagindo = null;
+    _caixaFocarComposer = true;
+    renderCaixaEntrada();
+  },
+  caixaCitarCancelar: () => {
+    _caixaCitando = null;
+    _caixaFocarComposer = true;
+    renderCaixaEntrada();
+  },
+  caixaReagirMenu: (_el, id) => {
+    _caixaReagindo = _caixaReagindo === id ? null : id;
+    renderCaixaEntrada();
+  },
+  caixaReagir: (_el, arg) => {
+    const s = String(arg || '');
+    const i = s.indexOf('|');
+    if (i < 1) return;
+    caixaReagir(s.slice(0, i), s.slice(i + 1));
+  },
+  caixaEmojis: () => {
+    _caixaEmojiAberto = !_caixaEmojiAberto;
+    renderCaixaEntrada();
+  },
+  caixaEmojiInserir: (_el, emoji) => {
+    const tx = document.getElementById('newNoteText');
+    if (!tx || !emoji) return;
+    const r = caixaInserirNoTexto(tx.value, emoji, tx.selectionStart, tx.selectionEnd);
+    tx.value = r.texto;
+    _caixaRascunho = {
+      id: _caixaSelecionada,
+      texto: r.texto,
+      kind: _caixaRascunho.kind || 'reply',
+    };
+    tx.focus();
+    try {
+      tx.setSelectionRange(r.cursor, r.cursor);
+    } catch (_e) {
+      /* campo sem cursor */
+    }
+    _caixaAjustarAltura(tx);
+  },
+  caixaGravar: () => {
+    caixaGravarIniciar();
+  },
+  caixaGravarCancelar: () => caixaGravarParar(false),
+  caixaGravarEnviar: () => caixaGravarParar(true),
+  caixaBuscarNaConversa: () => {
+    const b = _caixaBuscaConversa;
+    const aberta = !(b.aberta && b.conv === _caixaSelecionada);
+    _caixaBuscaConversa = { conv: _caixaSelecionada, termo: aberta ? b.termo : '', aberta };
+    _caixaBuscaIdx = -1;
+    renderCaixaEntrada();
+    const inp = document.getElementById('cxBuscaConv');
+    if (inp) inp.focus();
+  },
+  caixaBuscaConversaTermo: (_el, termo) => {
+    _caixaBuscaConversa.termo = String(termo || '');
+    _caixaBuscaIdx = -1;
+    caixaRealcarConversa(document.getElementById('caixaConversa'), true);
+  },
+  caixaBuscaConversaIr: (_el, passo) => {
+    const n = document.querySelectorAll('#caixaConversa mark.cx-achado').length;
+    if (!n) return;
+    _caixaBuscaIdx = (_caixaBuscaIdx + (Number(passo) || 1) + n) % n;
+    caixaRealcarConversa(document.getElementById('caixaConversa'), true);
   },
   caixaBusca: (_el, v) => {
     _caixaBusca = v || '';

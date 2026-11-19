@@ -1,6 +1,14 @@
 // Resposta e nota interna de uma conversa da caixa, sem exigir chamado.
 // O destino sai da última mensagem recebida no thread, nunca do navegador.
 //
+// Além de responder e anotar (kind 'reply' | 'internal'), no WhatsApp:
+//   * reply_to — id da linha citada; a resposta sai como "responder" no
+//     WhatsApp e a citação fica gravada (086);
+//   * kind 'reaction' — reage a uma mensagem da conversa (emoji '' tira);
+//   * kind 'seen' — marca a conversa como lida no celular do cliente.
+// Em todos, a linha alvo é procurada DENTRO do thread que o operador enxerga:
+// o id que vem do navegador nunca aponta para conversa de outra equipe.
+//
 // LIMITE CONHECIDO — no e-mail não existe prova de contato como a
 // whatsapp_conversas (076). O destino sai da última mensagem de entrada, mas
 // quem pode inserir em emails_triagem (RLS por equipe) consegue criar uma linha
@@ -10,7 +18,15 @@
 // e-mail, não um relay aberto — e é dívida registrada, não detalhe.
 import { type SupabaseContext, withSupabase } from 'npm:@supabase/server@1';
 import nodemailer from 'npm:nodemailer@6.9.16';
-import { enviarTexto } from '../whatsapp/provedor.ts';
+import {
+  emojiValido,
+  enviarReacao,
+  enviarTexto,
+  idDoChat,
+  idSerializado,
+  marcarVisto,
+} from '../whatsapp/provedor.ts';
+import { numeroEscreveuParaEquipe } from '../whatsapp/equipes.ts';
 
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 const TEXTO_MAX = 20000;
@@ -78,6 +94,8 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     const thread = String(body.thread_id || '').trim();
     const texto = String(body.text ?? '').trim();
     const interna = body.kind === 'internal';
+    const reacao = body.kind === 'reaction';
+    const visto = body.kind === 'seen';
     if (!thread) return json({ error: 'Conversa obrigatória', code: 'missing_thread' }, 400);
     if (texto.length > TEXTO_MAX)
       return json({ error: 'Texto longo demais', code: 'text_too_long' }, 400);
@@ -87,7 +105,9 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     } catch {
       return json({ error: 'Arquivo inválido ou maior que 5 MB', code: 'invalid_file' }, 400);
     }
-    if (!texto && !midia)
+    if (reacao && !emojiValido(body.emoji))
+      return json({ error: 'Reação inválida', code: 'invalid_reaction' }, 400);
+    if (!reacao && !visto && !texto && !midia)
       return json({ error: 'Escreva uma mensagem ou escolha um arquivo', code: 'empty_text' }, 400);
 
     const { data: visivel, error: visErr } = await ctx.supabase
@@ -110,6 +130,124 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     if (error || !ultima)
       return json({ error: 'Conversa não encontrada', code: 'thread_not_found' }, 404);
 
+    const whats = ultima.canal === 'whatsapp';
+    const credWaha = {
+      baseUrl: (Deno.env.get('WAHA_BASE_URL') || '').replace(/\/+$/, ''),
+      apiKey: Deno.env.get('WAHA_API_KEY') || '',
+      session: Deno.env.get('WAHA_SESSION') || 'default',
+    };
+    if ((reacao || visto) && !whats)
+      return json({ error: 'Só no WhatsApp', code: 'not_whatsapp' }, 400);
+
+    // Linha citada ou reagida: sempre deste thread e desta equipe. Com service
+    // role, o filtro de team é o que faz o papel da RLS.
+    const alvoId = String((reacao ? body.alvo : body.reply_to) || '').trim();
+    let alvo: {
+      id: string;
+      message_id: string | null;
+      de: string | null;
+      corpo: string | null;
+      direcao: string | null;
+    } | null = null;
+    if (alvoId) {
+      const { data: achado } = await ctx.supabaseAdmin
+        .from('emails_triagem')
+        .select('id, message_id, de, corpo, direcao')
+        .eq('id', alvoId)
+        .eq('thread_id', thread)
+        .eq('team', ultima.team)
+        .maybeSingle();
+      alvo = achado || null;
+      if (!alvo) return json({ error: 'Mensagem não encontrada', code: 'target_not_found' }, 404);
+    }
+
+    // A linha de entrada que diz "esta equipe atende este número" é gravável
+    // pelo operador (RLS de emails_triagem): forjando uma, a equipe A falava
+    // com contato da equipe B. A prova é a 088, gravada só pelo webhook. Banco
+    // sem a 088 (null) segue como antes, para não parar o atendimento.
+    if (whats && !interna) {
+      const fone = String(ultima.telefone || '').replace(/\D/g, '');
+      if ((await numeroEscreveuParaEquipe(ctx.supabaseAdmin, fone, ultima.team)) === false)
+        return json(
+          {
+            error: 'Este número não escreveu para a sua equipe',
+            code: 'not_team_contact',
+          },
+          403
+        );
+    }
+
+    // Visto e reação também falam com o número pela sessão compartilhada do
+    // WAHA: valem a mesma prova de contato (076) que a resposta exige.
+    if (visto || reacao) {
+      const foneContato = String(ultima.telefone || '').replace(/\D/g, '');
+      const { data: contatoOk } = foneContato
+        ? await ctx.supabaseAdmin
+            .from('whatsapp_conversas')
+            .select('telefone')
+            .eq('telefone', foneContato)
+            .maybeSingle()
+        : { data: null };
+      if (!contatoOk)
+        return json(
+          { error: 'Este número nunca escreveu para a empresa', code: 'not_whatsapp_contact' },
+          422
+        );
+    }
+
+    if (visto) {
+      // Melhor esforço: sem WAHA o operador continua atendendo, só o cliente
+      // não vê o azul. Por isso 200 mesmo quando não saiu.
+      const r =
+        credWaha.baseUrl && credWaha.apiKey
+          ? await marcarVisto(String(ultima.telefone || ''), credWaha)
+          : { ok: false };
+      return json({ success: true, enviado: r.ok });
+    }
+
+    if (reacao) {
+      // message_id é coluna que a RLS deixa a equipe gravar: sem amarrar o id
+      // ao chat deste contato, daria para reagir em mensagem de outra conversa
+      // da sessão. Id curto (sem o chat) não tem como ser conferido: recusa.
+      const fone = String(ultima.telefone || '').replace(/\D/g, '');
+      if (
+        !alvo ||
+        !alvo.message_id ||
+        alvo.direcao === 'interna' ||
+        !idDoChat(alvo.message_id, fone)
+      )
+        return json(
+          { error: 'Essa mensagem não aceita reação', code: 'target_not_reactable' },
+          422
+        );
+      if (!credWaha.baseUrl || !credWaha.apiKey)
+        return json({ error: 'WhatsApp não configurado', code: 'missing_credentials' }, 500);
+      const emoji = String(body.emoji || '');
+      const envio = await enviarReacao(alvo.message_id, emoji, credWaha);
+      if (!envio.ok)
+        return json(
+          { error: 'Não foi possível reagir pelo WhatsApp', code: 'provider_error' },
+          502
+        );
+      const { error: reErr } = await ctx.supabaseAdmin
+        .from('emails_triagem')
+        .update({ reacao_equipe: emoji || null, updated_at: new Date().toISOString() })
+        .eq('id', alvo.id)
+        .eq('team', ultima.team);
+      if (reErr) console.error('conversa-responder reação:', reErr.message);
+      return json({ success: true });
+    }
+
+    // A citação só vale no WhatsApp; no e-mail o histórico já vai no corpo.
+    const citacao =
+      whats && alvo
+        ? {
+            id: alvo.message_id || alvo.id,
+            texto: String(alvo.corpo || '').slice(0, 300),
+            autor: String(alvo.de || '').slice(0, 120),
+          }
+        : null;
+
     let providerId: string | null = null;
     if (!interna && ultima.canal === 'whatsapp') {
       const telefone = String(ultima.telefone || '').replace(/\D/g, '');
@@ -130,7 +268,9 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
         return json({ error: 'WhatsApp não configurado', code: 'missing_credentials' }, 500);
       const textoEnvio = prefixoAtendente(op.name || '', texto);
       if (!midia) {
-        const envio = await enviarTexto(telefone, textoEnvio, { baseUrl, apiKey, session });
+        const envio = await enviarTexto(telefone, textoEnvio, { baseUrl, apiKey, session }, fetch, {
+          replyTo: alvo?.message_id || null,
+        });
         if (!envio.ok)
           return json(
             { error: 'Não foi possível enviar pelo WhatsApp', code: 'provider_error' },
@@ -160,7 +300,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
           if (!resp.ok)
             return json({ error: 'Não foi possível enviar a mídia', code: 'provider_error' }, 502);
           const envio = await resp.json().catch(() => ({}));
-          providerId = typeof envio.id === 'string' ? envio.id : null;
+          providerId = idSerializado(envio.id) || idSerializado(envio.key) || null;
         } catch {
           return json({ error: 'WAHA inacessível', code: 'provider_unreachable' }, 502);
         }
@@ -216,7 +356,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
     // o texto enviado leva o nome de quem atendeu, então o registro idem.
     const textoSalvo =
       !interna && ultima.canal === 'whatsapp' ? prefixoAtendente(op.name || '', texto) : texto;
-    const { error: insertErr } = await ctx.supabaseAdmin.from('emails_triagem').insert({
+    const linha: Record<string, unknown> = {
       id,
       email_id: id,
       thread_id: thread,
@@ -240,7 +380,16 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
       media: midia ? { nome: midia.nome, tipo: midia.tipo, dados: midia.dados } : null,
       created_at: agora,
       updated_at: agora,
-    });
+    };
+    let { error: insertErr } = await ctx.supabaseAdmin
+      .from('emails_triagem')
+      .insert(citacao ? { ...linha, citacao } : linha);
+    // Banco sem a 086: a mensagem já saiu, então o histórico entra sem a
+    // citação em vez de virar "enviado, mas não salvo".
+    if (insertErr && citacao && /citacao/.test(insertErr.message || '')) {
+      console.warn('conversa-responder: migration 086 não aplicada, gravando sem citação');
+      ({ error: insertErr } = await ctx.supabaseAdmin.from('emails_triagem').insert(linha));
+    }
     if (insertErr) {
       console.error('conversa-responder insert:', insertErr.message);
       return json(

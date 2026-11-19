@@ -150,10 +150,91 @@ describe('whatsapp: mídia e reentrega', () => {
   // Sem a 082 o filtro falha sempre; devolver 0 desligaria o limite de vez.
   it('sem a coluna direcao, o limite conta de novo sem o filtro', async () => {
     const { queries } = await chamar(evento(), { semDirecao: true });
+    // Só as contagens do limite: as leituras das filas (087) filtram por canal.
     const contagens = queries.filter(
-      (q) => q.tabela === 'emails_triagem' && q.filtros.some(([col]) => col === 'telefone')
+      (q) =>
+        q.tabela === 'emails_triagem' &&
+        q.filtros.some(([col]) => col === 'telefone') &&
+        !q.filtros.some(([col]) => col === 'canal')
     );
     expect(contagens).toHaveLength(2);
     expect(contagens[1].filtros.some(([col]) => col === 'direcao')).toBe(false);
+  });
+});
+
+describe('whatsapp: recibo e reação (086)', () => {
+  it('recibo de leitura atualiza só a nossa mensagem, presa ao telefone do chat', async () => {
+    const { res, dados, queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'true_5511987654321@c.us_A1', fromMe: true, ack: 3 },
+    });
+    expect(res.status).toBe(200);
+    expect(dados).toMatchObject({ ok: true, recibos: 1 });
+    const up = queries.find((q) => q.patch && 'ack' in q.patch);
+    expect(up.patch.ack).toBe(3);
+    expect(up.filtros).toEqual(
+      expect.arrayContaining([
+        ['direcao', 'saida'],
+        ['telefone', '5511987654321'],
+        ['message_id', ['true_5511987654321@c.us_A1', 'A1'], 'in'],
+        ['or', 'ack.is.null,ack.lt.3', 'or'],
+      ])
+    );
+  });
+
+  it('reação do contato vai para reacao_contato', async () => {
+    const { queries } = await chamar({
+      event: 'message.reaction',
+      payload: {
+        from: '5511@c.us',
+        fromMe: false,
+        reaction: { text: '👍', messageId: 'true_5511@c.us_A1' },
+      },
+    });
+    const up = queries.find((q) => q.patch && 'reacao_contato' in q.patch);
+    expect(up.patch.reacao_contato).toBe('👍');
+  });
+
+  // A stanza sozinha não amarra a conversa: sem o chat no id, casar pelo final
+  // deixaria um evento de um contato mexer na linha de outra conversa.
+  it('id sem o chat (LID) só casa pelo id inteiro, nunca pelo final', async () => {
+    const { queries } = await chamar({
+      event: 'message.reaction',
+      payload: { from: '123@lid', reaction: { text: '👍', messageId: 'false_123@lid_A1' } },
+    });
+    const up = queries.find((q) => q.patch && 'reacao_contato' in q.patch);
+    expect(up.filtros).toContainEqual(['message_id', 'false_123@lid_A1']);
+    expect(up.filtros.some(([, v]) => Array.isArray(v))).toBe(false);
+  });
+
+  it('id com aspas ou vírgula não chega ao filtro', async () => {
+    const { queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'x",message_id.neq.0', fromMe: true, ack: 3 },
+    });
+    expect(queries.some((q) => q.patch && 'ack' in q.patch)).toBe(false);
+  });
+
+  it('evento de status não grava mensagem nem usa a chave de dedupe', async () => {
+    const { queries } = await chamar({
+      event: 'message.ack',
+      payload: { id: 'true_5511@c.us_A1', fromMe: true, ack: 2 },
+    });
+    expect(queries.some((q) => q.insert)).toBe(false);
+  });
+});
+
+describe('whatsapp: em que equipe o número escreveu (088)', () => {
+  // É a prova que a automação e o envio ativo exigem. O histórico da caixa não
+  // serve, porque o operador consegue gravar linha ali.
+  it('mensagem que entra na caixa registra a equipe do número', async () => {
+    const { queries } = await chamar(evento());
+    const reg = queries.find((q) => q.tabela === 'whatsapp_conversa_equipes' && q.upsert);
+    expect(reg.upsert).toEqual({ telefone: '5511987654321', team: 'init' });
+  });
+
+  it('mensagem que não entrou na caixa não registra nada', async () => {
+    const { queries } = await chamar(evento(), { falharInsert: true });
+    expect(queries.some((q) => q.tabela === 'whatsapp_conversa_equipes' && q.upsert)).toBe(false);
   });
 });

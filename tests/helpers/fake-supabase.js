@@ -42,7 +42,9 @@ export function fakeSupabase({
 
 function builder(linhas, tabela = '', queries = null) {
   let out = linhas.slice();
-  const registro = queries ? { tabela, filtros: [], patch: null, insert: null } : null;
+  const registro = queries
+    ? { tabela, filtros: [], patch: null, insert: null, upsert: null }
+    : null;
   if (registro) queries.push(registro);
   const api = {
     select: () => api,
@@ -57,6 +59,11 @@ function builder(linhas, tabela = '', queries = null) {
       return api;
     },
     not: () => api,
+    // Só registra: o filtro em texto do PostgREST não é reimplementado aqui.
+    or: (expr) => {
+      if (registro) registro.filtros.push(['or', expr, 'or']);
+      return api;
+    },
     is: (col, val) => {
       if (registro) registro.filtros.push([col, val, 'is']);
       out = out.filter((r) => r[col] == val);
@@ -81,7 +88,11 @@ function builder(linhas, tabela = '', queries = null) {
       return api;
     },
     delete: () => api,
-    upsert: () => api,
+    // Registrado à parte (não em `insert`): quem conta inserts não muda.
+    upsert: (valor) => {
+      if (registro) registro.upsert = valor;
+      return api;
+    },
     maybeSingle: async () => ({ data: out[0] ?? null, error: null }),
     single: async () => ({
       data: out[0] ?? null,

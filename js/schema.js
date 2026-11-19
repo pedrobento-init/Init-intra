@@ -587,13 +587,31 @@ const ENTITIES = [
       direcao: 'direcao',
       media: 'media',
       foto_url: 'fotoUrl',
+      ack: 'ack',
+      citacao: 'citacao',
+      reacao_contato: 'reacaoContato',
+      reacao_equipe: 'reacaoEquipe',
+      departamento: 'departamento', // 087
       created_at: 'createdAt',
       updated_at: 'updatedAt',
     },
     // 075/082: banco que ainda não rodou a migration não tem as colunas do
     // WhatsApp nem as do portal; a entrada sem canal continua sendo lida como
     // e-mail, e media/direcao vazios não entram no push.
-    optionalFields: ['canal', 'telefone', 'direcao', 'media', 'foto_url'], // 075, 082, 085
+    // 086: recibo, citação e reações são do servidor. O app não os escreve, e
+    // o trigger emails_triagem_colunas_servidor desfaz o que vier do app.
+    optionalFields: [
+      'canal',
+      'telefone',
+      'direcao',
+      'media',
+      'foto_url',
+      'ack',
+      'citacao',
+      'reacao_contato',
+      'reacao_equipe',
+      'departamento',
+    ], // 075, 082, 085, 086, 087
     onChange: () => {
       // A caixa mora na tela #caixa: e-mail que chega enquanto alguém
       // está olhando aparece sozinho, que é o ponto de ela existir.
@@ -603,6 +621,8 @@ const ENTITIES = [
         typeof renderCaixaEntrada === 'function'
       )
         renderCaixaEntrada();
+      // Contatos e painel do WhatsApp (089) também se desenham desta tabela.
+      if (typeof wcontPainelAtualizar === 'function') wcontPainelAtualizar();
     },
   },
   {
@@ -621,6 +641,71 @@ const ENTITIES = [
       created_by: 'createdBy',
       created_at: 'createdAt',
       updated_at: 'updatedAt',
+    },
+  },
+  // Etiquetas e nome de contato do WhatsApp (089), por equipe. Opcionais: banco
+  // sem a migration não quebra o sync, e a Caixa segue sem etiquetas.
+  {
+    table: 'whatsapp_etiquetas',
+    dbKey: 'intra_whatsapp_etiquetas',
+    label: 'Etiquetas do WhatsApp',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 089
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      cor: 'cor',
+      team: 'team',
+      created_by: 'createdBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+    },
+    onChange: () => {
+      if (typeof wetqRedesenharTelas === 'function') wetqRedesenharTelas();
+    },
+  },
+  {
+    table: 'whatsapp_conversa_etiquetas',
+    dbKey: 'intra_whatsapp_conversa_etiquetas',
+    label: 'Etiquetas das conversas',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 089
+    fields: {
+      id: 'id',
+      telefone: 'telefone',
+      etiqueta_id: 'etiquetaId',
+      team: 'team',
+      created_by: 'createdBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+    },
+    onChange: () => {
+      if (typeof wetqRedesenharTelas === 'function') wetqRedesenharTelas();
+    },
+  },
+  {
+    table: 'whatsapp_contatos',
+    dbKey: 'intra_whatsapp_contatos',
+    label: 'Contatos do WhatsApp',
+    hasTeam: true,
+    sync: true,
+    realtime: true,
+    optional: true, // migration 089
+    fields: {
+      id: 'id',
+      telefone: 'telefone',
+      nome: 'nome',
+      team: 'team',
+      created_by: 'createdBy',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+    },
+    onChange: () => {
+      if (typeof wetqRedesenharTelas === 'function') wetqRedesenharTelas();
     },
   },
   {

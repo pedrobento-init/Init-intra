@@ -61,6 +61,10 @@ describe('ENTITIES (schema central)', () => {
       'time_entries',
       'vencimentos',
       'visits',
+      // 089: etiquetas e nome de contato do WhatsApp, policy por team como a 074.
+      'whatsapp_contatos',
+      'whatsapp_conversa_etiquetas',
+      'whatsapp_etiquetas',
     ]);
   });
 });
