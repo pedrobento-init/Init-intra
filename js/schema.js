@@ -106,6 +106,7 @@ const ENTITIES = [
       email_message_id: 'emailMessageId',
       email_thread_id: 'emailThreadId',
       email_corpo: 'emailCorpo',
+      milvus_chamado_codigo: 'milvusChamadoCodigo',
     },
     // ids de pessoa (049): o banco deriva do nome; só vão no upsert se houver valor.
     // Atendimento e SLA (056): idem, para o app seguir funcionando antes da migration.
@@ -119,6 +120,7 @@ const ENTITIES = [
     // aberto pela triagem, só não dá para responder ao cliente pela tela.
     // E-mail inteiro (066): idem — sem a coluna o chamado mostra só a
     // descrição de 600 caracteres, como antes.
+    // Chamado do Milvus (090): idem — sem a coluna o vínculo fica só no aparelho.
     optionalFields: [
       'responsible_id',
       'timer_operator_id',
@@ -134,6 +136,7 @@ const ENTITIES = [
       'email_message_id',
       'email_thread_id',
       'email_corpo',
+      'milvus_chamado_codigo',
     ],
     onChange: () => {
       if (typeof updateBadges === 'function') updateBadges();

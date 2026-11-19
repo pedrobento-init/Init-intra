@@ -10,6 +10,16 @@
 // Finalizar 2× o mesmo chamado é inócuo no Milvus (mesmo estado final),
 // então o retry pós-timeout é seguro sem marcador.
 //
+// AÇÃO "conversa" — chamado avulso aberto da Caixa de entrada
+// (js/caixa-pendencia.js), sem visita por trás. O frontend manda
+// { action:"conversa", clientId, ref, assunto, descricao, contato?, telefone? }.
+// - ref é a chave de idempotência gerada UMA vez quando o formulário abre
+//   (CX-…): vai como marcador `[ref:CX-…]` na descrição, e um segundo clique
+//   ou um retry pós-timeout adota o chamado já criado em vez de abrir outro.
+// - Nada é gravado no banco aqui: o vínculo com a pendência é do app
+//   (pendencias.milvus_chamado_codigo, 090), que passa pela RLS normal.
+// - Mesmo gate das visitas: operador ativo + cliente da equipe (ou admin).
+//
 // CONFIGURAÇÃO (secrets — nunca no frontend, nunca no banco):
 //   supabase secrets set MILVUS_API_TOKEN=seu_token_aqui
 //   supabase secrets set MILVUS_API_URL=https://apiintegracao.milvus.com.br
@@ -636,6 +646,155 @@ async function _handleFinalizar(
   return json({ success: true, codigo: echoed || codigo, visitId });
 }
 
+// Identificador do cliente no Milvus: token preferencial, senão o mapa (028).
+async function _resolveClienteId(
+  admin: SupabaseContext['supabaseAdmin'],
+  c: Client
+): Promise<string | number | null> {
+  const clientToken = String(c.milvus_client_token ?? '').trim();
+  if (clientToken) return clientToken;
+  const { data: mapRows } = await admin
+    .from('milvus_client_map')
+    .select('milvus_cliente_id')
+    .eq('client_id', c.id);
+  const ids = [
+    ...new Set(
+      (mapRows || [])
+        .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
+        .filter((n): n is number => typeof n === 'number')
+    ),
+  ];
+  return ids.length ? ids[0] : null;
+}
+
+// Chave de idempotência do chamado avulso: o app gera CX-<aleatório>. Formato
+// fechado porque vira texto na descrição do chamado e filtro de busca.
+const REF_CONVERSA = /^CX-[A-Za-z0-9_-]{6,64}$/;
+const CONVERSA_ASSUNTO_MAX = 200;
+const CONVERSA_DESCRICAO_MAX = 4000;
+
+// Payload da ação "conversa". Puro: o que o técnico escreveu + o marcador.
+function buildConversaPayload(
+  input: { assunto: string; descricao: string; ref: string; contato: string; telefone: string },
+  c: Client,
+  clienteId: string | number,
+  operatorEmail: string
+): Record<string, unknown> {
+  const lines = String(input.descricao || input.assunto)
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd());
+  lines.push(_markerFor(input.ref));
+  return {
+    cliente_id: clienteId,
+    chamado_assunto: input.assunto,
+    chamado_descricao: lines.join('\n'),
+    chamado_descricao_html: '<p>' + lines.map(_escHtml).join('</p><p>') + '</p>',
+    chamado_contato: input.contato || MILVUS_DEFAULTS.contato,
+    chamado_email: operatorEmail || _firstEmail(c.emails),
+    chamado_telefone: input.telefone || _txt(c.responsible_phone) || _txt(c.owner_phone),
+    is_b2c: false,
+    chamado_tecnico: operatorEmail || MILVUS_DEFAULTS.tecnico,
+    chamado_mesa: MILVUS_DEFAULTS.mesa,
+    chamado_setor: MILVUS_DEFAULTS.setor,
+    chamado_categoria_primaria: MILVUS_DEFAULTS.categoria_primaria,
+    chamado_categoria_secundaria: MILVUS_DEFAULTS.categoria_secundaria,
+    categoria_id: MILVUS_DEFAULTS.categoria_id,
+  };
+}
+
+// AÇÃO "conversa": chamado avulso aberto da Caixa (sem visita).
+async function _handleConversa(
+  admin: SupabaseContext['supabaseAdmin'],
+  caller: Caller,
+  body: Record<string, unknown>
+): Promise<Response> {
+  const clientId = _txt(body?.clientId).trim();
+  const ref = _txt(body?.ref).trim();
+  const assunto = _txt(body?.assunto).trim().slice(0, CONVERSA_ASSUNTO_MAX);
+  const descricao = _txt(body?.descricao).trim().slice(0, CONVERSA_DESCRICAO_MAX);
+  const contato = _txt(body?.contato).trim().slice(0, 120);
+  const telefone = _txt(body?.telefone)
+    .replace(/[^0-9+()\s-]/g, '')
+    .trim()
+    .slice(0, 30);
+  if (!clientId) return json({ success: false, code: 'MILVUS_VISIT_WITHOUT_CLIENT' }, 400);
+  if (!REF_CONVERSA.test(ref)) return json({ error: 'ref inválida' }, 400);
+  if (!assunto) return json({ error: 'assunto é obrigatório' }, 400);
+
+  const { data: client } = await admin
+    .from('clients')
+    .select(
+      'id, name, team, emails, owner, owner_phone, responsible, responsible_phone, milvus_client_token'
+    )
+    .eq('id', clientId)
+    .maybeSingle();
+  const c = client as Client | null;
+  if (!c) return json({ error: 'Cliente não encontrado' }, 404);
+  // Mesma regra das policies (sem bypass): o service role só age depois daqui.
+  if (!caller.isAdmin && caller.team !== (c.team || 'init')) {
+    return json({ error: 'Acesso negado a este cliente' }, 403);
+  }
+
+  const clienteId = await _resolveClienteId(admin, c);
+  if (!clienteId) {
+    return json({ success: false, code: 'MILVUS_CLIENT_TOKEN_NOT_CONFIGURED', unmapped: true });
+  }
+  const filter =
+    typeof clienteId === 'number' ? { cliente_id: clienteId } : { cliente_token: clienteId };
+
+  // Duplo clique ou retry depois de timeout: o chamado pode já existir.
+  const recovered = await findCreatedCodigo(filter, ref);
+  if (recovered) {
+    console.log(`milvus-chamado-create: conversa recuperada ref=${ref} codigo=${recovered}`);
+    return json({ success: true, recovered: true, codigo: recovered, ref });
+  }
+
+  const { data: op } = await admin
+    .from('operators')
+    .select('email')
+    .eq('id', caller.id)
+    .maybeSingle();
+  const operatorEmail = _txt((op as { email?: unknown } | null)?.email);
+  const payload = buildConversaPayload(
+    { assunto, descricao, ref, contato, telefone },
+    c,
+    clienteId,
+    operatorEmail
+  );
+  let res: Response;
+  try {
+    res = await _fetchMilvus(CREATE_URL, payload);
+  } catch (e) {
+    console.error(
+      `milvus-chamado-create: conversa rede/timeout ref=${ref}: ${(e as Error)?.name ?? 'erro'}`
+    );
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', ref }, 502);
+  }
+  if (res.status === 401 || res.status === 403) {
+    console.error(`milvus-chamado-create: conversa auth Milvus recusada (HTTP ${res.status})`);
+    return json({ success: false, code: 'MILVUS_INVALID_TOKEN', ref });
+  }
+  if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+    console.error(`milvus-chamado-create: conversa Milvus indisponível (HTTP ${res.status})`);
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', ref }, 502);
+  }
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).slice(0, 300);
+    console.error(`milvus-chamado-create: conversa HTTP ${res.status} detail=${detail}`);
+    return json({ success: false, code: 'MILVUS_VALIDATION_ERROR', ref, detail });
+  }
+  const rawBody = await res.text().catch(() => '');
+  const codigo = _toCodigo(rawBody);
+  if (!codigo) {
+    // Resposta sem código: o chamado pode ter nascido. O próximo clique, com a
+    // mesma ref, acha pelo marcador em vez de criar outro.
+    console.error(`milvus-chamado-create: conversa sem código ref=${ref}`);
+    return json({ success: false, code: 'MILVUS_UNAVAILABLE', ref }, 502);
+  }
+  console.log(`milvus-chamado-create: conversa criada ref=${ref} codigo=${codigo}`);
+  return json({ success: true, codigo, ref });
+}
+
 async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
@@ -656,13 +815,16 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   // 2) Qual visita (+ ação).
   let visitId = '';
   let action = 'criar';
+  let body: Record<string, unknown> = {};
   try {
-    const body = await req.json();
+    body = ((await req.json()) ?? {}) as Record<string, unknown>;
     visitId = String(body?.visitId ?? '').trim();
     if (body?.action) action = String(body.action).trim().toLowerCase();
   } catch {
     return json({ error: 'Corpo inválido' }, 400);
   }
+  // Chamado avulso da Caixa: não tem visita.
+  if (action === 'conversa') return _handleConversa(admin, caller, body);
   if (!visitId) return json({ error: 'visitId é obrigatório' }, 400);
 
   // 3) ETAPA 2 — finalização (relatório concluído).
@@ -707,22 +869,7 @@ async function handle(req: Request, ctx: SupabaseContext): Promise<Response> {
   );
 
   // 6) Identificador do cliente no Milvus: token preferencial, senão mapa.
-  const clientToken = String(c.milvus_client_token ?? '').trim();
-  let clienteId: string | number | null = clientToken || null;
-  if (!clienteId) {
-    const { data: mapRows } = await admin
-      .from('milvus_client_map')
-      .select('milvus_cliente_id')
-      .eq('client_id', c.id);
-    const ids = [
-      ...new Set(
-        (mapRows || [])
-          .map((r: { milvus_cliente_id: number | null }) => r.milvus_cliente_id)
-          .filter((n): n is number => typeof n === 'number')
-      ),
-    ];
-    if (ids.length) clienteId = ids[0];
-  }
+  const clienteId = await _resolveClienteId(admin, c);
   if (!clienteId) {
     return json({
       success: false,

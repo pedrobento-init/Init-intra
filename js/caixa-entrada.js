@@ -627,6 +627,9 @@ function _caixaConversaHTML(c) {
         '">Vincular</button></div>'
       : '') +
     '</section>' +
+    // Formulário inline de pendência/Milvus e as pendências abertas do
+    // cliente (js/caixa-pendencia.js).
+    (typeof cxpLadoHTML === 'function' ? cxpLadoHTML(c) : '') +
     (historico.length
       ? '<section><h3>Outras conversas dele</h3><ul class="cx-historico">' +
         historico
@@ -673,9 +676,14 @@ function _caixaConversaHTML(c) {
       ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' +
         escapeHtml(pen.id) +
         '">Abrir chamado</button>'
-      : '<button type="button" class="btn cx-btn" data-action="caixaAbrirChamado" data-arg="' +
-        id +
-        '">Criar chamado</button>') +
+      : '') +
+    (typeof cxpBotoesHTML === 'function'
+      ? cxpBotoesHTML(c)
+      : pen
+        ? ''
+        : '<button type="button" class="btn cx-btn" data-action="caixaAbrirChamado" data-arg="' +
+          id +
+          '">Criar chamado</button>') +
     '<button type="button" class="btn cx-btn" data-action="caixaAtribuir" data-arg="' +
     id +
     '">' +
@@ -1643,6 +1651,10 @@ function _caixaCapturarConversa(conv) {
     topo: tl ? tl.scrollTop : 0,
     foco: !!tx && ativo === tx,
     buscaFoco: !!ativo && ativo.id === 'cxBuscaConv',
+    // Formulário do painel (js/caixa-pendencia.js): quem está preenchendo não
+    // pode perder o campo nem a rolagem quando chega mensagem nova.
+    ladoFoco: ativo && /^cxp/.test(String(ativo.id || '')) ? ativo.id : null,
+    ladoTopo: (conv.querySelector('.cx-lado') || {}).scrollTop || 0,
     inicio: tx && typeof tx.selectionStart === 'number' ? tx.selectionStart : null,
     fim: tx && typeof tx.selectionEnd === 'number' ? tx.selectionEnd : null,
   };
@@ -1669,6 +1681,19 @@ function _caixaRestaurarConversa(conv, antes, sel) {
       tl.querySelectorAll('img').forEach((img) => {
         if (!img.complete) img.addEventListener('load', () => _caixaRolarFim(tl), { once: true });
       });
+    }
+  }
+  const lado = mesma ? conv.querySelector('.cx-lado') : null;
+  if (lado && antes.ladoTopo) lado.scrollTop = antes.ladoTopo;
+  const campoLado = mesma && antes.ladoFoco ? conv.querySelector('#' + antes.ladoFoco) : null;
+  if (campoLado) {
+    campoLado.focus({ preventScroll: true });
+    if (typeof campoLado.value === 'string' && typeof campoLado.setSelectionRange === 'function') {
+      try {
+        campoLado.setSelectionRange(campoLado.value.length, campoLado.value.length);
+      } catch (_e) {
+        /* select/date não têm cursor */
+      }
     }
   }
   // Quem estava digitando na busca da conversa continua nela.
