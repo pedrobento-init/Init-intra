@@ -196,13 +196,22 @@ describe('caixaFiltrar', () => {
     ).toEqual(['t1', 't3']);
   });
 
-  it('minhas mostra o que está com o usuário, decidido ou não', () => {
+  it('minhas mostra o que está com o usuário e ainda não foi encerrado nem descartado', () => {
     expect(
       s
         .caixaFiltrar(conversas(), 'minhas', '', 'Ana')
         .map((c) => c.id)
         .sort()
-    ).toEqual(['t1', 't2']);
+    ).toEqual(['t1']);
+  });
+
+  it('conversa encerrada pelo usuário sai de minhas, mas segue em encerradas e todas', () => {
+    const encerrada = s.caixaAgruparConversas([
+      entrada({ id: 'E', threadId: 't9', status: 'encerrado', atribuidoA: 'Ana' }),
+    ]);
+    expect(s.caixaFiltrar(encerrada, 'minhas', '', 'Ana')).toHaveLength(0);
+    expect(s.caixaFiltrar(encerrada, 'encerradas', '', 'Ana')).toHaveLength(1);
+    expect(s.caixaFiltrar(encerrada, 'todas', '', 'Ana')).toHaveLength(1);
   });
 
   it('todas inclui as já tratadas', () => {

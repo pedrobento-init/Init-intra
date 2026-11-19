@@ -183,7 +183,13 @@ function caixaFiltrar(conversas, filtro, busca, usuario) {
   const qDig = chamadoTelefoneDigitos(q);
   return (conversas || []).filter((c) => {
     if (filtro === 'minhas' && c.atribuidoA !== usuario) return false;
-    if ((filtro || 'pendentes') === 'pendentes' && (c.encerrada || c.descartada)) return false;
+    // "Em atendimento" e "Atribuídas a mim" são filas de trabalho: o que foi
+    // encerrado ou descartado sai delas e continua em "Encerradas"/"Todas".
+    if (
+      ((filtro || 'pendentes') === 'pendentes' || filtro === 'minhas') &&
+      (c.encerrada || c.descartada)
+    )
+      return false;
     if (filtro === 'encerradas' && !c.encerrada) return false;
     if (!q) return true;
     return c.mensagens.some(
