@@ -39,12 +39,10 @@ function openPenQuickMenu(btn, id) {
   if (already) return;
   var p = getPendenciaById(id);
   if (!p) return;
+  // Admin reatribui para qualquer equipe: sem filtro de team.
   var team =
-    typeof isTeamAdmin === 'function' &&
-    isTeamAdmin() &&
-    typeof _selectedTeam !== 'undefined' &&
-    _selectedTeam
-      ? _selectedTeam
+    typeof isTeamAdmin === 'function' && isTeamAdmin()
+      ? null
       : typeof getCurrentTeam === 'function'
         ? getCurrentTeam()
         : null;
