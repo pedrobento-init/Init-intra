@@ -848,3 +848,15 @@ operador desativado herda, pelo ping, a linha dele no rodízio e as conversas
 atribuídas a ele. Não cruza equipe (a RLS segue por `team`). Fechar de vez é
 travar `name` no `operators_guard_self_update` para quem não é admin, ou passar
 a atribuição para o id do operador. Não aplicado: muda o modelo da caixa.
+
+### WA-02 (risco aceito) — envio ativo para telefone de cliente cadastrado pelo próprio operador
+
+Achado na revisão da 089 (`whatsapp-iniciar`). O envio ativo aceita telefone de
+cliente cadastrado da equipe, e a RLS de `clients` (024) deixa qualquer operador
+cadastrar ou editar `owner_phone`/`responsible_phone`. Na prática, o operador
+consegue mandar mensagem a qualquer número em nome da empresa. **Decisão
+(19/11/2026): manter.** Os freios que ficam são o limite de 20 conversas
+iniciadas por operador e 60 por equipe por hora, e o registro de cada tentativa
+em `whatsapp_envios_ativos` (operador, equipe, telefone, quando), que o app não
+lê nem apaga. Se precisar travar depois: exigir cadastro sem alteração há 24 h,
+ou restringir o envio ativo a admin.
