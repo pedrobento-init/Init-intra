@@ -308,11 +308,18 @@ export async function enviarTexto(
         }),
         signal: AbortSignal.timeout(20000),
       });
-    } catch {
+    } catch (e) {
       // Rede caiu: tentar outro destino só dobraria o tempo de espera.
+      console.warn(`whatsapp envio: WAHA inalcançável (${(e as Error)?.name ?? 'erro'})`);
       return { ok: false, erro: 'inalcancavel' };
     }
     if (resp.ok) break;
+    // O motivo da recusa só existe aqui: sem o log, o 502 da Caixa não diz se
+    // foi chave, sessão, número ou destino. O telefone entra só pelo final.
+    const corpo = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+    console.warn(
+      `whatsapp envio: destino ...${chatId.slice(-9)} recusado (HTTP ${resp.status}) ${corpo}`
+    );
   }
   if (!resp || !resp.ok) return { ok: false, erro: `provedor ${resp ? resp.status : 0}` };
   let corpo: Record<string, unknown> = {};

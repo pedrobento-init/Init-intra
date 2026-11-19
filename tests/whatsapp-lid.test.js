@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import {
   chatIdsPara,
   enviarTexto,
@@ -231,5 +231,25 @@ describe('envio para conversa gravada com o LID', () => {
     });
     expect(n).toBe(2);
     expect(envio.ok).toBe(false);
+  });
+
+  // O 502 da Caixa não diz por que o WAHA recusou. O log guarda o status e um
+  // trecho da resposta, e do telefone só o final.
+  it('recusa do WAHA fica no log com o status e sem o telefone inteiro', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await enviarTexto(
+        FONE,
+        'oi',
+        cred,
+        async () => new Response('sessao invalida', { status: 422 })
+      );
+      const linhas = aviso.mock.calls.map((c) => c.join(' ')).join('\n');
+      expect(linhas).toContain('HTTP 422');
+      expect(linhas).toContain('sessao invalida');
+      expect(linhas).not.toContain(FONE);
+    } finally {
+      aviso.mockRestore();
+    }
   });
 });
