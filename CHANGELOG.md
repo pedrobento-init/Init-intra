@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/pedrobento-init/Init-intra/compare/init-intra-v0.10.0...init-intra-v0.11.0) (2026-11-19)
+
+
+### Novidades
+
+* **caixa:** criar pendência e chamado no Milvus pelo painel da conversa ([#136](https://github.com/pedrobento-init/Init-intra/issues/136)) ([a304ffd](https://github.com/pedrobento-init/Init-intra/commit/a304ffd9a68e1eb557be6f42b3a4a23e68b604d1))
+
 ## [0.10.0](https://github.com/pedrobento-init/Init-intra/compare/init-intra-v0.9.0...init-intra-v0.10.0) (2026-11-19)
 
 
