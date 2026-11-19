@@ -1,0 +1,308 @@
+/* whatsapp.css — etiquetas, contatos e painel de atendimento do WhatsApp (089).
+   Arquivo próprio para não disputar o styles.css com as outras telas. Cor que
+   depende de dado só entra por classe (wetq-cor-*), nunca do banco direto. */
+
+/* ── Etiquetas ─────────────────────────────────────────────────────────────── */
+.wetq-cor-azul {
+  --wetq-c: #1d4ed8;
+}
+.wetq-cor-verde {
+  --wetq-c: #15803d;
+}
+.wetq-cor-amarelo {
+  --wetq-c: #a16207;
+}
+.wetq-cor-laranja {
+  --wetq-c: #c2410c;
+}
+.wetq-cor-vermelho {
+  --wetq-c: #b91c1c;
+}
+.wetq-cor-roxo {
+  --wetq-c: #6d28d9;
+}
+.wetq-cor-rosa {
+  --wetq-c: #be185d;
+}
+.wetq-cor-cinza,
+.wetq-mais {
+  --wetq-c: #475569;
+}
+/* No escuro o mesmo matiz, um degrau mais claro: o texto precisa de contraste
+   contra a superfície escura, não contra o branco. */
+body.dark-theme .wetq-cor-azul {
+  --wetq-c: #93c5fd;
+}
+body.dark-theme .wetq-cor-verde {
+  --wetq-c: #86efac;
+}
+body.dark-theme .wetq-cor-amarelo {
+  --wetq-c: #fde047;
+}
+body.dark-theme .wetq-cor-laranja {
+  --wetq-c: #fdba74;
+}
+body.dark-theme .wetq-cor-vermelho {
+  --wetq-c: #fca5a5;
+}
+body.dark-theme .wetq-cor-roxo {
+  --wetq-c: #c4b5fd;
+}
+body.dark-theme .wetq-cor-rosa {
+  --wetq-c: #f9a8d4;
+}
+body.dark-theme .wetq-cor-cinza,
+body.dark-theme .wetq-mais {
+  --wetq-c: #cbd5e1;
+}
+
+.wetq-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.wetq-chip,
+.cx-conv-id .wetq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 140px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--wetq-c) 35%, transparent);
+  background: color-mix(in srgb, var(--wetq-c) 12%, transparent);
+  color: var(--wetq-c);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wetq-chip::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wetq-c);
+}
+.wetq-mais::before {
+  display: none;
+}
+.cx-conv-id .wetq-chips {
+  margin-top: 2px;
+}
+.wetq-filtro {
+  width: auto;
+  max-width: 180px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 12px;
+}
+.wetq-modal {
+  display: grid;
+  gap: 12px;
+}
+.wetq-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.wetq-opcao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.wetq-nova,
+.wetq-edita {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.wetq-nova .form-input,
+.wetq-edita .form-input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.wetq-nova .form-select,
+.wetq-edita .form-select {
+  width: auto;
+}
+
+/* ── Contatos ──────────────────────────────────────────────────────────────── */
+.wcont-barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.wcont-busca {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.wcont-barra .form-select {
+  width: auto;
+}
+.wcont-rolagem {
+  overflow-x: auto;
+}
+.wcont-pessoa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wcont-pessoa > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+.wcont-fone {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.wcont-aberta {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 600;
+}
+.wcont-acoes {
+  white-space: nowrap;
+  text-align: right;
+}
+.wcont-acoes .btn + .btn {
+  margin-left: 4px;
+}
+.wcont-vazio {
+  padding: 24px 0;
+}
+
+/* ── Painel ────────────────────────────────────────────────────────────────── */
+.wpainel {
+  display: grid;
+  gap: 12px;
+}
+.wpainel-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.wpainel-equipe {
+  width: auto;
+}
+.wpainel-h {
+  margin: 8px 0 0;
+}
+.wpainel-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+.wpainel-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wpainel-tabela th,
+.wpainel-tabela td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.wpainel-tabela thead th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.wpainel-tabela td {
+  font-variant-numeric: tabular-nums;
+}
+/* Barra horizontal dentro da célula: comprimento = atendimentos; o número fica
+   ao lado, em cor de texto, para a cor não carregar a informação sozinha. */
+.wpainel-barra-h {
+  display: inline-block;
+  width: 80px;
+  height: 8px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.wpainel-barra-h > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.wpainel-colunas {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 160px;
+  padding-top: 4px;
+}
+.wpainel-col {
+  flex: 1 1 0;
+  min-width: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  text-align: center;
+  cursor: default;
+}
+.wpainel-col-barra {
+  display: block;
+  min-height: 0;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  transition: opacity var(--transition);
+}
+.wpainel-col:hover .wpainel-col-barra {
+  opacity: 0.75;
+}
+.wpainel-col-v {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-height: 14px;
+}
+.wpainel-col-r {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-height: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 2px;
+}
+.wpainel-rolagem {
+  overflow-x: auto;
+}
+.wpainel-curto .wpainel-colunas {
+  min-width: 560px;
+}
+.wpainel-curto .wpainel-col-v {
+  font-size: 9px;
+}
+.wpainel-dados {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.wpainel-dados summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.wpainel-nota {
+  font-size: 12px;
+}

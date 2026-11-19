@@ -43,7 +43,7 @@ roda `lint`, `format:check`, `typecheck`, `test`, o E2E (job separado) e `node t
 
 ## As armadilhas que custam caro
 
-**`js/` é modo script, não módulo.** Os 84 arquivos (fora o `config.example.js`) são carregados por `<script>`
+**`js/` é modo script, não módulo.** Os 89 arquivos (fora o `config.example.js`) são carregados por `<script>`
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,
@@ -102,7 +102,7 @@ linha, ou falha em checkout Windows e passa no CI (já aconteceu: `rls-055`).
 - Um `it()` por comportamento. Prefira caso-limite e regra de negócio (escopo de
   team, RLS, estados de pendência) a asserção trivial.
 - Antes de escrever, leia um ou dois testes do mesmo domínio e espelhe o estilo.
-  São 150 arquivos (~1.970 testes); o estilo já está decidido.
+  São 166 arquivos (~2.450 testes); o estilo já está decidido.
 - Teste novo não quebra teste existente: rode `npm test` até verde.
 
 ## Idioma e escrita

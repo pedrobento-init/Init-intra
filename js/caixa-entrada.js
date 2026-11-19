@@ -167,7 +167,11 @@ function caixaInterlocutor(c) {
   if (!c) return null;
   if (c.ultimaEntrada) return c.ultimaEntrada;
   const entradas = (c.mensagens || []).filter((m) => (m.direcao || 'entrada') === 'entrada');
-  return entradas.length ? entradas[entradas.length - 1] : c.ultima || null;
+  if (entradas.length) return entradas[entradas.length - 1];
+  // Conversa que a empresa começou (whatsapp-iniciar): o "de" da saída é quem
+  // atendeu, não o contato. Sem ele, o nome cai no telefone (ou no nome salvo).
+  if (c.ultima && c.canal === 'whatsapp') return Object.assign({}, c.ultima, { de: '' });
+  return c.ultima || null;
 }
 
 function caixaFiltrar(conversas, filtro, busca, usuario) {
@@ -222,6 +226,9 @@ function caixaClientePorTelefone(telefone, clientes) {
 function _caixaNomeDe(m, canal) {
   if (!m) return '(sem remetente)';
   if (canal !== 'whatsapp') return _emailTriagemNome(m.de) || m.de || '(sem remetente)';
+  // Nome editado em Contatos do WhatsApp (089) vale mais que o do perfil.
+  const salvo = typeof wcontNome === 'function' ? wcontNome(m.telefone, m.team) : '';
+  if (salvo) return salvo;
   const de = String(m.de || '').trim();
   const soNumero = !de || (chamadoTelefoneDigitos(de).length >= 8 && !/[a-zà-ú]/i.test(de));
   if (!soNumero) return de;
@@ -506,6 +513,7 @@ function _caixaItemHTML(c, lidas) {
       ? '<span class="cx-badge">Chamado ' + escapeHtml(_cxChamadoCurto(c.pendenciaId)) + '</span>'
       : '') +
     (c.atribuidoA ? '<span class="cx-meta-com">com ' + escapeHtml(c.atribuidoA) + '</span>' : '') +
+    (typeof wetqConversaChipsHTML === 'function' ? wetqConversaChipsHTML(c, 2) : '') +
     '</span>' +
     '</span></button>'
   );
@@ -678,6 +686,7 @@ function _caixaConversaHTML(c) {
     '">' +
     (cli ? 'Trocar cliente' : 'Vincular cliente') +
     '</button>' +
+    (typeof wetqBotaoHTML === 'function' ? wetqBotaoHTML(c) : '') +
     '<button type="button" class="btn cx-btn" data-action="caixaMarcarNaoLida" data-arg="' +
     id +
     '">Marcar como não lida</button>' +
@@ -754,7 +763,9 @@ function _caixaConversaHTML(c) {
     escapeHtml(nome) +
     '</b><span>' +
     escapeHtml((cli ? cli.name : '') + (cli ? ' · ' : '') + (whats ? 'WhatsApp' : 'E-mail')) +
-    '</span></div>' +
+    '</span>' +
+    (typeof wetqConversaChipsHTML === 'function' ? wetqConversaChipsHTML(c, 4) : '') +
+    '</div>' +
     '<span class="cx-conv-flex"></span>' +
     '<button type="button" class="btn cx-btn cx-ic-btn" data-action="caixaBuscarNaConversa" aria-label="Buscar na conversa" title="Buscar na conversa" aria-pressed="' +
     !!(_caixaBuscaConversa.aberta && _caixaBuscaConversa.conv === c.id) +
@@ -1287,7 +1298,9 @@ function renderCaixaEntrada() {
   const doCanalTodos = caixaFiltrarCanal(todas, _caixaCanal);
   // Filas por departamento (js/whatsapp-filas.js): a barra conta antes do recorte.
   if (typeof wfilaRenderBarra === 'function') wfilaRenderBarra(doCanalTodos);
-  const doCanal = typeof wfilaFiltrar === 'function' ? wfilaFiltrar(doCanalTodos) : doCanalTodos;
+  let doCanal = typeof wfilaFiltrar === 'function' ? wfilaFiltrar(doCanalTodos) : doCanalTodos;
+  // Etiqueta (089) recorta junto com o canal: as contagens seguem o filtro.
+  if (typeof wetqFiltrarConversas === 'function') doCanal = wetqFiltrarConversas(doCanal);
   const visiveis = caixaFiltrar(doCanal, _caixaFiltro, _caixaBusca, usuario);
   // Toolbar não é remontada (perderia o foco da busca), então só as contagens
   // e os estados ativo/inativo das chips e abas são atualizados.
@@ -1325,7 +1338,8 @@ function renderCaixaEntrada() {
     )
     .join('');
   const chipsBox = document.getElementById('caixaCanalChips');
-  if (chipsBox) chipsBox.innerHTML = chipsHtml;
+  if (chipsBox)
+    chipsBox.innerHTML = chipsHtml + (typeof wetqFiltroHTML === 'function' ? wetqFiltroHTML() : '');
   const tabs = Object.keys(CAIXA_FILTROS)
     .map(
       (k) =>

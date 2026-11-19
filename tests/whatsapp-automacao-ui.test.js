@@ -169,3 +169,16 @@ describe('acesso', () => {
     expect(html).toContain('data-submit="wautoSalvar"');
   });
 });
+
+describe('nota média do painel de atendimento', () => {
+  it('média e total só com notas válidas de 1 a 5', () => {
+    expect(ui.wautoResumoNotas([{ nota: 5 }, { nota: 4 }, { nota: 9 }, { nota: null }])).toEqual({
+      media: 4.5,
+      total: 2,
+    });
+  });
+
+  it('sem nenhuma nota, o painel não mostra o bloco', () => {
+    expect(ui.wautoResumoNotas([])).toBeNull();
+  });
+});

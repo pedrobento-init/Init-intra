@@ -620,6 +620,57 @@ if (typeof registerActions === 'function') {
   });
 }
 
+// ── Fonte de avaliações do painel de atendimento (js/whatsapp-painel.js) ───────
+// O painel pede de forma síncrona; a nota mora no banco. Primeira chamada de
+// um período devolve null e busca em segundo plano; quando chega, redesenha o
+// painel se ele estiver aberto. A RLS da 088 já limita à equipe de quem lê.
+var _wautoAvalPeriodo = {};
+
+function wautoFonteAvaliacoes(filtro) {
+  const f = filtro || {};
+  const chave = [f.desde, f.ate, f.team || ''].join('|');
+  const c = _wautoAvalPeriodo[chave];
+  if (c && !c.buscando && Date.now() - c.em < 60 * 1000) return c.resumo;
+  if (!c || !c.buscando) _wautoBuscarAvalPeriodo(chave, f);
+  return c ? c.resumo : null;
+}
+
+function wautoResumoNotas(lista) {
+  const notas = (lista || [])
+    .map((r) => Number(r && r.nota))
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 5);
+  if (!notas.length) return null;
+  return { media: notas.reduce((a, n) => a + n, 0) / notas.length, total: notas.length };
+}
+
+async function _wautoBuscarAvalPeriodo(chave, f) {
+  if (!_wautoOnline()) return;
+  const antes = _wautoAvalPeriodo[chave] || { resumo: null };
+  _wautoAvalPeriodo[chave] = Object.assign({}, antes, { buscando: true });
+  let resumo = antes.resumo;
+  try {
+    let q = supabaseClient
+      .from('whatsapp_avaliacoes')
+      .select('nota')
+      .gte('respondida_em', new Date(f.desde).toISOString())
+      .lt('respondida_em', new Date(f.ate).toISOString())
+      .limit(5000);
+    if (f.team) q = q.eq('team', f.team);
+    const res = await q;
+    if (!res.error) resumo = wautoResumoNotas(res.data);
+  } catch (e) {
+    if (typeof _logSilent === 'function') _logSilent(e, 'whatsapp_avaliacoes painel');
+  }
+  _wautoAvalPeriodo[chave] = { em: Date.now(), resumo, buscando: false };
+  const mudou = JSON.stringify(resumo) !== JSON.stringify(antes.resumo);
+  if (
+    mudou &&
+    typeof renderWhatsappPainel === 'function' &&
+    (window.location.hash.replace('#', '') || '') === 'whatsapp-painel'
+  )
+    renderWhatsappPainel();
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     wautoFaixasDoTexto,
@@ -635,5 +686,6 @@ if (typeof module !== 'undefined' && module.exports) {
     wautoFormHTML,
     wautoAvisarEncerramento,
     _wautoPrecisaBuscar,
+    wautoResumoNotas,
   };
 }

@@ -509,6 +509,8 @@ function navigateTo(page) {
   } else if (page === 'prazos') renderPrazos();
   else if (page === 'vencimentos') renderVencimentos();
   else if (page === 'caixa') renderCaixaEntrada();
+  else if (page === 'whatsapp-contatos') renderWhatsappContatos();
+  else if (page === 'whatsapp-painel') renderWhatsappPainel();
   else if (page === 'conhecimento') renderConhecimento();
   else if (page === 'clientes') renderClients();
   else if (page === 'templates') renderTemplates();
