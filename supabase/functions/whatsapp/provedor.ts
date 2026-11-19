@@ -273,7 +273,10 @@ export async function marcarVisto(
 export function chatIdsPara(telefone: string): string[] {
   const d = String(telefone || '').replace(/\D/g, '');
   if (!d) return [];
-  return d.length >= 14 ? [`${d}@c.us`, `${d}@lid`] : [`${d}@c.us`];
+  // Tamanho não diz nada: LID tem 13 dígitos (ex.: 3771736305909), como um
+  // celular brasileiro com DDI. Quem decide é a resposta do WAHA: se o @c.us
+  // for recusado, a próxima tentativa é o @lid do mesmo número.
+  return [`${d}@c.us`, `${d}@lid`];
 }
 
 export async function enviarTexto(
