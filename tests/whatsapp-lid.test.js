@@ -201,12 +201,13 @@ describe('envio para conversa gravada com o LID', () => {
   const cred = { baseUrl: 'https://waha.interno', apiKey: 'k', session: 'default' };
   const LID_DIGITOS = LID.replace(/\D/g, '');
 
-  it('telefone normal tenta só @c.us', () => {
-    expect(chatIdsPara(FONE)).toEqual([`${FONE}@c.us`]);
+  it('sempre tenta @c.us e depois @lid, sem depender do tamanho do número', () => {
+    expect(chatIdsPara(FONE)).toEqual([`${FONE}@c.us`, `${FONE}@lid`]);
+    expect(chatIdsPara(LID_DIGITOS)).toEqual([`${LID_DIGITOS}@c.us`, `${LID_DIGITOS}@lid`]);
   });
 
-  it('dígitos de LID tentam @c.us e depois @lid', () => {
-    expect(chatIdsPara(LID_DIGITOS)).toEqual([`${LID_DIGITOS}@c.us`, `${LID_DIGITOS}@lid`]);
+  it('LID de 13 dígitos (como na conversa real) também tenta @lid', () => {
+    expect(chatIdsPara('3771736305909')).toEqual(['3771736305909@c.us', '3771736305909@lid']);
   });
 
   it('@c.us recusado: reenvia para @lid e devolve o id', async () => {
@@ -222,13 +223,13 @@ describe('envio para conversa gravada com o LID', () => {
     expect(envio).toEqual({ ok: true, id: 'true_x@lid_A1' });
   });
 
-  it('telefone normal recusado não tenta @lid', async () => {
+  it('recusa nos dois destinos devolve falha sem inventar sucesso', async () => {
     let n = 0;
     const envio = await enviarTexto(FONE, 'oi', cred, async () => {
       n++;
       return new Response('{}', { status: 500 });
     });
-    expect(n).toBe(1);
+    expect(n).toBe(2);
     expect(envio.ok).toBe(false);
   });
 });
