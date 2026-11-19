@@ -7777,6 +7777,159 @@ mark.cx-achado-atual {
   justify-content: flex-start;
 }
 
+/* Pendência / chamado do Milvus abertos da conversa (js/caixa-pendencia.js). */
+.cxp-box {
+  padding: 12px;
+  border: 1px solid var(--cx-bd);
+  border-radius: 10px;
+  background: var(--cx-s2);
+}
+.cxp-form {
+  display: grid;
+  gap: 6px;
+}
+.cxp-form .form-input,
+.cxp-form .form-select,
+.cxp-form .form-textarea {
+  width: 100%;
+  min-width: 0;
+}
+.cx-lado .cxp-tit {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cx-tx);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cxp-origem {
+  justify-self: start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--cx-bd);
+  background: var(--cx-sel);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.cxp-l {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--cx-mut);
+}
+.cxp-par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cxp-par > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.cxp-prio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cxp-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cx-bd);
+  background: var(--cx-s1);
+  color: var(--cx-tx);
+  font-size: 12px;
+  cursor: pointer;
+}
+.cxp-chip.on {
+  border-color: var(--cx-ac);
+  background: var(--cx-sel);
+  font-weight: 600;
+}
+.cxp-chip.cxp-prio-alta.on,
+.cxp-chip.cxp-prio-critica.on {
+  border-color: var(--cx-amb);
+  color: var(--cx-amb);
+  background: transparent;
+}
+.cxp-chip.cxp-prio-critica.on {
+  border-color: var(--cx-red);
+  color: var(--cx-red);
+}
+.cxp-sugestoes {
+  display: grid;
+  gap: 4px;
+}
+.cxp-sugestoes:empty {
+  display: none;
+}
+.cxp-sug {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid var(--cx-bd);
+  border-radius: 8px;
+  background: var(--cx-s1);
+  color: var(--cx-tx);
+  font-size: 12px;
+  cursor: pointer;
+}
+.cxp-sug:hover {
+  border-color: var(--cx-ac);
+}
+.cxp-milvus-sel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--cx-ac);
+  border-radius: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cxp-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cxp-n {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--cx-sel);
+  color: var(--cx-tx);
+}
+.cxp-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.cxp-pen {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--cx-bd);
+  border-radius: 8px;
+  background: var(--cx-s2);
+  color: var(--cx-tx);
+  text-decoration: none;
+}
+.cxp-pen:hover {
+  border-color: var(--cx-ac);
+}
+.cxp-pen-meta {
+  font-size: 11px;
+  color: var(--cx-mut);
+}
+.cxp-pen b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 /* Estado vazio (nada selecionado). */
 .cx-empty {
   margin: auto;

@@ -43,7 +43,7 @@ roda `lint`, `format:check`, `typecheck`, `test`, o E2E (job separado) e `node t
 
 ## As armadilhas que custam caro
 
-**`js/` é modo script, não módulo.** Os 89 arquivos (fora o `config.example.js`) são carregados por `<script>`
+**`js/` é modo script, não módulo.** Os 90 arquivos (fora o `config.example.js`) são carregados por `<script>`
 no `index.html` e **compartilham um único escopo global**. Não há `import` nem
 `export`. Consequência prática: nome de função ou constante no topo de arquivo
 colide silenciosamente com o de outro arquivo. Antes de criar um nome global,

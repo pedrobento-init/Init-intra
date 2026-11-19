@@ -5,3 +5,4 @@ package-lock.json
 .claude/worktrees
 build
 CHANGELOG.md
+.release-please-manifest.json
