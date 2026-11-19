@@ -106,9 +106,20 @@ from unnest(array[
   'can_see_client', 'can_see_pendencia', 'can_see_team',
   'append_pendencia_note', 'marcar_chamado_visto',
   'my_calendar_feed_token', 'my_google_agenda_status',
-  'reveal_client_secret', 'op_id_by_name'
+  'reveal_client_secret', 'op_id_by_name',
+  -- 086/087 (WhatsApp): ping é SECURITY DEFINER; as de atribuir são INVOKER
+  'emails_triagem_ack_so_avanca',
+  'whatsapp_atendente_ping', 'whatsapp_atribuir_se_livre', 'whatsapp_pegar_proximo'
 ]) as e(nome)
 left join pg_proc p
   on p.proname = e.nome
  and p.pronamespace = (select oid from pg_namespace where nspname = 'public')
 order by existe, e.nome;
+
+-- 8) Grants das funções do WhatsApp (087): anon não pode executar nenhuma.
+--    proacl sem "anon=" e com "authenticated=X" é o esperado.
+select proname, prosecdef, proconfig, proacl
+from pg_proc
+where pronamespace = (select oid from pg_namespace where nspname = 'public')
+  and proname like 'whatsapp\_%'
+order by proname;

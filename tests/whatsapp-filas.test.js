@@ -347,6 +347,34 @@ describe('webhook: filas e rodízio', () => {
     expect(vez.filtros).toEqual(expect.arrayContaining([['operador', 'Caio']]));
   });
 
+  // O nome vem de operators.name, que o operador edita. Aspas no filtro do
+  // PostgREST quebravam a contagem e paravam o rodízio da equipe inteira.
+  it('nome de operador não vai para o filtro do PostgREST: a contagem filtra depois de ler', async () => {
+    const { rpcs, queries } = await chamar(evento('2'), {
+      env: BOT,
+      conversa: aguardando(),
+      config: { rodizio_ativo: true, limite_simultaneo: 1 },
+      atendentes: [online('Ana "x"'), online('Bia')],
+      caixa: [
+        {
+          canal: 'whatsapp',
+          team: 'init',
+          telefone: '5511900000001',
+          atribuido_a: 'Ana "x"',
+          direcao: 'entrada',
+          status: 'anexado',
+        },
+      ],
+    });
+    const porNome = queries.filter((q) =>
+      q.filtros.some(([col, , tipo]) => col === 'atribuido_a' && tipo === 'in')
+    );
+    expect(porNome).toEqual([]);
+    expect(atribuicoes(rpcs)).toEqual([
+      ['whatsapp_atribuir_se_livre', { p_team: 'init', p_telefone: FONE, p_operador: 'Bia' }],
+    ]);
+  });
+
   it('todos no limite: a conversa fica na fila', async () => {
     const aberta = (tel, op) => ({
       canal: 'whatsapp',

@@ -179,17 +179,21 @@ export async function aplicarFilas(
     const lista = ((atendentes || []) as Atendente[]).filter((a) => a.recebe_rodizio !== false);
     if (!lista.length) return 'fila';
 
-    const { data: abertas, error: erroAbertas } = await db
+    // Sem filtro por nome no PostgREST: o nome vem de operators.name, que o
+    // próprio operador edita, e aspas ali quebravam a query (e o rodízio da
+    // equipe inteira). Filtra por nome aqui, depois de ler.
+    const nomes = new Set(lista.map((a) => a.operador));
+    const { data: abertasTodas, error: erroAbertas } = await db
       .from('emails_triagem')
       .select('telefone, atribuido_a, direcao, status')
       .eq('canal', 'whatsapp')
       .eq('team', team)
       .in('status', STATUS_ABERTOS)
-      .in(
-        'atribuido_a',
-        lista.map((a) => a.operador)
-      )
+      .not('atribuido_a', 'is', null)
       .limit(5000);
+    const abertas = ((abertasTodas || []) as LinhaAberta[]).filter((r) =>
+      nomes.has(String(r.atribuido_a || ''))
+    );
     // Sem a contagem o limite não teria como ser respeitado: melhor deixar na
     // fila que entregar a quem já está cheio.
     if (erroAbertas) {

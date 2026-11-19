@@ -223,6 +223,33 @@ describe('087: whatsapp_atribuir_se_livre', () => {
     expect(await donos('5511900000001')).toEqual([['a1', 'Ana']]);
   });
 
+  // A função é liberada para authenticated: sem a trava, um operador punha
+  // conversa da fila no nome de um colega (ou de um nome inventado).
+  it('operador comum só atribui a si mesmo', async () => {
+    await msg('a1', '5511900000001', 10);
+    expect(
+      await falha('ana', "SELECT whatsapp_atribuir_se_livre('init', '5511900000001', 'Bia')")
+    ).toMatch(/só é possível atribuir a si mesmo/);
+    expect(
+      (
+        await como('ana', "SELECT whatsapp_atribuir_se_livre('init', '5511900000001', 'Ana') AS ok")
+      )[0].ok
+    ).toBe(true);
+  });
+
+  it('admin distribui para qualquer operador', async () => {
+    await msg('a1', '5511900000001', 10);
+    expect(
+      (
+        await como(
+          'admin',
+          "SELECT whatsapp_atribuir_se_livre('init', '5511900000001', 'Bia') AS ok"
+        )
+      )[0].ok
+    ).toBe(true);
+    expect(await donos('5511900000001')).toEqual([['a1', 'Bia']]);
+  });
+
   it('serializa por conversa com trava de transação (a garantia contra dois cliques juntos)', () => {
     expect(M087).toMatch(/pg_advisory_xact_lock\(\s*hashtextextended\(/);
     expect(M087).toMatch(/whatsapp_pegar_proximo[\s\S]*security invoker/);

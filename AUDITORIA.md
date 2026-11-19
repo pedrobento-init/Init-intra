@@ -837,3 +837,14 @@ segredo próprio (contratos testados em §14).
 
 Por instrução desta rodada, nenhum arquivo de `js/` foi alterado. Os achados **abertos** da §0
 ficam com os agentes responsáveis ou entram na fila de P-13/P-14 e afins.
+
+### WA-01 (aviso) — rodízio e atribuição identificam o operador pelo nome
+
+Achado na revisão da 087 (filas do WhatsApp). `emails_triagem.atribuido_a` e
+`whatsapp_atendentes.operador` guardam o **nome** do operador, como a caixa faz
+desde a 073. O índice `uq_operators_active_name` (049) só impede nome repetido
+entre operadores **ativos**: quem renomeia o próprio perfil para o nome de um
+operador desativado herda, pelo ping, a linha dele no rodízio e as conversas
+atribuídas a ele. Não cruza equipe (a RLS segue por `team`). Fechar de vez é
+travar `name` no `operators_guard_self_update` para quem não é admin, ou passar
+a atribuição para o id do operador. Não aplicado: muda o modelo da caixa.

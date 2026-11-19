@@ -207,6 +207,16 @@ begin
   if coalesce(p_telefone, '') = '' or coalesce(trim(p_operador), '') = '' then
     return false;
   end if;
+  -- Operador comum só atribui a si mesmo: a função está liberada para
+  -- authenticated e, sem isto, dava para pôr conversa no nome de um colega
+  -- (ou de um nome que nem existe). Admin distribui; o webhook (service role,
+  -- sem auth.uid()) é quem faz o rodízio.
+  if auth.uid() is not null
+     and not coalesce(public.current_op_is_admin(), false)
+     and lower(btrim(p_operador)) is distinct from lower(btrim(coalesce(public.current_op_name(), ''))) then
+    raise exception 'whatsapp_atribuir_se_livre: só é possível atribuir a si mesmo'
+      using errcode = '42501';
+  end if;
   perform pg_advisory_xact_lock(hashtextextended('whatsapp_fila:' || v_team || ':' || p_telefone, 0));
   if exists (
     select 1 from public.emails_triagem r
