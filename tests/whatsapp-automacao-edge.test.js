@@ -287,6 +287,25 @@ describe('conversa-encerrar', () => {
     expect(enviadas).toEqual([]);
   });
 
+  it('encerramento desligado: o status muda, nada sai e o motivo vem na resposta', async () => {
+    const { res, dados, enviadas } = await encerrar();
+    expect(res.status).toBe(200);
+    expect(dados).toMatchObject({ success: true, enviadas: 0, motivo: 'desativado' });
+    expect(enviadas).toEqual([]);
+  });
+
+  it('com o encerramento ligado, o cliente recebe o protocolo e a pesquisa fica esperando a nota', async () => {
+    const { dados, enviadas, queries } = await encerrar({
+      automacao: ligada,
+      conversa: { telefone: TEL, ultima_em: minAtras(30), bot_protocolo: '20261118-8019' },
+    });
+    expect(dados).toMatchObject({ enviadas: 2, pesquisa: true });
+    expect(dados.motivo).toBeUndefined();
+    expect(enviadas).toHaveLength(2);
+    const estado = patches(queries, 'whatsapp_conversas').find((q) => q.patch.pesquisa_ate);
+    expect(estado.patch).toMatchObject({ pesquisa_team: 'init', pesquisa_operador: 'Ana' });
+  });
+
   it('o status muda só no thread E na equipe da conversa', async () => {
     const { res, queries } = await encerrar({
       linhas: [entrada({ team: 'mam' }), entrada({ id: 'e0', recebido_em: minAtras(90) })],

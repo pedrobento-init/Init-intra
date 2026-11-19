@@ -25,6 +25,7 @@ import {
   type EstadoAutomacao,
   jaEncerrada,
   mensagensDeEncerramento,
+  type MotivoSemEnvio,
   pesquisaValidaAte,
   semAvisoFixoDoBot,
 } from './automacao.ts';
@@ -292,20 +293,37 @@ export async function encerrarPelaAutomacao(
     cred: CredenciaisWaha;
   },
   agora: Date = new Date()
-): Promise<{ enviadas: number; pesquisa: boolean; repetido: boolean }> {
+): Promise<{
+  enviadas: number;
+  pesquisa: boolean;
+  repetido: boolean;
+  motivo?: MotivoSemEnvio;
+}> {
+  const nada = (motivo: MotivoSemEnvio) => ({
+    enviadas: 0,
+    pesquisa: false,
+    repetido: false,
+    motivo,
+  });
   const lido = await lerEstadoAutomacao(db, p.telefone);
-  if (!lido.ok || !lido.existe) return { enviadas: 0, pesquisa: false, repetido: false };
+  if (!lido.ok || !lido.existe) return nada('sem_conversa');
   // Equipe que o número nunca procurou não mexe no estado dele: encerrada_em e
   // a pesquisa são por telefone, e valeriam também para a equipe de verdade.
   if ((await numeroEscreveuParaEquipe(db, p.telefone, p.team)) !== true)
-    return { enviadas: 0, pesquisa: false, repetido: false };
+    return nada('outra_equipe');
   // Só o clique da equipe pode repetir (dois cliques, ou o status local chegando
   // antes). O cron não: ele só vê conversa ainda em aberto, e a equipe pode ter
   // encerrado e reaberto respondendo de novo, sem mensagem nova do cliente.
   if (p.motivo === 'equipe' && jaEncerrada(lido.estado))
     return { enviadas: 0, pesquisa: false, repetido: true };
   const cfg = await configDaEquipe(db, p.team);
-  const { textos, pesquisa } = mensagensDeEncerramento(cfg, p.motivo);
+  const { textos, pesquisa } = mensagensDeEncerramento(
+    cfg,
+    p.motivo,
+    await protocoloDoNumero(db, p.telefone)
+  );
+  // encerrada_em é gravado mesmo sem mensagem: é ele que faz a próxima fala do
+  // cliente ser conversa nova, esteja o aviso ligado ou não.
   const enviadas =
     textos.length && temCredencial(p.cred)
       ? await enviarDaAutomacao(db, p.telefone, textos, {
@@ -324,5 +342,26 @@ export async function encerrarPelaAutomacao(
     pesquisa_team: esperaNota ? p.team : null,
     pesquisa_operador: esperaNota ? p.operador : null,
   });
-  return { enviadas, pesquisa: esperaNota, repetido: false };
+  const motivo: MotivoSemEnvio | null = !textos.length
+    ? 'desativado'
+    : !temCredencial(p.cred)
+      ? 'sem_credencial'
+      : enviadas < textos.length
+        ? 'falhou'
+        : null;
+  return { enviadas, pesquisa: esperaNota, repetido: false, ...(motivo ? { motivo } : {}) };
+}
+
+/**
+ * Protocolo que o robô deu à conversa (bot_protocolo, 085). Coluna ausente ou
+ * erro de leitura = sem protocolo: o encerramento sai igual, só sem a linha.
+ */
+async function protocoloDoNumero(db: Db, telefone: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('whatsapp_conversas')
+    .select('bot_protocolo')
+    .eq('telefone', telefone)
+    .maybeSingle();
+  if (error) return null;
+  return String((data as { bot_protocolo?: string | null } | null)?.bot_protocolo || '') || null;
 }
