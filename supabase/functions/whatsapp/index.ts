@@ -64,6 +64,13 @@ import {
   notaDaAtribuicao,
 } from './bot.ts';
 import { enviarTexto, fotoDoContato, mensagensDoWebhook, telefoneDoLid } from './provedor.ts';
+import {
+  agradecerNota as wautoAgradecerNota,
+  aposEntrada as wautoAposEntrada,
+  lerEstadoAutomacao as wautoLerEstado,
+  notaDaMensagem as wautoNotaDaMensagem,
+  respostasDoBot as wautoRespostasDoBot,
+} from './automacao-acoes.ts';
 
 type ClienteFone = {
   id: string;
@@ -485,6 +492,9 @@ async function handle(req: Request, ctx: SupabaseContext) {
       }
 
       const estadoLido = await lerConversa(db, m.telefone);
+      // Automação da leva 3 (automacao.ts), lida antes do upsert de ultima_em
+      // pelo mesmo motivo do bot. Sem a 088 vem ok: false e nada dela roda.
+      const wauto = telefoneConfirmado ? await wautoLerEstado(db, m.telefone) : null;
 
       // Prova, gravada só pelo servidor, de que este número falou com a empresa:
       // o whatsapp-responder recusa enviar para quem não está aqui (076). Falha
@@ -500,6 +510,19 @@ async function handle(req: Request, ctx: SupabaseContext) {
       const foto = estadoLido.ok
         ? await fotoAtual(db, m.telefone, estadoLido.linha, credWaha)
         : null;
+
+      // Resposta da pesquisa de satisfação: grava a nota, agradece e entra na
+      // caixa já encerrada (não reabre o atendimento). O que não é nota segue
+      // o caminho normal abaixo, sem ser engolido.
+      const wautoNota = wauto?.ok
+        ? await wautoNotaDaMensagem(db, m.telefone, m.texto, wauto.estado)
+        : null;
+      if (wautoNota) {
+        const status = { status: 'encerrado', team: wautoNota.team };
+        if (await guardarNaCaixa(db, m, status, { foto_url: foto })) caixa++;
+        await wautoAgradecerNota(db, m.telefone, wautoNota, credWaha);
+        continue;
+      }
 
       const aberto = await chamadoDaConversa(db, conversaDoTelefone(m.telefone));
       if (aberto) {
@@ -520,6 +543,19 @@ async function handle(req: Request, ctx: SupabaseContext) {
             )
           )
             caixa++;
+          if (wauto?.ok)
+            await wautoAposEntrada(
+              db,
+              m.telefone,
+              {
+                team: aberto.team || 'init',
+                clientId: aberto.client_id,
+                estado: wauto.estado,
+                chamadoAberto: true,
+                botRespondeu: false,
+              },
+              credWaha
+            );
           continue;
         }
         console.error(`whatsapp nota ${m.id}:`, anexo.erro);
@@ -562,6 +598,12 @@ async function handle(req: Request, ctx: SupabaseContext) {
           : EQUIPE_DO_SETOR[atrib.setor]
         : opcoesCaixa.team;
       const nota = atrib ? notaDaAtribuicao(atrib.setor, atrib.protocolo) : null;
+      if (decisao && wauto?.ok)
+        decisao.respostas = await wautoRespostasDoBot(
+          db,
+          atrib ? equipe : opcoesCaixa.team,
+          decisao.respostas
+        );
 
       const ok = await guardarNaCaixa(
         db,
@@ -645,6 +687,19 @@ async function handle(req: Request, ctx: SupabaseContext) {
         }
         bot++;
       }
+      if (wauto?.ok)
+        await wautoAposEntrada(
+          db,
+          m.telefone,
+          {
+            team: atrib ? equipe : opcoesCaixa.team,
+            clientId: c ? c.id : null,
+            estado: wauto.estado,
+            chamadoAberto: false,
+            botRespondeu: !!decisao?.respostas.length,
+          },
+          credWaha
+        );
       caixa++;
     }
     return json({ ok: true, notas, caixa, sem_cliente: semCliente, limitadas, bot });

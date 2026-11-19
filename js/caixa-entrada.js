@@ -671,6 +671,8 @@ function _caixaConversaHTML(c) {
     '</dl>' +
     (u.atribuicaoNota ? '<div class="cx-nota">' + escapeHtml(u.atribuicaoNota) + '</div>' : '') +
     '</section>' +
+    // Nota da pesquisa de satisfação (whatsapp-automacao.js, migration 088).
+    (typeof wautoAvaliacaoHTML === 'function' ? wautoAvaliacaoHTML(c) : '') +
     '<section class="cx-lado-acoes"><h3>Ações</h3><div class="cx-acoes-ver">' +
     (pen
       ? '<button type="button" class="btn cx-btn" data-action="openPendencia" data-arg="' +
@@ -963,7 +965,9 @@ function renderCaixaEntrada() {
       escapeHtml(_caixaBusca) +
       '" data-input="caixaBusca" aria-label="Buscar" /></div>' +
       '<div class="cx-chips" id="caixaCanalChips" role="group" aria-label="Canal"></div>' +
-      '<div class="cx-tabs" id="caixaTabs" role="tablist" aria-label="Situação"></div></div>' +
+      '<div class="cx-tabs" id="caixaTabs" role="tablist" aria-label="Situação"></div>' +
+      (typeof wautoBotaoCaixaHTML === 'function' ? wautoBotaoCaixaHTML() : '') +
+      '</div>' +
       '<div class="cx-cards" id="caixaLista"></div></div>' +
       '<section class="cx-main" id="caixaConversa"></section></div>';
   }
@@ -1517,6 +1521,9 @@ function caixaEncerrar(id) {
   });
   _emailTriagemRedesenhar();
   showToast('Conversa encerrada. Uma nova mensagem do cliente reabre o atendimento.', 'success');
+  // No WhatsApp o servidor encerra de novo e manda encerramento/pesquisa, se a
+  // equipe configurou (whatsapp-automacao.js). Offline, fica só o local.
+  if (typeof wautoAvisarEncerramento === 'function') wautoAvisarEncerramento(c);
 }
 
 registerActions({
