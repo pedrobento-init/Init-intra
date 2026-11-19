@@ -1,6 +1,6 @@
 {
   "name": "init-intra",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Init Intra — Sistema interno de gestão (clientes, pendências, visitas)",
   "private": true,
   "scripts": {
