@@ -26,6 +26,10 @@ var _cxpPainel = null;
 // Chamados do Milvus por cliente (client_milvus_tickets), lidos uma vez por
 // abertura de formulário. Busca no Milvus de verdade é a Edge milvus-tickets.
 var _cxpTickets = {};
+// Leitura em andamento por cliente: o painel se redesenha a cada mensagem e
+// não pode disparar uma leitura nova a cada redesenho.
+var _cxpTicketsCarregando = {};
+var _cxpTicketsAtualizando = {};
 
 const CXP_PRIORIDADES = [
   ['baixa', 'Baixa'],
@@ -37,6 +41,17 @@ const CXP_TICKETS_MAX = 6;
 const CXP_ABERTAS_MAX = 8;
 
 // ── Regras puras (testáveis) ────────────────────────────────────────────────
+
+// O Milvus devolve o status como texto livre do portal ("Finalizado",
+// "Cancelado", "Em atendimento"…): o que não é fim de linha conta como aberto.
+const _CXP_MILVUS_FECHADO = /finaliz|cancel|conclu|resolvid|fechad|encerrad/i;
+
+/** Chamados do Milvus ainda em aberto, os mais novos (maior código) primeiro. */
+function cxpChamadosMilvusAbertos(tickets) {
+  return (tickets || [])
+    .filter((t) => t && Number(t.codigo) > 0 && !_CXP_MILVUS_FECHADO.test(String(t.status || '')))
+    .sort((a, b) => Number(b.codigo) - Number(a.codigo));
+}
 
 const _CXP_FECHADAS = ['concluido', 'resolvido', 'cancelado', 'fechado'];
 
@@ -317,6 +332,71 @@ function cxpAbertasHTML(c) {
   );
 }
 
+/** "Chamados abertos no Milvus de <cliente>": ao lado das pendências, sempre visível. */
+function cxpMilvusAbertosHTML(c) {
+  if (typeof getClientMilvusTickets !== 'function') return '';
+  const clientId = (_cxpPainel && _cxpPainel.conv === c.id && _cxpPainel.v.clientId) || c.clientId;
+  if (!clientId) return '';
+  const cli = typeof getClientById === 'function' ? getClientById(clientId) : null;
+  _cxpCarregarTickets(clientId);
+  const tickets = _cxpTickets[clientId];
+  // Qual pendência aponta para cada chamado: é o que diz se já há alguém nele.
+  const vinculos = {};
+  _cxpPendencias().forEach((p) => {
+    const n = Number(p && p.milvusChamadoCodigo);
+    if (p.clientId === clientId && n > 0 && !vinculos[n]) vinculos[n] = p;
+  });
+  const abertos = tickets ? cxpChamadosMilvusAbertos(tickets) : [];
+  const atualizando = !!_cxpTicketsAtualizando[clientId];
+  let corpo;
+  if (!tickets) corpo = '<span class="cx-sub">Carregando chamados…</span>';
+  else if (!abertos.length)
+    corpo =
+      '<span class="cx-sub">Nenhum chamado aberto entre os ' +
+      (tickets.length ? 'mais recentes' : 'sincronizados') +
+      '.</span>';
+  else
+    corpo =
+      '<ul class="cxp-lista">' +
+      abertos
+        .map((t) => {
+          const pen = vinculos[Number(t.codigo)];
+          return (
+            '<li><div class="cxp-pen cxp-mv"><span class="cxp-pen-meta">#' +
+            escapeHtml(String(Number(t.codigo))) +
+            (t.status ? ' · ' + escapeHtml(t.status) : '') +
+            (t.tecnico ? ' · ' + escapeHtml(t.tecnico) : '') +
+            '</span><b>' +
+            escapeHtml(t.assunto || '(sem assunto)') +
+            '</b>' +
+            (pen
+              ? '<a href="#" class="cxp-mv-pen" data-action="openPendencia" data-arg="' +
+                escapeHtml(pen.id) +
+                '">Pendência #' +
+                escapeHtml(_cxpCurto(pen.id)) +
+                '</a>'
+              : '<span class="cx-sub">Sem pendência vinculada</span>') +
+            '</div></li>'
+          );
+        })
+        .join('') +
+      '</ul>';
+  return (
+    '<section class="cxp-abertas"><h3>Chamados abertos no Milvus' +
+    (cli ? ' de ' + escapeHtml(cli.name) : '') +
+    (abertos.length ? ' <span class="cxp-n">' + abertos.length + '</span>' : '') +
+    '</h3>' +
+    corpo +
+    '<button type="button" class="btn cx-btn cxp-mv-sync" data-action="cxpMilvusAtualizar" data-arg="' +
+    escapeHtml(clientId) +
+    '"' +
+    (atualizando ? ' disabled' : '') +
+    '>' +
+    (atualizando ? 'Atualizando…' : 'Atualizar do Milvus') +
+    '</button></section>'
+  );
+}
+
 function _cxpClienteSelectHTML(id, valor) {
   const clientes = _cxpClientes();
   // Cliente da conversa fora da lista (outra equipe vista pelo admin) não some.
@@ -531,7 +611,7 @@ function cxpLadoHTML(c) {
         : _cxpFormPendenciaHTML(c, ctx, _cxpPainel.v)) +
       '</section>';
   }
-  return form + cxpAbertasHTML(c);
+  return form + cxpAbertasHTML(c) + cxpMilvusAbertosHTML(c);
 }
 
 /** Botões de "Ações" do painel. */
@@ -554,17 +634,56 @@ function _cxpRedesenhar() {
   if (typeof renderCaixaEntrada === 'function') renderCaixaEntrada();
 }
 
+// Lê uma vez por cliente e redesenha quando chega. O redesenho não dispara
+// outra leitura: a lista já está no cache, e a que está a caminho é lembrada.
 function _cxpCarregarTickets(clientId) {
-  if (!clientId || _cxpTickets[clientId] || typeof getClientMilvusTickets !== 'function') return;
-  getClientMilvusTickets(clientId)
+  if (
+    !clientId ||
+    _cxpTickets[clientId] ||
+    _cxpTicketsCarregando[clientId] ||
+    typeof getClientMilvusTickets !== 'function'
+  )
+    return;
+  _cxpTicketsCarregando[clientId] = true;
+  Promise.resolve()
+    .then(() => getClientMilvusTickets(clientId))
     .then((lista) => {
       _cxpTickets[clientId] = Array.isArray(lista) ? lista : [];
-      _cxpAtualizarSugestoes();
     })
     .catch((e) => {
       _cxpTickets[clientId] = [];
       if (typeof _logSilent === 'function') _logSilent(e, 'caixa-pendencia');
+    })
+    .then(() => {
+      delete _cxpTicketsCarregando[clientId];
+      _cxpRedesenhar();
     });
+}
+
+// A lista local é a dos últimos chamados sincronizados; "Atualizar" pede à
+// Edge milvus-tickets uma leitura nova do Milvus e relê a lista.
+async function cxpMilvusAtualizar(clientId) {
+  if (!clientId || _cxpTicketsAtualizando[clientId]) return;
+  if (typeof syncClientMilvusTickets !== 'function') return;
+  _cxpTicketsAtualizando[clientId] = true;
+  _cxpRedesenhar();
+  try {
+    const res = await syncClientMilvusTickets(clientId);
+    const st =
+      typeof resolveMilvusTicketsSyncState === 'function'
+        ? resolveMilvusTicketsSyncState(res)
+        : { kind: 'ok' };
+    if (st.kind === 'no-token')
+      showToast('Este cliente ainda não está ligado ao Milvus (falta o token).', 'error');
+    else if (st.kind === 'unmapped')
+      showToast('Este cliente não tem mapeamento no Milvus.', 'error');
+  } catch (e) {
+    showToast((e && e.message) || 'Não foi possível atualizar os chamados do Milvus.', 'error');
+  }
+  delete _cxpTicketsAtualizando[clientId];
+  delete _cxpTickets[clientId];
+  _cxpCarregarTickets(clientId);
+  _cxpRedesenhar();
 }
 
 // Só a lista de sugestões muda enquanto se digita: redesenhar a conversa
@@ -749,9 +868,14 @@ async function cxpCriarMilvus(convId) {
     if (typeof _logSilent === 'function') _logSilent(e, 'caixa-pendencia');
   }
   // Atualiza a lista local de chamados do cliente (busca do outro formulário).
-  delete _cxpTickets[v.clientId];
+  // O chamado novo entra na lista de abertos assim que a sincronização volta.
   if (typeof syncClientMilvusTickets === 'function')
-    syncClientMilvusTickets(v.clientId).catch(() => {});
+    syncClientMilvusTickets(v.clientId)
+      .catch(() => {})
+      .then(() => {
+        delete _cxpTickets[v.clientId];
+        _cxpCarregarTickets(v.clientId);
+      });
   if (_cxpPainel === painel) _cxpPainel = null;
   showToast(
     'Chamado #' +
@@ -822,6 +946,9 @@ if (typeof registerActions === 'function') {
       _cxpRedesenhar();
     },
     cxpCriarPendencia: (_el, id) => cxpCriarPendencia(id),
+    cxpMilvusAtualizar: (_el, clientId) => {
+      cxpMilvusAtualizar(clientId);
+    },
     cxpCriarMilvus: (_el, id) => {
       cxpCriarMilvus(id);
     },
@@ -831,6 +958,7 @@ if (typeof registerActions === 'function') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     cxpPendenciasAbertas,
+    cxpChamadosMilvusAbertos,
     cxpPendenciaDados,
     cxpFiltrarTickets,
     cxpCodigoDigitado,
