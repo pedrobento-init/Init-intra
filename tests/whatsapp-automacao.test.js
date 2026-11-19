@@ -274,6 +274,26 @@ describe('decidirEntrada: saudação e aviso de horário', () => {
     expect(decidirEntrada(ligada, ctx({ chamadoAberto: true })).respostas).toEqual([]);
   });
 
+  it('resposta à pesquisa que não é nota ("Sim") não recebe a saudação', () => {
+    const estado = {
+      ...ESTADO_AUTOMACAO_VAZIO,
+      ultimaEm: iso(quarta(9, 50)),
+      encerradaEm: iso(quarta(9, 55)),
+      pesquisaAte: iso(quarta(21)),
+    };
+    expect(decidirEntrada(ligada, ctx({ estado })).respostas).toEqual([]);
+  });
+
+  it('pesquisa vencida volta a ser conversa nova e recebe a saudação', () => {
+    const estado = {
+      ...ESTADO_AUTOMACAO_VAZIO,
+      ultimaEm: iso(quarta(9, 50)),
+      encerradaEm: iso(quarta(9, 55)),
+      pesquisaAte: iso(quarta(9, 58)),
+    };
+    expect(decidirEntrada(ligada, ctx({ estado })).respostas).toEqual(['Olá!']);
+  });
+
   it('fora do horário, a saudação vem seguida do aviso', () => {
     const cfg = cfgComercial({ saudacao_ativa: true, texto_saudacao: 'Olá!' });
     const d = decidirEntrada(cfg, ctx({ agora: sabado(10) }));

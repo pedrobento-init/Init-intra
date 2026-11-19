@@ -32,8 +32,11 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
   for (const bruto of lista) {
     if (!bruto || typeof bruto !== 'object') continue;
     const evento = bruto as Record<string, unknown>;
-    if (evento.event !== 'message') continue;
-    const p = evento.payload as Record<string, unknown> | undefined;
+    // Voto na enquete da pesquisa de satisfação: entra como se o cliente tivesse
+    // digitado a opção escolhida (as estrelas), e o resto do fluxo não muda.
+    const voto = evento.event === 'poll.vote' ? votoComoMensagem(evento.payload) : null;
+    if (evento.event !== 'message' && !voto) continue;
+    const p = (voto ?? evento.payload) as Record<string, unknown> | undefined;
     if (!p || p.fromMe === true) continue;
     const origem = String(p.from ?? '');
     if (origem.endsWith('@g.us')) continue;
@@ -80,6 +83,19 @@ export function mensagensDoWebhook(payload: unknown): MensagemWhats[] {
     });
   }
   return out;
+}
+
+// Voto de enquete → forma de mensagem. O WAHA manda
+// payload.vote = { id, from, fromMe, selectedOptions: ["⭐⭐⭐"], timestamp }.
+// Só voto de UMA opção vira mensagem: sem opção (a pessoa retirou o voto) ou
+// com várias, não há nota para ler.
+function votoComoMensagem(payload: unknown): Record<string, unknown> | null {
+  const v = (payload as Record<string, unknown> | undefined)?.vote as
+    Record<string, unknown> | undefined;
+  if (!v || !Array.isArray(v.selectedOptions) || v.selectedOptions.length !== 1) return null;
+  const id = idSerializado(v.id);
+  if (!id) return null;
+  return { ...v, id: 'voto:' + id, body: String(v.selectedOptions[0] ?? '') };
 }
 
 // JID de telefone: "5511987654321@c.us", "...@s.whatsapp.net" ou com o
@@ -329,6 +345,57 @@ export async function enviarTexto(
     // 2xx sem JSON ainda é envio aceito; só fica sem id.
   }
   // WEBJS devolve id texto; outros engines, objeto com _serialized ou key.id.
+  const id = idSerializado(corpo.id) || idSerializado((corpo.key as unknown) ?? null);
+  return id ? { ok: true, id } : { ok: true };
+}
+
+// Opções da enquete de satisfação: uma por nota, de 1 a 5 estrelas. Só
+// estrelas de propósito: interpretarNota (automacao.ts) já lê "⭐⭐⭐" como 3, e
+// o WhatsApp não aceita duas opções iguais.
+export const OPCOES_ENQUETE_NOTA = ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'];
+
+// Envia uma enquete (o cliente toca na opção em vez de digitar). Não lança. Os
+// botões e listas do WhatsApp não são entregues de forma confiável por API não
+// oficial; a enquete é o único formato clicável que chega.
+export async function enviarEnquete(
+  telefone: string,
+  pergunta: string,
+  opcoes: string[],
+  cred: CredenciaisWaha,
+  fetchFn: FetchFn = fetch
+): Promise<Envio> {
+  const { baseUrl, apiKey, session } = credenciais(cred);
+  if (!baseUrl || !apiKey) return { ok: false, erro: 'credenciais' };
+  const destinos = chatIdsPara(telefone);
+  if (!destinos.length) return { ok: false, erro: 'destino' };
+  let resp: Response | null = null;
+  for (const chatId of destinos) {
+    try {
+      resp = await fetchFn(`${baseUrl}/api/sendPoll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        body: JSON.stringify({
+          session,
+          chatId,
+          poll: { name: pergunta, options: opcoes, multipleAnswers: false },
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (e) {
+      console.warn(`whatsapp enquete: WAHA inalcançável (${(e as Error)?.name ?? 'erro'})`);
+      return { ok: false, erro: 'inalcancavel' };
+    }
+    if (resp.ok) break;
+    const corpo = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+    console.warn(`whatsapp enquete: recusada (HTTP ${resp.status}) ${corpo}`);
+  }
+  if (!resp || !resp.ok) return { ok: false, erro: `provedor ${resp ? resp.status : 0}` };
+  let corpo: Record<string, unknown> = {};
+  try {
+    corpo = (await resp.json()) || {};
+  } catch {
+    // 2xx sem JSON ainda é envio aceito.
+  }
   const id = idSerializado(corpo.id) || idSerializado((corpo.key as unknown) ?? null);
   return id ? { ok: true, id } : { ok: true };
 }

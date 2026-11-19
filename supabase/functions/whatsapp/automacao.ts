@@ -423,6 +423,14 @@ export type ContextoEntrada = {
   botRespondeu: boolean;
 };
 
+// A pesquisa ainda espera resposta? O estado do webhook é lido ANTES de a
+// pesquisa ser limpa, então uma mensagem que não virou nota (o "Sim" de quem
+// respondeu a pergunta) ainda enxerga a pesquisa aberta aqui.
+function pesquisaEmAberto(estado: EstadoAutomacao, agora: Date): boolean {
+  const ate = estado.pesquisaAte ? Date.parse(estado.pesquisaAte) : NaN;
+  return Number.isFinite(ate) && agora.getTime() <= ate;
+}
+
 function conversaNova(estado: EstadoAutomacao, agora: Date): boolean {
   const ultima = estado.ultimaEm ? Date.parse(estado.ultimaEm) : NaN;
   if (!Number.isFinite(ultima)) return true;
@@ -447,6 +455,10 @@ export function decidirEntrada(
     cfg.saudacaoAtiva &&
     !ctx.botRespondeu &&
     !ctx.chamadoAberto &&
+    // Resposta à pesquisa que não é nota ("Sim", "ótimo"): é o cliente
+    // falando do atendimento que acabou de acabar, não um contato novo.
+    // Saudar aí ("Recebemos sua mensagem…") soa como se ninguém tivesse lido.
+    !pesquisaEmAberto(ctx.estado, ctx.agora) &&
     conversaNova(ctx.estado, ctx.agora)
   )
     respostas.push(cfg.textoSaudacao);
