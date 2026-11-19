@@ -22,6 +22,8 @@ let channelCount = 0;
 const subscribeCbs = [];
 let store = [];
 let captured = null;
+const consultas = [];
+let respostaCatchUp = [];
 
 globalThis.window = {
   addEventListener: hook('win:'),
@@ -50,6 +52,23 @@ globalThis.supabaseClient = {
     return ch;
   },
   removeChannel() {},
+  from(tabela) {
+    const q = { tabela, filtros: {} };
+    consultas.push(q);
+    const api = {
+      select: () => api,
+      gt: (col, val) => {
+        q.filtros[col] = val;
+        return api;
+      },
+      order: () => api,
+      limit: (n) => {
+        q.limite = n;
+        return Promise.resolve({ data: respostaCatchUp, error: null });
+      },
+    };
+    return api;
+  },
 };
 globalThis.dbGet = () => store.slice();
 globalThis.dbSet = (_key, value) => {
@@ -83,7 +102,7 @@ globalThis.ENTITIES = [
 ];
 
 const syncMgr = require('../js/sync-manager.js');
-const { SyncManager } = syncMgr;
+const { SyncManager, _syncCatchUpDesde } = syncMgr;
 
 describe('SyncManager — canal morto com a aba oculta (SYNC-08)', () => {
   beforeEach(() => {
@@ -195,5 +214,36 @@ describe('SyncManager — reconectar não entra em recursão (removeChannel disp
     } finally {
       globalThis.supabaseClient = original;
     }
+  });
+});
+
+describe('SyncManager — recupera o que o canal ao vivo perdeu', () => {
+  it('busca desde o maior updatedAt local, com sobreposição', () => {
+    const lista = [
+      { id: 'a', updatedAt: '2026-11-19T10:00:00.000Z' },
+      { id: 'b', updatedAt: '2026-11-19T12:00:00.000Z' },
+    ];
+    expect(_syncCatchUpDesde(lista, Date.parse('2026-11-19T18:00:00.000Z'))).toBe(
+      '2026-11-19T11:58:00.000Z'
+    );
+  });
+
+  it('sem nada local, busca só a última hora', () => {
+    expect(_syncCatchUpDesde([], Date.parse('2026-11-19T18:00:00.000Z'))).toBe(
+      '2026-11-19T17:00:00.000Z'
+    );
+  });
+
+  it('aplica o que chegou durante a queda e não repete a consulta em seguida', async () => {
+    store = [{ id: 'V1', numero: 7, updatedAt: '2026-01-01T00:00:00.000Z' }];
+    consultas.length = 0;
+    respostaCatchUp = [{ id: 'V2', numero: 8, updated_at: '2026-06-01T00:00:00.000Z' }];
+    expect(await SyncManager.catchUp('visits')).toBe(1);
+    expect(store.map((v) => v.id)).toContain('V2');
+    expect(consultas).toHaveLength(1);
+    expect(consultas[0].filtros.updated_at).toBe('2025-12-31T23:58:00.000Z');
+    // Throttle: o SUBSCRIBED, a volta da aba e o relógio caem juntos.
+    expect(await SyncManager.catchUp('visits')).toBe(0);
+    expect(consultas).toHaveLength(1);
   });
 });
