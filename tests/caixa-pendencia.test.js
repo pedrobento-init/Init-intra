@@ -14,6 +14,7 @@ const {
   cxpPendenciaDados,
   cxpFiltrarTickets,
   cxpCodigoDigitado,
+  cxpCorpoDoErro,
   cxpMilvusResultado,
   cxpNovaRef,
 } = require('../js/caixa-pendencia.js');
@@ -451,5 +452,43 @@ describe('Caixa — chamados abertos no Milvus', () => {
     await s.cxpMilvusAtualizar('c1');
     await espera();
     expect(painel()).toContain('#26200');
+  });
+});
+
+describe('erro do invoke do Milvus', () => {
+  const erroHttp = (status, corpo) => ({
+    context: { status, json: async () => corpo },
+  });
+
+  it('lê o corpo da resposta de erro em vez de descartá-lo', async () => {
+    const corpo = await cxpCorpoDoErro(
+      erroHttp(502, { success: false, code: 'MILVUS_UNAVAILABLE' })
+    );
+    expect(cxpMilvusResultado(corpo, null).msg).toMatch(/não respondeu/);
+  });
+
+  it('mensagem de erro da Edge (4xx) chega ao usuário', async () => {
+    const corpo = await cxpCorpoDoErro(erroHttp(403, { error: 'Acesso negado a este cliente' }));
+    expect(cxpMilvusResultado(corpo, null).msg).toBe('Acesso negado a este cliente');
+  });
+
+  it('corpo ilegível: mensagem genérica com o status HTTP', async () => {
+    const erro = {
+      context: {
+        status: 404,
+        json: async () => {
+          throw new Error('not json');
+        },
+      },
+    };
+    expect(await cxpCorpoDoErro(erro)).toBeNull();
+    expect(cxpMilvusResultado(null, erro).msg).toMatch(/Tente de novo\. \(erro 404\)$/);
+  });
+
+  it('falha de rede sem resposta: genérica, sem status', async () => {
+    expect(await cxpCorpoDoErro(new Error('Failed to fetch'))).toBeNull();
+    expect(cxpMilvusResultado(null, new Error('Failed to fetch')).msg).toBe(
+      'Não foi possível falar com o Milvus agora. Tente de novo.'
+    );
   });
 });

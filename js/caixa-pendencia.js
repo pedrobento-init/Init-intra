@@ -144,7 +144,14 @@ function cxpCodigoDigitado(termo) {
 /** Resultado do invoke da Edge (ação "conversa") → o que a tela faz. */
 function cxpMilvusResultado(data, invokeError) {
   if (invokeError) {
-    return { ok: false, msg: 'Não foi possível falar com o Milvus agora. Tente de novo.' };
+    // Sem corpo legível (function fora do ar, rede): o status HTTP, quando há,
+    // distingue "não publicada" (404) de "caiu" (500) para quem for investigar.
+    const ctx = invokeError.context;
+    const status = ctx && Number(ctx.status) > 0 ? ' (erro ' + Number(ctx.status) + ')' : '';
+    return {
+      ok: false,
+      msg: 'Não foi possível falar com o Milvus agora. Tente de novo.' + status,
+    };
   }
   const d = data || {};
   const codigo = Number(d.codigo);
@@ -164,6 +171,25 @@ function cxpMilvusResultado(data, invokeError) {
   if (code === 'MILVUS_UNAVAILABLE')
     return { ok: false, msg: 'O Milvus não respondeu. Tente de novo em instantes.' };
   return { ok: false, msg: String(d.error || 'Não foi possível criar o chamado no Milvus.') };
+}
+
+/**
+ * Corpo JSON de uma resposta de erro do invoke. O supabase-js devolve `data`
+ * nulo em qualquer status fora de 2xx e deixa a Response em `error.context`; a
+ * Edge responde 502 com `code: 'MILVUS_UNAVAILABLE'` e 4xx com `error`, e sem
+ * ler o corpo tudo virava a mesma frase genérica.
+ */
+async function cxpCorpoDoErro(erro) {
+  try {
+    const ctx = erro && erro.context;
+    if (ctx && typeof ctx.json === 'function') {
+      const corpo = await ctx.json();
+      return corpo && typeof corpo === 'object' ? corpo : null;
+    }
+  } catch (_e) {
+    /* corpo ilegível: fica a mensagem genérica */
+  }
+  return null;
 }
 
 /** Chave de idempotência do chamado (formato que a Edge aceita: CX-…). */
@@ -851,7 +877,8 @@ async function cxpCriarMilvus(convId) {
         telefone: ctx.telefone,
       },
     });
-    r = cxpMilvusResultado(data, error);
+    const corpo = data || (error ? await cxpCorpoDoErro(error) : null);
+    r = cxpMilvusResultado(corpo, corpo ? null : error);
   } catch (e) {
     r = cxpMilvusResultado(null, e);
   }
@@ -963,6 +990,7 @@ if (typeof module !== 'undefined' && module.exports) {
     cxpFiltrarTickets,
     cxpCodigoDigitado,
     cxpMilvusResultado,
+    cxpCorpoDoErro,
     cxpNovaRef,
   };
 }
